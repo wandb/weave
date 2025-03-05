@@ -38,30 +38,28 @@ CONCAT_TEST_CASES = [
         [1, 2, 3],
         [
             wbmedia.ImageArtifactFileRef(
-                artifact=UNSAVED_TEST_ARTIFACT,
-                path="path",
-                format="format",
-                height=25,
-                width=35,
-                sha256="sha256",
-                caption=None,
-                boxes=None,
-                masks=None,
-                classes=None,
+                UNSAVED_TEST_ARTIFACT,
+                "path",
+                "format",
+                25,
+                35,
+                "sha256",
+                None,
+                None,
+                None,
             )
         ],
     ),
     (
         [
             wbmedia.ImageArtifactFileRef(
-                artifact=UNSAVED_TEST_ARTIFACT,
-                path="path1",
-                format="format1",
-                height=25,
-                width=35,
-                sha256="sha256-1",
-                caption=None,
-                boxes={
+                UNSAVED_TEST_ARTIFACT,
+                "path1",
+                "format1",
+                25,
+                35,
+                "sha256-1",
+                {
                     "box": [
                         {
                             "position": {
@@ -75,22 +73,21 @@ CONCAT_TEST_CASES = [
                         }
                     ]
                 },
-                masks=None,
-                classes=None,
+                None,
+                None,
             )
         ],
         [
             wbmedia.ImageArtifactFileRef(
-                artifact=UNSAVED_TEST_ARTIFACT,
-                path="path2",
-                format="format2",
-                height=50,
-                width=70,
-                sha256="sha256-2",
-                caption=None,
-                boxes=None,
-                masks=None,
-                classes=None,
+                UNSAVED_TEST_ARTIFACT,
+                "path2",
+                "format2",
+                50,
+                70,
+                "sha256-2",
+                None,
+                None,
+                None,
             )
         ],
     ),
@@ -100,16 +97,15 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=50,
-                    width=70,
-                    sha256="sha256-2",
-                    caption=None,
-                    boxes=None,
-                    masks=None,
-                    classes=None,
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    50,
+                    70,
+                    "sha256-2",
+                    None,
+                    None,
+                    None,
                 ),
             }
         ],
@@ -120,14 +116,13 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=50,
-                    width=70,
-                    sha256="sha256-2",
-                    caption=None,
-                    boxes={
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    50,
+                    70,
+                    "sha256-2",
+                    {
                         "box": [
                             {
                                 "position": {
@@ -141,8 +136,8 @@ CONCAT_TEST_CASES = [
                             }
                         ]
                     },
-                    masks=None,
-                    classes=None,
+                    None,
+                    None,
                 ),
             }
         ],
@@ -157,14 +152,13 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=50,
-                    width=70,
-                    sha256="sha256-2",
-                    caption=None,
-                    boxes={
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    50,
+                    70,
+                    "sha256-2",
+                    {
                         "box": [
                             {
                                 "position": {
@@ -178,8 +172,8 @@ CONCAT_TEST_CASES = [
                             }
                         ]
                     },
-                    masks=None,
-                    classes=None,
+                    None,
+                    None,
                 ),
             },
         ],
@@ -189,14 +183,13 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=50,
-                    width=70,
-                    sha256="sha256-2",
-                    caption=None,
-                    boxes={
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    50,
+                    70,
+                    "sha256-2",
+                    {
                         "box": [
                             {
                                 "position": {
@@ -210,23 +203,22 @@ CONCAT_TEST_CASES = [
                             }
                         ]
                     },
-                    masks=None,
-                    classes=None,
+                    None,
+                    None,
                 ),
             },
             {
                 "a": 45,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=50,
-                    width=70,
-                    sha256="sha256-25",
-                    caption=None,
-                    boxes={"box": []},
-                    masks=None,
-                    classes=None,
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    50,
+                    70,
+                    "sha256-25",
+                    {"box": []},
+                    None,
+                    None,
                 ),
             },
         ],
@@ -235,16 +227,15 @@ CONCAT_TEST_CASES = [
             {
                 "a": 11,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact=UNSAVED_TEST_ARTIFACT,
-                    path="path2",
-                    format="format2",
-                    height=67,
-                    width=14,
-                    sha256="sha256-3",
-                    caption=None,
-                    boxes={"box": []},
-                    masks=None,
-                    classes=None,
+                    UNSAVED_TEST_ARTIFACT,
+                    "path2",
+                    "format2",
+                    67,
+                    14,
+                    "sha256-3",
+                    {"box": []},
+                    None,
+                    None,
                 ),
             },
         ],
@@ -367,16 +358,15 @@ def test_concat_wbtyped(l1, l2, l1_wb_type, l2_wb_type):
 
 def test_image_ref():
     py = wbmedia.ImageArtifactFileRef(
-        artifact="artifact1",
-        path="path1",
-        format="format1",
-        height=25,
-        width=35,
-        sha256="sha256-1",
-        caption=None,
-        boxes=None,
-        masks=None,
-        classes=None,
+        "artifact1",
+        "path1",
+        "format1",
+        25,
+        35,
+        "sha256-1",
+        None,
+        None,
+        None,
     )
     a = to_arrow([py])
     py2 = a.to_pylist_tagged()[0]
