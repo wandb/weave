@@ -45,7 +45,6 @@ class SQLiteWriteAheadLog(Generic[T]):
         # Ensure the directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Initialize the database
         self._init_db()
 
     def _init_db(self) -> None:
@@ -53,10 +52,8 @@ class SQLiteWriteAheadLog(Generic[T]):
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
-            # Enable WAL mode for better performance and durability
+            # Enable WAL mode and create the WAL table if it doesn't exist
             cursor.execute("PRAGMA journal_mode=WAL;")
-
-            # Create the table if it doesn't exist
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,8 +62,6 @@ class SQLiteWriteAheadLog(Generic[T]):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-
-            # Create an index on created_at for faster cleanup
             cursor.execute(f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_created_at
                 ON {self.table_name} (created_at)
