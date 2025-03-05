@@ -31,9 +31,9 @@ def test_disabled_setting(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert disabled_time * 10 < enabled_time, (
-        "Disabled weave should be faster than enabled weave"
-    )
+    assert (
+        disabled_time * 10 < enabled_time
+    ), "Disabled weave should be faster than enabled weave"
 
 
 def test_disabled_env(client):
@@ -47,9 +47,9 @@ def test_disabled_env(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert disabled_time * 10 < enabled_time, (
-        "Disabled weave should be faster than enabled weave"
-    )
+    assert (
+        disabled_time * 10 < enabled_time
+    ), "Disabled weave should be faster than enabled weave"
 
 
 def test_print_call_link_setting(client_creator):
