@@ -25,37 +25,38 @@ def temp_dir():
     shutil.rmtree(dir_path)
 
 
-def test_wal_basic_functionality(temp_dir):
-    """Test basic WAL functionality - adding and retrieving items."""
-    # Create a WAL
-    wal_path = os.path.join(temp_dir, "test_wal.db")
-    wal = SQLiteWriteAheadLog(wal_path)
-
-    # Create test items
-    start_req = tsi.CallStartReq(
+def make_start_req(name: str):
+    return tsi.CallStartReq(
         start=tsi.StartedCallSchemaForInsert(
             project_id="test-entity/test-project",
-            op_name="test-call",
+            op_name=f"call_{name}",
             started_at=datetime.datetime.now(),
             attributes={},
-            inputs={"a": 1, "b": 2},
+            inputs={"value": name},
         )
     )
 
-    end_req = tsi.CallEndReq(
+
+def make_end_req(name: str):
+    return tsi.CallEndReq(
         end=tsi.EndedCallSchemaForInsert(
             project_id="test-entity/test-project",
-            id="test-call-id",
+            id=f"call_{name}_id",
             ended_at=datetime.datetime.now(),
-            output={"result": 3},
+            output={"result": name},
             summary={},
         )
     )
 
-    start_item = StartBatchItem(req=start_req)
-    end_item = EndBatchItem(req=end_req)
 
-    # Add items to WAL
+def test_basic_adding_and_reading_from_wal(temp_dir):
+    # Create a WAL
+    wal_path = os.path.join(temp_dir, "test_wal.db")
+    wal = SQLiteWriteAheadLog(wal_path)
+
+    # Create and append test items to WAL
+    start_item = StartBatchItem(req=make_start_req("test-call"))
+    end_item = EndBatchItem(req=make_end_req("test-call"))
     wal.append([start_item, end_item])
 
     # Retrieve items
@@ -71,56 +72,31 @@ def test_wal_basic_functionality(temp_dir):
 
 
 def test_async_processor_with_wal(temp_dir):
-    """Test that AsyncBatchProcessor correctly uses the WAL."""
     # Create a processor function that tracks processed items
     processed_items = []
     processed_event = threading.Event()
 
-    def process_batch(batch):
+    def processor_fn(batch):
         processed_items.extend(batch)
         processed_event.set()
 
     # Create processor with WAL
     wal_path = os.path.join(temp_dir, "test_processor_wal.db")
     processor = AsyncBatchProcessor(
-        process_batch,
+        processor_fn,
         max_batch_size=5,
         min_batch_interval=0.1,
         use_wal=True,
         wal_path=wal_path,
     )
 
-    # Create test items
-    start_req = tsi.CallStartReq(
-        start=tsi.StartedCallSchemaForInsert(
-            project_id="test-entity/test-project",
-            op_name="test-call",
-            started_at=datetime.datetime.now(),
-            attributes={},
-            inputs={"a": 1, "b": 2},
-        )
-    )
-
-    end_req = tsi.CallEndReq(
-        end=tsi.EndedCallSchemaForInsert(
-            project_id="test-entity/test-project",
-            id="test-call-id",
-            ended_at=datetime.datetime.now(),
-            output={"result": 3},
-            summary={},
-        )
-    )
-
-    start_item = StartBatchItem(req=start_req)
-    end_item = EndBatchItem(req=end_req)
-
-    # Add items to processor
+    # Create and queue up test items
+    start_item = StartBatchItem(req=make_start_req("test-call"))
+    end_item = EndBatchItem(req=make_end_req("test-call"))
     processor.enqueue([start_item, end_item])
 
-    wal = SQLiteWriteAheadLog(wal_path)
-
     # After enqueue, check that no work has been done but items are in the WAL
-    items = wal.get_all_items()
+    items = processor.wal.get_all_items()
     assert len(items) == 2, f"Expected 2 items in WAL, got {len(items)}"
     assert len(processed_items) == 0, (
         f"Expected 0 items to be processed, got {len(processed_items)}"
@@ -131,7 +107,7 @@ def test_async_processor_with_wal(temp_dir):
     processor.stop_accepting_new_work_and_flush_queue()
 
     # After processing, check that work is done and WAL is empty
-    items = wal.get_all_items()
+    items = processor.wal.get_all_items()
     assert len(items) == 0, (
         f"Expected WAL to be empty after processing, got {len(items)} items"
     )
@@ -147,60 +123,38 @@ def test_wal_recovery_after_crash(temp_dir):
     # FIRST RUN: Add items, but simulate crash before processing.  Below, we patch
     # `threading.Thread.start` to do nothing, which means processing will never happen.
     # Data should still be written to the WAL, and we will try to recover on the next run.
-    first_run_processor = MagicMock()
-    with patch("threading.Thread.start") as mock_start:
+    with patch("threading.Thread.start"):
         processor = AsyncBatchProcessor(
-            first_run_processor,
+            processor_fn=MagicMock(),
             max_batch_size=5,
             min_batch_interval=0.1,
             use_wal=True,
             wal_path=wal_path,
         )
 
-        # Test only: Unregister the atexit handler to avoid the error message when the test exits
+        # Test only: Unregister the atexit handler to avoid the error message when the
+        # test exits.  We need to do this because we are patching threading.Thread.start
         atexit.unregister(processor.stop_accepting_new_work_and_flush_queue)
 
-        # Create test items
-        items = []
+        # Create and queue up test items
         for i in range(5):
-            start_req = tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id="test-entity/test-project",
-                    op_name=f"call_{i}",
-                    started_at=datetime.datetime.now(),
-                    attributes={},
-                    inputs={"value": i},
-                )
-            )
-
-            end_req = tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id="test-entity/test-project",
-                    id=f"call_{i}_id",
-                    ended_at=datetime.datetime.now(),
-                    output={"result": i * 2},
-                    summary={},
-                )
-            )
-
-            start_item = StartBatchItem(req=start_req)
-            end_item = EndBatchItem(req=end_req)
-
-            items.extend([start_item, end_item])
-
-        # Add items to processor (they'll be written to WAL but not processed)
-        for item in items:
-            processor.enqueue([item])
+            start_item = StartBatchItem(req=make_start_req(i))
+            end_item = EndBatchItem(req=make_end_req(i))
+            processor.enqueue([start_item, end_item])
 
         # Verify items were written to WAL
-        wal = SQLiteWriteAheadLog(wal_path)
-        stored_items = wal.get_all_items()
+        stored_items = processor.wal.get_all_items()
         assert len(stored_items) == 10, (
             f"Expected 10 items in WAL, got {len(stored_items)}"
         )
 
         # Simulate crash by not shutting down properly
         del processor
+
+        # If we inspect the WAL after crashing, we should see the same thing
+        wal = SQLiteWriteAheadLog(wal_path)
+        stored_items2 = wal.get_all_items()
+        assert stored_items == stored_items2
 
     # SECOND RUN: Create a new processor and verify recovery.  For simplicity, we just
     # verify that all items are processed by checking that they are added to a list.
@@ -239,15 +193,12 @@ def test_wal_recovery_after_crash(temp_dir):
 
 
 def test_wal_max_items(temp_dir):
-    """Test that WAL correctly handles the max_items parameter."""
-    # Create a temporary directory for the WAL database
+    MAX_ITEMS = 2
+
     wal_path = os.path.join(temp_dir, "test_max_items_wal.db")
+    wal = SQLiteWriteAheadLog(wal_path, max_items=MAX_ITEMS)
 
-    # Create a WAL with max_items=5
-    wal = SQLiteWriteAheadLog(wal_path, max_items=5)
-
-    # Add 10 items
-    for i in range(10):
+    for i in range(3):
         start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id="test-entity/test-project",
@@ -263,6 +214,6 @@ def test_wal_max_items(temp_dir):
 
     # Check that only the most recent items are in the WAL
     items = wal.get_all_items()
-    assert len(items) <= 5, (
-        f"Expected at most 5 items in WAL due to max_items, got {len(items)}"
+    assert len(items) <= MAX_ITEMS, (
+        f"Expected at most {MAX_ITEMS} items in WAL due to max_items, got {len(items)}"
     )
