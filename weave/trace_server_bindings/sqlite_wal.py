@@ -44,7 +44,6 @@ class SQLiteWriteAheadLog(Generic[T]):
         if db_path is None:
             # Create a directory in the user's temp directory
             weave_dir = Path(tempfile.gettempdir()) / "weave"
-            weave_dir.mkdir(exist_ok=True)
             self.db_path = weave_dir / "weave_batch_wal.db"
         else:
             self.db_path = Path(db_path)
