@@ -2,8 +2,8 @@ import {IconName} from '@wandb/weave/components/Icon';
 import {FC} from 'react';
 
 import {ScrubberOption} from './TraceScrubber';
-import {CodeView, FlameGraphView, GraphView, TreeView} from './TraceViews';
-import { FilterableTreeView } from './TraceViews/TreeView';
+import {CodeView, FlameGraphView, GraphView} from './TraceViews';
+import {FilterableTreeView} from './TraceViews/TreeView';
 import {TraceViewProps} from './TraceViews/types';
 
 /**

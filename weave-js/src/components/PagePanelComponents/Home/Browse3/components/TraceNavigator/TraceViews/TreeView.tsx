@@ -1,5 +1,4 @@
 import {Button} from '@wandb/weave/components/Button';
-import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
@@ -9,9 +8,13 @@ import {
   IconOnlyPill,
   TagColorName,
 } from '@wandb/weave/components/Tag';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {ReactNode,useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
+import {
+  getCostFromCostData,
+  getTokensFromUsage,
+  TraceStat,
+} from '../../../pages/CallPage/cost';
 import {STATUS_INFO, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {
@@ -19,13 +22,14 @@ import {
   traceCallStatusCode,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
 import {TraceViewProps} from './types';
-import {formatDuration, getCallDisplayName, getColorForOpName} from './utils';
+import {formatDuration, getCallDisplayName} from './utils';
 
 // Width breakpoints
 const WIDTH_BREAKPOINTS = {
   COMPACT: 250,
   MEDIUM: 300,
   LARGE: 350,
+  XLARGE: 500,
 };
 
 // Hook to track container width
@@ -64,23 +68,6 @@ interface TreeNodeProps {
   level?: number;
   filterCallIds?: Set<string>;
 }
-
-// Status type for the node
-type NodeStatus = 'success' | 'running' | 'error' | 'unknown';
-
-// Helper function to get status color
-const getStatusColor = (status: NodeStatus) => {
-  switch (status) {
-    case 'success':
-      return 'bg-green-500';
-    case 'running':
-      return 'bg-yellow-500';
-    case 'error':
-      return 'bg-red-500';
-    default:
-      return 'bg-moon-500';
-  }
-};
 
 type NodeType = 'agent' | 'tool' | 'llm' | 'model' | 'evaluation' | 'none';
 
@@ -153,20 +140,9 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   return 'none';
 };
 
-const getStatus = (call: TraceCallSchema): NodeStatus => {
-  if (call.exception) {
-    return 'error';
-  }
-  if (call.ended_at) {
-    return 'success';
-  }
-  if (Date.now() - Date.parse(call.started_at) > 1000 * 60 * 60 * 24) {
-    return 'unknown';
-  }
-  return 'running';
-};
-
-const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCallIds?: string[]}> = ({
+const TreeNode: React.FC<
+  TreeNodeProps & {containerWidth: number; deemphasizeCallIds?: string[]}
+> = ({
   id,
   call,
   childrenIds,
@@ -184,11 +160,12 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
 
-  const status: NodeStatus = getStatus(call);
   const spanName = parseSpanName(call.op_name);
   const typeName = spanNameToTypeHeuristic(spanName);
-  const cost = 0.0348;
-  const tokens = 12377;
+  const {cost, costToolTipContent} = getCostFromCostData(
+    call.summary?.weave?.costs
+  );
+  const {tokens, tokenToolTipContent} = getTokensFromUsage(call.summary?.usage);
 
   const opTypeColor = opTypeToColor(typeName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
@@ -219,6 +196,7 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
   const showTypeIcon = containerWidth >= WIDTH_BREAKPOINTS.LARGE;
   const showDuration = containerWidth >= WIDTH_BREAKPOINTS.MEDIUM;
   const showStatusIcon = containerWidth >= WIDTH_BREAKPOINTS.COMPACT;
+  const usageIconsOnly = containerWidth < WIDTH_BREAKPOINTS.XLARGE;
   const indentMultiplier = Math.max(4, Math.min(32, containerWidth / 50));
 
   return (
@@ -228,13 +206,11 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
           variant={id === selectedCallId ? 'secondary' : 'ghost'}
           active={id === selectedCallId}
           onClick={() => onCallSelect(id)}
-          className="w-full justify-start px-8 text-left text-sm h-[32px] " 
-          style={
-            {
-              opacity: isDeemphasized ? 0.6 : 1,
-              // borderLeft: `4px solid ${opColor}`,
-            }
-          }>
+          className="h-[32px] w-full justify-start px-8 text-left text-sm "
+          style={{
+            opacity: isDeemphasized ? 0.6 : 1,
+            // borderLeft: `4px solid ${opColor}`,
+          }}>
           <div className="flex w-full items-center justify-between gap-8">
             <div className="flex-0 flex min-w-0 items-center">
               {showTypeIcon ? (
@@ -276,22 +252,57 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
               /> */}
 
               <div className="ml-2 truncate font-medium">
-              {getCallDisplayName(call)}
+                {getCallDisplayName(call)}
               </div>
             </div>
 
             {/* Right section with metrics */}
             <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
               {showDuration && (
-                <div className="w-48 text-right">
-                  {duration !== null ? formatDuration(duration) : ''}
-                </div>
+                <>
+                  {usageIconsOnly ? (
+                    <>
+                      <div className="w-20 text-right">
+                        {cost && (
+                          <TraceStat
+                            label={''}
+                            tooltip={<>{cost && costToolTipContent}<br />{tokens && tokenToolTipContent}</>}
+                            icon="credit-card-payment"
+                            className="text-xs text-moon-400"
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {cost && (
+                        <div className="w-64 text-right">
+                          <TraceStat
+                            label={cost}
+                            tooltip={costToolTipContent}
+                            icon="credit-card-payment"
+                            className="text-xs text-moon-400"
+                          />
+                        </div>
+                      )}
+                      {tokens && (
+                        <div className="w-64 text-right">
+                          <TraceStat
+                            icon="database-artifacts"
+                            label={tokens.toString()}
+                            tooltip={tokenToolTipContent}
+                            className="text-xs text-moon-400"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div className="w-32 text-right">
+                    {duration !== null ? formatDuration(duration) : ''}
+                  </div>
+                </>
               )}
-              {/* <div
-                className={`h-8 w-8 rounded-full ${getTagColorClass(STATUS_INFO[statusCode].color)}`}
-              /> */}
-              {/* <div style={{width: '22px', height: '22px', overflow: 'hidden'}}> */}
-              {/* <div className="w-22 text-right"> */}
+
               {showStatusIcon ? (
                 <StatusChip value={statusCode} iconOnly />
               ) : (
@@ -301,10 +312,6 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
                   )}`}
                 />
               )}
-
-              {/* </div> */}
-              {/* <div className="w-48 text-right">${cost.toFixed(4)}</div>
-              <div className="w-48 text-right">{tokens.toLocaleString()}</div> */}
             </div>
           </div>
         </Button>
@@ -334,8 +341,6 @@ const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCal
     </div>
   );
 };
-
-type ExtendedNodeType = NodeType | 'all';
 
 interface TreeViewHeaderProps {
   searchQuery: string;
@@ -367,8 +372,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
         <Switch.Root
           size="small"
           checked={showDollars}
-          onCheckedChange={onShowDollarsChange}
-        >
+          onCheckedChange={onShowDollarsChange}>
           <Switch.Thumb size="small" checked={showDollars} />
         </Switch.Root>
         <span className="text-sm text-moon-500">Cost</span>
@@ -385,34 +389,41 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     const filtered = Object.entries(props.traceTreeFlat)
       .filter(([_, node]) => {
-        return searchQuery === '' || 
-          getCallDisplayName(node.call).toLowerCase().includes(searchQuery.toLowerCase());
-        
+        return (
+          searchQuery === '' ||
+          getCallDisplayName(node.call)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+        );
       })
       .map(([id]) => id);
-    
-      // Recursively include all ancestors of the filtered calls
 
-      const foundCallIds = new Set<string>(filtered);
-      const itemsToProcess = [...filtered];
-      const filteredCallIdsSet = new Set(filtered);
-      while (itemsToProcess.length > 0) {
-        const id = itemsToProcess.shift();
-        if (id) {
-          const node = props.traceTreeFlat[id];
-          if (node.parentId) {
-            filteredCallIdsSet.add(node.parentId);
-            itemsToProcess.push(node.parentId);
-          }
+    // Recursively include all ancestors of the filtered calls
+
+    const foundCallIds = new Set<string>(filtered);
+    const itemsToProcess = [...filtered];
+    const filteredCallIdsSet = new Set(filtered);
+    while (itemsToProcess.length > 0) {
+      const id = itemsToProcess.shift();
+      if (id) {
+        const node = props.traceTreeFlat[id];
+        if (node.parentId) {
+          filteredCallIdsSet.add(node.parentId);
+          itemsToProcess.push(node.parentId);
         }
       }
+    }
 
-    const deemphasizeCallIds = Array.from(filteredCallIdsSet.difference(foundCallIds));
-    return [Array.from(filteredCallIdsSet), deemphasizeCallIds];
+    return [
+      Array.from(filteredCallIdsSet),
+      Array.from(
+        new Set([...filteredCallIdsSet].filter(x => !foundCallIds.has(x)))
+      ),
+    ];
   }, [props.traceTreeFlat, searchQuery]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <TreeViewHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -432,10 +443,15 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   );
 };
 
-
 export const TreeView: React.FC<
-  TraceViewProps & {filterCallIds?: string[], deemphasizeCallIds?: string[]}
-> = ({traceTreeFlat, selectedCallId, onCallSelect, filterCallIds, deemphasizeCallIds}) => {
+  TraceViewProps & {filterCallIds?: string[]; deemphasizeCallIds?: string[]}
+> = ({
+  traceTreeFlat,
+  selectedCallId,
+  onCallSelect,
+  filterCallIds,
+  deemphasizeCallIds,
+}) => {
   const {containerRef, width} = useContainerWidth();
   const filterSet = useMemo(
     () => (filterCallIds ? new Set(filterCallIds) : undefined),

@@ -74,8 +74,9 @@ const fetchBareTraceCalls = (
       'exception',
       'wb_run_id',
       'wb_user_id',
+      'summary',
     ],
-    include_costs: false,
+    include_costs: true,
     include_feedback: false,
   });
   return traceCallsProm.then(res => res.calls);
