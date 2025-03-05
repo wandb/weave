@@ -1,12 +1,58 @@
 import {Button} from '@wandb/weave/components/Button';
+import {Select} from '@wandb/weave/components/Form/Select';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
-import React, {useEffect, useMemo} from 'react';
+import * as Switch from '@wandb/weave/components/Switch';
+import {
+  getTagColorClass,
+  IconOnlyPill,
+  TagColorName,
+} from '@wandb/weave/components/Tag';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import React, {ReactNode,useEffect, useMemo, useRef, useState} from 'react';
 
+import {STATUS_INFO, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
-import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {
+  parseSpanName,
+  traceCallStatusCode,
+} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import {TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName, getColorForOpName} from './utils';
+
+// Width breakpoints
+const WIDTH_BREAKPOINTS = {
+  COMPACT: 250,
+  MEDIUM: 300,
+  LARGE: 350,
+};
+
+// Hook to track container width
+const useContainerWidth = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(containerRef.current);
+    updateWidth(); // Initial measurement
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  return {containerRef, width};
+};
 
 interface TreeNodeProps {
   id: string;
@@ -58,6 +104,25 @@ const getCallTypeIcon = (type: NodeType): IconName => {
   }
 };
 
+const opTypeToColor = (typeName: NodeType): TagColorName => {
+  switch (typeName) {
+    case 'agent':
+      return 'blue';
+    case 'tool':
+      return 'gold';
+    case 'llm':
+      return 'purple';
+    case 'model':
+      return 'green';
+    case 'evaluation':
+      return 'cactus';
+    default:
+      return 'moon';
+  }
+};
+
+// Note to future dev: this should probably be configurable at the database / attribute level
+// for now we use these simple heuristics but this can be improved
 const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   spanName = spanName.toLowerCase();
   if (spanName.includes('agent')) {
@@ -101,7 +166,7 @@ const getStatus = (call: TraceCallSchema): NodeStatus => {
   return 'running';
 };
 
-const TreeNode: React.FC<TreeNodeProps> = ({
+const TreeNode: React.FC<TreeNodeProps & {containerWidth: number, deemphasizeCallIds?: string[]}> = ({
   id,
   call,
   childrenIds,
@@ -110,6 +175,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onCallSelect,
   level = 0,
   filterCallIds,
+  deemphasizeCallIds,
+  containerWidth,
 }) => {
   const nodeRef = React.useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = React.useState(true);
@@ -118,14 +185,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     : null;
 
   const status: NodeStatus = getStatus(call);
-  // Derive type from the op_name as a fallback
   const spanName = parseSpanName(call.op_name);
   const typeName = spanNameToTypeHeuristic(spanName);
   const cost = 0.0348;
   const tokens = 12377;
 
-  const opColor = getColorForOpName(spanName);
+  const opTypeColor = opTypeToColor(typeName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
+  const isDeemphasized = deemphasizeCallIds?.includes(id);
 
   // Auto-expand when filtering
   useEffect(() => {
@@ -147,6 +214,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     : childrenIds;
 
   const hasChildren = filteredChildrenIds.length > 0;
+  const statusCode = traceCallStatusCode(call);
+
+  const showTypeIcon = containerWidth >= WIDTH_BREAKPOINTS.LARGE;
+  const showDuration = containerWidth >= WIDTH_BREAKPOINTS.MEDIUM;
+  const showStatusIcon = containerWidth >= WIDTH_BREAKPOINTS.COMPACT;
+  const indentMultiplier = Math.max(4, Math.min(32, containerWidth / 50));
+
   return (
     <div className="flex flex-col">
       <span ref={nodeRef} className="w-full px-4">
@@ -154,14 +228,32 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           variant={id === selectedCallId ? 'secondary' : 'ghost'}
           active={id === selectedCallId}
           onClick={() => onCallSelect(id)}
-          className="w-full justify-start px-8 text-left"
-          style={{
-            borderLeft: `4px solid ${opColor}`,
-          }}>
-          <div className="flex w-full items-center justify-between">
+          className="w-full justify-start px-8 text-left text-sm h-[32px] " 
+          style={
+            {
+              opacity: isDeemphasized ? 0.6 : 1,
+              // borderLeft: `4px solid ${opColor}`,
+            }
+          }>
+          <div className="flex w-full items-center justify-between gap-8">
+            <div className="flex-0 flex min-w-0 items-center">
+              {showTypeIcon ? (
+                <IconOnlyPill
+                  icon={getCallTypeIcon(typeName)}
+                  color={opTypeColor}
+                  isInteractive={false}
+                />
+              ) : (
+                <div
+                  className={`h-8 w-8 rounded-full ${getTagColorClass(
+                    opTypeColor
+                  )}`}
+                />
+              )}
+            </div>
             {/* Left section with indentation, chevron, status, type icon, and name */}
             <div className="flex min-w-0 flex-1 items-center">
-              <div style={{width: level * 24}} />
+              <div style={{minWidth: level * indentMultiplier}} />
               {hasChildren ? (
                 <Icon
                   name={chevronIcon}
@@ -175,26 +267,44 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               ) : (
                 <div className="w-4" />
               )}
-              <Icon
+
+              {/* <Icon
                 name={getCallTypeIcon(typeName)}
                 size="small"
                 className="mx-1 shrink-0 text-moon-500"
-              />
+                style={{backgroundColor: opColor, borderRadius: '50%'}}
+              /> */}
+
               <div className="ml-2 truncate font-medium">
-                {getCallDisplayName(call)}
+              {getCallDisplayName(call)}
               </div>
             </div>
 
             {/* Right section with metrics */}
-            <div className="ml-8 flex shrink-0 items-center gap-8 text-sm text-moon-500">
-              <div
-                className={`h-8 w-8 rounded-full ${getStatusColor(status)}`}
-              />
-              <div className="w-48 text-right">
-                {duration !== null ? formatDuration(duration) : ''}
-              </div>
-              <div className="w-48 text-right">${cost.toFixed(4)}</div>
-              <div className="w-48 text-right">{tokens.toLocaleString()}</div>
+            <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
+              {showDuration && (
+                <div className="w-48 text-right">
+                  {duration !== null ? formatDuration(duration) : ''}
+                </div>
+              )}
+              {/* <div
+                className={`h-8 w-8 rounded-full ${getTagColorClass(STATUS_INFO[statusCode].color)}`}
+              /> */}
+              {/* <div style={{width: '22px', height: '22px', overflow: 'hidden'}}> */}
+              {/* <div className="w-22 text-right"> */}
+              {showStatusIcon ? (
+                <StatusChip value={statusCode} iconOnly />
+              ) : (
+                <div
+                  className={`h-8 w-8 rounded-full ${getTagColorClass(
+                    STATUS_INFO[statusCode].color
+                  )}`}
+                />
+              )}
+
+              {/* </div> */}
+              {/* <div className="w-48 text-right">${cost.toFixed(4)}</div>
+              <div className="w-48 text-right">{tokens.toLocaleString()}</div> */}
             </div>
           </div>
         </Button>
@@ -214,6 +324,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 onCallSelect={onCallSelect}
                 level={level + 1}
                 filterCallIds={filterCallIds}
+                containerWidth={containerWidth}
+                deemphasizeCallIds={deemphasizeCallIds}
               />
             );
           })}
@@ -223,9 +335,108 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   );
 };
 
+type ExtendedNodeType = NodeType | 'all';
+
+interface TreeViewHeaderProps {
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  selectedView: string;
+  onViewChange: (value: string) => void;
+  showDollars: boolean;
+  onShowDollarsChange: (value: boolean) => void;
+}
+
+const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
+  searchQuery,
+  onSearchChange,
+  selectedView,
+  onViewChange,
+  showDollars,
+  onShowDollarsChange,
+}) => {
+  return (
+    <div className="flex items-center gap-2 p-2">
+      <TextField
+        value={searchQuery}
+        onChange={onSearchChange}
+        placeholder="Search"
+        icon="search"
+      />
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-moon-500">Time</span>
+        <Switch.Root
+          size="small"
+          checked={showDollars}
+          onCheckedChange={onShowDollarsChange}
+        >
+          <Switch.Thumb size="small" checked={showDollars} />
+        </Switch.Root>
+        <span className="text-sm text-moon-500">Cost</span>
+      </div>
+    </div>
+  );
+};
+
+export const FilterableTreeView: React.FC<TraceViewProps> = props => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [showDollars, setShowDollars] = useState(false);
+
+  const [filteredCallIds, deemphasizeCallIds] = useMemo(() => {
+    const filtered = Object.entries(props.traceTreeFlat)
+      .filter(([_, node]) => {
+        return searchQuery === '' || 
+          getCallDisplayName(node.call).toLowerCase().includes(searchQuery.toLowerCase());
+        
+      })
+      .map(([id]) => id);
+    
+      // Recursively include all ancestors of the filtered calls
+
+      const foundCallIds = new Set<string>(filtered);
+      const itemsToProcess = [...filtered];
+      const filteredCallIdsSet = new Set(filtered);
+      while (itemsToProcess.length > 0) {
+        const id = itemsToProcess.shift();
+        if (id) {
+          const node = props.traceTreeFlat[id];
+          if (node.parentId) {
+            filteredCallIdsSet.add(node.parentId);
+            itemsToProcess.push(node.parentId);
+          }
+        }
+      }
+
+    const deemphasizeCallIds = Array.from(filteredCallIdsSet.difference(foundCallIds));
+    return [Array.from(filteredCallIdsSet), deemphasizeCallIds];
+  }, [props.traceTreeFlat, searchQuery]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <TreeViewHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        selectedView="tree"
+        onViewChange={() => {}}
+        showDollars={showDollars}
+        onShowDollarsChange={setShowDollars}
+      />
+      <div className="flex-1 overflow-hidden">
+        <TreeView
+          {...props}
+          filterCallIds={filteredCallIds}
+          deemphasizeCallIds={deemphasizeCallIds}
+        />
+      </div>
+    </div>
+  );
+};
+
+
 export const TreeView: React.FC<
-  TraceViewProps & {filterCallIds?: string[]}
-> = ({traceTreeFlat, selectedCallId, onCallSelect, filterCallIds}) => {
+  TraceViewProps & {filterCallIds?: string[], deemphasizeCallIds?: string[]}
+> = ({traceTreeFlat, selectedCallId, onCallSelect, filterCallIds, deemphasizeCallIds}) => {
+  const {containerRef, width} = useContainerWidth();
   const filterSet = useMemo(
     () => (filterCallIds ? new Set(filterCallIds) : undefined),
     [filterCallIds]
@@ -261,7 +472,7 @@ export const TreeView: React.FC<
   }, [traceTreeFlat, filterCallIds]);
 
   return (
-    <div className="h-full overflow-hidden">
+    <div className="h-full overflow-hidden" ref={containerRef}>
       <div className="h-[calc(100%)] overflow-y-auto pb-4 pt-4">
         <div className="flex flex-col">
           {rootNodes.map(node => (
@@ -274,6 +485,8 @@ export const TreeView: React.FC<
               selectedCallId={selectedCallId}
               onCallSelect={onCallSelect}
               filterCallIds={filterSet}
+              deemphasizeCallIds={deemphasizeCallIds}
+              containerWidth={width}
             />
           ))}
         </div>

@@ -17,14 +17,14 @@ export const ScrubberRow = styled.div`
 `;
 
 export const Label = styled.div`
-  width: 80px;
+  width: 50px;
   font-size: 12px;
   color: #64748b;
   flex-shrink: 0;
 `;
 
 export const CountIndicator = styled.div`
-  width: 60px;
+  width: 50px;
   font-size: 12px;
   color: #64748b;
   flex-shrink: 0;

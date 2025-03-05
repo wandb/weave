@@ -53,7 +53,9 @@ export const IconOnlyPill: FC<IconOnlyPillProps> = ({
   const classes = useTagClasses({color, isInteractive});
   return (
     <Tailwind>
-      <div key={`pill-${icon}`} className={twMerge(classes, 'rounded-2xl') + ' max-w-[22px] '}>
+      <div
+        key={`pill-${icon}`}
+        className={twMerge(classes, 'rounded-2xl') + ' max-w-[22px] '}>
         <Icon className="m-4 h-14 w-14" name={icon} />
       </div>
     </Tailwind>

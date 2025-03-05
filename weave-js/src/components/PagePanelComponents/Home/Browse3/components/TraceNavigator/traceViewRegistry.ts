@@ -3,6 +3,7 @@ import {FC} from 'react';
 
 import {ScrubberOption} from './TraceScrubber';
 import {CodeView, FlameGraphView, GraphView, TreeView} from './TraceViews';
+import { FilterableTreeView } from './TraceViews/TreeView';
 import {TraceViewProps} from './TraceViews/types';
 
 /**
@@ -37,7 +38,7 @@ export const traceViews: TraceViewRegistry = [
     id: 'tree',
     label: 'Tree',
     icon: 'layout-tabs',
-    component: TreeView,
+    component: FilterableTreeView,
     allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
   {
