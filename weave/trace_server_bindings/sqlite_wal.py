@@ -79,14 +79,17 @@ class SQLiteWriteAheadLog(Generic[T]):
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
-            for item in items:
-                item_type = item.__class__.__name__
-                item_data = item.model_dump_json()
-
-                cursor.execute(
-                    f"INSERT INTO {self.table_name} (item_type, item_data) VALUES (?, ?)",
-                    (item_type, item_data),
+            batch_data = [
+                (
+                    item.__class__.__name__,  # item_type
+                    item.model_dump_json(),  # item_data
                 )
+                for item in items
+            ]
+            cursor.executemany(
+                f"INSERT INTO {self.table_name} (item_type, item_data) VALUES (?, ?)",
+                batch_data,
+            )
 
             # Clean up old items if we have too many
             self._cleanup(cursor)
