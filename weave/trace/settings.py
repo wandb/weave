@@ -206,9 +206,9 @@ def scorers_dir() -> str:
 
 def max_calls_queue_size() -> int:
     max_queue_size = _optional_int("max_calls_queue_size")
-    if max_queue_size == 0:
-        return 0
-    return max_queue_size or 100_000
+    if max_queue_size is None:
+        return 100_000
+    return max_queue_size
 
 
 def parse_and_apply_settings(
