@@ -439,6 +439,9 @@ class InMemoryWeaveLogCollector(logging.Handler):
     def get_warning_logs(self):
         return self._get_logs("WARNING")
 
+    def get_info_logs(self):
+        return self._get_logs("INFO")
+
 
 @pytest.fixture
 def log_collector(request):

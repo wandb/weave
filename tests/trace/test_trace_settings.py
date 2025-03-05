@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import timeit
@@ -10,6 +11,7 @@ from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
+from weave.utils.retry import with_retry
 
 
 @weave.op
@@ -28,9 +30,9 @@ def test_disabled_setting(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_disabled_env(client):
@@ -44,9 +46,9 @@ def test_disabled_env(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_print_call_link_setting(client_creator):
@@ -232,3 +234,75 @@ def test_get_parallelism_settings() -> None:
         main, upload = get_parallelism_settings()
         assert main == 2
         assert upload == 3
+
+
+def test_retry_max_attempts_settings(client_creator, caplog) -> None:
+    # Set caplog to capture INFO level logs from the retry module
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    with client_creator(settings=UserSettings(retry_max_attempts=2)) as client:
+        with pytest.raises(RuntimeError):
+            func()
+
+    # Verify we logged retry attempts and failure
+    retry_attempt_logs = [r for r in caplog.records if r.msg == "retry_attempt"]
+    retry_failed_logs = [r for r in caplog.records if r.msg == "retry_failed"]
+
+    # Check the number of logs
+    assert len(retry_attempt_logs) == 1, (
+        f"Expected 1 retry_attempt log, got {len(retry_attempt_logs)}"
+    )
+    assert len(retry_failed_logs) == 1, (
+        f"Expected 1 retry_failed log, got {len(retry_failed_logs)}"
+    )
+
+    # Check the content of retry_attempt log
+    attempt_log = retry_attempt_logs[0]
+    assert attempt_log.attempt_number == 1
+    assert "Test error" in attempt_log.exception
+
+    # Check the content of retry_failed log
+    failed_log = retry_failed_logs[0]
+    assert failed_log.attempt_number == 2
+    assert "Test error" in failed_log.exception
+
+
+def test_retry_max_attempts_env(client_creator, caplog) -> None:
+    os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "2"
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    with client_creator(settings=UserSettings(retry_max_attempts=2)) as client:
+        with pytest.raises(RuntimeError):
+            func()
+
+    # Verify we logged retry attempts and failure
+    retry_attempt_logs = [r for r in caplog.records if r.msg == "retry_attempt"]
+    retry_failed_logs = [r for r in caplog.records if r.msg == "retry_failed"]
+
+    assert len(retry_attempt_logs) == 1, (
+        f"Expected 1 retry_attempt log, got {len(retry_attempt_logs)}"
+    )
+    assert len(retry_failed_logs) == 1, (
+        f"Expected 1 retry_failed log, got {len(retry_failed_logs)}"
+    )
+
+    # Check the content of retry_attempt log
+    attempt_log = retry_attempt_logs[0]
+    assert attempt_log.attempt_number == 1
+    assert "Test error" in attempt_log.exception
+
+    # Check the content of retry_failed log
+    failed_log = retry_failed_logs[0]
+    assert failed_log.attempt_number == 2
+    assert "Test error" in failed_log.exception
+
+    # Clean up environment variable
+    del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
