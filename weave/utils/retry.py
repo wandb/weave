@@ -24,7 +24,7 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
     """
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> T:
         retry = tenacity.Retrying(
             stop=tenacity.stop_after_attempt(retry_max_attempts()),
             wait=tenacity.wait_exponential_jitter(initial=1, max=retry_max_interval()),
@@ -33,8 +33,6 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
             retry_error_callback=_log_failure,
             reraise=True,
         )
-
-        # Use the retry object to call the function
         return retry(lambda: func(*args, **kwargs))
 
     return wrapper
