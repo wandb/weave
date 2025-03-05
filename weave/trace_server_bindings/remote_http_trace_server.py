@@ -46,7 +46,7 @@ REMOTE_REQUEST_BYTES_LIMIT = (
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
-REMOTE_REQUEST_MAX_ATTEMPTS = 3  # Maximum immediate retry attempts
+REMOTE_REQUEST_MAX_ATTEMPTS = 6  # Maximum immediate retry attempts
 
 
 def _is_retryable_exception(e: Exception) -> bool:
