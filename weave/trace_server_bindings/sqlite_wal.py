@@ -24,7 +24,7 @@ class SQLiteWriteAheadLog:
         self,
         db_path: str | None = None,
         table_name: str = "batch_items",
-        max_items: int = 10000,
+        max_items: int = 1_000_000,
     ) -> None:
         """Initialize the SQLite write-ahead log.
 
@@ -52,8 +52,7 @@ class SQLiteWriteAheadLog:
 
     def _init_db(self) -> None:
         """Initialize the SQLite database with the required schema."""
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Enable WAL mode for better performance and durability
@@ -75,10 +74,6 @@ class SQLiteWriteAheadLog:
                 ON {self.table_name} (created_at)
             """)
 
-            conn.commit()
-        finally:
-            conn.close()
-
     def append(self, items: list[T]) -> None:
         """Append items to the write-ahead log.
 
@@ -88,8 +83,7 @@ class SQLiteWriteAheadLog:
         if not items:
             return
 
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             for item in items:
@@ -101,13 +95,8 @@ class SQLiteWriteAheadLog:
                     (item_type, item_data),
                 )
 
-            conn.commit()
-
             # Clean up old items if we have too many
             self._cleanup(cursor)
-            conn.commit()
-        finally:
-            conn.close()
 
     def _cleanup(self, cursor: sqlite3.Cursor) -> None:
         """Clean up old items if we have too many."""
@@ -134,8 +123,7 @@ class SQLiteWriteAheadLog:
         Returns:
             List of items as dictionaries.
         """
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             if item_types:
@@ -164,8 +152,6 @@ class SQLiteWriteAheadLog:
                 items.append({"type": item_type, "data": item})
 
             return items
-        finally:
-            conn.close()
 
     def delete_items(self, ids: list[int]) -> None:
         """Delete items from the write-ahead log by their IDs.
@@ -176,8 +162,7 @@ class SQLiteWriteAheadLog:
         if not ids:
             return
 
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             placeholders = ", ".join("?" for _ in ids)
@@ -185,16 +170,8 @@ class SQLiteWriteAheadLog:
                 f"DELETE FROM {self.table_name} WHERE id IN ({placeholders})", ids
             )
 
-            conn.commit()
-        finally:
-            conn.close()
-
     def clear(self) -> None:
         """Clear all items from the write-ahead log."""
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(f"DELETE FROM {self.table_name}")
-            conn.commit()
-        finally:
-            conn.close()
