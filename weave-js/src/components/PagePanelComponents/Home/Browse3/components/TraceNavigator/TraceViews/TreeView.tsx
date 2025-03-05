@@ -24,6 +24,7 @@ import {
   parseSpanName,
   traceCallStatusCode,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
+import TraceScrubber from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -283,10 +284,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 interface TreeViewHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  selectedView: string;
-  onViewChange: (value: string) => void;
-  showDollars: boolean;
-  onShowDollarsChange: (value: boolean) => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
@@ -318,7 +315,6 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDollars, setShowDollars] = useState(false);
 
   const [filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     const filtered = Object.entries(props.traceTreeFlat)
@@ -359,10 +355,6 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
       <TreeViewHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        selectedView="tree"
-        onViewChange={() => {}}
-        showDollars={showDollars}
-        onShowDollarsChange={setShowDollars}
       />
       <div className="flex-1 overflow-hidden">
         <TreeView
@@ -371,6 +363,10 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           deemphasizeCallIds={deemphasizeCallIds}
         />
       </div>
+      <TraceScrubber
+        {...props}
+        allowedScrubbers={['timeline', 'peer', 'sibling', 'stack']}
+      />
     </div>
   );
 };

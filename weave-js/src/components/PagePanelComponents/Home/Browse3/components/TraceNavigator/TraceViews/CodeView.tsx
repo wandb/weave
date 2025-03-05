@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
+import TraceScrubber from '../TraceScrubber';
 import {TreeView} from './TreeView';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {buildCodeMap, CodeMapNode} from './utils';
@@ -249,12 +250,8 @@ export const getSortedPeerPathCallIds = (
   );
 };
 
-export const CodeView: React.FC<TraceViewProps> = ({
-  traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
-  stack,
-}) => {
+export const CodeView: React.FC<TraceViewProps> = props => {
+  const {traceTreeFlat, selectedCallId, onCallSelect, stack} = props;
   const codeMap = useMemo(() => buildCodeMap(traceTreeFlat), [traceTreeFlat]);
 
   // Find the selected operation's calls and update when selectedCallId changes
@@ -269,7 +266,6 @@ export const CodeView: React.FC<TraceViewProps> = ({
   const selectedPeerPathCallIds = useMemo(() => {
     return getSortedPeerPathCallIds(selectedCodeNode, traceTreeFlat);
   }, [selectedCodeNode, traceTreeFlat]);
-  console.log(selectedPeerPathCallIds);
   return (
     <Container>
       <TreePanel>
@@ -309,6 +305,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
           </div>
         )}
       </CallPanel>
+      <TraceScrubber {...props} allowedScrubbers={['codePath']} />
     </Container>
   );
 };

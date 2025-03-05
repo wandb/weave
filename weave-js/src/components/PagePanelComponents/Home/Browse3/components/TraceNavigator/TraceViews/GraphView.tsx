@@ -15,6 +15,7 @@ import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
 import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
 
@@ -193,11 +194,17 @@ const Flow: React.FC<TraceViewProps> = ({
 // Main component that wraps the Flow with ReactFlowProvider
 export const GraphView: React.FC<TraceViewProps> = props => {
   return (
-    <div className="h-full overflow-hidden">
-      <div className="h-[100%] p-4">
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="h-[100%] flex-1 p-4">
         <ReactFlowProvider>
           <Flow {...props} />
         </ReactFlowProvider>
+      </div>
+      <div className="flex-0">
+        <TraceScrubber
+          {...props}
+          allowedScrubbers={['timeline', 'peer', 'sibling', 'stack']}
+        />
       </div>
     </div>
   );

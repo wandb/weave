@@ -1,7 +1,6 @@
 import {IconName} from '@wandb/weave/components/Icon';
 import {FC} from 'react';
 
-import {ScrubberOption} from './TraceScrubber';
 import {CodeView, FlameGraphView, GraphView} from './TraceViews';
 import {FilterableTreeView} from './TraceViews/TreeView';
 import {TraceViewProps} from './TraceViews/types';
@@ -18,8 +17,6 @@ export interface ViewDefinition<T> {
   icon: IconName;
   /** The React component that implements the view */
   component: FC<T>;
-  /** Whether to show the scrubber for this view */
-  allowedScrubbers?: ScrubberOption[];
   /** Maximum number of traces this view can handle before being disabled */
   maxTraces?: number;
 }
@@ -39,14 +36,12 @@ export const traceViews: TraceViewRegistry = [
     label: 'Tree',
     icon: 'layout-tabs',
     component: FilterableTreeView,
-    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
   {
     id: 'code',
     label: 'Code',
     icon: 'code-alt',
     component: CodeView,
-    allowedScrubbers: ['codePath'],
   },
   {
     id: 'flamegraph',
@@ -54,7 +49,6 @@ export const traceViews: TraceViewRegistry = [
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
     maxTraces: 500,
-    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
   {
     id: 'graph',
@@ -62,6 +56,5 @@ export const traceViews: TraceViewRegistry = [
     icon: 'chart-scatterplot',
     component: GraphView,
     maxTraces: 50,
-    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
 ];

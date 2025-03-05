@@ -4,7 +4,6 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {FC, useEffect, useMemo, useState} from 'react';
 
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
-import TraceScrubber from './TraceScrubber';
 import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
 import {getTraceView, traceViews} from './traceViewRegistry';
 import {StackState, TraceTreeFlat, TraceViewProps} from './TraceViews/types';
@@ -132,11 +131,6 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
                 <div className="flex-1 overflow-auto">
                   <TraceViewComponent {...props} />
                 </div>
-
-                <TraceScrubber
-                  {...props}
-                  allowedScrubbers={getTraceView(traceViewId).allowedScrubbers}
-                />
               </div>
             </>
           )}

@@ -5,17 +5,15 @@ import {
 } from 'react-flame-graph';
 
 import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
 
 // Use the imported type directly
 type FlameGraphNode = FlameGraphNodeType;
 
-export const FlameGraphView: React.FC<TraceViewProps> = ({
-  traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
-}) => {
+export const FlameGraphView: React.FC<TraceViewProps> = props => {
+  const {traceTreeFlat, selectedCallId, onCallSelect} = props;
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = React.useState({width: 0, height: 0});
 
@@ -121,8 +119,10 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
   }
 
   return (
-    <div className="h-full overflow-hidden">
-      <div ref={containerRef} className="h-[100%] w-full overflow-hidden p-4">
+    <div className="flex h-full flex-col">
+      <div
+        ref={containerRef}
+        className="h-[100%] w-full flex-1 overflow-hidden p-4">
         {dimensions.width > 0 && dimensions.height > 0 && (
           <FlameGraph
             data={flameData}
@@ -134,6 +134,12 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
             disableHover={false}
           />
         )}
+      </div>
+      <div className="flex-0">
+        <TraceScrubber
+          {...props}
+          allowedScrubbers={['timeline', 'peer', 'sibling', 'stack']}
+        />
       </div>
     </div>
   );
