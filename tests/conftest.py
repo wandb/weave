@@ -3,6 +3,7 @@ import contextlib
 import logging
 import os
 import subprocess
+import tempfile
 import time
 import typing
 import urllib
@@ -687,3 +688,10 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for tests."""
+    with tempfile.TemporaryDirectory() as dir_path:
+        yield dir_path
