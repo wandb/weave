@@ -159,7 +159,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list,
+        batch: list[StartBatchItem | EndBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -202,9 +202,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         except Exception:
             # Add items back to the queue for later processing
             logger.warning(
-                "Batch failed after max retries, requeueing for later processing",
-                extra={"batch_size": len(batch)},
+                f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
             )
+
+            # only if debug mode
+            if logger.isEnabledFor(logging.DEBUG):
+                ids = []
+                for item in batch:
+                    if isinstance(item, StartBatchItem):
+                        ids.append(f"{item.req.start.id}-start")
+                    elif isinstance(item, EndBatchItem):
+                        ids.append(f"{item.req.end.id}-end")
+                logger.debug(f"Requeueing batch with {ids=}")
             self.call_processor.enqueue(batch)
 
     @tenacity.retry(
