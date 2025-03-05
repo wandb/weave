@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
-from weave.trace.serialize import dictify
+from weave.trace.op import Op
+from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
@@ -55,9 +56,8 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
-        if dictified_inputs_self["__class__"]["module"] == "__main__":
-            dictified_inputs_self["__class__"]["module"] = ""
 
+        # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], Predict) or isinstance(inputs["self"], Adapter):
             if hasattr(inputs["self"], "signature"):
                 if hasattr(inputs["self"].signature, "model_json_schema"):
@@ -69,15 +69,20 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
 
+        # Recursively serialize the dspy objects in the devset
         if isinstance(inputs["self"], Evaluate):
             if hasattr(inputs["self"], "devset"):
                 dictified_inputs_self["devset"] = [
                     serialize_dspy_objects(example) for example in inputs["self"].devset
                 ]
 
-            # TODO: This is a hack to make the metric a weave op. Should we do this? Need to ask Ayush tomorrow.
+            # Convert the metric to a weave op if it is not already one
             if hasattr(inputs["self"], "metric"):
-                inputs["self"].metric = weave.op(inputs["self"].metric)
+                inputs["self"].metric = (
+                    weave.op(inputs["self"].metric)
+                    if not isinstance(inputs["self"].metric, Op)
+                    else inputs["self"].metric
+                )
 
         inputs["self"] = dictified_inputs_self
 

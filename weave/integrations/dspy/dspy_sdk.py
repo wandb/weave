@@ -60,9 +60,6 @@ def get_dspy_patcher(
             ),
             get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),
             get_symbol_patcher("dspy", "BetterTogether.compile", base),
-            # REMARK: If we hack the metric to make it a weave op, we don't need to patch the following.
-            # get_symbol_patcher("dspy.evaluate", "answer_passage_match", base),
-            # get_symbol_patcher("dspy.evaluate", "answer_exact_match", base),
             get_symbol_patcher("dspy", "Evaluate.__call__", base),
             get_symbol_patcher("dspy.retrievers", "Embeddings.__call__", base),
             get_symbol_patcher("dspy.retrievers", "Embeddings.forward", base),
