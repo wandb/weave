@@ -138,6 +138,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_MAX_CALLS_QUEUE_SIZE`
     """
 
+    retry_max_interval: float = 60 * 5  # 5 min
+    """
+    Sets the maximum interval between retries.  Defaults to 5 minutes.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_INTERVAL`
+    """
+
+    retry_max_attempts: int = 3
+    """
+    Sets the maximum number of retries.  Defaults to 3.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -211,6 +225,22 @@ def max_calls_queue_size() -> int:
     return max_queue_size
 
 
+def retry_max_attempts() -> int:
+    """Returns the maximum number of retry attempts."""
+    max_attempts = _optional_int("retry_max_attempts")
+    if max_attempts is None:
+        return 3
+    return max_attempts
+
+
+def retry_max_interval() -> float:
+    """Returns the maximum interval between retries in seconds."""
+    max_interval = _optional_float("retry_max_interval")
+    if max_interval is None:
+        return 60 * 5
+    return max_interval
+
+
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
@@ -255,6 +285,12 @@ def _list_str(name: str) -> list[str]:
 def _optional_str(name: str) -> Optional[str]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return env
+    return _context_vars[name].get()
+
+
+def _optional_float(name: str) -> Optional[float]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return float(env)
     return _context_vars[name].get()
 
 
