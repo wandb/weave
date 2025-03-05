@@ -1,0 +1,118 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (float)\n\nAll
+      interactions will be structured in the following way, with the appropriate values
+      filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[
+      ## answer ## ]]\n{answer}        # note: the value you produce must be a single
+      float value\n\n[[ ## completed ## ]]\n\nIn adhering to this structure, your
+      objective is: \n        Given the fields `question`, produce the fields `answer`."},{"role":"user","content":"[[
+      ## question ## ]]\nTwo dice are tossed. What is the probability that the sum
+      equals two?\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]` (must be formatted
+      as a valid Python float), and then ending with the marker for `[[ ## completed
+      ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '984'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=7BRVQaL9UjVDctkMM4UaO_Ptm0ikboCw97CYkf.2E6s-1741164962-1.0.1.1-2HPH9rh05ibH.IKztSkFtmcg6XF9Iy2U5eiaCn_Qj0IIxwErc7d1V3pWdRVt3DdtJl.1rEge4bBLHgDI7WEYF44NSw.nimsz1ye5qUPGonk;
+        _cfuvid=dyUgjuuB5J0y2SSvFhetdC0n6iYOHCbAH4MGzhEHPgY-1741164962756-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFRNb9swDL3nVxDqpR2czB+BvQbYYcOADcN627BDWwSyREdcZcmV5GTB
+        0P8+yE7iFO2A+WDAfI9PpPjoPzMARpKtgAnFg2g7Pf9YYWeKm+vth+LLt6+fal7JzzfmR5s+NI8F
+        S2KGrX+hCMeshbBtpzGQNSMsHPKAUTWrlllWLq/LYgBaK1HHtE0X5ks7b8nQPE/z5Tyt5tm7Q7ay
+        JNCzFdzOAAD+DO9Yp5H4m60gTY6RFr3nG2SrEwmAOatjhHHvyQduAksmUFgT0Ayl397CxQU45N4a
+        Mpv4cX9/Z34qNBB2FiQJBO4QgvUeZQLIhQJJCIp7KKHhAn0CDn2vQxQgAxyCDVyDbaCEN1DCeyhK
+        6Kz3VGsE2wdhW/QL+K4QrNF72PE9BAtcKMItAgfftzE9B/JADdQ2qLEUr+wOOGRwSQtcJHCZJdnV
+        1SDlMLIHvQwavrWOnx0HjXUQFHnALZpwyGiswwSCQuicrXlNmsI+nhxDsQh87LmOfQ2lxKjp2xpd
+        5Lw4w4OkLUmUUO8H7ngPU8aRl8BOkVBRMntblIs7c2fGSXDjd+iOY0gXaV49f8qJe3AcypF+PmGH
+        Te95dJnptT7En06W0XYT+/UH/BRvyJBX69EO0R4+2I4N6NMM4H6wZv/Mbaxztu3COtgHNFEwT4tR
+        j00bMaFZvjygw91MQJFXySuCa4mBk/Zn7maCC4VySp1WgfeS7BkwO2v7ZTmvaZ824X/kJ0AI7ALK
+        dedQknje8kRzGP8Y/6KdrnkomHl0WxK4DoQujkJiw3s97jHzex+wXTdkNug6R+MyN906Laui4tdF
+        WrLZ0+wvAAAA//8DAHTooEfaBAAA
+    headers:
+      CF-RAY:
+      - 91b865d9dbbc54e4-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 05 Mar 2025 08:56:04 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1296'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998790'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_4e3bd0732730c6724bbec5256c285ef0
+    status:
+      code: 200
+      message: OK
+version: 1

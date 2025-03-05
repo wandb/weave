@@ -34,3 +34,50 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     call = calls[2]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_cot(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    math = dspy.ChainOfThought("question -> answer: float")
+    response = math(
+        question="Two dice are tossed. What is the probability that the sum equals two?"
+    )
+    assert response.answer > 0.027
+
+    calls = list(client.calls())
+    assert len(calls) == 6
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChainOfThought"
+    output = call.output
+    assert output["answer"] > 0.027
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Predict"
+    output = call.output
+    assert output["answer"] > 0.027
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChatAdapter"
+    output = call.output
+    assert output[0]["answer"] > 0.027
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
