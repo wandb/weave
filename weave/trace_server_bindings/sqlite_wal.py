@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import json
-import logging
-import os
 import sqlite3
 import tempfile
-from typing import TypeVar
+from pathlib import Path
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
-logger = logging.getLogger(__name__)
 
 
-class SQLiteWriteAheadLog:
+class SQLiteWriteAheadLog(Generic[T]):
     """A SQLite-based write-ahead log for durably storing batched operations.
 
     This class provides a durable storage mechanism for batched operations,
@@ -22,7 +20,7 @@ class SQLiteWriteAheadLog:
 
     def __init__(
         self,
-        db_path: str | None = None,
+        db_path: str | Path | None = None,
         table_name: str = "batch_items",
         max_items: int = 1_000_000,
     ) -> None:
@@ -38,21 +36,21 @@ class SQLiteWriteAheadLog:
 
         if db_path is None:
             # Create a directory in the user's temp directory
-            weave_dir = os.path.join(tempfile.gettempdir(), "weave")
-            os.makedirs(weave_dir, exist_ok=True)
-            self.db_path = os.path.join(weave_dir, "weave_batch_wal.db")
+            weave_dir = Path(tempfile.gettempdir()) / "weave"
+            weave_dir.mkdir(exist_ok=True)
+            self.db_path = weave_dir / "weave_batch_wal.db"
         else:
-            self.db_path = db_path
+            self.db_path = Path(db_path)
 
         # Ensure the directory exists
-        os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Initialize the database
         self._init_db()
 
     def _init_db(self) -> None:
         """Initialize the SQLite database with the required schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
             # Enable WAL mode for better performance and durability
@@ -83,7 +81,7 @@ class SQLiteWriteAheadLog:
         if not items:
             return
 
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
             for item in items:
@@ -123,7 +121,7 @@ class SQLiteWriteAheadLog:
         Returns:
             List of items as dictionaries.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
             if item_types:
@@ -162,7 +160,7 @@ class SQLiteWriteAheadLog:
         if not ids:
             return
 
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
             placeholders = ", ".join("?" for _ in ids)
@@ -172,6 +170,6 @@ class SQLiteWriteAheadLog:
 
     def clear(self) -> None:
         """Clear all items from the write-ahead log."""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute(f"DELETE FROM {self.table_name}")

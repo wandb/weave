@@ -1,9 +1,9 @@
 import atexit
 import datetime
-import os
 import shutil
 import tempfile
 import threading
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -51,7 +51,7 @@ def make_end_req(name: str):
 
 def test_basic_adding_and_reading_from_wal(temp_dir):
     # Create a WAL
-    wal_path = os.path.join(temp_dir, "test_wal.db")
+    wal_path = Path(temp_dir) / "test_wal.db"
     wal = SQLiteWriteAheadLog(wal_path)
 
     # Create and append test items to WAL
@@ -81,7 +81,7 @@ def test_async_processor_with_wal(temp_dir):
         processed_event.set()
 
     # Create processor with WAL
-    wal_path = os.path.join(temp_dir, "test_processor_wal.db")
+    wal_path = Path(temp_dir) / "test_processor_wal.db"
     processor = AsyncBatchProcessor(
         processor_fn,
         max_batch_size=5,
@@ -118,7 +118,7 @@ def test_async_processor_with_wal(temp_dir):
 
 def test_wal_recovery_after_crash(temp_dir):
     """Test recovery from WAL after a simulated crash."""
-    wal_path = os.path.join(temp_dir, "test_recovery_wal.db")
+    wal_path = Path(temp_dir) / "test_recovery_wal.db"
 
     # FIRST RUN: Add items, but simulate crash before processing.  Below, we patch
     # `threading.Thread.start` to do nothing, which means processing will never happen.
@@ -195,7 +195,7 @@ def test_wal_recovery_after_crash(temp_dir):
 def test_wal_max_items(temp_dir):
     MAX_ITEMS = 2
 
-    wal_path = os.path.join(temp_dir, "test_max_items_wal.db")
+    wal_path = Path(temp_dir) / "test_max_items_wal.db"
     wal = SQLiteWriteAheadLog(wal_path, max_items=MAX_ITEMS)
 
     for i in range(3):

@@ -50,15 +50,6 @@ class AsyncBatchProcessor(Generic[T]):
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
 
-        # WAL support
-        self.use_wal = use_wal
-        self.wal = None
-        if self.use_wal:
-            # Initialize the WAL
-            self.wal = SQLiteWriteAheadLog(db_path=wal_path)
-            # Recover any items from the WAL
-            self._recover_from_wal()
-
         # Start the processing thread
         self.processing_thread = Thread(target=self._process_batches)
         self.processing_thread.daemon = True
@@ -67,10 +58,13 @@ class AsyncBatchProcessor(Generic[T]):
         # TODO: Probably should include a health check thread here.  It will revive the
         # processing thread if that thread dies.
 
-        # TODO: Probably should include some sort of local write buffer.  It might not need
-        # to be here, but it should exist.  That handles 2 cases:
-        # 1. The queue is full, so users can sync up data later.
-        # 2. The system crashes for some reason, so users can resume from the local buffer.
+        # WAL support
+        self.use_wal = use_wal
+        self.wal = None
+        if self.use_wal:
+            # Initialize the WAL
+            self.wal = SQLiteWriteAheadLog(db_path=wal_path)
+            self._recover_from_wal()
 
         atexit.register(self.stop_accepting_new_work_and_flush_queue)
 
