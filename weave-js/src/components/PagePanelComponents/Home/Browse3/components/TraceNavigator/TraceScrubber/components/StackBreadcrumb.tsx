@@ -10,10 +10,6 @@ import {
 import {BaseScrubberProps} from './BaseScrubber';
 
 export const StackBreadcrumb: React.FC<BaseScrubberProps> = props => {
-  const selectedItemRef = React.useRef<HTMLButtonElement>(null);
-
-  useScrollIntoView(selectedItemRef, Boolean(props.selectedCallId));
-
   if (!props.selectedCallId) {
     return null;
   }
@@ -31,15 +27,26 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = props => {
       {stack.map((node, index) => (
         <React.Fragment key={node.id}>
           {index > 0 && <BreadcrumbSeparator>{'/'}</BreadcrumbSeparator>}
-          <BreadcrumbItem
-            ref={node.id === props.selectedCallId ? selectedItemRef : undefined}
-            $active={node.id === props.selectedCallId}
-            onClick={() => props.onCallSelect(node.id)}
-            title={node.name}>
-            {node.name}
-          </BreadcrumbItem>
+          <BreadCrumbItemWithScroll {...props} node={node} />
         </React.Fragment>
       ))}
     </BreadcrumbContainer>
+  );
+};
+
+const BreadCrumbItemWithScroll: React.FC<
+  BaseScrubberProps & {node: {id: string; name: string}}
+> = props => {
+  const isSelected = props.node.id === props.selectedCallId;
+  const selectedItemRef = React.useRef<HTMLButtonElement>(null);
+  useScrollIntoView(selectedItemRef, isSelected);
+  return (
+    <BreadcrumbItem
+      ref={selectedItemRef}
+      $active={isSelected}
+      onClick={() => props.onCallSelect(props.node.id)}
+      title={props.node.name}>
+      {props.node.name}
+    </BreadcrumbItem>
   );
 };
