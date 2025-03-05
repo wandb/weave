@@ -79,6 +79,11 @@ class FutureExecutor:
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
+    @property
+    def num_outstanding_futures(self) -> int:
+        with self._active_futures_lock:
+            return len(self._active_futures)
+
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Defer a function to be executed in a thread pool.
