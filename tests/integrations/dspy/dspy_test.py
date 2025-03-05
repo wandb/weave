@@ -45,7 +45,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 )
 def test_dspy_predict_module(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
-    qa = dspy.Predict('question: str -> response: str')
+    qa = dspy.Predict("question: str -> response: str")
     response = qa(question="who is the creator of git?")
     assert "Linus Torvalds" in response.response
 
