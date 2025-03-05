@@ -77,22 +77,19 @@ class AsyncBatchProcessor(Generic[T]):
             return
 
         try:
-            items = self.wal.get_all_items()
-            if not items:
+            if not (items := self.wal.get_all_items()):
                 return
 
             logger.info(f"Recovering {len(items)} items from WAL")
-            starting_wal_ids = {x["_wal_id"] for x in items if x["_wal_id"] is not None}
-            wal_ids_to_keep = set()
+            wal_ids_to_delete = {x["_wal_id"] for x in items}
             # Add recovered items to the queue
             for item in items:
                 try:
                     self.queue.put_nowait(cast(T, item["data"]))
                 except Full:
-                    wal_ids_to_keep.add(item["_wal_id"])
+                    wal_ids_to_delete.remove(item["_wal_id"])
 
             # Delete successfully queued items from the WAL
-            wal_ids_to_delete = starting_wal_ids - wal_ids_to_keep
             self.wal.delete_items(list(wal_ids_to_delete))
             logger.info(f"Recovered {len(wal_ids_to_delete)} items from WAL")
         except Exception as e:

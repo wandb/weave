@@ -4,7 +4,7 @@ import logging
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Generic, NotRequired, TypedDict, TypeVar
+from typing import Generic, TypedDict, TypeVar
 
 from pydantic import BaseModel
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ItemDict(TypedDict):
     type: str
     data: BaseModel
-    _wal_id: NotRequired[int]
+    _wal_id: int
 
 
 class SQLiteWriteAheadLog(Generic[T]):
