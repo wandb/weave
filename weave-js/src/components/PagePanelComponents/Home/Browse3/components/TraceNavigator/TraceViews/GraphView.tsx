@@ -1,6 +1,6 @@
 import '@xyflow/react/dist/style.css';
 
-import type {Node} from '@xyflow/react';
+import type {HandleProps, Node} from '@xyflow/react';
 import {
   Background,
   Controls,
@@ -10,7 +10,6 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react';
-import {Handle} from '@xyflow/react';
 import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
@@ -18,6 +17,14 @@ import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const {Handle} = require('@xyflow/react');
+
+// Create a wrapper component to address TypeScript issues
+const FlowHandle: React.FC<Partial<HandleProps>> = props => {
+  return <Handle {...props} />;
+};
 
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 40;
@@ -49,9 +56,9 @@ const TraceNode: React.FC<{
         borderRadius: '8px',
         padding: '8px',
       }}>
-      <Handle type="target" position={Position.Top} />
+      <FlowHandle type="target" position={Position.Top} />
       <div className="truncate text-center text-sm">{data.label}</div>
-      <Handle type="source" position={Position.Bottom} />
+      <FlowHandle type="source" position={Position.Bottom} />
     </div>
   );
 };
