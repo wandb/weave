@@ -1,16 +1,16 @@
 import '@xyflow/react/dist/style.css';
 
+import type {Node} from '@xyflow/react';
 import {
   Background,
   Controls,
   Edge,
-  Handle,
-  Node,
   Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react';
+import {Handle} from '@xyflow/react';
 import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
