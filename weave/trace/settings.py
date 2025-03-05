@@ -128,6 +128,14 @@ class UserSettings(BaseModel):
     ~/.cache/wandb/weave-scorers.
 
     Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
+
+    """
+    max_calls_queue_size: int = 100_000
+    """
+    Sets the maximum size of the calls queue.  Defaults to 100_000.
+    Setting a value of 0 means the queue can grow unbounded.
+
+    Can be overridden with the environment variable `WEAVE_MAX_CALLS_QUEUE_SIZE`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -194,6 +202,13 @@ def server_cache_dir() -> Optional[str]:
 
 def scorers_dir() -> str:
     return _optional_str("scorers_dir")  # type: ignore
+
+
+def max_calls_queue_size() -> int:
+    max_queue_size = _optional_int("max_calls_queue_size")
+    if max_queue_size is None:
+        return 100_000
+    return max_queue_size
 
 
 def parse_and_apply_settings(
