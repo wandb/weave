@@ -209,7 +209,6 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
     loadedFrom: imageArtifact,
     width: image?.width,
     height: image?.height,
-    caption: image?.caption,
   };
 
   if (tileLayout === 'MASKS_NEXT_TO_IMAGE') {
