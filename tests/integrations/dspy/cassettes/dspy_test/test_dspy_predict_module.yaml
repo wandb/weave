@@ -1,0 +1,115 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `response` (str)\n\nAll interactions will
+      be structured in the following way, with the appropriate values filled in.\n\n[[
+      ## question ## ]]\n{question}\n\n[[ ## response ## ]]\n{response}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Given the
+      fields `question`, produce the fields `response`."},{"role":"user","content":"[[
+      ## question ## ]]\nwho is the creator of git?\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## response ## ]]`, and then ending
+      with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '749'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNha9swEP3uX3GoX5NiO2nS5NsGYxtkrBvdYCTBqNLZ1iLrhCSnLSX/
+        fchO4pR1sC9C3Lv3ePdOekkAmJJsCUzUPIjG6vH7uf6Jcre6ufteZqtvz59/fH3MP/z68vTuU3PH
+        RpFBD79RhBPrWlBjNQZFpoeFQx4wqmbzaZYt0lmed0BDEnWkVTaMpzRulFHjPM2n43Q+zm6P7JqU
+        QM+WsE4AAF66M/o0Ep/YEtLRqdKg97xCtjw3ATBHOlYY9175wE1gowEUZAKazvp6DVdX4NBbMh7j
+        fbvdmPsaofNPDqiEjyqA8rBSpvVwT27PtfQjeKwJJO5Rk0UJscdAnqY3UJKDhhteKVNBqPHU1aAJ
+        US+WotgT7NAZ1NewMRvTWznGiLL3cmnbYdl6HqMzrdbH+uGcg6bKOnrwR/xcL5VRvi4cck8mzuwD
+        WdahhwRg2+XdvoqQWUeNDUWgHZoomE2nvR4b1jygk8URDBS4vmDdTkZv6BUSA1faX2yMCS5qlAN1
+        WC9vpaILILmY+m83b2n3kytT/Y/8AAiBNqAsrEOpxOuJhzaH8Rf8q+2ccmeYeXR7JbAICl3chMSS
+        t7p/m8w/+4BNUSpTobNO9Q+0tEU6m0/mfDFJZyw5JH8AAAD//wMAqOa8h64DAAA=
+    headers:
+      CF-RAY:
+      - 91bad84ada1c54e4-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 05 Mar 2025 16:03:42 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=9DFiQ.b1txm997XaS02BYN8JUIQ0NmknDg0nbkD.4JU-1741190622-1.0.1.1-z2eV_3xlBlXvDyy6x1.L2kgXw4FP4v3hVlJvpeAKKH2RJDbplUuQFPL3F2GpolE.5POOqdBSTijzupXgKQYIZY5OAEPH7fnxVR0Jz2yrg0s;
+        path=/; expires=Wed, 05-Mar-25 16:33:42 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=H8K7VKonSJwcE9DWHlDq.oVTDSZai8BeH1gPszaa7kk-1741190622790-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '657'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998847'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_ea779d48c576d3c3efeba37e88fa6af7
+    status:
+      code: 200
+      message: OK
+version: 1

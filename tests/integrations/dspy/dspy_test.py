@@ -43,6 +43,45 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+def test_dspy_predict_module(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    qa = dspy.Predict('question: str -> response: str')
+    response = qa(question="who is the creator of git?")
+    assert "Linus Torvalds" in response.response
+
+    calls = list(client.calls())
+    assert len(calls) == 5
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Predict"
+    output = call.output
+    assert "Linus Torvalds" in output["response"]
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChatAdapter"
+    output = call.output
+    assert "Linus Torvalds" in output[0]["response"]
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_dspy_cot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
     math = dspy.ChainOfThought("question -> answer: float")
