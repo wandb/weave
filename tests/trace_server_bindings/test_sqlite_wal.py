@@ -98,9 +98,9 @@ def test_async_processor_with_wal(temp_dir):
     # After enqueue, check that no work has been done but items are in the WAL
     items = processor.wal.get_all_items()
     assert len(items) == 2, f"Expected 2 items in WAL, got {len(items)}"
-    assert len(processed_items) == 0, (
-        f"Expected 0 items to be processed, got {len(processed_items)}"
-    )
+    assert (
+        len(processed_items) == 0
+    ), f"Expected 0 items to be processed, got {len(processed_items)}"
 
     # Wait for processing
     processed_event.wait(timeout=2.0)
@@ -108,12 +108,12 @@ def test_async_processor_with_wal(temp_dir):
 
     # After processing, check that work is done and WAL is empty
     items = processor.wal.get_all_items()
-    assert len(items) == 0, (
-        f"Expected WAL to be empty after processing, got {len(items)} items"
-    )
-    assert len(processed_items) == 2, (
-        f"Expected 2 items to be processed, got {len(processed_items)}"
-    )
+    assert (
+        len(items) == 0
+    ), f"Expected WAL to be empty after processing, got {len(items)} items"
+    assert (
+        len(processed_items) == 2
+    ), f"Expected 2 items to be processed, got {len(processed_items)}"
 
 
 def test_wal_recovery_after_crash(temp_dir):
@@ -144,9 +144,9 @@ def test_wal_recovery_after_crash(temp_dir):
 
         # Verify items were written to WAL
         stored_items = processor.wal.get_all_items()
-        assert len(stored_items) == 10, (
-            f"Expected 10 items in WAL, got {len(stored_items)}"
-        )
+        assert (
+            len(stored_items) == 10
+        ), f"Expected 10 items in WAL, got {len(stored_items)}"
 
         # Simulate crash by not shutting down properly
         del processor
@@ -180,16 +180,16 @@ def test_wal_recovery_after_crash(temp_dir):
     processor.stop_accepting_new_work_and_flush_queue()
 
     # Verify items were recovered and processed
-    assert len(processed_items) == 10, (
-        f"Expected 10 items to be recovered and processed, got {len(processed_items)}"
-    )
+    assert (
+        len(processed_items) == 10
+    ), f"Expected 10 items to be recovered and processed, got {len(processed_items)}"
 
     # Check WAL is empty after processing
     wal = SQLiteWriteAheadLog(wal_path)
     remaining_items = wal.get_all_items()
-    assert len(remaining_items) == 0, (
-        f"Expected WAL to be empty after recovery, got {len(remaining_items)} items"
-    )
+    assert (
+        len(remaining_items) == 0
+    ), f"Expected WAL to be empty after recovery, got {len(remaining_items)} items"
 
 
 def test_wal_max_items(temp_dir):
@@ -214,6 +214,6 @@ def test_wal_max_items(temp_dir):
 
     # Check that only the most recent items are in the WAL
     items = wal.get_all_items()
-    assert len(items) <= MAX_ITEMS, (
-        f"Expected at most {MAX_ITEMS} items in WAL due to max_items, got {len(items)}"
-    )
+    assert (
+        len(items) <= MAX_ITEMS
+    ), f"Expected at most {MAX_ITEMS} items in WAL due to max_items, got {len(items)}"
