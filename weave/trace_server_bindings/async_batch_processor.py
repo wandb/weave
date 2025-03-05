@@ -5,16 +5,22 @@ import logging
 import time
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
-from typing import Callable, Generic, TypeVar, cast
+from typing import Callable, Generic, TypedDict, TypeVar, cast
 
 from pydantic import BaseModel
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
+from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.sqlite_wal import SQLiteWriteAheadLog
 
 T = TypeVar("T")
 PydanticT = TypeVar("PydanticT", bound=BaseModel)
 logger = logging.getLogger(__name__)
+
+
+class BatchWithID(Generic[T], TypedDict):
+    batch: list[T]
+    batch_id: str
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -134,8 +140,9 @@ class AsyncBatchProcessor(Generic[T]):
                         f"Queue is full. Dropping item. Max queue size: {self.queue.maxsize}"
                     )
 
-    def _get_next_batch(self) -> list[T]:
+    def _get_next_batch(self) -> BatchWithID:
         batch: list[T] = []
+        batch_id = generate_id()
         while len(batch) < self.max_batch_size:
             try:
                 item = self.queue.get_nowait()
@@ -143,20 +150,20 @@ class AsyncBatchProcessor(Generic[T]):
                 break
             else:
                 batch.append(item)
-        return batch
+        return BatchWithID(batch=batch, batch_id=batch_id)
 
     def _process_batches(self) -> None:
         """Internal method that continuously processes batches of items from the queue."""
         while True:
-            if current_batch := self._get_next_batch():
+            if batch_with_id := self._get_next_batch():
                 try:
                     # Process the batch
-                    self.processor_fn(current_batch)
+                    self.processor_fn(batch_with_id["batch"])
 
                     # If using WAL, clear the WAL after successful processing
                     if self.use_wal and self.wal is not None:
                         try:
-                            self.wal.clear()
+                            self.wal.delete_items(batch_with_id["batch_id"])
                         except Exception as e:
                             logger.exception(f"Error clearing WAL: {e}")
                 except Exception as e:
@@ -164,7 +171,7 @@ class AsyncBatchProcessor(Generic[T]):
                         raise
                     logger.exception(f"Error processing batch: {e}")
                 else:
-                    for _ in current_batch:
+                    for _ in batch_with_id["batch"]:
                         self.queue.task_done()
 
             if self.stop_accepting_work_event.is_set() and self.queue.empty():

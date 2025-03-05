@@ -105,7 +105,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(
-                self._flush_calls, use_wal=use_wal, wal_path=wal_path
+                self._flush_calls,
+                use_wal=use_wal,
+                # wal_path=wal_path,
+                wal_path="temp.db",
             )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
