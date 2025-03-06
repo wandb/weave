@@ -15,9 +15,9 @@ server_dependency = ServerDependency(
     server_factory=lambda auth, op_name: stub_server,
 )
 
-router = generate_routes(APIRouter(), server_dependency)
+trace_service_router = generate_routes(APIRouter(), server_dependency)
 app = FastAPI()
-app.include_router(router)
+app.include_router(trace_service_router)
 
 if __name__ == "__main__":
     import uvicorn
