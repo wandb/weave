@@ -1994,10 +1994,12 @@ class WeaveClient:
 
         # Add call batch uploads if available
         if self._server_is_flushable:
-            total += self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            total += server.call_processor.num_outstanding_jobs
         return total
 
-    def flush(
+    def finish(
         self,
         use_progress_bar: bool = True,
         callback: Callable[[FlushStatus], None] | None = None,
@@ -2027,6 +2029,10 @@ class WeaveClient:
             self._flush_with_callback(callback=callback)
         else:
             self._flush()
+
+    def flush(self) -> None:
+        """Flushes background asynchronous tasks, safe to call multiple times."""
+        self._flush()
 
     def _flush_with_callback(
         self,
@@ -2117,7 +2123,16 @@ class WeaveClient:
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
         if self._server_is_flushable:
-            self.server.call_processor.stop_accepting_new_work_and_flush_queue()  # type: ignore
+            # We don't want to do an instance check here because it could
+            # be susceptible to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable.
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+            # Restart call processor processing thread after flushing
+            server.call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2135,7 +2150,9 @@ class WeaveClient:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
         if self._server_is_flushable:
-            call_processor_jobs = self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            call_processor_jobs = server.call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,

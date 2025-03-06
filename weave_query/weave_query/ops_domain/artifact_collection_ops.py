@@ -12,6 +12,10 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_prop_op,
     make_root_op_gql_op_output_type,
 )
+from weave_query.constants import (
+    LIMIT_ARTIFACT_VERSIONS,
+    LIMIT_ARTIFACT_SEQUENCES,
+)
 
 # Section 1/6: Tag Getters
 # None
@@ -38,7 +42,7 @@ def root_all_artifacts_gql_resolver(gql_result):
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
     instance {{
-        artifacts_500: artifactSequences(limit: 500) {{
+        artifacts_500: artifactSequences(limit: {LIMIT_ARTIFACT_SEQUENCES}) {{
             edges {{
                 node {{
                     {wdt.ArtifactCollection.REQUIRED_FRAGMENT}
@@ -119,7 +123,7 @@ gql_connection_op(
     "artifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_ARTIFACT_VERSIONS}",
 )
 gql_connection_op(
     "artifact-memberships",
