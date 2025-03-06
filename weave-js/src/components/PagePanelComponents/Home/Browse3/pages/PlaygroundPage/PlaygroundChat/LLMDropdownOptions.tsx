@@ -1,6 +1,7 @@
 import {Box} from '@mui/material';
 import {
   MOON_100,
+  MOON_200,
   MOON_800,
   MOON_900,
   OBLIVION,
@@ -194,6 +195,17 @@ const SubMenuOption = ({
     [children, isDisabled, isHovered, llms, onChange, position, props]
   );
 
+  if (props.data.value === 'divider') {
+    return (
+      <Box
+        sx={{
+          borderBottom: `1px solid ${MOON_200}`,
+          mb: 1,
+        }}
+      />
+    );
+  }
+
   return isDisabled ? (
     <DisabledProviderTooltip entity={entity}>
       {optionContent}
@@ -283,4 +295,26 @@ export const CustomOption = ({
       {children}
     </SubMenuOption>
   );
+};
+
+export const dividerOption: ProviderOption = {
+  label: '',
+  value: 'divider',
+  llms: [],
+};
+
+export const addProviderOption: ProviderOption = {
+  label: (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+      }}>
+      <Icon name="add-new" />
+      Add AI provider
+    </Box>
+  ),
+  value: 'add-provider',
+  llms: [],
 };
