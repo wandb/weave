@@ -6,7 +6,7 @@ import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {useDatasetEditContext} from './DatasetEditorContext';
-import {CallData, extractSourceSchema} from './schemaUtils';
+import {CallData, extractSourceSchema, getNestedValue} from './schemaUtils';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -67,23 +67,6 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
   // Extract preview data for each source field
   const fieldPreviews = useMemo(() => {
     const previews = new Map<string, Array<Record<string, any>>>();
-
-    const getNestedValue = (obj: any, path: string[]): any => {
-      let current = obj;
-      for (const part of path) {
-        if (current == null) {
-          return undefined;
-        }
-        if (typeof current === 'object' && '__val__' in current) {
-          current = current.__val__;
-        }
-        if (typeof current !== 'object') {
-          return current;
-        }
-        current = current[part];
-      }
-      return current;
-    };
 
     sourceSchema.forEach(field => {
       const fieldData = selectedCalls.map(call => {
@@ -153,10 +136,11 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
 
   return (
     <Stack spacing={'8px'} sx={{mt: '24px'}}>
-      <Typography sx={{...typographyStyle, fontWeight: 600}}>
+      <Typography component="div" sx={{...typographyStyle, fontWeight: 600}}>
         Configure dataset fields
       </Typography>
       <Typography
+        component="div"
         sx={{
           ...typographyStyle,
           color: 'text.secondary',
@@ -181,6 +165,7 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
             mb: 2,
           }}>
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
@@ -206,6 +191,7 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
           </Typography>
           <Box /> {/* Spacer for arrow */}
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
@@ -232,6 +218,7 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                   gap: 2,
                   cursor: 'pointer',
                   userSelect: 'none',
+                  overflow: 'hidden',
                   '&:hover': {
                     opacity: 0.8,
                   },
@@ -264,6 +251,10 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                     sx={{
                       ...typographyStyle,
                       color: config.included ? 'inherit' : 'text.disabled',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
                     }}>
                     {config.sourceField}
                   </Typography>

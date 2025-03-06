@@ -58,8 +58,17 @@ def test_server_caching(client):
     gotten_dataset = client.get(ref)
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
-        # 1 obj read for the dataset
+        # get the ref
+        "misses": 1,
+        "errors": 0,
+        "skips": 0,
+    }
+    caching_server.reset_cache_recorder()
+    rows = list(gotten_dataset)
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
         # 1 table read for the rows
+        # 1 table_query_stats for len(rows)
         # 5 images
         "misses": 7,
         "errors": 0,
@@ -71,7 +80,7 @@ def test_server_caching(client):
     caching_server.reset_cache_recorder()
     compare_datasets(client.get(ref), dataset)
     assert caching_server.get_cache_recorder() == {
-        "hits": 8,
+        "hits": 7,
         "misses": 0,
         "errors": 0,
         "skips": 0,
@@ -86,7 +95,7 @@ def test_server_caching(client):
         "hits": 0,
         "misses": 0,
         "errors": 0,
-        "skips": 8,
+        "skips": 7,
     }
 
 

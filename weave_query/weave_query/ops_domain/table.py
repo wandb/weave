@@ -363,6 +363,7 @@ def _table_data_to_weave1_objects(
                 boxes=cell.get("boxes", {}),  # type: ignore
                 masks=cell.get("masks", {}),  # type: ignore
                 classes=cell.get("classes"),  # type: ignore
+                caption=cell.get("caption", ""),
             )
         elif file_type in [
             "audio-file",
