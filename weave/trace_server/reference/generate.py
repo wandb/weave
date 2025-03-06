@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, NamedTuple
+from typing import Annotated, Any, Callable, NamedTuple, Optional, TypeVar
 
-from fastapi import APIRouter, FastAPI, UploadFile
-from fastapi.params import Depends, Form, Header
+from fastapi import APIRouter, Depends, UploadFile
+from fastapi.params import Form, Header
 from fastapi.responses import StreamingResponse
-from fastapi.security import HTTPBasic
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
@@ -38,8 +37,7 @@ class AuthParams(NamedTuple):
         )
 
 
-security = HTTPBasic()
-Auth = Annotated[AuthParams, Depends(security)]
+Auth = AuthParams
 
 
 # Special batch APIs outside of the core API
@@ -65,45 +63,97 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
+# Type aliases for better readability
+ReqT = TypeVar("ReqT")
+ProjectIdExtractor = Callable[[Any], str]
+
+
+class ServerDependency:
+    """Factory for creating server dependencies with proper authorization."""
+
+    def __init__(
+        self,
+        auth_dependency: Optional[Callable] = None,
+        server_factory: Optional[
+            Callable[[AuthParams], tsi.TraceServerInterface]
+        ] = None,
+    ):
+        """
+        Initialize with auth dependency and server factory.
+
+        Args:
+            auth_dependency: FastAPI dependency for auth
+            server_factory: Function that creates a server from auth params
+        """
+        self.auth_dependency = auth_dependency
+        self.server_factory = server_factory or (lambda auth: None)
+
+    def get_server(self) -> Callable[[AuthParams], tsi.TraceServerInterface]:
+        """Basic dependency that just returns the server."""
+
+        def dependency(
+            auth_params: Annotated[AuthParams, Depends(self.auth_dependency)],
+        ) -> tsi.TraceServerInterface:
+            return self.server_factory(auth_params)
+
+        return dependency
+
+
 def generate_routes(
-    router: APIRouter, server_impl: tsi.TraceServerInterface
-) -> FastAPI:
-    """Generate a FastAPI app from a TraceServerInterface implementation.
+    router: APIRouter, server_dependency: ServerDependency
+) -> APIRouter:
+    """Generate a FastAPI app from a TraceServerInterface implementation using dependencies.
 
     Args:
-        server_impl: An instance of a class implementing TraceServerInterface
+        router: The router to add routes to
+        server_dependency: The ServerDependency factory for creating server dependencies
 
     Returns:
-        A FastAPI application with all routes implemented
+        The router with all routes implemented
     """
+    # Create the basic server dependency
+    get_server = server_dependency.get_server()
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
-    def call_start(req: tsi.CallStartReq, auth_params: Auth) -> tsi.CallStartRes:
-        return server_impl.call_start(req)
+    def call_start(
+        req: tsi.CallStartReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallStartRes:
+        return server.call_start(req)
 
     @router.post("/call/end", tags=[CALLS_TAG_NAME])
-    def call_end(req: tsi.CallEndReq, auth_params: Auth) -> tsi.CallEndRes:
-        return server_impl.call_end(req)
+    def call_end(
+        req: tsi.CallEndReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallEndRes:
+        return server.call_end(req)
 
     @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
     def call_start_batch(
-        req: CallCreateBatchReq, auth_params: Auth
+        req: CallCreateBatchReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> CallCreateBatchRes:
         results = []
         for item in req.batch:
             if isinstance(item, CallBatchStartMode):
-                results.append(server_impl.call_start(item.req))
+                results.append(server.call_start(item.req))
             else:
-                results.append(server_impl.call_end(item.req))
+                results.append(server.call_end(item.req))
         return CallCreateBatchRes(res=results)
 
     @router.post("/call/read", tags=[CALLS_TAG_NAME])
-    def call_read(req: tsi.CallReadReq, auth_params: Auth) -> tsi.CallReadRes:
-        return server_impl.call_read(req)
+    def call_read(
+        req: tsi.CallReadReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallReadRes:
+        return server.call_read(req)
 
     @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
-    def calls_query(req: tsi.CallsQueryReq, auth_params: Auth) -> tsi.CallsQueryRes:
-        return server_impl.calls_query(req)
+    def calls_query(
+        req: tsi.CallsQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallsQueryRes:
+        return server.calls_query(req)
 
     @router.post(
         "/calls/query_stream",
@@ -125,76 +175,122 @@ def generate_routes(
     )
     def calls_query_stream(
         req: tsi.CallsQueryReq,
-        auth_params: Auth,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(server_impl.calls_query_stream(req))
+        return StreamingResponse(server.calls_query_stream(req))
 
     @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
-    def calls_delete(req: tsi.CallsDeleteReq, auth_params: Auth) -> tsi.CallsDeleteRes:
-        return server_impl.calls_delete(req)
+    def calls_delete(
+        req: tsi.CallsDeleteReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallsDeleteRes:
+        return server.calls_delete(req)
 
     @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
     def calls_query_stats(
-        req: tsi.CallsQueryStatsReq, auth_params: Auth
+        req: tsi.CallsQueryStatsReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.CallsQueryStatsRes:
-        return server_impl.calls_query_stats(req)
+        return server.calls_query_stats(req)
 
     @router.post("/call/update", tags=[CALLS_TAG_NAME])
-    def call_update(req: tsi.CallUpdateReq, auth_params: Auth) -> tsi.CallUpdateRes:
-        return server_impl.call_update(req)
+    def call_update(
+        req: tsi.CallUpdateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CallUpdateRes:
+        return server.call_update(req)
 
     @router.post("/op/create", tags=[OPS_TAG_NAME])
-    def op_create(req: tsi.OpCreateReq, auth_params: Auth) -> tsi.OpCreateRes:
-        return server_impl.op_create(req)
+    def op_create(
+        req: tsi.OpCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.OpCreateRes:
+        return server.op_create(req)
 
     @router.post("/op/read", tags=[OPS_TAG_NAME])
-    def op_read(req: tsi.OpReadReq, auth_params: Auth) -> tsi.OpReadRes:
-        return server_impl.op_read(req)
+    def op_read(
+        req: tsi.OpReadReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.OpReadRes:
+        return server.op_read(req)
 
     @router.post("/ops/query", tags=[OPS_TAG_NAME])
-    def ops_query(req: tsi.OpQueryReq, auth_params: Auth) -> tsi.OpQueryRes:
-        return server_impl.ops_query(req)
+    def ops_query(
+        req: tsi.OpQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.OpQueryRes:
+        return server.ops_query(req)
 
     @router.post("/cost/create", tags=[COST_TAG_NAME])
-    def cost_create(req: tsi.CostCreateReq, auth_params: Auth) -> tsi.CostCreateRes:
-        return server_impl.cost_create(req)
+    def cost_create(
+        req: tsi.CostCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CostCreateRes:
+        return server.cost_create(req)
 
     @router.post("/cost/query", tags=[COST_TAG_NAME])
-    def cost_query(req: tsi.CostQueryReq, auth_params: Auth) -> tsi.CostQueryRes:
-        return server_impl.cost_query(req)
+    def cost_query(
+        req: tsi.CostQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CostQueryRes:
+        return server.cost_query(req)
 
     @router.post("/cost/purge", tags=[COST_TAG_NAME])
-    def cost_purge(req: tsi.CostPurgeReq, auth_params: Auth) -> tsi.CostPurgeRes:
-        return server_impl.cost_purge(req)
+    def cost_purge(
+        req: tsi.CostPurgeReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.CostPurgeRes:
+        return server.cost_purge(req)
 
     @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
-    def obj_create(req: tsi.ObjCreateReq, auth_params: Auth) -> tsi.ObjCreateRes:
-        return server_impl.obj_create(req)
+    def obj_create(
+        req: tsi.ObjCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.ObjCreateRes:
+        return server.obj_create(req)
 
     @router.post("/obj/read", tags=[OBJECTS_TAG_NAME])
-    def obj_read(req: tsi.ObjReadReq, auth_params: Auth) -> tsi.ObjReadRes:
-        return server_impl.obj_read(req)
+    def obj_read(
+        req: tsi.ObjReadReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.ObjReadRes:
+        return server.obj_read(req)
 
     @router.post("/objs/query", tags=[OBJECTS_TAG_NAME])
-    def objs_query(req: tsi.ObjQueryReq, auth_params: Auth) -> tsi.ObjQueryRes:
-        return server_impl.objs_query(req)
+    def objs_query(
+        req: tsi.ObjQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.ObjQueryRes:
+        return server.objs_query(req)
 
     @router.post("/obj/delete", tags=[OBJECTS_TAG_NAME])
-    def obj_delete(req: tsi.ObjDeleteReq, auth_params: Auth) -> tsi.ObjDeleteRes:
-        return server_impl.obj_delete(req)
+    def obj_delete(
+        req: tsi.ObjDeleteReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.ObjDeleteRes:
+        return server.obj_delete(req)
 
     @router.post("/table/create", tags=[TABLES_TAG_NAME])
-    def table_create(req: tsi.TableCreateReq, auth_params: Auth) -> tsi.TableCreateRes:
-        return server_impl.table_create(req)
+    def table_create(
+        req: tsi.TableCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.TableCreateRes:
+        return server.table_create(req)
 
     @router.post("/table/update", tags=[TABLES_TAG_NAME])
-    def table_update(req: tsi.TableUpdateReq, auth_params: Auth) -> tsi.TableUpdateRes:
-        return server_impl.table_update(req)
+    def table_update(
+        req: tsi.TableUpdateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.TableUpdateRes:
+        return server.table_update(req)
 
     @router.post("/table/query", tags=[TABLES_TAG_NAME])
-    def table_query(req: tsi.TableQueryReq, auth_params: Auth) -> tsi.TableQueryRes:
-        return server_impl.table_query(req)
+    def table_query(
+        req: tsi.TableQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
+    ) -> tsi.TableQueryRes:
+        return server.table_query(req)
 
     @router.post(
         "/table/query_stream",
@@ -215,30 +311,34 @@ def generate_routes(
     )
     def table_query_stream(
         req: tsi.TableQueryReq,
-        auth_params: Auth,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(server_impl.table_query_stream(req))
+        return StreamingResponse(server.table_query_stream(req))
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
-        req: tsi.TableQueryStatsReq, auth_params: Auth
+        req: tsi.TableQueryStatsReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.TableQueryStatsRes:
-        return server_impl.table_query_stats(req)
+        return server.table_query_stats(req)
 
     @router.post("/refs/read_batch", tags=[REFS_TAG_NAME])
     def refs_read_batch(
-        req: tsi.RefsReadBatchReq, auth_params: Auth
+        req: tsi.RefsReadBatchReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.RefsReadBatchRes:
-        return server_impl.refs_read_batch(req)
+        return server.refs_read_batch(req)
 
     @router.post("/file/create", tags=[FILES_TAG_NAME])
     @router.post("/files/create", tags=[FILES_TAG_NAME], include_in_schema=False)
     async def file_create(
-        project_id: Annotated[str, Form()], file: UploadFile, auth_params: Auth
+        project_id: Annotated[str, Form()],
+        file: UploadFile,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.FileCreateRes:
         content = await file.read()
-        return server_impl.file_create(
+        return server.file_create(
             tsi.FileCreateReq(
                 project_id=project_id, name=file.filename, content=content
             )
@@ -247,49 +347,56 @@ def generate_routes(
     @router.post("/file/content", tags=[FILES_TAG_NAME])
     @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
     def file_content(
-        req: tsi.FileContentReadReq, auth_params: Auth
+        req: tsi.FileContentReadReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> StreamingResponse:
-        res = server_impl.file_content_read(req)
+        res = server.file_content_read(req)
         return StreamingResponse(iter([res.content]))
 
     @router.post("/feedback/create", tags=[FEEDBACK_TAG_NAME])
     def feedback_create(
-        req: tsi.FeedbackCreateReq, auth_params: Auth
+        req: tsi.FeedbackCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.FeedbackCreateRes:
-        return server_impl.feedback_create(req)
+        return server.feedback_create(req)
 
     @router.post("/feedback/query", tags=[FEEDBACK_TAG_NAME])
     def feedback_query(
-        req: tsi.FeedbackQueryReq, auth_params: Auth
+        req: tsi.FeedbackQueryReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.FeedbackQueryRes:
-        return server_impl.feedback_query(req)
+        return server.feedback_query(req)
 
     @router.post("/feedback/purge", tags=[FEEDBACK_TAG_NAME])
     def feedback_purge(
-        req: tsi.FeedbackPurgeReq, auth_params: Auth
+        req: tsi.FeedbackPurgeReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.FeedbackPurgeRes:
-        return server_impl.feedback_purge(req)
+        return server.feedback_purge(req)
 
     @router.post("/feedback/replace", tags=[FEEDBACK_TAG_NAME])
     def feedback_replace(
-        req: tsi.FeedbackReplaceReq, auth_params: Auth
+        req: tsi.FeedbackReplaceReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.FeedbackReplaceRes:
-        return server_impl.feedback_replace(req)
+        return server.feedback_replace(req)
 
     @router.post(
         "/actions/execute_batch", tags=[ACTIONS_TAG_NAME], include_in_schema=False
     )
     def actions_execute_batch(
-        req: tsi.ActionsExecuteBatchReq, auth_params: Auth
+        req: tsi.ActionsExecuteBatchReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.ActionsExecuteBatchRes:
-        return server_impl.actions_execute_batch(req)
+        return server.actions_execute_batch(req)
 
     @router.post(
         "/completions/create", tags=[COMPLETIONS_TAG_NAME], include_in_schema=False
     )
     def completions_create(
-        req: tsi.CompletionsCreateReq, auth_params: Auth
+        req: tsi.CompletionsCreateReq,
+        server: Annotated[tsi.TraceServerInterface, Depends(get_server)],
     ) -> tsi.CompletionsCreateRes:
-        return server_impl.completions_create(req)
+        return server.completions_create(req)
 
     return router
