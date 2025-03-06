@@ -399,6 +399,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                       }}
                     />
                   </Box>
+                  {/* Error messages */}
                   {name.length + modelName[index].length > 127 && (
                     <Typography
                       variant="caption"

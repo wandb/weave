@@ -54,7 +54,17 @@ const columns: GridColDef[] = [
     minWidth: 200,
     renderCell: (params: GridRenderCellParams) => (
       <div className="flex h-full items-center justify-between">
-        <span className="text-moon-500">{params.value || 'None'}</span>
+        <span
+          className="text-moon-500"
+          style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            display: 'inline-block',
+          }}>
+          {params.value || 'None'}
+        </span>
         {params.row.isAdmin && (
           <Link
             to={`/${params.row.entityName}/settings`}
