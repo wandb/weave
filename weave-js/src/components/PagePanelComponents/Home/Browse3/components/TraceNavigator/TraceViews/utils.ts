@@ -1,6 +1,30 @@
+import _ from 'lodash';
+
+import {isPredictAndScoreOp} from '../../../pages/common/heuristics';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import {TraceTreeFlat} from './types';
+
+const RE_TRAILING_INT = /\d+$/;
+// Sorting evaluation calls by dataset row.
+// Because of async they may have been processed in a different order.
+const getCallSortExampleRow = (call: TraceCallSchema): number | null => {
+  if (isPredictAndScoreOp(call.op_name)) {
+    return null;
+  }
+  const {example} = call.inputs;
+  if (example) {
+    // If not a string, we don't know how to sort.
+    if (!_.isString(example)) {
+      return null;
+    }
+    const match = example.match(RE_TRAILING_INT);
+    if (match) {
+      return parseInt(match[0], 10);
+    }
+  }
+  return null;
+};
 
 /**
  * Builds a flattened representation of a trace call tree.
@@ -40,6 +64,11 @@ export const buildTraceTreeFlat = (
   });
 
   const sortCalls = (a: TraceCallSchema, b: TraceCallSchema) => {
+    const aDatasetOrdering = getCallSortExampleRow(a);
+    const bDatasetOrdering = getCallSortExampleRow(b);
+    if (aDatasetOrdering !== null && bDatasetOrdering !== null) {
+      return aDatasetOrdering - bDatasetOrdering;
+    }
     const aStartedAt = Date.parse(a.started_at);
     const bStartedAt = Date.parse(b.started_at);
     return aStartedAt - bStartedAt;

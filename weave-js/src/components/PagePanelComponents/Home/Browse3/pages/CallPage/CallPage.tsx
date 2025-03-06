@@ -253,14 +253,22 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   const showFeedbackActual =
     showFeedback != null ? showFeedback : showFeedbackDefault;
 
+  useEffect(() => {
+    if (hideTraceTree == null) {
+      setHideTraceTree(hideTraceTreeDefault);
+    }
+  }, [
+    hideTraceTree,
+    hideTraceTreeActual,
+    hideTraceTreeDefault,
+    setHideTraceTree,
+  ]);
+
   const onToggleTraceTree = useCallback(() => {
     const targetValue = !hideTraceTreeActual;
-    if (targetValue === hideTraceTreeDefault) {
-      setHideTraceTree(undefined);
-    } else {
-      setHideTraceTree(targetValue);
-    }
-  }, [hideTraceTreeActual, hideTraceTreeDefault, setHideTraceTree]);
+    setHideTraceTree(targetValue);
+  }, [hideTraceTreeActual, setHideTraceTree]);
+
   const onToggleFeedbackExpand = useCallback(() => {
     const targetValue = !showFeedbackActual;
     if (targetValue === showFeedbackDefault) {
