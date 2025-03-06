@@ -95,6 +95,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
         del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
+        del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
 
     @patch("weave.trace_server.requests.post")
     def test_other_error_retry(self, mock_post):
@@ -119,6 +120,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
         del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
+        del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
 
 
 if __name__ == "__main__":
