@@ -5,11 +5,11 @@ import {
   Background,
   Controls,
   Edge,
+  Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
-} from '@xyflow/react';
+  useReactFlow} from '@xyflow/react';
 import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
@@ -17,9 +17,6 @@ import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const {Handle} = require('@xyflow/react');
 
 // Create a wrapper component to address TypeScript issues
 const FlowHandle: React.FC<Partial<HandleProps>> = props => {

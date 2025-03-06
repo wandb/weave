@@ -24,7 +24,7 @@ import {
   parseSpanName,
   traceCallStatusCode,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
-import TraceScrubber from '../TraceScrubber';
+import TraceScrubber, { ScrubberOption } from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -350,6 +350,13 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
     ];
   }, [props.traceTreeFlat, searchQuery]);
 
+  const scrubbers: ScrubberOption[] = useMemo(() => {
+    if (searchQuery === '') {
+      return ['timeline', 'peer', 'sibling', 'stack'];
+    }
+    return ['timeline'];
+  }, [searchQuery]);
+
   return (
     <div className="flex h-full flex-col">
       <TreeViewHeader
@@ -365,7 +372,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
       </div>
       <TraceScrubber
         {...props}
-        allowedScrubbers={['timeline', 'peer', 'sibling', 'stack']}
+        allowedScrubbers={scrubbers}
       />
     </div>
   );
