@@ -10,6 +10,7 @@ import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRef} from '../smallRef/SmallRef';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
+import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {useDatasetEditContext} from './DatasetEditorContext';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
@@ -24,6 +25,8 @@ export interface SelectDatasetStepProps {
   onValidationChange?: (isValid: boolean) => void;
   entity: string;
   project: string;
+  isCreatingNew?: boolean;
+  setIsCreatingNew?: (isCreating: boolean) => void;
 }
 
 interface DatasetOptionProps {
@@ -186,11 +189,13 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   onValidationChange = () => {},
   entity,
   project,
+  isCreatingNew = false,
+  setIsCreatingNew = () => {},
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [showLatestOnly, setShowLatestOnly] = useState(true);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const {resetEditState} = useDatasetEditContext();
+  const {dispatch} = useDatasetDrawer();
 
   const handleNameChange = (value: string) => {
     setNewDatasetName(value);
@@ -278,6 +283,9 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
       setSelectedDataset(null);
       setIsCreatingNew(true);
       resetEditState();
+      // Also clear any error from previous dataset name validation
+      setError(null);
+      dispatch({type: ACTION_TYPES.SET_ERROR, payload: null});
     } else {
       setSelectedDataset(option?.value ?? null);
       setIsCreatingNew(false);

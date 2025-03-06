@@ -24,6 +24,7 @@ type TextFieldProps = {
   onChange?: (value: string) => void;
   onKeyDown?: (key: string, e: React.KeyboardEvent<HTMLInputElement>) => void;
   onBlur?: (value: string) => void;
+  onFocus?: () => void;
   autoFocus?: boolean;
   disabled?: boolean;
   icon?: IconName;
@@ -48,6 +49,7 @@ export const TextField = ({
   onChange,
   onKeyDown,
   onBlur,
+  onFocus,
   autoFocus,
   disabled,
   icon,
@@ -133,6 +135,7 @@ export const TextField = ({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
+            onFocus={onFocus}
             autoFocus={autoFocus}
             disabled={disabled}
             readOnly={!onChange} // It would be readonly regardless but this prevents a console warning

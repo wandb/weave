@@ -1,5 +1,7 @@
 import asyncio
+import os
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -359,3 +361,67 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
 
     result = asyncio.run(evaluation.evaluate(model))
     assert result == expected_eval_result
+
+
+def test_evaluate_table_lazy_iter(client):
+    """
+    The intention of this test is to show that an evaluation harness
+    lazily fetches rows from a table rather than eagerly fetching all
+    rows up front.
+    """
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    ref = weave.publish(dataset)
+    dataset = ref.get()
+
+    @weave.op()
+    async def model_predict(input) -> int:
+        return input * 1
+
+    @weave.op()
+    def score_simple(input, output):
+        return input == output
+
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == [
+        "ensure_project_exists",
+        "table_create",
+        "obj_create",
+        "obj_read",
+    ]
+    client.server.attribute_access_log = []
+
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score_simple],
+    )
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == []
+
+    # Make sure we have deterministic results
+    with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
+        result = asyncio.run(evaluation.evaluate(model_predict))
+        assert result["output"] == {"mean": 149.5}
+        assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
+
+    log = client.server.attribute_access_log
+    log = [l for l in log if not l.startswith("_")]
+
+    # Make sure that the length was figured out deterministically
+    assert "table_query_stats" in log
+
+    counts_split_by_table_query = [0]
+    for log_entry in log:
+        if log_entry == "table_query":
+            counts_split_by_table_query.append(0)
+        else:
+            counts_split_by_table_query[-1] += 1
+
+    # Note: these exact numbers might change if we change the way eval traces work.
+    # However, the key part is that we have basically X + 2 splits, with the middle X
+    # being equal. We want to ensure that the table_query is not called in sequence,
+    # but rather lazily after each batch.
+    assert counts_split_by_table_query[0] <= 13
+    # Note: if this test suite is ran in a different order, then the low level eval ops will already be saved
+    # so the first count can be different.
+    count = counts_split_by_table_query[0]
+    assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
