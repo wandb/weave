@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 from typing import Callable
 
 import weave
@@ -79,7 +80,7 @@ def get_crewai_patcher(
     llm_settings = base.model_copy(
         update={
             "name": base.name or "crewai.LLM.call",
-            # "call_display_name": base.call_display_name
+            "call_display_name": base.call_display_name,
         }
     )
 
