@@ -236,7 +236,7 @@ export const ProvidersTabInner: React.FC<{
                 await objectDeleteAllVersions({
                   entity: entityName,
                   project: projectName,
-                  objectId: provider.val.name,
+                  objectId: provider.val.name || '',
                   weaveKind: 'object',
                   scheme: 'weave',
                   versionHash: '',
@@ -248,7 +248,7 @@ export const ProvidersTabInner: React.FC<{
                     objectDeleteAllVersions({
                       entity: entityName,
                       project: projectName,
-                      objectId: model.val.name,
+                      objectId: `${provider.val.name}-${model.val.name}`,
                       weaveKind: 'object',
                       scheme: 'weave',
                       versionHash: '',

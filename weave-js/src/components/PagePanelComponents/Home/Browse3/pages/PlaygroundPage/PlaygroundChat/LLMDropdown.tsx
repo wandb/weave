@@ -1,9 +1,9 @@
 import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
-import {useWFHooks} from '../../wfReactInterface/context';
+import {useBaseObjectInstances} from '../../wfReactInterface/objectClassQuery';
 import {
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
@@ -30,27 +30,33 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   entity,
   project,
 }) => {
+  const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entity);
 
-  const {useRootObjectVersions} = useWFHooks();
-  const {result: objectsRes, loading: objectsLoading} = useRootObjectVersions(
-    entity,
-    project,
-    {
-      latestOnly: true,
-      baseObjectClasses: ['Provider', 'ProviderModel', 'LLMModel'],
-    }
-  );
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+    refetch: refetchCustomProviders,
+  } = useBaseObjectInstances('Provider', {
+    project_id: `${entity}/${project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
 
-  const providers =
-    objectsRes?.filter(obj => obj.baseObjectClass === 'Provider') || [];
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+    refetch: refetchCustomProviderModels,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: `${entity}/${project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
 
-  const providerModels =
-    objectsRes?.filter(obj => obj.baseObjectClass === 'ProviderModel') || [];
-
-  const llmModels =
-    objectsRes?.filter(obj => obj.baseObjectClass === 'LLMModel') || [];
+  const customLoading = customProvidersLoading || customProviderModelsLoading;
 
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
@@ -88,41 +94,32 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   }
 
   // Add custom providers
-  if (!objectsLoading) {
-    providers.forEach(provider => {
-      const currentProviderModels = providerModels?.filter(
-        obj => obj.val.provider === provider.versionHash
-      );
-
-      const currentLLMModels = llmModels?.filter(obj =>
-        currentProviderModels.some(
-          pm => pm.versionHash === obj.val.provider_model
-        )
-      );
+  if (!customLoading) {
+    customProvidersResult?.forEach(provider => {
+      const providerName = provider.val.name || '';
+      const currentProviderModels =
+        customProviderModelsResult?.filter(
+          obj => obj.val.provider === provider.digest
+        ) || [];
 
       const shortenedProviderLabel =
-        provider.val.name.length > 20
-          ? provider.val.name.slice(0, 2) + '...' + provider.val.name.slice(-4)
-          : provider.val.name;
+        providerName.length > 20
+          ? providerName.slice(0, 2) + '...' + providerName.slice(-4)
+          : providerName;
 
-      const customLLMs = [
-        ...currentProviderModels.map(model => ({
-          label: shortenedProviderLabel + '/' + model.val.name,
-          value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
-          max_tokens: model.val.max_tokens,
-        })),
-        ...currentLLMModels.map(model => ({
-          label: shortenedProviderLabel + '/' + model.val.name,
-          value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
-          max_tokens: model.val.max_tokens,
-        })),
-      ];
+      const llmOptions = currentProviderModels.map(model => ({
+        label: shortenedProviderLabel + '/' + model.val.name,
+        value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
+        max_tokens: model.val.max_tokens,
+      }));
 
-      options.push({
-        label: provider.val.name,
-        value: provider.val.name,
-        llms: customLLMs,
-      });
+      if (llmOptions.length > 0) {
+        options.push({
+          label: providerName,
+          value: providerName,
+          llms: llmOptions,
+        });
+      }
     });
   }
 
@@ -132,9 +129,17 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     ...options,
     ...disabledOptions,
     dividerOption,
-    // TODO: make this open drawer
     addProviderOption,
   ];
+
+  const refetch = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+  }, [refetchCustomProviders, refetchCustomProviderModels]);
+
+  const handleCloseDrawer = () => {
+    setIsAddProviderDrawerOpen(false);
+  };
 
   return (
     <Box sx={{width: '300px'}}>
@@ -158,6 +163,13 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           // When you click a provider, select the first LLM
           if (option && 'value' in option) {
             const selectedOption = option as ProviderOption;
+
+            // Check if the "Add AI provider" option was selected
+            if (selectedOption.value === 'add-provider') {
+              setIsAddProviderDrawerOpen(true);
+              return;
+            }
+
             if (selectedOption.llms.length > 0) {
               const llm = selectedOption.llms[0];
               onChange(llm.value, llm.max_tokens);
@@ -190,15 +202,14 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           );
         }}
       />
-      {/* TODO: make this draewer work */}
-      {/* Add editing to porivders? */}
-      {/* Or just make the add provider option just add a link */}
-      {/* <AddProviderDrawer 
-  isOpen,
-  onClose,
-  refetch,
-  providers,
-  editingProvider, /> */}
+
+      <AddProviderDrawer
+        isOpen={isAddProviderDrawerOpen}
+        onClose={handleCloseDrawer}
+        refetch={refetch}
+        projectId={`${entity}/${project}`}
+        providers={customProvidersResult?.map(p => p.val.name || '') || []}
+      />
     </Box>
   );
 };
