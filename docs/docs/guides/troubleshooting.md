@@ -109,7 +109,7 @@ client = weave.init("fast-upload", settings={"client_parallelism": 100})
 
 ## OS errors
 
-### `[Errono 24]: Too many open files`
+### `[Errno 24]: Too many open files`
 
 This error occurs when the number of open files exceeds the limit set by your operating system. In Weave, this may happen because you're working with large image datasets. Weave uses `PIL` for image processing, which keeps file descriptors open for the duration of the program.
 
