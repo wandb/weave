@@ -306,10 +306,10 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'status',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
-      sortable: false,
+      sortable: true,
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
@@ -618,14 +618,14 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'latency',
+    field: 'summary.weave.latency_ms',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     // Should probably have a custom filter here.
     filterable: false,
-    sortable: false,
+    sortable: true,
     valueGetter: (unused: any, row: any) => {
       if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
