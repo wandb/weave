@@ -1,15 +1,14 @@
 import '@xyflow/react/dist/style.css';
 
-import type {HandleProps, Node} from '@xyflow/react';
+import type {Node} from '@xyflow/react';
 import {
   Background,
   Controls,
   Edge,
-  Handle,
-  Position,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow} from '@xyflow/react';
+  useReactFlow,
+} from '@xyflow/react';
 import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
@@ -17,11 +16,6 @@ import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
-
-// Create a wrapper component to address TypeScript issues
-const FlowHandle: React.FC<Partial<HandleProps>> = props => {
-  return <Handle {...props} />;
-};
 
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 40;
@@ -53,9 +47,7 @@ const TraceNode: React.FC<{
         borderRadius: '8px',
         padding: '8px',
       }}>
-      <FlowHandle type="target" position={Position.Top} />
       <div className="truncate text-center text-sm">{data.label}</div>
-      <FlowHandle type="source" position={Position.Bottom} />
     </div>
   );
 };

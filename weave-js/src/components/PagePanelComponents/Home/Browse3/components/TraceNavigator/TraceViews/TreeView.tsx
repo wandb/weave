@@ -24,7 +24,7 @@ import {
   parseSpanName,
   traceCallStatusCode,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
-import TraceScrubber, { ScrubberOption } from '../TraceScrubber';
+import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -370,10 +370,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           deemphasizeCallIds={deemphasizeCallIds}
         />
       </div>
-      <TraceScrubber
-        {...props}
-        allowedScrubbers={scrubbers}
-      />
+      <TraceScrubber {...props} allowedScrubbers={scrubbers} />
     </div>
   );
 };
