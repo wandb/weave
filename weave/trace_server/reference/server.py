@@ -9,10 +9,10 @@ class StubTraceService(tsi.TraceServerInterface): ...
 
 # The type ignore here is safe.  We are just inheriting from the protocol to generate a
 # stub implementation.  By definition, the stub should have all the methods of the protocol.
-stub_server = StubTraceService()  # type: ignore
+stub_service = StubTraceService()  # type: ignore
 server_dependency = ServerDependency(
     endpoint_auth_mapping=None,  # No auth for the stub server
-    server_factory=lambda auth, op_name: stub_server,
+    server_factory=lambda auth, op_name: stub_service,
 )
 
 trace_service_router = generate_routes(APIRouter(), server_dependency)
