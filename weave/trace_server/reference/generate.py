@@ -55,10 +55,6 @@ class CallCreateBatchRes(BaseModel):
     res: list[tsi.CallStartRes | tsi.CallEndRes]
 
 
-class ServerInfoRes(BaseModel):
-    min_required_weave_python_version: str
-
-
 class ServerDependency:
     """Factory for creating server dependencies with proper authorization."""
 
@@ -105,12 +101,13 @@ def generate_routes(
 
     Args:
         router: The router to add routes to
-        server_dependency: The ServerDependency factory for creating server dependencies
+        server_dependency: The factory function to create a ServerDependency.  This function
+            should return a class that implements TraceServerInterface and handle any
+            necessary auth before returning the server.
 
     Returns:
         The router with all routes implemented
     """
-    # Create the basic server dependency
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
