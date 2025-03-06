@@ -17,8 +17,8 @@ router = APIRouter()
 
 # Create a server dependency that simply returns the stub server
 server_dependency = ServerDependency(
-    auth_dependency=lambda: None,  # No auth for the stub server
-    server_factory=lambda _: stub_server,  # Always return the stub server
+    endpoint_auth_mapping=None,  # No auth for the stub server
+    server_factory=lambda auth, op_name: stub_server,  # Always return the stub server
 )
 
 router = generate_routes(router, server_dependency)
