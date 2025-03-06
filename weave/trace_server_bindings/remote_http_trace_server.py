@@ -46,6 +46,7 @@ REMOTE_REQUEST_BYTES_LIMIT = (
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
+REMOTE_REQUEST_MAX_ATTEMPTS = 6  # Maximum immediate retry attempts
 
 
 def _is_retryable_exception(e: Exception) -> bool:
@@ -102,6 +103,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
+        self.call_processor = None
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
@@ -129,7 +131,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth = auth
 
     @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        stop=tenacity.stop_after_attempt(REMOTE_REQUEST_MAX_ATTEMPTS),
         wait=tenacity.wait_exponential_jitter(
             initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
         ),
@@ -157,7 +159,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list,
+        batch: list[Union[StartBatchItem, EndBatchItem]],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -166,6 +168,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         This method handles the logic of splitting batches that are too large,
         but delegates the actual server communication (with retries) to _send_batch_to_server.
         """
+        # Call processor must be defined for this method
+        assert self.call_processor is not None
         if len(batch) == 0:
             return
 
@@ -188,11 +192,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # Send the batch to the server with retries
-        self._send_batch_to_server(encoded_data)
+        # If a single item is too large, we can't send it - raise an error
+        if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
+            raise ValueError(
+                f"Single call size ({encoded_bytes} bytes) is too large to send. "
+                f"The maximum size is {self.remote_request_bytes_limit} bytes."
+            )
+
+        try:
+            self._send_batch_to_server(encoded_data)
+        except Exception:
+            # Add items back to the queue for later processing
+            logger.warning(
+                f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+            )
+
+            # only if debug mode
+            if logger.isEnabledFor(logging.DEBUG):
+                ids = []
+                for item in batch:
+                    if isinstance(item, StartBatchItem):
+                        ids.append(f"{item.req.start.id}-start")
+                    elif isinstance(item, EndBatchItem):
+                        ids.append(f"{item.req.end.id}-end")
+                logger.debug(f"Requeueing batch with {ids=}")
+            self.call_processor.enqueue(batch)
 
     @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        stop=tenacity.stop_after_attempt(REMOTE_REQUEST_MAX_ATTEMPTS),
         wait=tenacity.wait_exponential_jitter(
             initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
         ),
@@ -259,7 +286,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 yield res_model.model_validate_json(line)
 
     @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        stop=tenacity.stop_after_attempt(REMOTE_REQUEST_MAX_ATTEMPTS),
         wait=tenacity.wait_exponential_jitter(
             initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
         ),
@@ -281,6 +308,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
@@ -300,6 +329,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
@@ -490,7 +521,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        stop=tenacity.stop_after_attempt(REMOTE_REQUEST_MAX_ATTEMPTS),
         wait=tenacity.wait_exponential_jitter(
             initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
         ),
@@ -511,7 +542,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return tsi.FileCreateRes.model_validate(r.json())
 
     @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        stop=tenacity.stop_after_attempt(REMOTE_REQUEST_MAX_ATTEMPTS),
         wait=tenacity.wait_exponential_jitter(
             initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
         ),
