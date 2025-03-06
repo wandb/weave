@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,

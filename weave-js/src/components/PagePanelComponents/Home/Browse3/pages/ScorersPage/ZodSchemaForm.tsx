@@ -146,6 +146,49 @@ const DiscriminatedUnionField: React.FC<{
   );
 };
 
+const useNestedField = (
+  config: Record<string, any>,
+  setConfig: (config: Record<string, any>) => void,
+  path: string[],
+  keyName: string
+) => {
+  const currentPath = useMemo(() => [...path, keyName], [path, keyName]);
+  const [currentValue, setCurrentValue] = useState(
+    getNestedValue(config, currentPath)
+  );
+
+  // The text field interacts very poorly with the "auto-refresh" feature
+  // in the main app, causing cursor jumps and deletion.
+  // We handle state updates in the following way:
+  // 1. when the field is focused, update the local state to the current value
+  //    from the parent config
+  // 2. only update the parent config when the field is blurred
+  //    not on every keystroke. This prevents the cursor from being reset
+  //    to the front of the field on external component updates.
+  const [isFocused, setIsFocused] = useState(false);
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    if (currentValue !== getNestedValue(config, currentPath)) {
+      updateConfig(currentPath, currentValue, config, setConfig);
+    }
+  }, [currentValue, currentPath, config, setConfig]);
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+  useEffect(() => {
+    if (!isFocused) {
+      setCurrentValue(getNestedValue(config, currentPath));
+    }
+  }, [config, currentPath, isFocused]);
+
+  // Update the local state when the user types
+  const handleChange = useCallback((value: string) => {
+    setCurrentValue(value);
+  }, []);
+
+  return {currentPath, currentValue, handleBlur, handleFocus, handleChange};
+};
+
 const NestedForm: React.FC<{
   keyName: string;
   fieldSchema: z.ZodTypeAny;
@@ -163,25 +206,8 @@ const NestedForm: React.FC<{
   hideLabel,
   autoFocus,
 }) => {
-  const currentPath = useMemo(() => [...path, keyName], [path, keyName]);
-  const [currentValue, setCurrentValue] = useState(
-    getNestedValue(config, currentPath)
-  );
-
-  // Only update parent config on blur, for string fields
-  const handleBlur = useCallback(() => {
-    if (currentValue !== getNestedValue(config, currentPath)) {
-      updateConfig(currentPath, currentValue, config, setConfig);
-    }
-  }, [currentValue, currentPath, config, setConfig]);
-  const handleChange = useCallback((value: string) => {
-    setCurrentValue(value);
-  }, []);
-
-  // set current value for non-string fields
-  useEffect(() => {
-    setCurrentValue(getNestedValue(config, currentPath));
-  }, [config, currentPath]);
+  const {currentPath, currentValue, handleBlur, handleFocus, handleChange} =
+    useNestedField(config, setConfig, path, keyName);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
   const isOptional = fieldSchema instanceof z.ZodOptional;
@@ -316,6 +342,7 @@ const NestedForm: React.FC<{
       value={currentValue ?? ''}
       onChange={handleChange}
       onBlur={handleBlur}
+      onFocus={handleFocus}
       autoFocus={autoFocus}
     />
   );
