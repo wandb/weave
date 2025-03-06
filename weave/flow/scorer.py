@@ -10,9 +10,8 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.weave_client import Call, sanitize_object_name
 
@@ -354,7 +353,7 @@ async def apply_scorer_async(
 
             scorer argument names: {score_arg_names}
             dataset keys: {example.keys()}
-            scorer.column_map: {getattr(scorer, 'column_map', '{}')}
+            scorer.column_map: {getattr(scorer, "column_map", "{}")}
 
             Options for resolving:
             a. if using the `Scorer` weave class, you can set the `scorer.column_map` attribute to map scorer argument names to dataset column names or
@@ -365,3 +364,12 @@ async def apply_scorer_async(
         raise OpCallError(message)
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
+
+
+class WeaveScorerResult(BaseModel):
+    """The result of a weave.Scorer.score method."""
+
+    passed: bool = Field(description="Whether the scorer passed or not")
+    metadata: dict[str, Any] = Field(
+        description="Any extra information from the scorer like numerical scores, model outputs, etc."
+    )

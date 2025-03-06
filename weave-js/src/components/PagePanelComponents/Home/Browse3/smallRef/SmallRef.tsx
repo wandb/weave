@@ -7,16 +7,15 @@ import React, {FC} from 'react';
 
 import {SmallArtifactRef} from './SmallArtifactRef';
 import {SmallWeaveRef} from './SmallWeaveRef';
-import {WFDBTableType} from './types';
 
 export const SmallRef: FC<{
   objRef: ObjectRef;
-  wfTable?: WFDBTableType;
   iconOnly?: boolean;
-}> = ({objRef, wfTable, iconOnly = false}) => {
+  noLink?: boolean;
+}> = ({objRef, iconOnly = false, noLink = false}) => {
   if (isWeaveObjectRef(objRef)) {
     return (
-      <SmallWeaveRef objRef={objRef} wfTable={wfTable} iconOnly={iconOnly} />
+      <SmallWeaveRef objRef={objRef} iconOnly={iconOnly} noLink={noLink} />
     );
   }
   if (isWandbArtifactRef(objRef)) {

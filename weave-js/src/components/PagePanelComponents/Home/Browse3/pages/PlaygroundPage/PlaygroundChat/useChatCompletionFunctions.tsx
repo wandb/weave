@@ -67,17 +67,19 @@ export const useChatCompletionFunctions = (
       setIsLoading(true);
       const newMessageContent = content || chatText;
       const newMessage = createMessage(role, newMessageContent, toolCallId);
-      const updatedStates = playgroundStates.map((state, index) => {
-        if (callIndex !== undefined && callIndex !== index) {
-          return state;
-        }
-        const updatedState = appendChoiceToMessages(state);
-        // If the new message is not empty, add it to the messages
-        if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
-          updatedState.traceCall.inputs.messages.push(newMessage);
-        }
-        return updatedState;
-      });
+      const updatedStates = filterNullMessagesFromStates(
+        playgroundStates.map((state, index) => {
+          if (callIndex !== undefined && callIndex !== index) {
+            return state;
+          }
+          const updatedState = appendChoiceToMessages(state);
+          // If the new message is not empty, add it to the messages
+          if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
+            updatedState.traceCall.inputs.messages.push(newMessage);
+          }
+          return updatedState;
+        })
+      );
 
       setPlaygroundStates(updatedStates);
       setChatText('');
@@ -105,20 +107,25 @@ export const useChatCompletionFunctions = (
   ) => {
     try {
       setIsLoading(true);
-      const updatedStates = playgroundStates.map((state, index) => {
-        if (index === callIndex) {
-          if (choiceIndex !== undefined) {
-            return appendChoiceToMessages(state, choiceIndex);
+      const updatedStates = filterNullMessagesFromStates(
+        playgroundStates.map((state, index) => {
+          if (index === callIndex) {
+            if (choiceIndex !== undefined) {
+              return appendChoiceToMessages(state, choiceIndex);
+            }
+            const updatedState = JSON.parse(JSON.stringify(state));
+            if (updatedState.traceCall?.inputs?.messages) {
+              updatedState.traceCall.inputs.messages =
+                updatedState.traceCall.inputs.messages.slice(
+                  0,
+                  messageIndex + 1
+                );
+            }
+            return updatedState;
           }
-          const updatedState = JSON.parse(JSON.stringify(state));
-          if (updatedState.traceCall?.inputs?.messages) {
-            updatedState.traceCall.inputs.messages =
-              updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
-          }
-          return updatedState;
-        }
-        return state;
-      });
+          return state;
+        })
+      );
 
       const response = await makeCompletionRequest(callIndex, updatedStates);
       await handleErrorsAndUpdate(
@@ -229,4 +236,57 @@ const appendChoiceToMessages = (
     updatedState.traceCall.output.choices = undefined;
   }
   return updatedState;
+};
+
+/**
+ * Filters out null messages from a PlaygroundState
+ *
+ * @param state The PlaygroundState to filter
+ * @returns A new PlaygroundState with null messages filtered out
+ */
+export const filterNullMessages = (state: PlaygroundState): PlaygroundState => {
+  if (
+    !state.traceCall ||
+    !state.traceCall.inputs ||
+    !state.traceCall.inputs.messages
+  ) {
+    return state;
+  }
+
+  const messages = state.traceCall.inputs.messages as Message[];
+  const filteredMessages = messages.filter(
+    message =>
+      message !== null &&
+      typeof message === 'object' &&
+      (message.content !== null || message.tool_calls !== null) &&
+      message.content !== ''
+  );
+
+  // Only create a new state if messages were actually filtered out
+  if (filteredMessages.length === messages.length) {
+    return state;
+  }
+
+  return {
+    ...state,
+    traceCall: {
+      ...state.traceCall,
+      inputs: {
+        ...state.traceCall.inputs,
+        messages: filteredMessages,
+      },
+    },
+  };
+};
+
+/**
+ * Filters out null messages from an array of PlaygroundStates
+ *
+ * @param states Array of PlaygroundStates to filter
+ * @returns A new array of PlaygroundStates with null messages filtered out
+ */
+export const filterNullMessagesFromStates = (
+  states: PlaygroundState[]
+): PlaygroundState[] => {
+  return states.map(filterNullMessages);
 };

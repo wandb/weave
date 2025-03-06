@@ -97,8 +97,33 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
+  'o3-mini': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'o3-mini-2025-01-31': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview-2025-02-27': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
 
   // Anthropic models
+  'claude-3-7-sonnet-20250219': {
+    provider: 'anthropic',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
   'claude-3-5-sonnet-20240620': {
     provider: 'anthropic',
     max_tokens: 8192,
@@ -469,6 +494,18 @@ export const LLM_MAX_TOKENS = {
     provider: 'xai',
     supports_function_calling: true,
   },
+
+  // DeepSeek models
+  'deepseek/deepseek-reasoner': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'deepseek/deepseek-chat': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
@@ -485,6 +522,7 @@ export const LLM_PROVIDERS = [
   'groq',
   'bedrock',
   'xai',
+  'deepseek',
 ];
 
 export const LLM_PROVIDER_LABELS: Record<
@@ -498,4 +536,5 @@ export const LLM_PROVIDER_LABELS: Record<
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
+  deepseek: 'DeepSeek',
 };

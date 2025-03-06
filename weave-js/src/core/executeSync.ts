@@ -116,6 +116,17 @@ class ThrowingPlaceholderServer implements ServerAPI {
   ): Promise<DirMetadata | FileMetadata | null> {
     throw new Error(`Cannot getArtifactFileMetadata`);
   }
+
+  getArtifactMembershipFileMetadata(
+    artifactCollectionMembershipId: string,
+    entityName: string,
+    projectName: string,
+    collectionName: string,
+    artifactVersionIndex: string,
+    assetPath: string
+  ): Promise<DirMetadata | FileMetadata | null> {
+    throw new Error(`Cannot getArtifactMembershipFileMetadata`);
+  }
 }
 
 const syncResolverContext: ResolverContext = {
