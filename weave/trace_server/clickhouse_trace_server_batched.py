@@ -1681,7 +1681,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Always use "custom" as the provider for litellm
             provider = "custom"
             # Update the model name for the API call
-            req.inputs.model = actual_model_name
+            # If the model name is ollama, we need to add the ollama/ prefix
+            req.inputs.model = (
+                "ollama/" + actual_model_name
+                if "ollama" in model_name
+                else actual_model_name
+            )
 
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
