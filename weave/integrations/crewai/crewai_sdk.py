@@ -5,7 +5,7 @@ from typing import Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.weave_client import Call
 
 _crewai_patcher: MultiPatcher | None = None
@@ -44,27 +44,12 @@ def get_crewai_patcher(
         return _crewai_patcher
 
     base = settings.op_settings
+    print("base settings: ", base)
 
     kickoff_settings = base.model_copy(
         update={"name": base.name or "crewai.Crew.kickoff"}
     )
-    kickoff_for_each_settings = base.model_copy(
-        update={"name": base.name or "crewai.Crew.kickoff_for_each"}
-    )
-    execute_task_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Agent.execute_task",
-            "call_display_name": base.call_display_name
-            or default_call_display_name_execute_task,
-        }
-    )
-    execute_sync_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Task.execute_sync",
-            "call_display_name": base.call_display_name
-            or default_call_display_name_execute_sync,
-        }
-    )
+    print("kickoff settings: ", kickoff_settings)
 
     patchers = [
         SymbolPatcher(
@@ -72,22 +57,8 @@ def get_crewai_patcher(
             "Crew.kickoff",
             crewai_wrapper(kickoff_settings),
         ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff_for_each",
-            crewai_wrapper(kickoff_for_each_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Agent.execute_task",
-            crewai_wrapper(execute_task_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Task.execute_sync",
-            crewai_wrapper(execute_sync_settings),
-        ),
     ]
+    print("patchers: ", patchers)
 
     _crewai_patcher = MultiPatcher(patchers)
 

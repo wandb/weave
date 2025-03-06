@@ -62,7 +62,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
-    from weave.integrations.crewai.crewai_sdk import get_crewai_patcher
+    from weave.integrations.crewai import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
@@ -107,7 +107,7 @@ def reset_autopatch() -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
-    from weave.integrations.crewai.crewai_sdk import get_crewai_patcher
+    from weave.integrations.crewai import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
