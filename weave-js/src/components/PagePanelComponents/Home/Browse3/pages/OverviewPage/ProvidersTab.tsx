@@ -282,6 +282,7 @@ export const ProvidersTabInner: React.FC<{
               apiKey: provider.val.api_key_name,
               models: providerModels.map(model => model.val.name),
               headers: Object.entries(provider.val.extra_headers || {}),
+              maxTokens: providerModels.map(model => model.val.max_tokens),
             });
             setIsDrawerOpen(true);
           },

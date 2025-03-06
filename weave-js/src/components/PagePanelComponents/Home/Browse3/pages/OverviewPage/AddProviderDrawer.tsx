@@ -1,13 +1,14 @@
-import {Box, Divider, Drawer, TextField, Typography} from '@mui/material';
+import {Box, Divider, Drawer, Typography} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {useHandleScroll} from '@wandb/weave/common/hooks/useHandleScroll';
 import {Button} from '@wandb/weave/components/Button';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useState} from 'react';
 
 import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
 import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
-
 interface AddProviderDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,6 +21,7 @@ interface AddProviderDrawerProps {
     apiKey: string;
     models: string[];
     headers: Array<[string, string]>;
+    maxTokens: number[];
   };
 }
 
@@ -44,6 +46,11 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
   const [modelName, setModelName] = useState<string[]>(
     editingProvider?.models || []
   );
+  const [maxTokens, setMaxTokens] = useState<number[]>(
+    editingProvider?.maxTokens || []
+  );
+
+  const {scrolled} = useHandleScroll();
 
   useEffect(() => {
     if (editingProvider) {
@@ -52,6 +59,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       setBaseUrl(editingProvider.baseUrl);
       setModelName(editingProvider.models);
       setHeaders(editingProvider.headers);
+      setMaxTokens(editingProvider.maxTokens || []);
     }
   }, [editingProvider]);
 
@@ -61,6 +69,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     setApiKey('');
     setBaseUrl('');
     setModelName([]);
+    setMaxTokens([]);
     setHeaders([]);
     onClose();
   };
@@ -97,22 +106,28 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       let modelDigests: string[] = [];
       if (result?.digest) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        modelDigests = await Promise.all(
-          modelName.map(async model => {
-            const modelResult = await createProviderModel({
-              obj: {
-                val: {
-                  name: model,
-                  provider: result.digest,
-                  max_tokens: findMaxTokensByModelName(model),
+        modelDigests = (
+          await Promise.all(
+            modelName.map(async (model, index) => {
+              if (model === '') {
+                return '';
+              }
+              const modelResult = await createProviderModel({
+                obj: {
+                  val: {
+                    name: model,
+                    provider: result.digest,
+                    max_tokens:
+                      maxTokens[index] || findMaxTokensByModelName(model),
+                  },
+                  project_id: projectId,
+                  object_id: name + '-' + model,
                 },
-                project_id: projectId,
-                object_id: name + '-' + model,
-              },
-            });
-            return modelResult.digest;
-          })
-        );
+              });
+              return modelResult.digest;
+            })
+          )
+        ).filter((digest: string) => digest !== '');
       }
 
       refetch();
@@ -128,12 +143,17 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     !providers.includes(name) || name === editingProvider?.name;
   const nameNoSpaces = name.includes(' ') === false;
 
+  const hasDuplicateModelNames = modelName.some(
+    (model, index) => modelName.findIndex(m => m === model) !== index
+  );
+
   const disableSave =
     name.length === 0 ||
     apiKey.length === 0 ||
     baseUrl.length === 0 ||
     !nameIsUnique ||
-    !nameNoSpaces;
+    !nameNoSpaces ||
+    hasDuplicateModelNames;
 
   return (
     <Drawer
@@ -143,8 +163,8 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       PaperProps={{
         sx: {
           width: 480,
-          marginTop: '60px',
-          height: 'calc(100% - 60px)',
+          marginTop: scrolled ? '0px' : '60px',
+          height: scrolled ? '100%' : 'calc(100% - 60px)',
         },
       }}>
       <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
@@ -172,23 +192,26 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 Name
               </Typography>
               <TextField
-                fullWidth
-                size="small"
-                placeholder="Enter unique name"
-                variant="outlined"
+                placeholder="Enter provider name"
                 value={name}
-                onChange={e => setName(e.target.value)}
-                error={!nameIsUnique || !nameNoSpaces || name.length > 128}
-                helperText={
-                  !nameIsUnique
-                    ? 'Provider with this name already exists'
-                    : !nameNoSpaces
-                    ? 'Name cannot contain spaces'
-                    : name.length > 128
-                    ? 'Name must be less than 128 characters'
-                    : ''
-                }
+                onChange={value => setName(value)}
+                errorState={!nameIsUnique || !nameNoSpaces || name.length > 128}
               />
+              {!nameIsUnique && (
+                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                  Provider with this name already exists
+                </Typography>
+              )}
+              {!nameNoSpaces && (
+                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                  Name cannot contain spaces
+                </Typography>
+              )}
+              {name.length > 128 && (
+                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                  Name must be less than 128 characters
+                </Typography>
+              )}
             </Box>
 
             <Box>
@@ -196,12 +219,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 API key name
               </Typography>
               <TextField
-                fullWidth
-                size="small"
-                placeholder="Enter secret name"
-                variant="outlined"
+                placeholder="Enter API key name"
                 value={apiKey}
-                onChange={e => setApiKey(e.target.value.replace(/\s/g, ''))}
+                onChange={value => setApiKey(value)}
               />
             </Box>
 
@@ -210,12 +230,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 API base URL
               </Typography>
               <TextField
-                fullWidth
-                size="small"
-                placeholder="Enter API base URL"
-                variant="outlined"
+                placeholder="Enter base URL"
                 value={baseUrl}
-                onChange={e => setBaseUrl(e.target.value.replace(/\s/g, ''))}
+                onChange={value => setBaseUrl(value)}
               />
             </Box>
 
@@ -244,30 +261,27 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
               </Box>
               <Box sx={{display: 'flex', flexDirection: 'column', gap: 1}}>
                 {headers?.map(([key, value], index) => (
-                  <Box key={index} sx={{display: 'flex', alignItems: 'center'}}>
+                  <Box
+                    key={index}
+                    sx={{display: 'flex', alignItems: 'center', gap: 1}}>
                     <TextField
-                      fullWidth
-                      size="small"
+                      placeholder="Enter header key"
                       value={key}
-                      sx={{mr: 1}}
-                      onChange={e =>
+                      onChange={val =>
                         setHeaders(prev =>
                           prev.map(([k, v], i) =>
-                            i === index ? [e.target.value, v] : [k, v]
+                            i === index ? [val, v] : [k, v]
                           )
                         )
                       }
                     />
                     <TextField
-                      fullWidth
-                      size="small"
+                      placeholder="Enter header value"
                       value={value}
-                      onChange={e =>
+                      onChange={val =>
                         setHeaders(prev =>
                           prev.map(([k, v], i) =>
-                            i === index
-                              ? ([k, e.target.value] as [string, string])
-                              : [k, v]
+                            i === index ? [k, val] : [k, v]
                           )
                         )
                       }
@@ -292,7 +306,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             <Box>
               <Box
                 sx={{
-                  mb: 1,
+                  mb: 2,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -317,49 +331,92 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                   variant="secondary"
                   size="small"
                   icon="add-new"
-                  onClick={() => setModelName([...modelName, ''])}>
+                  onClick={() => {
+                    setModelName([...modelName, '']);
+                    setMaxTokens([...maxTokens, 0]);
+                  }}>
                   Add a model
                 </Button>
               </Box>
               {modelName.map((model, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    mt: index > 0 ? 2 : 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    width: '100%',
-                  }}>
-                  <Box sx={{flexGrow: 1}}>
-                    <TextField
-                      fullWidth
+                <Box key={index}>
+                  <Box
+                    sx={{
+                      mt: index > 0 ? 2 : 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      width: '100%',
+                    }}>
+                    <Box sx={{width: '75%'}}>
+                      <TextField
+                        placeholder="Enter model name"
+                        value={model}
+                        onChange={value => {
+                          const newValue = value.replace(/\s/g, '');
+                          setModelName(prev =>
+                            prev.map((m, i) => (i === index ? newValue : m))
+                          );
+                        }}
+                        errorState={
+                          name.length + modelName[index].length > 127 ||
+                          modelName.some(
+                            (m, i) => i !== index && m === modelName[index]
+                          )
+                        }
+                      />
+                    </Box>
+                    <Box sx={{width: '25%'}}>
+                      <TextField
+                        placeholder="Max tokens"
+                        type="number"
+                        value={String(maxTokens[index] || '')}
+                        onChange={value => {
+                          // Only allow numeric input
+                          const newValue = value.replace(/[^0-9]/g, '');
+                          const numericValue = newValue
+                            ? parseInt(newValue, 10)
+                            : 0;
+                          setMaxTokens(prev => {
+                            const newTokens = [...prev];
+                            newTokens[index] = numericValue;
+                            return newTokens;
+                          });
+                        }}
+                      />
+                    </Box>
+                    <Button
+                      variant="ghost"
                       size="small"
-                      placeholder="Enter model name"
-                      variant="outlined"
-                      value={model}
-                      onChange={e => {
-                        const newValue = e.target.value.replace(/\s/g, '');
+                      icon="delete"
+                      onClick={() => {
                         setModelName(prev =>
-                          prev.map((m, i) => (i === index ? newValue : m))
+                          prev.filter((_, i) => i !== index)
+                        );
+                        setMaxTokens(prev =>
+                          prev.filter((_, i) => i !== index)
                         );
                       }}
-                      error={name.length + model.length > 127}
-                      helperText={
-                        name.length + model.length > 127
-                          ? `<Provider>/<Model> cannot be more than 128 characters`
-                          : ''
-                      }
                     />
                   </Box>
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    icon="delete"
-                    onClick={() =>
-                      setModelName(prev => prev.filter((_, i) => i !== index))
-                    }
-                  />
+                  {name.length + modelName[index].length > 127 && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{mt: 0.5, display: 'block'}}>
+                      {'<Provider>/<Model> cannot be more than 128 characters'}
+                    </Typography>
+                  )}
+                  {modelName.some(
+                    (m, i) => i !== index && m === modelName[index]
+                  ) && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{mt: 0.5, display: 'block'}}>
+                      Model name must be unique
+                    </Typography>
+                  )}
                 </Box>
               ))}
             </Box>
