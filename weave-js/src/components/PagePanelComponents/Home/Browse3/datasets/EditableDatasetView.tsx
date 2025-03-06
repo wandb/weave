@@ -297,15 +297,29 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return [...displayedAddedRows, ...rows];
   }, [rows, addedRows, numAddedRows, paginationModel, isEditing]);
 
+  const initialFieldsSet = useMemo(
+    () => new Set(initialFields),
+    [initialFields]
+  );
+
   const preserveFieldOrder = useCallback(
     (row: OrderedRow): OrderedRow => {
       const orderedRow: OrderedRow = {___weave: row.___weave};
+      // First add all fields that are in initialFields in the correct order
       initialFields.forEach(field => {
         orderedRow[field] = row[field] !== undefined ? row[field] : '';
       });
+
+      // Then add any additional fields that weren't in initialFields
+      Object.keys(row).forEach(field => {
+        if (field !== '___weave' && !initialFieldsSet.has(field)) {
+          orderedRow[field] = row[field];
+        }
+      });
+
       return orderedRow;
     },
-    [initialFields]
+    [initialFields, initialFieldsSet]
   );
 
   const columns = useMemo(() => {

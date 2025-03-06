@@ -181,6 +181,7 @@ export const PlaygroundChat = ({
                               'selectedChoiceIndex',
                               choiceIndex
                             ),
+                          selectedChoiceIndex: state.selectedChoiceIndex,
                         }}>
                         <CallChat call={state.traceCall as TraceCallSchema} />
                       </PlaygroundContext.Provider>
