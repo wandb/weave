@@ -237,7 +237,7 @@ def retry_max_interval() -> float:
     """Returns the maximum interval between retries in seconds."""
     max_interval = _optional_float("retry_max_interval")
     if max_interval is None:
-        return 60 * 5
+        return 60 * 5  # 5 minutes
     return max_interval
 
 
