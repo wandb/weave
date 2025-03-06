@@ -316,7 +316,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [filteredCallIds, deemphasizeCallIds] = useMemo(() => {
+  const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     const filtered = Object.entries(props.traceTreeFlat)
       .filter(([_, node]) => {
         return (
@@ -343,6 +343,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
     }
 
     return [
+      filtered,
       Array.from(filteredCallIdsSet),
       Array.from(
         new Set([...filteredCallIdsSet].filter(x => !foundCallIds.has(x)))
@@ -357,6 +358,19 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
     return ['timeline'];
   }, [searchQuery]);
 
+  // Derived data
+  const traceTreeFlat = useMemo(() => {
+    if (searchQuery === '') {
+      return props.traceTreeFlat;
+    }
+    const matched = new Set<string>(matchedCallIds);
+    return Object.fromEntries(
+      Object.entries(props.traceTreeFlat).filter(([_, node]) => {
+        return matched.has(node.id);
+      })
+    );
+  }, [matchedCallIds, props.traceTreeFlat, searchQuery]);
+
   return (
     <div className="flex h-full flex-col">
       <TreeViewHeader
@@ -370,7 +384,11 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           deemphasizeCallIds={deemphasizeCallIds}
         />
       </div>
-      <TraceScrubber {...props} allowedScrubbers={scrubbers} />
+      <TraceScrubber
+        {...props}
+        allowedScrubbers={scrubbers}
+        traceTreeFlat={traceTreeFlat}
+      />
     </div>
   );
 };
