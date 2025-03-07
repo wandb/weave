@@ -278,7 +278,7 @@ export const SimplePageLayoutWithHeader: FC<{
                 opacity: props.dimMainContent ? 0.5 : 1,
                 transition: 'opacity 0.3s ease-in-out',
                 // Disable pointer events
-                pointerEvents: 'none',
+                pointerEvents: props.dimMainContent ? 'none' : 'auto',
               }}
               main={
                 <SimpleTabView
