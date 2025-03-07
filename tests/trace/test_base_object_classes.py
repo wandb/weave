@@ -23,7 +23,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
-    TestOnlyNestedBaseModel,
+    NestedBaseModelForTesting,
 )
 
 
@@ -50,24 +50,24 @@ def with_base_object_class_annotations(
 
 def test_pythonic_creation(client: WeaveClient):
     # First, let's use the high-level pythonic creation API.
-    nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
-    top_obj = base_objects.TestOnlyExample(
+    nested_obj = base_objects.NestedBaseObjectForTesting(b=3)
+    top_obj = base_objects.ExampleForTesting(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=NestedBaseModelForTesting(a=2),
         nested_base_object=weave.publish(nested_obj).uri(),
     )
     ref = weave.publish(top_obj)
 
     top_obj_gotten = weave.ref(ref.uri()).get()
 
-    assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
+    assert isinstance(top_obj_gotten, base_objects.ExampleForTesting)
     assert top_obj_gotten.model_dump() == top_obj.model_dump()
 
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["TestOnlyExample"]},
+                "filter": {"base_object_classes": ["ExampleForTesting"]},
             },
         )
     )
@@ -78,25 +78,25 @@ def test_pythonic_creation(client: WeaveClient):
         objs[0].val
         == {
             **with_base_object_class_annotations(
-                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+                top_obj.model_dump(), "ExampleForTesting", "BaseObject"
             ),
             "nested_base_model": with_base_object_class_annotations(
-                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+                top_obj.nested_base_model.model_dump(), "NestedBaseModelForTesting"
             ),
         }
         == {
-            "_type": "TestOnlyExample",
+            "_type": "ExampleForTesting",
             "name": None,
             "description": None,
             "primitive": 1,
             "nested_base_model": {
-                "_type": "TestOnlyNestedBaseModel",
+                "_type": "NestedBaseModelForTesting",
                 "a": 2,
-                "_class_name": "TestOnlyNestedBaseModel",
+                "_class_name": "NestedBaseModelForTesting",
                 "_bases": ["BaseModel"],
             },
-            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
-            "_class_name": "TestOnlyExample",
+            "nested_base_object": "weave:///shawn/test-project/object/NestedBaseObjectForTesting:HOg74sTrZ1XkVyPRJPlhGBhf3FoguS6FZo1l4ES0Sx4",
+            "_class_name": "ExampleForTesting",
             "_bases": ["BaseObject", "BaseModel"],
         }
     )
@@ -105,7 +105,7 @@ def test_pythonic_creation(client: WeaveClient):
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
+                "filter": {"base_object_classes": ["NestedBaseObjectForTesting"]},
             },
         )
     )
@@ -115,14 +115,14 @@ def test_pythonic_creation(client: WeaveClient):
     assert (
         objs[0].val
         == with_base_object_class_annotations(
-            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+            nested_obj.model_dump(), "NestedBaseObjectForTesting", "BaseObject"
         )
         == {
-            "_type": "TestOnlyNestedBaseObject",
+            "_type": "NestedBaseObjectForTesting",
             "name": None,
             "description": None,
             "b": 3,
-            "_class_name": "TestOnlyNestedBaseObject",
+            "_class_name": "NestedBaseObjectForTesting",
             "_bases": ["BaseObject", "BaseModel"],
         }
     )
@@ -130,8 +130,8 @@ def test_pythonic_creation(client: WeaveClient):
 
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
-    nested_obj_id = "TestOnlyNestedBaseObject"
-    nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
+    nested_obj_id = "NestedBaseObjectForTesting"
+    nested_obj = base_objects.NestedBaseObjectForTesting(b=3)
     nested_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
@@ -139,7 +139,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
-                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "NestedBaseObjectForTesting",
                 }
             }
         )
@@ -151,10 +151,10 @@ def test_interface_creation(client):
         _digest=nested_obj_res.digest,
     )
 
-    top_level_obj_id = "TestOnlyExample"
-    top_obj = base_objects.TestOnlyExample(
+    top_level_obj_id = "ExampleForTesting"
+    top_obj = base_objects.ExampleForTesting(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=NestedBaseModelForTesting(a=2),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
@@ -164,7 +164,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
-                    "builtin_object_class": "TestOnlyExample",
+                    "builtin_object_class": "ExampleForTesting",
                 }
             }
         )
@@ -188,7 +188,7 @@ def test_interface_creation(client):
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["TestOnlyExample"]},
+                "filter": {"base_object_classes": ["ExampleForTesting"]},
             },
         )
     )
@@ -199,25 +199,25 @@ def test_interface_creation(client):
         objs[0].val
         == {
             **with_base_object_class_annotations(
-                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+                top_obj.model_dump(), "ExampleForTesting", "BaseObject"
             ),
             "nested_base_model": with_base_object_class_annotations(
-                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+                top_obj.nested_base_model.model_dump(), "NestedBaseModelForTesting"
             ),
         }
         == {
-            "_type": "TestOnlyExample",
+            "_type": "ExampleForTesting",
             "name": None,
             "description": None,
             "primitive": 1,
             "nested_base_model": {
-                "_type": "TestOnlyNestedBaseModel",
+                "_type": "NestedBaseModelForTesting",
                 "a": 2,
-                "_class_name": "TestOnlyNestedBaseModel",
+                "_class_name": "NestedBaseModelForTesting",
                 "_bases": ["BaseModel"],
             },
-            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
-            "_class_name": "TestOnlyExample",
+            "nested_base_object": "weave:///shawn/test-project/object/NestedBaseObjectForTesting:HOg74sTrZ1XkVyPRJPlhGBhf3FoguS6FZo1l4ES0Sx4",
+            "_class_name": "ExampleForTesting",
             "_bases": ["BaseObject", "BaseModel"],
         }
     )
@@ -226,7 +226,7 @@ def test_interface_creation(client):
         tsi.ObjQueryReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
+                "filter": {"base_object_classes": ["NestedBaseObjectForTesting"]},
             },
         )
     )
@@ -235,14 +235,14 @@ def test_interface_creation(client):
     assert (
         objs[0].val
         == with_base_object_class_annotations(
-            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+            nested_obj.model_dump(), "NestedBaseObjectForTesting", "BaseObject"
         )
         == {
-            "_type": "TestOnlyNestedBaseObject",
+            "_type": "NestedBaseObjectForTesting",
             "name": None,
             "description": None,
             "b": 3,
-            "_class_name": "TestOnlyNestedBaseObject",
+            "_class_name": "NestedBaseObjectForTesting",
             "_bases": ["BaseObject", "BaseModel"],
         }
     )
@@ -250,11 +250,11 @@ def test_interface_creation(client):
 
 def test_digest_equality(client):
     # Next, let's make sure that the digests are all equivalent
-    nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
+    nested_obj = base_objects.NestedBaseObjectForTesting(b=3)
     nested_ref = weave.publish(nested_obj)
-    top_obj = base_objects.TestOnlyExample(
+    top_obj = base_objects.ExampleForTesting(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=NestedBaseModelForTesting(a=2),
         nested_base_object=nested_ref.uri(),
     )
     ref = weave.publish(top_obj)
@@ -262,8 +262,8 @@ def test_digest_equality(client):
     top_level_pythonic_digest = ref.digest
 
     # Now we will do the equivant operation using low-level interface.
-    nested_obj_id = "TestOnlyNestedBaseObject"
-    nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
+    nested_obj_id = "NestedBaseObjectForTesting"
+    nested_obj = base_objects.NestedBaseObjectForTesting(b=3)
     nested_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
@@ -271,7 +271,7 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
-                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "NestedBaseObjectForTesting",
                 }
             }
         )
@@ -287,10 +287,10 @@ def test_digest_equality(client):
 
     assert nested_pythonic_digest == nested_interface_style_digest
 
-    top_level_obj_id = "TestOnlyExample"
-    top_obj = base_objects.TestOnlyExample(
+    top_level_obj_id = "ExampleForTesting"
+    top_obj = base_objects.ExampleForTesting(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=NestedBaseModelForTesting(a=2),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
@@ -300,7 +300,7 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
-                    "builtin_object_class": "TestOnlyExample",
+                    "builtin_object_class": "ExampleForTesting",
                 }
             }
         )
@@ -322,7 +322,7 @@ def test_schema_validation(client):
                         "object_id": "nested_obj",
                         # Incorrect schema, should raise!
                         "val": {"a": 2},
-                        "builtin_object_class": "TestOnlyNestedBaseObject",
+                        "builtin_object_class": "NestedBaseObjectForTesting",
                     }
                 }
             )
@@ -337,10 +337,10 @@ def test_schema_validation(client):
                     "object_id": "nested_obj",
                     "val": {
                         "b": 2,
-                        "_class_name": "TestOnlyNestedBaseObject",
+                        "_class_name": "NestedBaseObjectForTesting",
                         "_bases": ["BaseObject", "BaseModel"],
                     },
-                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "NestedBaseObjectForTesting",
                 }
             }
         )
@@ -356,10 +356,10 @@ def test_schema_validation(client):
                         "object_id": "nested_obj",
                         "val": {
                             "b": 2,
-                            "_class_name": "TestOnlyNestedBaseObject",
+                            "_class_name": "NestedBaseObjectForTesting",
                             "_bases": ["BaseObject", "BaseModel"],
                         },
-                        "builtin_object_class": "TestOnlyExample",
+                        "builtin_object_class": "ExampleForTesting",
                     }
                 }
             )

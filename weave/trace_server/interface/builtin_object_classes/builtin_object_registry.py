@@ -7,8 +7,8 @@ from weave.trace_server.interface.builtin_object_classes.base_object_def import 
 )
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
-    TestOnlyExample,
-    TestOnlyNestedBaseObject,
+    ExampleForTesting,
+    NestedBaseObjectForTesting,
 )
 
 BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
@@ -24,8 +24,8 @@ def register_base_object(cls: type[BaseObject]) -> None:
     BUILTIN_OBJECT_REGISTRY[cls.__name__] = cls
 
 
-register_base_object(TestOnlyExample)
-register_base_object(TestOnlyNestedBaseObject)
+register_base_object(ExampleForTesting)
+register_base_object(NestedBaseObjectForTesting)
 register_base_object(Leaderboard)
 register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)
