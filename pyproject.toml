@@ -46,6 +46,12 @@ dependencies = [
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",      # Used by scorers for field validation
   "diskcache==5.6.3",        # Used for data caching
+
+  # TODO: This needs to be updated each time we regenerate the trace server bindings.
+  # Basically:
+  # 1. For normal dev, pin to a SHA and allow direct references
+  # 2. For deploys, pin to a specific version and remove allow-direct-references.
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25",
 ]
 
 [project.optional-dependencies]
@@ -94,7 +100,9 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
-llamaindex = ["llama-index>=0.10.35,<0.12.0"] # temporary max pin b/c 0.12.0 changes call structure and therefor tests
+llamaindex = [
+  "llama-index>=0.10.35,<0.12.0",
+] # temporary max pin b/c 0.12.0 changes call structure and therefor tests
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
@@ -105,7 +113,7 @@ scorers = [
   "transformers>=4.48.2",
   "torch>=2.4.1",
   "sentencepiece>=0.2.0",
-  "pip>=20.0", # this is needed for presidio-analyzer to pull the spacy models
+  "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
 ]
@@ -139,7 +147,7 @@ test = [
   "pillow",
   "filelock",
   "httpx",
-  
+
   "weave[trace_server]",
   "weave[trace_server_tests]",
 ]
@@ -171,6 +179,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
