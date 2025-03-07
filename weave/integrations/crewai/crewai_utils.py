@@ -109,9 +109,19 @@ def crew_kickoff_postprocess_inputs(inputs):
                 if isinstance(v2, list) and len(v2) == 0:
                     results["self"].pop(k2)
         if k == "inputs":
-            results["inputs"] = {
-                k: safe_serialize_crewai_object(v) for k, v in v.items()
-            }
+            if isinstance(v, dict):
+                results["inputs"] = {
+                    k: safe_serialize_crewai_object(v) for k, v in v.items()
+                }
+            elif isinstance(v, list):
+                results["inputs"] = [
+                    {
+                        k: safe_serialize_crewai_object(v) for k, v in item.items()
+                    }
+                    for item in v
+                ]
+            else:
+                results["inputs"] = v
 
     return results
 

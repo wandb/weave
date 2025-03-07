@@ -57,6 +57,14 @@ def get_crewai_patcher(
         }
     )
 
+    crew_kickoff_for_each_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Crew.kickoff_for_each",
+            "call_display_name": base.call_display_name,
+            "postprocess_inputs": crew_kickoff_postprocess_inputs,
+        }
+    )
+
     agent_execute_task_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Agent.execute_task",
@@ -105,6 +113,11 @@ def get_crewai_patcher(
             lambda: importlib.import_module("crewai"),
             "Crew.kickoff",
             crewai_wrapper(crew_kickoff_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai"),
+            "Crew.kickoff_for_each",
+            crewai_wrapper(crew_kickoff_for_each_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
