@@ -9,7 +9,7 @@ Efficiently evaluating LLM applications requires robust tooling to collect and a
 - Identify and resolve LLM content issues effectively.
 - Gather examples for advanced tasks like fine-tuning.
 
-This guide covers how to use Weave's feedback functionality in both the UI and SDK, query and manage feedback, and use human annotations for detailed evaluations.
+This guide covers how to use Weave’s feedback functionality in both the UI and SDK, query and manage feedback, and use human annotations for detailed evaluations.
 
 - [Provide feedback in the UI](#provide-feedback-in-the-ui)
 - [Provide feedback via the SDK](#provide-feedback-via-the-sdk)
@@ -252,7 +252,7 @@ In the following example, a human annotator is asked to select which type of doc
 
 Once you [create a human annotation scorer](#create-a-human-annotation-scorer-in-the-ui), it will automatically display in the **Feedback** sidebar of the call details page with the configured options. To use the scorer, do the following:
 
-1. In the sidebar, navigate to **Traces**.
+1. In the sidebar, navigate to **Traces**
 2. Find the row for the call that you want to add a human annotation to.
 3. Open the call details page.
 4. In the upper right corner, click the **Show feedback** button.
@@ -356,7 +356,7 @@ Expanding on [creating a human annotation scorer using the API](#create-a-human-
 
 ### Use a human annotation scorer using the API
 
-You can use a human annotation scorer using the feedback API, with a specially constructed name and `annotation_ref` field. Find the `annotation_spec_ref` used in the example below either from the UI (use tab) or during creation of the `AnnotationSpec`.
+The feedback API allows you to use a human annotation scorer by specifying a specially constructed name and an `annotation_ref` field. You can obtain the `annotation_spec_ref` from the UI by selecting the appropriate tab, or during the creation of the `AnnotationSpec`.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
