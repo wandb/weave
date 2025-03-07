@@ -1,88 +1,125 @@
 import {Box} from '@mui/material';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
 import {
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
-  LLM_PROVIDERS,
   LLMMaxTokensKey,
 } from '../llmMaxTokens';
+import {useConfiguredProviders} from '../useConfiguredProviders';
+import {CustomOption, ProviderOption} from './LLMDropdownOptions';
 
 interface LLMDropdownProps {
   value: LLMMaxTokensKey;
   onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  entity: string;
+  project: string;
 }
 
-export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
-  const options = LLM_PROVIDERS.map(provider => ({
-    // for each provider, get all the LLMs that are supported by that provider
-    label: LLM_PROVIDER_LABELS[provider],
-    // filtering to the LLMs that are supported by that provider
-    options: Object.keys(LLM_MAX_TOKENS)
-      .reduce<
-        Array<{
-          provider_label: string;
-          label: string;
-          value: string;
-        }>
-      >((acc, llm) => {
-        if (LLM_MAX_TOKENS[llm as LLMMaxTokensKey].provider === provider) {
-          acc.push({
-            provider_label: LLM_PROVIDER_LABELS[provider],
-            // add provider to the label if the LLM is not already prefixed with it
-            label: llm.includes(provider) ? llm : provider + '/' + llm,
-            value: llm,
-          });
-        }
-        return acc;
-      }, [])
-      .sort((a, b) => a.label.localeCompare(b.label)),
-  }));
+export const LLMDropdown: React.FC<LLMDropdownProps> = ({
+  value,
+  onChange,
+  entity,
+  project,
+}) => {
+  const {result: configuredProviders, loading: configuredProvidersLoading} =
+    useConfiguredProviders(entity);
+
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const isAdmin = !loadingUserInfo && userInfo?.admin;
+
+  const options: ProviderOption[] = [];
+  const disabledOptions: ProviderOption[] = [];
+
+  if (configuredProvidersLoading) {
+    options.push({
+      label: 'Loading providers...',
+      value: 'loading',
+      llms: [],
+    });
+  } else {
+    Object.entries(configuredProviders).forEach(([provider, {status}]) => {
+      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
+        .filter(([_, config]) => config.provider === provider)
+        .map(([llmKey]) => ({
+          label: llmKey,
+          value: llmKey as LLMMaxTokensKey,
+          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+        }));
+
+      const option = {
+        label:
+          LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
+        value: provider,
+        llms: status ? providerLLMs : [],
+        isDisabled: !status,
+      };
+
+      if (!status) {
+        disabledOptions.push(option);
+      } else {
+        options.push(option);
+      }
+    });
+  }
+
+  // Combine enabled and disabled options
+  const allOptions = [...options, ...disabledOptions];
 
   return (
-    <Box
-      sx={{
-        width: 'max-content',
-        maxWidth: '100%',
-        '& .MuiOutlinedInput-root': {
-          width: 'max-content',
-          maxWidth: '300px',
-        },
-        '& > div': {
-          width: 'max-content',
-          maxWidth: '300px',
-        },
-        '& .MuiAutocomplete-popper, & [class*="-menu"]': {
-          width: '300px !important',
-        },
-        '& #react-select-2-listbox': {
-          width: '300px',
-          maxHeight: '500px',
-        },
-        '& #react-select-2-listbox > div': {
-          maxHeight: '500px',
-          width: '300px',
-        },
-      }}>
+    <Box sx={{width: '300px'}}>
       <Select
-        value={options.flatMap(o => o.options).find(o => o.value === value)}
+        isDisabled={configuredProvidersLoading}
+        placeholder={
+          configuredProvidersLoading ? 'Loading providers...' : 'Select a model'
+        }
+        value={allOptions.find(
+          option =>
+            'llms' in option && option.llms?.some(llm => llm.value === value)
+        )}
+        formatOptionLabel={(option: ProviderOption, meta) => {
+          if (meta.context === 'value' && 'llms' in option) {
+            const selectedLLM = option.llms.find(llm => llm.value === value);
+            return selectedLLM?.label ?? option.label;
+          }
+          return option.label;
+        }}
         onChange={option => {
-          if (option) {
-            const maxTokens =
-              LLM_MAX_TOKENS[option.value as LLMMaxTokensKey]?.max_tokens || 0;
-            onChange(option.value as LLMMaxTokensKey, maxTokens);
+          // When you click a provider, select the first LLM
+          if (option && 'value' in option) {
+            const selectedOption = option as ProviderOption;
+            if (selectedOption.llms.length > 0) {
+              const llm = selectedOption.llms[0];
+              onChange(llm.value, llm.max_tokens);
+            }
           }
         }}
-        options={options}
+        options={allOptions}
+        maxMenuHeight={500}
+        components={{
+          Option: props => (
+            <CustomOption
+              {...props}
+              onChange={onChange}
+              entity={entity}
+              project={project}
+              isAdmin={isAdmin}
+            />
+          ),
+        }}
         size="medium"
         isSearchable
         filterOption={(option, inputValue) => {
           const searchTerm = inputValue.toLowerCase();
+          const label =
+            typeof option.data.label === 'string' ? option.data.label : '';
           return (
-            option.data.provider_label.toLowerCase().includes(searchTerm) ||
-            option.data.label.toLowerCase().includes(searchTerm) ||
-            option.data.value.toLowerCase().includes(searchTerm)
+            label.toLowerCase().includes(searchTerm) ||
+            option.data.llms.some(llm =>
+              llm.label.toLowerCase().includes(searchTerm)
+            )
           );
         }}
       />

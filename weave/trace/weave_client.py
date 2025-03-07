@@ -1995,6 +1995,7 @@ class WeaveClient:
         # Add call batch uploads if available
         if self._server_is_flushable:
             server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
             total += server.call_processor.num_outstanding_jobs
         return total
 
@@ -2127,6 +2128,7 @@ class WeaveClient:
             # _server_is_flushable and only call this if we know the server is
             # flushable.
             server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
             server.call_processor.stop_accepting_new_work_and_flush_queue()
 
             # Restart call processor processing thread after flushing
@@ -2149,6 +2151,7 @@ class WeaveClient:
         call_processor_jobs = 0
         if self._server_is_flushable:
             server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
             call_processor_jobs = server.call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
