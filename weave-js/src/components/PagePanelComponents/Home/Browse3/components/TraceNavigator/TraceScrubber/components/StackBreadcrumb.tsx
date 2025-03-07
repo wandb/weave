@@ -1,7 +1,7 @@
 import {Button} from '@wandb/weave/components/Button';
 import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {getCallDisplayName} from '../../TraceViews/utils';
 import {
@@ -19,17 +19,21 @@ export const StackBreadcrumb: React.FC<
     traceRootCallId: string | undefined;
   }
 > = props => {
+  const stack = useMemo(
+    () =>
+      props.stack.map(id => {
+        const call = props.traceTreeFlat[id]?.call;
+        return {
+          id,
+          name: call ? getCallDisplayName(call) : id,
+        };
+      }),
+    [props.stack, props.traceTreeFlat]
+  );
+
   if (!props.focusedCallId) {
     return null;
   }
-
-  const stack = props.stack.map(id => {
-    const call = props.traceTreeFlat[id]?.call;
-    return {
-      id,
-      name: call ? getCallDisplayName(call) : id,
-    };
-  });
 
   return (
     <BreadcrumbWrapper>
@@ -59,8 +63,7 @@ export const StackBreadcrumb: React.FC<
             <Button
               variant={'ghost'}
               disabled={
-                !props.rootParentId ||
-                props.rootCallId === props.rootParentId
+                !props.rootParentId || props.rootCallId === props.rootParentId
               }
               onClick={() => {
                 if (props.rootParentId) {

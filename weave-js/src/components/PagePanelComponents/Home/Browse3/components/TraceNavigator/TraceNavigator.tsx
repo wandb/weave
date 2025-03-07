@@ -33,13 +33,13 @@ export const TraceNavigator = ({
   } = useBareTraceCalls(entity, project, traceId);
 
   // Derived data
-  const traceTreeFlat = useMemo(
+  const traceTreeFlatRootedAtTraceRoot = useMemo(
     () => buildTraceTreeFlat(traceCalls ?? []),
     [traceCalls]
   );
 
   const traceRootCallId = useMemo(() => {
-    const treeEntries = Object.entries(traceTreeFlat);
+    const treeEntries = Object.entries(traceTreeFlatRootedAtTraceRoot);
     if (treeEntries.length > 0 && !traceCallsLoading && !traceCallsError) {
       // Find the call with the lowest dfsOrder (root of the trace)
       return treeEntries.reduce((acc, [id, node]) =>
@@ -47,42 +47,97 @@ export const TraceNavigator = ({
       )[0];
     }
     return undefined;
-  }, [traceCallsError, traceCallsLoading, traceTreeFlat]);
+  }, [traceCallsError, traceCallsLoading, traceTreeFlatRootedAtTraceRoot]);
+
+  const rootParentId = useMemo(() => {
+    if (!rootCallId) {
+      return undefined;
+    }
+    const currentNode = traceTreeFlatRootedAtTraceRoot[rootCallId];
+    return currentNode?.parentId;
+  }, [rootCallId, traceTreeFlatRootedAtTraceRoot]);
+
+  const traceTreeFlatRootedAtRootCallId = useMemo(() => {
+    if (!rootCallId || traceRootCallId === rootCallId) {
+      return traceTreeFlatRootedAtTraceRoot;
+    }
+
+    const rootCall = traceTreeFlatRootedAtTraceRoot[rootCallId];
+    if (!rootCall) {
+      return traceTreeFlatRootedAtTraceRoot;
+    }
+
+    const traceTreeFlat: TraceTreeFlat = {};
+
+    const addNode = (node: TraceTreeFlat[string]) => {
+      traceTreeFlat[node.call.id] = node;
+      node.childrenIds.forEach(nodeId => {
+        addNode(traceTreeFlatRootedAtTraceRoot[nodeId]);
+      });
+    };
+
+    addNode({
+      ...rootCall,
+      parentId: undefined,
+    });
+
+    return traceTreeFlat;
+  }, [rootCallId, traceRootCallId, traceTreeFlatRootedAtTraceRoot]);
+
+  // If the focusedCallId is not a descendant of the rootCallId, set it to the rootCallId
+  useEffect(() => {
+    if (!focusedCallId) {
+      return;
+    }
+    let candidateRootCallId: string | undefined = focusedCallId;
+    while (candidateRootCallId) {
+      if (candidateRootCallId === rootCallId) {
+        return;
+      }
+      candidateRootCallId =
+        traceTreeFlatRootedAtRootCallId[candidateRootCallId]?.parentId;
+    }
+
+    setRootCallId(focusedCallId);
+  }, [
+    focusedCallId,
+    rootCallId,
+    setRootCallId,
+    traceTreeFlatRootedAtRootCallId,
+  ]);
 
   // Auto-select first call when trace tree is built and no call is selected
   useEffect(() => {
     if (!focusedCallId && traceRootCallId) {
       setFocusedCallId(traceRootCallId);
     }
-  }, [
-    focusedCallId,
-    setFocusedCallId,
-    traceCallsError,
-    traceCallsLoading,
-    traceRootCallId,
-    traceTreeFlat,
-  ]);
+  }, [focusedCallId, setFocusedCallId, traceRootCallId]);
 
-  const stack = useStackForCallId(traceTreeFlat, focusedCallId);
+  const stack = useStackForCallId(
+    traceTreeFlatRootedAtRootCallId,
+    focusedCallId
+  );
 
   const childProps = useMemo(
     () => ({
       traceRootCallId,
-      traceTreeFlat,
+      traceTreeFlat: traceTreeFlatRootedAtRootCallId,
       focusedCallId,
       setFocusedCallId,
       setRootCallId,
       stack,
       rootCallId,
+      rootParentId,
     }),
     [
       traceRootCallId,
-      traceTreeFlat,
+      traceTreeFlatRootedAtRootCallId,
       focusedCallId,
       setFocusedCallId,
       setRootCallId,
       stack,
       rootCallId,
+      rootParentId,
     ]
   );
 
@@ -90,15 +145,11 @@ export const TraceNavigator = ({
 };
 
 export const TraceNavigatorInner: FC<
-  TraceViewProps & {traceRootCallId: string | undefined}
+  TraceViewProps & {
+    traceRootCallId: string | undefined;
+    rootParentId: string | undefined;
+  }
 > = props => {
-  const rootParentId = useMemo(() => {
-    if (!props.rootCallId) {
-      return undefined;
-    }
-    const currentNode = props.traceTreeFlat[props.rootCallId];
-    return currentNode?.parentId;
-  }, [props.rootCallId, props.traceTreeFlat]);
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
   const loading = props.traceTreeFlat[props.focusedCallId ?? ''] == null;
@@ -154,7 +205,7 @@ export const TraceNavigatorInner: FC<
             <>
               <StackBreadcrumb
                 {...props}
-                rootParentId={rootParentId}
+                rootParentId={props.rootParentId}
                 traceRootCallId={props.traceRootCallId}
               />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -207,6 +258,7 @@ const useStackForCallId = (
             Date.parse(traceTreeFlat[a].call.started_at) -
             Date.parse(traceTreeFlat[b].call.started_at)
         )[0];
+
         stack.push(nextId);
         currentId = nextId;
       }
@@ -219,12 +271,7 @@ const useStackForCallId = (
   // Update stack state whenever selected call changes
   React.useEffect(() => {
     if (selectedCallId) {
-      setStackState(curr => {
-        if (!curr.includes(selectedCallId)) {
-          return buildStackForCall(selectedCallId);
-        }
-        return curr;
-      });
+      setStackState(buildStackForCall(selectedCallId));
     } else {
       setStackState([]);
     }

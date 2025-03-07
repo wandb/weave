@@ -411,8 +411,8 @@ export const TreeView: React.FC<
   setRootCallId,
 }) => {
   // Initialize expandedNodes with all node IDs
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
-    () => new Set(Object.keys(traceTreeFlat))
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
+    () => new Set([])
   );
 
   const filterSet = useMemo(
@@ -445,7 +445,7 @@ export const TreeView: React.FC<
   const flattenedNodes = useMemo(() => {
     const result: FlattenedNode[] = [];
     const processNode = (node: TraceTreeFlat[string], level: number) => {
-      const isExpanded = expandedNodes.has(node.id);
+      const isExpanded = !collapsedNodes.has(node.id);
       const filteredChildren = node.childrenIds.filter(childId => {
         return !filterSet || filterSet.has(childId);
       });
@@ -471,16 +471,16 @@ export const TreeView: React.FC<
 
     rootNodes.forEach(node => processNode(node, 0));
     return result;
-  }, [rootNodes, traceTreeFlat, expandedNodes, filterSet]);
+  }, [rootNodes, traceTreeFlat, collapsedNodes, filterSet]);
 
   const handleToggleExpand = (id: string) => {
-    const newExpandedNodes = new Set(expandedNodes);
+    const newExpandedNodes = new Set(collapsedNodes);
     if (newExpandedNodes.has(id)) {
       newExpandedNodes.delete(id);
     } else {
       newExpandedNodes.add(id);
     }
-    setExpandedNodes(newExpandedNodes);
+    setCollapsedNodes(newExpandedNodes);
   };
 
   const rowRenderer = ({index, style}: any) => {
