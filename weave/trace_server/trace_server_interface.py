@@ -229,6 +229,24 @@ class CallEndRes(BaseModel):
     pass
 
 
+class CallBatchStartMode(BaseModel):
+    mode: str = "start"
+    req: CallStartReq
+
+
+class CallBatchEndMode(BaseModel):
+    mode: str = "end"
+    req: CallEndReq
+
+
+class CallCreateBatchReq(BaseModel):
+    batch: list[Union[CallBatchStartMode, CallBatchEndMode]]
+
+
+class CallCreateBatchRes(BaseModel):
+    res: list[Union[CallStartRes, CallEndRes]]
+
+
 class CallReadReq(BaseModel):
     project_id: str
     id: str
