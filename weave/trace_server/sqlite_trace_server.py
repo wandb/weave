@@ -208,6 +208,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             trace_id=req.start.trace_id,
         )
 
+    # TODO: The Sqlite Trace Server does not support batching.
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return tsi.CallCreateBatchRes(res=[])
+
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         conn, cursor = get_conn_cursor(self.db_path)
         parsable_output = req.end.output
