@@ -145,7 +145,9 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
    - Page size
    - Column visibility
    - Column pinning
-3. In the upper right hand corner, click **Save view**. 
+3. Save the view using one of two options:
+   - In the upper right hand corner, click **Save view**. 
+   - Click the hamburger menu to the left of **Save view**. In the dropdown menu, click **+ Save as new view**.
 
 ### Load a saved view
 
@@ -165,6 +167,18 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
 1. Follow the steps described in [Access a saved view](#access-a-saved-view).
 2. Adjust your table configuration.
 3. In the upper right hand corner, click **Save view**. 
+
+### Delete a saved view 
+
+:::important
+You can delete a view if you believe it is no longer useful to you and your team. This cannot be undone.
+:::
+
+1. Navigate to your **Traces** or **Evals** tab.
+2. [Load the view](#load-a-saved-view) that you want to delete.
+3. Click the hamburger menu to the left of **Save view**. 
+4. In the dropdown menu, click **Delete view**.
+5. In the pop-up modal, confirm by clicking **Delete view**. Alternatively, click **Cancel** to stop deletion.
 
 ### Return to the default view
 
