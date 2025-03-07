@@ -4,53 +4,7 @@
     "title": "FastAPI",
     "version": "0.1.0"
   },
-  "servers": [
-    {
-      "url": "https://trace.wandb.ai",
-      "description": "Prod"
-    }
-  ],
   "paths": {
-    "/health": {
-      "get": {
-        "tags": [
-          "Service"
-        ],
-        "summary": "Read Root",
-        "operationId": "read_root_health_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/server_info": {
-      "get": {
-        "tags": [
-          "Service"
-        ],
-        "summary": "Server Info",
-        "operationId": "server_info_server_info_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServerInfoRes"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/call/start": {
       "post": {
         "tags": [
@@ -89,12 +43,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/call/end": {
@@ -135,12 +84,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/call/upsert_batch": {
@@ -181,12 +125,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/calls/delete": {
@@ -227,12 +166,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/call/update": {
@@ -273,12 +207,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/call/read": {
@@ -319,12 +248,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/calls/query_stats": {
@@ -365,12 +289,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/calls/stream_query": {
@@ -380,11 +299,6 @@
         ],
         "summary": "Calls Query Stream",
         "operationId": "calls_query_stream_calls_stream_query_post",
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ],
         "parameters": [
           {
             "name": "accept",
@@ -409,13 +323,13 @@
         },
         "responses": {
           "200": {
-            "description": "Stream of calls in JSONL format",
+            "description": "Stream of data in JSONL format",
             "content": {
               "application/jsonl": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CallSchema"
+                    "$ref": "#/components/schemas/Schema"
                   }
                 }
               }
@@ -472,12 +386,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/obj/read": {
@@ -518,12 +427,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/objs/query": {
@@ -564,12 +468,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/obj/delete": {
@@ -610,12 +509,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/table/create": {
@@ -656,12 +550,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/table/update": {
@@ -702,12 +591,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/table/query": {
@@ -748,12 +632,60 @@
               }
             }
           }
-        },
-        "security": [
+        }
+      }
+    },
+    "/table/query_stream": {
+      "post": {
+        "summary": "Table Query Stream",
+        "operationId": "table_query_stream_table_query_stream_post",
+        "parameters": [
           {
-            "HTTPBasic": []
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "application/jsonl",
+              "title": "Accept"
+            }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableQueryReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schema"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/table/query_stats": {
@@ -794,12 +726,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/refs/read_batch": {
@@ -840,12 +767,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/file/create": {
@@ -886,12 +808,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/file/content": {
@@ -930,12 +847,130 @@
               }
             }
           }
+        }
+      }
+    },
+    "/op/create": {
+      "post": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op Create",
+        "operationId": "op_create_op_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpCreateReq"
+              }
+            }
+          },
+          "required": true
         },
-        "security": [
-          {
-            "HTTPBasic": []
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        ]
+        }
+      }
+    },
+    "/op/read": {
+      "post": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op Read",
+        "operationId": "op_read_op_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpReadReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ops/query": {
+      "post": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Ops Query",
+        "operationId": "ops_query_ops_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpQueryReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpQueryRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/cost/create": {
@@ -976,12 +1011,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/cost/query": {
@@ -1022,12 +1052,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/cost/purge": {
@@ -1068,12 +1093,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/feedback/create": {
@@ -1115,12 +1135,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/feedback/query": {
@@ -1162,12 +1177,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/feedback/purge": {
@@ -1209,12 +1219,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     },
     "/feedback/replace": {
@@ -1255,12 +1260,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        }
       }
     }
   },
@@ -4140,6 +4140,136 @@
         "type": "object",
         "title": "ObjectVersionFilter"
       },
+      "OpCreateReq": {
+        "properties": {
+          "op_obj": {
+            "$ref": "#/components/schemas/ObjSchemaForInsert"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op_obj"
+        ],
+        "title": "OpCreateReq"
+      },
+      "OpCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest"
+        ],
+        "title": "OpCreateRes"
+      },
+      "OpQueryReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpVersionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "OpQueryReq"
+      },
+      "OpQueryRes": {
+        "properties": {
+          "op_objs": {
+            "items": {
+              "$ref": "#/components/schemas/ObjSchema"
+            },
+            "type": "array",
+            "title": "Op Objs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op_objs"
+        ],
+        "title": "OpQueryRes"
+      },
+      "OpReadReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "name",
+          "digest"
+        ],
+        "title": "OpReadReq"
+      },
+      "OpReadRes": {
+        "properties": {
+          "op_obj": {
+            "$ref": "#/components/schemas/ObjSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op_obj"
+        ],
+        "title": "OpReadRes"
+      },
+      "OpVersionFilter": {
+        "properties": {
+          "op_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op Names"
+          },
+          "latest_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Only"
+          }
+        },
+        "type": "object",
+        "title": "OpVersionFilter"
+      },
       "OrOperation": {
         "properties": {
           "$or": {
@@ -4257,19 +4387,6 @@
           "vals"
         ],
         "title": "RefsReadBatchRes"
-      },
-      "ServerInfoRes": {
-        "properties": {
-          "min_required_weave_python_version": {
-            "type": "string",
-            "title": "Min Required Weave Python Version"
-          }
-        },
-        "type": "object",
-        "required": [
-          "min_required_weave_python_version"
-        ],
-        "title": "ServerInfoRes"
       },
       "SortBy": {
         "properties": {
@@ -4839,12 +4956,6 @@
           "type"
         ],
         "title": "ValidationError"
-      }
-    },
-    "securitySchemes": {
-      "HTTPBasic": {
-        "type": "http",
-        "scheme": "basic"
       }
     }
   }
