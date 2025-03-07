@@ -508,28 +508,22 @@ export const LLM_MAX_TOKENS = {
   },
 };
 
-export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4o-mini-2024-07-18';
-
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
 export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
-  openai: ['OPENAI_API_KEY'],
-  anthropic: ['ANTHROPIC_API_KEY'],
-  gemini: ['GEMINI_API_KEY'],
-  xai: ['XAI_API_KEY'],
-  bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
-  azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
-  groq: ['GEMMA_API_KEY'],
-  deepseek: ['DEEPSEEK_API_KEY'],
-};
-
-export const LLM_PROVIDERS = Object.keys(LLM_PROVIDER_SECRETS) as Array<
-  keyof typeof LLM_PROVIDER_SECRETS
->;
+export const LLM_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'azure',
+  'gemini',
+  'groq',
+  'bedrock',
+  'xai',
+  'deepseek',
+];
 
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
