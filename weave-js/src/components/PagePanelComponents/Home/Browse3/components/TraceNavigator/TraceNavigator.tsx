@@ -242,7 +242,7 @@ const useStackForCallId = (
 ) => {
   const [stackState, setStackState] = React.useState<StackState>([]);
 
-  const buildStackForCall = React.useCallback(
+  const buildAncestorStackForCall = React.useCallback(
     (callId: string) => {
       if (!callId || Object.keys(traceTreeFlat).length === 0) {
         return [];
@@ -260,8 +260,20 @@ const useStackForCallId = (
         currentId = node.parentId || '';
       }
 
+      return stack;
+    },
+    [traceTreeFlat]
+  );
+
+  const buildDescendantStackForCall = React.useCallback(
+    (callId: string) => {
+      if (!callId || Object.keys(traceTreeFlat).length === 0) {
+        return [];
+      }
+
       // Build stack down to leaves
-      currentId = callId;
+      const stack: string[] = [];
+      let currentId = callId;
       while (currentId) {
         const node = traceTreeFlat[currentId];
         if (!node || node.childrenIds.length === 0) {
@@ -286,11 +298,19 @@ const useStackForCallId = (
   // Update stack state whenever selected call changes
   React.useEffect(() => {
     if (selectedCallId) {
-      setStackState(buildStackForCall(selectedCallId));
+      setStackState(curr => {
+        const currIndex = curr.indexOf(selectedCallId);
+        const ancestorStack = buildAncestorStackForCall(selectedCallId);
+        let descendantStack = buildDescendantStackForCall(selectedCallId);
+        if (currIndex !== -1) {
+          descendantStack = curr.slice(currIndex + 1);
+        }
+        return ancestorStack.concat(descendantStack);
+      });
     } else {
       setStackState([]);
     }
-  }, [selectedCallId, buildStackForCall]);
+  }, [selectedCallId, buildAncestorStackForCall, buildDescendantStackForCall]);
 
   return stackState;
 };
