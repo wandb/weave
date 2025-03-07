@@ -256,6 +256,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
 
+    # TODO: This is not actually implemented at the lower level yet.
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return tsi.CallCreateBatchRes(res=[])
+
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
             assert self.call_processor is not None

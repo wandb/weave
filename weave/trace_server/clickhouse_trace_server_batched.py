@@ -250,6 +250,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
+    # TODO: This is not actually implemented at the lower level yet.
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return tsi.CallCreateBatchRes(res=[])
+
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
