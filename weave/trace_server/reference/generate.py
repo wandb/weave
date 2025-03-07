@@ -382,12 +382,12 @@ def generate_routes(
             server_dependency.get_server("file_create")
         ),
     ) -> tsi.FileCreateRes:
-        content = await file.read()
-        return server.file_create(
-            tsi.FileCreateReq(
-                project_id=project_id, name=file.filename, content=content
-            )
+        req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=file.filename or "<unnamed_file>",
+            content=await file.read(),
         )
+        return server.file_create(req)
 
     @router.post("/file/content", tags=[FILES_TAG_NAME])
     @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
