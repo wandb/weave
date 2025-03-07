@@ -75,7 +75,7 @@ def get_openapi_spec(output_file: str | None = None) -> None:
     server = subprocess.Popen(
         [
             "uvicorn",
-            "trace_server_reference.reference_server:app",
+            "weave.trace_server.reference.server:app",
             f"--port={WEAVE_PORT}",
         ],
         stdout=subprocess.PIPE,

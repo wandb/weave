@@ -38,13 +38,13 @@ This tool generates code from the OpenAPI specification for Python, Node.js, and
 For help, run:
 
 ```
-codegen --help
+make generate ARGS="--help"
 ```
 
 To run the full pipeline:
 
 ```bash
-codegen all
+make generate ARGS="all"
 ```
 
 ## Troubleshooting
