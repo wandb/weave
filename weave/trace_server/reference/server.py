@@ -6,8 +6,6 @@ from weave.trace_server.reference.generate import (
     noop_trace_server_factory,
 )
 
-# The type ignore here is safe.  We are just inheriting from the protocol to generate a
-# stub implementation.  By definition, the stub should have all the methods of the protocol.
 server_dependency = ServerDependency(server_factory=noop_trace_server_factory)
 trace_service_router = generate_routes(APIRouter(), server_dependency)
 app = FastAPI()
