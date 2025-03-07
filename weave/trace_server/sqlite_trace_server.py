@@ -208,10 +208,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             trace_id=req.start.trace_id,
         )
 
-    # TODO: This is not actually implemented at the lower level yet.
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return tsi.CallCreateBatchRes(res=[])
-
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         conn, cursor = get_conn_cursor(self.db_path)
         parsable_output = req.end.output
