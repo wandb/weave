@@ -63,6 +63,7 @@ class ServerDependency:
         endpoint_auth_mapping: dict[str, Callable] | None = None,
         server_factory: Callable[[AuthParams, str], tsi.TraceServerInterface]
         | None = None,
+        default_auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
     ):
         """
         Initialize with auth dependencies and server factory.
@@ -71,7 +72,7 @@ class ServerDependency:
             endpoint_auth_mapping: Dict mapping endpoint names directly to auth dependencies
             server_factory: Function that creates a server from auth params and endpoint name
         """
-        self.default_auth_dependency = lambda: AuthParams()  # This means no auth
+        self.default_auth_dependency = default_auth_dependency
         self.endpoint_auth_mapping = endpoint_auth_mapping or {}
 
         # Default to no server
@@ -183,7 +184,7 @@ def generate_routes(
         ),
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(server.calls_query_stream(req))
+        return StreamingResponse(server.calls_query_stream(req), media_type=accept)
 
     @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
     def calls_delete(
