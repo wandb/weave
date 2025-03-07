@@ -225,29 +225,29 @@ def generate_routes(
     ) -> tsi.TableQueryRes:
         return server.table_query(req)
 
-    @router.post(
-        "/table/query_stream",
-        response_class=StreamingResponse,
-        responses={
-            200: {
-                "description": "Stream of data in JSONL format",
-                "content": {
-                    "application/jsonl": {
-                        "schema": {
-                            "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
-                        }
-                    }
-                },
-            }
-        },
-    )
-    def table_query_stream(
-        req: tsi.TableQueryReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-        accept: Annotated[str, Header()] = "application/jsonl",
-    ) -> StreamingResponse:
-        return StreamingResponse(server.table_query_stream(req))
+    # @router.post(
+    #     "/table/query_stream",
+    #     response_class=StreamingResponse,
+    #     responses={
+    #         200: {
+    #             "description": "Stream of data in JSONL format",
+    #             "content": {
+    #                 "application/jsonl": {
+    #                     "schema": {
+    #                         "type": "array",
+    #                         "items": {"$ref": "#/components/schemas/Schema"},
+    #                     }
+    #                 }
+    #             },
+    #         }
+    #     },
+    # )
+    # def table_query_stream(
+    #     req: tsi.TableQueryReq,
+    #     server: tsi.TraceServerInterface = Depends(get_server),
+    #     accept: Annotated[str, Header()] = "application/jsonl",
+    # ) -> StreamingResponse:
+    #     return StreamingResponse(server.table_query_stream(req))
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
@@ -286,26 +286,26 @@ def generate_routes(
         res = server.file_content_read(req)
         return StreamingResponse(iter([res.content]))
 
-    @router.post("/op/create", tags=[OPS_TAG_NAME])
-    def op_create(
-        req: tsi.OpCreateReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.OpCreateRes:
-        return server.op_create(req)
+    # @router.post("/op/create", tags=[OPS_TAG_NAME])
+    # def op_create(
+    #     req: tsi.OpCreateReq,
+    #     server: tsi.TraceServerInterface = Depends(get_server),
+    # ) -> tsi.OpCreateRes:
+    #     return server.op_create(req)
 
-    @router.post("/op/read", tags=[OPS_TAG_NAME])
-    def op_read(
-        req: tsi.OpReadReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.OpReadRes:
-        return server.op_read(req)
+    # @router.post("/op/read", tags=[OPS_TAG_NAME])
+    # def op_read(
+    #     req: tsi.OpReadReq,
+    #     server: tsi.TraceServerInterface = Depends(get_server),
+    # ) -> tsi.OpReadRes:
+    #     return server.op_read(req)
 
-    @router.post("/ops/query", tags=[OPS_TAG_NAME])
-    def ops_query(
-        req: tsi.OpQueryReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.OpQueryRes:
-        return server.ops_query(req)
+    # @router.post("/ops/query", tags=[OPS_TAG_NAME])
+    # def ops_query(
+    #     req: tsi.OpQueryReq,
+    #     server: tsi.TraceServerInterface = Depends(get_server),
+    # ) -> tsi.OpQueryRes:
+    #     return server.ops_query(req)
 
     @router.post("/cost/create", tags=[COST_TAG_NAME])
     def cost_create(
