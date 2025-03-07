@@ -131,13 +131,7 @@ def generate_routes(
         req: CallCreateBatchReq,
         server: tsi.TraceServerInterface = Depends(get_server),
     ) -> CallCreateBatchRes:
-        results = []
-        for item in req.batch:
-            if isinstance(item, CallBatchStartMode):
-                results.append(server.call_start(item.req))
-            else:
-                results.append(server.call_end(item.req))
-        return CallCreateBatchRes(res=results)
+        return server.call_start_batch(req)
 
     @router.post("/call/read", tags=[CALLS_TAG_NAME])
     def call_read(
