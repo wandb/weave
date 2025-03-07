@@ -31,7 +31,8 @@ export const createScrubber = ({
   alwaysEnabled,
 }: ScrubberConfig) => {
   const ScrubberComponent: React.FC<BaseScrubberProps> = props => {
-    const {selectedCallId, onCallSelect} = props;
+    const {focusedCallId: selectedCallId, setFocusedCallId: onCallSelect} =
+      props;
 
     const nodes = React.useMemo(() => getNodes(props), [props]);
 

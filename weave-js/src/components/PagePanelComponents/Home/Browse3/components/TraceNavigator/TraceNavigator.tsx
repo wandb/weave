@@ -12,21 +12,25 @@ import {buildTraceTreeFlat} from './TraceViews/utils';
 export const TraceNavigator = ({
   entity,
   project,
-  selectedTraceId,
-  selectedCallId,
-  setSelectedCallId,
+  traceId,
+  focusedCallId,
+  setFocusedCallId,
+  setRootCallId,
+  rootCallId,
 }: {
   entity: string;
   project: string;
-  selectedTraceId: string;
-  selectedCallId: string | undefined;
-  setSelectedCallId: (callId: string) => void;
+  traceId: string;
+  focusedCallId: string | undefined;
+  setFocusedCallId: (callId: string) => void;
+  setRootCallId: (callId: string) => void;
+  rootCallId: string | undefined;
 }) => {
   const {
     loading: traceCallsLoading,
     error: traceCallsError,
     result: traceCalls,
-  } = useBareTraceCalls(entity, project, selectedTraceId);
+  } = useBareTraceCalls(entity, project, traceId);
 
   // Derived data
   const traceTreeFlat = useMemo(
@@ -34,48 +38,70 @@ export const TraceNavigator = ({
     [traceCalls]
   );
 
+  const traceRootCallId = useMemo(() => {
+    const treeEntries = Object.entries(traceTreeFlat);
+    if (treeEntries.length > 0 && !traceCallsLoading && !traceCallsError) {
+      // Find the call with the lowest dfsOrder (root of the trace)
+      return treeEntries.reduce((acc, [id, node]) =>
+        node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
+      )[0];
+    }
+    return undefined;
+  }, [traceCallsError, traceCallsLoading, traceTreeFlat]);
+
   // Auto-select first call when trace tree is built and no call is selected
   useEffect(() => {
-    const treeEntries = Object.entries(traceTreeFlat);
-    if (
-      !selectedCallId &&
-      treeEntries.length > 0 &&
-      !traceCallsLoading &&
-      !traceCallsError
-    ) {
-      // Find the call with the lowest dfsOrder (root of the trace)
-      const [firstCallId] = treeEntries.reduce((acc, [id, node]) =>
-        node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
-      );
-      setSelectedCallId(firstCallId);
+    if (!focusedCallId && traceRootCallId) {
+      setFocusedCallId(traceRootCallId);
     }
   }, [
-    selectedCallId,
-    setSelectedCallId,
+    focusedCallId,
+    setFocusedCallId,
     traceCallsError,
     traceCallsLoading,
+    traceRootCallId,
     traceTreeFlat,
   ]);
 
-  const stack = useStackForCallId(traceTreeFlat, selectedCallId);
+  const stack = useStackForCallId(traceTreeFlat, focusedCallId);
 
   const childProps = useMemo(
     () => ({
+      traceRootCallId,
       traceTreeFlat,
-      selectedCallId,
-      onCallSelect: setSelectedCallId,
+      focusedCallId,
+      setFocusedCallId,
+      setRootCallId,
       stack,
+      rootCallId,
     }),
-    [traceTreeFlat, selectedCallId, setSelectedCallId, stack]
+    [
+      traceRootCallId,
+      traceTreeFlat,
+      focusedCallId,
+      setFocusedCallId,
+      setRootCallId,
+      stack,
+      rootCallId,
+    ]
   );
 
   return <TraceNavigatorInner {...childProps} />;
 };
 
-export const TraceNavigatorInner: FC<TraceViewProps> = props => {
+export const TraceNavigatorInner: FC<
+  TraceViewProps & {traceRootCallId: string | undefined}
+> = props => {
+  const rootParentId = useMemo(() => {
+    if (!props.rootCallId) {
+      return undefined;
+    }
+    const currentNode = props.traceTreeFlat[props.rootCallId];
+    return currentNode?.parentId;
+  }, [props.rootCallId, props.traceTreeFlat]);
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
-  const loading = props.traceTreeFlat[props.selectedCallId ?? ''] == null;
+  const loading = props.traceTreeFlat[props.focusedCallId ?? ''] == null;
 
   // Count total traces
   const traceCount = Object.keys(props.traceTreeFlat).length;
@@ -126,7 +152,11 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
             </div>
           ) : (
             <>
-              <StackBreadcrumb {...props} />
+              <StackBreadcrumb
+                {...props}
+                rootParentId={rootParentId}
+                traceRootCallId={props.traceRootCallId}
+              />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex-1 overflow-auto">
                   <TraceViewComponent {...props} />

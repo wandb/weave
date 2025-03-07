@@ -104,10 +104,11 @@ interface CodeMapNodeProps extends TraceViewProps {
 
 const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   node,
-  selectedCallId,
-  onCallSelect,
+  focusedCallId: selectedCallId,
+  setFocusedCallId: onCallSelect,
   traceTreeFlat,
   stack,
+  setRootCallId,
   level = 0,
 }) => {
   const hasChildren = node.children.length > 0;
@@ -204,11 +205,12 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
             <CodeMapNodeComponent
               key={child.opName}
               node={child}
-              selectedCallId={selectedCallId}
-              onCallSelect={onCallSelect}
+              focusedCallId={selectedCallId}
+              setFocusedCallId={onCallSelect}
               traceTreeFlat={traceTreeFlat}
               stack={stack}
               level={level + 1}
+              setRootCallId={setRootCallId}
             />
           ))}
         </NodeContent>
@@ -251,7 +253,12 @@ export const getSortedPeerPathCallIds = (
 };
 
 export const CodeView: React.FC<TraceViewProps> = props => {
-  const {traceTreeFlat, selectedCallId, onCallSelect, stack} = props;
+  const {
+    traceTreeFlat,
+    focusedCallId: selectedCallId,
+    setFocusedCallId: onCallSelect,
+    stack,
+  } = props;
   const codeMap = useMemo(() => buildCodeMap(traceTreeFlat), [traceTreeFlat]);
 
   // Find the selected operation's calls and update when selectedCallId changes
@@ -273,10 +280,11 @@ export const CodeView: React.FC<TraceViewProps> = props => {
           <CodeMapNodeComponent
             key={node.opName}
             node={node}
-            selectedCallId={selectedCallId}
-            onCallSelect={onCallSelect}
+            focusedCallId={selectedCallId}
+            setFocusedCallId={onCallSelect}
             traceTreeFlat={traceTreeFlat}
             stack={stack}
+            setRootCallId={props.setRootCallId}
           />
         ))}
       </TreePanel>
@@ -292,10 +300,11 @@ export const CodeView: React.FC<TraceViewProps> = props => {
             <div className="flex-1 overflow-hidden">
               <TreeView
                 traceTreeFlat={traceTreeFlat}
-                selectedCallId={selectedCallId}
-                onCallSelect={onCallSelect}
+                focusedCallId={selectedCallId}
+                setFocusedCallId={onCallSelect}
                 filterCallIds={selectedPeerPathCallIds}
                 stack={stack}
+                setRootCallId={props.setRootCallId}
               />
             </div>
           </>

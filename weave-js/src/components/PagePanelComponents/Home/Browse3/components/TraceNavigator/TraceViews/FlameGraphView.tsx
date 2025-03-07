@@ -13,7 +13,11 @@ import {getCallDisplayName, getColorForOpName} from './utils';
 type FlameGraphNode = FlameGraphNodeType;
 
 export const FlameGraphView: React.FC<TraceViewProps> = props => {
-  const {traceTreeFlat, selectedCallId, onCallSelect} = props;
+  const {
+    traceTreeFlat,
+    focusedCallId: selectedCallId,
+    setFocusedCallId: onCallSelect,
+  } = props;
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = React.useState({width: 0, height: 0});
 

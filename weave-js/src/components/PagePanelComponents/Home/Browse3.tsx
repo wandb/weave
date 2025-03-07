@@ -738,8 +738,8 @@ const CallPageBinding = () => {
       project={project}
       rootCallId={rootCallId}
       setRootCallId={setRootCallId}
-      descendentCallId={descendentCallId}
-      setDescendentCallId={setDescendentCallId}
+      focusedCallId={descendentCallId}
+      setFocusedCallId={setDescendentCallId}
       hideTraceTree={hideTraceTree}
       setHideTraceTree={setHideTraceTree}
       showFeedback={showFeedback}

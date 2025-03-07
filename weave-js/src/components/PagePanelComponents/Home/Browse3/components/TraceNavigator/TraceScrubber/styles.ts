@@ -191,18 +191,32 @@ export const TooltipContent = styled.div`
   }
 `;
 
-export const BreadcrumbContainer = styled.div`
+export const BreadcrumbWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  overflow-x: hidden;
+  font-size: 12px;
+  color: #64748b;
+  min-height: 32px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+`;
+
+export const BreadcrumbNavigationButtons = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-right: 1px solid #e2e8f0;
+`;
+
+export const BreadcrumbList = styled.div`
   padding: 4px 16px;
   display: flex;
   align-items: center;
   gap: 6px;
   overflow-x: auto;
   white-space: nowrap;
-  font-size: 12px;
-  color: #64748b;
-  min-height: 32px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 

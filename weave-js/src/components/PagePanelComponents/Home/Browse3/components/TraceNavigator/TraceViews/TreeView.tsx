@@ -41,8 +41,10 @@ interface FlattenedNode {
 interface TreeNodeProps {
   node: FlattenedNode;
   style: React.CSSProperties;
-  selectedCallId?: string;
-  onCallSelect: (id: string) => void;
+  focusedCallId?: string;
+  setFocusedCallId: (id: string) => void;
+  rootCallId?: string;
+  setRootCallId: (id: string) => void;
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
 }
@@ -135,8 +137,9 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
   style,
-  selectedCallId,
-  onCallSelect,
+  focusedCallId,
+  setFocusedCallId,
+  setRootCallId,
   onToggleExpand,
   deemphasizeCallIds,
 }) => {
@@ -169,9 +172,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   return (
     <div style={style}>
       <Button
-        variant={id === selectedCallId ? 'secondary' : 'ghost'}
-        active={id === selectedCallId}
-        onClick={() => onCallSelect(id)}
+        variant={id === focusedCallId ? 'secondary' : 'ghost'}
+        active={id === focusedCallId}
+        onClick={() => setFocusedCallId(id)}
+        onDoubleClick={() => setRootCallId(id)}
         className="h-[32px] w-full justify-start px-8 text-left text-sm"
         style={{
           opacity: isDeemphasized ? 0.6 : 1,
@@ -400,10 +404,11 @@ export const TreeView: React.FC<
   }
 > = ({
   traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
+  focusedCallId,
+  setFocusedCallId,
   filterCallIds,
   deemphasizeCallIds,
+  setRootCallId,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
@@ -485,8 +490,9 @@ export const TreeView: React.FC<
         key={node.id}
         node={node}
         style={style}
-        selectedCallId={selectedCallId}
-        onCallSelect={onCallSelect}
+        focusedCallId={focusedCallId}
+        setFocusedCallId={setFocusedCallId}
+        setRootCallId={setRootCallId}
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
       />
@@ -496,12 +502,12 @@ export const TreeView: React.FC<
   // Scroll when selectedCallId changes
   useEffect(() => {
     const scrollToSelectedRow = () => {
-      if (!selectedCallId || !listRef.current) {
+      if (!focusedCallId || !listRef.current) {
         return;
       }
 
       const selectedIndex = flattenedNodes.findIndex(
-        (node: FlattenedNode) => node.id === selectedCallId
+        (node: FlattenedNode) => node.id === focusedCallId
       );
       if (selectedIndex === -1) {
         return;
@@ -512,7 +518,7 @@ export const TreeView: React.FC<
 
     const timer = setTimeout(scrollToSelectedRow, 0);
     return () => clearTimeout(timer);
-  }, [selectedCallId, flattenedNodes]);
+  }, [focusedCallId, flattenedNodes]);
 
   return (
     <div className="h-full overflow-hidden">

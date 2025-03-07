@@ -37,8 +37,8 @@ type CallPageProps = {
   project: string;
   rootCallId: string;
   setRootCallId: (callId: string) => void;
-  descendentCallId?: string;
-  setDescendentCallId: (descendentCallId: string | undefined) => void;
+  focusedCallId?: string;
+  setFocusedCallId: (focusedCallId: string | undefined) => void;
   hideTraceTree?: boolean;
   setHideTraceTree: (hideTraceTree: boolean | undefined) => void;
   showFeedback?: boolean;
@@ -46,16 +46,16 @@ type CallPageProps = {
 };
 
 type CallPageInnerProps = CallPageProps & {
-  descendentCallId: string;
-  setDescendentCallId: (descendentCallId: string) => void;
-  descendentCall: CallSchema;
+  focusedCallId: string;
+  setFocusedCallId: (focusedCallId: string) => void;
+  focusedCall: CallSchema;
   callIsStale: boolean;
 };
 
 export const CallPage: FC<CallPageProps> = props => {
   const {useCall} = useWFHooks();
 
-  const descendentCallId = props.descendentCallId ?? props.rootCallId;
+  const descendentCallId = props.focusedCallId ?? props.rootCallId;
 
   // Note to future devs: We could delay the cost (and i/o) fetching. This is
   // just needed to validate that the call truly exists.
@@ -84,8 +84,8 @@ export const CallPage: FC<CallPageProps> = props => {
       return (
         <CallPageInnerVertical
           {...props}
-          descendentCallId={descendentCallId}
-          descendentCall={call.result}
+          focusedCallId={descendentCallId}
+          focusedCall={call.result}
           callIsStale={call.result.callId !== descendentCallId}
         />
       );
@@ -97,8 +97,8 @@ export const CallPage: FC<CallPageProps> = props => {
       return (
         <CallPageInnerVertical
           {...props}
-          descendentCallId={descendentCallId}
-          descendentCall={lastResult.current}
+          focusedCallId={descendentCallId}
+          focusedCall={lastResult.current}
           callIsStale={lastResult.current.callId !== descendentCallId}
         />
       );
@@ -235,18 +235,20 @@ const useCallTabs = (call: CallSchema) => {
 };
 
 const CallPageInnerVertical: FC<CallPageInnerProps> = ({
-  descendentCall: call,
-  descendentCallId: callId,
-  setRootCallId: setCallId,
+  focusedCall,
+  focusedCallId,
+  setRootCallId,
+  setFocusedCallId,
   setHideTraceTree,
   setShowFeedback,
   showFeedback,
   hideTraceTree,
   callIsStale,
+  rootCallId,
 }) => {
-  useViewTraceEvent(call);
+  useViewTraceEvent(focusedCall);
 
-  const hideTraceTreeDefault = isEvaluateOp(call.spanName);
+  const hideTraceTreeDefault = isEvaluateOp(focusedCall.spanName);
   const showFeedbackDefault = false;
   const hideTraceTreeActual =
     hideTraceTree != null ? hideTraceTree : hideTraceTreeDefault;
@@ -279,15 +281,15 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
 
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
-    call.entity,
-    call.project
+    focusedCall.entity,
+    focusedCall.project
   );
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
-  const callTabs = useCallTabs(call);
+  const callTabs = useCallTabs(focusedCall);
 
   return (
     <SimplePageLayoutWithHeader
@@ -300,7 +302,10 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
             alignItems: 'center',
           }}>
           {showPaginationControls && (
-            <PaginationControls call={call} setRootCallId={setCallId} />
+            <PaginationControls
+              call={focusedCall}
+              setRootCallId={setRootCallId}
+            />
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
@@ -328,24 +333,26 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
               specsLoading={specsLoading}
-              callID={callId}
-              entity={call.entity}
-              project={call.project}
+              callID={focusedCallId}
+              entity={focusedCall.entity}
+              project={focusedCall.project}
             />
           </div>
         </Tailwind>
       }
-      headerContent={<CallOverview call={call} />}
+      headerContent={<CallOverview call={focusedCall} />}
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
             <TraceNavigator
-              entity={call.entity}
-              project={call.project}
-              selectedTraceId={call.traceId}
-              selectedCallId={callId}
-              setSelectedCallId={setCallId}
+              entity={focusedCall.entity}
+              project={focusedCall.project}
+              traceId={focusedCall.traceId}
+              focusedCallId={focusedCallId}
+              rootCallId={rootCallId}
+              setFocusedCallId={setFocusedCallId}
+              setRootCallId={setRootCallId}
             />
           </div>
         </Tailwind>

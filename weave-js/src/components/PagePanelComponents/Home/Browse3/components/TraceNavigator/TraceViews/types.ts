@@ -29,9 +29,13 @@ export interface TraceViewProps {
   /** The flattened trace call tree */
   traceTreeFlat: TraceTreeFlat;
   /** Currently selected call ID */
-  selectedCallId?: string;
+  focusedCallId?: string;
+  /** The root call ID */
+  rootCallId?: string;
   /** Current stack  */
   stack: StackState;
   /** Callback when a call is selected */
-  onCallSelect: (callId: string) => void;
+  setFocusedCallId: (callId: string) => void;
+  /** Callback when a call is selected */
+  setRootCallId: (callId: string) => void;
 }

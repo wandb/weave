@@ -102,8 +102,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 // Internal flow component that uses the React Flow hooks
 const Flow: React.FC<TraceViewProps> = ({
   traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
+  focusedCallId: selectedCallId,
+  setFocusedCallId: onCallSelect,
 }) => {
   // Calculate initial layout once
   const {nodes: initialRawNodes, edges} = useMemo(() => {
