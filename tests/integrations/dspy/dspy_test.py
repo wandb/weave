@@ -2,9 +2,15 @@ from typing import Literal
 
 import dspy
 import pytest
+from datasets import load_dataset
 
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace.weave_client import WeaveClient
+
+
+def accuracy_metric(answer, model_output):
+    predicted_answer = model_output["answer"].lower()
+    return answer["answer"].lower() == predicted_answer
 
 
 @pytest.mark.skip_clickhouse_client
@@ -174,3 +180,22 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     call = calls[4]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_evaluate(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    dataset = load_dataset("maveriq/bigbenchhard", "causal_judgement")["train"]
+    rows = [{"question": data["input"], "answer": data["target"]} for data in dataset]
+    dataset = [dspy.Example(row).with_inputs("question") for row in rows[:5]]
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    evaluate = dspy.Evaluate(devset=dataset, metric=accuracy_metric)
+    accuracy = evaluate(module)
+    assert accuracy > 50
+
+    calls = list(client.calls())
+    assert len(calls) == 36

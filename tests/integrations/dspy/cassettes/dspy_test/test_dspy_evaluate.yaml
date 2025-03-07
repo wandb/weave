@@ -1,0 +1,1444 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 09cf9c6f-6c20-41af-9709-4731c4ab7d83
+      user-agent:
+      - unknown/None; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://huggingface.co/api/datasets/maveriq/bigbenchhard
+  response:
+    body:
+      string: '{"_id":"651339806e06b81de3f902bb","id":"maveriq/bigbenchhard","author":"maveriq","sha":"d53c5b10a77edeb29da195f47e6086b29f2f7f74","lastModified":"2023-09-29T08:24:12.000Z","private":false,"gated":false,"disabled":false,"tags":["task_categories:question-answering","task_categories:token-classification","task_categories:text2text-generation","task_categories:text-classification","language:en","license:mit","size_categories:1K<n<10K","modality:text","library:datasets","library:mlcroissant","arxiv:2210.09261","region:us"],"citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\\\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}","description":"BIG-Bench (Srivastava
+        et al., 2022) is a diverse evaluation suite that focuses on tasks believed
+        to be beyond the capabilities of current language models. Language models
+        have already made good progress on this benchmark, with the best model in
+        the BIG-Bench paper outperforming average reported human-rater results on
+        65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do language
+        models fall short of average human-rater performance, and are those tasks
+        actually unsolvable by current language models?","downloads":2113,"likes":25,"cardData":{"license":"mit","task_categories":["question-answering","token-classification","text2text-generation","text-classification"],"language":["en"],"pretty_name":"Big
+        Bench Hard","size_categories":["n<1K"]},"siblings":[{"rfilename":".gitattributes"},{"rfilename":"README.md"},{"rfilename":"bigbenchhard.py"}],"createdAt":"2023-09-26T20:05:20.000Z","usedStorage":159786895}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1883'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 07 Mar 2025 05:18:03 GMT
+      ETag:
+      - W/"75b-SRCwBm2kudyzVWPiahGgFAdwVSY"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 a29f9f1ff42721dbcda7f3bae04962a0.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - UK3WfoFW8BJ7MrWJHaFkhFHPjqFrdM2_iGT9hjW4RPtRaB6xFzo8YQ==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ca818b-57a4f0b75a26719337f718c8;09cf9c6f-6c20-41af-9709-4731c4ab7d83
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      user-agent:
+      - datasets/2.21.0; python/3.12.8; huggingface_hub/0.29.1; pyarrow/19.0.1; torch/2.6.0
+    method: HEAD
+    uri: https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/maveriq/bigbenchhard/maveriq/bigbenchhard.py
+  response:
+    body:
+      string: ''
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Fri, 07 Mar 2025 05:18:04 GMT
+      Server:
+      - AmazonS3
+      Transfer-Encoding:
+      - chunked
+      x-amz-id-2:
+      - CFXFAIZTpejxyAkYDotFaXcQwIkf29qKv1Xz0U0n8g9FkvI8iDnf6z2geV9GHzwefdMGym1mz2A=
+      x-amz-request-id:
+      - XSDKTX0WCX0HS6QZ
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      user-agent:
+      - datasets/2.21.0; python/3.12.8; huggingface_hub/0.29.1; pyarrow/19.0.1; torch/2.6.0;
+        datasets/2.21.0; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://datasets-server.huggingface.co/parquet?dataset=maveriq/bigbenchhard
+  response:
+    body:
+      string: '{"parquet_files":[{"dataset":"maveriq/bigbenchhard","config":"boolean_expressions","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/boolean_expressions/train/0000.parquet","filename":"0000.parquet","size":4700},{"dataset":"maveriq/bigbenchhard","config":"causal_judgement","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/causal_judgement/train/0000.parquet","filename":"0000.parquet","size":69494},{"dataset":"maveriq/bigbenchhard","config":"date_understanding","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/date_understanding/train/0000.parquet","filename":"0000.parquet","size":18041},{"dataset":"maveriq/bigbenchhard","config":"disambiguation_qa","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/disambiguation_qa/train/0000.parquet","filename":"0000.parquet","size":16704},{"dataset":"maveriq/bigbenchhard","config":"dyck_languages","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/dyck_languages/train/0000.parquet","filename":"0000.parquet","size":10015},{"dataset":"maveriq/bigbenchhard","config":"formal_fallacies","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/formal_fallacies/train/0000.parquet","filename":"0000.parquet","size":35789},{"dataset":"maveriq/bigbenchhard","config":"geometric_shapes","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/geometric_shapes/train/0000.parquet","filename":"0000.parquet","size":20233},{"dataset":"maveriq/bigbenchhard","config":"hyperbaton","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/hyperbaton/train/0000.parquet","filename":"0000.parquet","size":10422},{"dataset":"maveriq/bigbenchhard","config":"logical_deduction_five_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/logical_deduction_five_objects/train/0000.parquet","filename":"0000.parquet","size":33498},{"dataset":"maveriq/bigbenchhard","config":"logical_deduction_seven_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/logical_deduction_seven_objects/train/0000.parquet","filename":"0000.parquet","size":43970},{"dataset":"maveriq/bigbenchhard","config":"logical_deduction_three_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/logical_deduction_three_objects/train/0000.parquet","filename":"0000.parquet","size":21597},{"dataset":"maveriq/bigbenchhard","config":"movie_recommendation","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/movie_recommendation/train/0000.parquet","filename":"0000.parquet","size":21749},{"dataset":"maveriq/bigbenchhard","config":"multistep_arithmetic_two","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/multistep_arithmetic_two/train/0000.parquet","filename":"0000.parquet","size":7552},{"dataset":"maveriq/bigbenchhard","config":"navigate","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/navigate/train/0000.parquet","filename":"0000.parquet","size":10032},{"dataset":"maveriq/bigbenchhard","config":"object_counting","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/object_counting/train/0000.parquet","filename":"0000.parquet","size":10586},{"dataset":"maveriq/bigbenchhard","config":"penguins_in_a_table","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/penguins_in_a_table/train/0000.parquet","filename":"0000.parquet","size":10654},{"dataset":"maveriq/bigbenchhard","config":"reasoning_about_colored_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/reasoning_about_colored_objects/train/0000.parquet","filename":"0000.parquet","size":20387},{"dataset":"maveriq/bigbenchhard","config":"ruin_names","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/ruin_names/train/0000.parquet","filename":"0000.parquet","size":15644},{"dataset":"maveriq/bigbenchhard","config":"salient_translation_error_detection","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/salient_translation_error_detection/train/0000.parquet","filename":"0000.parquet","size":56862},{"dataset":"maveriq/bigbenchhard","config":"snarks","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/snarks/train/0000.parquet","filename":"0000.parquet","size":16406},{"dataset":"maveriq/bigbenchhard","config":"sports_understanding","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/sports_understanding/train/0000.parquet","filename":"0000.parquet","size":8163},{"dataset":"maveriq/bigbenchhard","config":"temporal_sequences","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/temporal_sequences/train/0000.parquet","filename":"0000.parquet","size":35571},{"dataset":"maveriq/bigbenchhard","config":"tracking_shuffled_objects_five_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/tracking_shuffled_objects_five_objects/train/0000.parquet","filename":"0000.parquet","size":37111},{"dataset":"maveriq/bigbenchhard","config":"tracking_shuffled_objects_seven_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/tracking_shuffled_objects_seven_objects/train/0000.parquet","filename":"0000.parquet","size":49062},{"dataset":"maveriq/bigbenchhard","config":"tracking_shuffled_objects_three_objects","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/tracking_shuffled_objects_three_objects/train/0000.parquet","filename":"0000.parquet","size":25142},{"dataset":"maveriq/bigbenchhard","config":"web_of_lies","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/web_of_lies/train/0000.parquet","filename":"0000.parquet","size":15615},{"dataset":"maveriq/bigbenchhard","config":"word_sorting","split":"train","url":"https://huggingface.co/datasets/maveriq/bigbenchhard/resolve/refs%2Fconvert%2Fparquet/word_sorting/train/0000.parquet","filename":"0000.parquet","size":44584}],"pending":[],"failed":[],"partial":false}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:04 GMT
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 8890f821f2766635a0bf9c35769eb6d6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - pIZ1t3raz2LNMvt1k-P5ySq8EqPRKfMpZqXA9BZuXYbhi590ru7QCw==
+      X-Amz-Cf-Pop:
+      - MAA50-P1
+      X-Cache:
+      - Miss from cloudfront
+      cache-control:
+      - max-age=120
+      content-encoding:
+      - gzip
+      server:
+      - uvicorn
+      vary:
+      - Accept-Encoding
+      x-revision:
+      - d53c5b10a77edeb29da195f47e6086b29f2f7f74
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      user-agent:
+      - datasets/2.21.0; python/3.12.8; huggingface_hub/0.29.1; pyarrow/19.0.1; torch/2.6.0;
+        datasets/2.21.0; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://datasets-server.huggingface.co/info?dataset=maveriq/bigbenchhard
+  response:
+    body:
+      string: '{"dataset_info":{"boolean_expressions":{"description":"BIG-Bench (Srivastava
+        et al., 2022) is a diverse evaluation suite that focuses on tasks believed
+        to be beyond the capabilities of current language models. Language models
+        have already made good progress on this benchmark, with the best model in
+        the BIG-Bench paper outperforming average reported human-rater results on
+        65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do language
+        models fall short of average human-rater performance, and are those tasks
+        actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"boolean_expressions","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":11790,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/boolean_expressions.json":{"num_bytes":17172,"checksum":null}},"download_size":17172,"dataset_size":11790,"size_in_bytes":28962},"causal_judgement":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"causal_judgement","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":198021,"num_examples":187,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/causal_judgement.json":{"num_bytes":202943,"checksum":null}},"download_size":202943,"dataset_size":198021,"size_in_bytes":400964},"date_understanding":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"date_understanding","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":54666,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/date_understanding.json":{"num_bytes":61760,"checksum":null}},"download_size":61760,"dataset_size":54666,"size_in_bytes":116426},"disambiguation_qa":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"disambiguation_qa","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":78620,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/disambiguation_qa.json":{"num_bytes":85255,"checksum":null}},"download_size":85255,"dataset_size":78620,"size_in_bytes":163875},"dyck_languages":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"dyck_languages","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":38432,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/dyck_languages.json":{"num_bytes":43814,"checksum":null}},"download_size":43814,"dataset_size":38432,"size_in_bytes":82246},"formal_fallacies":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"formal_fallacies","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":138224,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/formal_fallacies.json":{"num_bytes":145562,"checksum":null}},"download_size":145562,"dataset_size":138224,"size_in_bytes":283786},"geometric_shapes":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"geometric_shapes","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":68560,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/geometric_shapes.json":{"num_bytes":77242,"checksum":null}},"download_size":77242,"dataset_size":68560,"size_in_bytes":145802},"hyperbaton":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"hyperbaton","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":38574,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/hyperbaton.json":{"num_bytes":44706,"checksum":null}},"download_size":44706,"dataset_size":38574,"size_in_bytes":83280},"logical_deduction_five_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"logical_deduction_five_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":148595,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/logical_deduction_five_objects.json":{"num_bytes":155477,"checksum":null}},"download_size":155477,"dataset_size":148595,"size_in_bytes":304072},"logical_deduction_seven_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"logical_deduction_seven_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":191022,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/logical_deduction_seven_objects.json":{"num_bytes":198404,"checksum":null}},"download_size":198404,"dataset_size":191022,"size_in_bytes":389426},"logical_deduction_three_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"logical_deduction_three_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":105831,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/logical_deduction_three_objects.json":{"num_bytes":112213,"checksum":null}},"download_size":112213,"dataset_size":105831,"size_in_bytes":218044},"movie_recommendation":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"movie_recommendation","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":50985,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/movie_recommendation.json":{"num_bytes":57684,"checksum":null}},"download_size":57684,"dataset_size":50985,"size_in_bytes":108669},"multistep_arithmetic_two":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"multistep_arithmetic_two","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":12943,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/multistep_arithmetic_two.json":{"num_bytes":18325,"checksum":null}},"download_size":18325,"dataset_size":12943,"size_in_bytes":31268},"navigate":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"navigate","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":49031,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/navigate.json":{"num_bytes":55163,"checksum":null}},"download_size":55163,"dataset_size":49031,"size_in_bytes":104194},"object_counting":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"object_counting","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":30508,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/object_counting.json":{"num_bytes":35890,"checksum":null}},"download_size":35890,"dataset_size":30508,"size_in_bytes":66398},"penguins_in_a_table":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"penguins_in_a_table","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":70062,"num_examples":146,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/penguins_in_a_table.json":{"num_bytes":74516,"checksum":null}},"download_size":74516,"dataset_size":70062,"size_in_bytes":144578},"reasoning_about_colored_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"reasoning_about_colored_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":89579,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/reasoning_about_colored_objects.json":{"num_bytes":98694,"checksum":null}},"download_size":98694,"dataset_size":89579,"size_in_bytes":188273},"ruin_names":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"ruin_names","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":46537,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/ruin_names.json":{"num_bytes":53178,"checksum":null}},"download_size":53178,"dataset_size":46537,"size_in_bytes":99715},"salient_translation_error_detection":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"salient_translation_error_detection","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":277110,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/salient_translation_error_detection.json":{"num_bytes":286443,"checksum":null}},"download_size":286443,"dataset_size":277110,"size_in_bytes":563553},"snarks":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"snarks","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":38223,"num_examples":178,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/snarks.json":{"num_bytes":42646,"checksum":null}},"download_size":42646,"dataset_size":38223,"size_in_bytes":80869},"sports_understanding":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"sports_understanding","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":22723,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/sports_understanding.json":{"num_bytes":28617,"checksum":null}},"download_size":28617,"dataset_size":22723,"size_in_bytes":51340},"temporal_sequences":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"temporal_sequences","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":139546,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/temporal_sequences.json":{"num_bytes":148176,"checksum":null}},"download_size":148176,"dataset_size":139546,"size_in_bytes":287722},"tracking_shuffled_objects_five_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"tracking_shuffled_objects_five_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":162590,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/tracking_shuffled_objects_five_objects.json":{"num_bytes":169722,"checksum":null}},"download_size":169722,"dataset_size":162590,"size_in_bytes":332312},"tracking_shuffled_objects_seven_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"tracking_shuffled_objects_seven_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":207274,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/tracking_shuffled_objects_seven_objects.json":{"num_bytes":214906,"checksum":null}},"download_size":214906,"dataset_size":207274,"size_in_bytes":422180},"tracking_shuffled_objects_three_objects":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"tracking_shuffled_objects_three_objects","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":122104,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/tracking_shuffled_objects_three_objects.json":{"num_bytes":128736,"checksum":null}},"download_size":128736,"dataset_size":122104,"size_in_bytes":250840},"web_of_lies":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"web_of_lies","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":47582,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/web_of_lies.json":{"num_bytes":52964,"checksum":null}},"download_size":52964,"dataset_size":47582,"size_in_bytes":100546},"word_sorting":{"description":"BIG-Bench
+        (Srivastava et al., 2022) is a diverse evaluation suite that focuses on tasks
+        believed to be beyond the capabilities of current language models. Language
+        models have already made good progress on this benchmark, with the best model
+        in the BIG-Bench paper outperforming average reported human-rater results
+        on 65% of the BIG-Bench tasks via few-shot prompting. But on what tasks do
+        language models fall short of average human-rater performance, and are those
+        tasks actually unsolvable by current language models?\n","citation":"@article{suzgun2022challenging,\n  title={Challenging
+        BIG-Bench Tasks and Whether Chain-of-Thought Can Solve Them},\n  author={Suzgun,
+        Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian
+        and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V and
+        Chi, Ed H and Zhou, Denny and and Wei, Jason},\n  journal={arXiv preprint
+        arXiv:2210.09261},\n  year={2022}\n}\n","homepage":"https://github.com/suzgunmirac/BIG-Bench-Hard","license":"MIT
+        license","features":{"input":{"dtype":"string","_type":"Value"},"target":{"dtype":"string","_type":"Value"}},"supervised_keys":{"input":"input","output":"target"},"builder_name":"bigbenchhard","dataset_name":"bigbenchhard","config_name":"word_sorting","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":60918,"num_examples":250,"dataset_name":"bigbenchhard"}},"download_checksums":{"https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/bbh/word_sorting.json":{"num_bytes":66300,"checksum":null}},"download_size":66300,"dataset_size":60918,"size_in_bytes":127218}},"pending":[],"failed":[],"partial":false}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:05 GMT
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 f9d84910e0898e3959adf8fe3567a85c.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - kNuNLNTskwvGiluXRGy2LaJEtMB7tZaQ34QgvsUUN5Meh7H0vIne3Q==
+      X-Amz-Cf-Pop:
+      - MAA50-P1
+      X-Cache:
+      - Miss from cloudfront
+      cache-control:
+      - max-age=120
+      content-encoding:
+      - gzip
+      server:
+      - uvicorn
+      vary:
+      - Accept-Encoding
+      x-revision:
+      - d53c5b10a77edeb29da195f47e6086b29f2f7f74
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - f5e021f3-e884-4e1b-b389-257c144f5300
+      user-agent:
+      - unknown/None; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://huggingface.co/api/datasets/maveriq/bigbenchhard/revision/refs%2Fconvert%2Fparquet
+  response:
+    body:
+      string: '{"_id":"651339806e06b81de3f902bb","id":"maveriq/bigbenchhard","author":"maveriq","sha":"a493490a030bfe06c7baa2db022263afbfa04cfb","lastModified":"2024-03-07T21:25:40.000Z","private":false,"gated":false,"disabled":false,"tags":["size_categories:1K<n<10K","modality:text","library:datasets","library:mlcroissant","region:us"],"citation":null,"description":null,"downloads":2113,"likes":25,"cardData":null,"siblings":[{"rfilename":".gitattributes"},{"rfilename":"boolean_expressions/train/0000.parquet"},{"rfilename":"causal_judgement/train/0000.parquet"},{"rfilename":"date_understanding/train/0000.parquet"},{"rfilename":"disambiguation_qa/train/0000.parquet"},{"rfilename":"dyck_languages/train/0000.parquet"},{"rfilename":"formal_fallacies/train/0000.parquet"},{"rfilename":"geometric_shapes/train/0000.parquet"},{"rfilename":"hyperbaton/train/0000.parquet"},{"rfilename":"logical_deduction_five_objects/train/0000.parquet"},{"rfilename":"logical_deduction_seven_objects/train/0000.parquet"},{"rfilename":"logical_deduction_three_objects/train/0000.parquet"},{"rfilename":"movie_recommendation/train/0000.parquet"},{"rfilename":"multistep_arithmetic_two/train/0000.parquet"},{"rfilename":"navigate/train/0000.parquet"},{"rfilename":"object_counting/train/0000.parquet"},{"rfilename":"penguins_in_a_table/train/0000.parquet"},{"rfilename":"reasoning_about_colored_objects/train/0000.parquet"},{"rfilename":"ruin_names/train/0000.parquet"},{"rfilename":"salient_translation_error_detection/train/0000.parquet"},{"rfilename":"snarks/train/0000.parquet"},{"rfilename":"sports_understanding/train/0000.parquet"},{"rfilename":"temporal_sequences/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_five_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_seven_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_three_objects/train/0000.parquet"},{"rfilename":"web_of_lies/train/0000.parquet"},{"rfilename":"word_sorting/train/0000.parquet"}],"createdAt":"2023-09-26T20:05:20.000Z","usedStorage":159786895}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2045'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 07 Mar 2025 05:18:05 GMT
+      ETag:
+      - W/"7fd-Y5Owi1cHGO9fipi6QQwrB+P8qXA"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 beb33a719a87cc7f27a3c69c71141e5e.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - wrzpQ8LZwQBRbvFKVD8q6etlAHvwOYYfI7jetnyzDFIkIh2GS9-6AQ==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ca818d-6414fced620a61990f93bccb;f5e021f3-e884-4e1b-b389-257c144f5300
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - a069e736-f33d-4e26-ac0a-f6a08c41be74
+      user-agent:
+      - unknown/None; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://huggingface.co/api/datasets/maveriq/bigbenchhard/revision/a493490a030bfe06c7baa2db022263afbfa04cfb
+  response:
+    body:
+      string: '{"_id":"651339806e06b81de3f902bb","id":"maveriq/bigbenchhard","author":"maveriq","sha":"a493490a030bfe06c7baa2db022263afbfa04cfb","lastModified":"2024-03-07T21:25:40.000Z","private":false,"gated":false,"disabled":false,"tags":["size_categories:1K<n<10K","modality:text","library:datasets","library:mlcroissant","region:us"],"citation":null,"description":null,"downloads":2113,"likes":25,"cardData":null,"siblings":[{"rfilename":".gitattributes"},{"rfilename":"boolean_expressions/train/0000.parquet"},{"rfilename":"causal_judgement/train/0000.parquet"},{"rfilename":"date_understanding/train/0000.parquet"},{"rfilename":"disambiguation_qa/train/0000.parquet"},{"rfilename":"dyck_languages/train/0000.parquet"},{"rfilename":"formal_fallacies/train/0000.parquet"},{"rfilename":"geometric_shapes/train/0000.parquet"},{"rfilename":"hyperbaton/train/0000.parquet"},{"rfilename":"logical_deduction_five_objects/train/0000.parquet"},{"rfilename":"logical_deduction_seven_objects/train/0000.parquet"},{"rfilename":"logical_deduction_three_objects/train/0000.parquet"},{"rfilename":"movie_recommendation/train/0000.parquet"},{"rfilename":"multistep_arithmetic_two/train/0000.parquet"},{"rfilename":"navigate/train/0000.parquet"},{"rfilename":"object_counting/train/0000.parquet"},{"rfilename":"penguins_in_a_table/train/0000.parquet"},{"rfilename":"reasoning_about_colored_objects/train/0000.parquet"},{"rfilename":"ruin_names/train/0000.parquet"},{"rfilename":"salient_translation_error_detection/train/0000.parquet"},{"rfilename":"snarks/train/0000.parquet"},{"rfilename":"sports_understanding/train/0000.parquet"},{"rfilename":"temporal_sequences/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_five_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_seven_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_three_objects/train/0000.parquet"},{"rfilename":"web_of_lies/train/0000.parquet"},{"rfilename":"word_sorting/train/0000.parquet"}],"createdAt":"2023-09-26T20:05:20.000Z","usedStorage":159786895}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2045'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 07 Mar 2025 05:18:06 GMT
+      ETag:
+      - W/"7fd-Y5Owi1cHGO9fipi6QQwrB+P8qXA"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 4774b00e2d656478bcba37c033ae541c.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 0KR1k4NAn7NofFjB4mxPJ09zvq96KuKi0XB4StR_sHdZ8IrcaES5Eg==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ca818e-54feb93407d430306249759b;a069e736-f33d-4e26-ac0a-f6a08c41be74
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 835643a2-4837-434d-bafb-56697a2749ce
+      user-agent:
+      - unknown/None; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://huggingface.co/api/datasets/maveriq/bigbenchhard/tree/a493490a030bfe06c7baa2db022263afbfa04cfb/causal_judgement%2Ftrain?recursive=False&expand=False
+  response:
+    body:
+      string: '[{"type":"file","oid":"82691b7d66368ae58c3580759cc3db9f80d0e407","size":69494,"lfs":{"oid":"e2ea2b0e1afc30670e389669e8ccfb80c8e9763fcc4c9d92a8ca1cd615593d55","size":69494,"pointerSize":130},"path":"causal_judgement/train/0000.parquet"}]'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '236'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 07 Mar 2025 05:18:06 GMT
+      ETag:
+      - W/"ec-fATrHjeCFFXV2F9fC70iSHkiVY4"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 beb33a719a87cc7f27a3c69c71141e5e.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - xQvt0JGSyCTEcU-KQNoPmWO5fMm07WVAFaxJxZYOvVwKSGQdIW8Wmg==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ca818e-30b7ca836d488a3a042bbcf8;835643a2-4837-434d-bafb-56697a2749ce
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - b6765035-063a-4efa-86fe-4b890b4ab57a
+      user-agent:
+      - unknown/None; hf_hub/0.29.1; python/3.12.8; torch/2.6.0
+    method: GET
+    uri: https://huggingface.co/api/datasets/maveriq/bigbenchhard/revision/a493490a030bfe06c7baa2db022263afbfa04cfb
+  response:
+    body:
+      string: '{"_id":"651339806e06b81de3f902bb","id":"maveriq/bigbenchhard","author":"maveriq","sha":"a493490a030bfe06c7baa2db022263afbfa04cfb","lastModified":"2024-03-07T21:25:40.000Z","private":false,"gated":false,"disabled":false,"tags":["size_categories:1K<n<10K","modality:text","library:datasets","library:mlcroissant","region:us"],"citation":null,"description":null,"downloads":2113,"likes":25,"cardData":null,"siblings":[{"rfilename":".gitattributes"},{"rfilename":"boolean_expressions/train/0000.parquet"},{"rfilename":"causal_judgement/train/0000.parquet"},{"rfilename":"date_understanding/train/0000.parquet"},{"rfilename":"disambiguation_qa/train/0000.parquet"},{"rfilename":"dyck_languages/train/0000.parquet"},{"rfilename":"formal_fallacies/train/0000.parquet"},{"rfilename":"geometric_shapes/train/0000.parquet"},{"rfilename":"hyperbaton/train/0000.parquet"},{"rfilename":"logical_deduction_five_objects/train/0000.parquet"},{"rfilename":"logical_deduction_seven_objects/train/0000.parquet"},{"rfilename":"logical_deduction_three_objects/train/0000.parquet"},{"rfilename":"movie_recommendation/train/0000.parquet"},{"rfilename":"multistep_arithmetic_two/train/0000.parquet"},{"rfilename":"navigate/train/0000.parquet"},{"rfilename":"object_counting/train/0000.parquet"},{"rfilename":"penguins_in_a_table/train/0000.parquet"},{"rfilename":"reasoning_about_colored_objects/train/0000.parquet"},{"rfilename":"ruin_names/train/0000.parquet"},{"rfilename":"salient_translation_error_detection/train/0000.parquet"},{"rfilename":"snarks/train/0000.parquet"},{"rfilename":"sports_understanding/train/0000.parquet"},{"rfilename":"temporal_sequences/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_five_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_seven_objects/train/0000.parquet"},{"rfilename":"tracking_shuffled_objects_three_objects/train/0000.parquet"},{"rfilename":"web_of_lies/train/0000.parquet"},{"rfilename":"word_sorting/train/0000.parquet"}],"createdAt":"2023-09-26T20:05:20.000Z","usedStorage":159786895}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2045'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 07 Mar 2025 05:18:06 GMT
+      ETag:
+      - W/"7fd-Y5Owi1cHGO9fipi6QQwrB+P8qXA"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 310f78097a148c20abaa7b74a711dbaa.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - BPihnqkkkYZAIeFHNBrArUmg0QgGGnmXB-aNbQjsbVkTosLks2EktA==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ca818e-3f27d8d35669fe515bda051d;b6765035-063a-4efa-86fe-4b890b4ab57a
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nA
+      machine is set up in such a way that it will short circuit if both the black
+      wire and the red wire touch the battery at the same time. The machine will not
+      short circuit if just one of these wires touches the battery. The black wire
+      is designated as the one that is supposed to touch the battery, while the red
+      wire is supposed to remain in some other part of the machine. One day, the black
+      wire and the red wire both end up touching the battery at the same time. There
+      is a short circuit. Did the black wire cause the short circuit?\nOptions:\n-
+      Yes\n- No\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation
+      ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1559'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xVwW4jNwy9+ysI7aGXcWDH3jjNrQEWKFogaIFciiQwZA3Hw12NOBA567iL/Hsh
+        zdhje7PYXgxYj3p8j6Q43yYAhkpzB8bVVl3T+un97Z8P/z7sbfXX/eM/n/6o6k/1EsPf14vXxxmb
+        It3gzWd0erh15bhpPSpx6GEX0Som1vlqOV9cL29uVxlouESfrm1bnS552lCg6fXsejmdrabz2+F2
+        zeRQzB08TQAAvuXfpDOU+GruYFYcThoUsVs0d8cgABPZpxNjRUjUBjXFCDoOiiFLf3qCDx8gohUO
+        FLbpz8vLc/gNdN+Ssx5ajMIBGtrWOsSB1lZBa4SNt+4L7ChiAbuaXA0kUKLQNiTvoAzKnav7YKuK
+        cV+kmOQCS7AQ0CX5cQ+OQ0mpfFBxzBek5qjgKLqONHGxc128gt95h18xFiAUHObQiGWWAdbLkDOl
+        H7PCoFhsg6DUYAGkKadG2nQHrTWeyMgune1kYDqTcwWPNUaseLDu8aIgyWVrowJXPW8iyklJILCC
+        sEe/h4jSchDaePyB8ew6UtjmnNBGFEy+uYINa52zSe85dfDUtFDTebUBuRO/T5l3yZQf7Z6beg7P
+        oZ8IG2SH8TAODzwi+Np6G2wu0QA/njsvqTx1mJ2/42uDI3Lo3y9ypjk3yDqFHenZEMHOSt/rcYB+
+        Njb3PynW5YTA8IIvxuLdNEWaaHJWe9IDFWnXFyrLTb3uvF40LlqtMVHaAJ87uXxYYD0HPOnMsGew
+        7Kt/+q4jVp3YtFtC5/1w/nZcFJ63beSNDPjxvKJAUq/7x52Wgii3JqNvE4CXvJC6sx1j2shNq2vl
+        LxgS4WIx7/nMuAdHdH67HFBltX4EPs4/Fu8QrktUS15OdppxNr3p8eq4AG1XEp8AkxPb38t5j/u4
+        //4P/Qg4h61iuW4jluTOLY9hEdN34kdhxzJnwUYwfiWHayWMqRUlVrbz/fY2shfFZl1R2GJsI/Ur
+        vGrXs5vVYmV/XcxuzORt8h8AAAD//wMAFfrim9AGAAA=
+    headers:
+      CF-RAY:
+      - 91c7a15d9d897fe3-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:09 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=eQhX7Eel2f42MiE1v3M0FjPoPnaJCvGVo4e5TAtJJH0-1741324689-1.0.1.1-JGaqjx0pYkyPXhNNO6jrno4URFSpkwJl_YTXOs2vhbyWZ6MENkOzuqluXSQMADCXBpaTTQUSplqr.p2it6u7GizNA.Z_6YG2CVy3n04UNLw;
+        path=/; expires=Fri, 07-Mar-25 05:48:09 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=912Zquq49CrIV2ISIVXKTAlup7hFuP.HQh7gM68MRZ4-1741324689459-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2239'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998649'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_7d9332f00d7e067fb6f1e7150f2fec1c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nLong
+      ago, when John was only 17 years old, he got a job working for a large manufacturing
+      company. He started out working on an assembly line for minimum wage, but after
+      a few years at the company, he was given a choice between two line manager positions.
+      He could stay in the woodwork division, which is where he was currently working.
+      Or he could move to the plastics division. John was unsure what to do because
+      he liked working in the woodwork division, but he also thought it might be worth
+      trying something different. He finally decided to switch to the plastics division
+      and try something new. For the last 30 years, John has worked as a production
+      line supervisor in the plastics division. After the first year there, the plastics
+      division was moved to a different building with more space. Unfortunately, through
+      the many years he worked there, John was exposed to asbestos, a highly carcinogenic
+      substance. Most of the plastics division was quite safe, but the small part
+      in which John worked was exposed to asbestos fibers. And now, although John
+      has never smoked a cigarette in his life and otherwise lives a healthy lifestyle,
+      he has a highly progressed and incurable case of lung cancer at the age of 50.
+      John had seen three cancer specialists, all of whom confirmed the worst: that,
+      except for pain, John''s cancer was untreatable and he was absolutely certain
+      to die from it very soon (the doctors estimated no more than 2 months). Yesterday,
+      while John was in the hospital for a routine medical appointment, a new nurse
+      accidentally administered the wrong medication to him. John was allergic to
+      the drug and he immediately went into shock and experienced cardiac arrest (a
+      heart attack). Doctors attempted to resuscitate him but he died minutes after
+      the medication was administered. Did John''s job cause his premature death?\nOptions:\n-
+      Yes\n- No\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation
+      ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '2865'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=eQhX7Eel2f42MiE1v3M0FjPoPnaJCvGVo4e5TAtJJH0-1741324689-1.0.1.1-JGaqjx0pYkyPXhNNO6jrno4URFSpkwJl_YTXOs2vhbyWZ6MENkOzuqluXSQMADCXBpaTTQUSplqr.p2it6u7GizNA.Z_6YG2CVy3n04UNLw;
+        _cfuvid=912Zquq49CrIV2ISIVXKTAlup7hFuP.HQh7gM68MRZ4-1741324689459-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//rFXBbts4EL37KwbqoRc7sBNvnOTWPS3abvdSYLdNAmNMjqRpKZLljOwY
+        Rf69oGRbym5S7KEXAZo3HL7hPD5+nwAUbIsbKEyNaproZr9fvftr8W3+6R/+uF8tP30+3374vH23
+        /3PL5v2ymOYVYfOFjB5XnZnQREfKwfewSYRKuepitVxcnC8vr647oAmWXF5WRZ0tw6xhz7Pz+fly
+        Nl/NFleH1XVgQ1LcwO0EAOB79808vaWH4gbm02OkIRGsqLg5JQEUKbgcKVCERdFrMR1AE7yS76jf
+        3sKrV5AIJXj2Vf65v7/zb0D3kQ06iJQkeGi4qhVM8MKWEmhNsMXEoRUo0WhIAlpjl6GJN62SBQ3w
+        NtT+tYAl1PoM/q7Z0THmgq9mSqkBeohB2kR5AcqGRIMAKtQs8CVsQLjyXLJBr24P3EQ0uXyGa0Kn
+        NaC34Podc9S1vgKD3lCadlS5acgyKoHBVghC2eV1tGCH0iWhc5QqNvk0TJ5jLpeBXQq+glzBYBdH
+        m2cmSoksbPZdkm+T0Bl8rClRGRJNYTfuNvcRHe7JAoJJrWF0kIcE7DsuYUsJnTt2ZMk49tTTt5zI
+        6M+49+QcUEohTcEH7cJ5V1YhV2ZmrUwBXxysca2lfogjzpZtV62n4PYHEplBTNSg5rn1473zd76X
+        E3rZUTpq6UMYEHqIDn1/igd4tNm/xDMaMIu0JPmsO7FkpdbcjAXTnbepX5DBGfwRdrT9NXoYKaHi
+        LfknEjjyYAEEoYgpb8PesCWvzwjkqPIa7ehOHPrOF46+teQNyRRYfzaPnj170PwnkUy+NMA+339D
+        o/kcrIpsP4OxNSQqW8FsT7517hB/PHmNC1VMYSMH/BQv832o172PZF8RDbHo0McJwH3nae0Tmypi
+        Ck3UtYav5HPB364Wfb1isNIBXVxfHlANim4AVqvV9JmCa0uK7GRki4VBU5Mdlg4eiq3lMAImo7b/
+        S+e52icL/T/lB8AYikp2HVMW1dOWh7RE+al5Ke10zB3hQiht2dBamVIehaUSW9c/AIXsRalZl+wr
+        SjFx/wqUcT2/XF2s8PpifllMHic/AAAA//8DAGdWqKITBwAA
+    headers:
+      CF-RAY:
+      - 91c7a16d89847fe3-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:11 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2187'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998322'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_4c45f973a2550aee65296409678ef61d
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nLong
+      ago, when John was only 17 years old, he got a job working for a large manufacturing
+      company. He started out working on an assembly line for minimum wage, but after
+      a few years at the company, he was given a choice between two line manager positions.
+      He could stay in the woodwork division, which is where he was currently working.
+      Or he could move to the plastics division. John was unsure what to do because
+      he liked working in the woodwork division, but he also thought it might be worth
+      trying something different. He finally decided to switch to the plastics division
+      and try something new. For the last 30 years, John has worked as a production
+      line supervisor in the plastics division. After the first year there, the plastics
+      division was moved to a different building with more space. Unfortunately, through
+      the many years he worked there, John was exposed to asbestos, a highly carcinogenic
+      substance. Most of the plastics division was quite safe, but the small part
+      in which John worked was exposed to asbestos fibers. And now, although John
+      has never smoked a cigarette in his life and otherwise lives a healthy lifestyle,
+      he has a highly progressed and incurable case of lung cancer at the age of 50.
+      John had seen three cancer specialists, all of whom confirmed the worst: that,
+      except for pain, John''s cancer was untreatable and he was absolutely certain
+      to die from it very soon (the doctors estimated no more than 2 months). Yesterday,
+      while John was in the hospital for a routine medical appointment, a new nurse
+      accidentally administered the wrong medication to him. John was allergic to
+      the drug and he immediately went into shock and experienced cardiac arrest (a
+      heart attack). Doctors attempted to resuscitate him but he died minutes after
+      the medication was administered. Did misadministration of medication cause John''s
+      premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding output
+      fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## answer
+      ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker for
+      `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '2889'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=eQhX7Eel2f42MiE1v3M0FjPoPnaJCvGVo4e5TAtJJH0-1741324689-1.0.1.1-JGaqjx0pYkyPXhNNO6jrno4URFSpkwJl_YTXOs2vhbyWZ6MENkOzuqluXSQMADCXBpaTTQUSplqr.p2it6u7GizNA.Z_6YG2CVy3n04UNLw;
+        _cfuvid=912Zquq49CrIV2ISIVXKTAlup7hFuP.HQh7gM68MRZ4-1741324689459-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFVNb9xGDL3vryCUQy+7hj828cfNLQoEbeFcjBaBbSzoGUpiM5qRh5TX
+        m8D/vaCkXa1jp8hlIQ2Hj4+Pb6lvM4CCfXEBhatRXdOGxa9nf35abjYP13+X/JFC8n9dfroKV79/
+        vXK/PRVzy0j3/5LTbdaBS00bSDnFIewyoZKhHp0uj06Olx/Oj/tAkzwFS6taXSzTouHIi+PD4+Xi
+        8HRxdDZm14kdSXEBNzMAgG/9r/GMnp6KCzicb08aEsGKiovdJYAip2AnBYqwKEYt5lPQpagUe+o3
+        N/DuHWRCSZFjZS93d7fxEnTTssMALWVJERquagWXorCnDFoT9ChPCqmEP1IdfxGoCYPWIKwdmhBw
+        T2XK1N9uyLMbTinnlA/gn5rDGGNBbzKI5uFKKvcTPGdyGjYQyIOmbTmH2TM6wJxJFDB6kO5e6KGj
+        qOAJtZ4DK7AABknATZuyaWEYmVyqIn81Bqg9JKzRbmZCvwGOgOAya6+CKCqB78hSawP0jxgdeQhd
+        rMDZcz6A65py3/Ic1lN333U+lBmbAoedkPVrqCNnSQ2NimOuupGiXeiipxw2NqlRbJei5x7cYK1e
+        m7nBvHmJzE3DcSfLAXxMa3qkPAfh6AaeDx1JDyQtOS6t77ABlC8CXP5gTn0N31doMzWoXaZtF5aB
+        UdaUYZ264CEQRtC0xuwFbovPJPPbAlBsRlvy3JhcJjY9Gt2+83HsO4UObuNtHJw7Fhht+5lkCtFT
+        GzAOPMf49U+YbWzpTY/1Y3X1ZMhM0gUlb3aZ6MFl0Dp1VT3YqkYPCEq54YgBOIRIIvPv+t2Nq8fY
+        CZIJXc9LU/++zilWe3xfmI7NT/a3M1u40HkTzhT8Hx9aXVR+JCjRacrbVl7N05O0rINXXvuQRTqy
+        FWAw5PdGNC5G8sMU9hdRprITtGUYuxDG8+fdZgupanO6lzG+Oy9tevVq2Fq2xURTW/TR5xnAXb9B
+        uxdLsWhzalpdafpC0QDfny0HvGJa3FP0+OhojGpSDFPg9Pz9/A3AlSdFDrK3hAuHriY/pU4bGzvP
+        aS8w22v7NZ23sHcL+2fgp4Bz1Cr5VZvNCy9bnq5lsg/bj67tZO4JF0L5kR2tlCnbKDyV2IXhc1PI
+        RpSaVcmxotxmHr45Zbs6/HB6cornJ4cfitnz7D8AAAD//wMAKtEB9YEHAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 91c7a17d1d917fe3-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:16 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '3768'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998316'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_8b849023f9dd8d80306d02f16eb98bd9
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nMr.
+      Wallace is highly influential in the organized crime scene. Although he commands
+      the respect of many, there are also a number of people who stand to benefit
+      from his death. Today, he was having lunch with one of his associates, Mr. Vincent.
+      At one point during their meeting, Mr. Wallace left the table to go to the toilet.
+      While he was gone, Mr. Vincent managed to slip a lethal dose of poison into
+      his martini. The poison is known to take one hour (give or take 10 minutes,
+      depending on the victim''s body weight) to kill and would go unnoticed for the
+      first half hour after consumption. When Mr. Wallace returned to the table, he
+      finished his lunch and then drank the rest of his martini. The two men concluded
+      their meeting a few minutes later. Mr. Wallace paid the bill and they both left
+      the restaurant going in different directions. Mr. Wallace had another important
+      business meeting about 15 minutes away in a remote part of the countryside.
+      On an isolated stretch of road, he noticed that he was suddenly being followed
+      by a van that had pulled out from the roadside. The van accelerated and began
+      hitting his car from behind. Mr. Wallace recognized that the driver was Mr.
+      Bruce, an associate of one of Mr. Wallace''s rivals. He tried to evade the van
+      but there was no time. The van relentlessly hit his car and pushed it off the
+      side where it fell into a ravine and exploded. The remains of Mr. Wallace''s
+      body were discovered later that day. The chief coroner''s report later revealed
+      that Mr. Wallace had received fatal burns in the car explosion. The report also
+      indicated, however, that a lethal dose of poison was found in Mr. Wallace''s
+      blood. Did the crime life cause Mr. Wallace''s death?\nOptions:\n- Yes\n- No\n\nRespond
+      with the corresponding output fields, starting with the field `[[ ## reasoning
+      ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation ## ]]`, and then
+      ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '2728'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=eQhX7Eel2f42MiE1v3M0FjPoPnaJCvGVo4e5TAtJJH0-1741324689-1.0.1.1-JGaqjx0pYkyPXhNNO6jrno4URFSpkwJl_YTXOs2vhbyWZ6MENkOzuqluXSQMADCXBpaTTQUSplqr.p2it6u7GizNA.Z_6YG2CVy3n04UNLw;
+        _cfuvid=912Zquq49CrIV2ISIVXKTAlup7hFuP.HQh7gM68MRZ4-1741324689459-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xVTW8bNxC961cMNoe2wEqQPyLZ7ikBAgct2lySuoBtCCNydndSLrkdcm3Lgf97
+        QHK1KycumosA8c08vplHPX2ZARSsiwsoVINBtZ2Zvz37/cPZb2/+3q2q97rGS7nCSx/c5btP7B+L
+        Mna47WdSYd+1UK7tDAV2NsNKCANF1qP16dHJ8enqfJWA1mkysa3uwvzUzVu2PD9eHp/Ol+v50dnQ
+        3ThW5IsLuJ4BAHxJn1Gn1fRQXMCy3J+05D3WVFyMRQCFOBNPCvSefUAbinIClbOBbJJ+fQ2vXoEQ
+        emfZ1vHL7e2NfQNh17FCAx2JdxZarpsAaNHsHglCQ+A59BjHhe0OlLOeNUmkSCD925NVBK4CuiMb
+        PKDVCdIspAIo7D35iP8hC7hCY1DRTx40YWgWcNWwyfc4qdHyI2lQwi2B4YpGMlRRwUjzF1tFNsDP
+        neM80C+AErXWlitWaANUqIITX6Z+blvSjIGynsiTBMA9+lSgUIAeOuN8nDQV6ThwvO2t9EnyIGIB
+        HxsSqpxQCfh8ccpZZXodJ8IA9+NwByNFU4S3fSANwWWURfVttE+RB0Oo034dNDwsqvxupaPyUXUJ
+        1oV0lLeyuLE3NvuO1t+T7E3/001I7Eab/R3gj/+rd3D6QOgL3paAHjjA8PsATEz0ENdCQtAMI6DU
+        FPKyhe/Q+AW8d/d0R/KD1k22VeLa0U0l6JsyeqByLe73J+R7E/Zv6SV3hw2Wg4OdkI/PjW1yxO98
+        oLYEzTqtPO7hmVuwTa/jG3VOqV6EdLyhH97lwZ73bFmk2Q3jjqS/fkOnWR84PKQS6eziYQoIVb3H
+        mES2N2Y4fxpjxbi6E7f1Az6eV2zZN5scGTFCfHBdkdCnGcBtiq/+WSIVnbi2C5vg/iEbCV+vzzNf
+        MaXmhB4vVwMaXEAzAeuz1+ULhBtNAdn4gwQsFKqG9NQ6xSX2mt0BMDsY+3s5L3GPafkj9BOgFHWB
+        9KYT0qyejzyVCcV/lf8qG9ecBBee5I4VbQKTRCs0VdibnPVFfo6bim1N0gnnwK+6zXK1Plnj+cly
+        VcyeZl8BAAD//wMANqQnLf4GAAA=
+    headers:
+      CF-RAY:
+      - 91c7a1969a3f7fe3-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '3401'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998356'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_b02ad8e1f3107f3abcffd7d35f5e7560
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nClaire''s
+      parents bought her an old computer. Claire uses it for schoolwork, but her brother
+      Daniel sometimes logs on to play games. Claire has told Daniel, \"Please don''t
+      log on to my computer. If we are both logged on at the same time, it will crash\".
+      One day, Claire and Daniel logged on to the computer at the same time. The computer
+      crashed. Later that day, Claire''s mother is talking with the computer repairman.
+      The repairman says, \"I see that Daniel was logged on, but this computer will
+      only crash if two people are logged on at the same time. So, I still don''t
+      see quite why the computer crashed.\" Did Daniel cause the computer crash?\nOptions:\n-
+      Yes\n- No\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation
+      ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1669'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=eQhX7Eel2f42MiE1v3M0FjPoPnaJCvGVo4e5TAtJJH0-1741324689-1.0.1.1-JGaqjx0pYkyPXhNNO6jrno4URFSpkwJl_YTXOs2vhbyWZ6MENkOzuqluXSQMADCXBpaTTQUSplqr.p2it6u7GizNA.Z_6YG2CVy3n04UNLw;
+        _cfuvid=912Zquq49CrIV2ISIVXKTAlup7hFuP.HQh7gM68MRZ4-1741324689459-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFXBbuM2EL37Kwbaw15sw06ceJPbZntqCxRoN2iLJDDG5Eialhqq5Mhe
+        d5F/LyjKloNki70YMB9n+OY98unrBKBgW9xCYWpU07Rudvfhp1/u2nhXdqulNvwz/fFrc3+/u49X
+        //y4KKapwm//IqPHqrnxTetI2UuGTSBUSl2X69Xy8mJ1fXPTA4235FJZ1eps5WcNC88uFher2WI9
+        W34YqmvPhmJxCw8TAICv/W/iKZa+FLewmB5XGooRKypuT5sAiuBdWikwRo6KosV0BI0XJempPzzA
+        u3cQCKMXlir9eXp6lI+gh5YNOmgpRC/QcFUroKA7/EugNUFk7TCNC9sDGC+RLYXUIoEspQ9Nhtvg
+        d2zJzuGTQw4EewxCFn5AYXKgNSo4X1Wp1gug5vbYECg3BHvfOQsGu5gPTkJ3SgHUgwkY6ymwWDao
+        +XRUiNx0TlHIdxG6pA5wBAQTWPupSjTqwxx+YzEEW6/1kRzKidmeAvXMyL5NrCbJjBIL8MZ0IZCd
+        Aiug40oi7PnU+X3sB2ep5vC5pkClDzQFHMTHrUujiXFdTKpxzKNkLu8joOnV9OW5WMnJwNtOySY5
+        sjxiOW0dGrgzKKtFOxLgEupkRQTxw2A+MUgyzx/lUfLNQIl7Csdr8SfFEaIvrUPJHg/453N7+tPI
+        wpayd9+n8rl17jCFfc3mVFajPXpNdrgYjrAfEPOBc/i9ZkfH7g0e+gFr3BFsaTDMizsMd2AKNX9D
+        3FeGYzwSsRzIqDu8ZcD4MHr9++HtqH9yv4v9JTEosD26bvtNrx2PYLmfmuh/X8GZaUMUkc2+nD/9
+        QGUXMcWPdM4N68+nLHG+aoPfxgE/rZcsHOtNvqopN6L6tujR5wnAU59Z3YsYKtrgm1Y36v8mSQ0v
+        r9a5XzFG5Ygub4ZEK9QruhG4Wh3LXjTcWFJkF89irzBoarJj6ZiR2Fn2Z8DkbOzXdN7qfYrI72k/
+        AsZQq2Q3bSDL5uXI47ZA6VPyrW0nmXvCRaSwY0MbZQrJCksldi4HfBEPUanZlCwVhTZwTvmy3Syu
+        15drvLlcXBeT58l/AAAA//8DACz0/XrzBgAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 91c7a1adbbba7fe3-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 07 Mar 2025 05:18:22 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2698'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998621'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_09c414ef5d36b55c1c9a062cf40891f8
+    status:
+      code: 200
+      message: OK
+version: 1
