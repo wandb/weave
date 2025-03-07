@@ -5,6 +5,8 @@ import {
   Background,
   Controls,
   Edge,
+  Handle,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -47,7 +49,9 @@ const TraceNode: React.FC<{
         borderRadius: '8px',
         padding: '8px',
       }}>
+      <Handle type="source" position={Position.Bottom} />
       <div className="truncate text-center text-sm">{data.label}</div>
+      <Handle type="target" position={Position.Top} />
     </div>
   );
 };
@@ -193,7 +197,7 @@ export const GraphView: React.FC<TraceViewProps> = props => {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="h-[100%] flex-1 p-4">
         <ReactFlowProvider>
-          <Flow {...props} />
+          <Flow {...props} key={props.rootCallId} />
         </ReactFlowProvider>
       </div>
       <div className="flex-0">

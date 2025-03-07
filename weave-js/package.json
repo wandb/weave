@@ -69,7 +69,7 @@
     "@types/react-syntax-highlighter": "^15.5.7",
     "@wandb/semantic": "^0.0.1",
     "@wandb/ui": "^0.1.0",
-    "@xyflow/react": "^12.4.4",
+    "@xyflow/react": "12.0.4",
     "ansi_up": "^3.0.0",
     "body-scroll-lock": "^2.6.4",
     "classnames": "^2.2.6",
