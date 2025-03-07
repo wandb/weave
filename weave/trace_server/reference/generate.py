@@ -92,26 +92,21 @@ def generate_routes(
     """
     get_server = server_dependency.get_server()
 
-    @router.post("/call/start", tags=[CALLS_TAG_NAME])
-    def call_start(
-        req: tsi.CallStartReq,
+    # This order is done to minimize diff to the current OpenAPI spec.  Once everything
+    # settles, we should refactor this to be in the order of the TraceServerInterface.
+    @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
+    def calls_delete(
+        req: tsi.CallsDeleteReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallStartRes:
-        return server.call_start(req)
+    ) -> tsi.CallsDeleteRes:
+        return server.calls_delete(req)
 
-    @router.post("/call/end", tags=[CALLS_TAG_NAME])
-    def call_end(
-        req: tsi.CallEndReq,
+    @router.post("/call/update", tags=[CALLS_TAG_NAME])
+    def call_update(
+        req: tsi.CallUpdateReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallEndRes:
-        return server.call_end(req)
-
-    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
-    def call_start_batch(
-        req: tsi.CallCreateBatchReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallCreateBatchRes:
-        return server.call_start_batch(req)
+    ) -> tsi.CallUpdateRes:
+        return server.call_update(req)
 
     @router.post("/call/read", tags=[CALLS_TAG_NAME])
     def call_read(
@@ -120,12 +115,12 @@ def generate_routes(
     ) -> tsi.CallReadRes:
         return server.call_read(req)
 
-    @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
-    def calls_query(
-        req: tsi.CallsQueryReq,
+    @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
+    def calls_query_stats(
+        req: tsi.CallsQueryStatsReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallsQueryRes:
-        return server.calls_query(req)
+    ) -> tsi.CallsQueryStatsRes:
+        return server.calls_query_stats(req)
 
     @router.post(
         "/calls/query_stream",
@@ -152,26 +147,33 @@ def generate_routes(
     ) -> StreamingResponse:
         return StreamingResponse(server.calls_query_stream(req), media_type=accept)
 
-    @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
-    def calls_delete(
-        req: tsi.CallsDeleteReq,
+    @router.post("/call/start", tags=[CALLS_TAG_NAME])
+    def call_start(
+        req: tsi.CallStartReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallsDeleteRes:
-        return server.calls_delete(req)
+    ) -> tsi.CallStartRes:
+        return server.call_start(req)
 
-    @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
-    def calls_query_stats(
-        req: tsi.CallsQueryStatsReq,
+    @router.post("/call/end", tags=[CALLS_TAG_NAME])
+    def call_end(
+        req: tsi.CallEndReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallsQueryStatsRes:
-        return server.calls_query_stats(req)
+    ) -> tsi.CallEndRes:
+        return server.call_end(req)
 
-    @router.post("/call/update", tags=[CALLS_TAG_NAME])
-    def call_update(
-        req: tsi.CallUpdateReq,
+    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
+    def call_start_batch(
+        req: tsi.CallCreateBatchReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallUpdateRes:
-        return server.call_update(req)
+    ) -> tsi.CallCreateBatchRes:
+        return server.call_start_batch(req)
+
+    @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
+    def calls_query(
+        req: tsi.CallsQueryReq,
+        server: tsi.TraceServerInterface = Depends(get_server),
+    ) -> tsi.CallsQueryRes:
+        return server.calls_query(req)
 
     @router.post("/op/create", tags=[OPS_TAG_NAME])
     def op_create(
