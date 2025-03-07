@@ -1,20 +1,14 @@
 from fastapi import APIRouter, FastAPI
 
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.reference.generate import ServerDependency, generate_routes
-
-
-class StubTraceService(tsi.TraceServerInterface): ...
-
+from weave.trace_server.reference.generate import (
+    ServerDependency,
+    generate_routes,
+    noop_trace_server_factory,
+)
 
 # The type ignore here is safe.  We are just inheriting from the protocol to generate a
 # stub implementation.  By definition, the stub should have all the methods of the protocol.
-stub_service = StubTraceService()  # type: ignore
-server_dependency = ServerDependency(
-    endpoint_auth_mapping=None,  # No auth for the stub server
-    server_factory=lambda auth, op_name: stub_service,
-)
-
+server_dependency = ServerDependency(server_factory=noop_trace_server_factory)
 trace_service_router = generate_routes(APIRouter(), server_dependency)
 app = FastAPI()
 app.include_router(trace_service_router)
