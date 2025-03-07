@@ -1,8 +1,16 @@
 import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {FC, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
 import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
 import {getTraceView, traceViews} from './traceViewRegistry';
@@ -116,6 +124,13 @@ export const TraceNavigator = ({
   const stack = useStackForCallId(
     traceTreeFlatRootedAtRootCallId,
     focusedCallId
+  );
+
+  useUpdateTableRowSelectionContextPath(
+    stack,
+    focusedCallId,
+    traceTreeFlatRootedAtRootCallId,
+    traceTreeFlatRootedAtTraceRoot
   );
 
   const childProps = useMemo(
@@ -278,4 +293,100 @@ const useStackForCallId = (
   }, [selectedCallId, buildStackForCall]);
 
   return stackState;
+};
+
+const useUpdateTableRowSelectionContextPath = (
+  stack: string[],
+  focusedCallId: string | undefined,
+  traceTreeFlatRootedAtRootCallId: TraceTreeFlat,
+  traceTreeFlatRootedAtTraceRoot: TraceTreeFlat
+) => {
+  // Update the selection path when the focused call changes - this is used by the
+  // trace table to maintain sub-selection of the root call
+  const {setGetDescendantCallIdAtSelectionPath} = useContext(
+    TableRowSelectionContext
+  );
+
+  const selectionPath = useMemo(() => {
+    if (!focusedCallId) {
+      return undefined;
+    }
+    const focusIndex = stack.findIndex(id => id === focusedCallId);
+    if (focusIndex <= 0) {
+      return undefined;
+    }
+    const focusStack = stack.slice(1, focusIndex + 1);
+    const getIndexWithinSameNameSiblings = (
+      parentCallId: string,
+      childCallId: string
+    ) => {
+      const parentCall = traceTreeFlatRootedAtTraceRoot[parentCallId];
+      const childrenIds = parentCall.childrenIds;
+      const filteredChildren = childrenIds.filter(
+        id =>
+          traceTreeFlatRootedAtTraceRoot[id]?.call.op_name ===
+          traceTreeFlatRootedAtTraceRoot[childCallId]?.call.op_name
+      );
+      const orderedChildren = filteredChildren.sort((a, b) => {
+        return (
+          traceTreeFlatRootedAtTraceRoot[a].dfsOrder -
+          traceTreeFlatRootedAtTraceRoot[b].dfsOrder
+        );
+      });
+      return orderedChildren.findIndex(id => id === childCallId);
+    };
+
+    const path: Array<{name: string; index: number}> = [];
+    let parentId: string | undefined;
+    focusStack.forEach(id => {
+      path.push({
+        name: traceTreeFlatRootedAtTraceRoot[id].call.op_name,
+        index: parentId ? getIndexWithinSameNameSiblings(parentId, id) : 0,
+      });
+      parentId = id;
+    });
+    return path;
+  }, [focusedCallId, stack, traceTreeFlatRootedAtTraceRoot]);
+
+  const getDescendantCallIdAtSelectionPath = useCallback(
+    (callId: string) => {
+      // Validate callId is in the trace
+      let targetCall: TraceTreeFlat[string] | undefined =
+        traceTreeFlatRootedAtTraceRoot[callId];
+      if (!targetCall || !selectionPath) {
+        return null;
+      }
+      selectionPath.forEach(part => {
+        if (!targetCall) {
+          return;
+        }
+        const childrenIds = targetCall.childrenIds;
+        const childrenCalls = childrenIds.map(
+          id => traceTreeFlatRootedAtTraceRoot[id]
+        );
+        const filteredChildren = childrenCalls.filter(
+          child => child?.call.op_name === part.name
+        );
+        const sortedChildren = filteredChildren.sort((a, b) => {
+          return a.dfsOrder - b.dfsOrder;
+        });
+        if (part.index > sortedChildren.length) {
+          targetCall = undefined;
+          return;
+        } else {
+          targetCall = sortedChildren[part.index];
+        }
+      });
+
+      return targetCall?.id;
+    },
+    [selectionPath, traceTreeFlatRootedAtTraceRoot]
+  );
+
+  useEffect(() => {
+    setGetDescendantCallIdAtSelectionPath?.(getDescendantCallIdAtSelectionPath);
+  }, [
+    getDescendantCallIdAtSelectionPath,
+    setGetDescendantCallIdAtSelectionPath,
+  ]);
 };

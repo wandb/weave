@@ -296,6 +296,7 @@ export const CallLink: React.FC<{
   callId: string;
   variant?: LinkVariant;
   fullWidth?: boolean;
+  focusedCallId?: string;
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
@@ -334,7 +335,7 @@ export const CallLink: React.FC<{
     props.projectName,
     '',
     props.callId,
-    undefined,
+    props.focusedCallId,
     hideTraceTree,
     showFeedbackExpand
   );
