@@ -291,6 +291,14 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
 
   const callTabs = useCallTabs(focusedCall);
 
+  const setRootCallIdForPagination = useCallback(
+    (callId: string) => {
+      setFocusedCallId(callId);
+      setRootCallId(callId);
+    },
+    [setRootCallId, setFocusedCallId]
+  );
+
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
@@ -303,8 +311,8 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
           }}>
           {showPaginationControls && (
             <PaginationControls
-              call={focusedCall}
-              setRootCallId={setRootCallId}
+              callId={rootCallId}
+              setRootCallId={setRootCallIdForPagination}
             />
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>

@@ -84,27 +84,27 @@ export const TraceNavigator = ({
     return traceTreeFlat;
   }, [rootCallId, traceRootCallId, traceTreeFlatRootedAtTraceRoot]);
 
-  // If the focusedCallId is not a descendant of the rootCallId, set it to the rootCallId
-  useEffect(() => {
-    if (!focusedCallId) {
-      return;
-    }
-    let candidateRootCallId: string | undefined = focusedCallId;
-    while (candidateRootCallId) {
-      if (candidateRootCallId === rootCallId) {
-        return;
-      }
-      candidateRootCallId =
-        traceTreeFlatRootedAtRootCallId[candidateRootCallId]?.parentId;
-    }
+  // // If the focusedCallId is not a descendant of the rootCallId, set it to the rootCallId
+  // useEffect(() => {
+  //   if (!focusedCallId) {
+  //     return;
+  //   }
+  //   let candidateRootCallId: string | undefined = focusedCallId;
+  //   while (candidateRootCallId) {
+  //     if (candidateRootCallId === rootCallId) {
+  //       return;
+  //     }
+  //     candidateRootCallId =
+  //       traceTreeFlatRootedAtRootCallId[candidateRootCallId]?.parentId;
+  //   }
 
-    setRootCallId(focusedCallId);
-  }, [
-    focusedCallId,
-    rootCallId,
-    setRootCallId,
-    traceTreeFlatRootedAtRootCallId,
-  ]);
+  //   setRootCallId(focusedCallId);
+  // }, [
+  //   focusedCallId,
+  //   rootCallId,
+  //   setRootCallId,
+  //   traceTreeFlatRootedAtRootCallId,
+  // ]);
 
   // Auto-select first call when trace tree is built and no call is selected
   useEffect(() => {

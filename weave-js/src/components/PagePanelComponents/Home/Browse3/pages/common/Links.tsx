@@ -13,7 +13,6 @@ import styled, {css} from 'styled-components';
 import {TargetBlank} from '../../../../../../common/util/links';
 import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {
-  DESCENDENT_CALL_ID_PARAM,
   HIDE_TRACETREE_PARAM,
   SHOW_FEEDBACK_PARAM,
   usePeekLocation,
@@ -297,7 +296,6 @@ export const CallLink: React.FC<{
   callId: string;
   variant?: LinkVariant;
   fullWidth?: boolean;
-  preserveDescendentCallId?: boolean;
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
@@ -313,11 +311,6 @@ export const CallLink: React.FC<{
   // to provide the right abstractions.
   const peekLoc = usePeekLocation();
   const peekParams = new URLSearchParams(peekLoc?.search ?? '');
-  const existingDCID = peekParams.get(DESCENDENT_CALL_ID_PARAM) ?? '';
-  // Preserve the path only when showing trace tree
-  const descendentCallId = props.preserveDescendentCallId
-    ? existingDCID
-    : undefined;
   // default to true if not specified and not an eval
   const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
   const hideTraceTree =
@@ -341,7 +334,7 @@ export const CallLink: React.FC<{
     props.projectName,
     '',
     props.callId,
-    descendentCallId,
+    undefined,
     hideTraceTree,
     showFeedbackExpand
   );

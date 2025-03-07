@@ -3,29 +3,28 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useContext, useEffect} from 'react';
 
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const PaginationControls: FC<{
-  call: CallSchema;
+  callId: string;
   setRootCallId: (callId: string) => void;
-}> = ({call, setRootCallId}) => {
+}> = ({callId, setRootCallId}) => {
   // Call navigation by arrow keys and buttons
   const {getNextRowId, getPreviousRowId, rowIdInTable} = useContext(
     TableRowSelectionContext
   );
 
   const onNextCall = useCallback(() => {
-    const nextCallId = getNextRowId?.(call.callId);
+    const nextCallId = getNextRowId?.(callId);
     if (nextCallId) {
       setRootCallId(nextCallId);
     }
-  }, [getNextRowId, call.callId, setRootCallId]);
+  }, [getNextRowId, callId, setRootCallId]);
   const onPreviousCall = useCallback(() => {
-    const previousRowId = getPreviousRowId?.(call.callId);
+    const previousRowId = getPreviousRowId?.(callId);
     if (previousRowId) {
       setRootCallId(previousRowId);
     }
-  }, [getPreviousRowId, call.callId, setRootCallId]);
+  }, [getPreviousRowId, callId, setRootCallId]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown' && event.shiftKey) {
@@ -43,7 +42,7 @@ export const PaginationControls: FC<{
     };
   }, [handleKeyDown]);
 
-  const disabled = !rowIdInTable(call.callId);
+  const disabled = !rowIdInTable(callId);
   const disabledMsg = 'Paging is disabled after navigating to a parent call';
 
   return (
