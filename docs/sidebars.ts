@@ -104,6 +104,7 @@ const sidebars: SidebarsConfig = {
         "guides/tracking/costs",
         "guides/tools/comparison",
         "guides/tools/playground",
+        "guides/tools/saved-views",
         "guides/core-types/media",
         "guides/core-types/env-vars",
         "guides/troubleshooting",

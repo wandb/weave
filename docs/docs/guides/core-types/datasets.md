@@ -8,7 +8,7 @@ Weave `Dataset`s help you to organize, collect, track, and version examples for 
 This page describes:
 
 - Basic `Dataset` operations in Python and TypeScript and how to get started  
-- How to create a `Dataset` in Python and TypeScript from objects such as Weave [calls](../tracking/tracing)
+- How to create a `Dataset` in Python and TypeScript from objects such as Weave [calls](../tracking/tracing.mdx)
 - Available operations on a `Dataset` in the UI
 
 ## `Dataset` quickstart
@@ -82,7 +82,7 @@ Select a tab to see Python and TypeScript-specific code.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-  In Python, `Dataset`s can also be constructed from common Weave objects like [calls](../tracking/tracing), and Python objects like `pandas.DataFrame`s. This feature is useful if you want to create an example `Dataset` from specific examples.
+  In Python, `Dataset`s can also be constructed from common Weave objects like [calls](../tracking/tracing.mdx), and Python objects like `pandas.DataFrame`s. This feature is useful if you want to create an example `Dataset` from specific examples.
 
   ### Weave call
 
