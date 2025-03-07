@@ -188,6 +188,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.calls_delete, req)
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return self._ref_apply(self._internal_trace_server.call_start_batch, req)
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.filter is not None:

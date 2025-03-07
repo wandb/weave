@@ -4,7 +4,6 @@ from typing import Annotated, Callable, NamedTuple
 
 from fastapi import APIRouter, Depends, Form, Header, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 
@@ -34,25 +33,6 @@ class AuthParams(NamedTuple):
                 self.auth,
             )
         )
-
-
-# Special batch APIs outside of the core API
-class CallBatchStartMode(BaseModel):
-    mode: str = "start"
-    req: tsi.CallStartReq
-
-
-class CallBatchEndMode(BaseModel):
-    mode: str = "end"
-    req: tsi.CallEndReq
-
-
-class CallCreateBatchReq(BaseModel):
-    batch: list[CallBatchStartMode | CallBatchEndMode]
-
-
-class CallCreateBatchRes(BaseModel):
-    res: list[tsi.CallStartRes | tsi.CallEndRes]
 
 
 class NoopTraceServer(tsi.TraceServerInterface): ...
@@ -128,9 +108,9 @@ def generate_routes(
 
     @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
     def call_start_batch(
-        req: CallCreateBatchReq,
+        req: tsi.CallCreateBatchReq,
         server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> CallCreateBatchRes:
+    ) -> tsi.CallCreateBatchRes:
         return server.call_start_batch(req)
 
     @router.post("/call/read", tags=[CALLS_TAG_NAME])
