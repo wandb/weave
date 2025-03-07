@@ -40,6 +40,7 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from clickhouse_connect.driver import httputil
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -1688,12 +1689,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return self._thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
+        # Create a larger connection pool to support more concurrent requests
+        big_pool_mgr = httputil.get_pool_manager(maxsize=20, num_pools=12)
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            pool_mgr=big_pool_mgr,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
