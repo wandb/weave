@@ -37,10 +37,10 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 import emoji
+from clickhouse_connect.driver import httputil
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from clickhouse_connect.driver import httputil
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
