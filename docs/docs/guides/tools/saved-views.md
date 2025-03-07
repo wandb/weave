@@ -26,7 +26,7 @@ view = weave.SavedView()
 
 ### Visualize the `SavedView` as a grid
 
-Use `.to_grid()` to represent the saved view as a grdi. Specify the maximum number of rows to display with `limit`.
+Use `.to_grid()` to represent the saved view as a grid. Specify the maximum number of rows to display with `limit`.
 
 ```python
 view.to_grid(limit=5)
@@ -146,7 +146,7 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
    - Column visibility
    - Column pinning
 3. Save the view using one of two options:
-   - In the upper right hand corner, click **Save view**. 
+   - In the upper right-hand corner, click **Save view**. 
    - Click the hamburger menu to the left of **Save view**. In the dropdown menu, click **+ Save as new view**.
 
 ### Load a saved view
@@ -166,7 +166,7 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
 
 1. Follow the steps described in [Load a saved view](#load-a-saved-view).
 2. Adjust your table configuration.
-3. In the upper right hand corner, click **Save view**. 
+3. In the upper right-hand corner, click **Save view**. 
 
 ### Delete a saved view 
 
