@@ -1,42 +1,27 @@
 from __future__ import annotations
 
 import importlib
-import json
 from typing import Callable
+
+import_failed = False
+
+try:
+    from crewai.tools.base_tool import BaseTool  # type: ignore
+except ImportError:
+    import_failed = True
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 from weave.integrations.crewai.crewai_utils import (
-    safe_serialize_crewai_agent,
-    safe_serialize_crewai_task,
+    crewai_postprocess_inputs,
+    crew_kickoff_postprocess_inputs,
     default_call_display_name_execute_task,
-    default_call_display_name_execute_sync,
 )
 
+
 _crewai_patcher: MultiPatcher | None = None
-
-
-def safe_serialize_crewai_object(obj):
-    """Safely serialize CrewAI objects to prevent recursion."""
-    # Return primitive types directly
-    if obj is None or isinstance(obj, (str, int, float, bool)):
-        return obj        
-
-    # Everything else is serialized as a dict
-    if hasattr(obj, "__class__") and obj.__class__.__module__.startswith("crewai"):
-        if obj.__class__.__name__ == "Agent":
-            return safe_serialize_crewai_agent(obj)
-        elif obj.__class__.__name__ == "Task":
-            return safe_serialize_crewai_task(obj)
-        else:
-            return obj
-
-
-def crewai_postprocess_inputs(inputs):
-    """Process CrewAI inputs to prevent recursion."""
-    return {k: safe_serialize_crewai_object(v) for k, v in inputs.items()}
 
 
 def crewai_wrapper(settings: OpSettings) -> Callable:
@@ -63,9 +48,14 @@ def get_crewai_patcher(
 
     base = settings.op_settings
 
-    kickoff_settings = base.model_copy(
-        update={"name": base.name or "crewai.Crew.kickoff"}
-    )  # TODO: improve the inputs to the kickoff method.
+    # Naming convention -- module_method_settings
+    crew_kickoff_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Crew.kickoff",
+            "call_display_name": base.call_display_name,
+            "postprocess_inputs": crew_kickoff_postprocess_inputs,
+        }
+    )
 
     agent_execute_task_settings = base.model_copy(
         update={
@@ -73,22 +63,48 @@ def get_crewai_patcher(
             "call_display_name": base.call_display_name
             or default_call_display_name_execute_task,
             "postprocess_inputs": crewai_postprocess_inputs,
-            # We don't need to postprocess outputs because the output is always a string.
         }
     )
 
-    llm_settings = base.model_copy(
+    llm_call_settings = base.model_copy(
         update={
             "name": base.name or "crewai.LLM.call",
             "call_display_name": base.call_display_name,
         }
     )
 
+    task_execute_sync_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Task.execute_sync",
+            "call_display_name": base.call_display_name,
+            "postprocess_inputs": crewai_postprocess_inputs,
+        }
+    )
+
+    tools_settings = {}
+    crewai_tools = dir(importlib.import_module("crewai_tools"))
+    crewai_tools = [tool for tool in crewai_tools if "Tool" in tool]
+
+    for tool in crewai_tools:
+        try:
+            tool_class = getattr(importlib.import_module("crewai_tools"), tool)
+            if issubclass(tool_class, BaseTool):
+                tools_settings[tool] = base.model_copy(
+                    update={
+                        "name": base.name or f"crewai_tools.{tool}._run",
+                        "call_display_name": base.call_display_name or f"{tool}._run",
+                    }
+                )
+            else:
+                continue
+        except (AttributeError, ImportError):
+            continue
+
     patchers = [
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
             "Crew.kickoff",
-            crewai_wrapper(kickoff_settings),
+            crewai_wrapper(crew_kickoff_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
@@ -98,9 +114,23 @@ def get_crewai_patcher(
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
             "LLM.call",
-            crewai_wrapper(llm_settings),
+            crewai_wrapper(llm_call_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai"),
+            "Task.execute_sync",
+            crewai_wrapper(task_execute_sync_settings),
         ),
     ]
+
+    for tool_name, tool_settings in tools_settings.items():
+        patchers.append(
+            SymbolPatcher(
+                lambda: importlib.import_module("crewai_tools"),
+                f"{tool_name}._run",
+                crewai_wrapper(tool_settings),
+            )
+        )
 
     _crewai_patcher = MultiPatcher(patchers)
 

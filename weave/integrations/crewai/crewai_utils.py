@@ -1,3 +1,4 @@
+import copy
 import warnings
 
 from weave.trace.weave_client import Call
@@ -34,8 +35,8 @@ def safe_serialize_crewai_agent(obj):
         if attr == "i18n":
             if value.get("prompt_file", None):
                 result[f"{attr}.prompt_file"] = str(value.get("prompt_file"))
-
-        result[attr] = str(value)  # TODO: handle more gracefully.
+        else:
+            result[attr] = str(value)  # TODO: handle more gracefully.
 
     return result
 
@@ -68,10 +69,51 @@ def safe_serialize_crewai_task(obj):
             continue
         if attr == "agent":
             result[f"{attr}.role"] = value.get("role", "")
-
-        result[attr] = str(value)
+        else:
+            result[attr] = str(value)
 
     return result
+
+
+def safe_serialize_crewai_object(obj):
+    """Safely serialize CrewAI objects to prevent recursion."""
+    # Return primitive types directly
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+
+    # Everything else is serialized as a dict
+    if hasattr(obj, "__class__") and obj.__class__.__module__.startswith("crewai"):
+        if obj.__class__.__name__ == "Agent":
+            return safe_serialize_crewai_agent(obj)
+        elif obj.__class__.__name__ == "Task":
+            return safe_serialize_crewai_task(obj)
+        else:
+            return obj
+
+
+def crewai_postprocess_inputs(inputs):
+    """Process CrewAI inputs to prevent recursion."""
+    return {k: safe_serialize_crewai_object(v) for k, v in inputs.items()}
+
+
+def crew_kickoff_postprocess_inputs(inputs):
+    results = {}
+    for k, v in inputs.items():
+        if k == "self":
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                results["self"] = v.model_dump()
+            for k2, v2 in copy.deepcopy(results["self"]).items():
+                if v2 is None:
+                    results["self"].pop(k2)
+                if isinstance(v2, list) and len(v2) == 0:
+                    results["self"].pop(k2)
+        if k == "inputs":
+            results["inputs"] = {
+                k: safe_serialize_crewai_object(v) for k, v in v.items()
+            }
+
+    return results
 
 
 def default_call_display_name_execute_task(call: Call) -> str:
