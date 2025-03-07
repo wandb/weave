@@ -94,6 +94,8 @@ def generate_routes(
 
     # This order is done to minimize diff to the current OpenAPI spec.  Once everything
     # settles, we should refactor this to be in the order of the TraceServerInterface.
+    # Commented out blocks are technically not defined on the interface yet and thus
+    # not part of the official spec.
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
@@ -109,12 +111,12 @@ def generate_routes(
     ) -> tsi.CallEndRes:
         return server.call_end(req)
 
-    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
-    def call_start_batch(
-        req: tsi.CallCreateBatchReq,
-        server: tsi.TraceServerInterface = Depends(get_server),
-    ) -> tsi.CallCreateBatchRes:
-        return server.call_start_batch(req)
+    # @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
+    # def call_start_batch(
+    #     req: tsi.CallCreateBatchReq,
+    #     server: tsi.TraceServerInterface = Depends(get_server),
+    # ) -> tsi.CallCreateBatchRes:
+    #     return server.call_start_batch(req)
 
     @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
     def calls_delete(
