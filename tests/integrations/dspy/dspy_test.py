@@ -2,10 +2,42 @@ from typing import Literal
 
 import dspy
 import pytest
-from datasets import load_dataset
 
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace.weave_client import WeaveClient
+
+SAMPLE_EVAL_DATASET = [
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+A machine is set up in such a way that it will short circuit if both the black wire and the red wire touch the battery at the same time. The machine will not short circuit if just one of these wires touches the battery. The black wire is designated as the one that is supposed to touch the battery, while the red wire is supposed to remain in some other part of the machine. One day, the black wire and the red wire both end up touching the battery at the same time. There is a short circuit. Did the black wire cause the short circuit?
+Options:
+- Yes
+- No""",
+            "answer": "No",
+        }
+    ).with_inputs("question"),
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+Long ago, when John was only 17 years old, he got a job working for a large manufacturing company. He started out working on an assembly line for minimum wage, but after a few years at the company, he was given a choice between two line manager positions. He could stay in the woodwork division, which is where he was currently working. Or he could move to the plastics division. John was unsure what to do because he liked working in the woodwork division, but he also thought it might be worth trying something different. He finally decided to switch to the plastics division and try something new. For the last 30 years, John has worked as a production line supervisor in the plastics division. After the first year there, the plastics division was moved to a different building with more space. Unfortunately, through the many years he worked there, John was exposed to asbestos, a highly carcinogenic substance. Most of the plastics division was quite safe, but the small part in which John worked was exposed to asbestos fibers. And now, although John has never smoked a cigarette in his life and otherwise lives a healthy lifestyle, he has a highly progressed and incurable case of lung cancer at the age of 50. John had seen three cancer specialists, all of whom confirmed the worst: that, except for pain, John's cancer was untreatable and he was absolutely certain to die from it very soon (the doctors estimated no more than 2 months). Yesterday, while John was in the hospital for a routine medical appointment, a new nurse accidentally administered the wrong medication to him. John was allergic to the drug and he immediately went into shock and experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate him but he died minutes after the medication was administered. Did John's job cause his premature death?
+Options:
+- Yes
+- No""",
+            "answer": "No",
+        }
+    ).with_inputs("question"),
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+Long ago, when John was only 17 years old, he got a job working for a large manufacturing company. He started out working on an assembly line for minimum wage, but after a few years at the company, he was given a choice between two line manager positions. He could stay in the woodwork division, which is where he was currently working. Or he could move to the plastics division. John was unsure what to do because he liked working in the woodwork division, but he also thought it might be worth trying something different. He finally decided to switch to the plastics division and try something new. For the last 30 years, John has worked as a production line supervisor in the plastics division. After the first year there, the plastics division was moved to a different building with more space. Unfortunately, through the many years he worked there, John was exposed to asbestos, a highly carcinogenic substance. Most of the plastics division was quite safe, but the small part in which John worked was exposed to asbestos fibers. And now, although John has never smoked a cigarette in his life and otherwise lives a healthy lifestyle, he has a highly progressed and incurable case of lung cancer at the age of 50. John had seen three cancer specialists, all of whom confirmed the worst: that, except for pain, John's cancer was untreatable and he was absolutely certain to die from it very soon (the doctors estimated no more than 2 months). Yesterday, while John was in the hospital for a routine medical appointment, a new nurse accidentally administered the wrong medication to him. John was allergic to the drug and he immediately went into shock and experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate him but he died minutes after the medication was administered. Did misadministration of medication cause John's premature death?
+Options:
+- Yes
+- No""",
+            "answer": "Yes",
+        }
+    ).with_inputs("question"),
+]
 
 
 def accuracy_metric(answer, model_output):
@@ -219,13 +251,10 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
 )
 def test_dspy_evaluate(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
-    dataset = load_dataset("maveriq/bigbenchhard", "causal_judgement")["train"]
-    rows = [{"question": data["input"], "answer": data["target"]} for data in dataset]
-    dataset = [dspy.Example(row).with_inputs("question") for row in rows[:5]]
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
-    evaluate = dspy.Evaluate(devset=dataset, metric=accuracy_metric)
+    evaluate = dspy.Evaluate(devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric)
     accuracy = evaluate(module)
     assert accuracy > 50
 
     calls = list(client.calls())
-    assert len(calls) == 36
+    assert len(calls) == 22
