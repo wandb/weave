@@ -35,7 +35,7 @@ view.to_grid(limit=5)
 Display the grid representation using `.show()`:
 
 ```python
-to_grid().show()
+view.to_grid().show()
 ```
 
 ### Set displayed columns
@@ -157,14 +157,14 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
 
 ### Rename a saved view
 
-1. Follow the steps described in [Access a saved view](#access-a-saved-view).
+1. Follow the steps described in [Load a saved view](#load-a-saved-view).
 2. In the upper lefthand corner of the **Traces** or **Evals** tab, click the view name.
 3. Enter a new name for the view.
 4. To save the new view name, press **Enter**.
 
 ### Edit a saved view
 
-1. Follow the steps described in [Access a saved view](#access-a-saved-view).
+1. Follow the steps described in [Load a saved view](#load-a-saved-view).
 2. Adjust your table configuration.
 3. In the upper right hand corner, click **Save view**. 
 
