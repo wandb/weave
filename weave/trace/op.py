@@ -7,7 +7,7 @@ import logging
 import random
 import sys
 import traceback
-from collections.abc import Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Mapping
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -21,6 +21,11 @@ from typing import (
     cast,
     overload,
     runtime_checkable,
+    TypeVar,
+    cast,
+    ParamSpec,
+    TypeGuard,
+    Generic,
 )
 
 from weave.trace import box, settings
@@ -562,36 +567,47 @@ PostprocessInputsFunc = Callable[[dict[str, Any]], dict[str, Any]]
 PostprocessOutputFunc = Callable[..., Any]
 
 
-@overload
-def op(
-    func: Callable,
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-) -> Op: ...
+# Type variables for preserving function signatures
+# Captures the function signature of the decorated function
+P = ParamSpec("P")
+# Captures the return type of the decorated function
+R = TypeVar("R")
+# Captures the type of the decorated function
+T = TypeVar("T", bound=Callable[..., Any])
 
 
 @overload
 def op(
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-) -> Callable[[Callable], Op]: ...
-
-
-def op(
-    func: Callable | None = None,
+    func: Callable[P, R],
     *,
     name: str | None = None,
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
-) -> Callable[[Callable], Op] | Op:
+) -> Callable[P, R]: ...
+
+
+@overload
+def op(
+    *,
+    name: str | None = None,
+    call_display_name: str | CallDisplayNameFunc | None = None,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    tracing_sample_rate: float = 1.0,
+) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+
+
+def op(
+    func: Callable[P, R] | None = None,
+    *,
+    name: str | None = None,
+    call_display_name: str | Callable[["Call"], str] | None = None,
+    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    postprocess_output: Callable[..., Any] | None = None,
+    tracing_sample_rate: float = 1.0,
+) -> Callable[[Callable[P, R]], Callable[P, R]] | Callable[P, R]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
 
@@ -619,8 +635,16 @@ def op(
         tracing_sample_rate (float): The sampling rate for tracing this function. Defaults to 1.0 (always trace).
 
     Returns:
-        Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
-        If called with a function, returns the decorated function as an Op.
+        Union[Callable[[Callable[P, R]], Callable[P, R]], Callable[P, R]]:
+            P is the ParamSpec that captures all the parameters of the original function
+            R is the TypeVar that captures the return type of the original function
+            Callable[[Callable[P, R]], Callable[P, R]]:
+                The decorator is directly applied to a function (without parentheses).
+                Immediately processes the function and returns the wrapped function with the same signature as the original.
+            
+            Callable[[Callable[P, R]], Callable[P, R]]:
+                The decorator is called with arguments.
+                The decorator returns another decorator function that will later be applied to the target function.
 
     Raises:
         ValueError: If the decorated object is not a function or method.
@@ -650,28 +674,28 @@ def op(
     if not 0 <= tracing_sample_rate <= 1:
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
-    def op_deco(func: Callable) -> Op:
+    def op_deco(func: Callable[P, R]) -> Callable[P, R]:
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
 
-        def create_wrapper(func: Callable) -> Op:
+        def create_wrapper(func: Callable[P, R]) -> Callable[P, R]:
             if is_async:
 
                 @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
+                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _do_call_async(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
-                    return res
+                    return cast(R, res)
             else:
 
                 @wraps(func)
-                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _do_call(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
-                    return res
+                    return cast(R, res)
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
@@ -717,12 +741,12 @@ def op(
                     )
             wrapper.call_display_name = call_display_name  # type: ignore
 
-            return cast(Op, wrapper)
+            return cast(Callable[P, R], wrapper)
 
         return create_wrapper(func)
 
     if func is None:
-        return op_deco
+        return cast(Callable[[Callable[P, R]], Callable[P, R]], op_deco)
     return op_deco(func)
 
 
