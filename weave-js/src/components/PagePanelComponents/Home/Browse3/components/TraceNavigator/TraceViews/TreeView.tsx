@@ -3,7 +3,6 @@ import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {
   getTagColorClass,
-  IconOnlyPill,
   TagColorName,
 } from '@wandb/weave/components/Tag';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -72,30 +71,31 @@ const getCallTypeIcon = (type: NodeType): IconName => {
     case 'model':
       return 'model';
     case 'evaluation':
-      return 'number';
+      return 'baseline-alt';
     case 'scorer':
-      return 'checkmark-circle';
+      return 'number';
     default:
       return 'circle';
   }
 };
 
-const opTypeToColor = (typeName: NodeType): TagColorName => {
+const opTypeToColor = (typeName: NodeType): string => {
   switch (typeName) {
+    // Identifiers
     case 'agent':
-      return 'blue';
-    case 'tool':
-      return 'gold';
-    case 'llm':
-      return 'purple';
     case 'model':
-      return 'green';
+      return 'text-green-500 dark:text-green-400';
+    // Evals
+    case 'tool':
+    case 'llm':
+      return 'text-magenta-600 dark:text-magenta-500';
+    // Evals
     case 'evaluation':
-      return 'cactus';
     case 'scorer':
-      return 'magenta';
+      return 'text-amber-500 dark:text-amber-400';
+    // Other, probable noise
     default:
-      return 'moon';
+      return 'text-moon-400 dark:text-moon-300';
   }
 };
 
@@ -163,11 +163,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   if (hasDescendantErrors && statusCode === 'SUCCESS') {
     statusCode = 'DESCENDANT_ERROR';
   }
-  const showTypeIcon = true;
-  const showDuration = true;
-  const showStatusIcon = true;
-  const usageIconsOnly = false;
-  const indentMultiplier = 14;
+ const indentMultiplier = 14;
 
   return (
     <div style={style}>
@@ -208,85 +204,40 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
           </div>
 
-          <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
-
-            {showDuration && (
-              <>
-                {usageIconsOnly ? (
-                  <>
-                    <div className="w-20 text-right">
-                      {cost && (
-                        <TraceStat
-                          label={''}
-                          tooltip={
-                            <>
-                              {cost && costToolTipContent}
-                              <br />
-                              {tokens && tokenToolTipContent}
-                            </>
-                          }
-                          icon="credit-card-payment"
-                          className="text-xs text-moon-400"
-                        />
+          <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
+            <div className="text-right">
+              {cost && (
+                <TraceStat
+                  label={cost}
+                  tooltip={
+                    <div className="text-white-800">
+                      {costToolTipContent}
+                      {tokens && (
+                        <>
+                          <br />
+                          <span style={{fontWeight: 600}}>Estimated Tokens</span>
+                        </>
                       )}
+                      {tokens && tokenToolTipContent}
                     </div>
-                  </>
-                ) : (
-                  <>
-                    {cost && (
-                      <div className="w-64 text-right">
-                        <TraceStat
-                          label={cost}
-                          tooltip={costToolTipContent}
-                          icon="credit-card-payment"
-                          className="text-xs text-moon-400"
-                        />
-                      </div>
-                    )}
-                    {tokens && (
-                      <div className="w-64 text-right">
-                        <TraceStat
-                          icon="database-artifacts"
-                          label={tokens.toString()}
-                          tooltip={tokenToolTipContent}
-                          className="text-xs text-moon-400"
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-                <div className="w-32 text-right">
-                  {duration !== null ? formatDuration(duration) : ''}
-                </div>
-              </>
-            )}
+                  }
+                  className="text-xs text-moon-400"
+                />
+              )}
+            </div>
 
-          <div className="flex-0 flex min-w-0 items-center">
-            {showTypeIcon ? (
-              <IconOnlyPill
-                icon={getCallTypeIcon(typeName)}
-                color={opTypeColor}
-                isInteractive={false}
-              />
-            ) : (
-              <div
-                className={`h-8 w-8 rounded-full ${getTagColorClass(
-                  opTypeColor
-                )}`}
-              />
-            )}
+            {/* 
+              <div className="text-right">
+                {duration !== null ? formatDuration(duration) : ''}
+              </div> 
+            */}
+            <Icon
+              name={getCallTypeIcon(typeName)}
+              className={`max-w-16 max-h-16 ${opTypeColor}`}
+            />            
+            <StatusChip value={statusCode} iconOnly />
           </div>
-
-            {showStatusIcon ? (
-              <StatusChip value={statusCode} iconOnly />
-            ) : (
-              <div
-                className={`h-8 w-8 rounded-full ${getTagColorClass(
-                  STATUS_INFO[statusCode].color
-                )}`}
-              />
-            )}
-          </div>
+          
         </div>
       </Button>
     </div>
@@ -307,7 +258,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
       <TextField
         value={searchQuery}
         onChange={onSearchChange}
-        placeholder="Filter by op name"
+        placeholder="Filter by op name..."
         icon="filter-alt"
         extraActions={
           searchQuery !== '' && (
