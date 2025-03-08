@@ -534,6 +534,79 @@ def test_get_calls_limit_offset(client):
         assert call.inputs["a"] == 7 + i
 
 
+def test_get_calls_by_op_version_alias(client):
+    @weave.op(name="my-op")
+    def my_op(x):
+        return x
+
+    ref = weave.publish(my_op, "my-op")
+
+    my_op(1)
+
+    @weave.op(name="my-op")
+    def my_op2(x):
+        return x + 1
+
+    ref2 = weave.publish(my_op2, "my-op")
+    my_op2(2)
+
+    @weave.op(name="second-op")
+    def second_op(x):
+        return x + 2
+
+    ref3 = weave.publish(second_op, "second-op")
+    second_op(1)
+
+    calls = client.get_calls(filter={"op_names": [ref.uri()]})
+    assert len(calls) == 1
+
+    def make_ref_with_alias(ref, version):
+        return ":".join(ref.uri().split(":")[:-1]) + f":{version}"
+
+    # with version alias
+    ref_with_alias = make_ref_with_alias(ref, "v0")
+    calls = client.get_calls(filter={"op_names": [ref_with_alias]})
+    assert len(calls) == 1
+
+    # ref with 'latest' alias
+    ref_with_latest = make_ref_with_alias(ref, "latest")
+    calls = client.get_calls(filter={"op_names": [ref_with_latest]})
+    assert len(calls) == 1
+    # should be the second op
+    assert calls[0].op_name == ref2.uri()
+
+    # multiple specific op names with aliases
+    ref_with_alias2 = make_ref_with_alias(ref2, "v1")
+    calls = client.get_calls(filter={"op_names": [ref_with_alias, ref_with_alias2]})
+    assert len(calls) == 2
+
+    # multiple op names with aliases and latest
+    ref_with_latest2 = make_ref_with_alias(ref2, "latest")
+    calls = client.get_calls(
+        filter={"op_names": [ref_with_alias, ref_with_alias2, ref_with_latest]}
+    )
+    assert len(calls) == 2
+
+    # with duplicate op version names
+    calls = client.get_calls(filter={"op_names": [ref_with_alias, ref_with_alias]})
+    assert len(calls) == 1
+    assert calls[0].op_name == ref.uri()
+
+    # duplicate mixed w/ latest
+    calls = client.get_calls(
+        filter={
+            "op_names": [
+                ref_with_alias,
+                ref_with_latest,
+                ref_with_alias2,
+                ref_with_latest2,
+                ref3.uri(),
+            ]
+        }
+    )
+    assert len(calls) == 3
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
