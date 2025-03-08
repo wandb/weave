@@ -167,7 +167,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const showDuration = true;
   const showStatusIcon = true;
   const usageIconsOnly = false;
-  const indentMultiplier = 10;
+  const indentMultiplier = 14;
 
   return (
     <div style={style}>
@@ -176,14 +176,22 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         active={id === focusedCallId}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start px-8 text-left text-sm"
+        className="h-[32px] w-full justify-start px-8 text-left text-sm rounded-none"
         style={{
           opacity: isDeemphasized ? 0.6 : 1,
         }}>
-        <div className="flex w-full items-center justify-between gap-8">
+        <div className="flex w-full items-center justify-between gap-8 relative">
           <div className="flex min-w-0 flex-1 items-center">
-            <div style={{minWidth: level * indentMultiplier}} />
-            {hasChildren ? (
+            <div style={{marginLeft: level * indentMultiplier}}  className={`h-[32px]`} />
+            {/* Render vertical lines for each level of hierarchy */}
+            {Array.from({ length: level }).map((_, idx) => (
+              <div 
+                key={`line-${idx}`} 
+                style={{left: idx * indentMultiplier, marginLeft: 8}} 
+                className="absolute top-0 h-full w-px border-l border-moon-300" 
+              />
+            ))}
+            {hasChildren && (
               <Icon
                 name={chevronIcon}
                 size="small"
@@ -191,15 +199,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                   e.stopPropagation();
                   onToggleExpand(id);
                 }}
-                className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-200"
+                className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
-            ) : (
-              <div className="w-4" />
             )}
-
-            <div className="ml-2 truncate font-medium">
+            <div className="pl-4 truncate font-medium">
               {getCallDisplayName(call)}
             </div>
+
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
@@ -254,7 +260,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 </div>
               </>
             )}
-            
+
           <div className="flex-0 flex min-w-0 items-center">
             {showTypeIcon ? (
               <IconOnlyPill
