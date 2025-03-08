@@ -1,8 +1,3 @@
-from weave.scorers.initialization import check_litellm_installation
-
-# Make sure litellm is available
-check_litellm_installation()
-
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
