@@ -111,12 +111,12 @@ def generate_routes(
     ) -> tsi.CallEndRes:
         return server.call_end(req)
 
-    # @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
-    # def call_start_batch(
-    #     req: tsi.CallCreateBatchReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    # ) -> tsi.CallCreateBatchRes:
-    #     return server.call_start_batch(req)
+    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
+    def call_start_batch(
+        req: tsi.CallCreateBatchReq,
+        server: tsi.TraceServerInterface = Depends(get_server),
+    ) -> tsi.CallCreateBatchRes:
+        return server.call_start_batch(req)
 
     @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
     def calls_delete(
