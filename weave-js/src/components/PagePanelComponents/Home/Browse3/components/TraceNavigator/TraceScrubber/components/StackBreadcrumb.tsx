@@ -37,45 +37,37 @@ export const StackBreadcrumb: React.FC<
 
   return (
     <BreadcrumbWrapper>
-      <BreadcrumbNavigationButtons>
-        <Tooltip
-          content={'Reveal root call'}
-          trigger={
-            <Button
-              variant={'ghost'}
-              disabled={
-                !props.traceRootCallId ||
-                props.rootCallId === props.traceRootCallId
+      {((props.traceRootCallId && props.rootCallId !== props.traceRootCallId) ||
+        (props.rootParentId && props.rootCallId !== props.rootParentId)) && (
+        <BreadcrumbNavigationButtons>
+          {props.traceRootCallId && props.rootCallId !== props.traceRootCallId && (
+            <Tooltip
+              content={'Reveal root call'}
+              trigger={
+                <Button
+                  variant={'ghost'}
+                  onClick={() => props.setRootCallId(props.traceRootCallId!)}
+                  icon={'chevron-up'}
+                  size="small"
+                />
               }
-              onClick={() => {
-                if (props.traceRootCallId) {
-                  props.setRootCallId(props.traceRootCallId);
-                }
-              }}
-              icon={'chevron-up'}
-              size="small"
             />
-          }
-        />
-        <Tooltip
-          content={'Reveal parent call'}
-          trigger={
-            <Button
-              variant={'ghost'}
-              disabled={
-                !props.rootParentId || props.rootCallId === props.rootParentId
+          )}
+          {props.rootParentId && props.rootCallId !== props.rootParentId && (
+            <Tooltip
+              content={'Reveal parent call'}
+              trigger={
+                <Button
+                  variant={'ghost'}
+                  onClick={() => props.setRootCallId(props.rootParentId!)}
+                  icon={'parent-back-up'}
+                  size="small"
+                />
               }
-              onClick={() => {
-                if (props.rootParentId) {
-                  props.setRootCallId(props.rootParentId);
-                }
-              }}
-              icon={'parent-back-up'}
-              size="small"
             />
-          }
-        />
-      </BreadcrumbNavigationButtons>
+          )}
+        </BreadcrumbNavigationButtons>
+      )}
 
       <BreadcrumbList>
         {stack.map((node, index) => (
