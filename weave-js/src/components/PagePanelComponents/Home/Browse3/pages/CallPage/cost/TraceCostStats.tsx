@@ -31,13 +31,7 @@ const tooltipRowStyles = {
 };
 
 const tooltipDivider = (
-  <Divider
-    sx={{
-      borderColor: MOON_600,
-      marginTop: '8px',
-      marginBottom: '7px',
-    }}
-  />
+  <div className="border-t border-moon-600 mt-5 mb-4" />
 );
 
 export const TokenToolTip = (metrics: TokenTotals) => (
