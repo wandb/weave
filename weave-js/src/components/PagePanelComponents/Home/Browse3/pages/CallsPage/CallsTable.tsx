@@ -62,6 +62,7 @@ import {
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
+import {DateRangeFilterPanel} from '../../filters/DateRange/DateRangeFilterPanel';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -167,6 +168,9 @@ export const CallsTable: FC<{
   paginationModel?: GridPaginationModel;
   setPaginationModel?: (newModel: GridPaginationModel) => void;
 
+  filterDateRangeModel?: GridFilterModel;
+  setFilterDateRangeModel?: (newModel: GridFilterModel) => void;
+
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
 }> = ({
@@ -188,6 +192,8 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  filterDateRangeModel,
+  setFilterDateRangeModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -774,6 +780,14 @@ export const CallsTable: FC<{
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
             />
+          )}
+          {filterDateRangeModel && setFilterDateRangeModel && (
+            <div className="flex items-center gap-6">
+              <DateRangeFilterPanel
+                filterModel={filterDateRangeModel}
+                setFilterModel={setFilterDateRangeModel}
+              />
+            </div>
           )}
           <div className="flex items-center gap-6">
             <Switch.Root
