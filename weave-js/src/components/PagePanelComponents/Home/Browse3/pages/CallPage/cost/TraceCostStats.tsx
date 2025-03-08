@@ -130,10 +130,12 @@ export const TraceStat = ({
   icon,
   label,
   tooltip,
+  className = '',
 }: {
   icon?: IconName;
   label: string;
   tooltip?: ReactNode;
+  className?: string;
 }) => {
   const trigger = (
     <div>
@@ -141,7 +143,10 @@ export const TraceStat = ({
         icon={icon}
         label={label}
         color="moon"
-        className="bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500"
+        className={
+          'bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500 ' +
+          className
+        }
       />
     </div>
   );

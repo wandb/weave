@@ -69,7 +69,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             null
           );
         } else {
-          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId, null);
+          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
         }
         history.push(to);
       }

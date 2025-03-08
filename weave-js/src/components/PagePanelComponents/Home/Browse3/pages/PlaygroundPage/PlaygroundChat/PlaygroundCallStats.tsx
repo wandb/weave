@@ -27,7 +27,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
     projectName,
     '',
     callId,
-    null,
+    undefined,
     false
   );
 

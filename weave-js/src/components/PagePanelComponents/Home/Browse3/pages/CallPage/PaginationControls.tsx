@@ -1,83 +1,30 @@
 import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useContext, useEffect} from 'react';
-import {useHistory} from 'react-router-dom';
 
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
-import {
-  FEEDBACK_EXPAND_PARAM,
-  TRACETREE_PARAM,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
-import {useURLSearchParamsDict} from '../util';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const PaginationControls: FC<{
-  call: CallSchema;
-  path?: string;
-}> = ({call, path}) => {
+  callId: string;
+  setRootCallId: (callId: string) => void;
+}> = ({callId, setRootCallId}) => {
   // Call navigation by arrow keys and buttons
   const {getNextRowId, getPreviousRowId, rowIdInTable} = useContext(
     TableRowSelectionContext
   );
-  const history = useHistory();
-  const currentRouter = useWeaveflowCurrentRouteContext();
-  const query = useURLSearchParamsDict();
-  const showTraceTree =
-    TRACETREE_PARAM in query ? query[TRACETREE_PARAM] === '1' : false;
-  const showFeedbackExpand =
-    FEEDBACK_EXPAND_PARAM in query
-      ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : undefined;
 
   const onNextCall = useCallback(() => {
-    const nextCallId = getNextRowId?.(call.callId);
+    const nextCallId = getNextRowId?.(callId);
     if (nextCallId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          call.entity,
-          call.project,
-          call.traceId,
-          nextCallId,
-          path,
-          showTraceTree,
-          showFeedbackExpand
-        )
-      );
+      setRootCallId(nextCallId);
     }
-  }, [
-    call,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getNextRowId,
-    showFeedbackExpand,
-  ]);
+  }, [getNextRowId, callId, setRootCallId]);
   const onPreviousCall = useCallback(() => {
-    const previousRowId = getPreviousRowId?.(call.callId);
+    const previousRowId = getPreviousRowId?.(callId);
     if (previousRowId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          call.entity,
-          call.project,
-          call.traceId,
-          previousRowId,
-          path,
-          showTraceTree,
-          showFeedbackExpand
-        )
-      );
+      setRootCallId(previousRowId);
     }
-  }, [
-    call,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getPreviousRowId,
-    showFeedbackExpand,
-  ]);
+  }, [getPreviousRowId, callId, setRootCallId]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown' && event.shiftKey) {
@@ -95,7 +42,7 @@ export const PaginationControls: FC<{
     };
   }, [handleKeyDown]);
 
-  const disabled = !rowIdInTable(call.callId);
+  const disabled = !rowIdInTable(callId);
   const disabledMsg = 'Paging is disabled after navigating to a parent call';
 
   return (

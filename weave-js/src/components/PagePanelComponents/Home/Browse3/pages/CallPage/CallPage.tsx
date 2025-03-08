@@ -1,28 +1,15 @@
 import Box from '@mui/material/Box';
-import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {useHistory} from 'react-router-dom';
+import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
-import {
-  FEEDBACK_EXPAND_PARAM,
-  TRACETREE_PARAM,
-  useWeaveflowCurrentRouteContext,
-  WeaveflowPeekContext,
-} from '../../context';
+import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
+import {WeaveflowPeekContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
@@ -36,44 +23,87 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
-import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
-export const CallPage: FC<{
+type CallPageProps = {
   entity: string;
   project: string;
-  callId: string;
-  path?: string;
-}> = props => {
-  const {useCall} = useWFHooks();
-
-  const call = useCall({
-    entity: props.entity,
-    project: props.project,
-    callId: props.callId,
-  });
-
-  if (call.loading) {
-    return <CenteredAnimatedLoader />;
-  } else if (call.result === null) {
-    return <NotFoundPanel title="Call not found" />;
-  }
-  return <CallPageInnerVertical {...props} call={call.result} />;
+  rootCallId: string;
+  setRootCallId: (callId: string) => void;
+  focusedCallId?: string;
+  setFocusedCallId: (focusedCallId: string | undefined) => void;
+  hideTraceTree?: boolean;
+  setHideTraceTree: (hideTraceTree: boolean | undefined) => void;
+  showFeedback?: boolean;
+  setShowFeedback: (showFeedback: boolean | undefined) => void;
 };
 
-export const useShowRunnableUI = () => {
-  return false;
-  // Uncomment to re-enable
-  // const viewerInfo = useViewerInfo();
-  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+type CallPageInnerProps = CallPageProps & {
+  focusedCallId: string;
+  setFocusedCallId: (focusedCallId: string) => void;
+  focusedCall: CallSchema;
+  callIsStale: boolean;
+};
+
+export const CallPage: FC<CallPageProps> = props => {
+  const {useCall} = useWFHooks();
+
+  const descendentCallId = props.focusedCallId ?? props.rootCallId;
+
+  // Note to future devs: We could delay the cost (and i/o) fetching. This is
+  // just needed to validate that the call truly exists.
+  const call = useCall(
+    {
+      entity: props.entity,
+      project: props.project,
+      callId: descendentCallId,
+    },
+    {includeCosts: true}
+  );
+
+  // This is a little hack, but acceptable for now.
+  // We don't want the entire page to re-render when the call result is updated.
+  const lastResult = useRef(call.result);
+  useEffect(() => {
+    if (call.result) {
+      lastResult.current = call.result;
+    }
+  }, [call.result]);
+
+  if (!call.loading) {
+    if (call.result === null) {
+      return <NotFoundPanel title="Call not found" />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          focusedCallId={descendentCallId}
+          focusedCall={call.result}
+          callIsStale={call.result.callId !== descendentCallId}
+        />
+      );
+    }
+  } else {
+    if (lastResult.current === null) {
+      return <CenteredAnimatedLoader />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          focusedCallId={descendentCallId}
+          focusedCall={lastResult.current}
+          callIsStale={lastResult.current.callId !== descendentCallId}
+        />
+      );
+    }
+  }
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -204,119 +234,70 @@ const useCallTabs = (call: CallSchema) => {
   ];
 };
 
-const CallPageInnerVertical: FC<{
-  call: CallSchema;
-  path?: string;
-}> = ({call, path}) => {
-  useViewTraceEvent(call);
+const CallPageInnerVertical: FC<CallPageInnerProps> = ({
+  focusedCall,
+  focusedCallId,
+  setRootCallId,
+  setFocusedCallId,
+  setHideTraceTree,
+  setShowFeedback,
+  showFeedback,
+  hideTraceTree,
+  callIsStale,
+  rootCallId,
+}) => {
+  useViewTraceEvent(focusedCall);
 
-  const {useCall} = useWFHooks();
-  const history = useHistory();
-  const currentRouter = useWeaveflowCurrentRouteContext();
+  const hideTraceTreeDefault = isEvaluateOp(focusedCall.spanName);
+  const showFeedbackDefault = false;
+  const hideTraceTreeActual =
+    hideTraceTree != null ? hideTraceTree : hideTraceTreeDefault;
+  const showFeedbackActual =
+    showFeedback != null ? showFeedback : showFeedbackDefault;
 
-  const query = useURLSearchParamsDict();
-  const showTraceTree =
-    TRACETREE_PARAM in query
-      ? query[TRACETREE_PARAM] === '1'
-      : !isEvaluateOp(call.spanName);
-  const showFeedbackExpand =
-    FEEDBACK_EXPAND_PARAM in query
-      ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : false;
+  useEffect(() => {
+    if (hideTraceTree == null) {
+      setHideTraceTree(hideTraceTreeDefault);
+    }
+  }, [
+    hideTraceTree,
+    hideTraceTreeActual,
+    hideTraceTreeDefault,
+    setHideTraceTree,
+  ]);
 
   const onToggleTraceTree = useCallback(() => {
-    history.replace(
-      currentRouter.callUIUrl(
-        call.entity,
-        call.project,
-        call.traceId,
-        call.callId,
-        path,
-        !showTraceTree,
-        showFeedbackExpand ? true : undefined
-      )
-    );
-  }, [
-    call.callId,
-    call.entity,
-    call.project,
-    call.traceId,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    showFeedbackExpand,
-  ]);
+    const targetValue = !hideTraceTreeActual;
+    setHideTraceTree(targetValue);
+  }, [hideTraceTreeActual, setHideTraceTree]);
+
   const onToggleFeedbackExpand = useCallback(() => {
-    history.replace(
-      currentRouter.callUIUrl(
-        call.entity,
-        call.project,
-        call.traceId,
-        call.callId,
-        path,
-        showTraceTree,
-        !showFeedbackExpand ? true : undefined
-      )
-    );
-  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+    const targetValue = !showFeedbackActual;
+    if (targetValue === showFeedbackDefault) {
+      setShowFeedback(undefined);
+    } else {
+      setShowFeedback(targetValue);
+    }
+  }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
+
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
-    call.entity,
-    call.project
+    focusedCall.entity,
+    focusedCall.project
   );
-
-  const tree = useCallFlattenedTraceTree(call, path ?? null);
-  const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
-  const callComplete = useCall({
-    entity: selectedCall.entity,
-    project: selectedCall.project,
-    callId: selectedCall.callId,
-  });
-  const callCompleteWithCosts = useMemo(() => {
-    if (callComplete.result?.traceCall == null) {
-      return callComplete.result;
-    }
-    return {
-      ...callComplete.result,
-      traceCall: {
-        ...callComplete.result?.traceCall,
-        summary: {
-          ...callComplete.result?.traceCall?.summary,
-          weave: {
-            ...callComplete.result?.traceCall?.summary?.weave,
-            // Only selectedCall has costs, injected when creating
-            // the trace tree
-            costs: selectedCall.traceCall?.summary?.weave?.costs,
-          },
-        },
-      },
-    };
-  }, [callComplete.result, selectedCall]);
-
-  const assumeCallIsSelectedCall = path == null || path === '';
-  const [currentCall, setCurrentCall] = useState(call);
-
-  useEffect(() => {
-    if (assumeCallIsSelectedCall) {
-      setCurrentCall(selectedCall);
-    }
-  }, [assumeCallIsSelectedCall, selectedCall]);
-
-  useEffect(() => {
-    if (callCompleteWithCosts != null) {
-      setCurrentCall(callCompleteWithCosts);
-    }
-  }, [callCompleteWithCosts]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
-  const callTabs = useCallTabs(currentCall);
+  const callTabs = useCallTabs(focusedCall);
 
-  if (loading && !assumeCallIsSelectedCall) {
-    return <Loading centered />;
-  }
+  const setRootCallIdForPagination = useCallback(
+    (callId: string) => {
+      setFocusedCallId(callId);
+      setRootCallId(callId);
+    },
+    [setRootCallId, setFocusedCallId]
+  );
 
   return (
     <SimplePageLayoutWithHeader
@@ -329,62 +310,63 @@ const CallPageInnerVertical: FC<{
             alignItems: 'center',
           }}>
           {showPaginationControls && (
-            <PaginationControls call={call} path={path} />
+            <PaginationControls
+              callId={rootCallId}
+              setRootCallId={setRootCallIdForPagination}
+            />
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
-              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              tooltip={`${!hideTraceTreeActual ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
-              active={showTraceTree ?? false}
+              active={!hideTraceTreeActual}
               onClick={onToggleTraceTree}
             />
             <Button
               icon="marker"
-              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              tooltip={`${showFeedbackActual ? 'Hide' : 'Show'} feedback`}
               variant="ghost"
-              active={showFeedbackExpand ?? false}
+              active={showFeedbackActual ?? false}
               onClick={onToggleFeedbackExpand}
               className="ml-4"
             />
           </Box>
         </Box>
       }
-      isRightSidebarOpen={showFeedbackExpand}
+      isRightSidebarOpen={showFeedbackActual}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
               specsLoading={specsLoading}
-              callID={currentCall.callId}
-              entity={currentCall.entity}
-              project={currentCall.project}
+              callID={focusedCallId}
+              entity={focusedCall.entity}
+              project={focusedCall.project}
             />
           </div>
         </Tailwind>
       }
-      headerContent={<CallOverview call={currentCall} />}
-      isLeftSidebarOpen={showTraceTree}
+      headerContent={<CallOverview call={focusedCall} />}
+      isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
-            {loading ? (
-              <Loading centered />
-            ) : (
-              <CallTraceView
-                call={call}
-                selectedCall={currentCall}
-                rows={rows}
-                forcedExpandKeys={expandKeys}
-                path={path}
-                costLoading={costLoading}
-              />
-            )}
+            <TraceNavigator
+              entity={focusedCall.entity}
+              project={focusedCall.project}
+              traceId={focusedCall.traceId}
+              focusedCallId={focusedCallId}
+              rootCallId={rootCallId}
+              setFocusedCallId={setFocusedCallId}
+              setRootCallId={setRootCallId}
+            />
           </div>
         </Tailwind>
       }
       tabs={callTabs}
+      dimMainContent={callIsStale}
     />
   );
 };
