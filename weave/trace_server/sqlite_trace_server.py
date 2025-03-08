@@ -425,9 +425,37 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         json_path = field[len("output.") :]
                         field = "output"
                 elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
+                    field = "attributes" + field[len("attributes") :]
+                    if field.startswith("attributes."):
+                        json_path = field[len("attributes.") :]
+                        field = "attributes"
                 elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
+                    # Handle special summary fields that are calculated rather than stored directly
+                    if field == "summary.weave.status":
+                        # Create a CASE expression to properly determine the status
+                        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                ELSE 'success'
+                            END
+                        """
+                        json_path = None
+                    elif field == "summary.weave.latency_ms":
+                        # Calculate latency directly using julianday for millisecond precision
+                        field = """
+                            CASE
+                                WHEN ended_at IS NOT NULL THEN
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                ELSE 0
+                            END
+                        """
+                        json_path = None
+                    else:
+                        field = "summary" + field[len("summary") :]
+                        if field.startswith("summary."):
+                            json_path = field[len("summary.") :]
+                            field = "summary"
 
                 assert direction in [
                     "ASC",
