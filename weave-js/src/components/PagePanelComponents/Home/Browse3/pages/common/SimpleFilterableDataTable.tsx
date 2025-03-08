@@ -31,7 +31,8 @@ export const FilterLayoutTemplate: React.FC<{
             overflowY: 'hidden',
             alignItems: 'center',
             gap: '8px',
-            p: 1,
+            px: '16px',
+            py: '8px',
             '& li': {
               padding: 0,
               minWidth: '200px',
