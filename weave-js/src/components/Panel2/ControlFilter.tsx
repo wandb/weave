@@ -57,7 +57,9 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
 
     return (
       <S.FilterControls>
-        <div style={{flex: '1 1 auto', paddingBottom: '5px'}}>
+        <div
+          style={{flex: '1 1 auto', paddingBottom: '5px'}}
+          data-test="filter-expr">
           <WeaveExpression
             expr={filterFunction}
             setExpression={setFilterFunction}
