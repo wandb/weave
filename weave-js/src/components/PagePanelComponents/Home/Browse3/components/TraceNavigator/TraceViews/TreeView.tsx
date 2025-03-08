@@ -181,21 +181,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           opacity: isDeemphasized ? 0.6 : 1,
         }}>
         <div className="flex w-full items-center justify-between gap-8">
-          <div className="flex-0 flex min-w-0 items-center">
-            {showTypeIcon ? (
-              <IconOnlyPill
-                icon={getCallTypeIcon(typeName)}
-                color={opTypeColor}
-                isInteractive={false}
-              />
-            ) : (
-              <div
-                className={`h-8 w-8 rounded-full ${getTagColorClass(
-                  opTypeColor
-                )}`}
-              />
-            )}
-          </div>
           <div className="flex min-w-0 flex-1 items-center">
             <div style={{minWidth: level * indentMultiplier}} />
             {hasChildren ? (
@@ -218,6 +203,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
+
             {showDuration && (
               <>
                 {usageIconsOnly ? (
@@ -268,6 +254,22 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 </div>
               </>
             )}
+            
+          <div className="flex-0 flex min-w-0 items-center">
+            {showTypeIcon ? (
+              <IconOnlyPill
+                icon={getCallTypeIcon(typeName)}
+                color={opTypeColor}
+                isInteractive={false}
+              />
+            ) : (
+              <div
+                className={`h-8 w-8 rounded-full ${getTagColorClass(
+                  opTypeColor
+                )}`}
+              />
+            )}
+          </div>
 
             {showStatusIcon ? (
               <StatusChip value={statusCode} iconOnly />
