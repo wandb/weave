@@ -46,6 +46,7 @@ interface TreeNodeProps {
   setRootCallId: (id: string) => void;
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
+  searchQuery?: string;
 }
 
 type NodeType =
@@ -142,6 +143,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   setRootCallId,
   onToggleExpand,
   deemphasizeCallIds,
+  searchQuery,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
@@ -154,6 +156,30 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     call.summary?.weave?.costs
   );
   const {tokens, tokenToolTipContent} = getTokensFromUsage(call.summary?.usage);
+
+  const displayName = getCallDisplayName(call);
+  const renderHighlightedText = () => {
+    if (!searchQuery) {
+      return displayName;
+    }
+    const searchLower = searchQuery.toLowerCase();
+    const textLower = displayName.toLowerCase();
+    const index = textLower.indexOf(searchLower);
+    
+    if (index === -1) {
+      return displayName;
+    }
+
+    return (
+      <>
+        {displayName.slice(0, index)}
+        <span className="font-semibold text-teal-600 dark:text-teal-500">
+          {displayName.slice(index, index + searchQuery.length)}
+        </span>
+        {displayName.slice(index + searchQuery.length)}
+      </>
+    );
+  };
 
   const opTypeColor = opTypeToColor(typeName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
@@ -174,7 +200,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onDoubleClick={() => setRootCallId(id)}
         className="h-[32px] w-full justify-start px-8 text-left text-sm rounded-none"
         style={{
-          opacity: isDeemphasized ? 0.6 : 1,
+          opacity: isDeemphasized ? 0.7 : 1,
         }}>
         <div className="flex w-full items-center justify-between gap-8 relative">
           <div className="flex min-w-0 flex-1 items-center">
@@ -199,7 +225,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               />
             )}
             <div className="pl-4 truncate font-medium">
-              {getCallDisplayName(call)}
+              {renderHighlightedText()}
             </div>
 
           </div>
@@ -227,10 +253,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             </div>
 
             {/* 
-              <div className="text-right">
-                {duration !== null ? formatDuration(duration) : ''}
-              </div> 
-            */}
+s            */}
             <Icon
               name={getCallTypeIcon(typeName)}
               className={`max-w-16 max-h-16 ${opTypeColor}`}
@@ -280,7 +303,8 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
-    const filtered = Object.entries(props.traceTreeFlat)
+    // First find direct matches
+    const directMatches = Object.entries(props.traceTreeFlat)
       .filter(([_, node]) => {
         return (
           searchQuery === '' ||
@@ -291,22 +315,44 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
       })
       .map(([id]) => id);
 
-    const foundCallIds = new Set<string>(filtered);
-    const itemsToProcess = [...filtered];
-    const filteredCallIdsSet = new Set(filtered);
+    const foundCallIds = new Set<string>(directMatches);
+    const filteredCallIdsSet = new Set(directMatches);
+    
+    // Process queue for both upward (parents) and downward (children)
+    const itemsToProcess = [...directMatches];
+    
     while (itemsToProcess.length > 0) {
       const id = itemsToProcess.shift();
       if (id) {
         const node = props.traceTreeFlat[id];
+        
+        // Add parents
         if (node.parentId) {
           filteredCallIdsSet.add(node.parentId);
-          itemsToProcess.push(node.parentId);
+          if (!foundCallIds.has(node.parentId)) {
+            itemsToProcess.push(node.parentId);
+          }
         }
+        
+        // Add all children recursively
+        const addChildren = (nodeId: string) => {
+          const currentNode = props.traceTreeFlat[nodeId];
+          if (currentNode && currentNode.childrenIds) {
+            for (const childId of currentNode.childrenIds) {
+              if (!filteredCallIdsSet.has(childId)) {
+                filteredCallIdsSet.add(childId);
+                addChildren(childId);
+              }
+            }
+          }
+        };
+        
+        addChildren(id);
       }
     }
 
     return [
-      filtered,
+      directMatches,
       Array.from(filteredCallIdsSet),
       Array.from(
         new Set([...filteredCallIdsSet].filter(x => !foundCallIds.has(x)))
@@ -345,6 +391,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           {...props}
           filterCallIds={filteredCallIds}
           deemphasizeCallIds={deemphasizeCallIds}
+          searchQuery={searchQuery}
         />
       </div>
       <TraceScrubber
@@ -360,6 +407,7 @@ export const TreeView: React.FC<
   TraceViewProps & {
     filterCallIds?: string[];
     deemphasizeCallIds?: string[];
+    searchQuery?: string;
   }
 > = ({
   traceTreeFlat,
@@ -368,6 +416,7 @@ export const TreeView: React.FC<
   filterCallIds,
   deemphasizeCallIds,
   setRootCallId,
+  searchQuery,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
@@ -454,6 +503,7 @@ export const TreeView: React.FC<
         setRootCallId={setRootCallId}
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
+        searchQuery={searchQuery}
       />
     );
   };
