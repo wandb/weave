@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import AsyncIterator, Iterator
-from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
@@ -91,16 +90,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # it manually here...
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        def _fn_wrapper(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
-
-            return _async_wrapper
-
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
-        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
