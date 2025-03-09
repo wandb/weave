@@ -48,6 +48,11 @@ from weave_query.language_features.tagging.make_tag_getter_op import (
 )
 from weave_query.ops_domain import wb_domain_types as wdt
 from weave_query.ops_domain import wb_util
+from weave_query.constants import (
+    LIMIT_RUN_HISTORY_KEYS,
+    LIMIT_RUN_USED_ARTIFACT_VERSIONS,
+    LIMIT_RUN_LOGGED_ARTIFACT_VERSIONS,
+)
 
 # Important to re-export ops
 from weave_query.ops_domain.run_history import (
@@ -67,9 +72,6 @@ tracer = engine_trace.tracer()
 
 # number of rows of example data to look at to determine history type
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
-
-# number of history key metrics to fetch from run history
-LIMIT_RUN_HISTORY_KEYS = 100
 
 # Section 1/6: Tag Getters
 run_tag_getter_op = make_tag_getter_op("run", wdt.RunType, op_name="tag-run")
@@ -378,7 +380,7 @@ gql_connection_op(
     "inputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_RUN_USED_ARTIFACT_VERSIONS}",
 )
 
 gql_connection_op(
@@ -387,7 +389,7 @@ gql_connection_op(
     "outputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_RUN_LOGGED_ARTIFACT_VERSIONS}",
 )
 
 
