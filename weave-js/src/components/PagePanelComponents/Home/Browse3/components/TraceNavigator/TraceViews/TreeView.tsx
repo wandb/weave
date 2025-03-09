@@ -381,7 +381,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   }, [matchedCallIds, props.traceTreeFlat, searchQuery]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       <TreeViewHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

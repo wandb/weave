@@ -1,8 +1,46 @@
 import styled from 'styled-components';
 
-export const Container = styled.div`
+export const Container = styled.div<{ $isCollapsed?: boolean }>`
   border-top: 1px solid #e2e8f0;
+  margin-bottom: ${props => props.$isCollapsed ? '-110px' : '0px'};
   padding: 8px 16px;
+  transition: padding 0.2s ease;
+  background: #fff;
+`;
+
+export const CollapseButton = styled.button`
+  position: absolute;
+  background: #f8fafc !important;
+  left: 16px;
+  top: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #D4D5D9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+
+  &:hover {
+    transform: scale(1.05);
+    border: 1px solid #B1B4B9;
+    background: #E8E8E9;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+export const CollapseWrapper = styled.div`
+  position: relative;
 `;
 
 export const ScrubberRow = styled.div`
