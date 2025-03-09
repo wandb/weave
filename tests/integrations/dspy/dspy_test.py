@@ -258,3 +258,9 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
 
     calls = list(client.calls())
     assert len(calls) == 22
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Evaluate"
+    output = call.output
+    assert output > 50
