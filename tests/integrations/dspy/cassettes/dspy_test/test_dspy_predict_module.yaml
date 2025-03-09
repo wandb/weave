@@ -49,20 +49,18 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNBbtswELzrFQvmKgWyrciOjzm0hwQFUqS92IbAkCuJCUUSXMpNEfjv
-        BSXbctAU6IUgdnYGs7PkewLAlGRrYKLlQXROZ3er+0f1g0qalQ/F91DK7gt9u3cv8593zSNLI8M+
-        v6AIJ9a1sJ3TGJQ1Iyw88oBRdbYsZot5sbopB6CzEnWkNS5khc06ZVQ2z+dFli+z2erIbq0SSGwN
-        mwQA4H04o08j8Y2tIU9PlQ6JeINsfW4CYN7qWGGcSFHgJrB0AoU1Ac1gfbOBqyvwSM4awnjf7bbm
-        qUUY/FsPtoavKoAieFCmJ3iyfs+1pBR+tRYk7lFbhxJij4F5nt9AbT103PBGmQZCi6euDk2IerEU
-        xd7gFb1BfQ1bszWjlWOMKEcvl7Y91j3xGJ3ptT7WD+cctG2ct890xM/1WhlFbeWRkzVxZgrWsQE9
-        JAC7Ie/+Q4TMedu5UAX7iiYKzopi1GPTmid0cXsEgw1cX7BWi/QTvUpi4ErTxcaY4KJFOVGn9fJe
-        KnsBJBdT/+3mM+1xcmWa/5GfACHQBZSV8yiV+Djx1OYx/oJ/tZ1THgwzQr9XAqug0MdNSKx5r8e3
-        yeg3BeyqWpkGvfNqfKC1q/JyuVjy20VesuSQ/AEAAP//AwCnZSYtrgMAAA==
+        H4sIAAAAAAAAAwAAAP//jFNNa+MwEL37VwzqNS6O89XktttDD1solBwWkmJUaWwrkTVaSU67lPz3
+        RXYSp2wX9iLEvHmPN2+kjwSAKclWwETNg2isTr8vZ+LHLn+6H++el9/Wk/3j/bPNH97Ur6efnI0i
+        g153KMKZdSuosRqDItPDwiEPGFXHi+l4ls3z6bQDGpKoI62yIZ1S2iij0jzLp2m2SMd3J3ZNSqBn
+        K9gkAAAf3Rl9GonvbAXZ6Fxp0HteIVtdmgCYIx0rjHuvfOAmsNEACjIBTWd9s4GbG3DoLRmP8f7y
+        sjXrGqHzTw6ohAcVQHl4VKb1sCZ34Fr6EbzVBBIPqMmihNhjIM+yGZTkoOGGV8pUEGo8dzVoQtSL
+        pSj2Dnt0BvUtbM3W9FZOMaLsvVzbdli2nsfoTKv1qX685KCpso5e/Qm/1EtllK8Lh9yTiTP7QJZ1
+        6DEBeOnybj9FyKyjxoYi0B5NFBz3u+uyO695QCfLExgocH3FupuMvtArJAautL/aGBNc1CgH6rBe
+        3kpFV0ByNfXfbr7S7idXpvof+QEQAm1AWViHUonPEw9tDuMv+FfbJeXOMPPoDkpgERS6uAmJJW91
+        /zaZ/+0DNkWpTIXOOtU/0NIW2XwxWfDlJJuz5Jj8AQAA//8DACFq3ZyuAwAA
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 91c7a57f9f507f50-MAA
+      - 91d8f1ea7cee6a31-SAN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -70,7 +68,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 07 Mar 2025 05:20:57 GMT
+      - Sun, 09 Mar 2025 07:44:05 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -81,10 +79,12 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '846'
+      - '728'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -102,7 +102,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_f973550d6afdbda7d64a5ff874f6d8ca
+      - req_832a8b2793cdeacc7ae16ef0399a2944
     status:
       code: 200
       message: OK

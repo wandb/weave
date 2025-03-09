@@ -277,11 +277,50 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    optimizer = dspy.LabeledFewShot()
+    optimized_module = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET)
+    assert (
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LabeledFewShot.compile"
+    output = call.output
+    assert len(output["predict"]["demos"]) > 0
+    assert (
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
+    )
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
     optimizer = dspy.BootstrapFewShot(metric=accuracy_metric)
-    _ = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET)
+    optimized_module = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET)
+    assert (
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
+    )
 
     calls = list(client.calls())
     assert len(calls) == 20
@@ -291,3 +330,7 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "dspy.BootstrapFewShot.compile"
     output = call.output
     assert len(output["predict"]["demos"]) > 0
+    assert (
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
+    )
