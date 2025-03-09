@@ -289,13 +289,13 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
         icon="filter-alt"
         extraActions={
           searchQuery !== '' && (
-            <div className="mr-6 cursor-pointer rounded-sm p-1 hover:bg-moon-200">
-              <Icon
-                name="close"
-                size="small"
-                onClick={() => onSearchChange('')}
-              />
-            </div>
+            <Button
+              variant="ghost"
+              size="small"
+              icon="close"
+              onClick={() => onSearchChange('')}
+              className="mr-6"
+            />
           )
         }
       />
