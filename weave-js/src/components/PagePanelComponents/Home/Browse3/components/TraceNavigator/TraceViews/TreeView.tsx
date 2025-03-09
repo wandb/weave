@@ -5,6 +5,7 @@ import {
   getTagColorClass,
   TagColorName,
 } from '@wandb/weave/components/Tag';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
 
@@ -225,7 +226,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               />
             )}
             <div className="pl-4 truncate font-medium">
-              {renderHighlightedText()}
+              <Tooltip
+                trigger={<div className="truncate">{renderHighlightedText()}</div>}
+                content={<span>{displayName}</span>}
+              />
             </div>
 
           </div>
