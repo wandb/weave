@@ -1,4 +1,5 @@
-import React from 'react';
+import {Icon} from '@wandb/weave/components/Icon';
+import React, {useState} from 'react';
 
 import {BaseScrubberProps} from './components/BaseScrubber';
 import {
@@ -8,7 +9,7 @@ import {
   StackScrubber,
   TimelineScrubber,
 } from './components/scrubbers';
-import {Container} from './styles';
+import {CollapseButton, CollapseWrapper, Container} from './styles';
 
 export type ScrubberOption =
   | 'timeline'
@@ -22,20 +23,32 @@ const TraceScrubber: React.FC<
     allowedScrubbers?: ScrubberOption[];
   }
 > = props => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
   const showScrubber = (scrubber: ScrubberOption) => {
     if (!props.allowedScrubbers) {
       return true;
     }
     return props.allowedScrubbers.includes(scrubber);
   };
+
   return (
-    <Container>
-      {showScrubber('timeline') && <TimelineScrubber {...props} />}
-      {showScrubber('peer') && <PeerScrubber {...props} />}
-      {showScrubber('codePath') && <CodePathScrubber {...props} />}
-      {showScrubber('sibling') && <SiblingScrubber {...props} />}
-      {showScrubber('stack') && <StackScrubber {...props} />}
-    </Container>
+    <CollapseWrapper>
+      <CollapseButton onClick={() => setIsCollapsed(!isCollapsed)}>
+        <Icon
+          name={isCollapsed ? 'chevron-up' : 'chevron-down'}
+          size="small"
+          className="max-w-14 max-h-14"
+        />
+      </CollapseButton>
+      <Container $isCollapsed={isCollapsed}>
+        {showScrubber('timeline') && <TimelineScrubber {...props} />}
+        {showScrubber('peer') && <PeerScrubber {...props} />}
+        {showScrubber('codePath') && <CodePathScrubber {...props} />}
+        {showScrubber('sibling') && <SiblingScrubber {...props} />}
+        {showScrubber('stack') && <StackScrubber {...props} />}
+      </Container>
+    </CollapseWrapper>
   );
 };
 

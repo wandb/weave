@@ -1,6 +1,4 @@
-import {Divider} from '@mui/material';
 import Box from '@mui/material/Box';
-import {MOON_600} from '@wandb/weave/common/css/color.styles';
 import {IconName} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Pill} from '@wandb/weave/components/Tag';
@@ -30,15 +28,7 @@ const tooltipRowStyles = {
   gap: '16px',
 };
 
-const tooltipDivider = (
-  <Divider
-    sx={{
-      borderColor: MOON_600,
-      marginTop: '8px',
-      marginBottom: '7px',
-    }}
-  />
-);
+const tooltipDivider = <div className="mb-4 mt-5 border-t border-moon-600" />;
 
 export const TokenToolTip = (metrics: TokenTotals) => (
   <Box>
@@ -64,7 +54,7 @@ export const TokenToolTip = (metrics: TokenTotals) => (
 
 export const CostToolTip = (metrics: CostTotals) => (
   <Box>
-    <span style={{fontWeight: 600}}>Estimated Cost</span>
+    <span style={{fontWeight: 600}}>Estimated cost</span>
     {Object.keys(metrics.inputs.cost).map(model => (
       <Box key={model + 'input'} sx={tooltipRowStyles}>
         <span>{model === 'total' ? 'Input cost' : model}: </span>
