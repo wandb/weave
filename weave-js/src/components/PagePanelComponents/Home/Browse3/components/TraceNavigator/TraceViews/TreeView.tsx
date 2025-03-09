@@ -18,8 +18,7 @@ import {
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
-// import {formatDuration, getCallDisplayName} from './utils';
-import {getCallDisplayName} from './utils';
+import {formatDuration, getCallDisplayName} from './utils';
 
 interface FlattenedNode {
   id: string;
@@ -41,6 +40,7 @@ interface TreeNodeProps {
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
   searchQuery?: string;
+  showDuration?: boolean;
 }
 
 type NodeType =
@@ -138,11 +138,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onToggleExpand,
   deemphasizeCallIds,
   searchQuery,
+  showDuration,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
-  // const duration = call.ended_at
-  //   ? Date.parse(call.ended_at) - Date.parse(call.started_at)
-  //   : null;
+  const duration = call.ended_at
+    ? Date.parse(call.ended_at) - Date.parse(call.started_at)
+    : null;
 
   const spanName = parseSpanName(call.op_name);
   const typeName = spanNameToTypeHeuristic(spanName);
@@ -233,30 +234,32 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
             <div className="text-right">
-              {cost && (
-                <TraceStat
-                  label={cost}
-                  tooltip={
-                    <div className="text-white-800">
-                      {costToolTipContent}
-                      {tokens && (
-                        <>
-                          <br />
-                          <span style={{fontWeight: 600}}>
-                            Estimated Tokens
-                          </span>
-                        </>
-                      )}
-                      {tokens && tokenToolTipContent}
-                    </div>
-                  }
-                  className="text-xs text-moon-400"
-                />
-              )}
+              {showDuration
+                ? duration !== null
+                  ? formatDuration(duration)
+                  : ''
+                : cost && (
+                    <TraceStat
+                      label={cost}
+                      tooltip={
+                        <div className="text-white-800">
+                          {costToolTipContent}
+                          {tokens && (
+                            <>
+                              <br />
+                              <span style={{fontWeight: 600}}>
+                                Estimated tokens
+                              </span>
+                            </>
+                          )}
+                          {tokens && tokenToolTipContent}
+                        </div>
+                      }
+                      className="text-xs text-moon-400"
+                    />
+                  )}
             </div>
 
-            {/* 
-s            */}
             <Icon
               name={getCallTypeIcon(typeName)}
               className={`max-w-16 max-h-16 ${opTypeColor}`}
@@ -272,11 +275,15 @@ s            */}
 interface TreeViewHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  showDuration: boolean;
+  onToggleView: () => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   searchQuery,
   onSearchChange,
+  showDuration,
+  onToggleView,
 }) => {
   return (
     <div className="flex items-center px-8 py-4 text-sm">
@@ -297,12 +304,20 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
           )
         }
       />
+      <Button
+        variant="ghost"
+        icon={showDuration ? 'recent-clock' : 'database-artifacts'}
+        onClick={onToggleView}
+        className="ml-8"
+        tooltip={showDuration ? 'Latency' : 'Cost / duration'}
+      />
     </div>
   );
 };
 
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDuration, setShowDuration] = useState(false);
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     // First find direct matches
@@ -387,6 +402,8 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
       <TreeViewHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        showDuration={showDuration}
+        onToggleView={() => setShowDuration(!showDuration)}
       />
       <div className="flex-1 overflow-hidden">
         <TreeView
@@ -394,6 +411,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           filterCallIds={filteredCallIds}
           deemphasizeCallIds={deemphasizeCallIds}
           searchQuery={searchQuery}
+          showDuration={showDuration}
         />
       </div>
       <TraceScrubber
@@ -410,6 +428,7 @@ export const TreeView: React.FC<
     filterCallIds?: string[];
     deemphasizeCallIds?: string[];
     searchQuery?: string;
+    showDuration?: boolean;
   }
 > = ({
   traceTreeFlat,
@@ -419,6 +438,7 @@ export const TreeView: React.FC<
   deemphasizeCallIds,
   setRootCallId,
   searchQuery,
+  showDuration,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
@@ -506,6 +526,7 @@ export const TreeView: React.FC<
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
         searchQuery={searchQuery}
+        showDuration={showDuration}
       />
     );
   };

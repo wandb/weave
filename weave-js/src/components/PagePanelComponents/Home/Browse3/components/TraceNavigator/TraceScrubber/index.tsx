@@ -35,7 +35,11 @@ const TraceScrubber: React.FC<
   return (
     <CollapseWrapper>
       <CollapseButton onClick={() => setIsCollapsed(!isCollapsed)}>
-        <Icon name={isCollapsed ? 'chevron-up' : 'chevron-down'} size="small" className="max-w-14 max-h-14" />
+        <Icon
+          name={isCollapsed ? 'chevron-up' : 'chevron-down'}
+          size="small"
+          className="max-w-14 max-h-14"
+        />
       </CollapseButton>
       <Container $isCollapsed={isCollapsed}>
         {showScrubber('timeline') && <TimelineScrubber {...props} />}

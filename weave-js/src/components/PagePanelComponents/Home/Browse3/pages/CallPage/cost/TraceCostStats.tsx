@@ -54,7 +54,7 @@ export const TokenToolTip = (metrics: TokenTotals) => (
 
 export const CostToolTip = (metrics: CostTotals) => (
   <Box>
-    <span style={{fontWeight: 600}}>Estimated Cost</span>
+    <span style={{fontWeight: 600}}>Estimated cost</span>
     {Object.keys(metrics.inputs.cost).map(model => (
       <Box key={model + 'input'} sx={tooltipRowStyles}>
         <span>{model === 'total' ? 'Input cost' : model}: </span>

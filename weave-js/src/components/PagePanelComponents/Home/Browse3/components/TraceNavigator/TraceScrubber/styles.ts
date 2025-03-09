@@ -134,8 +134,8 @@ export const RangeInput = styled.input<RangeInputProps>`
   height: 8px;
   background: linear-gradient(
     to right,
-    #13A9BA 0%,
-    #13A9BA ${props => props.$progress}%,
+    #13a9ba 0%,
+    #13a9ba ${props => props.$progress}%,
     #e2e8f0 ${props => props.$progress}%,
     #e2e8f0 100%
   );
@@ -154,7 +154,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #13A9BA;
+    background: #13a9ba;
     border: 2px solid white;
     margin-top: -4px;
     transition: transform 0.1s;
@@ -175,7 +175,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #13A9BA;
+    background: #13a9ba;
     border: 2px solid white;
     transition: transform 0.1s;
   }
