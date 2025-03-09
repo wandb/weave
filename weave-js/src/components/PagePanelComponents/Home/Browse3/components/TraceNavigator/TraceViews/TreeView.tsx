@@ -1,10 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import {
-  getTagColorClass,
-  TagColorName,
-} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
@@ -14,11 +10,7 @@ import {
   getTokensFromUsage,
   TraceStat,
 } from '../../../pages/CallPage/cost';
-import {
-  CallStatusType,
-  STATUS_INFO,
-  StatusChip,
-} from '../../../pages/common/StatusChip';
+import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {
   parseSpanName,
@@ -26,7 +18,8 @@ import {
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
-import {formatDuration, getCallDisplayName} from './utils';
+// import {formatDuration, getCallDisplayName} from './utils';
+import {getCallDisplayName} from './utils';
 
 interface FlattenedNode {
   id: string;
@@ -147,9 +140,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   searchQuery,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
-  const duration = call.ended_at
-    ? Date.parse(call.ended_at) - Date.parse(call.started_at)
-    : null;
+  // const duration = call.ended_at
+  //   ? Date.parse(call.ended_at) - Date.parse(call.started_at)
+  //   : null;
 
   const spanName = parseSpanName(call.op_name);
   const typeName = spanNameToTypeHeuristic(spanName);
@@ -166,7 +159,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     const searchLower = searchQuery.toLowerCase();
     const textLower = displayName.toLowerCase();
     const index = textLower.indexOf(searchLower);
-    
+
     if (index === -1) {
       return displayName;
     }
@@ -190,7 +183,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   if (hasDescendantErrors && statusCode === 'SUCCESS') {
     statusCode = 'DESCENDANT_ERROR';
   }
- const indentMultiplier = 14;
+  const indentMultiplier = 14;
 
   return (
     <div style={style}>
@@ -199,19 +192,22 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         active={id === focusedCallId}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start px-8 text-left text-sm rounded-none"
+        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm"
         style={{
           opacity: isDeemphasized ? 0.7 : 1,
         }}>
-        <div className="flex w-full items-center justify-between gap-8 relative">
+        <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
-            <div style={{marginLeft: level * indentMultiplier}}  className={`h-[32px]`} />
+            <div
+              style={{marginLeft: level * indentMultiplier}}
+              className={`h-[32px]`}
+            />
             {/* Render vertical lines for each level of hierarchy */}
-            {Array.from({ length: level }).map((_, idx) => (
-              <div 
-                key={`line-${idx}`} 
-                style={{left: idx * indentMultiplier, marginLeft: 8}} 
-                className="absolute top-0 h-full w-px border-l border-moon-300" 
+            {Array.from({length: level}).map((_, idx) => (
+              <div
+                key={`line-${idx}`}
+                style={{left: idx * indentMultiplier, marginLeft: 8}}
+                className="absolute top-0 h-full w-px border-l border-moon-300"
               />
             ))}
             {hasChildren && (
@@ -225,13 +221,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
             )}
-            <div className="pl-4 truncate font-medium">
+            <div className="truncate pl-4 font-medium">
               <Tooltip
-                trigger={<div className="truncate">{renderHighlightedText()}</div>}
+                trigger={
+                  <div className="truncate">{renderHighlightedText()}</div>
+                }
                 content={<span>{displayName}</span>}
               />
             </div>
-
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
@@ -245,7 +242,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                       {tokens && (
                         <>
                           <br />
-                          <span style={{fontWeight: 600}}>Estimated Tokens</span>
+                          <span style={{fontWeight: 600}}>
+                            Estimated Tokens
+                          </span>
                         </>
                       )}
                       {tokens && tokenToolTipContent}
@@ -261,10 +260,9 @@ s            */}
             <Icon
               name={getCallTypeIcon(typeName)}
               className={`max-w-16 max-h-16 ${opTypeColor}`}
-            />            
+            />
             <StatusChip value={statusCode} iconOnly />
           </div>
-          
         </div>
       </Button>
     </div>
@@ -321,15 +319,15 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
 
     const foundCallIds = new Set<string>(directMatches);
     const filteredCallIdsSet = new Set(directMatches);
-    
+
     // Process queue for both upward (parents) and downward (children)
     const itemsToProcess = [...directMatches];
-    
+
     while (itemsToProcess.length > 0) {
       const id = itemsToProcess.shift();
       if (id) {
         const node = props.traceTreeFlat[id];
-        
+
         // Add parents
         if (node.parentId) {
           filteredCallIdsSet.add(node.parentId);
@@ -337,7 +335,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
             itemsToProcess.push(node.parentId);
           }
         }
-        
+
         // Add all children recursively
         const addChildren = (nodeId: string) => {
           const currentNode = props.traceTreeFlat[nodeId];
@@ -350,7 +348,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
             }
           }
         };
-        
+
         addChildren(id);
       }
     }

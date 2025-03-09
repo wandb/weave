@@ -1,8 +1,8 @@
 import styled from 'styled-components';
 
-export const Container = styled.div<{ $isCollapsed?: boolean }>`
+export const Container = styled.div<{$isCollapsed?: boolean}>`
   border-top: 1px solid #e2e8f0;
-  margin-bottom: ${props => props.$isCollapsed ? '-110px' : '0px'};
+  margin-bottom: ${props => (props.$isCollapsed ? '-110px' : '0px')};
   padding: 8px 16px;
   transition: padding 0.2s ease;
   background: #fff;
@@ -17,7 +17,7 @@ export const CollapseButton = styled.button`
   height: 24px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid #D4D5D9;
+  border: 1px solid #d4d5d9;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,11 +26,10 @@ export const CollapseButton = styled.button`
   z-index: 1;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 
-
   &:hover {
     transform: scale(1.05);
-    border: 1px solid #B1B4B9;
-    background: #E8E8E9;
+    border: 1px solid #b1b4b9;
+    background: #e8e8e9;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
 

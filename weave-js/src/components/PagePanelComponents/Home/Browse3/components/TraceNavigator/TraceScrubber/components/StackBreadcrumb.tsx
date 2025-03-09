@@ -40,19 +40,20 @@ export const StackBreadcrumb: React.FC<
       {((props.traceRootCallId && props.rootCallId !== props.traceRootCallId) ||
         (props.rootParentId && props.rootCallId !== props.rootParentId)) && (
         <BreadcrumbNavigationButtons>
-          {props.traceRootCallId && props.rootCallId !== props.traceRootCallId && (
-            <Tooltip
-              content={'Reveal root call'}
-              trigger={
-                <Button
-                  variant={'ghost'}
-                  onClick={() => props.setRootCallId(props.traceRootCallId!)}
-                  icon={'chevron-up'}
-                  size="small"
-                />
-              }
-            />
-          )}
+          {props.traceRootCallId &&
+            props.rootCallId !== props.traceRootCallId && (
+              <Tooltip
+                content={'Reveal root call'}
+                trigger={
+                  <Button
+                    variant={'ghost'}
+                    onClick={() => props.setRootCallId(props.traceRootCallId!)}
+                    icon={'chevron-up'}
+                    size="small"
+                  />
+                }
+              />
+            )}
           {props.rootParentId && props.rootCallId !== props.rootParentId && (
             <Tooltip
               content={'Reveal parent call'}

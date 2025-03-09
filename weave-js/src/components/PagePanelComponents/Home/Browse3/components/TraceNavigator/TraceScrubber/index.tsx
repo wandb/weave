@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
 import {Icon} from '@wandb/weave/components/Icon';
+import React, {useState} from 'react';
 
 import {BaseScrubberProps} from './components/BaseScrubber';
 import {
@@ -9,7 +9,7 @@ import {
   StackScrubber,
   TimelineScrubber,
 } from './components/scrubbers';
-import {Container, CollapseButton, CollapseWrapper} from './styles';
+import {CollapseButton, CollapseWrapper, Container} from './styles';
 
 export type ScrubberOption =
   | 'timeline'
