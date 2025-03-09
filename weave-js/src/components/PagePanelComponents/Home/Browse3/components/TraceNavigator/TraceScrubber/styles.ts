@@ -11,7 +11,7 @@ export const Container = styled.div<{$isCollapsed?: boolean}>`
 export const CollapseButton = styled.button`
   position: absolute;
   background: #f8fafc !important;
-  left: 16px;
+  right: 6px;
   top: -12px;
   width: 24px;
   height: 24px;
@@ -28,7 +28,6 @@ export const CollapseButton = styled.button`
 
   &:hover {
     transform: scale(1.05);
-    border: 1px solid #b1b4b9;
     background: #e8e8e9;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
@@ -135,8 +134,8 @@ export const RangeInput = styled.input<RangeInputProps>`
   height: 8px;
   background: linear-gradient(
     to right,
-    #3b82f6 0%,
-    #3b82f6 ${props => props.$progress}%,
+    #13A9BA 0%,
+    #13A9BA ${props => props.$progress}%,
     #e2e8f0 ${props => props.$progress}%,
     #e2e8f0 100%
   );
@@ -155,7 +154,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: #13A9BA;
     border: 2px solid white;
     margin-top: -4px;
     transition: transform 0.1s;
@@ -176,7 +175,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: #13A9BA;
     border: 2px solid white;
     transition: transform 0.1s;
   }
@@ -295,7 +294,7 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
       left: 4px;
       right: 4px;
       height: 2px;
-      background: #3B82F6;
+      background: #13A9BA;
       border-radius: 1px;
     }
   `}
