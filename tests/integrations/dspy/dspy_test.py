@@ -334,3 +334,49 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
         output["predict"]["signature"]["instructions"]
         == optimized_module.predict.signature.instructions
     )
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
+    client: WeaveClient,
+) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    optimizer = dspy.BootstrapFewShotWithRandomSearch(
+        metric=accuracy_metric,
+        num_candidate_programs=1,
+        stop_at_score=100,
+        num_threads=1,
+    )
+    optimized_module = optimizer.compile(
+        module, trainset=SAMPLE_EVAL_DATASET, valset=SAMPLE_EVAL_DATASET
+    )
+    assert (
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 23
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "dspy.BootstrapFewShotWithRandomSearch.compile"
+    )
+    output = call.output
+    assert (
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
+    )
