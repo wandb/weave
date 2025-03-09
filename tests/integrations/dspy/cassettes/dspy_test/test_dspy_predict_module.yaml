@@ -1,7 +1,14 @@
 interactions:
 - request:
-    body: '{"messages":[{"role":"user","content":"Say this is a test! Don''t say anything
-      else."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.7}'
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `response` (str)\n\nAll interactions will
+      be structured in the following way, with the appropriate values filled in.\n\n[[
+      ## question ## ]]\n{question}\n\n[[ ## response ## ]]\n{response}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Given the
+      fields `question`, produce the fields `response`."},{"role":"user","content":"[[
+      ## question ## ]]\nwho is the creator of git?\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## response ## ]]`, and then ending
+      with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
     headers:
       accept:
       - application/json
@@ -10,7 +17,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '145'
+      - '749'
       content-type:
       - application/json
       host:
@@ -42,19 +49,18 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFKxbtswEN31FSxnq5BsxXI8duhQIEvaJSgKgSJP0rUUSfBObdLA/15Q
-        ciwHTYEuHN679+7d8Z4zISQaeRRSD4r1GGz+4fZGf6oPH0ttqX1oP/+mqX266711xf0vuUkK334H
-        zS+q99qPwQKjdwutIyiG5FrWVXlT7LfVbiZGb8AmWR84r3w+osN8W2yrvKjz8nBWDx41kDyKr5kQ
-        QjzPb8rpDDzKoyg2L8gIRKoHebwUCSGjtwmRigiJlWO5WUntHYObo38ZkASSUIKB+N11VYRuIpWS
-        usnaM366tLW+D9G3dOYveIcOaWgiKPIutSD2Qc7sKRPi2zze9CqxDNGPgRv2P8Alw/Kw2Ml1qSu5
-        P3PsWdkV3labN8waA6zQ0tV2pFZ6ALMq11WqyaC/IrKrkf/O8pb3Mja6/n/sV0JrCAymCREM6tfz
-        rmUR0sX9q+yy4jmwJIg/UUPDCDF9g4FOTXa5A0lPxDA2HboeYoi4HEMXmmJf72p1uyv2MjtlfwAA
-        AP//AwDqf3HEGgMAAA==
+        H4sIAAAAAAAAAwAAAP//jFNNa+MwEL37VwzqNS6O89XktttDD1solBwWkmJUaWwrkTVaSU67lPz3
+        RXYSp2wX9iLEvHmPN2+kjwSAKclWwETNg2isTr8vZ+LHLn+6H++el9/Wk/3j/bPNH97Ur6efnI0i
+        g153KMKZdSuosRqDItPDwiEPGFXHi+l4ls3z6bQDGpKoI62yIZ1S2iij0jzLp2m2SMd3J3ZNSqBn
+        K9gkAAAf3Rl9GonvbAXZ6Fxp0HteIVtdmgCYIx0rjHuvfOAmsNEACjIBTWd9s4GbG3DoLRmP8f7y
+        sjXrGqHzTw6ohAcVQHl4VKb1sCZ34Fr6EbzVBBIPqMmihNhjIM+yGZTkoOGGV8pUEGo8dzVoQtSL
+        pSj2Dnt0BvUtbM3W9FZOMaLsvVzbdli2nsfoTKv1qX685KCpso5e/Qm/1EtllK8Lh9yTiTP7QJZ1
+        6DEBeOnybj9FyKyjxoYi0B5NFBz3u+uyO695QCfLExgocH3FupuMvtArJAautL/aGBNc1CgH6rBe
+        3kpFV0ByNfXfbr7S7idXpvof+QEQAm1AWViHUonPEw9tDuMv+FfbJeXOMPPoDkpgERS6uAmJJW91
+        /zaZ/+0DNkWpTIXOOtU/0NIW2XwxWfDlJJuz5Jj8AQAA//8DACFq3ZyuAwAA
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 91d8f1e53f706a31-SAN
+      - 91d8f1ea7cee6a31-SAN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -62,15 +68,9 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Sun, 09 Mar 2025 07:44:04 GMT
+      - Sun, 09 Mar 2025 07:44:05 GMT
       Server:
       - cloudflare
-      Set-Cookie:
-      - __cf_bm=OvLBA5PJZxE5iJXpJKgdL2U1SRPLH16iHP5Oufd91_Q-1741506244-1.0.1.1-hbcTpjT0G04793Buh9cWzC8Npye5R4j.6_m3mHl4mFlSafRSEFXb.LIshZa6Ji5JKpFoYHTKpL61QFJTklJR94I9N7BfLcwXoLCnW7pB8mM;
-        path=/; expires=Sun, 09-Mar-25 08:14:04 GMT; domain=.api.openai.com; HttpOnly;
-        Secure; SameSite=None
-      - _cfuvid=HYuX8KnpXalmbG2FipUtzveoHZlmv5x9mUfwb8fiHvI-1741506244067-0.0.1.1-604800000;
-        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
       X-Content-Type-Options:
@@ -79,10 +79,12 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '494'
+      - '728'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -94,13 +96,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998988'
+      - '149998848'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_d48cd0d9a7f1928ab86d64e7fa55dd8a
+      - req_832a8b2793cdeacc7ae16ef0399a2944
     status:
       code: 200
       message: OK
