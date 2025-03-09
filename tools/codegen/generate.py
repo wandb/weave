@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Weave SDK Code Generator
 
@@ -15,6 +13,8 @@ Environment:
  - Ensure necessary environment variables (e.g., STAINLESS_API_KEY, GITHUB_TOKEN) are set.
  - A local uvicorn server is used to fetch the OpenAPI spec.
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -262,10 +262,62 @@ def all(
 
     # Validate required config
     if not cfg.get("repo_path") or not cfg.get("package_name"):
-        error(
-            "repo_path and package_name must be specified either in config file or as arguments"
+        warning(
+            "repo_path and package_name must be specified either in config file or as arguments. "
+            "Creating a config file with user inputs..."
         )
-        sys.exit(1)
+
+        # Create config file from template if it doesn't exist
+        config_dir = Path(CODEGEN_ROOT_RELPATH).resolve()
+        template_path = config_dir / "generate_config.yaml.template"
+        if template_path.exists():
+            # Copy template content
+            with open(template_path) as src:
+                config_content = src.read()
+
+            # Prompt for repo_path
+            repo_path_input = input(
+                "\nPlease enter the path to your local Python repository: "
+            )
+            if not repo_path_input:
+                error("Repository path cannot be empty")
+                sys.exit(1)
+
+            # Expand user path (e.g., ~/repo becomes /home/user/repo)
+            repo_path_input = os.path.expanduser(repo_path_input)
+
+            # Ensure the path exists
+            if not os.path.exists(repo_path_input):
+                warning(
+                    f"Repository path '{repo_path_input}' does not exist. Please make sure it's correct."
+                )
+                create_anyway = input(
+                    "Continue creating config anyway? (y/n): "
+                ).lower()
+                if create_anyway != "y":
+                    error("Config creation aborted")
+                    sys.exit(1)
+
+            # Set the repo_path in the config
+            cfg["repo_path"] = repo_path_input
+
+            # Replace the template repo_path with the provided value
+            config_content = config_content.replace(
+                "/path/to/your/local/python/repo", repo_path_input
+            )
+
+            # Write the updated content to the config file
+            config_file_path = Path(config_path)
+            with open(config_file_path, "w") as dst:
+                dst.write(config_content)
+
+            info(f"Config file created at: {config_file_path}")
+        else:
+            error(f"Template file not found: {template_path}")
+            error(
+                "repo_path and package_name must be specified either in config file or as arguments"
+            )
+            sys.exit(1)
 
     str_path = _ensure_absolute_path(cfg["repo_path"])
     if str_path is None:
