@@ -41,6 +41,7 @@ from weave.scorers.string_scorer import (
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.xml_scorer import ValidXMLScorer
+from weave.scorers.verdict_scorer import VerdictScorer
 
 __all__ = [
     "auto_summarize",
@@ -62,6 +63,7 @@ __all__ = [
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
+    "VerdictScorer",
     "WeaveBiasScorerV1",
     "WeaveToxicityScorerV1",
     "WeaveCoherenceScorerV1",
