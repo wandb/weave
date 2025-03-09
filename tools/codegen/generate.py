@@ -277,7 +277,7 @@ def all(
 
             # Prompt for repo_path
             repo_path_input = input(
-                "\nPlease enter the path to your local Python repository: "
+                "\nPlease enter the absolute path to your local Python repository: "
             )
             if not repo_path_input:
                 error("Repository path cannot be empty")
