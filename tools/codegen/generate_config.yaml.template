@@ -17,11 +17,11 @@ repo_path: /path/to/your/local/python/repo
 
 # Path to the Node package repository (optional)
 # Comment out or remove if not needed
-node_output: /path/to/your/local/node/repo
+# node_output: /path/to/your/local/node/repo
 
 # Path to the TypeScript package repository (optional)
 # Comment out or remove if not needed
-typescript_output: /path/to/your/local/typescript/repo
+# typescript_output: /path/to/your/local/typescript/repo
 
 # ==========================
 # PROBABLY SHOULD NOT CHANGE
