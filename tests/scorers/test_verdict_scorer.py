@@ -22,7 +22,7 @@ def verdict_scorer() -> VerdictScorer:
         , repeat=3) \
         >> MaxPoolUnit()
 
-    return VerdictScorer(pipeline)
+    return VerdictScorer(pipeline=pipeline)
 
 
 def test_verdict_scorer_score(verdict_scorer):

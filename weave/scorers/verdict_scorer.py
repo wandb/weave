@@ -1,8 +1,8 @@
-import weave
-from weave import Scorer
-from typing import Dict
-
 import verdict
+import weave
+from pydantic import Field
+from typing import Dict
+from weave import Scorer
 
 class VerdictScorer(Scorer):
     """
@@ -40,13 +40,9 @@ class VerdictScorer(Scorer):
         }
     """
 
-    _pipeline: verdict.Pipeline
-
-    def __init__(self, pipeline: verdict.Pipeline):
-        super().__init__()
-        self._pipeline = pipeline
+    pipeline: verdict.Pipeline = Field(description="The Verdict pipeline to use for judging")
 
     @weave.op
-    def score(self, **kwargs: Dict[str, str]) -> dict:
-        response, leaf_node_prefixes = self._pipeline.run(verdict.schema.Schema.of(**kwargs))
+    def score(self, output: str, **kwargs: Dict[str, str]) -> dict:
+        response, leaf_node_prefixes = self.pipeline.run(verdict.schema.Schema.of(output=output, **kwargs))
         return {prefix: response[prefix] for prefix in leaf_node_prefixes}
