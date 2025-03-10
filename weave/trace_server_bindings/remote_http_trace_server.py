@@ -4,10 +4,16 @@ import logging
 from collections.abc import Iterator
 from typing import Optional, Union
 
+import httpx
 from pydantic import BaseModel, validate_call
+from typing_extensions import Self
 from weave_server_sdk import DefaultHttpxClient, WeaveTrace
 
-from weave.trace.env import weave_trace_server_url
+from weave.trace.env import (
+    weave_trace_server_url,
+    weave_wandb_api_key,
+    weave_wandb_entity_name,
+)
 from weave.trace.settings import max_calls_queue_size
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
@@ -57,8 +63,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        entity_name: Optional[str] = None,
+        api_key: Optional[str] = None,
         debug: bool = True,
     ):
         super().__init__()
@@ -70,14 +76,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
             )
-        self._auth: Optional[tuple[str, str]] = None
-        if password is not None:
-            self._auth = ("api", password)
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
         self.stainless_client = WeaveTrace(
-            username=username if username else "",
-            password=password if password else "",
+            username=entity_name if entity_name else "",
+            password=api_key if api_key else "",
             base_url=self.trace_server_url,
             http_client=VerboseClient() if debug else DefaultHttpxClient(),
         )
@@ -91,13 +94,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return tsi.EnsureProjectExistsRes.model_validate(wandb_api_res)
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
-        # that type checking is applied to the constructor.
-        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
-
-    def set_auth(self, auth: tuple[str, str]) -> None:
-        self._auth = auth
+    def from_env(
+        cls,
+        entity_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+        should_batch: bool = False,
+    ) -> Self:
+        return cls(
+            weave_trace_server_url(),
+            should_batch,
+            entity_name=entity_name or weave_wandb_entity_name(),
+            api_key=api_key or weave_wandb_api_key(),
+        )
 
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
@@ -108,7 +116,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,  # type: ignore
-            auth=self._auth,
             # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 413:
@@ -179,69 +186,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor.enqueue(batch)
 
     @with_retry
-    def _generic_request_executor(
-        self,
-        url: str,
-        req: BaseModel,
-        stream: bool = False,
-    ) -> requests.Response:
-        r = requests.post(
-            self.trace_server_url + url,
-            # `by_alias` is required since we have Mongo-style properties in the
-            # query models that are aliased to conform to start with `$`. Without
-            # this, the model_dump will use the internal property names which are
-            # not valid for the `model_validate` step.
-            data=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=self._auth,
-            stream=stream,
-            # timeout=DEFAULT_TIMEOUT,
-        )
-        if r.status_code == 500:
-            reason_val = r.text
-            try:
-                reason_val = json.dumps(json.loads(reason_val), indent=2)
-            except json.JSONDecodeError:
-                reason_val = f"Reason: {reason_val}"
-            raise requests.HTTPError(
-                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
-                response=r,
-            )
-        r.raise_for_status()
-
-        return r
-
-    def _generic_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> BaseModel:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req)
-        return res_model.model_validate(r.json())
-
-    def _generic_stream_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> Iterator[BaseModel]:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield res_model.model_validate_json(line)
-
-    @with_retry
     @validate_call
     def server_info(self) -> ServerInfoRes:
         # TODO: This is not implemented on the stub.
         # return self.stainless_client.services.server_info()
-        ...
+        return httpx.get(self.trace_server_url + "/server_info").json()
 
     # Call API
     @validate_call
@@ -272,6 +221,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @validate_call
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        # Technically this is a deprecated endpoint?
         return self.stainless_client.calls.read(
             id=req.id,
             project_id=req.project_id,
@@ -458,28 +408,27 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         return self.stainless_client.refs.read_batch(refs=req.refs)
 
-    # TODO: Not sure how this will be implemented; revisit
     @with_retry
     @validate_call
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
-            self.trace_server_url + "/files/create",
-            auth=self._auth,
-            data={"project_id": req.project_id},
-            files={"file": (req.name, req.content)},
-            # timeout=DEFAULT_TIMEOUT,
+        return self.stainless_client.files.create(
+            file=(req.name, req.content),
+            project_id=req.project_id,
         )
-        r.raise_for_status()
-        return tsi.FileCreateRes.model_validate(r.json())
 
     # TODO: Not sure how this will be implemented; revisit
     @with_retry
     @validate_call
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        # TODO: This returns the wrong type?
+        # res = self.stainless_client.files.content(
+        #     digest=req.digest, project_id=req.project_id
+        # )
+        # return tsi.FileContentReadRes(content=res.content)
+
         r = requests.post(
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
-            auth=self._auth,
             # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
