@@ -237,7 +237,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         # TODO: Technically this does not exist on the interface yet.
         # return self.stainless_client.calls.stream_query(query=req.query)
-        ...
+        return iter([])
 
     @validate_call
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
@@ -492,12 +492,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ActionsExecuteBatchReq,
-            tsi.ActionsExecuteBatchRes,
-        )
+        return tsi.ActionsExecuteBatchRes()
+        # return self.stainless_client.actions.execute_batch(
+        #     actions=req.actions,
+        #     project_id=req.project_id,
+        #     call_ids=req.call_ids,
+        #     wb_user_id=req.wb_user_id,
+        # )
 
     # Cost API
     @validate_call
@@ -531,12 +532,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        return self._generic_request(
-            "/completions/create",
-            req,
-            tsi.CompletionsCreateReq,
-            tsi.CompletionsCreateRes,
-        )
+        return tsi.CompletionsCreateRes(response={})
+        # return self.stainless_client.completions.create(
+        #     project_id=req.project_id,
+        #     inputs=req.inputs,
+        #     wb_user_id=req.wb_user_id,
+        #     track_llm_call=req.track_llm_call,
+        # )
 
 
 __docspec__ = [
