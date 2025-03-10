@@ -1,5 +1,6 @@
 import base64
 import contextlib
+import json
 import logging
 import os
 import subprocess
@@ -8,6 +9,7 @@ import typing
 import urllib
 from collections.abc import Iterator
 
+import httpx
 import pytest
 import requests
 from fastapi import FastAPI
@@ -673,17 +675,43 @@ def network_proxy_client(client):
         return client.server.table_update(req)
 
     with TestClient(app) as c:
+        # Create a custom HTTP client that routes requests through the TestClient
+        class TestClientAdapter(httpx.Client):
+            def send(self, request, **kwargs):
+                # Extract path from the URL and route it to the test client
+                url_path = str(request.url).replace("http://testserver", "")
 
-        def post(url, data=None, json=None, **kwargs):
-            kwargs.pop("stream", None)
-            return c.post(url, data=data, json=json, **kwargs)
+                # Extract JSON data from the request
+                json_data = None
+                if request.content:
+                    try:
+                        json_data = json.loads(request.content)
+                    except:
+                        pass
 
-        orig_post = weave.trace_server.requests.post
-        weave.trace_server.requests.post = post
+                # Use the TestClient to make the request
+                response = c.request(
+                    method=request.method,
+                    url=url_path,
+                    json=json_data,
+                    headers=dict(request.headers),
+                )
 
+                # Convert the response to an httpx.Response
+                return httpx.Response(
+                    status_code=response.status_code,
+                    headers=response.headers,
+                    content=response.content,
+                    request=request,
+                )
+
+        # Initialize the RemoteHTTPTraceServer with our custom client
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+            trace_server_url="http://testserver",
+            debug=False,  # Don't use VerboseClient
         )
-        yield (client, remote_client, records)
 
-        weave.trace_server.requests.post = orig_post
+        # Replace the stainless client's HTTP client with our adapter
+        remote_client.stainless_client._client = TestClientAdapter()
+
+        yield (client, remote_client, records)

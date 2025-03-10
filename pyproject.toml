@@ -53,8 +53,7 @@ dependencies = [
   # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
   #    weave_server_sdk==0.0.1
 
-  # TODO: Uncomment when ready to commit to the new bindings.
-  # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@f371501abbf3132c68b8c29028f34bb3821d7e1b",
 ]
 
 [project.optional-dependencies]
