@@ -10,7 +10,7 @@ from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 _openai_agents_patcher: MultiPatcher | None = None
 
 
-def openai_agents_wrapper(settings: OpSettings) -> Callable:
+def openai_agents_wrapper_async(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
@@ -35,33 +35,19 @@ def get_openai_agents_patcher(
     base = settings.op_settings
 
     # Naming convention -- module_method_settings
-    crew_kickoff_settings = base.model_copy(
+    runner_run_settings = base.model_copy(
         update={
-            "name": base.name or "crewai.Crew.kickoff",
+            "name": base.name or "agents.Runner.run",
             "call_display_name": base.call_display_name,
-            "postprocess_inputs": ,
-        }
-    )
-
-    agent_execute_task_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Agent.execute_task",
-            "call_display_name": base.call_display_name
-            or default_call_display_name_execute_task,
-            "postprocess_inputs": crewai_postprocess_inputs,
+            # "postprocess_inputs": ,
         }
     )
 
     patchers = [
         SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff",
-            crewai_wrapper(crew_kickoff_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Agent.execute_task",
-            crewai_wrapper(agent_execute_task_settings),
+            lambda: importlib.import_module("agents"),
+            "Runner.run",
+            openai_agents_wrapper_async(runner_run_settings),
         ),
     ]
 
