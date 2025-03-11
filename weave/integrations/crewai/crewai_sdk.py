@@ -65,6 +65,9 @@ def get_crewai_patcher(
         }
     )
 
+    # TODOs (ayulockin): kickoff_async and kickoff_for_each_async
+    # TODO (ayulockin): replay?
+
     agent_execute_task_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Agent.execute_task",
