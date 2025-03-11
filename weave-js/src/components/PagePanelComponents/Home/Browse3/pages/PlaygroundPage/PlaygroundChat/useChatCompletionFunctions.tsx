@@ -1,5 +1,5 @@
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import React from 'react';
+import React, {Dispatch, SetStateAction} from 'react';
 import {Link} from 'react-router-dom';
 
 import {Message} from '../../ChatView/types';
@@ -9,10 +9,11 @@ import {PlaygroundState} from '../types';
 import {PlaygroundMessageRole} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
+import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
 export const useChatCompletionFunctions = (
-  setPlaygroundStates: (states: PlaygroundState[]) => void,
-  setIsLoading: (isLoading: boolean) => void,
+  setPlaygroundStates: Dispatch<SetStateAction<PlaygroundState[]>>,
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType,
   playgroundStates: PlaygroundState[],
   entity: string,
   project: string,
@@ -34,25 +35,25 @@ export const useChatCompletionFunctions = (
   };
 
   const handleErrorsAndUpdate = async (
-    response: Array<CompletionsCreateRes | null>,
-    updatedStates: PlaygroundState[],
-    callIndex?: number
+    response: CompletionsCreateRes | null,
+    callIndex: number
   ): Promise<boolean> => {
     const hasMissingLLMApiKey = handleMissingLLMApiKey(response, entity);
-    const hasError = handleErrorResponse(response.map(r => r?.response));
+    const hasError = handleErrorResponse(response);
 
     if (hasMissingLLMApiKey || hasError) {
       return false;
     }
 
-    const finalStates = updatedStates.map((state, index) => {
-      if (callIndex === undefined || index === callIndex) {
-        return handleUpdateCallWithResponse(state, response[index]);
-      }
-      return state;
+    setPlaygroundStates(prevState => {
+      const newState = prevState.map((state, index) => {
+        if (index === callIndex) {
+          return handleUpdateCallWithResponse(state, response);
+        }
+        return state;
+      });
+      return newState;
     });
-
-    setPlaygroundStates(finalStates);
     return true;
   };
 
@@ -64,39 +65,55 @@ export const useChatCompletionFunctions = (
     toolCallId?: string
   ) => {
     try {
-      setIsLoading(true);
+      // Start by determining which chats need to be updated
+      const chatsToUpdate =
+        callIndex !== undefined
+          ? [callIndex]
+          : playgroundStates.map((_, i) => i);
+
       const newMessageContent = content || chatText;
       const newMessage = createMessage(role, newMessageContent, toolCallId);
-      const updatedStates = filterNullMessagesFromStates(
-        playgroundStates.map((state, index) => {
-          if (callIndex !== undefined && callIndex !== index) {
-            return state;
-          }
-          const updatedState = appendChoiceToMessages(state);
-          // If the new message is not empty, add it to the messages
-          if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
-            updatedState.traceCall.inputs.messages.push(newMessage);
-          }
-          return updatedState;
-        })
-      );
 
+      // Update the playground states with the new message
+      const updatedStates = [...playgroundStates];
+      chatsToUpdate.forEach(idx => {
+        const updatedState = appendChoiceToMessages(playgroundStates[idx]);
+        if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
+          updatedState.traceCall.inputs.messages.push(newMessage);
+        }
+        updatedState.loading = true;
+        updatedStates[idx] = filterNullMessages(updatedState);
+      });
+
+      // Update state with the new messages before starting API requests
       setPlaygroundStates(updatedStates);
       setChatText('');
 
-      const responses = await Promise.all(
-        updatedStates.map(async (_, index) => {
-          if (callIndex !== undefined && callIndex !== index) {
-            return Promise.resolve(null);
-          }
-          return await makeCompletionRequest(index, updatedStates);
-        })
-      );
-      await handleErrorsAndUpdate(responses, updatedStates);
+      // Create an array of promises to process all chats in parallel
+      const completionPromises = chatsToUpdate.map(async idx => {
+        try {
+          // Make the API request
+          const response = await makeCompletionRequest(idx, updatedStates);
+
+          await handleErrorsAndUpdate(response, idx);
+
+          return {idx, success: true};
+        } catch (error) {
+          console.error(`Error processing completion for chat ${idx}:`, error);
+          // Make sure to clear loading state on error
+          setPlaygroundStateField(idx, 'loading', false);
+          return {idx, success: false, error};
+        }
+      });
+
+      // Wait for all completions to finish
+      await Promise.all(completionPromises);
     } catch (error) {
       console.error('Error processing completion:', error);
-    } finally {
-      setIsLoading(false);
+      // Reset all loading states on global error
+      playgroundStates.forEach((_, idx) => {
+        setPlaygroundStateField(idx, 'loading', false);
+      });
     }
   };
 
@@ -106,37 +123,35 @@ export const useChatCompletionFunctions = (
     choiceIndex?: number
   ) => {
     try {
-      setIsLoading(true);
-      const updatedStates = filterNullMessagesFromStates(
-        playgroundStates.map((state, index) => {
-          if (index === callIndex) {
-            if (choiceIndex !== undefined) {
-              return appendChoiceToMessages(state, choiceIndex);
-            }
-            const updatedState = JSON.parse(JSON.stringify(state));
-            if (updatedState.traceCall?.inputs?.messages) {
-              updatedState.traceCall.inputs.messages =
-                updatedState.traceCall.inputs.messages.slice(
-                  0,
-                  messageIndex + 1
-                );
-            }
-            return updatedState;
-          }
-          return state;
-        })
-      );
+      // Update the chat state to prepare for retry
+      const updatedStates = [...playgroundStates];
+      let updatedState;
+
+      if (choiceIndex !== undefined) {
+        updatedState = appendChoiceToMessages(
+          playgroundStates[callIndex],
+          choiceIndex
+        );
+      } else {
+        updatedState = JSON.parse(JSON.stringify(playgroundStates[callIndex]));
+        if (updatedState.traceCall?.inputs?.messages) {
+          updatedState.traceCall.inputs.messages =
+            updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
+        }
+      }
+      updatedState.loading = true;
+
+      updatedStates[callIndex] = filterNullMessages(updatedState);
+      setPlaygroundStates(updatedStates);
 
       const response = await makeCompletionRequest(callIndex, updatedStates);
-      await handleErrorsAndUpdate(
-        updatedStates.map(() => response),
-        updatedStates,
-        callIndex
-      );
+
+      // Handle any errors or global updates
+      await handleErrorsAndUpdate(response, callIndex);
     } catch (error) {
       console.error('Error processing completion:', error);
-    } finally {
-      setIsLoading(false);
+      // Clear loading state in case of outer error
+      setPlaygroundStateField(callIndex, 'loading', false);
     }
   };
 
@@ -177,16 +192,13 @@ const handleMissingLLMApiKey = (responses: any, entity: string): boolean => {
 };
 
 const handleErrorResponse = (
-  responses: Array<CompletionsCreateRes | null | {error: string}>
+  response: CompletionsCreateRes | null | {error: string}
 ): boolean => {
-  if (!responses) {
+  if (!response) {
     return true;
   }
-  if (responses.some(r => r && 'error' in r)) {
-    const errorResponse = responses.find(r => r && 'error' in r) as {
-      error: string;
-    };
-    toast(errorResponse?.error, {
+  if (response && 'error' in response) {
+    toast(response?.error, {
       type: 'error',
     });
     return true;
@@ -209,6 +221,7 @@ const handleUpdateCallWithResponse = (
       id: response.weave_call_id ?? '',
       output: response.response,
     },
+    loading: false,
   };
 };
 
