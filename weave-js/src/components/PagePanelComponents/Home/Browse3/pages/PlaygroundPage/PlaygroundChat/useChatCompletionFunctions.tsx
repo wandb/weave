@@ -123,26 +123,27 @@ export const useChatCompletionFunctions = (
     choiceIndex?: number
   ) => {
     try {
-      // Update the chat state to prepare for retry
-      const updatedStates = [...playgroundStates];
-      let updatedState;
+      setPlaygroundStateField(callIndex, 'loading', true);
 
-      if (choiceIndex !== undefined) {
-        updatedState = appendChoiceToMessages(
-          playgroundStates[callIndex],
-          choiceIndex
-        );
-      } else {
-        updatedState = JSON.parse(JSON.stringify(playgroundStates[callIndex]));
-        if (updatedState.traceCall?.inputs?.messages) {
-          updatedState.traceCall.inputs.messages =
-            updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
-        }
-      }
-      updatedState.loading = true;
-
-      updatedStates[callIndex] = filterNullMessages(updatedState);
-      setPlaygroundStates(updatedStates);
+      const updatedStates = filterNullMessagesFromStates(
+        playgroundStates.map((state, index) => {
+          if (index === callIndex) {
+            if (choiceIndex !== undefined) {
+              return appendChoiceToMessages(state, choiceIndex);
+            }
+            const updatedState = JSON.parse(JSON.stringify(state));
+            if (updatedState.traceCall?.inputs?.messages) {
+              updatedState.traceCall.inputs.messages =
+                updatedState.traceCall.inputs.messages.slice(
+                  0,
+                  messageIndex + 1
+                );
+            }
+            return updatedState;
+          }
+          return state;
+        })
+      );
 
       const response = await makeCompletionRequest(callIndex, updatedStates);
 
