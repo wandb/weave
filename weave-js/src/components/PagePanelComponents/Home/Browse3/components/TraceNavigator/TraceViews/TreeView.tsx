@@ -61,14 +61,14 @@ const getCallTypeIcon = (type: NodeType): IconName => {
       return 'code-alt';
     case 'llm':
       return 'forum-chat-bubble';
-    case 'none':
-      return 'circle';
     case 'model':
       return 'model';
     case 'evaluation':
       return 'baseline-alt';
     case 'scorer':
       return 'number';
+    case 'none':
+      return 'circle';  
     default:
       return 'circle';
   }
@@ -90,7 +90,7 @@ const opTypeToColor = (typeName: NodeType): string => {
       return 'text-sienna-500 dark:text-sienna-400';
     // Other, probable noise
     default:
-      return 'text-moon-400 dark:text-moon-300';
+      return 'text-moon-300 dark:text-moon-200';
   }
 };
 
