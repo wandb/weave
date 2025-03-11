@@ -79,7 +79,7 @@ const opTypeToColor = (typeName: NodeType): string => {
     // Identifiers
     case 'agent':
     case 'model':
-      return 'text-green-500 dark:text-green-400';
+      return 'text-blue-500 dark:text-blue-400';
     // Evals
     case 'tool':
     case 'llm':
@@ -87,7 +87,7 @@ const opTypeToColor = (typeName: NodeType): string => {
     // Evals
     case 'evaluation':
     case 'scorer':
-      return 'text-amber-500 dark:text-amber-400';
+      return 'text-sienna-500 dark:text-sienna-400';
     // Other, probable noise
     default:
       return 'text-moon-400 dark:text-moon-300';
