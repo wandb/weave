@@ -277,6 +277,8 @@ interface TreeViewHeaderProps {
   onSearchChange: (value: string) => void;
   showDuration: boolean;
   onToggleView: () => void;
+  strictSearch: boolean;
+  onToggleStrictSearch: () => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
@@ -284,6 +286,8 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   onSearchChange,
   showDuration,
   onToggleView,
+  strictSearch,
+  onToggleStrictSearch,
 }) => {
   return (
     <div className="flex items-center px-8 py-4 text-sm">
@@ -294,13 +298,25 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
         icon="filter-alt"
         extraActions={
           searchQuery !== '' && (
-            <Button
-              variant="ghost"
-              size="small"
-              icon="close"
-              onClick={() => onSearchChange('')}
-              className="mr-6"
-            />
+            <>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={onToggleStrictSearch}
+                tooltip={strictSearch ? "(Strict) Only show matching nodes" : "(Loose) Show children of matching nodes"}
+                className={strictSearch ? "mr-2" : "mr-2 text-moon-500"}
+                active={strictSearch}
+              >
+                Strict
+              </Button>
+              <Button
+                variant="ghost"
+                size="small"
+                icon="close"
+                onClick={() => onSearchChange('')}
+                className="mr-6"
+              />
+            </>
           )
         }
       />
@@ -318,6 +334,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDuration, setShowDuration] = useState(false);
+  const [strictSearch, setStrictSearch] = useState(false);
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     // First find direct matches
@@ -351,9 +368,9 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           }
         }
 
-        // Only add children of direct matches
+        // Only add children of direct matches if not in strict search mode
         // Don't add children of parent nodes that were added just to show the path
-        if (foundCallIds.has(id)) {
+        if (foundCallIds.has(id) && !strictSearch) {
           // Add all children recursively
           const addChildren = (nodeId: string) => {
             const currentNode = props.traceTreeFlat[nodeId];
@@ -379,7 +396,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         new Set([...filteredCallIdsSet].filter(x => !foundCallIds.has(x)))
       ),
     ];
-  }, [props.traceTreeFlat, searchQuery]);
+  }, [props.traceTreeFlat, searchQuery, strictSearch]);
 
   const scrubbers: ScrubberOption[] = useMemo(() => {
     if (searchQuery === '') {
@@ -408,6 +425,8 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         onSearchChange={setSearchQuery}
         showDuration={showDuration}
         onToggleView={() => setShowDuration(!showDuration)}
+        strictSearch={strictSearch}
+        onToggleStrictSearch={() => setStrictSearch(!strictSearch)}
       />
       <div className="flex-1 overflow-hidden">
         <TreeView
