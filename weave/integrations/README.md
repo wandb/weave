@@ -75,13 +75,13 @@ This directory contains various integrations for Weave. As of this writing, ther
 
 4. At this point, you should be able to run the unit test and see a failure at the `assert len(res.calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. Note: the `--record-mode=rewrite` tells the system to ignore any recorded network calls.
 5. Now - time to implement the integration!
-6. Inside of `<vendor>.py`, implement the integration. The most basic form will look like this. Of course, you might need to do a lot here if there is sufficient complexity required. The key idea is to have a symbol called `<vendor>_patcher` exported at the end which is a subclass of `weave.trace.patcher.Patcher`. _Note: this assumes non-generator return libraries. More work is required for those to work well._
+6. Inside of `<vendor>.py`, implement the integration. The most basic form will look like this. Of course, you might need to do a lot here if there is sufficient complexity required. The key idea is to have a symbol called `<vendor>_patcher` exported at the end which is a subclass of `weave.integrations.patcher.Patcher`. _Note: this assumes non-generator return libraries. More work is required for those to work well._
 
    ```
    import importlib
 
    import weave
-   from weave.trace.patcher import SymbolPatcher, MultiPatcher
+   from weave.integrations.patcher import SymbolPatcher, MultiPatcher
 
 
    <vendor>_patcher = MultiPatcher(                            # <vendor>_patcher.attempt_patch() will attempt to patch all patchers

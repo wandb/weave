@@ -16,6 +16,7 @@ type SmallRefLoadedProps = {
   url: string;
   label?: string;
   error: Error | null;
+  noLink?: boolean;
 };
 
 export const SmallRefLoaded = ({
@@ -23,13 +24,18 @@ export const SmallRefLoaded = ({
   url,
   label,
   error,
+  noLink = false,
 }: SmallRefLoadedProps) => {
   const content = (
     <div
-      className={classNames('flex items-center gap-4 text-moon-700', {
-        'hover:text-teal-500': !error,
-        'line-through': error,
-      })}>
+      className={classNames(
+        'flex items-center gap-4 font-semibold text-moon-700',
+        {
+          'cursor-pointer hover:text-teal-500': !error && !noLink,
+          'line-through': error,
+          'cursor-default': noLink,
+        }
+      )}>
       <SmallRefIcon icon={icon} />
       {label && (
         <div className="h-[22px] min-w-0 flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
@@ -47,6 +53,9 @@ export const SmallRefLoaded = ({
         content={reason}
       />
     );
+  }
+  if (noLink) {
+    return <div className="w-full cursor-default">{content}</div>;
   }
   return (
     <Link $variant="secondary" to={url} className="w-full">

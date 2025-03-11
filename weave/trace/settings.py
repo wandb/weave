@@ -21,6 +21,7 @@ If True, prints a link to the Weave UI when calling a weave op.
 
 import os
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
@@ -59,6 +60,24 @@ class UserSettings(BaseModel):
 
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
     may lead to unexpected behavior.  Make sure this is only set once at the start!
+    """
+
+    redact_pii: bool = False
+    """Toggles PII redaction using Microsoft Presidio.
+
+    If True, redacts PII from trace data before sending to the server.
+    Can be overriden with the environment variable `WEAVE_REDACT_PII`
+    """
+
+    redact_pii_fields: list[str] = []
+    """List of fields to redact.
+
+    If redact_pii is True, this list of fields will be redacted.
+    If redact_pii is False, this list is ignored.
+    If this list is left empty, the default fields will be redacted.
+
+    A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
+    Can be overriden with the environment variable `WEAVE_REDACT_PII_FIELDS`
     """
 
     capture_client_info: bool = True
@@ -103,6 +122,36 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
     """
 
+    scorers_dir: str = str(Path.home() / ".cache" / "wandb" / "weave-scorers")
+    """
+    Sets the directory for the scorers model checkpoints. Defaults to
+    ~/.cache/wandb/weave-scorers.
+
+    Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
+
+    """
+    max_calls_queue_size: int = 100_000
+    """
+    Sets the maximum size of the calls queue.  Defaults to 100_000.
+    Setting a value of 0 means the queue can grow unbounded.
+
+    Can be overridden with the environment variable `WEAVE_MAX_CALLS_QUEUE_SIZE`
+    """
+
+    retry_max_interval: float = 60 * 5  # 5 min
+    """
+    Sets the maximum interval between retries.  Defaults to 5 minutes.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_INTERVAL`
+    """
+
+    retry_max_attempts: int = 3
+    """
+    Sets the maximum number of retries.  Defaults to 3.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -145,6 +194,14 @@ def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
 
+def should_redact_pii() -> bool:
+    return _should("redact_pii")
+
+
+def redact_pii_fields() -> list[str]:
+    return _list_str("redact_pii_fields")
+
+
 def use_server_cache() -> bool:
     return _should("use_server_cache")
 
@@ -157,15 +214,42 @@ def server_cache_dir() -> Optional[str]:
     return _optional_str("server_cache_dir")
 
 
+def scorers_dir() -> str:
+    return _optional_str("scorers_dir")  # type: ignore
+
+
+def max_calls_queue_size() -> int:
+    max_queue_size = _optional_int("max_calls_queue_size")
+    if max_queue_size is None:
+        return 100_000
+    return max_queue_size
+
+
+def retry_max_attempts() -> int:
+    """Returns the maximum number of retry attempts."""
+    max_attempts = _optional_int("retry_max_attempts")
+    if max_attempts is None:
+        return 3
+    return max_attempts
+
+
+def retry_max_interval() -> float:
+    """Returns the maximum interval between retries in seconds."""
+    max_interval = _optional_float("retry_max_interval")
+    if max_interval is None:
+        return 60 * 5  # 5 minutes
+    return max_interval
+
+
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
-    if settings is None:
-        user_settings = UserSettings()
-    if isinstance(settings, dict):
-        user_settings = UserSettings.model_validate(settings)
     if isinstance(settings, UserSettings):
         user_settings = settings
+    elif isinstance(settings, dict):
+        user_settings = UserSettings.model_validate(settings)
+    else:
+        user_settings = UserSettings()
 
     user_settings.apply()
 
@@ -192,9 +276,21 @@ def _optional_int(name: str) -> Optional[int]:
     return _context_vars[name].get()
 
 
+def _list_str(name: str) -> list[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env.split(",")
+    return _context_vars[name].get() or []
+
+
 def _optional_str(name: str) -> Optional[str]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return env
+    return _context_vars[name].get()
+
+
+def _optional_float(name: str) -> Optional[float]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return float(env)
     return _context_vars[name].get()
 
 
