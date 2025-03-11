@@ -351,20 +351,24 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           }
         }
 
-        // Add all children recursively
-        const addChildren = (nodeId: string) => {
-          const currentNode = props.traceTreeFlat[nodeId];
-          if (currentNode && currentNode.childrenIds) {
-            for (const childId of currentNode.childrenIds) {
-              if (!filteredCallIdsSet.has(childId)) {
-                filteredCallIdsSet.add(childId);
-                addChildren(childId);
+        // Only add children of direct matches
+        // Don't add children of parent nodes that were added just to show the path
+        if (foundCallIds.has(id)) {
+          // Add all children recursively
+          const addChildren = (nodeId: string) => {
+            const currentNode = props.traceTreeFlat[nodeId];
+            if (currentNode && currentNode.childrenIds) {
+              for (const childId of currentNode.childrenIds) {
+                if (!filteredCallIdsSet.has(childId)) {
+                  filteredCallIdsSet.add(childId);
+                  addChildren(childId);
+                }
               }
             }
-          }
-        };
-
-        addChildren(id);
+          };
+          
+          addChildren(id);
+        }
       }
     }
 
