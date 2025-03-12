@@ -39,7 +39,6 @@ def get_openai_agents_patcher(
         update={
             "name": base.name or "agents.Runner.run",
             "call_display_name": base.call_display_name,
-            # "postprocess_inputs": ,
         }
     )
 
