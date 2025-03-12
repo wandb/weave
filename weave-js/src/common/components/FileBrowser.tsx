@@ -601,6 +601,10 @@ const Netron: FC<NetronProps> = ({useLoadFileUrl, file: fileToQuery}) => {
   );
 };
 
+const oneMb = 1024 * 1024;
+const numMbToPreview = 20;
+const maxPreviewSize = numMbToPreview * oneMb;
+
 interface CodePreviewProps {
   useLoadFile: UseLoadFile;
   file: FileData;
@@ -615,6 +619,17 @@ const CodePreview: FC<CodePreviewProps> = memo(
     const ref = useRef<HTMLDivElement>(null);
     const setData = useCallback(
       (d: string) => {
+        if (d.length > maxPreviewSize) {
+          // Trying to display large formatted files crashes the browser, so we don't pretty-print them,
+          // and we truncate the file to 20MB. 20 may be too big - the browser definitely chugs at that point,
+          // but it doesn't crash, so it's a compromise that lets users preview the file if they really want.
+          // This works together with the below code that won't try to use Prism to do highlighting on large files.
+          setDataVal(
+            d.slice(0, maxPreviewSize) +
+              `\n(file truncated to ${numMbToPreview}MB)`
+          );
+          return;
+        }
         // Automatically reformat JSON
         let lines = d.split('\n');
         if (
@@ -682,7 +697,7 @@ const CodePreview: FC<CodePreviewProps> = memo(
           overflowY: 'auto',
           maxWidth: '100%',
         }}>
-        {file.sizeBytes / 1024 < 1024 ? (
+        {file.sizeBytes < oneMb ? (
           // When the file is under 1MB we use the normal code viewer with highlighting
           <pre
             style={{
