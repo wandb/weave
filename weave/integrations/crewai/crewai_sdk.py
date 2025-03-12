@@ -92,6 +92,14 @@ def get_crewai_patcher(
         }
     )
 
+    flow_kickoff_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Flow.kickoff",
+            "call_display_name": base.call_display_name,
+            # "postprocess_inputs": crewai_postprocess_inputs,
+        }
+    )
+
     tools_settings = {}
     crewai_tools = dir(importlib.import_module("crewai_tools"))
     crewai_tools = [tool for tool in crewai_tools if "Tool" in tool]
@@ -136,6 +144,11 @@ def get_crewai_patcher(
             lambda: importlib.import_module("crewai"),
             "Task.execute_sync",
             crewai_wrapper(task_execute_sync_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai"),
+            "Flow.kickoff",
+            crewai_wrapper(flow_kickoff_settings),
         ),
     ]
 
