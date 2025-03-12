@@ -339,7 +339,7 @@ def _execute_op(
 
     try:
         res = func(*args, **kwargs)
-    except BaseException as e:
+    except (Exception, SystemExit, KeyboardInterrupt) as e:
         handle_exception(e)
     else:
         return process(res)
