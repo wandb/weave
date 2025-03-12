@@ -65,7 +65,7 @@ export const useChatCompletionFunctions = (
     toolCallId?: string
   ) => {
     try {
-      // Start by determining if a specific chat is being updated or all of them
+      // Start by determining which chats need to be updated
       const chatsToUpdate =
         callIndex !== undefined
           ? [callIndex]
@@ -74,21 +74,19 @@ export const useChatCompletionFunctions = (
       const newMessageContent = content || chatText;
       const newMessage = createMessage(role, newMessageContent, toolCallId);
 
-      // Update state with the new messages before starting API requests
-      setPlaygroundStates(prevState => {
-        const updatedStates = [...prevState];
-        // Update the playground states with the new message
-        chatsToUpdate.forEach(idx => {
-          const updatedState = appendChoiceToMessages(prevState[idx]);
-          updatedState.loading = true;
-          // If the new message is not empty, add it to the messages
-          if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
-            updatedState.traceCall.inputs.messages.push(newMessage);
-          }
-          updatedStates[idx] = filterNullMessages(updatedState);
-        });
-        return updatedStates;
+      // Update the playground states with the new message
+      const updatedStates = [...playgroundStates];
+      chatsToUpdate.forEach(idx => {
+        const updatedState = appendChoiceToMessages(playgroundStates[idx]);
+        if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
+          updatedState.traceCall.inputs.messages.push(newMessage);
+        }
+        updatedState.loading = true;
+        updatedStates[idx] = filterNullMessages(updatedState);
       });
+
+      // Update state with the new messages before starting API requests
+      setPlaygroundStates(updatedStates);
       setChatText('');
 
       // Create an array of promises to process all chats in parallel
