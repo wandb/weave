@@ -273,6 +273,11 @@ FROM (
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
+        --
+        -- Object versions are uniquely identified by (kind, project_id, object_id, digest).
+        -- This subquery selects a row to represent each object version. There are multiple rows
+        -- for each object version if it has been deleted or recreated prior to a table merge.
+        --
         SELECT
             project_id,
             object_id,
@@ -289,7 +294,15 @@ FROM (
                 kind,
                 object_id,
                 digest
-                ORDER BY created_at ASC
+                --
+                -- Prefer the most recent row. If there is a tie, prefer the row
+                -- with non-null deleted_at, which represents the deletion event.
+                --
+                -- Rows for the same object version may have the same created_at
+                -- because deletion events inherit the created_at of the last
+                -- non-deleted row for the object version.
+                --
+                ORDER BY created_at DESC, (deleted_at IS NULL) ASC
             ) AS rn
         FROM object_versions
         WHERE project_id = {{project_id: String}}{self.object_id_conditions_part}
@@ -311,7 +324,7 @@ def make_objects_val_query_and_parameters(
     project_id: str, object_ids: list[str], digests: list[str]
 ) -> tuple[str, dict[str, Any]]:
     query = """
-        SELECT object_id, digest, any(val_dump)
+        SELECT object_id, digest, argMax(val_dump, created_at)
         FROM object_versions
         WHERE project_id = {project_id: String} AND
             object_id IN {object_ids: Array(String)} AND
