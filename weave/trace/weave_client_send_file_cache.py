@@ -6,15 +6,20 @@ multiple times, using an LRU (Least Recently Used) eviction policy.
 import hashlib
 import threading
 from collections import OrderedDict
-from typing import Any, Optional
+from concurrent.futures import Future
+from typing import Generic, Optional, TypeVar
 
 from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
 
+# Define generic type variables
+K = TypeVar("K")  # Key type
+V = TypeVar("V")  # Value type
 
-class ThreadSafeLRUCache:
+
+class ThreadSafeLRUCache(Generic[K, V]):
     """Thread-safe LRU cache implementation using OrderedDict."""
 
-    def __init__(self, max_size: int = 1000):
+    def __init__(self, max_size: int = 1000) -> None:
         """Initialize an LRU cache with a maximum size.
 
         Args:
@@ -22,10 +27,10 @@ class ThreadSafeLRUCache:
                      If set to 0 or negative, cache size is unlimited.
         """
         self._max_size = max(0, max_size)  # Ensure max_size is non-negative
-        self._cache = OrderedDict()
+        self._cache: OrderedDict[K, V] = OrderedDict()
         self._lock = threading.RLock()
 
-    def put(self, key: str, value: Any):
+    def put(self, key: K, value: V) -> None:
         """Thread-safe insertion/update with LRU tracking.
 
         If the key already exists, it will be moved to the end (most recently used position).
@@ -45,7 +50,7 @@ class ThreadSafeLRUCache:
             # Add new key-value pair (will be at the end - most recently used)
             self._cache[key] = value
 
-    def get(self, key: str) -> Any | None:
+    def get(self, key: K) -> Optional[V]:
         """Thread-safe retrieval with LRU tracking.
 
         If the key exists, it will be moved to the end (most recently used position).
@@ -59,18 +64,18 @@ class ThreadSafeLRUCache:
             self._cache[key] = value
             return value
 
-    def delete(self, key: str):
+    def delete(self, key: K) -> None:
         """Thread-safe deletion."""
         with self._lock:
             if key in self._cache:
                 del self._cache[key]
 
-    def contains(self, key: str) -> bool:
+    def contains(self, key: K) -> bool:
         """Check if key exists in a thread-safe way."""
         with self._lock:
             return key in self._cache
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all items from the cache."""
         with self._lock:
             self._cache.clear()
@@ -86,7 +91,7 @@ class ThreadSafeLRUCache:
         return self._max_size
 
     @max_size.setter
-    def max_size(self, value: int):
+    def max_size(self, value: int) -> None:
         """Set a new maximum size for the cache.
 
         If the new size is smaller than the current cache size,
@@ -104,7 +109,7 @@ class ThreadSafeLRUCache:
             if len(self._cache) > self._max_size:
                 # Keep only the max_size most recently used items
                 keys_to_keep = list(self._cache.keys())[-self._max_size :]
-                new_cache = OrderedDict()
+                new_cache: OrderedDict[K, V] = OrderedDict()
                 for key in keys_to_keep:
                     new_cache[key] = self._cache[key]
                 self._cache = new_cache
@@ -113,14 +118,16 @@ class ThreadSafeLRUCache:
 class WeaveClientSendFileCache:
     """Cache for file create requests and responses with LRU eviction policy."""
 
-    def __init__(self, max_size: int = 1000):
+    def __init__(self, max_size: int = 1000) -> None:
         """Initialize the file cache with a maximum size.
 
         Args:
             max_size: Maximum number of items to store in the cache.
                      If set to 0, cache size is unlimited.
         """
-        self.cache = ThreadSafeLRUCache(max_size=max_size)
+        self.cache: ThreadSafeLRUCache[str, Future[FileCreateRes]] = ThreadSafeLRUCache(
+            max_size=max_size
+        )
 
     def _key(self, req: FileCreateReq) -> str:
         """Generate a unique key for a file create request.
@@ -132,7 +139,7 @@ class WeaveClientSendFileCache:
         ) + req.content
         return hashlib.sha256(cache_key_bytes).hexdigest()
 
-    def get(self, req: FileCreateReq) -> Optional[FileCreateRes]:
+    def get(self, req: FileCreateReq) -> Optional[Future[FileCreateRes]]:
         """Get a cached response for a file create request.
 
         Returns None if the request is not in the cache.
@@ -140,12 +147,12 @@ class WeaveClientSendFileCache:
         key = self._key(req)
         return self.cache.get(key)
 
-    def put(self, req: FileCreateReq, res: FileCreateRes):
+    def put(self, req: FileCreateReq, res: Future[FileCreateRes]) -> None:
         """Cache a response for a file create request."""
         key = self._key(req)
         self.cache.put(key, res)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all items from the cache."""
         self.cache.clear()
 
@@ -159,6 +166,6 @@ class WeaveClientSendFileCache:
         return self.cache.max_size
 
     @max_size.setter
-    def max_size(self, value: int):
+    def max_size(self, value: int) -> None:
         """Set a new maximum size for the cache."""
         self.cache.max_size = value
