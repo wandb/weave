@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.autopatch import OpSettings
-from weave.trace.op import add_accumulator
+from weave.trace.op import _add_accumulator
 
 
 def instructor_partial_accumulator(
@@ -19,7 +19,7 @@ def instructor_wrapper_partial(settings: OpSettings) -> Callable[[Callable], Cal
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_partial_accumulator,
             should_accumulate=lambda inputs: True,
