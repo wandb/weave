@@ -1,11 +1,23 @@
+import {InputLabel} from '@material-ui/core';
+import {GridColDef, GridRowSelectionModel} from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
 import {createNewDataset} from '../../datasets/datasetOperations';
 import {ReusableDrawer} from '../../ReusableDrawer';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {TextFieldWithLabel} from '../ScorersPage/FormComponents';
 import {useWFHooks} from '../wfReactInterface/context';
+
+type ColumnRow = {
+  id: number;
+  selected: boolean;
+  original: string;
+  renamed: string;
+};
 
 export const DatasetUploadDrawer: React.FC<{
   entity: string;
@@ -24,12 +36,18 @@ export const DatasetUploadDrawer: React.FC<{
   >([]);
   const [previewData, setPreviewData] = useState<any[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [publishing, setPublishing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>(
+    []
+  );
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjCreate, useTableCreate} = useWFHooks();
   const tableCreate = useTableCreate();
   const objCreate = useObjCreate();
+  const history = useHistory();
 
   // Reset form when drawer is opened
   useEffect(() => {
@@ -41,7 +59,10 @@ export const DatasetUploadDrawer: React.FC<{
       setColumns([]);
       setPreviewData(null);
       setLoading(false);
+      setPublishing(false);
       setError(null);
+      setSelectionModel([]);
+      setIsDragging(false);
     }
   }, [show]);
 
@@ -54,12 +75,18 @@ export const DatasetUploadDrawer: React.FC<{
     }
   }, [file, datasetName]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) {
-      return;
+  useEffect(() => {
+    if (columns.length > 0) {
+      // Initialize selection model with indices of all selected columns
+      const newSelectionModel = columns
+        .map((col, index) => (col.selected ? index : -1))
+        .filter(index => index !== -1);
+      setSelectionModel(newSelectionModel);
     }
+  }, [columns]);
+
+  const processFile = async (selectedFile: File) => {
+    setError(null);
 
     const extension = selectedFile.name.split('.').pop()?.toLowerCase();
     if (!['csv', 'tsv', 'json', 'jsonl'].includes(extension || '')) {
@@ -103,6 +130,47 @@ export const DatasetUploadDrawer: React.FC<{
     }
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) {
+      return;
+    }
+
+    await processFile(selectedFile);
+  };
+
+  // Handle drag events
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await processFile(files[0]);
+    }
+  };
+
   const handleColumnChange = (
     index: number,
     field: 'renamed' | 'selected',
@@ -118,6 +186,20 @@ export const DatasetUploadDrawer: React.FC<{
     });
   };
 
+  const handleSelectionModelChange = (
+    newSelectionModel: GridRowSelectionModel
+  ) => {
+    setSelectionModel(newSelectionModel);
+
+    // Update columns selection based on selection model
+    setColumns(prev => {
+      return prev.map((col, index) => ({
+        ...col,
+        selected: newSelectionModel.includes(index),
+      }));
+    });
+  };
+
   const handleSubmit = async () => {
     if (!datasetName.trim()) {
       setError('Please enter a dataset name');
@@ -129,33 +211,106 @@ export const DatasetUploadDrawer: React.FC<{
       return;
     }
 
-    const finalColumns = columns.filter(col => col.selected);
-    const finalRows = fileContent.map(row => {
-      return Object.fromEntries(
-        finalColumns.map(col => [col.renamed, row[col.original]])
+    setPublishing(true);
+    setError(null);
+
+    try {
+      const finalColumns = columns.filter(col => col.selected);
+      const finalRows = fileContent.map(row => {
+        return Object.fromEntries(
+          finalColumns.map(col => [col.renamed, row[col.original]])
+        );
+      });
+
+      const projectId = `${entity}/${project}`;
+      const res = await createNewDataset({
+        projectId,
+        entity,
+        project,
+        datasetName,
+        rows: finalRows,
+        tableCreate,
+        objCreate,
+        router: peekingRouter,
+      });
+
+      history.push(res.url);
+      onClose();
+    } catch (err) {
+      setError(
+        `Failed to publish dataset: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
-    });
-
-    const projectId = `${entity}/${project}`;
-    await createNewDataset({
-      projectId,
-      entity,
-      project,
-      datasetName,
-      rows: finalRows,
-      tableCreate,
-      objCreate,
-      router: peekingRouter,
-    });
-
-    onClose();
+    } finally {
+      setPublishing(false);
+    }
   };
+
+  // Generate rows for the columns table
+  const columnsTableRows: ColumnRow[] = columns.map((col, index) => ({
+    id: index,
+    selected: col.selected,
+    original: col.original,
+    renamed: col.renamed,
+  }));
+
+  // Column definitions for the columns table
+  const columnDefinitions: GridColDef[] = [
+    {
+      field: 'original',
+      headerName: 'Original Name',
+      flex: 1,
+      editable: false,
+    },
+    {
+      field: 'renamed',
+      headerName: 'New Name',
+      flex: 1,
+      editable: true,
+    },
+  ];
+
+  // Handle cell editing more explicitly
+  const processRowUpdate = (newRow: ColumnRow, oldRow: ColumnRow) => {
+    if (newRow.renamed !== oldRow.renamed) {
+      handleColumnChange(newRow.id, 'renamed', newRow.renamed);
+    }
+    return newRow;
+  };
+
+  // Handle failed edit
+  const handleProcessRowUpdateError = (newError: any) => {
+    console.error('Error during row update:', newError);
+  };
+
+  // Generate column definitions for the preview table
+  const previewColumnDefinitions = columns
+    .filter(col => col.selected)
+    .map(
+      (col): GridColDef => ({
+        field: col.original,
+        headerName: col.renamed,
+        flex: 1,
+        editable: false,
+      })
+    );
 
   const renderUploadStep = () => (
     <Tailwind>
-      <div className="flex flex-col gap-8 p-2">
+      <div className="flex h-full w-full flex-col gap-6 p-4">
         <div>
-          <div className="border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg border-2 border-dashed p-8 text-center transition-colors duration-200 hover:border-blue-300">
+          <div
+            className={`
+              border-gray-200 bg-gray-50 rounded-md border border-dashed p-8 text-center 
+              transition-all duration-200
+              ${isDragging ? 'bg-blue-50 border-blue-500' : ''}
+              hover:shadow-sm focus-within:border-blue-500 hover:border-blue-400
+            `}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}>
             <input
               type="file"
               accept=".csv,.tsv,.json,.jsonl"
@@ -165,12 +320,16 @@ export const DatasetUploadDrawer: React.FC<{
             />
             <label
               htmlFor="file-upload"
-              className="flex cursor-pointer flex-col items-center justify-center gap-3">
-              <div className="text-5xl text-blue-400">📄</div>
-              <div className="text-lg font-medium text-blue-700">
-                Click to upload a file
+              className="flex cursor-pointer flex-col items-center justify-center gap-3 outline-none">
+              <div className="text-gray-500 text-4xl">
+                {isDragging ? '📂' : '📄'}
               </div>
-              <div className="text-sm font-semibold text-blue-500">
+              <div className="text-gray-700 text-base font-medium">
+                {isDragging
+                  ? 'Drop your file here'
+                  : 'Click to upload a file or drag and drop'}
+              </div>
+              <div className="text-gray-500 text-sm">
                 Supported formats: CSV, TSV, JSON, JSONL
               </div>
             </label>
@@ -179,17 +338,17 @@ export const DatasetUploadDrawer: React.FC<{
 
         {loading && (
           <div className="py-4 text-center">
-            <div className="mb-2 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
-            <div>Processing file...</div>
+            <div className="border-gray-500 mb-2 inline-block h-5 w-5 animate-spin rounded-full border-b-2 border-t-2"></div>
+            <div className="text-gray-600">Processing file...</div>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 rounded border-l-4 border-red-500 p-4">
-            <div className="flex">
+          <div className="bg-red-50 rounded border-l-2 border-red-400 p-3">
+            <div className="flex items-center">
               <div className="flex-shrink-0">⚠️</div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="ml-2">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             </div>
           </div>
@@ -200,163 +359,81 @@ export const DatasetUploadDrawer: React.FC<{
 
   const renderConfigureStep = () => (
     <Tailwind>
-      <div className="flex flex-col gap-8 p-2">
-        <div>
-          <label
-            htmlFor="dataset-name"
-            className="mb-3 block text-base font-medium">
-            Dataset Name
-          </label>
-          <input
-            type="text"
-            id="dataset-name"
-            value={datasetName}
-            onChange={e => setDatasetName(e.target.value)}
-            className="border-gray-300 w-full rounded-md border px-4 py-2 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter dataset name"
-          />
-        </div>
+      <div className="flex flex-col gap-6 p-4">
+        <TextFieldWithLabel
+          label="Dataset Name"
+          value={datasetName}
+          onChange={setDatasetName}
+        />
 
         <div>
-          <div className="mb-3 flex items-center justify-between">
-            <label className="block text-base font-medium">Columns</label>
-            <div className="text-gray-500 text-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <InputLabel>Columns</InputLabel>
+            <div className="text-gray-500 text-xs">
               {columns.filter(c => c.selected).length} of {columns.length}{' '}
               selected
             </div>
           </div>
 
-          <div className="border-gray-300 shadow-sm overflow-hidden rounded-lg border">
-            <div className="max-h-[400px] overflow-auto">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-100 sticky top-0 z-10">
-                  <tr>
-                    <th className="text-gray-700 border-gray-200 w-[70px] border-b px-4 py-3 text-left font-semibold">
-                      Include
-                    </th>
-                    <th className="text-gray-700 border-gray-200 w-[45%] border-b px-4 py-3 text-left font-semibold">
-                      Original Name
-                    </th>
-                    <th className="text-gray-700 border-gray-200 w-[45%] border-b px-4 py-3 text-left font-semibold">
-                      New Name
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {columns.map((column, index) => (
-                    <tr
-                      key={index}
-                      className={`border-gray-200 border-b ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      } hover:bg-blue-50 transition-colors duration-150`}>
-                      <td className="px-4 py-3 align-middle">
-                        <input
-                          type="checkbox"
-                          checked={column.selected}
-                          onChange={e =>
-                            handleColumnChange(
-                              index,
-                              'selected',
-                              e.target.checked
-                            )
-                          }
-                          className="form-checkbox border-gray-300 h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div
-                          className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap"
-                          title={column.original}>
-                          {column.original}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={column.renamed}
-                          onChange={e =>
-                            handleColumnChange(index, 'renamed', e.target.value)
-                          }
-                          className="border-gray-300 py-1.5 w-full rounded border px-3 text-sm outline-none transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                          title={column.renamed}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div style={{height: 400}}>
+            <StyledDataGrid
+              rows={columnsTableRows}
+              columns={columnDefinitions}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableColumnMenu
+              disableColumnFilter
+              hideFooter
+              density="standard"
+              columnHeaderHeight={38}
+              rowHeight={38}
+              onRowSelectionModelChange={handleSelectionModelChange}
+              rowSelectionModel={selectionModel}
+              processRowUpdate={processRowUpdate}
+              onProcessRowUpdateError={handleProcessRowUpdateError}
+            />
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-50 rounded border-l-4 border-red-500 p-4">
-            <div className="flex">
+          <div className="bg-red-50 rounded border-l-2 border-red-400 p-3">
+            <div className="flex items-center">
               <div className="flex-shrink-0">⚠️</div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="ml-2">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             </div>
           </div>
         )}
 
         <div>
-          <div className="mb-3 flex items-center justify-between">
-            <label className="block text-base font-medium">Preview</label>
-            <div className="text-gray-500 text-xs italic">
+          <div className="mb-2 flex items-center justify-between">
+            <InputLabel>Preview</InputLabel>
+            <div className="text-gray-500 text-xs">
               First {Math.min(previewData?.length || 0, 5)} rows shown
             </div>
           </div>
 
-          <div className="border-gray-300 shadow-sm overflow-hidden rounded-lg border bg-white">
-            <div className="max-h-[200px] overflow-auto">
-              {columns.filter(col => col.selected).length > 0 ? (
-                <table className="w-full border-collapse">
-                  <thead className="bg-gray-100 sticky top-0 z-10">
-                    <tr>
-                      {columns
-                        .filter(col => col.selected)
-                        .map((col, index) => (
-                          <th
-                            key={index}
-                            className="text-gray-700 border-gray-200 whitespace-nowrap border-b px-3 py-2 text-left text-sm font-semibold">
-                            <div
-                              className="max-w-[150px] overflow-hidden text-ellipsis"
-                              title={col.renamed}>
-                              {col.renamed}
-                            </div>
-                          </th>
-                        ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewData?.map((row, rowIndex) => (
-                      <tr
-                        key={rowIndex}
-                        className={`border-gray-200 border-b ${
-                          rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        }`}>
-                        {columns
-                          .filter(col => col.selected)
-                          .map((col, colIndex) => (
-                            <td key={colIndex} className="px-3 py-2 text-sm">
-                              <div
-                                className="max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap"
-                                title={String(row[col.original] ?? '')}>
-                                {String(row[col.original] ?? '')}
-                              </div>
-                            </td>
-                          ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-gray-500 p-4 text-center">
-                  No columns selected for preview
-                </div>
-              )}
-            </div>
+          <div style={{height: 200}}>
+            {columns.filter(col => col.selected).length > 0 &&
+            previewData &&
+            previewData.length > 0 ? (
+              <StyledDataGrid
+                rows={previewData.map((row, index) => ({id: index, ...row}))}
+                columns={previewColumnDefinitions}
+                disableRowSelectionOnClick
+                disableColumnMenu
+                disableColumnFilter
+                hideFooter
+                density="compact"
+                columnHeaderHeight={38}
+                rowHeight={38}
+              />
+            ) : (
+              <div className="text-gray-500 rounded border bg-white p-4 text-center">
+                No columns selected for preview
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -380,13 +457,20 @@ export const DatasetUploadDrawer: React.FC<{
       title="Upload Dataset"
       onClose={onClose}
       onSave={handleSubmit}
-      saveDisabled={loading || !file || !datasetName.trim()}
+      saveDisabled={loading || publishing || !file || !datasetName.trim()}
       footer={
         <Button
           className="w-full"
           onClick={handleSubmit}
-          disabled={loading || !file || !datasetName.trim()}>
-          Upload Dataset
+          disabled={loading || publishing || !file || !datasetName.trim()}>
+          {publishing ? (
+            <>
+              <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              Publishing...
+            </>
+          ) : (
+            'Upload Dataset'
+          )}
         </Button>
       }>
       {renderContent()}
