@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
 
@@ -95,7 +95,7 @@ def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable
 
         op = weave.op(fn, **op_kwargs)
         op._set_on_finish_handler(vertexai_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)
@@ -120,7 +120,7 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         op._set_on_finish_handler(vertexai_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)

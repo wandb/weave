@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
@@ -93,7 +93,7 @@ def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: groq_accumulator,
             should_accumulate=should_use_accumulator,

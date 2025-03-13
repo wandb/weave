@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.autopatch import OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 
 
 def instructor_iterable_accumulator(
@@ -32,7 +32,7 @@ def instructor_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callab
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_iterable_accumulator,
             should_accumulate=should_accumulate_iterable,
@@ -52,7 +52,7 @@ def instructor_wrapper_async(settings: OpSettings) -> Callable[[Callable], Calla
 
         op_kwargs = settings.model_dump()
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_iterable_accumulator,
             should_accumulate=should_accumulate_iterable,
