@@ -801,7 +801,6 @@ def as_op(fn: Callable) -> Op:
     return maybe_unbind_method(cast(Op, fn))
 
 
-__docspec__ = [call, calls]
 _OnYieldType = Callable[[V], None]
 _OnErrorType = Callable[[Exception], None]
 _OnCloseType = Callable[[], None]
@@ -1092,3 +1091,6 @@ def add_accumulator(
 
     op._set_on_output_handler(on_output)
     return op
+
+
+__docspec__ = [call, calls]
