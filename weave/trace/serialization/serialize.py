@@ -93,8 +93,9 @@ def to_json(
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
+    if "val" in encoded:
+        return encoded
     result = _build_result_from_encoded(encoded, project_id, client)
-
     return result
 
 
@@ -290,10 +291,13 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_obj(
-                obj["weave_type"], files, obj.get("load_op")
-            )
+            if "val" in obj:
+                return custom_objs.decode_inline_obj(obj)
+            else:
+                files = _load_custom_obj_files(project_id, server, obj["files"])
+                return custom_objs.decode_custom_obj(
+                    obj["weave_type"], files, obj.get("load_op")
+                )
         elif (
             isinstance(val_type, str)
             and obj.get("_class_name") == val_type
