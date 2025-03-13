@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.op import _IteratorWrapper, add_accumulator
+from weave.trace.op import _add_accumulator, _IteratorWrapper
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
@@ -133,7 +133,7 @@ def create_stream_wrapper(
                         )
                     return self
 
-        return add_accumulator(
+        return _add_accumulator(
             op,
             make_accumulator=lambda _: bedrock_stream_accumulator,
             should_accumulate=lambda _: True,

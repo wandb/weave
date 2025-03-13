@@ -720,7 +720,7 @@ def op(
                 return accumulator
 
             # Apply the accumulator
-            add_accumulator(wrapped_op, make_accumulator)
+            _add_accumulator(wrapped_op, make_accumulator)
 
         return wrapped_op
 
@@ -1036,7 +1036,7 @@ def _build_iterator_from_accumulator_for_op(
     return iterator_wrapper(value, on_yield, on_error, on_close)
 
 
-def add_accumulator(
+def _add_accumulator(
     op: Op,
     make_accumulator: Callable[[dict], Callable[[S, V], S]],
     *,
