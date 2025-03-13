@@ -15,6 +15,7 @@ import {DeleteObjectVersionsButtonWithModal} from '../ObjectsPage/ObjectDeleteBu
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 import {useControllableState} from '../util';
+import {DatasetUploadDrawer} from './DatasetUploadDrawer';
 
 export type DatasetFilter = WFHighLevelObjectVersionFilter;
 
@@ -29,6 +30,7 @@ export const DatasetsPage: React.FC<{
   const history = useHistory();
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
+  const [showDatasetUploadDrawer, setShowDatasetUploadDrawer] = useState(false);
 
   const baseFilter = useMemo(() => {
     return {
@@ -69,39 +71,50 @@ export const DatasetsPage: React.FC<{
   const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
 
   return (
-    <SimplePageLayout
-      title={title}
-      hideTabsIfSingle
-      headerExtra={
-        <DatasetsPageHeaderExtra
-          entity={entity}
-          project={project}
-          objectName={filter.objectName ?? null}
-          selectedVersions={selectedVersions}
-          setSelectedVersions={setSelectedVersions}
-          showDeleteButton={showDeleteButton}
-          showCompareButton={hasComparison}
-          onCompare={onCompare}
-        />
-      }
-      tabs={[
-        {
-          label: '',
-          content: (
-            <FilterableObjectVersionsTable
-              entity={entity}
-              project={project}
-              initialFilter={filter}
-              onFilterUpdate={setFilter}
-              selectedVersions={selectedVersions}
-              setSelectedVersions={
-                hasComparison ? setSelectedVersions : undefined
-              }
-            />
-          ),
-        },
-      ]}
-    />
+    <React.Fragment>
+      <SimplePageLayout
+        title={title}
+        hideTabsIfSingle
+        headerExtra={
+          <DatasetsPageHeaderExtra
+            entity={entity}
+            project={project}
+            objectName={filter.objectName ?? null}
+            selectedVersions={selectedVersions}
+            setSelectedVersions={setSelectedVersions}
+            showDeleteButton={showDeleteButton}
+            showCompareButton={hasComparison}
+            onCompare={onCompare}
+            onUploadButton={() => {
+              setShowDatasetUploadDrawer(true);
+            }}
+          />
+        }
+        tabs={[
+          {
+            label: '',
+            content: (
+              <FilterableObjectVersionsTable
+                entity={entity}
+                project={project}
+                initialFilter={filter}
+                onFilterUpdate={setFilter}
+                selectedVersions={selectedVersions}
+                setSelectedVersions={
+                  hasComparison ? setSelectedVersions : undefined
+                }
+              />
+            ),
+          },
+        ]}
+      />
+      <DatasetUploadDrawer
+        entity={entity}
+        project={project}
+        show={showDatasetUploadDrawer}
+        onClose={() => setShowDatasetUploadDrawer(false)}
+      />
+    </React.Fragment>
   );
 };
 
@@ -114,6 +127,7 @@ const DatasetsPageHeaderExtra: React.FC<{
   showDeleteButton?: boolean;
   showCompareButton?: boolean;
   onCompare: () => void;
+  onUploadButton: () => void;
 }> = ({
   entity,
   project,
@@ -123,6 +137,7 @@ const DatasetsPageHeaderExtra: React.FC<{
   showDeleteButton,
   showCompareButton,
   onCompare,
+  onUploadButton,
 }) => {
   const compareButton = showCompareButton ? (
     <Button disabled={selectedVersions.length < 2} onClick={onCompare}>
@@ -141,11 +156,18 @@ const DatasetsPageHeaderExtra: React.FC<{
     />
   ) : undefined;
 
+  const uploadButton = (
+    <Button icon="add-new" onClick={onUploadButton}>
+      Upload
+    </Button>
+  );
+
   return (
     <Tailwind>
       <div className="mr-16 flex gap-8">
         {compareButton}
         {deleteButton}
+        {uploadButton}
       </div>
     </Tailwind>
   );
