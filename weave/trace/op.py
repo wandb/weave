@@ -388,19 +388,6 @@ def call(
         )
 
 
-def _placeholder_call() -> Call:
-    # Import here to avoid circular dependency
-    from weave.trace.weave_client import Call
-
-    return Call(
-        _op_name="",
-        trace_id="",
-        project_id="",
-        parent_id=None,
-        inputs={},
-    )
-
-
 def _do_call(
     op: Op,
     *args: Any,
@@ -409,7 +396,7 @@ def _do_call(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = Call()
 
     pargs = None
     if op._on_input_handler is not None:
@@ -481,7 +468,7 @@ async def _do_call_async(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = Call()
 
     # Handle all of the possible cases where we would skip tracing.
     if settings.should_disable_weave():

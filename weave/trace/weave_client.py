@@ -499,11 +499,11 @@ class CallDict(TypedDict):
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
 
-    _op_name: str | Future[str]
-    trace_id: str
-    project_id: str
-    parent_id: str | None
-    inputs: dict
+    _op_name: str | Future[str] = ""
+    trace_id: str = ""
+    project_id: str = ""
+    parent_id: str | None = None
+    inputs: dict = dataclasses.field(default_factory=dict)
     id: str | None = None
     output: Any = None
     exception: str | None = None
