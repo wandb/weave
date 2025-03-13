@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
+from weave.trace.op import _IteratorWrapper, add_accumulator
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
