@@ -715,6 +715,8 @@ def op(
         if is_iterator and accumulator is not None:
             # Create an appropriate make_accumulator function
             def make_accumulator(inputs: dict) -> Callable:
+                if accumulator is None:
+                    return lambda acc, value: value  # Default accumulator if None
                 return accumulator
 
             # Apply the accumulator
