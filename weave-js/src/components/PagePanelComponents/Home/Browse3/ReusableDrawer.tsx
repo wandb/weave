@@ -8,6 +8,7 @@ interface ReusableDrawerProps {
   onClose: () => void;
   onSave: () => void;
   saveDisabled?: boolean;
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -15,8 +16,7 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
   open,
   title,
   onClose,
-  onSave,
-  saveDisabled,
+  footer,
   children,
 }) => {
   return (
@@ -60,21 +60,17 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
           {children}
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            flex: '0 0 auto',
-            borderTop: '1px solid #e0e0e0',
-            p: '10px',
-          }}>
-          <Button
-            onClick={onSave}
-            color="primary"
-            disabled={saveDisabled}
-            className="w-full">
-            Create scorer
-          </Button>
-        </Box>
+        {footer && (
+          <Box
+            sx={{
+              display: 'flex',
+              flex: '0 0 auto',
+              borderTop: '1px solid #e0e0e0',
+              p: '10px',
+            }}>
+            {footer}
+          </Box>
+        )}
       </Box>
     </Drawer>
   );
