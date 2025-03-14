@@ -1,0 +1,69 @@
+interactions:
+- request:
+    body: '{"contents": [{"parts": [{"text": "Write a python function named `is_leap_year`
+      that checks if a year is a leap year."}], "role": "user"}], "systemInstruction":
+      {"parts": [{"text": "\nYou are an expert software developer and a helpful coding
+      assistant.\nYou are able to generate high-quality code in the Python programming
+      language."}], "role": "user"}, "generationConfig": {"temperature": 0.5}}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '395'
+      content-type:
+      - application/json
+      host:
+      - generativelanguage.googleapis.com
+      user-agent:
+      - google-genai-sdk/1.3.0 gl-python/3.12.8
+      x-goog-api-client:
+      - google-genai-sdk/1.3.0 gl-python/3.12.8
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAC/61UXWvbQBB8169YDgoOOLbkxHFqyENI01JoaEhMaamLc5HW0hH5Ttyt0piQ/949
+        ybIlm9KX2iDOOzP7dSO/BgAiljpRiSR0Ygo/OQLwWj09ZjShJgaaEAcLaWnHrT+vrTNTCF+8SDw8
+        PBRryoye6wSXoNwiR1ks1ihtzz+OpnMNMBfVl09XGcZPDtQSJHicFXzymvqnjGNjE6VTIAOUIXyy
+        mBqrpIZY5qgT5tgyRzeYa5/v0qauKgGVfgqXGhSPlCLzsLDoeLoqHefyjI3uDqm0upHObIm+p4a0
+        11UfPsrcIRjG7W/lcNAdipXaEIuUdiR1jL1axY0cbSpYyTKYrQu8ttbY3lz88HVWpSN4RJDbrgdz
+        cVS3yFmrXt7BKVxcQLjJtAtHYdgGOop9iDuoJq5GbYLIQx0yqlnraIewl6CFdYVsCdEyy9v2/Ku/
+        s5g1OXr/rEyCeUN/awhiqbRy2R1KZ7Sn3c++3ootGiuSpIy+QZLsa9l1b4Pem9LG+A8f831Z+sze
+        fWHeSRj2uzAbrgFP34/3wNIq31tGVLjpcJgqysrHQWxWw5syJ7WUMRImw1tr0sVVLp37y1oOppfP
+        6ReTFtY8+u6Pw0E4CqPJ2fn5ZByNRuEkPImCJke1VFE6meLBOgSnWBU0M0+or0xZvebjqC7T+lfo
+        4NF4M6YgQzLvYKPwrH+Q2H3gsipv77l1GXy/Mle09ouaXX+fiZYHqNtXs4ag5ZX9Lv9TMR6yWy3Y
+        rL/24ze0TtXGS3HFVjweDcLjJV9hJoK34A8OYZtNVQUAAA==
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 04 Mar 2025 19:43:49 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=2463
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
