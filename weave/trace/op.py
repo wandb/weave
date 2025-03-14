@@ -320,6 +320,27 @@ def _execute_op(
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, __call.inputs)
+        # Special handling for generators if no custom handler is set
+        if inspect.isgenerator(output):
+            # Get current call context
+            current_call = call_context.get_current_call()
+
+            # Preserve call context while collecting generator values
+            result = []
+            # Push the call context before iterating
+            if current_call:
+                call_context.push_call(current_call)
+            try:
+                # Collect generator values into a list
+                for item in output:
+                    result.append(item)
+            finally:
+                # Pop the call context when done
+                if current_call:
+                    call_context.pop_call(current_call.id)
+
+            finish(result)
+            return result
         finish(output)
         return output
 
@@ -719,6 +740,20 @@ def op(
 
             # Apply the accumulator
             _add_accumulator(wrapped_op, make_accumulator)
+        # Add a default list accumulator for generator functions when no accumulator is provided
+        elif is_iterator:
+
+            def default_list_accumulator(acc: list[V] | None, value: V) -> list[V]:
+                if acc is None:
+                    acc = []
+                acc.append(value)
+                return acc
+
+            def make_default_accumulator(inputs: dict) -> Callable:
+                return default_list_accumulator
+
+            # Apply the default accumulator
+            _add_accumulator(wrapped_op, make_default_accumulator)
 
         return wrapped_op
 
@@ -1079,8 +1114,32 @@ def _add_accumulator(
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
+
+            # If the value is a generator, we need to preserve the call context
+            if inspect.isgenerator(value):
+                # Get the current call context
+                current_call = call_context.get_current_call()
+
+                # Wrap the generator to maintain call context
+                def context_preserving_generator():
+                    # Push the current call at the beginning of iteration
+                    if current_call:
+                        call_context.push_call(current_call)
+                    try:
+                        for item in value:
+                            yield item
+                    finally:
+                        # Pop the call context when the generator is exhausted
+                        if current_call:
+                            call_context.pop_call(current_call.id)
+
+                # Use the context-preserving generator
+                iterator_value = context_preserving_generator()
+            else:
+                iterator_value = value
+
             return _build_iterator_from_accumulator_for_op(
-                value,
+                iterator_value,
                 accumulator,
                 wrapped_on_finish,
                 iterator_wrapper,
