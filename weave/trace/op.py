@@ -395,6 +395,8 @@ def _do_call(
     __should_raise: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
+    from weave.trace.weave_client import Call
+
     func = op.resolve_fn
     call = Call()
 
@@ -467,6 +469,8 @@ async def _do_call_async(
     __should_raise: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
+    from weave.trace.weave_client import Call
+
     func = op.resolve_fn
     call = Call()
 
