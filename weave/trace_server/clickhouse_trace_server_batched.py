@@ -29,7 +29,7 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
@@ -592,7 +592,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             object_class_type = get_builtin(req.obj.builtin_object_class)
 
-            new_obj = object_class_type.model_validate(req.obj.val)
+            # PROBLEM: If req.obj.val contains refs, this is going to break due to
+            # pydantic validation. No clear solution.
+            new_obj = object_class_type.model_validate(req.obj.val, strict=False)
             runner = RunAsUser(ch_server_dump=self.model_dump())
             digest = runner.run_save_object(
                 new_obj, req.obj.project_id, req.obj.object_id, None
@@ -1728,6 +1730,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 tsi.CallReadReq(project_id=req.project_id, id=res["scorer_call_id"])
             ).call,
         )
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        raise NotImplementedError("Evaluate stream is not yet implemented")
 
     # Private Methods
     @property

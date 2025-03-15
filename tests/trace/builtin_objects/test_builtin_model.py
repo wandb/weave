@@ -38,7 +38,7 @@ def test_model_publishing_alignment(client: WeaveClient):
                     "project_id": client._project_id(),
                     "object_id": "LiteLLMCompletionModel",
                     "val": model_args,
-                    "set_leaf_object_class": "LiteLLMCompletionModel",
+                    "builtin_object_class": "LiteLLMCompletionModel",
                 }
             }
         )
@@ -90,7 +90,7 @@ def test_model_remote_create_local_use(client: WeaveClient):
                     "project_id": client._project_id(),
                     "object_id": "LiteLLMCompletionModel",
                     "val": model_args,
-                    "set_leaf_object_class": "LiteLLMCompletionModel",
+                    "builtin_object_class": "LiteLLMCompletionModel",
                 }
             }
         )
@@ -115,7 +115,7 @@ def test_model_remote_create_remote_use(client: WeaveClient):
                     "project_id": client._project_id(),
                     "object_id": "LiteLLMCompletionModel",
                     "val": model_args,
-                    "set_leaf_object_class": "LiteLLMCompletionModel",
+                    "builtin_object_class": "LiteLLMCompletionModel",
                 }
             }
         )

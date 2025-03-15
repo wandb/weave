@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
@@ -1255,6 +1255,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
         raise NotImplementedError("score_call is not implemented for local sqlite")
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        raise NotImplementedError("evaluate_stream is not implemented for local sqlite")
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

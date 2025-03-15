@@ -44,7 +44,7 @@ def test_scorer_publishing_alignment(client: WeaveClient):
                     "project_id": client._project_id(),
                     "object_id": "CorrectnessJudge",
                     "val": scorer_args,
-                    "set_leaf_object_class": "LLMJudgeScorer",
+                    "builtin_object_class": "LLMJudgeScorer",
                 }
             }
         )
@@ -106,7 +106,7 @@ def make_remote_scorer(client: WeaveClient):
                     "project_id": client._project_id(),
                     "object_id": "CorrectnessJudge",
                     "val": scorer_args,
-                    "set_leaf_object_class": "LLMJudgeScorer",
+                    "builtin_object_class": "LLMJudgeScorer",
                 }
             }
         )

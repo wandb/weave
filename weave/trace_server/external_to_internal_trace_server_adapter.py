@@ -1,6 +1,6 @@
 import abc
 import typing
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
@@ -398,3 +398,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
         return self._ref_apply(self._internal_trace_server.score_call, req)
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_user_id = req.wb_user_id
+        if original_user_id is None:
+            raise ValueError("wb_user_id cannot be None")
+        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
+        return await self._internal_trace_server.evaluate_stream(req)

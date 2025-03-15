@@ -1,5 +1,5 @@
 import datetime
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
@@ -925,6 +925,30 @@ class ScoreCallRes(BaseModel):
     score_call: CallSchema
 
 
+class EvaluateReq(BaseModel):
+    project_id: str
+    evaluation_ref: str
+    model_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluateStartRes(BaseModel):
+    pass
+
+
+class EvaluatePredictAndScoreRes(BaseModel):
+    pass
+
+
+class EvaluateSummaryRes(BaseModel):
+    pass
+
+
+EvaluateStepRes = Union[
+    EvaluateStartRes, EvaluatePredictAndScoreRes, EvaluateSummaryRes
+]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -980,3 +1004,6 @@ class TraceServerInterface(Protocol):
     # Execute API
     def call_method(self, req: CallMethodReq) -> CallMethodRes: ...
     def score_call(self, req: ScoreCallReq) -> ScoreCallRes: ...
+    async def evaluate_stream(
+        self, req: EvaluateReq
+    ) -> AsyncIterator[EvaluateStepRes]: ...

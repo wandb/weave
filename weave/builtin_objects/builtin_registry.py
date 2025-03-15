@@ -21,3 +21,5 @@ def get_builtin(name: str) -> type[weave.Object]:
 
 register_builtin(LiteLLMCompletionModel)
 register_builtin(LLMJudgeScorer)
+# Since evals require nested refs, this is not possible yet
+# register_builtin(weave.Evaluation)

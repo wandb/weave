@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-from weave.builtin_objects.builtin_registry import get_builtin
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
@@ -281,6 +280,8 @@ def _load_custom_obj_files(
 
 
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+    from weave.builtin_objects.builtin_registry import get_builtin
+
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):

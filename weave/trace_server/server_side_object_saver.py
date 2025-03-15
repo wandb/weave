@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import multiprocessing
+from collections.abc import AsyncIterator
 from typing import Any, Callable, TypedDict
 
 import weave
@@ -398,3 +399,11 @@ class UserInjectingExternalTraceServer(
             raise ValueError("User ID is required")
         req.wb_user_id = self._user_id
         return super().score_call(req)
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        if self._user_id is None:
+            raise ValueError("User ID is required")
+        req.wb_user_id = self._user_id
+        return await super().evaluate_stream(req)
