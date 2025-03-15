@@ -222,6 +222,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             file_storage_uri_str=wf_env.wf_file_storage_uri(),
         )
 
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "host": self._host,
+            "port": self._port,
+            "user": self._user,
+            "password": self._password,
+            "database": self._database,
+            "use_async_insert": self._use_async_insert,
+        }
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
@@ -575,6 +585,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        from weave.builtin_objects.builtin_registry import get_builtin
+
+        if req.obj.builtin_object_class is not None:
+            from weave.trace_server.server_side_object_saver import RunAsUser
+
+            object_class_type = get_builtin(req.obj.builtin_object_class)
+
+            new_obj = object_class_type.model_validate(req.obj.val)
+            runner = RunAsUser(ch_server_dump=self.model_dump())
+            digest = runner.run_save_object(
+                new_obj, req.obj.project_id, req.obj.object_id, None
+            )
+            return tsi.ObjCreateRes(digest=digest)
+
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
         )
@@ -1677,6 +1701,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
+        )
+
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        from weave.trace_server.server_side_object_saver import RunAsUser
+
+        if req.wb_user_id is None:
+            raise ValueError("User ID is required")
+
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        # TODO: handle errors here
+        res = runner.run_call_method(
+            req.object_ref, req.project_id, req.wb_user_id, req.method_name, req.args
+        )
+        return tsi.CallMethodRes.model_validate(res)
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        from weave.trace_server.server_side_object_saver import RunAsUser
+
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        res = runner.run_score_call(req)
+
+        return tsi.ScoreCallRes(
+            feedback_id=res["feedback_id"],
+            score_call=self.call_read(
+                tsi.CallReadReq(project_id=req.project_id, id=res["scorer_call_id"])
+            ).call,
         )
 
     # Private Methods

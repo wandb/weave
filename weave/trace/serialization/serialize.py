@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
+from weave.builtin_objects.builtin_registry import get_builtin
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
@@ -300,6 +301,15 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             and (builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(val_type))
         ):
             return builtin_object_class.model_validate(obj)
+        elif (
+            isinstance(val_type, str)
+            and obj.get("_class_name") == val_type
+            and (baseObject := get_builtin(val_type))
+        ):
+            valid_keys = baseObject.model_fields.keys()
+            return baseObject.model_validate(
+                {k: v for k, v in obj.items() if k in valid_keys}
+            )
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
