@@ -123,7 +123,7 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 if TYPE_CHECKING:
     import pandas as pd
 
-    from weave.flow.scorer import ApplyScorerResult, Scorer
+    from weave.flow.scorer import Scorer
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -496,6 +496,13 @@ class CallDict(TypedDict):
 
 
 @dataclasses.dataclass
+class ClientApplyScorerResult:
+    result: Any
+    score_call: Call
+    feedback_id: Future[str] | None = None
+
+
+@dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
 
@@ -650,7 +657,7 @@ class Call:
 
     async def apply_scorer(
         self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
-    ) -> ApplyScorerResult:
+    ) -> ClientApplyScorerResult:
         """
         `apply_scorer` is a method that applies a Scorer to a Call. This is useful
         for guarding application logic with a scorer and/or monitoring the quality
@@ -665,7 +672,7 @@ class Call:
                 inputs.
 
         Returns:
-            The result of the scorer application in the form of an `ApplyScorerResult`.
+            The result of the scorer application in the form of an `ClientApplyScorerResult`.
 
         ```python
         class ApplyScorerSuccess:
@@ -700,8 +707,17 @@ class Call:
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-            wc._send_score_call(self, score_call, scorer_ref_uri)
-        return apply_scorer_result
+            feedback_id = wc._send_score_call(self, score_call, scorer_ref_uri)
+            return ClientApplyScorerResult(
+                result=apply_scorer_result.result,
+                score_call=score_call,
+                feedback_id=feedback_id,
+            )
+        return ClientApplyScorerResult(
+            result=apply_scorer_result.result,
+            score_call=score_call,
+            feedback_id=None,
+        )
 
     def to_dict(self) -> CallDict:
         if callable(display_name := self.display_name):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import multiprocessing
 from typing import Any, Callable, TypedDict
 
@@ -292,19 +293,21 @@ class RunAsUser:
             ).get()
             if not isinstance(scorer, weave.Scorer):
                 raise TypeError("Invalid scorer reference")
-            apply_scorer_res = target_call._apply_scorer(scorer)
+            apply_scorer_res = asyncio.run(target_call.apply_scorer(scorer))
+            if apply_scorer_res.feedback_id is None:
+                raise ValueError("Feedback ID is required")
 
             autopatch.reset_autopatch()
             client._flush()
             ic.reset()
-            scorer_call_id = apply_scorer_res["score_call"].id
+            scorer_call_id = apply_scorer_res.score_call.id
             if not scorer_call_id:
                 raise ValueError("Scorer call ID is required")
             result_queue.put(
                 (
                     "success",
                     ScoreCallResult(
-                        feedback_id=apply_scorer_res["feedback_id"],
+                        feedback_id=apply_scorer_res.feedback_id.result(),
                         scorer_call_id=scorer_call_id,
                     ),
                 )
