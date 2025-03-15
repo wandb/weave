@@ -1734,7 +1734,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     async def evaluate_stream(
         self, req: tsi.EvaluateReq
     ) -> AsyncIterator[tsi.EvaluateStepRes]:
-        raise NotImplementedError("Evaluate stream is not yet implemented")
+        from weave.trace_server.server_side_object_saver import RunAsUser
+
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+
+        return runner.run_evaluate_stream(req)
 
     # Private Methods
     @property

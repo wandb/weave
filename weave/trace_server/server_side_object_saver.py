@@ -316,6 +316,92 @@ class RunAsUser:
         except Exception as e:
             result_queue.put(("error", str(e)))  # Put any errors in the queue
 
+    async def run_evaluate_stream(
+        self,
+        req: tsi.EvaluateReq,
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        result_queue: multiprocessing.Queue[tuple[str, dict]] = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._evaluate_stream,
+            args=(req, result_queue),
+        )
+
+        process.start()
+
+        async def process_results() -> AsyncIterator[tsi.EvaluateStepRes]:
+            while True:
+                await asyncio.sleep(1.0)
+                status, result = result_queue.get()
+                if status == "error":
+                    raise ValueError(f"Process execution failed: {result}")
+                if status == "success":
+                    if result["step_type"] == "start":
+                        yield tsi.EvaluateStartRes.model_validate(result)
+                    elif result["step_type"] == "predict_and_score":
+                        yield tsi.EvaluatePredictAndScoreRes.model_validate(result)
+                    elif result["step_type"] == "summary":
+                        yield tsi.EvaluateSummaryRes.model_validate(result)
+                        return
+                    else:
+                        raise ValueError(f"Unexpected result: {result}")
+                else:
+                    raise ValueError(f"Unexpected result: {result}")
+
+        async for res in process_results():
+            yield res
+        process.join()
+        return
+
+    async def _evaluate_stream(
+        self,
+        req: tsi.EvaluateReq,
+        result_queue: multiprocessing.Queue[tuple[str, dict]],
+    ) -> None:
+        try:
+            from weave.trace_server.clickhouse_trace_server_batched import (
+                ClickHouseTraceServer,
+            )
+
+            client = WeaveClient(
+                "_SERVER_",
+                req.project_id,
+                UserInjectingExternalTraceServer(
+                    ClickHouseTraceServer(**self.ch_server_dump),
+                    id_converter=IdConverter(),
+                    user_id=req.wb_user_id,
+                ),
+                False,
+            )
+
+            ic = InitializedClient(client)
+            autopatch.autopatch()
+
+            evaluation = client.get(req.evaluation_ref)
+            model = client.get(req.model_ref)
+
+            def on_start() -> None:
+                result_queue.put(("success", tsi.EvaluateStartRes().model_dump()))
+
+            def on_row_complete(call_id: str, eval_row: dict) -> None:
+                result_queue.put(
+                    ("success", tsi.EvaluatePredictAndScoreRes().model_dump())
+                )
+
+            eval_results = await evaluation.evaluate(model, on_start, on_row_complete)
+
+            autopatch.reset_autopatch()
+            client._flush()
+            ic.reset()
+
+            print(eval_results)  # add eval_results to summary
+            result_queue.put(("success", tsi.EvaluateSummaryRes().model_dump()))
+
+        except Exception as e:
+            result_queue.put(
+                ("error", {"error": str(e)})
+            )  # Put any errors in the queue
+
 
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:

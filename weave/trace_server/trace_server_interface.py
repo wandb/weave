@@ -932,16 +932,20 @@ class EvaluateReq(BaseModel):
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluateStartRes(BaseModel):
-    pass
+class EvaluateStepResBase(BaseModel):
+    step_type: Literal["start", "predict_and_score", "summary"]
 
 
-class EvaluatePredictAndScoreRes(BaseModel):
-    pass
+class EvaluateStartRes(EvaluateStepResBase):
+    step_type: Literal["start", "predict_and_score", "summary"] = "start"
 
 
-class EvaluateSummaryRes(BaseModel):
-    pass
+class EvaluatePredictAndScoreRes(EvaluateStepResBase):
+    step_type: Literal["start", "predict_and_score", "summary"] = "predict_and_score"
+
+
+class EvaluateSummaryRes(EvaluateStepResBase):
+    step_type: Literal["start", "predict_and_score", "summary"] = "summary"
 
 
 EvaluateStepRes = Union[

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
 import diskcache
@@ -432,3 +432,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         return self._next_trace_server.completions_create(req)
+
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        return self._next_trace_server.call_method(req)
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        return self._next_trace_server.score_call(req)
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        return await self._next_trace_server.evaluate_stream(req)

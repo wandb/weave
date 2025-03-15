@@ -394,11 +394,11 @@ class TestOnlyUserInjectingExternalTraceServer(
 
     # Missing for call method and score call?
 
-    def evaluate_stream(
+    async def evaluate_stream(
         self, req: tsi.EvaluateReq
     ) -> typing.AsyncIterator[tsi.EvaluateStepRes]:
         req.wb_user_id = self._user_id
-        return super().evaluate_stream(req)
+        return await super().evaluate_stream(req)
 
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
