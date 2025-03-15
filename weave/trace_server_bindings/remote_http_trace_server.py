@@ -571,7 +571,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     async def evaluate_stream(
-        self, req: tsi.EvaluateReq
+        self, req:Union[ tsi.EvaluateReq, dict[str, Any]]
     ) -> AsyncIterator[tsi.EvaluateStepRes]:
         # I doubt this will work.
         return self._generic_stream_request_async(
