@@ -1,12 +1,12 @@
 import React from 'react';
 
-import { CreateDataset } from './components/CreateDataset';
-import { CreateEvaluation } from './components/CreateEvaluation';
-import { CreateScorer } from './components/CreateScorer';
-import { EvaluationResults } from './components/EvaluationResults';
-import { EvaluationsList } from './components/EvaluationsList';
-import { EvalStudioProvider } from './context';
-import { useEvalStudio } from './context';
+import {CreateDataset} from './components/CreateDataset';
+import {CreateEvaluation} from './components/CreateEvaluation';
+import {CreateScorer} from './components/CreateScorer';
+import {EvaluationResults} from './components/EvaluationResults';
+import {EvaluationsList} from './components/EvaluationsList';
+import {EvalStudioProvider} from './context';
+import {useEvalStudio} from './context';
 
 type EvalStudioPageProps = {
   entity: string;
@@ -34,15 +34,20 @@ const EvalStudioContent: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: '300px', borderRight: '1px solid #ccc', overflow: 'auto' }}>
+    <div style={{display: 'flex', height: '100%'}}>
+      <div
+        style={{
+          width: '300px',
+          borderRight: '1px solid #ccc',
+          overflow: 'auto',
+        }}>
         <EvaluationsList />
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{flex: 1, overflow: 'auto'}}>
         {selectedEvaluation ? (
           <EvaluationResults />
         ) : (
-          <div style={{ padding: '1rem' }}>
+          <div style={{padding: '1rem'}}>
             Select an evaluation from the list or create a new one
           </div>
         )}
@@ -54,7 +59,7 @@ const EvalStudioContent: React.FC = () => {
 export const EvalStudioPage: React.FC<EvalStudioPageProps> = () => {
   return (
     <EvalStudioProvider>
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
         <EvalStudioContent />
       </div>
     </EvalStudioProvider>

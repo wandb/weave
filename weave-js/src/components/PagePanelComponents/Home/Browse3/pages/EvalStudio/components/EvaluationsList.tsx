@@ -1,16 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 
-import { fetchEvaluations } from '../api';
-import { useEvalStudio } from '../context';
-import { EvaluationDefinition } from '../types';
+import {fetchEvaluations} from '../api';
+import {useEvalStudio} from '../context';
+import {EvaluationDefinition} from '../types';
 
 export const EvaluationsList: React.FC = () => {
   const [evaluations, setEvaluations] = useState<EvaluationDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const { 
-    setSelectedEvaluation,
-    setIsCreatingNewEval,
-  } = useEvalStudio();
+  const {setSelectedEvaluation, setIsCreatingNewEval} = useEvalStudio();
 
   useEffect(() => {
     const loadEvaluations = async () => {
@@ -33,18 +30,24 @@ export const EvaluationsList: React.FC = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1rem',
+        }}>
         <h2>Evaluations</h2>
         <button onClick={() => setIsCreatingNewEval(true)}>
           Create New Evaluation
         </button>
       </div>
-      
+
       {evaluations.length === 0 ? (
         <div>No evaluations found. Create your first one!</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {evaluations.map((evaluation) => (
+        <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+          {evaluations.map(evaluation => (
             <div
               key={evaluation.id}
               style={{
@@ -53,16 +56,20 @@ export const EvaluationsList: React.FC = () => {
                 borderRadius: '4px',
                 cursor: 'pointer',
               }}
-              onClick={() => setSelectedEvaluation(evaluation)}
-            >
+              onClick={() => setSelectedEvaluation(evaluation)}>
               <h3>{evaluation.name}</h3>
               <div>Dataset: {evaluation.dataset.name}</div>
-              <div>Scorers: {evaluation.scorers.map(s => s.name).join(', ')}</div>
-              <div>Last Modified: {new Date(evaluation.lastModified).toLocaleDateString()}</div>
+              <div>
+                Scorers: {evaluation.scorers.map(s => s.name).join(', ')}
+              </div>
+              <div>
+                Last Modified:{' '}
+                {new Date(evaluation.lastModified).toLocaleDateString()}
+              </div>
             </div>
           ))}
         </div>
       )}
     </div>
   );
-}; 
+};

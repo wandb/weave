@@ -1,6 +1,6 @@
 export interface DatasetSample {
   id: string;
-  input: string;  // This could be more specific based on your needs
+  input: string; // This could be more specific based on your needs
 }
 
 export interface Dataset {
@@ -34,8 +34,8 @@ export interface EvaluationDefinition {
 
 export interface PredictionResult {
   sampleId: string;
-  modelPrediction: string;  // This could be more specific based on your needs
-  scores: Record<string, number>;  // Keyed by scorer ID
+  modelPrediction: string; // This could be more specific based on your needs
+  scores: Record<string, number>; // Keyed by scorer ID
 }
 
 export interface DetailedEvaluationResult {
@@ -47,7 +47,7 @@ export interface EvaluationResult {
   id: string;
   evaluationDefinition: EvaluationDefinition;
   model: Model;
-  metrics: Record<string, number>;  // Placeholder for summary metrics
+  metrics: Record<string, number>; // Placeholder for summary metrics
   status: 'running' | 'completed' | 'failed';
   createdAt: string;
 }
@@ -73,4 +73,4 @@ export interface EvalStudioContextValue extends EvalStudioContextState {
   setIsCreatingNewDataset: (isCreating: boolean) => void;
   setIsCreatingNewScorer: (isCreating: boolean) => void;
   setSelectedResult: (result: EvaluationResult | null) => void;
-} 
+}

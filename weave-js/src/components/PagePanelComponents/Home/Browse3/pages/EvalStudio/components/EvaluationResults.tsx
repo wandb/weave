@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 
-import { fetchEvaluationResults, fetchModels, runEvaluation } from '../api';
-import { useEvalStudio } from '../context';
-import { EvaluationResult, Model } from '../types';
-import { DetailedResults } from './DetailedResults';
+import {fetchEvaluationResults, fetchModels, runEvaluation} from '../api';
+import {useEvalStudio} from '../context';
+import {EvaluationResult, Model} from '../types';
+import {DetailedResults} from './DetailedResults';
 
 export const EvaluationResults: React.FC = () => {
   const [results, setResults] = useState<EvaluationResult[]>([]);
@@ -12,13 +12,16 @@ export const EvaluationResults: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  
-  const { selectedEvaluation, selectedResult, setSelectedResult } = useEvalStudio();
+
+  const {selectedEvaluation, selectedResult, setSelectedResult} =
+    useEvalStudio();
 
   useEffect(() => {
     const loadData = async () => {
-      if (!selectedEvaluation) return;
-      
+      if (!selectedEvaluation) {
+        return;
+      }
+
       setLoading(true);
       try {
         const [resultsData, modelsData] = await Promise.all([
@@ -48,7 +51,10 @@ export const EvaluationResults: React.FC = () => {
     setError(null);
 
     try {
-      const result = await runEvaluation(selectedEvaluation.id, selectedModel.id);
+      const result = await runEvaluation(
+        selectedEvaluation.id,
+        selectedModel.id
+      );
       setResults(prev => [...prev, result]);
       setSelectedModel(null);
     } catch (error) {
@@ -72,26 +78,23 @@ export const EvaluationResults: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '1rem' }}>
+    <div style={{padding: '1rem'}}>
       <h2>{selectedEvaluation.name} Results</h2>
-      
-      {error && (
-        <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>
-      )}
 
-      <div style={{ marginBottom: '2rem' }}>
+      {error && <div style={{color: 'red', marginBottom: '1rem'}}>{error}</div>}
+
+      <div style={{marginBottom: '2rem'}}>
         <h3>Run New Evaluation</h3>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
           <select
             value={selectedModel?.id || ''}
-            onChange={(e) => {
+            onChange={e => {
               const model = models.find(m => m.id === e.target.value);
               setSelectedModel(model || null);
             }}
-            style={{ padding: '0.5rem' }}
-          >
+            style={{padding: '0.5rem'}}>
             <option value="">Select a model...</option>
-            {models.map((model) => (
+            {models.map(model => (
               <option key={model.id} value={model.id}>
                 {model.name}
               </option>
@@ -99,8 +102,7 @@ export const EvaluationResults: React.FC = () => {
           </select>
           <button
             onClick={handleRunEvaluation}
-            disabled={isRunning || !selectedModel}
-          >
+            disabled={isRunning || !selectedModel}>
             {isRunning ? 'Running...' : 'Run Evaluation'}
           </button>
         </div>
@@ -110,8 +112,8 @@ export const EvaluationResults: React.FC = () => {
       {results.length === 0 ? (
         <div>No results yet. Run your first evaluation!</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {results.map((result) => (
+        <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+          {results.map(result => (
             <div
               key={result.id}
               style={{
@@ -122,12 +124,12 @@ export const EvaluationResults: React.FC = () => {
                 backgroundColor: 'white',
                 transition: 'background-color 0.2s',
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 if (result.status === 'completed') {
                   e.currentTarget.style.backgroundColor = '#f5f5f5';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 if (result.status === 'completed') {
                   e.currentTarget.style.backgroundColor = 'white';
                 }
@@ -136,17 +138,21 @@ export const EvaluationResults: React.FC = () => {
                 if (result.status === 'completed') {
                   setSelectedResult(result);
                 }
-              }}
-            >
-              <div style={{ marginBottom: '0.5rem' }}>
+              }}>
+              <div style={{marginBottom: '0.5rem'}}>
                 <strong>Model:</strong> {result.model.name}
               </div>
-              <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{marginBottom: '0.5rem'}}>
                 <strong>Status:</strong>{' '}
-                <span style={{
-                  color: result.status === 'completed' ? 'green' :
-                         result.status === 'failed' ? 'red' : 'orange'
-                }}>
+                <span
+                  style={{
+                    color:
+                      result.status === 'completed'
+                        ? 'green'
+                        : result.status === 'failed'
+                        ? 'red'
+                        : 'orange',
+                  }}>
                   {result.status}
                 </span>
               </div>
@@ -154,7 +160,7 @@ export const EvaluationResults: React.FC = () => {
                 <>
                   <div>
                     <strong>Summary Metrics:</strong>
-                    <div style={{ marginLeft: '1rem' }}>
+                    <div style={{marginLeft: '1rem'}}>
                       {Object.entries(result.metrics).map(([key, value]) => (
                         <div key={key}>
                           {key}: {value.toFixed(4)}
@@ -162,17 +168,19 @@ export const EvaluationResults: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  <div style={{ 
-                    marginTop: '0.5rem',
-                    fontSize: '0.9em',
-                    color: '#666',
-                    fontStyle: 'italic'
-                  }}>
+                  <div
+                    style={{
+                      marginTop: '0.5rem',
+                      fontSize: '0.9em',
+                      color: '#666',
+                      fontStyle: 'italic',
+                    }}>
                     Click to view detailed results
                   </div>
                 </>
               )}
-              <div style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5rem' }}>
+              <div
+                style={{fontSize: '0.9em', color: '#666', marginTop: '0.5rem'}}>
                 Run at: {new Date(result.createdAt).toLocaleString()}
               </div>
             </div>
@@ -181,4 +189,4 @@ export const EvaluationResults: React.FC = () => {
       )}
     </div>
   );
-}; 
+};

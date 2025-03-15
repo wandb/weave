@@ -1,4 +1,11 @@
-import { Dataset, DetailedEvaluationResult, EvaluationDefinition, EvaluationResult, Model, Scorer } from './types';
+import {
+  Dataset,
+  DetailedEvaluationResult,
+  EvaluationDefinition,
+  EvaluationResult,
+  Model,
+  Scorer,
+} from './types';
 
 // Mock data
 const MOCK_DATASETS: Dataset[] = [
@@ -7,9 +14,9 @@ const MOCK_DATASETS: Dataset[] = [
     name: 'MNIST Test Set',
     createdAt: '2024-03-20T10:00:00Z',
     samples: [
-      { id: 'sample-1', input: 'Image of digit 7' },
-      { id: 'sample-2', input: 'Image of digit 3' },
-      { id: 'sample-3', input: 'Image of digit 5' },
+      {id: 'sample-1', input: 'Image of digit 7'},
+      {id: 'sample-2', input: 'Image of digit 3'},
+      {id: 'sample-3', input: 'Image of digit 5'},
     ],
   },
   {
@@ -17,9 +24,9 @@ const MOCK_DATASETS: Dataset[] = [
     name: 'ImageNet Validation',
     createdAt: '2024-03-19T15:30:00Z',
     samples: [
-      { id: 'sample-4', input: 'Image of a cat' },
-      { id: 'sample-5', input: 'Image of a dog' },
-      { id: 'sample-6', input: 'Image of a bird' },
+      {id: 'sample-4', input: 'Image of a cat'},
+      {id: 'sample-5', input: 'Image of a dog'},
+      {id: 'sample-6', input: 'Image of a bird'},
     ],
   },
 ];
@@ -83,7 +90,7 @@ const MOCK_DETAILED_RESULTS: Record<string, DetailedEvaluationResult> = {
         sampleId: 'sample-1',
         modelPrediction: '7',
         scores: {
-          'scorer-1': 1.0,  // Accuracy
+          'scorer-1': 1.0, // Accuracy
           'scorer-2': 0.95, // F1 Score
         },
       },
@@ -128,9 +135,13 @@ export const fetchModels = async (): Promise<Model[]> => {
   return MOCK_MODELS;
 };
 
-export const fetchEvaluationResults = async (evaluationId: string): Promise<EvaluationResult[]> => {
+export const fetchEvaluationResults = async (
+  evaluationId: string
+): Promise<EvaluationResult[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  return MOCK_EVALUATION_RESULTS.filter(r => r.evaluationDefinition.id === evaluationId);
+  return MOCK_EVALUATION_RESULTS.filter(
+    r => r.evaluationDefinition.id === evaluationId
+  );
 };
 
 export const createEvaluation = async (
@@ -141,7 +152,7 @@ export const createEvaluation = async (
   await new Promise(resolve => setTimeout(resolve, 1000));
   const dataset = MOCK_DATASETS.find(d => d.id === datasetId);
   const scorers = MOCK_SCORERS.filter(s => scorerIds.includes(s.id));
-  
+
   if (!dataset || scorers.length === 0) {
     throw new Error('Invalid dataset or scorers');
   }
@@ -181,11 +192,13 @@ export const runEvaluation = async (
   };
 };
 
-export const fetchDetailedResults = async (resultId: string): Promise<DetailedEvaluationResult> => {
+export const fetchDetailedResults = async (
+  resultId: string
+): Promise<DetailedEvaluationResult> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   const result = MOCK_DETAILED_RESULTS[resultId];
   if (!result) {
     throw new Error('Detailed results not found');
   }
   return result;
-}; 
+};
