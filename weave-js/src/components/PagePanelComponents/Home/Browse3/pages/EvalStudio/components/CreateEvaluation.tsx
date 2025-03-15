@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Dataset, Scorer } from '../types';
-import { fetchDatasets, fetchScorers, createEvaluation } from '../api';
+
+import { createEvaluation,fetchDatasets, fetchScorers } from '../api';
 import { useEvalStudio } from '../context';
+import { Dataset, Scorer } from '../types';
 
 export const CreateEvaluation: React.FC = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);

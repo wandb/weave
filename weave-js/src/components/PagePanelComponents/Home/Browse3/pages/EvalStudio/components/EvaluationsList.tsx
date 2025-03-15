@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { EvaluationDefinition } from '../types';
+
 import { fetchEvaluations } from '../api';
 import { useEvalStudio } from '../context';
+import { EvaluationDefinition } from '../types';
 
 export const EvaluationsList: React.FC = () => {
   const [evaluations, setEvaluations] = useState<EvaluationDefinition[]>([]);

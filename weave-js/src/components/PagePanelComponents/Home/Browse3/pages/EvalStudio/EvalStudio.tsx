@@ -1,10 +1,11 @@
 import React from 'react';
-import { EvalStudioProvider } from './context';
-import { EvaluationsList } from './components/EvaluationsList';
-import { CreateEvaluation } from './components/CreateEvaluation';
+
 import { CreateDataset } from './components/CreateDataset';
+import { CreateEvaluation } from './components/CreateEvaluation';
 import { CreateScorer } from './components/CreateScorer';
 import { EvaluationResults } from './components/EvaluationResults';
+import { EvaluationsList } from './components/EvaluationsList';
+import { EvalStudioProvider } from './context';
 import { useEvalStudio } from './context';
 
 type EvalStudioPageProps = {

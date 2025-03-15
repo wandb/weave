@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { DetailedEvaluationResult } from '../types';
+
 import { fetchDetailedResults } from '../api';
 import { useEvalStudio } from '../context';
+import { DetailedEvaluationResult } from '../types';
 
 export const DetailedResults: React.FC = () => {
   const [detailedResults, setDetailedResults] = useState<DetailedEvaluationResult | null>(null);

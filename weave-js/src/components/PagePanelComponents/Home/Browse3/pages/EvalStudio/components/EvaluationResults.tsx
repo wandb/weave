@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { EvaluationResult, Model } from '../types';
+
 import { fetchEvaluationResults, fetchModels, runEvaluation } from '../api';
 import { useEvalStudio } from '../context';
+import { EvaluationResult, Model } from '../types';
 import { DetailedResults } from './DetailedResults';
 
 export const EvaluationResults: React.FC = () => {
