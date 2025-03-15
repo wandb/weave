@@ -284,14 +284,8 @@ class RunAsUser:
             scorer_ref = parse_internal_uri(req.scorer_ref)
             if not isinstance(scorer_ref, InternalObjectRef):
                 raise TypeError("Invalid scorer reference")
-            scorer = weave.ref(
-                ObjectRef(
-                    entity="_SERVER_",
-                    project=scorer_ref.project_id,
-                    name=scorer_ref.name,
-                    _digest=scorer_ref.version,
-                ).uri()
-            ).get()
+
+            scorer = weave.ref(internal_ref_to_ext_ref(scorer_ref).uri()).get()
             if not isinstance(scorer, weave.Scorer):
                 raise TypeError("Invalid scorer reference")
             apply_scorer_res = asyncio.run(target_call.apply_scorer(scorer))
@@ -353,7 +347,7 @@ class RunAsUser:
         process.join()
         return
 
-    async def _evaluate_stream(
+    def _evaluate_stream(
         self,
         req: tsi.EvaluateReq,
         result_queue: multiprocessing.Queue[tuple[str, dict]],
@@ -377,8 +371,17 @@ class RunAsUser:
             ic = InitializedClient(client)
             autopatch.autopatch()
 
-            evaluation = client.get(req.evaluation_ref)
-            model = client.get(req.model_ref)
+            parsed_evaluation_ref = parse_internal_uri(req.evaluation_ref)
+            if not isinstance(parsed_evaluation_ref, InternalObjectRef):
+                raise TypeError("Invalid evaluation reference")
+            mocked_ext_ref = internal_ref_to_ext_ref(parsed_evaluation_ref)
+            evaluation = client.get(mocked_ext_ref)
+
+            parsed_model_ref = parse_internal_uri(req.model_ref)
+            if not isinstance(parsed_model_ref, InternalObjectRef):
+                raise TypeError("Invalid model reference")
+            mocked_ext_ref = internal_ref_to_ext_ref(parsed_model_ref)
+            model = client.get(mocked_ext_ref)
 
             def on_start() -> None:
                 result_queue.put(("success", tsi.EvaluateStartRes().model_dump()))
@@ -388,7 +391,9 @@ class RunAsUser:
                     ("success", tsi.EvaluatePredictAndScoreRes().model_dump())
                 )
 
-            eval_results = await evaluation.evaluate(model, on_start, on_row_complete)
+            eval_results = asyncio.run(
+                evaluation.evaluate(model, on_start, on_row_complete)
+            )
 
             autopatch.reset_autopatch()
             client._flush()
@@ -493,3 +498,9 @@ class UserInjectingExternalTraceServer(
             raise ValueError("User ID is required")
         req.wb_user_id = self._user_id
         return await super().evaluate_stream(req)
+
+
+def internal_ref_to_ext_ref(ref: InternalObjectRef) -> ObjectRef:
+    return ObjectRef(
+        entity="_SERVER_", project=ref.project_id, name=ref.name, _digest=ref.version
+    )

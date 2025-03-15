@@ -1,6 +1,6 @@
 import abc
 import typing
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Iterator
 from typing import Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
@@ -92,6 +92,31 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
         for item in res:
             yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
+
+    async def _stream_ref_apply_async(
+        self, method: Callable[[A], Awaitable[AsyncIterator[B]]], req: A
+    ) -> AsyncIterator[B]:
+        async def stream_ref_apply_async_helper() -> AsyncIterator[B]:
+            req_conv = universal_ext_to_int_ref_converter(
+                req, self._idc.ext_to_int_project_id
+            )
+            res = await method(req_conv)
+
+            int_to_ext_project_cache = {}
+
+            def cached_int_to_ext_project_id(project_id: str) -> typing.Optional[str]:
+                if project_id not in int_to_ext_project_cache:
+                    int_to_ext_project_cache[project_id] = (
+                        self._idc.int_to_ext_project_id(project_id)
+                    )
+                return int_to_ext_project_cache[project_id]
+
+            async for item in res:
+                yield universal_int_to_ext_ref_converter(
+                    item, cached_int_to_ext_project_id
+                )
+
+        return stream_ref_apply_async_helper()
 
     # Standard API Below:
     def ensure_project_exists(
@@ -407,4 +432,6 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        return await self._internal_trace_server.evaluate_stream(req)
+        return await self._stream_ref_apply_async(
+            self._internal_trace_server.evaluate_stream, req
+        )

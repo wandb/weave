@@ -591,6 +591,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             from weave.trace_server.server_side_object_saver import RunAsUser
 
             object_class_type = get_builtin(req.obj.builtin_object_class)
+            if object_class_type is None:
+                raise ValueError(
+                    f"Unknown builtin object class: {req.obj.builtin_object_class}"
+                )
 
             # PROBLEM: If req.obj.val contains refs, this is going to break due to
             # pydantic validation. No clear solution.

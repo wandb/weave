@@ -101,12 +101,12 @@ async def test_entire_eval_lifecycle(client: WeaveClient):
             assert index == 0
             index += 1
         elif event.step_type == "predict_and_score":
-            assert index == 1
+            assert index > 0 and index <= 3
             index += 1
         elif event.step_type == "summary":
-            assert index == 1 + 3
+            assert index == 4
             index += 1
         else:
             raise ValueError(f"Unknown event type: {event.step_type}")
 
-    assert index == 1 + 3 + 1
+    assert index == 5

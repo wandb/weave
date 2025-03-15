@@ -15,8 +15,8 @@ def register_builtin(cls: type[weave.Object]) -> None:
     _BUILTIN_REGISTRY[cls.__name__] = cls
 
 
-def get_builtin(name: str) -> type[weave.Object]:
-    return _BUILTIN_REGISTRY[name]
+def get_builtin(name: str) -> type[weave.Object] | None:
+    return _BUILTIN_REGISTRY.get(name)
 
 
 register_builtin(LiteLLMCompletionModel)
