@@ -330,15 +330,10 @@ class RunAsUser:
                 if status == "error":
                     raise ValueError(f"Process execution failed: {result}")
                 if status == "success":
-                    if result["step_type"] == "start":
-                        yield tsi.EvaluateStartRes.model_validate(result)
-                    elif result["step_type"] == "predict_and_score":
-                        yield tsi.EvaluatePredictAndScoreRes.model_validate(result)
-                    elif result["step_type"] == "summary":
-                        yield tsi.EvaluateSummaryRes.model_validate(result)
+                    res = tsi.EvaluateStepRes.model_validate(result)
+                    yield res
+                    if res.item.step_type == "summary":
                         return
-                    else:
-                        raise ValueError(f"Unexpected result: {result}")
                 else:
                     raise ValueError(f"Unexpected result: {result}")
 
@@ -384,11 +379,21 @@ class RunAsUser:
             model = client.get(mocked_ext_ref)
 
             def on_start() -> None:
-                result_queue.put(("success", tsi.EvaluateStartRes().model_dump()))
+                result_queue.put(
+                    (
+                        "success",
+                        tsi.EvaluateStepRes(item=tsi.EvaluateStartRes()).model_dump(),
+                    )
+                )
 
             def on_row_complete(call_id: str, eval_row: dict) -> None:
                 result_queue.put(
-                    ("success", tsi.EvaluatePredictAndScoreRes().model_dump())
+                    (
+                        "success",
+                        tsi.EvaluateStepRes(
+                            item=tsi.EvaluatePredictAndScoreRes()
+                        ).model_dump(),
+                    )
                 )
 
             eval_results = asyncio.run(
@@ -400,7 +405,12 @@ class RunAsUser:
             ic.reset()
 
             print(eval_results)  # add eval_results to summary
-            result_queue.put(("success", tsi.EvaluateSummaryRes().model_dump()))
+            result_queue.put(
+                (
+                    "success",
+                    tsi.EvaluateStepRes(item=tsi.EvaluateSummaryRes()).model_dump(),
+                )
+            )
 
         except Exception as e:
             result_queue.put(

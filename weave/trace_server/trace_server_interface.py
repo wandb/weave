@@ -932,25 +932,22 @@ class EvaluateReq(BaseModel):
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluateStepResBase(BaseModel):
-    step_type: Literal["start", "predict_and_score", "summary"]
+class EvaluateStartRes(BaseModel):
+    step_type: Literal["start"] = "start"
 
 
-class EvaluateStartRes(EvaluateStepResBase):
-    step_type: Literal["start", "predict_and_score", "summary"] = "start"
+class EvaluatePredictAndScoreRes(BaseModel):
+    step_type: Literal["predict_and_score"] = "predict_and_score"
 
 
-class EvaluatePredictAndScoreRes(EvaluateStepResBase):
-    step_type: Literal["start", "predict_and_score", "summary"] = "predict_and_score"
+class EvaluateSummaryRes(BaseModel):
+    step_type: Literal["summary"] = "summary"
 
 
-class EvaluateSummaryRes(EvaluateStepResBase):
-    step_type: Literal["start", "predict_and_score", "summary"] = "summary"
-
-
-EvaluateStepRes = Union[
-    EvaluateStartRes, EvaluatePredictAndScoreRes, EvaluateSummaryRes
-]
+class EvaluateStepRes(BaseModel):
+    item: Union[EvaluateStartRes, EvaluatePredictAndScoreRes, EvaluateSummaryRes] = (
+        Field(discriminator="step_type")
+    )
 
 
 class TraceServerInterface(Protocol):

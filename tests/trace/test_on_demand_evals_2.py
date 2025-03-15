@@ -97,16 +97,16 @@ async def test_entire_eval_lifecycle(client: WeaveClient):
     index = 0
 
     async for event in stream:
-        if event.step_type == "start":
+        if event.item.step_type == "start":
             assert index == 0
             index += 1
-        elif event.step_type == "predict_and_score":
+        elif event.item.step_type == "predict_and_score":
             assert index > 0 and index <= 3
             index += 1
-        elif event.step_type == "summary":
+        elif event.item.step_type == "summary":
             assert index == 4
             index += 1
         else:
-            raise ValueError(f"Unknown event type: {event.step_type}")
+            raise ValueError(f"Unknown event type: {event.item.step_type}")
 
     assert index == 5

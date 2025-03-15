@@ -223,6 +223,20 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             if line:
                 yield res_model.model_validate_json(line)
 
+    async def _generic_stream_request_async(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
+    ) -> AsyncIterator[BaseModel]:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield res_model.model_validate_json(line)
+
     @with_retry
     def server_info(self) -> ServerInfoRes:
         r = requests.get(
@@ -559,7 +573,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def evaluate_stream(
         self, req: tsi.EvaluateReq
     ) -> AsyncIterator[tsi.EvaluateStepRes]:
-        raise NotImplementedError("Evaluate stream is not yet implemented")
+        # I doubt this will work.
+        return self._generic_stream_request_async(
+            "/evaluation/evaluate", req, tsi.EvaluateReq, tsi.EvaluateStepRes
+        )
 
 
 __docspec__ = [
