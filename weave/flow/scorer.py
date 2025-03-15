@@ -311,6 +311,10 @@ async def apply_scorer_async(
                         """
                 )
                 raise ValueError(message)
+    elif "inputs" in score_arg_names:
+        score_args = {
+            "inputs": example,
+        }
     else:
         # Without column mapping, directly match scorer arguments to example keys
         score_args = {k: v for k, v in example.items() if k in score_arg_names}

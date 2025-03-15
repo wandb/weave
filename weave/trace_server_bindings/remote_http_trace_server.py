@@ -1,7 +1,7 @@
 import io
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Optional, Union, cast
 
 from pydantic import BaseModel
@@ -545,6 +545,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
         )
+
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        return self._generic_request(
+            "/execute/method", req, tsi.CallMethodReq, tsi.CallMethodRes
+        )
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        return self._generic_request(
+            "/execute/score_call", req, tsi.ScoreCallReq, tsi.ScoreCallRes
+        )
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        raise NotImplementedError("Evaluate stream is not yet implemented")
 
 
 __docspec__ = [

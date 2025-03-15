@@ -220,6 +220,9 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  evalStudioUri: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -493,6 +496,9 @@ export const browse3ContextGen = (
         .join('&');
       return `${projectRoot(entityName, projectName)}/compare?${params}`;
     },
+    evalStudioUri: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/eval-studio`;
+    },
   };
   return browse3Context;
 };
@@ -602,6 +608,8 @@ type RouteType = {
     projectName: string,
     objectSpecifiers: string[]
   ) => string;
+
+  evalStudioUri: (entityName: string, projectName: string) => string;
 };
 
 const useSetSearchParam = () => {
@@ -733,6 +741,9 @@ const useMakePeekingRouter = (): RouteType => {
       ...args: Parameters<typeof baseContext.compareObjectsUri>
     ) => {
       return setSearchParam(PEEK_PARAM, baseContext.compareObjectsUri(...args));
+    },
+    evalStudioUri: (...args: Parameters<typeof baseContext.evalStudioUri>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.evalStudioUri(...args));
     },
   };
 };
