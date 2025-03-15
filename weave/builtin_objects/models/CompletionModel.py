@@ -25,4 +25,10 @@ class LiteLLMCompletionModel(weave.Model):
             response_format=self.response_format,
         )
 
-        return json.loads(res.choices[0].message.content)
+        if self.response_format and (
+            self.response_format.get("type") == "json_object"
+            or self.response_format.get("type") == "json_schema"
+        ):
+            return json.loads(res.choices[0].message.content)
+        else:
+            return res.choices[0].message.content

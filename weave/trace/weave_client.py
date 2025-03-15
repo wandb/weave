@@ -690,7 +690,7 @@ class Call:
         """
         from weave.flow.scorer import Scorer, apply_scorer_async
 
-        model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
+        model_inputs = {k: v for k, v in self.inputs.items() if k != "self" and k != "kwargs"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
         output = self.output
         if isinstance(output, ObjectRef):
