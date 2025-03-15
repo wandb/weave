@@ -396,7 +396,7 @@ class TestOnlyUserInjectingExternalTraceServer(
 
     def evaluate_stream(
         self, req: tsi.EvaluateReq
-    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+    ) -> typing.AsyncIterator[tsi.EvaluateStepRes]:
         req.wb_user_id = self._user_id
         return super().evaluate_stream(req)
 

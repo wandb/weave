@@ -8,6 +8,7 @@ import weave
 
 class LiteLLMCompletionModel(weave.Model):
     model: str
+    # TODO: add prior messages input
     messages_template: list[dict[str, str]]
     response_format: Optional[dict] = None
 
