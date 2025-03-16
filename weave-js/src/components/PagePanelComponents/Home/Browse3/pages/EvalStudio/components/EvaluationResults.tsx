@@ -3,15 +3,16 @@ import React, {useEffect, useState} from 'react';
 
 import {SmallRef} from '../../../smallRef/SmallRef';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {StatusCodeType} from '../../wfReactInterface/tsDataModelHooks';
 import {fetchEvaluationResults} from '../api';
 import {useEvalStudio} from '../context';
-import {EvaluationResult} from '../types';
 
 type ResultRow = {
   id: string;
-  status: 'running' | 'completed' | 'failed';
-  metrics: Record<string, number>;
-  createdAt: string;
+  status: StatusCodeType;
+  metrics: Record<string, unknown>;
+  createdAt: Date;
+  modelRef: string;
 };
 
 export const EvaluationResults: React.FC = () => {
@@ -31,14 +32,20 @@ export const EvaluationResults: React.FC = () => {
       }
 
       try {
-        const data = await fetchEvaluationResults(selectedEvaluation.objectId);
+        const data = await fetchEvaluationResults(
+          getTraceServerClient(),
+          selectedEvaluation.entity,
+          selectedEvaluation.project,
+          selectedEvaluation.evaluationRef
+        );
 
         // Transform the data into the format we need
         const transformedData: ResultRow[] = data.map(result => ({
-          id: result.id,
+          id: result.callId,
           status: result.status,
           metrics: result.metrics,
           createdAt: result.createdAt,
+          modelRef: result.modelRef,
         }));
 
         setResults(transformedData);
@@ -51,7 +58,7 @@ export const EvaluationResults: React.FC = () => {
     };
 
     loadResults();
-  }, [selectedEvaluation]);
+  }, [getTraceServerClient, selectedEvaluation]);
 
   if (!selectedEvaluation) {
     return null;
@@ -152,6 +159,7 @@ export const EvaluationResults: React.FC = () => {
           <thead>
             <tr>
               <th style={columnStyles.header}>Status</th>
+              <th style={columnStyles.header}>Model</th>
               <th style={columnStyles.header}>Created At</th>
               <th style={columnStyles.header}>Metrics</th>
             </tr>
@@ -179,9 +187,9 @@ export const EvaluationResults: React.FC = () => {
                       height: '8px',
                       borderRadius: '50%',
                       backgroundColor:
-                        row.status === 'completed'
+                        row.status === 'SUCCESS'
                           ? '#4CAF50'
-                          : row.status === 'failed'
+                          : row.status === 'ERROR'
                           ? '#f44336'
                           : '#FFC107',
                       display: 'inline-block',
@@ -191,7 +199,10 @@ export const EvaluationResults: React.FC = () => {
                   {row.status}
                 </td>
                 <td style={columnStyles.cell}>
-                  {new Date(row.createdAt).toLocaleString()}
+                  <SmallRef objRef={parseRef(row.modelRef) as ObjectRef} />
+                </td>
+                <td style={columnStyles.cell}>
+                  {row.createdAt.toLocaleString()}
                 </td>
                 <td style={columnStyles.cell}>
                   {Object.entries(row.metrics).map(([key, value]) => (
@@ -199,7 +210,7 @@ export const EvaluationResults: React.FC = () => {
                       key={key}
                       style={{display: 'inline-block', marginRight: '1rem'}}>
                       <span style={{color: '#666'}}>{key}:</span>{' '}
-                      <span>{value.toFixed(3)}</span>
+                      <span>{value + ''}</span>
                     </div>
                   ))}
                 </td>

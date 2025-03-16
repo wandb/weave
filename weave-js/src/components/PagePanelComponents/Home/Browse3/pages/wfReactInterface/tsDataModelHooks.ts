@@ -1816,7 +1816,7 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+export type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
 export const traceCallStatusCode = (
   traceCall: traceServerTypes.TraceCallSchema
 ): StatusCodeType => {

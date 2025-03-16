@@ -21,7 +21,7 @@ export const DetailedResults: React.FC = () => {
 
       setLoading(true);
       try {
-        const data = await fetchDetailedResults(selectedResult.id);
+        const data = await fetchDetailedResults(selectedResult.callId);
         setDetailedResults(data);
       } catch (error) {
         console.error('Failed to fetch detailed results:', error);

@@ -1,3 +1,5 @@
+import {StatusCodeType} from '../wfReactInterface/tsDataModelHooks';
+
 export interface DatasetSample {
   id: string;
   input: string; // This could be more specific based on your needs
@@ -47,12 +49,14 @@ export interface DetailedEvaluationResult {
 }
 
 export interface EvaluationResult {
-  id: string;
-  evaluationDefinition: EvaluationDefinition;
-  model: Model;
-  metrics: Record<string, number>; // Placeholder for summary metrics
-  status: 'running' | 'completed' | 'failed';
-  createdAt: string;
+  entity: string;
+  project: string;
+  callId: string;
+  evaluationRef: string;
+  modelRef: string;
+  createdAt: Date;
+  metrics: Record<string, unknown>;
+  status: StatusCodeType;
 }
 
 // Context types for managing evaluation creation flow

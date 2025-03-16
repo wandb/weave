@@ -1,6 +1,10 @@
 import {makeRefObject} from '@wandb/weave/util/refs';
 
+import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {DirectTraceServerClient} from '../wfReactInterface/traceServerDirectClient';
+import {traceCallStatusCode} from '../wfReactInterface/tsDataModelHooks';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {
   Dataset,
   DetailedEvaluationResult,
@@ -68,10 +72,37 @@ export const fetchModels = async (): Promise<Model[]> => {
 };
 
 export const fetchEvaluationResults = async (
-  evaluationId: string
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string,
+  evaluationRef: string
 ): Promise<EvaluationResult[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return [];
+  const res = await client.callsStreamQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      op_names: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: ALL_VALUE,
+        }),
+      ],
+      input_refs: [evaluationRef],
+    },
+  });
+  return res.calls.map(call => {
+    return {
+      entity,
+      project,
+      callId: call.id,
+      evaluationRef,
+      modelRef: call.inputs.model,
+      createdAt: new Date(call.started_at),
+      metrics: (call.output ?? {}) as Record<string, any>,
+      status: traceCallStatusCode(call),
+    };
+  });
 };
 
 export const createEvaluation = async (
