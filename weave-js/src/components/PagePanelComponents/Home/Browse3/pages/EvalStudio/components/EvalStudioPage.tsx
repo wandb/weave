@@ -45,6 +45,7 @@ import {NewDatasetForm} from './forms/NewDatasetForm';
 import {NewEvaluationForm} from './forms/NewEvaluationForm';
 import {NewModelForm} from './forms/NewModelForm';
 import {ModelReport} from './ModelReport';
+import { RunReport } from './RunReport';
 
 // Types
 type TabId =
@@ -994,14 +995,19 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
               Loading results...
             </div>
           ) : selectedRun ? (
-            <CompareEvaluationsPageContent
+            <RunReport
               entity={entity}
               project={project}
-              evaluationCallIds={[selectedRun.callId!]}
-              onEvaluationCallIdsUpdate={() => {}}
-              selectedMetrics={selectedMetrics}
-              setSelectedMetrics={setSelectedMetrics}
+              runId={selectedRun.callId}
             />
+            // <CompareEvaluationsPageContent
+            //   entity={entity}
+            //   project={project}
+            //   evaluationCallIds={[selectedRun.callId!]}
+            //   onEvaluationCallIdsUpdate={() => {}}
+            //   selectedMetrics={selectedMetrics}
+            //   setSelectedMetrics={setSelectedMetrics}
+            // />
           ) : (
             <div>No run selected</div>
           ),
