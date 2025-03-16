@@ -1,15 +1,39 @@
+/**
+ * EvalStudioPage Component
+ *
+ * A comprehensive UI for managing datasets, evaluations, and evaluation runs.
+ * The component follows a three-panel layout where each panel represents a different
+ * level in the hierarchy: Datasets -> Evaluations -> Evaluation Runs.
+ *
+ * Key features:
+ * - Dataset version management
+ * - Evaluation creation and monitoring
+ * - Model evaluation runs and results
+ * - Automatic selection of most recent evaluation context
+ */
+
+// External imports
+import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+// Internal imports - components
 import {DatasetEditProvider} from '../../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../../datasets/DatasetVersionPage';
+// Internal imports - utilities
+import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
+import {CallPage} from '../../CallPage/CallPage';
 import {CompareEvaluationsPageContent} from '../../CompareEvaluationsPage/CompareEvaluationsPage';
+import {ObjectVersionPage} from '../../ObjectsPage/ObjectVersionPage';
 import {useWFHooks} from '../../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {traceCallStatusCode} from '../../wfReactInterface/tsDataModelHooks';
+// Internal imports - API and types
 import {
   fetchDatasets,
   fetchDatasetVersions,
   fetchEvaluationResults,
   fetchEvaluations,
+  fetchLastEvaluationContext,
 } from '../api';
 import {
   Dataset,
@@ -46,6 +70,8 @@ interface ListDetailViewProps<T> {
   renderListItem: (item: T) => React.ReactNode;
   renderDetail: () => React.ReactNode;
   sidebarLabel?: React.ReactNode;
+  /** Function to get a unique key for an item. Used for selection comparison. */
+  getItemKey?: (item: T) => string;
 }
 
 interface HeaderProps {
@@ -93,6 +119,18 @@ const styles = {
     fontSize: '1.2em',
     fontWeight: 'bold',
   },
+  addButtonDisabled: {
+    cursor: 'not-allowed',
+    width: '24px',
+    height: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    color: '#ccc',
+    fontSize: '1.2em',
+    fontWeight: 'bold',
+  },
 };
 
 // Helper functions
@@ -124,8 +162,12 @@ const ListDetailView = <T,>({
   renderListItem,
   renderDetail,
   sidebarLabel,
+  getItemKey = (item: T) => JSON.stringify(item),
 }: ListDetailViewProps<T>) => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  // Get the key of the selected item for comparison
+  const selectedKey = selectedItem ? getItemKey(selectedItem) : null;
 
   return (
     <div style={{display: 'flex', height: '100%', position: 'relative'}}>
@@ -164,30 +206,33 @@ const ListDetailView = <T,>({
 
         {/* List */}
         <div style={{flex: 1, overflowY: 'auto'}}>
-          {items.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                ...styles.listItemContainer,
-                padding: isCollapsed ? '8px' : '8px 16px',
-                backgroundColor:
-                  item === selectedItem ? '#f5f5f5' : 'transparent',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = '#fafafa';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor =
-                  item === selectedItem ? '#f5f5f5' : 'transparent';
-              }}
-              onClick={() => onSelectItem(item)}>
-              {isCollapsed ? (
-                <div style={styles.collapsedIcon}>{getInitial(item)}</div>
-              ) : (
-                renderListItem(item)
-              )}
-            </div>
-          ))}
+          {items.map((item, index) => {
+            const itemKey = getItemKey(item);
+            return (
+              <div
+                key={itemKey}
+                style={{
+                  ...styles.listItemContainer,
+                  padding: isCollapsed ? '8px' : '8px 16px',
+                  backgroundColor:
+                    itemKey === selectedKey ? '#f5f5f5' : 'transparent',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#fafafa';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor =
+                    itemKey === selectedKey ? '#f5f5f5' : 'transparent';
+                }}
+                onClick={() => onSelectItem(item)}>
+                {isCollapsed ? (
+                  <div style={styles.collapsedIcon}>{getInitial(item)}</div>
+                ) : (
+                  renderListItem(item)
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -276,7 +321,10 @@ const Header: React.FC<HeaderProps> = ({tabs, activeTab, onTabChange}) => (
   </div>
 );
 
-// Cache management hook
+/**
+ * Cache management hook for storing and retrieving data.
+ * Provides a simple key-value store with update and retrieval methods.
+ */
 const useDataCache = <T,>(key: string, getDefaultData: () => T) => {
   const [cache, setCache] = useState<{[key: string]: T}>({
     [key]: getDefaultData(),
@@ -298,7 +346,9 @@ const makeList = () => {
   return [];
 };
 
-// Custom hooks for data fetching and state management
+/**
+ * Hook for managing datasets. Handles loading, caching, and refreshing dataset data.
+ */
 const useDatasets = (getClient: () => any, entity: string, project: string) => {
   const [loading, setLoading] = useState(true);
   const cacheKey = `${entity}/${project}/datasets`;
@@ -328,7 +378,10 @@ const useDatasets = (getClient: () => any, entity: string, project: string) => {
   };
 };
 
-// Modify selection hook to treat datasets and versions as the same type
+/**
+ * Hook for managing selection state across datasets, versions, evaluations, and runs.
+ * Handles the relationships between these entities and their selection behaviors.
+ */
 const useSelection = () => {
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<DatasetVersion | null>(
@@ -353,7 +406,7 @@ const useSelection = () => {
   const selectDataset = useCallback(
     (dataset: Dataset | null) => {
       setSelectedDataset(dataset);
-      setSelectedVersion(null); // Clear version selection when dataset changes
+      // Don't reset version when selecting a dataset
       resetEvaluation();
       if (dataset) {
         setActiveTab('data-preview');
@@ -406,7 +459,9 @@ const useSelection = () => {
   };
 };
 
-// Update useEvaluations to use only the version's objectRef
+/**
+ * Hook for managing evaluations. Filters evaluations based on the selected dataset version.
+ */
 const useEvaluations = (
   getClient: () => any,
   entity: string,
@@ -458,6 +513,9 @@ const useEvaluations = (
   };
 };
 
+/**
+ * Hook for managing evaluation runs. Loads and caches runs for the selected evaluation.
+ */
 const useEvaluationRuns = (
   getClient: () => any,
   entity: string,
@@ -512,7 +570,9 @@ const useEvaluationRuns = (
   };
 };
 
-// Add version management hook
+/**
+ * Hook for managing dataset versions. Handles loading, caching, and identifying the latest version.
+ */
 const useDatasetVersions = (
   getClient: () => any,
   entity: string,
@@ -585,7 +645,7 @@ const DatasetListItem: React.FC<{
   project: string;
 }> = ({dataset, selectedVersion, onVersionSelect, entity, project}) => {
   const getClient = useGetTraceServerClientContext();
-  const {versions, latestVersion, loading} = useDatasetVersions(
+  const {versions, loading} = useDatasetVersions(
     getClient,
     entity,
     project,
@@ -598,23 +658,12 @@ const DatasetListItem: React.FC<{
     return [...versions].sort((a, b) => b.version - a.version);
   }, [versions]);
 
-  // Auto-select latest version if none selected
-  useEffect(() => {
-    if (!loading && latestVersion && !selectedVersion) {
-      onVersionSelect(latestVersion);
-    }
-  }, [loading, latestVersion, selectedVersion, onVersionSelect]);
-
-  const currentVersion = selectedVersion || latestVersion;
+  // Get the selected version's ref for comparison
+  const selectedVersionRef = selectedVersion?.objectRef;
 
   return (
     <div style={{width: '100%'}}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2px',
-        }}>
+      <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
         <div style={{fontWeight: 500}}>{dataset.name}</div>
         <div
           style={{
@@ -642,14 +691,16 @@ const DatasetListItem: React.FC<{
           }}>
           {loading ? (
             'Loading...'
-          ) : (
+          ) : selectedVersion ? (
             <>
-              <span style={{color: '#333'}}>v{currentVersion?.version}</span>
-              {currentVersion?.isLatest && (
+              <span style={{color: '#333'}}>v{selectedVersion.version}</span>
+              {selectedVersion.isLatest && (
                 <span style={{color: '#00A4EF', fontWeight: 500}}>latest</span>
               )}
               <span style={{fontSize: '0.8em', marginLeft: '2px'}}>▼</span>
             </>
+          ) : (
+            <span style={{color: '#666'}}>Select version ▼</span>
           )}
           {isOpen && (
             <div
@@ -668,7 +719,7 @@ const DatasetListItem: React.FC<{
               }}>
               {sortedVersions.map(version => (
                 <div
-                  key={version.version}
+                  key={version.objectRef}
                   style={{
                     padding: '6px 12px',
                     cursor: 'pointer',
@@ -676,7 +727,7 @@ const DatasetListItem: React.FC<{
                     alignItems: 'center',
                     gap: '6px',
                     backgroundColor:
-                      version.version === currentVersion?.version
+                      version.objectRef === selectedVersionRef
                         ? '#f5f5f5'
                         : 'white',
                   }}
@@ -685,7 +736,7 @@ const DatasetListItem: React.FC<{
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor =
-                      version.version === currentVersion?.version
+                      version.objectRef === selectedVersionRef
                         ? '#f5f5f5'
                         : 'white';
                   }}
@@ -725,6 +776,11 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     string,
     boolean
   > | null>(null);
+  const [lastRunContext, setLastRunContext] = useState<{
+    datasetRefUri: string;
+    evaluationRefUri: string;
+    run: any;
+  } | null>(null);
 
   const {
     selectedDataset,
@@ -759,24 +815,109 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     selectedEvaluation
   );
 
-  // Set initial selections when data is loaded
+  // Step 1: Get the latest run info
   useEffect(() => {
-    if (datasets.length > 0 && !selectedDataset) {
+    const loadLastRun = async () => {
+      try {
+        const context = await fetchLastEvaluationContext(
+          getClient(),
+          entity,
+          project
+        );
+        if (context) {
+          setLastRunContext(context);
+        }
+      } catch (error) {
+        console.error('Error loading last run context:', error);
+      }
+    };
+    loadLastRun();
+  }, [getClient, entity, project]);
+
+  // Step 2 & 3: Once datasets are loaded, select the one matching the last run
+  useEffect(() => {
+    if (!lastRunContext || loadingDatasets || !datasets.length) {
+      return;
+    }
+
+    const ref = parseRef(lastRunContext.datasetRefUri);
+    const datasetName = ref.artifactName;
+    const dataset = datasets.find(d => d.name === datasetName);
+
+    if (dataset) {
+      // First select the dataset
+      selectDataset(dataset);
+
+      // Then load and select the correct version
+      const loadAndSelectVersion = async () => {
+        try {
+          const versions = await fetchDatasetVersions(
+            getClient(),
+            entity,
+            project,
+            dataset.name
+          );
+          const matchingVersion = versions.find(
+            v => v.objectRef === lastRunContext.datasetRefUri
+          );
+          if (matchingVersion) {
+            setSelectedVersion(matchingVersion);
+          }
+        } catch (error) {
+          console.error('Error loading dataset versions:', error);
+        }
+      };
+      loadAndSelectVersion();
+    } else {
+      // Fallback to first dataset if no match
       selectDataset(datasets[0]);
     }
-  }, [datasets, selectedDataset, selectDataset]);
+  }, [
+    lastRunContext,
+    loadingDatasets,
+    datasets,
+    selectDataset,
+    getClient,
+    entity,
+    project,
+    setSelectedVersion,
+  ]);
 
+  // Step 4 & 5: Once evaluations are loaded, select the one matching the last run
   useEffect(() => {
-    if (evaluations.length > 0 && !selectedEvaluation) {
-      selectEvaluation(evaluations[0]);
+    if (!lastRunContext || loadingEvaluations || !evaluations.length) {
+      return;
     }
-  }, [evaluations, selectedEvaluation, selectEvaluation]);
 
-  useEffect(() => {
-    if (evaluationRuns.length > 0 && !selectedRun) {
-      selectRun(evaluationRuns[0]);
+    const matchingEvaluation = evaluations.find(
+      e => e.evaluationRef === lastRunContext.evaluationRefUri
+    );
+    if (matchingEvaluation) {
+      selectEvaluation(matchingEvaluation);
     }
-  }, [evaluationRuns, selectedRun, selectRun]);
+  }, [lastRunContext, loadingEvaluations, evaluations, selectEvaluation]);
+
+  // Step 6 & 7: Once runs are loaded, select the matching run
+  useEffect(() => {
+    if (!lastRunContext || loadingRuns) {
+      return;
+    }
+
+    const run: EvaluationResult = {
+      entity,
+      project,
+      callId: lastRunContext.run.id,
+      evaluationRef: lastRunContext.evaluationRefUri,
+      modelRef: lastRunContext.run.inputs.model,
+      createdAt: new Date(lastRunContext.run.started_at),
+      metrics: lastRunContext.run.output
+        ? flattenObjectPreservingWeaveTypes(lastRunContext.run.output)
+        : {},
+      status: traceCallStatusCode(lastRunContext.run),
+    };
+    selectRun(run);
+    setActiveTab('model-report');
+  }, [lastRunContext, loadingRuns, entity, project, selectRun, setActiveTab]);
 
   const {useObjectVersion} = useWFHooks();
   const objectVersion = useObjectVersion({
@@ -809,13 +950,39 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
       {
         id: 'evaluation-details',
         label: 'Evaluation Details',
-        component: () => <div>Evaluation Details</div>,
+        component: () => (
+          <div style={{height: '100%', width: '100%', overflow: 'auto'}}>
+            {selectedEvaluation ? (
+              <ObjectVersionPage
+                entity={entity}
+                project={project}
+                objectName={selectedEvaluation.objectId}
+                version={selectedEvaluation.objectDigest}
+                filePath={''}
+              />
+            ) : (
+              <div>No evaluation selected</div>
+            )}
+          </div>
+        ),
         disabled: !selectedEvaluation,
       },
       {
         id: 'model-details',
         label: 'Run Details',
-        component: () => <div>Run Details</div>,
+        component: () => (
+          <div style={{height: '100%', width: '100%', overflow: 'auto'}}>
+            {selectedRun ? (
+              <CallPage
+                entity={entity}
+                project={project}
+                callId={selectedRun.callId}
+              />
+            ) : (
+              <div>No run selected</div>
+            )}
+          </div>
+        ),
         disabled: !selectedRun,
       },
       {
@@ -885,6 +1052,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
             items={datasets}
             selectedItem={selectedDataset}
             onSelectItem={selectDataset}
+            getItemKey={dataset => dataset.name}
             sidebarLabel={
               <div
                 style={{
@@ -928,6 +1096,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
             items={evaluations}
             selectedItem={selectedEvaluation}
             onSelectItem={selectEvaluation}
+            getItemKey={evaluation => evaluation.evaluationRef}
             sidebarLabel={
               <div
                 style={{
@@ -940,15 +1109,25 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                 <div
                   onClick={e => {
                     e.stopPropagation();
-                    resetEvaluation();
-                    setActiveTab('new-evaluation');
+                    if (selectedVersion) {
+                      resetEvaluation();
+                      setActiveTab('new-evaluation');
+                    }
                   }}
-                  style={styles.addButton}
+                  style={
+                    selectedVersion
+                      ? styles.addButton
+                      : styles.addButtonDisabled
+                  }
                   onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f0';
+                    if (selectedVersion) {
+                      e.currentTarget.style.backgroundColor = '#f0f0f0';
+                    }
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    if (selectedVersion) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
                   }}>
                   +
                 </div>
@@ -969,6 +1148,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
             items={evaluationRuns}
             selectedItem={selectedRun}
             onSelectItem={selectRun}
+            getItemKey={run => run.callId}
             sidebarLabel={
               <div
                 style={{
@@ -981,15 +1161,25 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                 <div
                   onClick={e => {
                     e.stopPropagation();
-                    selectRun(null);
-                    setActiveTab('new-model');
+                    if (selectedEvaluation) {
+                      selectRun(null);
+                      setActiveTab('new-model');
+                    }
                   }}
-                  style={styles.addButton}
+                  style={
+                    selectedEvaluation
+                      ? styles.addButton
+                      : styles.addButtonDisabled
+                  }
                   onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f0';
+                    if (selectedEvaluation) {
+                      e.currentTarget.style.backgroundColor = '#f0f0f0';
+                    }
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    if (selectedEvaluation) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
                   }}>
                   +
                 </div>

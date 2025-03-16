@@ -1,3 +1,4 @@
+import {parseRef} from '@wandb/weave/react';
 import {makeRefObject} from '@wandb/weave/util/refs';
 
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -271,3 +272,50 @@ export const fetchDatasetVersions = async (
   }));
   return final;
 };
+
+// Fetch the most recent evaluation run and its related data
+export async function fetchLastEvaluationContext(
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string
+) {
+  // Get all evaluation runs first
+  const allRuns = await client.callsStreamQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      op_names: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: ALL_VALUE,
+        }),
+      ],
+    },
+    limit: 1,
+    sort_by: [{field: 'started_at', direction: 'desc'}],
+  });
+  const runs = allRuns.calls;
+
+  if (runs.length === 0) {
+    return null;
+  }
+
+  const lastRun = runs[0];
+  const evaluationRefUri = lastRun.inputs.self;
+  const evaluationRef = parseRef(evaluationRefUri);
+
+  // Get the evaluation definition
+  const evaluation = await client.objRead({
+    project_id: `${entity}/${project}`,
+    object_id: evaluationRef.artifactName,
+    digest: evaluationRef.artifactVersion,
+  });
+  const datasetRefUri = evaluation.obj.val.dataset;
+
+  return {
+    run: lastRun,
+    evaluationRefUri,
+    datasetRefUri,
+  };
+}
