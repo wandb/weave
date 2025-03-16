@@ -614,7 +614,6 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
-    accumulator: Callable | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -708,17 +707,6 @@ def op(
 
         # Create the wrapper
         wrapped_op = create_wrapper(func)
-
-        # Apply accumulator if this is an iterator and accumulator was provided
-        if is_iterator and accumulator is not None:
-            # Create an appropriate make_accumulator function
-            def make_accumulator(inputs: dict) -> Callable:
-                if accumulator is None:
-                    return lambda acc, value: value  # Default accumulator if None
-                return accumulator
-
-            # Apply the accumulator
-            _add_accumulator(wrapped_op, make_accumulator)
 
         return wrapped_op
 
