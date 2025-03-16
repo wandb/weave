@@ -19,7 +19,6 @@ const MOCK_DATASETS: Dataset[] = [];
 const MOCK_SCORERS: Scorer[] = [];
 const MOCK_MODELS: Model[] = [];
 const MOCK_EVALUATIONS: EvaluationDefinition[] = [];
-const MOCK_EVALUATION_RESULTS: EvaluationResult[] = [];
 const MOCK_DETAILED_RESULTS: Record<string, DetailedEvaluationResult> = {};
 
 // API functions
