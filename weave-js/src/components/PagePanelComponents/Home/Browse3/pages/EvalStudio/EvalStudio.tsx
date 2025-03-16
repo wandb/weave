@@ -40,7 +40,7 @@ export const EvalStudioPage: React.FC<EvalStudioPageProps> = ({
 }) => {
   return (
     <EvalStudioProvider>
-      <div style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
+      <div style={{height: '100%', display: 'flex', flexDirection: 'column'}}>
         <EvalStudioContent entity={entity} project={project} />
       </div>
     </EvalStudioProvider>

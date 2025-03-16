@@ -1,5 +1,6 @@
 import {makeRefObject} from '@wandb/weave/util/refs';
 
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {DirectTraceServerClient} from '../wfReactInterface/traceServerDirectClient';
@@ -7,13 +8,13 @@ import {traceCallStatusCode} from '../wfReactInterface/tsDataModelHooks';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {
   Dataset,
+  DatasetVersion,
   DetailedEvaluationResult,
   EvaluationDefinition,
   EvaluationResult,
   Model,
   Scorer,
 } from './types';
-import { flattenObjectPreservingWeaveTypes } from '../../flattenObject';
 
 // Mock data
 const MOCK_DATASETS: Dataset[] = [];
@@ -64,6 +65,7 @@ export const fetchEvaluations = async (
     project_id: `${entity}/${project}`,
     filter: {
       base_object_classes: ['Evaluation'],
+      latest_only: false,
     },
   });
   return res.objs.map(obj => {
@@ -173,7 +175,10 @@ export const fetchEvaluationResults = async (
       evaluationRef,
       modelRef: call.inputs.model,
       createdAt: new Date(call.started_at),
-      metrics: flattenObjectPreservingWeaveTypes(call.output ?? {}) as Record<string, any>,
+      metrics: flattenObjectPreservingWeaveTypes(call.output ?? {}) as Record<
+        string,
+        any
+      >,
       status: traceCallStatusCode(call),
     };
   });
@@ -229,4 +234,40 @@ export const fetchDetailedResults = async (
     throw new Error('Detailed results not found');
   }
   return result;
+};
+
+export const fetchDatasetVersions = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string,
+  datasetName: string
+): Promise<DatasetVersion[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      object_ids: [datasetName],
+      base_object_classes: ['Dataset'],
+      latest_only: false,
+    },
+    metadata_only: true,
+  });
+
+  const final = res.objs.map(version => ({
+    isLatest: version.is_latest === 1,
+    version: version.version_index,
+    createdAt: new Date(version.created_at),
+    digest: version.digest,
+    objectRef: makeRefObject(
+      entity,
+      project,
+      'object',
+      version.object_id,
+      version.digest,
+      undefined
+    ),
+    entity,
+    project,
+    name: version.object_id,
+  }));
+  return final;
 };

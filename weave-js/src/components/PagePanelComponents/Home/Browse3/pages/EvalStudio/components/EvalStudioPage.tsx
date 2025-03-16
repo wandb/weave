@@ -1,9 +1,19 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {DatasetEditProvider} from '../../../datasets/DatasetEditorContext';
+import {DatasetVersionPage} from '../../../datasets/DatasetVersionPage';
+import {CompareEvaluationsPageContent} from '../../CompareEvaluationsPage/CompareEvaluationsPage';
+import {useWFHooks} from '../../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
-import {fetchDatasets, fetchEvaluationResults, fetchEvaluations} from '../api';
+import {
+  fetchDatasets,
+  fetchDatasetVersions,
+  fetchEvaluationResults,
+  fetchEvaluations,
+} from '../api';
 import {
   Dataset,
+  DatasetVersion,
   EvaluationDefinition as Evaluation,
   EvaluationResult,
 } from '../types';
@@ -318,11 +328,90 @@ const useDatasets = (getClient: () => any, entity: string, project: string) => {
   };
 };
 
+// Modify selection hook to treat datasets and versions as the same type
+const useSelection = () => {
+  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<DatasetVersion | null>(
+    null
+  );
+  const [selectedEvaluation, setSelectedEvaluation] =
+    useState<Evaluation | null>(null);
+  const [selectedRun, setSelectedRun] = useState<EvaluationResult | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('new-dataset');
+
+  const resetEvaluation = useCallback(() => {
+    setSelectedEvaluation(null);
+    setSelectedRun(null);
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setSelectedDataset(null);
+    setSelectedVersion(null);
+    resetEvaluation();
+  }, [resetEvaluation]);
+
+  const selectDataset = useCallback(
+    (dataset: Dataset | null) => {
+      setSelectedDataset(dataset);
+      setSelectedVersion(null); // Clear version selection when dataset changes
+      resetEvaluation();
+      if (dataset) {
+        setActiveTab('data-preview');
+      }
+    },
+    [resetEvaluation]
+  );
+
+  // Update version selection to be the primary reference
+  const selectVersion = useCallback(
+    (version: DatasetVersion | null) => {
+      setSelectedVersion(version);
+      if (version) {
+        // Update selectedDataset to match the version since DatasetVersion extends Dataset
+        setSelectedDataset(version);
+      }
+      resetEvaluation();
+    },
+    [resetEvaluation]
+  );
+
+  const selectEvaluation = useCallback((evaluation: Evaluation | null) => {
+    setSelectedEvaluation(evaluation);
+    setSelectedRun(null);
+    if (evaluation) {
+      setActiveTab('evaluation-details');
+    }
+  }, []);
+
+  const selectRun = useCallback((run: EvaluationResult | null) => {
+    setSelectedRun(run);
+    if (run) {
+      setActiveTab('model-report');
+    }
+  }, []);
+
+  return {
+    selectedDataset,
+    selectedVersion,
+    setSelectedVersion: selectVersion,
+    selectedEvaluation,
+    selectedRun,
+    activeTab,
+    setActiveTab,
+    selectDataset,
+    selectEvaluation,
+    selectRun,
+    resetEvaluation,
+    resetAll,
+  };
+};
+
+// Update useEvaluations to use only the version's objectRef
 const useEvaluations = (
   getClient: () => any,
   entity: string,
   project: string,
-  selectedDataset: Dataset | null
+  selectedVersion: DatasetVersion | null
 ) => {
   const [loading, setLoading] = useState(false);
   const cacheKey = `${entity}/${project}/evaluations`;
@@ -332,7 +421,7 @@ const useEvaluations = (
   );
 
   const fetchData = useCallback(async () => {
-    if (!selectedDataset) {
+    if (!selectedVersion) {
       return;
     }
     setLoading(true);
@@ -343,7 +432,7 @@ const useEvaluations = (
       console.error('Error loading evaluations:', error);
     }
     setLoading(false);
-  }, [getClient, entity, project, selectedDataset, updateCache, cacheKey]);
+  }, [getClient, entity, project, selectedVersion, updateCache, cacheKey]);
 
   useEffect(() => {
     if (!getCached(cacheKey).length) {
@@ -352,14 +441,15 @@ const useEvaluations = (
   }, [fetchData, getCached, cacheKey]);
 
   const evaluations = useMemo(() => {
-    if (!selectedDataset) {
+    if (!selectedVersion) {
       return [];
     }
+    console.log('selectedVersion', selectedVersion.objectRef);
     const allEvaluations = getCached(cacheKey);
     return allEvaluations.filter(
-      e => e.datasetRef === selectedDataset.objectRef
+      e => e.datasetRef === selectedVersion.objectRef
     );
-  }, [getCached, cacheKey, selectedDataset]);
+  }, [getCached, cacheKey, selectedVersion]);
 
   return {
     evaluations,
@@ -422,62 +512,207 @@ const useEvaluationRuns = (
   };
 };
 
-// Selection management hook
-const useSelection = () => {
-  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [selectedEvaluation, setSelectedEvaluation] =
-    useState<Evaluation | null>(null);
-  const [selectedRun, setSelectedRun] = useState<EvaluationResult | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('new-dataset');
-
-  const resetEvaluation = useCallback(() => {
-    setSelectedEvaluation(null);
-    setSelectedRun(null);
-  }, []);
-
-  const resetAll = useCallback(() => {
-    setSelectedDataset(null);
-    resetEvaluation();
-  }, [resetEvaluation]);
-
-  const selectDataset = useCallback(
-    (dataset: Dataset | null) => {
-      setSelectedDataset(dataset);
-      resetEvaluation();
-      if (dataset) {
-        setActiveTab('data-preview');
-      }
-    },
-    [resetEvaluation]
+// Add version management hook
+const useDatasetVersions = (
+  getClient: () => any,
+  entity: string,
+  project: string,
+  dataset: Dataset | null
+) => {
+  const cacheKey = dataset
+    ? `${entity}/${project}/datasets/${dataset.name}/versions`
+    : '';
+  const {updateCache, getCached} = useDataCache<DatasetVersion[]>(
+    cacheKey,
+    makeList
   );
+  const [loading, setLoading] = useState(false);
 
-  const selectEvaluation = useCallback((evaluation: Evaluation | null) => {
-    setSelectedEvaluation(evaluation);
-    setSelectedRun(null);
-    if (evaluation) {
-      setActiveTab('evaluation-details');
+  const fetchVersions = useCallback(async () => {
+    if (!dataset || !cacheKey) {
+      return;
     }
-  }, []);
+    setLoading(true);
+    try {
+      const vs = await fetchDatasetVersions(
+        getClient(),
+        entity,
+        project,
+        dataset.name
+      );
+      updateCache(cacheKey, vs);
+    } catch (error) {
+      console.error('Error loading dataset versions:', error);
+    }
+    setLoading(false);
+  }, [getClient, entity, project, dataset, updateCache, cacheKey]);
 
-  const selectRun = useCallback((run: EvaluationResult | null) => {
-    setSelectedRun(run);
-    if (run) {
-      setActiveTab('model-report');
+  useEffect(() => {
+    if (cacheKey && !getCached(cacheKey).length) {
+      fetchVersions();
     }
-  }, []);
+  }, [fetchVersions, getCached, cacheKey]);
+
+  const versions = useMemo(() => {
+    if (!cacheKey) {
+      return [];
+    }
+    return getCached(cacheKey);
+  }, [getCached, cacheKey]);
+
+  // Get the latest version
+  const latestVersion = useMemo(() => {
+    if (!versions.length) {
+      return null;
+    }
+    return versions.find(v => v.isLatest) || versions[0];
+  }, [versions]);
 
   return {
-    selectedDataset,
-    selectedEvaluation,
-    selectedRun,
-    activeTab,
-    setActiveTab,
-    selectDataset,
-    selectEvaluation,
-    selectRun,
-    resetEvaluation,
-    resetAll,
+    versions,
+    latestVersion,
+    loading,
+    refetch: fetchVersions,
   };
+};
+
+// Dataset list item component with version selector
+const DatasetListItem: React.FC<{
+  dataset: Dataset;
+  selectedVersion: DatasetVersion | null;
+  onVersionSelect: (version: DatasetVersion) => void;
+  entity: string;
+  project: string;
+}> = ({dataset, selectedVersion, onVersionSelect, entity, project}) => {
+  const getClient = useGetTraceServerClientContext();
+  const {versions, latestVersion, loading} = useDatasetVersions(
+    getClient,
+    entity,
+    project,
+    dataset
+  );
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Sort versions by version number, newest first
+  const sortedVersions = useMemo(() => {
+    return [...versions].sort((a, b) => b.version - a.version);
+  }, [versions]);
+
+  // Auto-select latest version if none selected
+  useEffect(() => {
+    if (!loading && latestVersion && !selectedVersion) {
+      onVersionSelect(latestVersion);
+    }
+  }, [loading, latestVersion, selectedVersion, onVersionSelect]);
+
+  const currentVersion = selectedVersion || latestVersion;
+
+  return (
+    <div style={{width: '100%'}}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+        }}>
+        <div style={{fontWeight: 500}}>{dataset.name}</div>
+        <div
+          style={{
+            position: 'relative',
+            fontSize: '0.85em',
+            color: '#666',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: '#f5f5f5',
+            width: 'fit-content',
+          }}
+          onClick={e => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = '#ebebeb';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = '#f5f5f5';
+          }}>
+          {loading ? (
+            'Loading...'
+          ) : (
+            <>
+              <span style={{color: '#333'}}>v{currentVersion?.version}</span>
+              {currentVersion?.isLatest && (
+                <span style={{color: '#00A4EF', fontWeight: 500}}>latest</span>
+              )}
+              <span style={{fontSize: '0.8em', marginLeft: '2px'}}>▼</span>
+            </>
+          )}
+          {isOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                background: 'white',
+                border: '1px solid #eee',
+                borderRadius: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                maxHeight: '200px',
+                overflowY: 'auto',
+                minWidth: '120px',
+              }}>
+              {sortedVersions.map(version => (
+                <div
+                  key={version.version}
+                  style={{
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor:
+                      version.version === currentVersion?.version
+                        ? '#f5f5f5'
+                        : 'white',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f0';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor =
+                      version.version === currentVersion?.version
+                        ? '#f5f5f5'
+                        : 'white';
+                  }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onVersionSelect(version);
+                    setIsOpen(false);
+                  }}>
+                  <span style={{color: '#333'}}>v{version.version}</span>
+                  {version.isLatest && (
+                    <span
+                      style={{
+                        color: '#00A4EF',
+                        fontSize: '0.85em',
+                        fontWeight: 500,
+                      }}>
+                      latest
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // Main View Component
@@ -486,9 +721,15 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
   project,
 }) => {
   const getClient = useGetTraceServerClientContext();
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<
+    string,
+    boolean
+  > | null>(null);
 
   const {
     selectedDataset,
+    selectedVersion,
+    setSelectedVersion,
     selectedEvaluation,
     selectedRun,
     activeTab,
@@ -509,7 +750,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     getClient,
     entity,
     project,
-    selectedDataset
+    selectedVersion
   );
   const {evaluationRuns, loading: loadingRuns} = useEvaluationRuns(
     getClient,
@@ -537,13 +778,32 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     }
   }, [evaluationRuns, selectedRun, selectRun]);
 
+  const {useObjectVersion} = useWFHooks();
+  const objectVersion = useObjectVersion({
+    scheme: 'weave',
+    entity,
+    project,
+    weaveKind: 'object',
+    objectId: selectedVersion?.name ?? '',
+    versionHash: selectedVersion?.digest ?? '',
+    path: '',
+  });
+
   // Tab configuration
   const availableTabs = useMemo(() => {
     const tabs: TabConfig[] = [
       {
         id: 'data-preview',
         label: 'Data Preview',
-        component: () => <div>Data Preview Content</div>,
+        component: () => (
+          <div style={{height: '100%', width: '100%', overflow: 'auto'}}>
+            {objectVersion.result && (
+              <DatasetEditProvider>
+                <DatasetVersionPage objectVersion={objectVersion.result} />
+              </DatasetEditProvider>
+            )}
+          </div>
+        ),
         disabled: !selectedDataset,
       },
       {
@@ -566,15 +826,34 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
             <div style={{padding: '1rem', textAlign: 'center', color: '#666'}}>
               Loading results...
             </div>
+          ) : selectedRun ? (
+            <CompareEvaluationsPageContent
+              entity={entity}
+              project={project}
+              evaluationCallIds={[selectedRun.callId!]}
+              onEvaluationCallIdsUpdate={() => {}}
+              selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
+            />
           ) : (
-            <ModelReport results={[selectedRun!]} />
+            <div>No run selected</div>
           ),
         disabled: !selectedRun,
       },
     ];
 
     return tabs;
-  }, [selectedDataset, selectedEvaluation, selectedRun, loadingRuns]);
+  }, [
+    selectedDataset,
+    selectedEvaluation,
+    selectedRun,
+    objectVersion.result,
+    loadingRuns,
+    entity,
+    project,
+    selectedMetrics,
+    setSelectedMetrics,
+  ]);
 
   // Render helpers
   const renderDetailView = () => {
@@ -593,7 +872,6 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     return <div>Loading datasets...</div>;
   }
 
-  // Render
   return (
     <div style={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <Header
@@ -634,12 +912,15 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
               </div>
             }
             renderListItem={dataset => (
-              <div>
-                <div style={{fontWeight: 500}}>{dataset.name}</div>
-                <div style={{fontSize: '0.9em', color: '#666'}}>
-                  N/A samples
-                </div>
-              </div>
+              <DatasetListItem
+                dataset={dataset}
+                selectedVersion={selectedVersion}
+                onVersionSelect={version => {
+                  setSelectedVersion(version);
+                }}
+                entity={entity}
+                project={project}
+              />
             )}
             renderDetail={() => null}
           />

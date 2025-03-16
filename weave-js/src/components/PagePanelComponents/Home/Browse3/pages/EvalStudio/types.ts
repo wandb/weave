@@ -5,15 +5,20 @@ export interface DatasetSample {
   input: string; // This could be more specific based on your needs
 }
 
+// Dataset from initial list
 export interface Dataset {
   entity: string;
   project: string;
   name: string;
-  digest: string;
+}
+
+// Dataset version contains all the version-specific information
+export interface DatasetVersion extends Dataset {
   objectRef: string;
+  digest: string;
   createdAt: Date;
-  // // Adding sample data field for demonstration
-  // samples: DatasetSample[];
+  version: number;
+  isLatest: boolean;
 }
 
 export interface Scorer {
