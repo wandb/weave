@@ -1,192 +1,213 @@
+import {ObjectRef, parseRef} from '@wandb/weave/react';
 import React, {useEffect, useState} from 'react';
 
-import {fetchEvaluationResults, fetchModels, runEvaluation} from '../api';
+import {SmallRef} from '../../../smallRef/SmallRef';
+import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {fetchEvaluationResults} from '../api';
 import {useEvalStudio} from '../context';
-import {EvaluationResult, Model} from '../types';
-import {DetailedResults} from './DetailedResults';
+import {EvaluationResult} from '../types';
+
+type ResultRow = {
+  id: string;
+  status: 'running' | 'completed' | 'failed';
+  metrics: Record<string, number>;
+  createdAt: string;
+};
 
 export const EvaluationResults: React.FC = () => {
-  const [results, setResults] = useState<EvaluationResult[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
+  const [results, setResults] = useState<ResultRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
 
-  const {selectedEvaluation, selectedResult, setSelectedResult} =
-    useEvalStudio();
+  const {selectedEvaluation} = useEvalStudio();
+  const getTraceServerClient = useGetTraceServerClientContext();
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadResults = async () => {
       if (!selectedEvaluation) {
         return;
       }
 
-      setLoading(true);
       try {
-        const [resultsData, modelsData] = await Promise.all([
-          fetchEvaluationResults(selectedEvaluation.id),
-          fetchModels(),
-        ]);
-        setResults(resultsData);
-        setModels(modelsData);
+        const data = await fetchEvaluationResults(selectedEvaluation.objectId);
+
+        // Transform the data into the format we need
+        const transformedData: ResultRow[] = data.map(result => ({
+          id: result.id,
+          status: result.status,
+          metrics: result.metrics,
+          createdAt: result.createdAt,
+        }));
+
+        setResults(transformedData);
       } catch (error) {
-        console.error('Failed to fetch data:', error);
+        console.error('Failed to fetch results:', error);
         setError('Failed to load evaluation results');
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    loadResults();
   }, [selectedEvaluation]);
 
-  const handleRunEvaluation = async () => {
-    if (!selectedEvaluation || !selectedModel) {
-      setError('Please select a model to evaluate');
-      return;
-    }
-
-    setIsRunning(true);
-    setError(null);
-
-    try {
-      const result = await runEvaluation(
-        selectedEvaluation.id,
-        selectedModel.id
-      );
-      setResults(prev => [...prev, result]);
-      setSelectedModel(null);
-    } catch (error) {
-      console.error('Failed to run evaluation:', error);
-      setError('Failed to run evaluation');
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
   if (!selectedEvaluation) {
-    return <div>No evaluation selected</div>;
+    return null;
   }
 
   if (loading) {
-    return <div>Loading results...</div>;
+    return <div style={{padding: '1rem'}}>Loading results...</div>;
   }
 
-  if (selectedResult) {
-    return <DetailedResults />;
+  if (error) {
+    return <div style={{padding: '1rem', color: 'red'}}>{error}</div>;
   }
+
+  const columnStyles = {
+    header: {
+      padding: '0.75rem 1rem',
+      textAlign: 'left' as const,
+      fontWeight: 500,
+      color: '#666',
+      borderBottom: '2px solid #eee',
+      backgroundColor: '#f8f8f8',
+    },
+    cell: {
+      padding: '0.75rem 1rem',
+      borderBottom: '1px solid #eee',
+    },
+  };
 
   return (
-    <div style={{padding: '1rem'}}>
-      <h2>{selectedEvaluation.name} Results</h2>
-
-      {error && <div style={{color: 'red', marginBottom: '1rem'}}>{error}</div>}
-
-      <div style={{marginBottom: '2rem'}}>
-        <h3>Run New Evaluation</h3>
-        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-          <select
-            value={selectedModel?.id || ''}
-            onChange={e => {
-              const model = models.find(m => m.id === e.target.value);
-              setSelectedModel(model || null);
-            }}
-            style={{padding: '0.5rem'}}>
-            <option value="">Select a model...</option>
-            {models.map(model => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleRunEvaluation}
-            disabled={isRunning || !selectedModel}>
-            {isRunning ? 'Running...' : 'Run Evaluation'}
-          </button>
+    <div style={{height: '100%', display: 'flex', flexDirection: 'column'}}>
+      <div
+        style={{
+          padding: '1.5rem',
+          borderBottom: '1px solid #eee',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+        }}>
+        <div>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: '1.4rem',
+              fontWeight: 500,
+              color: '#111',
+              marginBottom: '1rem',
+            }}>
+            {selectedEvaluation.displayName}
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              gap: '0.5rem 1rem',
+              color: '#666',
+              fontSize: '0.9rem',
+            }}>
+            <div style={{fontWeight: 500}}>Dataset:</div>
+            <div>
+              <SmallRef
+                objRef={parseRef(selectedEvaluation.datasetRef) as ObjectRef}
+              />
+            </div>
+            <div style={{fontWeight: 500}}>Scorers:</div>
+            <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+              {selectedEvaluation.scorerRefs.map((scorerRef, index) => (
+                <React.Fragment key={scorerRef}>
+                  <SmallRef objRef={parseRef(scorerRef) as ObjectRef} />
+                  {index < selectedEvaluation.scorerRefs.length - 1 && (
+                    <span style={{color: '#999'}}>•</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
         </div>
+        <button
+          style={{
+            padding: '0.75rem 1.25rem',
+            backgroundColor: '#00A4EF',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          }}
+          onClick={() => {
+            /* TODO: Implement run action */
+          }}>
+          Run Evaluation
+        </button>
       </div>
 
-      <h3>Previous Results</h3>
-      {results.length === 0 ? (
-        <div>No results yet. Run your first evaluation!</div>
-      ) : (
-        <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-          {results.map(result => (
-            <div
-              key={result.id}
-              style={{
-                padding: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                cursor: result.status === 'completed' ? 'pointer' : 'default',
-                backgroundColor: 'white',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={e => {
-                if (result.status === 'completed') {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5';
-                }
-              }}
-              onMouseLeave={e => {
-                if (result.status === 'completed') {
-                  e.currentTarget.style.backgroundColor = 'white';
-                }
-              }}
-              onClick={() => {
-                if (result.status === 'completed') {
-                  setSelectedResult(result);
-                }
-              }}>
-              <div style={{marginBottom: '0.5rem'}}>
-                <strong>Model:</strong> {result.model.name}
-              </div>
-              <div style={{marginBottom: '0.5rem'}}>
-                <strong>Status:</strong>{' '}
-                <span
-                  style={{
-                    color:
-                      result.status === 'completed'
-                        ? 'green'
-                        : result.status === 'failed'
-                        ? 'red'
-                        : 'orange',
-                  }}>
-                  {result.status}
-                </span>
-              </div>
-              {result.status === 'completed' && (
-                <>
-                  <div>
-                    <strong>Summary Metrics:</strong>
-                    <div style={{marginLeft: '1rem'}}>
-                      {Object.entries(result.metrics).map(([key, value]) => (
-                        <div key={key}>
-                          {key}: {value.toFixed(4)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+      <div style={{flex: 1, overflowY: 'auto'}}>
+        <table style={{width: '100%', borderCollapse: 'collapse'}}>
+          <thead>
+            <tr>
+              <th style={columnStyles.header}>Status</th>
+              <th style={columnStyles.header}>Created At</th>
+              <th style={columnStyles.header}>Metrics</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((row, index) => (
+              <tr
+                key={row.id}
+                style={{
+                  backgroundColor:
+                    selectedRow === index
+                      ? '#f5f5f5'
+                      : hoveredRow === index
+                      ? '#f8f8f8'
+                      : 'white',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setSelectedRow(index)}
+                onMouseEnter={() => setHoveredRow(index)}
+                onMouseLeave={() => setHoveredRow(null)}>
+                <td style={columnStyles.cell}>
                   <div
                     style={{
-                      marginTop: '0.5rem',
-                      fontSize: '0.9em',
-                      color: '#666',
-                      fontStyle: 'italic',
-                    }}>
-                    Click to view detailed results
-                  </div>
-                </>
-              )}
-              <div
-                style={{fontSize: '0.9em', color: '#666', marginTop: '0.5rem'}}>
-                Run at: {new Date(result.createdAt).toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        row.status === 'completed'
+                          ? '#4CAF50'
+                          : row.status === 'failed'
+                          ? '#f44336'
+                          : '#FFC107',
+                      display: 'inline-block',
+                      marginRight: '0.5rem',
+                    }}
+                  />
+                  {row.status}
+                </td>
+                <td style={columnStyles.cell}>
+                  {new Date(row.createdAt).toLocaleString()}
+                </td>
+                <td style={columnStyles.cell}>
+                  {Object.entries(row.metrics).map(([key, value]) => (
+                    <div
+                      key={key}
+                      style={{display: 'inline-block', marginRight: '1rem'}}>
+                      <span style={{color: '#666'}}>{key}:</span>{' '}
+                      <span>{value.toFixed(3)}</span>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

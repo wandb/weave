@@ -24,12 +24,15 @@ export interface Model {
 }
 
 export interface EvaluationDefinition {
-  id: string;
-  name: string;
-  dataset: Dataset;
-  scorers: Scorer[];
-  createdAt: string;
-  lastModified: string;
+  entity: string;
+  project: string;
+  objectId: string;
+  objectDigest: string;
+  evaluationRef: string;
+  displayName: string;
+  createdAt: Date;
+  datasetRef: string;
+  scorerRefs: string[];
 }
 
 export interface PredictionResult {

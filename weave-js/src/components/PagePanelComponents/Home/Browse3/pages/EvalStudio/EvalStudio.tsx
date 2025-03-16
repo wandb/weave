@@ -13,7 +13,10 @@ type EvalStudioPageProps = {
   project: string;
 };
 
-const EvalStudioContent: React.FC = () => {
+const EvalStudioContent: React.FC<EvalStudioPageProps> = ({
+  entity,
+  project,
+}) => {
   const {
     selectedEvaluation,
     isCreatingNewEval,
@@ -41,7 +44,7 @@ const EvalStudioContent: React.FC = () => {
           borderRight: '1px solid #ccc',
           overflow: 'auto',
         }}>
-        <EvaluationsList />
+        <EvaluationsList entity={entity} project={project} />
       </div>
       <div style={{flex: 1, overflow: 'auto'}}>
         {selectedEvaluation ? (
@@ -56,11 +59,14 @@ const EvalStudioContent: React.FC = () => {
   );
 };
 
-export const EvalStudioPage: React.FC<EvalStudioPageProps> = () => {
+export const EvalStudioPage: React.FC<EvalStudioPageProps> = ({
+  entity,
+  project,
+}) => {
   return (
     <EvalStudioProvider>
       <div style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
-        <EvalStudioContent />
+        <EvalStudioContent entity={entity} project={project} />
       </div>
     </EvalStudioProvider>
   );

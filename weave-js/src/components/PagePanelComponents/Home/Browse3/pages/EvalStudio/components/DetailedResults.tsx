@@ -88,45 +88,41 @@ export const DetailedResults: React.FC = () => {
                 }}>
                 Model Prediction
               </th>
-              {selectedEvaluation.scorers.map(scorer => (
+              {selectedEvaluation.scorerRefs.map(scorerRef => (
                 <th
-                  key={scorer.id}
+                  key={scorerRef}
                   style={{
                     padding: '0.5rem',
                     textAlign: 'left',
                     borderBottom: '2px solid #ccc',
                   }}>
-                  {scorer.name}
+                  {scorerRef}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {detailedResults.predictions.map(prediction => {
-              const sample = selectedEvaluation.dataset.samples.find(
-                s => s.id === prediction.sampleId
-              );
-
               return (
                 <tr key={prediction.sampleId}>
                   <td
                     style={{padding: '0.5rem', borderBottom: '1px solid #eee'}}>
-                    {sample?.input || 'Unknown input'}
+                    {'Unknown input'}
                   </td>
                   <td
                     style={{padding: '0.5rem', borderBottom: '1px solid #eee'}}>
                     {prediction.modelPrediction}
                   </td>
-                  {selectedEvaluation.scorers.map(scorer => (
+                  {selectedEvaluation.scorerRefs.map(scorerRef => (
                     <td
-                      key={scorer.id}
+                      key={scorerRef}
                       style={{
                         padding: '0.5rem',
                         borderBottom: '1px solid #eee',
                         color:
-                          prediction.scores[scorer.id] >= 0.5 ? 'green' : 'red',
+                          prediction.scores[scorerRef] >= 0.5 ? 'green' : 'red',
                       }}>
-                      {prediction.scores[scorer.id]?.toFixed(4) || 'N/A'}
+                      {prediction.scores[scorerRef]?.toFixed(4) || 'N/A'}
                     </td>
                   ))}
                 </tr>

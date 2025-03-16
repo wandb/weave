@@ -1,3 +1,6 @@
+import {makeRefObject} from '@wandb/weave/util/refs';
+
+import {DirectTraceServerClient} from '../wfReactInterface/traceServerDirectClient';
 import {
   Dataset,
   DetailedEvaluationResult,
@@ -8,116 +11,45 @@ import {
 } from './types';
 
 // Mock data
-const MOCK_DATASETS: Dataset[] = [
-  {
-    id: 'dataset-1',
-    name: 'MNIST Test Set',
-    createdAt: '2024-03-20T10:00:00Z',
-    samples: [
-      {id: 'sample-1', input: 'Image of digit 7'},
-      {id: 'sample-2', input: 'Image of digit 3'},
-      {id: 'sample-3', input: 'Image of digit 5'},
-    ],
-  },
-  {
-    id: 'dataset-2',
-    name: 'ImageNet Validation',
-    createdAt: '2024-03-19T15:30:00Z',
-    samples: [
-      {id: 'sample-4', input: 'Image of a cat'},
-      {id: 'sample-5', input: 'Image of a dog'},
-      {id: 'sample-6', input: 'Image of a bird'},
-    ],
-  },
-];
-
-const MOCK_SCORERS: Scorer[] = [
-  {
-    id: 'scorer-1',
-    name: 'Accuracy Scorer',
-    description: 'Basic classification accuracy',
-  },
-  {
-    id: 'scorer-2',
-    name: 'F1 Score',
-    description: 'Balanced F1 metric',
-  },
-];
-
-const MOCK_MODELS: Model[] = [
-  {
-    id: 'model-1',
-    name: 'ResNet50',
-    description: 'Standard ResNet50 architecture',
-  },
-  {
-    id: 'model-2',
-    name: 'ViT-B16',
-    description: 'Vision Transformer Base',
-  },
-];
-
-const MOCK_EVALUATIONS: EvaluationDefinition[] = [
-  {
-    id: 'eval-1',
-    name: 'MNIST Classification Eval',
-    dataset: MOCK_DATASETS[0],
-    scorers: [MOCK_SCORERS[0]],
-    createdAt: '2024-03-20T11:00:00Z',
-    lastModified: '2024-03-20T11:00:00Z',
-  },
-];
-
-const MOCK_EVALUATION_RESULTS: EvaluationResult[] = [
-  {
-    id: 'result-1',
-    evaluationDefinition: MOCK_EVALUATIONS[0],
-    model: MOCK_MODELS[0],
-    metrics: {
-      accuracy: 0.95,
-      f1_score: 0.94,
-    },
-    status: 'completed',
-    createdAt: '2024-03-20T12:00:00Z',
-  },
-];
-
-const MOCK_DETAILED_RESULTS: Record<string, DetailedEvaluationResult> = {
-  'result-1': {
-    id: 'result-1',
-    predictions: [
-      {
-        sampleId: 'sample-1',
-        modelPrediction: '7',
-        scores: {
-          'scorer-1': 1.0, // Accuracy
-          'scorer-2': 0.95, // F1 Score
-        },
-      },
-      {
-        sampleId: 'sample-2',
-        modelPrediction: '3',
-        scores: {
-          'scorer-1': 1.0,
-          'scorer-2': 0.97,
-        },
-      },
-      {
-        sampleId: 'sample-3',
-        modelPrediction: '6', // Incorrect prediction
-        scores: {
-          'scorer-1': 0.0,
-          'scorer-2': 0.85,
-        },
-      },
-    ],
-  },
-};
+const MOCK_DATASETS: Dataset[] = [];
+const MOCK_SCORERS: Scorer[] = [];
+const MOCK_MODELS: Model[] = [];
+const MOCK_EVALUATIONS: EvaluationDefinition[] = [];
+const MOCK_EVALUATION_RESULTS: EvaluationResult[] = [];
+const MOCK_DETAILED_RESULTS: Record<string, DetailedEvaluationResult> = {};
 
 // API functions
-export const fetchEvaluations = async (): Promise<EvaluationDefinition[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  return MOCK_EVALUATIONS;
+export const fetchEvaluations = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string
+): Promise<EvaluationDefinition[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      base_object_classes: ['Evaluation'],
+    },
+  });
+  return res.objs.map(obj => {
+    return {
+      entity,
+      project,
+      objectId: obj.object_id,
+      objectDigest: obj.digest,
+      evaluationRef: makeRefObject(
+        entity,
+        project,
+        'object',
+        obj.object_id,
+        obj.digest,
+        undefined
+      ),
+      displayName: obj.val.name ?? obj.object_id,
+      createdAt: new Date(obj.created_at),
+      datasetRef: obj.val.dataset,
+      scorerRefs: obj.val.scorers,
+    };
+  });
 };
 
 export const fetchDatasets = async (): Promise<Dataset[]> => {
@@ -139,9 +71,7 @@ export const fetchEvaluationResults = async (
   evaluationId: string
 ): Promise<EvaluationResult[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  return MOCK_EVALUATION_RESULTS.filter(
-    r => r.evaluationDefinition.id === evaluationId
-  );
+  return [];
 };
 
 export const createEvaluation = async (
@@ -157,14 +87,7 @@ export const createEvaluation = async (
     throw new Error('Invalid dataset or scorers');
   }
 
-  return {
-    id: `eval-${Date.now()}`,
-    name,
-    dataset,
-    scorers,
-    createdAt: new Date().toISOString(),
-    lastModified: new Date().toISOString(),
-  };
+  return {};
 };
 
 export const runEvaluation = async (
