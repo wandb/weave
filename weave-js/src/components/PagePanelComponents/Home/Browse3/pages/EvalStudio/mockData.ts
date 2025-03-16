@@ -1,33 +1,13 @@
+import {makeRefObject} from '@wandb/weave/util/refs';
+
+import {DirectTraceServerClient} from '../wfReactInterface/traceServerDirectClient';
 import {StatusCodeType} from '../wfReactInterface/tsDataModelHooks';
 import {
   Dataset,
-  DatasetSample,
   EvaluationDefinition as Evaluation,
   EvaluationResult,
   Model,
 } from './types';
-
-// Mock data
-const mockDatasetSamples: DatasetSample[] = [
-  {id: '1', input: 'What is machine learning?'},
-  {id: '2', input: 'Explain neural networks'},
-  {id: '3', input: 'How does backpropagation work?'},
-];
-
-export const mockDatasets: Dataset[] = [
-  {
-    id: '1',
-    name: 'ML Questions Dataset',
-    createdAt: new Date().toISOString(),
-    samples: mockDatasetSamples,
-  },
-  {
-    id: '2',
-    name: 'NLP Dataset',
-    createdAt: new Date().toISOString(),
-    samples: mockDatasetSamples,
-  },
-];
 
 export const mockModels: Model[] = [
   {
@@ -127,9 +107,36 @@ export const mockResults: EvaluationResult[] = [
 ];
 
 // Mock API functions
-export const fetchDatasets = async (): Promise<Dataset[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  return mockDatasets;
+export const fetchDatasets = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string
+): Promise<Dataset[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      base_object_classes: ['Dataset'],
+      latest_only: true,
+    },
+    metadata_only: true,
+  });
+  return res.objs.map(o => {
+    return {
+      entity,
+      project,
+      name: o.object_id,
+      digest: o.digest,
+      createdAt: new Date(o.created_at),
+      objectRef: makeRefObject(
+        entity,
+        project,
+        'object',
+        o.object_id,
+        o.digest,
+        undefined
+      ),
+    };
+  });
 };
 
 export const fetchEvaluations = async (

@@ -13,6 +13,7 @@ import {
   Model,
   Scorer,
 } from './types';
+import { flattenObjectPreservingWeaveTypes } from '../../flattenObject';
 
 // Mock data
 const MOCK_DATASETS: Dataset[] = [];
@@ -22,6 +23,38 @@ const MOCK_EVALUATIONS: EvaluationDefinition[] = [];
 const MOCK_DETAILED_RESULTS: Record<string, DetailedEvaluationResult> = {};
 
 // API functions
+export const fetchDatasets = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string
+): Promise<Dataset[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      base_object_classes: ['Dataset'],
+      latest_only: true,
+    },
+    metadata_only: true,
+  });
+  return res.objs.map(o => {
+    return {
+      entity,
+      project,
+      name: o.object_id,
+      digest: o.digest,
+      createdAt: new Date(o.created_at),
+      objectRef: makeRefObject(
+        entity,
+        project,
+        'object',
+        o.object_id,
+        o.digest,
+        undefined
+      ),
+    };
+  });
+};
+
 export const fetchEvaluations = async (
   client: DirectTraceServerClient,
   entity: string,
@@ -55,19 +88,61 @@ export const fetchEvaluations = async (
   });
 };
 
-export const fetchDatasets = async (): Promise<Dataset[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return MOCK_DATASETS;
-};
-
 export const fetchScorers = async (): Promise<Scorer[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   return MOCK_SCORERS;
 };
 
-export const fetchModels = async (): Promise<Model[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return MOCK_MODELS;
+export const fetchModels = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string,
+  evaluationRef: string
+): Promise<Model[]> => {
+  const res = await client.callsStreamQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      input_refs: [evaluationRef],
+      op_names: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: ALL_VALUE,
+        }),
+      ],
+    },
+  });
+  return res.objs.map(obj => ({
+    id: obj.object_id,
+    name: obj.val.name ?? obj.object_id,
+    description: obj.val.description,
+  }));
+};
+
+export const fetchModelResults = async (
+  client: DirectTraceServerClient,
+  entity: string,
+  project: string,
+  evaluationRef: string,
+  modelId: string
+): Promise<EvaluationResult[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      base_object_classes: ['EvaluationResult'],
+      // evaluation_ref: evaluationRef,
+      // model_id: modelId,
+    },
+  });
+  return res.objs.map(obj => ({
+    id: obj.object_id,
+    status: obj.val.status,
+    created: new Date(obj.created_at),
+    accuracy: obj.val.accuracy,
+    f1Score: obj.val.f1_score,
+    latency: obj.val.latency,
+  }));
 };
 
 export const fetchEvaluationResults = async (
@@ -98,7 +173,7 @@ export const fetchEvaluationResults = async (
       evaluationRef,
       modelRef: call.inputs.model,
       createdAt: new Date(call.started_at),
-      metrics: (call.output ?? {}) as Record<string, any>,
+      metrics: flattenObjectPreservingWeaveTypes(call.output ?? {}) as Record<string, any>,
       status: traceCallStatusCode(call),
     };
   });
@@ -141,7 +216,7 @@ export const runEvaluation = async (
       f1_score: Math.random() * 0.2 + 0.8,
     },
     status: 'completed',
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(),
   };
 };
 

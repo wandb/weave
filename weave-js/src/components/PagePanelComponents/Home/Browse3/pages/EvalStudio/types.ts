@@ -6,11 +6,14 @@ export interface DatasetSample {
 }
 
 export interface Dataset {
-  id: string;
+  entity: string;
+  project: string;
   name: string;
-  createdAt: string;
-  // Adding sample data field for demonstration
-  samples: DatasetSample[];
+  digest: string;
+  objectRef: string;
+  createdAt: Date;
+  // // Adding sample data field for demonstration
+  // samples: DatasetSample[];
 }
 
 export interface Scorer {

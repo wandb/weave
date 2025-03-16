@@ -150,7 +150,9 @@ export const ModelReport: React.FC<ModelReportProps> = ({results}) => {
                   </td>
                   {Object.entries(result.metrics).map(([key, value]) => (
                     <td key={key} style={{padding: '0.75rem'}}>
-                      {typeof value === 'number' ? value.toFixed(3) : value}
+                      {typeof value === 'number'
+                        ? value.toFixed(3)
+                        : value.toString()}
                     </td>
                   ))}
                 </tr>

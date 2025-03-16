@@ -1,16 +1,11 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {
-  fetchDatasets,
-  fetchEvaluations,
-  fetchModelResults,
-  fetchModels,
-} from '../mockData';
+import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
+import {fetchDatasets, fetchEvaluationResults, fetchEvaluations} from '../api';
 import {
   Dataset,
   EvaluationDefinition as Evaluation,
   EvaluationResult,
-  Model,
 } from '../types';
 import {NewDatasetForm} from './forms/NewDatasetForm';
 import {NewEvaluationForm} from './forms/NewEvaluationForm';
@@ -97,8 +92,8 @@ const getHeaderIcon = (label: string): string => {
       return '📊';
     case 'Evaluations':
       return '📋';
-    case 'Models':
-      return '🤖';
+    case 'Evaluation Runs':
+      return '🎯';
     default:
       return '📄';
   }
@@ -271,114 +266,279 @@ const Header: React.FC<HeaderProps> = ({tabs, activeTab, onTabChange}) => (
   </div>
 );
 
+// Cache management hook
+const useDataCache = <T,>(key: string, getDefaultData: () => T) => {
+  const [cache, setCache] = useState<{[key: string]: T}>({
+    [key]: getDefaultData(),
+  });
+
+  const updateCache = useCallback((k: string, data: T) => {
+    setCache(prev => ({...prev, [k]: data}));
+  }, []);
+
+  const getCached = useCallback(
+    (k: string) => cache[k] || getDefaultData(),
+    [cache, getDefaultData]
+  );
+
+  return {updateCache, getCached};
+};
+
+const makeList = () => {
+  return [];
+};
+
+// Custom hooks for data fetching and state management
+const useDatasets = (getClient: () => any, entity: string, project: string) => {
+  const [loading, setLoading] = useState(true);
+  const cacheKey = `${entity}/${project}/datasets`;
+  const {updateCache, getCached} = useDataCache<Dataset[]>(cacheKey, makeList);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchDatasets(getClient(), entity, project);
+      updateCache(cacheKey, data);
+    } catch (error) {
+      console.error('Error loading datasets:', error);
+    }
+    setLoading(false);
+  }, [getClient, entity, project, updateCache, cacheKey]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const datasets = useMemo(() => getCached(cacheKey), [getCached, cacheKey]);
+
+  return {
+    datasets,
+    loading,
+    refetch: fetchData,
+  };
+};
+
+const useEvaluations = (
+  getClient: () => any,
+  entity: string,
+  project: string,
+  selectedDataset: Dataset | null
+) => {
+  const [loading, setLoading] = useState(false);
+  const cacheKey = `${entity}/${project}/evaluations`;
+  const {updateCache, getCached} = useDataCache<Evaluation[]>(
+    cacheKey,
+    makeList
+  );
+
+  const fetchData = useCallback(async () => {
+    if (!selectedDataset) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await fetchEvaluations(getClient(), entity, project);
+      updateCache(cacheKey, data);
+    } catch (error) {
+      console.error('Error loading evaluations:', error);
+    }
+    setLoading(false);
+  }, [getClient, entity, project, selectedDataset, updateCache, cacheKey]);
+
+  useEffect(() => {
+    if (!getCached(cacheKey).length) {
+      fetchData();
+    }
+  }, [fetchData, getCached, cacheKey]);
+
+  const evaluations = useMemo(() => {
+    if (!selectedDataset) {
+      return [];
+    }
+    const allEvaluations = getCached(cacheKey);
+    return allEvaluations.filter(
+      e => e.datasetRef === selectedDataset.objectRef
+    );
+  }, [getCached, cacheKey, selectedDataset]);
+
+  return {
+    evaluations,
+    loading,
+    refetch: fetchData,
+  };
+};
+
+const useEvaluationRuns = (
+  getClient: () => any,
+  entity: string,
+  project: string,
+  selectedEvaluation: Evaluation | null
+) => {
+  const [loading, setLoading] = useState(false);
+  const cacheKey = selectedEvaluation
+    ? `${entity}/${project}/evaluations/${selectedEvaluation.evaluationRef}/runs`
+    : '';
+  const {updateCache, getCached} = useDataCache<EvaluationResult[]>(
+    cacheKey,
+    makeList
+  );
+
+  const fetchData = useCallback(async () => {
+    if (!selectedEvaluation || !cacheKey) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await fetchEvaluationResults(
+        getClient(),
+        entity,
+        project,
+        selectedEvaluation.evaluationRef
+      );
+      updateCache(cacheKey, data);
+    } catch (error) {
+      console.error('Error loading evaluation runs:', error);
+    }
+    setLoading(false);
+  }, [getClient, entity, project, selectedEvaluation, updateCache, cacheKey]);
+
+  useEffect(() => {
+    if (cacheKey && !getCached(cacheKey)?.length) {
+      fetchData();
+    }
+  }, [fetchData, getCached, cacheKey]);
+
+  const evaluationRuns = useMemo(() => {
+    if (!cacheKey) {
+      return [];
+    }
+    return getCached(cacheKey);
+  }, [getCached, cacheKey]);
+
+  return {
+    evaluationRuns,
+    loading,
+    refetch: fetchData,
+  };
+};
+
+// Selection management hook
+const useSelection = () => {
+  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
+  const [selectedEvaluation, setSelectedEvaluation] =
+    useState<Evaluation | null>(null);
+  const [selectedRun, setSelectedRun] = useState<EvaluationResult | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('new-dataset');
+
+  const resetEvaluation = useCallback(() => {
+    setSelectedEvaluation(null);
+    setSelectedRun(null);
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setSelectedDataset(null);
+    resetEvaluation();
+  }, [resetEvaluation]);
+
+  const selectDataset = useCallback(
+    (dataset: Dataset | null) => {
+      setSelectedDataset(dataset);
+      resetEvaluation();
+      if (dataset) {
+        setActiveTab('data-preview');
+      }
+    },
+    [resetEvaluation]
+  );
+
+  const selectEvaluation = useCallback((evaluation: Evaluation | null) => {
+    setSelectedEvaluation(evaluation);
+    setSelectedRun(null);
+    if (evaluation) {
+      setActiveTab('evaluation-details');
+    }
+  }, []);
+
+  const selectRun = useCallback((run: EvaluationResult | null) => {
+    setSelectedRun(run);
+    if (run) {
+      setActiveTab('model-report');
+    }
+  }, []);
+
+  return {
+    selectedDataset,
+    selectedEvaluation,
+    selectedRun,
+    activeTab,
+    setActiveTab,
+    selectDataset,
+    selectEvaluation,
+    selectRun,
+    resetEvaluation,
+    resetAll,
+  };
+};
+
 // Main View Component
 export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
   entity,
   project,
 }) => {
-  // State
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [selectedEvaluation, setSelectedEvaluation] =
-    useState<Evaluation | null>(null);
-  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('new-dataset');
+  const getClient = useGetTraceServerClientContext();
 
-  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
-  const [modelResults, setModelResults] = useState<EvaluationResult[]>([]);
+  const {
+    selectedDataset,
+    selectedEvaluation,
+    selectedRun,
+    activeTab,
+    setActiveTab,
+    selectDataset,
+    selectEvaluation,
+    selectRun,
+    resetAll,
+    resetEvaluation,
+  } = useSelection();
 
-  const [loading, setLoading] = useState(true);
-  const [loadingEvaluations, setLoadingEvaluations] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [loadingResults, setLoadingResults] = useState(false);
+  const {datasets, loading: loadingDatasets} = useDatasets(
+    getClient,
+    entity,
+    project
+  );
+  const {evaluations, loading: loadingEvaluations} = useEvaluations(
+    getClient,
+    entity,
+    project,
+    selectedDataset
+  );
+  const {evaluationRuns, loading: loadingRuns} = useEvaluationRuns(
+    getClient,
+    entity,
+    project,
+    selectedEvaluation
+  );
 
-  // Data loading effects
+  // Set initial selections when data is loaded
   useEffect(() => {
-    const loadDatasets = async () => {
-      setLoading(true);
-      try {
-        const data = await fetchDatasets();
-        setDatasets(data);
-        if (data.length > 0 && !selectedDataset) {
-          setSelectedDataset(data[0]);
-          setActiveTab('data-preview');
-        }
-      } catch (error) {
-        console.error('Error loading datasets:', error);
-      }
-      setLoading(false);
-    };
-    loadDatasets();
-  }, [selectedDataset]);
-
-  useEffect(() => {
-    if (selectedDataset) {
-      const loadEvaluations = async () => {
-        setLoadingEvaluations(true);
-        try {
-          const data = await fetchEvaluations(selectedDataset.id);
-          setEvaluations(data);
-          if (data.length > 0 && !selectedEvaluation) {
-            setSelectedEvaluation(data[0]);
-            setActiveTab('evaluation-details');
-          }
-        } catch (error) {
-          console.error('Error loading evaluations:', error);
-        }
-        setLoadingEvaluations(false);
-      };
-      loadEvaluations();
-    } else {
-      setEvaluations([]);
+    if (datasets.length > 0 && !selectedDataset) {
+      selectDataset(datasets[0]);
     }
-  }, [selectedDataset, selectedEvaluation]);
+  }, [datasets, selectedDataset, selectDataset]);
 
   useEffect(() => {
-    if (selectedEvaluation) {
-      const loadModels = async () => {
-        setLoadingModels(true);
-        try {
-          const data = await fetchModels(selectedEvaluation.evaluationRef);
-          setModels(data);
-          if (data.length > 0 && !selectedModel) {
-            setSelectedModel(data[0]);
-            setActiveTab('model-report');
-          }
-        } catch (error) {
-          console.error('Error loading models:', error);
-        }
-        setLoadingModels(false);
-      };
-      loadModels();
-    } else {
-      setModels([]);
+    if (evaluations.length > 0 && !selectedEvaluation) {
+      selectEvaluation(evaluations[0]);
     }
-  }, [selectedEvaluation, selectedModel]);
+  }, [evaluations, selectedEvaluation, selectEvaluation]);
 
   useEffect(() => {
-    if (selectedModel && selectedEvaluation) {
-      const loadResults = async () => {
-        setLoadingResults(true);
-        try {
-          const data = await fetchModelResults(
-            selectedEvaluation.evaluationRef,
-            selectedModel.id
-          );
-          setModelResults(data);
-        } catch (error) {
-          console.error('Error loading model results:', error);
-        }
-        setLoadingResults(false);
-      };
-      loadResults();
-    } else {
-      setModelResults([]);
+    if (evaluationRuns.length > 0 && !selectedRun) {
+      selectRun(evaluationRuns[0]);
     }
-  }, [selectedModel, selectedEvaluation]);
+  }, [evaluationRuns, selectedRun, selectRun]);
 
   // Tab configuration
-  const availableTabs = React.useMemo(() => {
+  const availableTabs = useMemo(() => {
     const tabs: TabConfig[] = [
       {
         id: 'data-preview',
@@ -394,33 +554,27 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
       },
       {
         id: 'model-details',
-        label: 'Model Details',
-        component: () => <div>Model Details</div>,
-        disabled: !selectedModel,
+        label: 'Run Details',
+        component: () => <div>Run Details</div>,
+        disabled: !selectedRun,
       },
       {
         id: 'model-report',
-        label: 'Model Report',
+        label: 'Run Report',
         component: () =>
-          loadingResults ? (
+          loadingRuns ? (
             <div style={{padding: '1rem', textAlign: 'center', color: '#666'}}>
               Loading results...
             </div>
           ) : (
-            <ModelReport results={modelResults} />
+            <ModelReport results={[selectedRun!]} />
           ),
-        disabled: !selectedModel,
+        disabled: !selectedRun,
       },
     ];
 
     return tabs;
-  }, [
-    selectedDataset,
-    selectedEvaluation,
-    selectedModel,
-    modelResults,
-    loadingResults,
-  ]);
+  }, [selectedDataset, selectedEvaluation, selectedRun, loadingRuns]);
 
   // Render helpers
   const renderDetailView = () => {
@@ -435,7 +589,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
     return <Component />;
   };
 
-  if (loading) {
+  if (loadingDatasets) {
     return <div>Loading datasets...</div>;
   }
 
@@ -452,14 +606,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
           <ListDetailView
             items={datasets}
             selectedItem={selectedDataset}
-            onSelectItem={dataset => {
-              setSelectedDataset(dataset);
-              setSelectedEvaluation(null);
-              setSelectedModel(null);
-              if (dataset) {
-                setActiveTab('data-preview');
-              }
-            }}
+            onSelectItem={selectDataset}
             sidebarLabel={
               <div
                 style={{
@@ -472,9 +619,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                 <div
                   onClick={e => {
                     e.stopPropagation();
-                    setSelectedDataset(null);
-                    setSelectedEvaluation(null);
-                    setSelectedModel(null);
+                    resetAll();
                     setActiveTab('new-dataset');
                   }}
                   style={styles.addButton}
@@ -492,7 +637,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
               <div>
                 <div style={{fontWeight: 500}}>{dataset.name}</div>
                 <div style={{fontSize: '0.9em', color: '#666'}}>
-                  {dataset.samples.length} samples
+                  N/A samples
                 </div>
               </div>
             )}
@@ -501,13 +646,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
           <ListDetailView
             items={evaluations}
             selectedItem={selectedEvaluation}
-            onSelectItem={evaluation => {
-              setSelectedEvaluation(evaluation);
-              setSelectedModel(null);
-              if (evaluation) {
-                setActiveTab('evaluation-details');
-              }
-            }}
+            onSelectItem={selectEvaluation}
             sidebarLabel={
               <div
                 style={{
@@ -520,8 +659,7 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                 <div
                   onClick={e => {
                     e.stopPropagation();
-                    setSelectedEvaluation(null);
-                    setSelectedModel(null);
+                    resetEvaluation();
                     setActiveTab('new-evaluation');
                   }}
                   style={styles.addButton}
@@ -547,14 +685,9 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
             renderDetail={() => null}
           />
           <ListDetailView
-            items={models}
-            selectedItem={selectedModel}
-            onSelectItem={model => {
-              setSelectedModel(model);
-              if (model) {
-                setActiveTab('model-report');
-              }
-            }}
+            items={evaluationRuns}
+            selectedItem={selectedRun}
+            onSelectItem={selectRun}
             sidebarLabel={
               <div
                 style={{
@@ -563,11 +696,11 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                   alignItems: 'center',
                   width: '100%',
                 }}>
-                <span>Models</span>
+                <span>Evaluation Runs</span>
                 <div
                   onClick={e => {
                     e.stopPropagation();
-                    setSelectedModel(null);
+                    selectRun(null);
                     setActiveTab('new-model');
                   }}
                   style={styles.addButton}
@@ -581,14 +714,14 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
                 </div>
               </div>
             }
-            renderListItem={model => (
+            renderListItem={run => (
               <div>
-                <div style={{fontWeight: 500}}>{model.name}</div>
-                {model.description && (
-                  <div style={{fontSize: '0.9em', color: '#666'}}>
-                    {model.description}
-                  </div>
-                )}
+                <div style={{fontWeight: 500}}>
+                  {run.modelRef ? run.modelRef.split('/').pop() : 'Unnamed Run'}
+                </div>
+                <div style={{fontSize: '0.9em', color: '#666'}}>
+                  Status: {run.status}
+                </div>
               </div>
             )}
             renderDetail={() => null}
@@ -598,24 +731,21 @@ export const EvalStudioMainView: React.FC<EvalStudioMainViewProps> = ({
           {activeTab === 'new-dataset' && (
             <NewDatasetForm
               onSubmit={dataset => {
-                setDatasets([...datasets, dataset]);
-                setSelectedDataset(dataset);
-                setActiveTab('data-preview');
+                selectDataset(dataset);
               }}
             />
           )}
           {activeTab === 'new-evaluation' && selectedDataset && (
             <NewEvaluationForm
               onSubmit={evaluation => {
-                setSelectedEvaluation(evaluation);
-                setActiveTab('evaluation-details');
+                selectEvaluation(evaluation);
               }}
             />
           )}
           {activeTab === 'new-model' && selectedEvaluation && (
             <NewModelForm
               onSubmit={model => {
-                setSelectedModel(model);
+                // TODO: Implement creating new evaluation run
                 setActiveTab('model-report');
               }}
             />
