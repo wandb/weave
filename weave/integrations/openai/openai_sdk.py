@@ -380,6 +380,42 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
+### Responses API
+def create_wrapper_responses_sync(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        def _inner(*args: Any, **kwargs: Any) -> Any:
+            return fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        return op
+
+    return wrapper
+
+
+def create_wrapper_responses_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        async def _inner(*args: Any, **kwargs: Any) -> Any:
+            return await fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        return op
+
+    return wrapper
+
+
+###
+
+
 def get_openai_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -418,6 +454,12 @@ def get_openai_patcher(
     )
     async_embeddings_create_settings = base.model_copy(
         update={"name": base.name or "openai.embeddings.create"}
+    )
+    responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
+    )
+    async_responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
     )
 
     _openai_patcher = MultiPatcher(
@@ -465,6 +507,18 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.embeddings"),
                 "AsyncEmbeddings.create",
                 create_wrapper_async(settings=async_embeddings_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.create",
+                create_wrapper_responses_sync(settings=responses_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.create",
+                create_wrapper_responses_async(
+                    settings=async_responses_create_settings
+                ),
             ),
         ]
     )
