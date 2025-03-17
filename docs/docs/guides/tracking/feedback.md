@@ -276,7 +276,7 @@ Once you [create a human annotation scorer](#create-a-human-annotation-scorer-in
 Human annotation scorers can also be created through the API. Each scorer is its own object, which is created and updated independently. To create a human annotation scorer programmatically, do the following:
 
 1. Import the `AnnotationSpec` class from `weave.flow.annotation_spec`
-2. Use the `save` method on the weave client to create the scorer.
+2. Use the `publish` method from `weave` to create the scorer.
 
 In the following example, two scorers are created. The first scorer, `Temperature`, is used to score the perceived temperature of the LLM call. The second scorer, `Tone`, is used to score the tone of the LLM response. Each scorer is created using `save` with an associated object ID (`temperature-scorer` and `tone-scorer`).
 
@@ -319,7 +319,7 @@ In the following example, two scorers are created. The first scorer, `Temperatur
 
 ### Modify a human annotation scorer using the API
 
-Expanding on [creating a human annotation scorer using the API](#create-a-human-annotation-scorer-using-the-api), the following example creates an updated version of the `Temperature` scorer, by using the original object ID (`temperature-scorer`) on `save`. The result is an updated object, with a history of all versions.
+Expanding on [creating a human annotation scorer using the API](#create-a-human-annotation-scorer-using-the-api), the following example creates an updated version of the `Temperature` scorer, by using the original object ID (`temperature-scorer`) on `publish`. The result is an updated object, with a history of all versions.
 
 > You can view human annotation scorer object history in the **Scorers** tab under **Human annotations**.
 
