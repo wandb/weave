@@ -63,8 +63,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
             If None, the current call from the context will be used.
     """
 
-    def __init__(self, parent_call: call_context.Call | None = None):
-        self._parent_call = parent_call
+    def __init__(self):
         self._trace_data: dict[str, dict[str, Any]] = {}
         self._trace_calls: dict[str, call_context.Call] = {}
         self._span_calls: dict[str, call_context.Call] = {}
@@ -82,12 +81,11 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         }
 
         # Create a call for this trace
-        parent = self._parent_call or call_context.get_current_call()
         wc = require_weave_client()
         trace_call = wc.create_call(
             op="openai_agent_trace",
             inputs={"name": trace.name},
-            parent=parent,
+            parent=call_context.get_current_call(),
             attributes={"type": "task", "agent_trace_id": trace.trace_id},
             display_name=trace.name,
         )
@@ -465,9 +463,8 @@ class OpenAIAgentsPatcher(Patcher):
 
     def __init__(self, settings: IntegrationSettings) -> None:
         self.settings = settings
-        self.processor: WeaveTracingProcessor | None = None
         self.patched = False
-        self.parent_call: weave.trace.context.call_context.Call | None = None
+        self.processor: WeaveTracingProcessor | None = None
 
     def attempt_patch(self) -> bool:
         """Install a WeaveTracingProcessor in the OpenAI Agents tracing system."""
@@ -475,7 +472,7 @@ class OpenAIAgentsPatcher(Patcher):
             return True
 
         try:
-            self.processor = WeaveTracingProcessor(self.parent_call)
+            self.processor = WeaveTracingProcessor()
             add_trace_processor(self.processor)
             self.patched = True
         except Exception as e:
