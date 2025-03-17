@@ -1,5 +1,5 @@
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useState, useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 
 import {BaseScrubberProps} from './components/BaseScrubber';
 import {
@@ -25,21 +25,30 @@ const TraceScrubber: React.FC<
 > = props => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  const showScrubber = (scrubber: ScrubberOption) => {
-    if (!props.allowedScrubbers) {
-      return true;
-    }
-    return props.allowedScrubbers.includes(scrubber);
-  };
+  const showScrubber = useCallback(
+    (scrubber: ScrubberOption) => {
+      if (!props.allowedScrubbers) {
+        return true;
+      }
+      return props.allowedScrubbers.includes(scrubber);
+    },
+    [props.allowedScrubbers]
+  );
 
   // Count how many scrubbers are visible
   // Only show collapse functionality if there are 4 or more scrubbers
   const visibleScrubberCount = useMemo(() => {
-    const scrubberOptions: ScrubberOption[] = ['timeline', 'peer', 'codePath', 'sibling', 'stack'];
+    const scrubberOptions: ScrubberOption[] = [
+      'timeline',
+      'peer',
+      'codePath',
+      'sibling',
+      'stack',
+    ];
     return scrubberOptions.filter(scrubber => showScrubber(scrubber)).length;
-  }, [props.allowedScrubbers]);
+  }, [showScrubber]);
   const showCollapseButton = visibleScrubberCount >= 4;
-  
+
   return (
     <CollapseWrapper>
       {showCollapseButton && (

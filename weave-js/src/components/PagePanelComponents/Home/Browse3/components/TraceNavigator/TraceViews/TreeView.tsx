@@ -68,7 +68,7 @@ const getCallTypeIcon = (type: NodeType): IconName => {
     case 'scorer':
       return 'number';
     case 'none':
-      return 'circle';  
+      return 'circle';
     default:
       return 'circle';
   }
@@ -303,10 +303,13 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
                 variant="ghost"
                 size="small"
                 onClick={onToggleStrictSearch}
-                tooltip={strictSearch ? "(Strict) Only show matching nodes" : "(Loose) Show children of matching nodes"}
-                className={strictSearch ? "mr-2" : "mr-2 text-moon-500"}
-                active={strictSearch}
-              >
+                tooltip={
+                  strictSearch
+                    ? '(Strict) Only show matching nodes'
+                    : '(Loose) Show children of matching nodes'
+                }
+                className={strictSearch ? 'mr-2' : 'mr-2 text-moon-500'}
+                active={strictSearch}>
                 Strict
               </Button>
               <Button
@@ -383,7 +386,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
               }
             }
           };
-          
+
           addChildren(id);
         }
       }

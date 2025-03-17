@@ -35,26 +35,29 @@ export const StackBreadcrumb: React.FC<
     return null;
   }
 
+  const showRootNav =
+    props.traceRootCallId && props.rootCallId !== props.traceRootCallId;
+  const showParentNav =
+    props.rootParentId && props.rootCallId !== props.rootParentId;
+
   return (
     <BreadcrumbWrapper>
-      {((props.traceRootCallId && props.rootCallId !== props.traceRootCallId) ||
-        (props.rootParentId && props.rootCallId !== props.rootParentId)) && (
+      {(showRootNav || showParentNav) && (
         <BreadcrumbNavigationButtons>
-          {props.traceRootCallId &&
-            props.rootCallId !== props.traceRootCallId && (
-              <Tooltip
-                content={'Reveal root call'}
-                trigger={
-                  <Button
-                    variant={'ghost'}
-                    onClick={() => props.setRootCallId(props.traceRootCallId!)}
-                    icon={'chevron-up'}
-                    size="small"
-                  />
-                }
-              />
-            )}
-          {props.rootParentId && props.rootCallId !== props.rootParentId && (
+          {showRootNav && (
+            <Tooltip
+              content={'Reveal root call'}
+              trigger={
+                <Button
+                  variant={'ghost'}
+                  onClick={() => props.setRootCallId(props.traceRootCallId!)}
+                  icon={'chevron-up'}
+                  size="small"
+                />
+              }
+            />
+          )}
+          {showParentNav && (
             <Tooltip
               content={'Reveal parent call'}
               trigger={
