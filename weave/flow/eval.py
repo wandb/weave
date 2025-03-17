@@ -234,7 +234,6 @@ class Evaluation(Object):
             BarColumn(),
             util.IterationSpeedColumn(),
             TimeElapsedColumn(),
-            TimeRemainingColumn(),
             console=console,
         ) as progress:
             task = progress.add_task("Evaluating samples...", total=len(trial_rows))
