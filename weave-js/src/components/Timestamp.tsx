@@ -150,7 +150,7 @@ export const TimestampMicro = ({
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />
-      <span>
+      <span className="font-semibold">
         {label} {micro}
       </span>
     </div>
