@@ -37,12 +37,14 @@ class ThreadSafeLRUCache(Generic[K, V]):
         If max_size is reached, the least recently used item will be evicted.
         """
         with self._lock:
-            # If key exists, remove it so we can re-insert at the end (most recently used)
+            # If key exists, move it to end (most recently used position)
             if key in self._cache:
-                self._cache.pop(key)
+                self._cache.move_to_end(key)
+                self._cache[key] = value
+                return
 
             # If we've reached max size and max_size is not 0 (unlimited), remove oldest item
-            if self._max_size > 0 and len(self._cache) >= self._max_size:
+            if 0 < self._max_size <= len(self._cache):
                 self._cache.popitem(
                     last=False
                 )  # last=False removes the first item (least recently used)
@@ -59,10 +61,9 @@ class ThreadSafeLRUCache(Generic[K, V]):
             if key not in self._cache:
                 return None
 
-            # Move the key to the end by removing and reinserting it
-            value = self._cache.pop(key)
-            self._cache[key] = value
-            return value
+            # Move the key to the end (most recently used position)
+            self._cache.move_to_end(key)
+            return self._cache[key]
 
     def delete(self, key: K) -> None:
         """Thread-safe deletion."""
@@ -105,14 +106,9 @@ class ThreadSafeLRUCache(Generic[K, V]):
                 return
 
             # If we have more items than the new max_size, evict the oldest ones
-            # Need to make a copy to keep LRU order intact during eviction
-            if len(self._cache) > self._max_size:
-                # Keep only the max_size most recently used items
-                keys_to_keep = list(self._cache.keys())[-self._max_size :]
-                new_cache: OrderedDict[K, V] = OrderedDict()
-                for key in keys_to_keep:
-                    new_cache[key] = self._cache[key]
-                self._cache = new_cache
+            # Since OrderedDict maintains insertion order, we can just pop from the front
+            while len(self._cache) > self._max_size:
+                self._cache.popitem(last=False)  # Remove oldest item (first inserted)
 
 
 class WeaveClientSendFileCache:
