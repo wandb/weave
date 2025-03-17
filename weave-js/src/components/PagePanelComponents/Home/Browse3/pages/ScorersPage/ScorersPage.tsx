@@ -5,7 +5,6 @@ import React, {useState} from 'react';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
-import {LLMJudgesTab} from './LLMJudgesTab';
 import {
   HUMAN_ANNOTATION_VALUE,
   NewScorerDrawer,
@@ -32,15 +31,6 @@ export const ScorersPage: React.FC<{
             icon: scorerTypeRecord.ANNOTATION.icon,
             content: <AnnotationsTab entity={entity} project={project} />,
           },
-          ...(false
-            ? [
-                {
-                  label: scorerTypeRecord.LLM_JUDGE.label + 's',
-                  icon: scorerTypeRecord.LLM_JUDGE.icon,
-                  content: <LLMJudgesTab entity={entity} project={project} />,
-                },
-              ]
-            : []),
           {
             label: scorerTypeRecord.PROGRAMMATIC.label + 's',
             icon: scorerTypeRecord.PROGRAMMATIC.icon,
