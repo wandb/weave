@@ -10,8 +10,6 @@ from pydantic import BaseModel, Field, validate_call
 
 from weave.trace.weave_client import Call
 
-print("HELLO")
-
 
 class OpSettings(BaseModel):
     """Op settings for a specific integration.
@@ -61,8 +59,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     if settings.disable_autopatch:
         return
 
-    print("inside autopatch")
-
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
@@ -86,8 +82,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-
-    print("Hello from patcher")
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
