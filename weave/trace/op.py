@@ -33,7 +33,6 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
@@ -216,6 +215,9 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
+class OpCallError(Exception): ...
+
+
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     try:
         sig = inspect.signature(func)
@@ -255,7 +257,7 @@ def _create_call(
 
     parent_call = call_context.get_current_call()
     attributes = call_attributes.get()
-    from weave.trace.serialize import dictify
+    from weave.trace.serialization.serialize import dictify
 
     attributes = dictify(attributes)
 
@@ -317,7 +319,9 @@ def _execute_op(
 
         return res, __call
 
-    def handle_exception(e: Exception) -> tuple[Any, Call]:
+    def handle_exception(
+        e: Exception | SystemExit | KeyboardInterrupt,
+    ) -> tuple[Any, Call]:
         finish(exception=e)
         if __should_raise:
             raise
@@ -337,7 +341,7 @@ def _execute_op(
 
     try:
         res = func(*args, **kwargs)
-    except Exception as e:
+    except (Exception, SystemExit, KeyboardInterrupt) as e:
         handle_exception(e)
     else:
         return process(res)

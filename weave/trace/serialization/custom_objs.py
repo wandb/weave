@@ -3,12 +3,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Callable
 
-from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
-from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
+from weave.trace.serialization import (
+    op_type,  # noqa: F401, Must import this to register op save/load
+)
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace.serialization.serializer import (
+    get_serializer_by_id,
+    get_serializer_for_obj,
+)
 
 
 class DecodeCustomObjectError(Exception):

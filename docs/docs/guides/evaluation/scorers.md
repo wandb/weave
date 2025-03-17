@@ -187,7 +187,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
     class SummarizationScorer(Scorer):
 
         @weave.op
-        def score(output, text) -> dict:
+        def score(self, output, text) -> dict:
             """
                 output: output summary from a LLM summarization system
                 text: the text being summarised
@@ -287,8 +287,8 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
         """
 
         @weave.op
-        def score(output, target):
-            return {"match": if output == target}
+        def score(self, output, target):
+            return {"match": output == target}
 
         def summarize(self, score_rows: list) -> dict:
             full_match = all(row["match"] for row in score_rows)

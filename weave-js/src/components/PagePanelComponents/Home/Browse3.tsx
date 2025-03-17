@@ -67,6 +67,7 @@ import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
@@ -411,10 +412,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(datasets)`}>
+          <DatasetsPageBinding />
         </Route>
         {/* OPS */}
         <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
@@ -820,6 +824,41 @@ const ObjectVersionsPageBinding = () => {
   );
   return (
     <ObjectVersionsPage
+      entity={entity}
+      project={project}
+      initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
+    />
+  );
+};
+
+// New DatasetsPageBinding component for the dedicated datasets page
+const DatasetsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(routerContext.objectVersionsUIUrl(entity, project, filter));
+    },
+    [history, entity, project, routerContext]
+  );
+
+  return (
+    <DatasetsPage
       entity={entity}
       project={project}
       initialFilter={filters}

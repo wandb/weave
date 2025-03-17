@@ -159,7 +159,7 @@ async def test_evaluation_resilience(
         with pytest.raises(DummyTestException):
             res = await evaluation.evaluate(predict)
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
@@ -172,7 +172,7 @@ async def test_evaluation_resilience(
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])

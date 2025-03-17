@@ -1,5 +1,6 @@
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
 import {TABLE_FILE_TYPE} from '@wandb/weave/common/types/file';
+import {getTableKeysFromNodeType} from '@wandb/weave/common/util/table';
 import {
   constFunction,
   constNumber,
@@ -44,6 +45,7 @@ type PanelRunHistoryTablesStepperProps = Panel2.PanelProps<
 const getTableKeysFromRunsHistoryPropertyType = (
   runsHistoryPropertyType: Type | undefined
 ) => {
+  // Case where keys across runs vary (hence the union)
   if (
     runsHistoryPropertyType &&
     isUnion(nullableTaggableValue(listObjectType(runsHistoryPropertyType)))
@@ -62,8 +64,16 @@ const getTableKeysFromRunsHistoryPropertyType = (
       },
       []
     );
+
     return [...new Set(tableKeys)].sort();
   }
+
+  // Case where keys across runs are the same
+  if (runsHistoryPropertyType) {
+    const {tableKeys} = getTableKeysFromNodeType(runsHistoryPropertyType);
+    return tableKeys.sort();
+  }
+
   return [];
 };
 
@@ -123,7 +133,7 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
 const PanelRunHistoryTablesStepper: React.FC<
   PanelRunHistoryTablesStepperProps
 > = props => {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(-1);
   const [steps, setSteps] = useState<number[]>([]);
   const {input} = props;
 
@@ -166,7 +176,7 @@ const PanelRunHistoryTablesStepper: React.FC<
   });
   const exampleRowRefined = useNodeWithServerType(exampleRow);
   let defaultNode: NodeOrVoidNode = voidNode();
-  if (currentStep) {
+  if (currentStep != null && currentStep >= 0 && tableHistoryKey) {
     // This performs the following weave expression:
     // runs.history.concat.filter((row) => row._step == <current-step>)[<table-history-key>].concat
     defaultNode = opConcat({
