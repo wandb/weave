@@ -138,7 +138,10 @@ export const Timestamp = ({value, format, live = true}: TimestampProps) => {
   return <Tooltip content={long} trigger={text} />;
 };
 
-export const TimestampMicro = ({value}: TimestampProps) => {
+export const TimestampMicro = ({
+  value,
+  label,
+}: TimestampProps & {label?: string}) => {
   /* TimestampMicro displays a micro timestamp, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
@@ -147,7 +150,9 @@ export const TimestampMicro = ({value}: TimestampProps) => {
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />
-      <span>{micro}</span>
+      <span>
+        {label} {micro}
+      </span>
     </div>
   );
   return <Tooltip content={long} trigger={text} />;
