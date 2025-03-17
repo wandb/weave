@@ -12,6 +12,12 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
+    from openai.types.responses import (
+        Response,
+        ResponseCompletedEvent,
+        ResponseCreatedEvent,
+        ResponseTextDeltaEvent,
+    )
 
 _openai_patcher: MultiPatcher | None = None
 
@@ -381,6 +387,49 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 ### Responses API
+def responses_accumulator(
+    acc: Response | None,
+    value: ResponseCreatedEvent | ResponseCompletedEvent | ResponseTextDeltaEvent,
+) -> Response:
+    from openai.types.responses import (
+        Response,
+        ResponseCompletedEvent,
+        ResponseCreatedEvent,
+        ResponseTextDeltaEvent,
+    )
+
+    if acc is None:
+        acc = Response(
+            id="",
+            created_at=0,
+            model="",
+            object="response",
+            output=[],
+            parallel_tool_calls=False,
+            tool_choice="auto",
+            tools=[],
+        )
+
+    if isinstance(value, ResponseCreatedEvent):
+        acc = value.response
+
+    elif isinstance(value, ResponseTextDeltaEvent):
+        # Accumulation is not strictly necessary, except in cases where the stream terminates prematurely.
+        if not acc.output:
+            acc.output = [""]
+        acc.output[0] += value.delta
+
+    elif isinstance(value, ResponseCompletedEvent):
+        # This is the most faithful representation, so just use this
+        acc = value.response
+
+    return acc
+
+
+def should_use_responses_accumulator(inputs: dict) -> bool:
+    return isinstance(inputs, dict) and inputs.get("stream") is True
+
+
 def create_wrapper_responses_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
@@ -392,7 +441,15 @@ def create_wrapper_responses_sync(
             return fn(*args, **kwargs)
 
         op = weave.op(_inner, **op_kwargs)
-        return op
+        op._set_on_input_handler(openai_on_input_handler)
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
+        )
 
     return wrapper
 
@@ -408,12 +465,17 @@ def create_wrapper_responses_async(
             return await fn(*args, **kwargs)
 
         op = weave.op(_inner, **op_kwargs)
-        return op
+        op._set_on_input_handler(openai_on_input_handler)
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
+        )
 
     return wrapper
-
-
-###
 
 
 def get_openai_patcher(
