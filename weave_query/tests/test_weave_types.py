@@ -699,7 +699,6 @@ def test_init_image():
         "_is_object": True,
         "boxLayers": {"a": [1, 2, 3]},
         "boxScoreKeys": [],
-        "caption": "",
         "classMap": {},
         "maskLayers": {},
         "type": "image-file",

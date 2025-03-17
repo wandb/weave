@@ -76,6 +76,7 @@ huggingface = ["huggingface-hub>=0.28.1"]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
+  "google-genai>=1.5.0"
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -253,7 +254,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.36-dev0"
+current_version = "0.51.37-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

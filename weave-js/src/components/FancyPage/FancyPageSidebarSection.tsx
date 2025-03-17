@@ -156,6 +156,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 pathname: item.slug
                   ? `${props.baseUrl}/${item.slug}`
                   : props.baseUrl,
+                search: item.search,
               },
         };
 
