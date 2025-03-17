@@ -1,7 +1,7 @@
 import warnings
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
@@ -41,8 +41,14 @@ class PromptInjectionLLMGuardrail(LLMScorer):
 
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)"
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens allowed in the LLM's response"
+    )
 
     def model_post_init(self, __context: Any) -> None:
         if self.model_id not in SUPPORTED_MODELS:
@@ -52,7 +58,7 @@ class PromptInjectionLLMGuardrail(LLMScorer):
             )
 
     @weave.op
-    async def score(self, output: str) -> dict[str, Any]:
+    async def score(self, output: str) -> WeaveScorerResult:
         user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
             prompt=output,
