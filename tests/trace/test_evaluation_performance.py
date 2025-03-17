@@ -68,22 +68,22 @@ def build_evaluation():
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="red"),
         },
         {
             "question": "Who wrote 'To Kill a Mockingbird'?",
             "expected": "Harper Lee",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="green"),
         },
         {
             "question": "What is the square root of 64?",
             "expected": "8",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="blue"),
         },
         {
             "question": "What is the thing you say when you don't know something?",
             "expected": "I don't know",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="yellow"),
         },
     ]
 
