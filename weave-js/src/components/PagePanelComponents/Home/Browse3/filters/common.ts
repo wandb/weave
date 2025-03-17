@@ -398,6 +398,16 @@ export const makeDefaultDateFilter = (): GridFilterItem => {
   };
 };
 
+export const make3MonthsLongDateFilter = (): GridFilterItem => {
+  const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  return {
+    id: 0,
+    field: 'started_at',
+    operator: '(date): after',
+    value: threeMonthsAgo.toISOString(),
+  };
+};
+
 export const makeYearLongDateFilter = (): GridFilterItem => {
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   return {
