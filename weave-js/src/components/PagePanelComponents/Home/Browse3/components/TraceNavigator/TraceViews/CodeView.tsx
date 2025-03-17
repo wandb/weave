@@ -13,6 +13,7 @@ const Container = styled.div`
   flex-direction: column;
   overflow: hidden;
 `;
+Container.displayName = 'Container';
 
 const TreePanel = styled.div`
   height: 50%;
@@ -22,6 +23,7 @@ const TreePanel = styled.div`
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
 `;
+TreePanel.displayName = 'TreePanel';
 
 const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   margin: 2px 0;
@@ -32,6 +34,7 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
 `;
+NodeContainer.displayName = 'NodeContainer';
 
 const NodeHeader = styled.button`
   width: 100%;
@@ -50,12 +53,14 @@ const NodeHeader = styled.button`
     background: rgba(0, 0, 0, 0.02);
   }
 `;
+NodeHeader.displayName = 'NodeHeader';
 
 const NodeContent = styled.div<{$isExpanded: boolean}>`
   display: ${props => (props.$isExpanded ? 'flex' : 'none')};
   flex-wrap: wrap;
   gap: 4px;
 `;
+NodeContent.displayName = 'NodeContent';
 
 const CallPanel = styled.div`
   height: 50%;
@@ -64,6 +69,7 @@ const CallPanel = styled.div`
   display: flex;
   flex-direction: column;
 `;
+CallPanel.displayName = 'CallPanel';
 
 const CallPanelHeader = styled.div`
   padding: 6px 12px;
@@ -76,6 +82,7 @@ const CallPanelHeader = styled.div`
   justify-content: space-between;
   align-items: center;
 `;
+CallPanelHeader.displayName = 'CallPanelHeader';
 
 const RecursionBlock = styled.div`
   margin: 2px 0;
@@ -96,6 +103,7 @@ const RecursionBlock = styled.div`
     font-weight: bold;
   }
 `;
+RecursionBlock.displayName = 'RecursionBlock';
 
 interface CodeMapNodeProps extends TraceViewProps {
   node: CodeMapNode;

@@ -25,7 +25,7 @@ const TraceScrubber: React.FC<
 > = props => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  const showScrubber = useCallback(
+  const isScrubberShown = useCallback(
     (scrubber: ScrubberOption) => {
       if (!props.allowedScrubbers) {
         return true;
@@ -45,8 +45,8 @@ const TraceScrubber: React.FC<
       'sibling',
       'stack',
     ];
-    return scrubberOptions.filter(scrubber => showScrubber(scrubber)).length;
-  }, [showScrubber]);
+    return scrubberOptions.filter(scrubber => isScrubberShown(scrubber)).length;
+  }, [isScrubberShown]);
   const showCollapseButton = visibleScrubberCount >= 4;
 
   return (
@@ -61,11 +61,11 @@ const TraceScrubber: React.FC<
         </CollapseButton>
       )}
       <Container $isCollapsed={showCollapseButton ? isCollapsed : false}>
-        {showScrubber('timeline') && <TimelineScrubber {...props} />}
-        {showScrubber('peer') && <PeerScrubber {...props} />}
-        {showScrubber('codePath') && <CodePathScrubber {...props} />}
-        {showScrubber('sibling') && <SiblingScrubber {...props} />}
-        {showScrubber('stack') && <StackScrubber {...props} />}
+        {isScrubberShown('timeline') && <TimelineScrubber {...props} />}
+        {isScrubberShown('peer') && <PeerScrubber {...props} />}
+        {isScrubberShown('codePath') && <CodePathScrubber {...props} />}
+        {isScrubberShown('sibling') && <SiblingScrubber {...props} />}
+        {isScrubberShown('stack') && <StackScrubber {...props} />}
       </Container>
     </CollapseWrapper>
   );

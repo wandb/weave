@@ -7,6 +7,7 @@ export const Container = styled.div<{$isCollapsed?: boolean}>`
   transition: padding 0.2s ease;
   background: #fff;
 `;
+Container.displayName = 'Container';
 
 export const CollapseButton = styled.button`
   position: absolute;
@@ -36,10 +37,12 @@ export const CollapseButton = styled.button`
     transform: scale(0.95);
   }
 `;
+CollapseButton.displayName = 'CollapseButton';
 
 export const CollapseWrapper = styled.div`
   position: relative;
 `;
+CollapseWrapper.displayName = 'CollapseWrapper';
 
 export const ScrubberRow = styled.div`
   display: flex;
@@ -51,6 +54,7 @@ export const ScrubberRow = styled.div`
     margin-top: 4px;
   }
 `;
+ScrubberRow.displayName = 'ScrubberRow';
 
 export const Label = styled.div`
   width: 50px;
@@ -58,6 +62,7 @@ export const Label = styled.div`
   color: #64748b;
   flex-shrink: 0;
 `;
+Label.displayName = 'Label';
 
 export const CountIndicator = styled.div`
   width: 50px;
@@ -67,6 +72,7 @@ export const CountIndicator = styled.div`
   text-align: right;
   font-variant-numeric: tabular-nums;
 `;
+CountIndicator.displayName = 'CountIndicator';
 
 export const ScrubberContent = styled.div`
   flex: 1;
@@ -74,6 +80,7 @@ export const ScrubberContent = styled.div`
   gap: 8px;
   align-items: center;
 `;
+ScrubberContent.displayName = 'ScrubberContent';
 
 export const ArrowButton = styled.button<{disabled?: boolean}>`
   width: 24px;
@@ -103,6 +110,7 @@ export const ArrowButton = styled.button<{disabled?: boolean}>`
     height: 16px;
   }
 `;
+ArrowButton.displayName = 'ArrowButton';
 
 export const RangeContainer = styled.div`
   flex: 1;
@@ -115,6 +123,7 @@ export const RangeContainer = styled.div`
     margin-left: auto;
   }
 `;
+RangeContainer.displayName = 'RangeContainer';
 
 export const SliderContainer = styled.div`
   flex: 1;
@@ -123,6 +132,7 @@ export const SliderContainer = styled.div`
   align-items: center;
   min-width: 0; /* Ensure flex shrinking works properly */
 `;
+SliderContainer.displayName = 'SliderContainer';
 
 interface RangeInputProps {
   $progress: number;
@@ -189,12 +199,14 @@ export const RangeInput = styled.input<RangeInputProps>`
     cursor: not-allowed;
   }
 `;
+RangeInput.displayName = 'RangeInput';
 
 export const TooltipContainer = styled.div`
   position: relative;
   display: inline-flex;
   align-items: center;
 `;
+TooltipContainer.displayName = 'TooltipContainer';
 
 export const TooltipContent = styled.div`
   position: absolute;
@@ -226,6 +238,7 @@ export const TooltipContent = styled.div`
     border-top-color: #1e293b;
   }
 `;
+TooltipContent.displayName = 'TooltipContent';
 
 export const BreadcrumbWrapper = styled.div`
   display: flex;
@@ -237,6 +250,7 @@ export const BreadcrumbWrapper = styled.div`
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
 `;
+BreadcrumbWrapper.displayName = 'BreadcrumbWrapper';
 
 export const BreadcrumbNavigationButtons = styled.div`
   display: flex;
@@ -245,6 +259,7 @@ export const BreadcrumbNavigationButtons = styled.div`
   padding: 4px 6px;
   border-right: 1px solid #e2e8f0;
 `;
+BreadcrumbNavigationButtons.displayName = 'BreadcrumbNavigationButtons';
 
 export const BreadcrumbList = styled.div`
   padding: 4px 16px;
@@ -260,6 +275,7 @@ export const BreadcrumbList = styled.div`
     display: none; /* Chrome, Safari and Opera */
   }
 `;
+BreadcrumbList.displayName = 'BreadcrumbList';
 
 export const BreadcrumbItem = styled.button<{$active?: boolean}>`
   padding: 0px 4px !important;
@@ -299,6 +315,7 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
     }
   `}
 `;
+BreadcrumbItem.displayName = 'BreadcrumbItem';
 
 export const BreadcrumbSeparator = styled.span`
   color: #94a3b8;
@@ -307,3 +324,4 @@ export const BreadcrumbSeparator = styled.span`
   margin: 0 -2px;
   opacity: 0.6;
 `;
+BreadcrumbSeparator.displayName = 'BreadcrumbSeparator';
