@@ -12,13 +12,11 @@ from typing import Any, TypedDict
 from agents import tracing
 from agents.tracing import add_trace_processor
 
-import weave
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
-from weave.trace.context.weave_client_context import (
-    require_weave_client,
-)
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.weave_client import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
@@ -42,7 +40,7 @@ def _call_name(span: tracing.Span[Any]) -> str:
         return "Unknown"
 
 
-class WeaveDataFormat(TypedDict):
+class WeaveDataDict(TypedDict):
     inputs: dict[str, Any]
     outputs: dict[str, Any]
     metadata: dict[str, Any]
@@ -63,7 +61,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
             If None, the current call from the context will be used.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._trace_data: dict[str, dict[str, Any]] = {}
         self._trace_calls: dict[str, call_context.Call] = {}
         self._span_calls: dict[str, call_context.Call] = {}
@@ -115,9 +113,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _agent_log_data(
         self, span: tracing.Span[tracing.AgentSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from an agent span."""
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs={},
             outputs={},
             metadata={
@@ -131,7 +129,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _response_log_data(
         self, span: tracing.Span[tracing.ResponseSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a response span."""
         inputs = {}
         outputs = {}
@@ -165,7 +163,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
                     "completion_tokens": usage.output_tokens,
                 }
 
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs=inputs,
             outputs=outputs,
             metadata=metadata,
@@ -175,9 +173,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _function_log_data(
         self, span: tracing.Span[tracing.FunctionSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a function span."""
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs={"input": span.span_data.input},
             outputs={"output": span.span_data.output},
             metadata={},
@@ -187,9 +185,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _handoff_log_data(
         self, span: tracing.Span[tracing.HandoffSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a handoff span."""
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs={},
             outputs={},
             metadata={
@@ -202,9 +200,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _guardrail_log_data(
         self, span: tracing.Span[tracing.GuardrailSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a guardrail span."""
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs={},
             outputs={},
             metadata={"triggered": span.span_data.triggered},
@@ -214,9 +212,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _generation_log_data(
         self, span: tracing.Span[tracing.GenerationSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a generation span."""
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs={"input": span.span_data.input},
             outputs={"output": span.span_data.output},
             metadata={
@@ -233,7 +231,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
 
     def _custom_log_data(
         self, span: tracing.Span[tracing.CustomSpanData]
-    ) -> WeaveDataFormat:
+    ) -> WeaveDataDict:
         """Extract log data from a custom span."""
         # Prepare fields
         inputs = {}
@@ -262,7 +260,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
             if key not in ["input", "output", "metadata", "metrics"]:
                 metadata[key] = value
 
-        return WeaveDataFormat(
+        return WeaveDataDict(
             inputs=inputs,
             outputs=outputs,
             metadata=metadata,
@@ -270,7 +268,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
             error=None,
         )
 
-    def _log_data(self, span: tracing.Span[Any]) -> WeaveDataFormat:
+    def _log_data(self, span: tracing.Span[Any]) -> WeaveDataDict:
         """Extract the appropriate log data based on the span type."""
         if isinstance(span.span_data, tracing.AgentSpanData):
             return self._agent_log_data(span)
@@ -287,7 +285,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         elif isinstance(span.span_data, tracing.CustomSpanData):
             return self._custom_log_data(span)
         else:
-            return WeaveDataFormat(
+            return WeaveDataDict(
                 inputs={},
                 outputs={},
                 metadata={},
@@ -295,9 +293,7 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
                 error=None,
             )
 
-    def _get_parent_call(
-        self, span: tracing.Span[Any]
-    ) -> weave.trace.context.call_context.Call | None:
+    def _get_parent_call(self, span: tracing.Span[Any]) -> Call | None:
         """Helper method to determine the parent call for a span."""
         trace_id = span.trace_id
         parent_span_id = getattr(span, "parent_id", None)
@@ -396,10 +392,6 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
             return
 
         output = {
-            "status": "error" if span.error else "completed",
-            "type": span_type,
-            "name": span_name,
-            "parent_span_id": getattr(span, "parent_id", None),
             "output": log_data["outputs"].get("output"),
             "metrics": log_data["metrics"],
             "metadata": log_data["metadata"],
