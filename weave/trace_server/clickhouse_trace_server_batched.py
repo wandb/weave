@@ -2195,10 +2195,22 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
+    if root_span := ddtrace.tracer.current_span():
+        root_span.set_tags(
+            {
+                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                    len(root_ids)
+                ),
+                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                    len(all_calls)
+                ),
+            }
+        )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
