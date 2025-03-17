@@ -1,7 +1,8 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
+import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {Dispatch, SetStateAction, useState} from 'react';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
@@ -57,7 +58,10 @@ export const PlaygroundChat = ({
   };
 
   // Check if any chat is loading
-  const isAnyLoading = playgroundStates.some(state => state.loading);
+  const isAnyLoading = useMemo(
+    () => playgroundStates.some(state => state.loading),
+    [playgroundStates]
+  );
 
   return (
     <Box
@@ -105,7 +109,7 @@ export const PlaygroundChat = ({
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    backgroundColor: hexToRGB(WHITE, 0.7),
                     zIndex: 100,
                     display: 'flex',
                     alignItems: 'center',
