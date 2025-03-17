@@ -60,10 +60,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
     This processor captures different types of spans from OpenAI Agents (agent execution,
     function calls, LLM generations, etc.) and logs them to Weave as structured trace data.
     Child spans are logged as separate calls but not redundantly included in the parent trace data.
-
-    Args:
-        parent_call: Optional Weave call to use as the parent for all traces.
-            If None, the current call from the context will be used.
     """
 
     def __init__(self) -> None:
@@ -97,10 +93,8 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
     def on_trace_end(self, trace: tracing.Trace) -> None:
         """Called when a trace ends."""
         tid = trace.trace_id
-
         if tid not in self._trace_data:
             return
-
         if tid not in self._trace_calls:
             return
 
