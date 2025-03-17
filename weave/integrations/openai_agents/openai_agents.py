@@ -23,8 +23,7 @@ try:
     from agents.tracing import TracingProcessor
 except ImportError:
 
-    class TracingProcessor:  # type: ignore
-        pass
+    class TracingProcessor: ...  # type: ignore[no-redef]
 
 
 def _call_type(span: tracing.Span[Any]) -> str:
@@ -54,7 +53,7 @@ class WeaveDataDict(TypedDict):
     error: dict[str, Any] | None
 
 
-class WeaveTracingProcessor(TracingProcessor):
+class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralTypeIssues]
     """
     A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
 
