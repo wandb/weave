@@ -46,12 +46,12 @@ export const StackBreadcrumb: React.FC<
         <BreadcrumbNavigationButtons>
           {showRootNav && (
             <Tooltip
-              content={'Reveal root call'}
+              content='Reveal root call'
               trigger={
                 <Button
-                  variant={'ghost'}
+                  variant='ghost'
                   onClick={() => props.setRootCallId(props.traceRootCallId!)}
-                  icon={'chevron-up'}
+                  icon='chevron-up'
                   size="small"
                 />
               }
@@ -59,12 +59,12 @@ export const StackBreadcrumb: React.FC<
           )}
           {showParentNav && (
             <Tooltip
-              content={'Reveal parent call'}
+              content='Reveal parent call'
               trigger={
                 <Button
-                  variant={'ghost'}
+                  variant='ghost'
                   onClick={() => props.setRootCallId(props.rootParentId!)}
-                  icon={'parent-back-up'}
+                  icon='parent-back-up'
                   size="small"
                 />
               }

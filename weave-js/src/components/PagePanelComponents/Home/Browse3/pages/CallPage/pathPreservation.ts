@@ -51,11 +51,3 @@ export const scorePathSimilarity = (pathA: string, pathB: string) => {
   }
   return score;
 };
-
-export const parsePath = (path: string) => {
-  const parts = path.split(SEPARATOR_NODE);
-  return parts.map(part => {
-    const [name, index] = part.split(SEPARATOR_INDEX);
-    return {name, index: parseInt(index, 10)};
-  });
-};

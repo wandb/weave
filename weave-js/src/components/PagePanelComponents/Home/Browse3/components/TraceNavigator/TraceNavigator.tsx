@@ -92,28 +92,6 @@ export const TraceNavigator = ({
     return traceTreeFlat;
   }, [rootCallId, traceRootCallId, traceTreeFlatRootedAtTraceRoot]);
 
-  // // If the focusedCallId is not a descendant of the rootCallId, set it to the rootCallId
-  // useEffect(() => {
-  //   if (!focusedCallId) {
-  //     return;
-  //   }
-  //   let candidateRootCallId: string | undefined = focusedCallId;
-  //   while (candidateRootCallId) {
-  //     if (candidateRootCallId === rootCallId) {
-  //       return;
-  //     }
-  //     candidateRootCallId =
-  //       traceTreeFlatRootedAtRootCallId[candidateRootCallId]?.parentId;
-  //   }
-
-  //   setRootCallId(focusedCallId);
-  // }, [
-  //   focusedCallId,
-  //   rootCallId,
-  //   setRootCallId,
-  //   traceTreeFlatRootedAtRootCallId,
-  // ]);
-
   // Auto-select first call when trace tree is built and no call is selected
   useEffect(() => {
     if (!focusedCallId && traceRootCallId) {
@@ -183,7 +161,7 @@ export const TraceNavigatorInner: FC<
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
-        <h2 className="truncate text-sm font-semibold">Trace View</h2>
+        <h2 className="truncate text-sm font-semibold">Trace view</h2>
         <div className="flex items-center gap-3">
           {traceViews.map(view => {
             const isDisabled = !!(
@@ -199,13 +177,13 @@ export const TraceNavigatorInner: FC<
                 content={tooltipContent}
                 trigger={
                   <Button
-                    variant={'ghost'}
+                    variant='ghost'
                     active={traceViewId === view.id}
                     onClick={() => setTraceViewId(view.id)}
                     icon={view.icon}
                     size="small"
-                    disabled={isDisabled}></Button>
-                }></Tooltip>
+                    disabled={isDisabled}/>
+                }/>
             );
           })}
         </div>

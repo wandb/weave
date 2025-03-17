@@ -20,6 +20,7 @@ import {
   getUsageInputTokens,
   getUsageOutputTokens,
 } from './costUtils';
+import classNames from 'classnames';
 
 const tooltipRowStyles = {
   display: 'flex',
@@ -133,10 +134,10 @@ export const TraceStat = ({
         icon={icon}
         label={label}
         color="moon"
-        className={
-          'bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500 ' +
+        className={classNames(
+          'bg-transparent','text-moon-500','dark:bg-transparent','dark:text-moon-500',
           className
-        }
+        )}
       />
     </div>
   );
