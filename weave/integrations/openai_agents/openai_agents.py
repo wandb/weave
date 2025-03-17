@@ -9,9 +9,6 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
-from agents import tracing
-from agents.tracing import add_trace_processor
-
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
@@ -19,6 +16,15 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
+
+
+try:
+    from agents import tracing
+    from agents.tracing import TracingProcessor
+except ImportError:
+
+    class TracingProcessor:  # type: ignore
+        pass
 
 
 def _call_type(span: tracing.Span[Any]) -> str:
@@ -48,7 +54,7 @@ class WeaveDataDict(TypedDict):
     error: dict[str, Any] | None
 
 
-class WeaveTracingProcessor(tracing.TracingProcessor):
+class WeaveTracingProcessor(TracingProcessor):
     """
     A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
 
@@ -464,6 +470,8 @@ class OpenAIAgentsPatcher(Patcher):
             return True
 
         try:
+            from agents.tracing import add_trace_processor
+
             self.processor = WeaveTracingProcessor()
             add_trace_processor(self.processor)
             self.patched = True

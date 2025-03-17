@@ -50,6 +50,7 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "openai_agents",
         "vertexai",
         "bedrock",
         "scorers",
