@@ -384,36 +384,42 @@ export type OperatorGroupedOption = {
   options: SelectOperatorOption[];
 };
 
-export const makeDefaultDateFilter = (): GridFilterItem => {
-  /*
-    Default date filter is 30 days agoqq
-    TODO: should this be configurable?
-  */
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return {
-    id: 0,
-    field: 'started_at',
-    operator: '(date): after',
-    value: thirtyDaysAgo.toISOString(),
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
   };
+};
+
+// Default time ranges for date filters in days
+const DEFAULT_DATE_RANGE_DAYS = 30;
+const EXTENDED_DATE_RANGE_DAYS = 90;
+const YEAR_LONG_DATE_RANGE_DAYS = 365;
+
+export const makeDefaultDateFilter = (): GridFilterItem => {
+  return makeDateFilter(DEFAULT_DATE_RANGE_DAYS);
 };
 
 export const make3MonthsLongDateFilter = (): GridFilterItem => {
-  const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  return {
-    id: 0,
-    field: 'started_at',
-    operator: '(date): after',
-    value: threeMonthsAgo.toISOString(),
-  };
+  return makeDateFilter(EXTENDED_DATE_RANGE_DAYS);
 };
 
 export const makeYearLongDateFilter = (): GridFilterItem => {
-  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-  return {
-    id: 0,
-    field: 'started_at',
-    operator: '(date): after',
-    value: oneYearAgo.toISOString(),
-  };
+  return makeDateFilter(YEAR_LONG_DATE_RANGE_DAYS);
 };

@@ -12,11 +12,12 @@ import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {filterHasCalledAfterDateFilter} from './CallsTable';
 
 type CallsTableNoRowsOverlayProps = {
   callsLoading: boolean;
-  callsResult: any[];
+  callsResult: CallSchema[];
   isEvaluateTable: boolean;
   effectiveFilter: {
     traceRootsOnly?: boolean;
@@ -97,7 +98,7 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
 
     // Determine new date range based on current filter's date
     let newDateFilter;
-    if (dateFilter && dateFilter.value) {
+    if (dateFilter?.value) {
       const filterDate = new Date(dateFilter.value);
       const now = new Date();
       const daysDifference = Math.round(
