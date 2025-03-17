@@ -61,7 +61,7 @@ import {
   DEFAULT_FILTER_CALLS_WITH_DATE,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
-  filterHasDefaultDateFilter,
+  filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
@@ -706,7 +706,7 @@ const CallsPageBinding = () => {
   // Only show the date filter if not evals and we haven't explicitly removed it
   const defaultDateFilter =
     isEvaluationsTab || hasRemovedDateFilter.current
-      ? DEFAULT_FILTER_CALLS // No date filter for evaluations or if user removed it
+      ? DEFAULT_FILTER_CALLS
       : DEFAULT_FILTER_CALLS_WITH_DATE;
 
   const filterModel = useMemo(
@@ -717,8 +717,8 @@ const CallsPageBinding = () => {
   const setFilterModel = (newModel: GridFilterModel) => {
     // If there was a date filter and now there isn't, mark it as explicitly removed
     // so we don't add it back on subsequent navigations
-    const hadDateFilter = filterHasDefaultDateFilter(filterModel);
-    if (hadDateFilter && !filterHasDefaultDateFilter(newModel)) {
+    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
+    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
       hasRemovedDateFilter.current = true;
     }
 

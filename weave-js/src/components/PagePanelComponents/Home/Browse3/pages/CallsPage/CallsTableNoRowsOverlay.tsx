@@ -12,7 +12,7 @@ import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
-import {filterHasDefaultDateFilter} from './CallsTable';
+import {filterHasCalledAfterDateFilter} from './CallsTable';
 
 type CallsTableNoRowsOverlayProps = {
   callsLoading: boolean;
@@ -57,7 +57,7 @@ export const CallsTableNoRowsOverlay: React.FC<
     return <Empty {...EMPTY_PROPS_TRACES} />;
   }
 
-  const hasDateFilter = filterHasDefaultDateFilter(filterModelResolved);
+  const hasDateFilter = filterHasCalledAfterDateFilter(filterModelResolved);
   if (hasDateFilter) {
     return (
       <DateFilterEmptyState
