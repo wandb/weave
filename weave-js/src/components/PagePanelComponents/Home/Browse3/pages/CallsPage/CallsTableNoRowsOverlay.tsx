@@ -89,7 +89,6 @@ export const CallsTableNoRowsOverlay: React.FC<
     </Box>
   );
 
-  // Helper for rendering a clickable action when clearFilters is available
   const ClearFiltersAction = ({
     onClick,
     text,
@@ -98,7 +97,6 @@ export const CallsTableNoRowsOverlay: React.FC<
     text: string;
   }) => <A onClick={onClick}>{text}</A>;
 
-  // Documentation link that appears in both states
   const DocsLink = () => (
     <TargetBlank href="https://wandb.me/weave">the docs</TargetBlank>
   );
@@ -107,39 +105,35 @@ export const CallsTableNoRowsOverlay: React.FC<
     return (
       <EmptyStateBox>
         No calls found for the specified date range.{' '}
-        {clearFilters != null ? (
-          <>
-            Try{' '}
-            <ClearFiltersAction
-              onClick={expandDateRange}
-              text="expanding your date range"
-            />{' '}
-            or looking for data in a different time period.
-          </>
-        ) : (
-          <>Try searching for data in a different time period.</>
-        )}
-      </EmptyStateBox>
-    );
-  } else {
-    return (
-      <EmptyStateBox>
-        No calls found with the current filters.{' '}
-        {clearFilters != null ? (
-          <>
-            Try{' '}
-            <ClearFiltersAction
-              onClick={clearFilters}
-              text="clearing the filters"
-            />{' '}
-            or learn more about how to log calls by visiting <DocsLink />.
-          </>
-        ) : (
-          <>
-            Learn more about how to log calls by visiting <DocsLink />.
-          </>
-        )}
+        <>
+          Try{' '}
+          <ClearFiltersAction
+            onClick={expandDateRange}
+            text="expanding your date range"
+          />{' '}
+          or looking for data in a different time period.
+        </>
       </EmptyStateBox>
     );
   }
+
+  return (
+    <EmptyStateBox>
+      No calls found with the current filters.{' '}
+      {clearFilters != null ? (
+        <>
+          Try{' '}
+          <ClearFiltersAction
+            onClick={clearFilters}
+            text="clearing the filters"
+          />{' '}
+          or learn more about how to log calls by visiting <DocsLink />.
+        </>
+      ) : (
+        <>
+          Learn more about how to log calls by visiting <DocsLink />.
+        </>
+      )}
+    </EmptyStateBox>
+  );
 };

@@ -8,12 +8,10 @@
 
 import {
   Autocomplete,
-  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
-  Typography,
 } from '@mui/material';
 import {
   GridColDef,
@@ -48,7 +46,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -64,7 +61,6 @@ import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {
   getDefaultOperatorForValue,
   makeDefaultDateFilter,
-  makeYearLongDateFilter,
 } from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -73,11 +69,6 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
-import {Empty} from '../common/Empty';
-import {
-  EMPTY_PROPS_EVALUATIONS,
-  EMPTY_PROPS_TRACES,
-} from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
