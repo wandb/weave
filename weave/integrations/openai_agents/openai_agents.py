@@ -13,10 +13,14 @@ from agents import tracing
 from agents.tracing import add_trace_processor
 
 import weave
+from weave.integrations.patcher import NoOpPatcher, Patcher
+from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import (
     require_weave_client,
 )
+
+_openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
 
 def _call_type(span: tracing.Span[Any]) -> str:
@@ -133,8 +137,8 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         """Extract log data from a response span."""
         inputs = {}
         outputs = {}
-        metadata = {}
-        metrics = {}
+        metadata: dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
 
         # Add input if available
         if span.span_data.input is not None:
@@ -236,8 +240,8 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         # Prepare fields
         inputs = {}
         outputs = {}
-        metadata = {}
-        metrics = {}
+        metadata: dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
 
         # Extract data from the custom span
         custom_data = span.span_data.data
@@ -301,7 +305,9 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         parent_span_id = getattr(span, "parent_id", None)
 
         # Child span
-        if call := self._span_calls.get(parent_span_id):
+        if parent_span_id is not None and (
+            call := self._span_calls.get(parent_span_id)
+        ):
             return call
 
         # Trace root
@@ -449,22 +455,63 @@ class WeaveTracingProcessor(tracing.TracingProcessor):
         self._finish_unfinished_calls("force_flushed")
 
 
-def install(
-    parent_call: weave.trace.context.call_context.Call | None = None,
-) -> WeaveTracingProcessor:
+class OpenAIAgentsPatcher(Patcher):
     """
-    Install the Weave tracing processor for OpenAI Agents.
+    A patcher for OpenAI Agents that manages the lifecycle of a WeaveTracingProcessor.
 
-    This function creates a WeaveTracingProcessor and registers it with
-    the OpenAI Agents tracing system.
+    Unlike other patchers that modify function behavior, this patcher installs and
+    removes a processor from the OpenAI Agents tracing system.
+    """
+
+    def __init__(self, settings: IntegrationSettings) -> None:
+        self.settings = settings
+        self.processor: WeaveTracingProcessor | None = None
+        self.patched = False
+        self.parent_call: weave.trace.context.call_context.Call | None = None
+
+    def attempt_patch(self) -> bool:
+        """Install a WeaveTracingProcessor in the OpenAI Agents tracing system."""
+        if self.patched:
+            return True
+
+        try:
+            self.processor = WeaveTracingProcessor(self.parent_call)
+            add_trace_processor(self.processor)
+            self.patched = True
+        except Exception as e:
+            self.processor = None
+            return False
+        else:
+            return True
+
+    def undo_patch(self) -> bool:
+        # OpenAI Agents doesn't have a way to de-register a processor yet...
+        return True
+
+
+def get_openai_agents_patcher(
+    settings: IntegrationSettings | None = None,
+) -> OpenAIAgentsPatcher | NoOpPatcher:
+    """
+    Get a patcher for OpenAI Agents integration.
 
     Args:
-        parent_call: Optional Weave call to use as the parent for all traces.
-            If None, the current call from the context will be used.
+        settings: Optional integration settings to configure the patcher.
+            If None, default settings will be used.
 
     Returns:
-        The installed WeaveTracingProcessor instance.
+        A patcher that can be used to patch and unpatch the OpenAI Agents integration.
     """
-    processor = WeaveTracingProcessor(parent_call)
-    add_trace_processor(processor)
-    return processor
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _openai_agents_patcher
+    if _openai_agents_patcher is not None:
+        return _openai_agents_patcher
+
+    _openai_agents_patcher = OpenAIAgentsPatcher(settings)
+
+    return _openai_agents_patcher
