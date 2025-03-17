@@ -151,6 +151,11 @@ const allOperators: SelectOperatorOption[] = [
     group: 'date',
   },
   {
+    value: '(date): range',
+    label: 'between',
+    group: 'date',
+  },
+  {
     value: '(any): isEmpty',
     label: 'is empty',
     group: 'any',
@@ -249,6 +254,11 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(date): before',
         label: 'before',
+        group: 'date',
+      },
+      {
+        value: '(date): range',
+        label: 'between',
         group: 'date',
       },
     ];

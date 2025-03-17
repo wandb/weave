@@ -143,6 +143,60 @@ export const operationConverter = (
         },
       ],
     };
+  } else if (item.operator === '(date): range') {
+    if (item.value === '') {
+      return null;
+    }
+
+    try {
+      // Parse the JSON string containing start and end dates
+      const {start, end} = JSON.parse(item.value);
+
+      // If both start and end are specified, use $and to combine them
+      if (start && end) {
+        const startSecs = new Date(start).getTime();
+        const endSecs = new Date(end).getTime();
+
+        return {
+          $and: [
+            {
+              $gt: [{$getField: item.field}, {$literal: startSecs / 1000}],
+            },
+            {
+              $not: [
+                {
+                  $gt: [{$getField: item.field}, {$literal: endSecs / 1000}],
+                },
+              ],
+            },
+          ],
+        };
+      }
+      // If only start date is specified, use 'after' condition
+      else if (start) {
+        const startSecs = new Date(start).getTime();
+        return {
+          $gt: [{$getField: item.field}, {$literal: startSecs / 1000}],
+        };
+      }
+      // If only end date is specified, use 'before' condition
+      else if (end) {
+        const endSecs = new Date(end).getTime();
+        return {
+          $not: [
+            {
+              $gt: [{$getField: item.field}, {$literal: endSecs / 1000}],
+            },
+          ],
+        };
+      }
+
+      // If neither start nor end is specified, return null
+      return null;
+    } catch (e) {
+      console.error('Error parsing date range value:', e);
+      return null;
+    }
   } else {
     throw new Error(`Unsupported operator: ${item.operator}`);
   }
