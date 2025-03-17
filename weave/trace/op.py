@@ -40,27 +40,6 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
-logger = logging.getLogger(__name__)
-
-S = TypeVar("S")
-V = TypeVar("V")
-
-
-if sys.version_info < (3, 10):
-
-    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
-        return obj.__aiter__()
-
-    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP007
-        try:
-            return await obj.__anext__()
-        except StopAsyncIteration:
-            if default is not None:
-                return default
-            else:
-                raise
-
-
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
 
@@ -83,6 +62,29 @@ try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
+
+
+S = TypeVar("S")
+V = TypeVar("V")
+
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
+        return obj.__aiter__()
+
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP007,UP045
+        try:
+            return await obj.__anext__()
+        except StopAsyncIteration:
+            if default is not None:
+                return default
+            else:
+                raise
+
+
+logger = logging.getLogger(__name__)
+
 
 CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
@@ -616,7 +618,6 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
-    accumulator: Callable | None = None,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -633,9 +634,6 @@ def op(
         is_async = inspect.iscoroutinefunction(func)
         is_generator = inspect.isgeneratorfunction(func)
         is_async_generator = inspect.isasyncgenfunction(func)
-
-        # Detect if this is an iterator function
-        is_iterator = is_generator or is_async_generator
 
         # Create the appropriate wrapper based on function type
         def create_wrapper(func: Callable) -> Op:
@@ -702,27 +700,13 @@ def op(
 
             # Mark what type of function this is for runtime type checking
             wrapper._is_async = is_async  # type: ignore
-            wrapper._is_iterator = is_iterator  # type: ignore
             wrapper._is_generator = is_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
             return cast(Op, wrapper)
 
         # Create the wrapper
-        wrapped_op = create_wrapper(func)
-
-        # Apply accumulator if this is an iterator and accumulator was provided
-        if is_iterator and accumulator is not None:
-            # Create an appropriate make_accumulator function
-            def make_accumulator(inputs: dict) -> Callable:
-                if accumulator is None:
-                    return lambda acc, value: value  # Default accumulator if None
-                return accumulator
-
-            # Apply the accumulator
-            _add_accumulator(wrapped_op, make_accumulator)
-
-        return wrapped_op
+        return create_wrapper(func)
 
     if func is None:
         return op_deco
