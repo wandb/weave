@@ -118,6 +118,7 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
         }}
         onMouseDown={handleMouseDown}
       />
+      {headerContent}
       {children}
     </Drawer>
   );

@@ -456,11 +456,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
+            )
+
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.calls_delete.count": str(
+                        len(req.call_ids)
+                    )
+                }
             )
 
         # get all parents
@@ -1725,6 +1735,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
         if batch:
             settings = {}
             if self._use_async_insert:
@@ -2177,10 +2195,22 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
+    if root_span := ddtrace.tracer.current_span():
+        root_span.set_tags(
+            {
+                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                    len(root_ids)
+                ),
+                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                    len(all_calls)
+                ),
+            }
+        )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
