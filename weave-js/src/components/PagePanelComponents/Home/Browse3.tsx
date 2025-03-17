@@ -662,19 +662,11 @@ const CallsPageBinding = () => {
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
 
-  // Track if we've ever had a filter applied
-  const hasHadFilter = useRef(false);
-
   // Track if the user has explicitly removed the date filter
   const hasRemovedDateFilter = useRef(false);
 
-  // Update the onFilterUpdate callback to track filter state
   const onFilterUpdate = useCallback(
     filter => {
-      // Mark that we've had a filter applied
-      hasHadFilter.current = true;
-
-      // Push the new URL with the updated filter
       history.push(routerContext.callsUIUrl(entity, project, filter));
     },
     [history, entity, project, routerContext]
@@ -720,6 +712,7 @@ const CallsPageBinding = () => {
 
   const setFilterModel = (newModel: GridFilterModel) => {
     // If there was a date filter and now there isn't, mark it as explicitly removed
+    // so we don't add it back on subsequent navigations
     const hadDateFilter = filterHasDefaultDateFilter(filterModel);
     if (hadDateFilter && !filterHasDefaultDateFilter(newModel)) {
       hasRemovedDateFilter.current = true;
@@ -727,8 +720,6 @@ const CallsPageBinding = () => {
 
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
-      // If clearing all filters, mark date filter as explicitly removed
-      hasRemovedDateFilter.current = true;
       newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));
