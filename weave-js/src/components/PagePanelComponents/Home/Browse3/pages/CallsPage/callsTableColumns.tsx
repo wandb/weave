@@ -226,6 +226,10 @@ function buildCallsTableColumns(
       hideable: false,
       display: 'flex',
       valueGetter: (unused: any, row: any) => {
+        const displayName = row.display_name;
+        if (displayName) {
+          return displayName;
+        }
         const op_name = row.op_name;
         if (!isWeaveRef(op_name)) {
           return op_name;
