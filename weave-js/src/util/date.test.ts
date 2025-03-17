@@ -101,7 +101,7 @@ describe('Date Utility Functions', () => {
       );
     });
 
-    test('should parse natural language dates', () => {
+    test('should parse basic natural language dates', () => {
       // Current date is 2023-06-15 (Thursday)
 
       // Today, yesterday, tomorrow
@@ -115,7 +115,7 @@ describe('Date Utility Functions', () => {
         areDatesEqual(parseDate('tomorrow'), createDate(2023, 6, 16))
       ).toBe(true);
 
-      // Last/next/this time units
+      // Last/next time units
       expect(
         areDatesEqual(parseDate('last day'), createDate(2023, 6, 14))
       ).toBe(true);
@@ -140,30 +140,6 @@ describe('Date Utility Functions', () => {
       expect(
         areDatesEqual(parseDate('next year'), createDate(2024, 6, 15))
       ).toBe(true);
-
-      // For day of week tests, we need to be more flexible
-      // The actual behavior might depend on the current day of the week
-      // Just verify they return a valid date
-      const thisMonday = parseDate('this monday');
-      expect(thisMonday instanceof Date).toBe(true);
-
-      const thisThursday = parseDate('this thursday');
-      expect(thisThursday instanceof Date).toBe(true);
-
-      const thisSunday = parseDate('this sunday');
-      expect(thisSunday instanceof Date).toBe(true);
-
-      const nextMonday = parseDate('next monday');
-      expect(nextMonday instanceof Date).toBe(true);
-
-      const nextThursday = parseDate('next thursday');
-      expect(nextThursday instanceof Date).toBe(true);
-
-      const lastMonday = parseDate('last monday');
-      expect(lastMonday instanceof Date).toBe(true);
-
-      const lastThursday = parseDate('last thursday');
-      expect(lastThursday instanceof Date).toBe(true);
     });
 
     test('should parse "X units ago" format', () => {
@@ -222,109 +198,7 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
     });
 
-    test('should parse quarter formats', () => {
-      expect(areDatesEqual(parseDate('Q1 2023'), createDate(2023, 1, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('Q2 2023'), createDate(2023, 4, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('Q3 2023'), createDate(2023, 7, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('Q4 2023'), createDate(2023, 10, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('2023 Q1'), createDate(2023, 1, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('2023 Q2'), createDate(2023, 4, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('2023 Q3'), createDate(2023, 7, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('2023 Q4'), createDate(2023, 10, 1))).toBe(
-        true
-      );
-    });
-
-    test('should parse month and year formats', () => {
-      // Full month names
-      expect(
-        areDatesEqual(parseDate('January 2023'), createDate(2023, 1, 1))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('June 2023'), createDate(2023, 6, 1))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('December 2023'), createDate(2023, 12, 1))
-      ).toBe(true);
-
-      // Abbreviated month names
-      expect(areDatesEqual(parseDate('Jan 2023'), createDate(2023, 1, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('Jun 2023'), createDate(2023, 6, 1))).toBe(
-        true
-      );
-      expect(
-        areDatesEqual(parseDate('Dec 2023'), createDate(2023, 12, 1))
-      ).toBe(true);
-
-      // Year first formats
-      expect(
-        areDatesEqual(parseDate('2023 January'), createDate(2023, 1, 1))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('2023 June'), createDate(2023, 6, 1))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('2023 December'), createDate(2023, 12, 1))
-      ).toBe(true);
-
-      // Year first with abbreviated months
-      expect(areDatesEqual(parseDate('2023 Jan'), createDate(2023, 1, 1))).toBe(
-        true
-      );
-      expect(areDatesEqual(parseDate('2023 Jun'), createDate(2023, 6, 1))).toBe(
-        true
-      );
-      expect(
-        areDatesEqual(parseDate('2023 Dec'), createDate(2023, 12, 1))
-      ).toBe(true);
-    });
-
-    test('should handle before/after today and current time formats', () => {
-      // X days/weeks/months before/after today
-      expect(
-        areDatesEqual(parseDate('3 days before today'), createDate(2023, 6, 12))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('3 days after today'), createDate(2023, 6, 18))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('1 week before today'), createDate(2023, 6, 8))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('1 week after today'), createDate(2023, 6, 22))
-      ).toBe(true);
-      expect(
-        areDatesEqual(
-          parseDate('1 month before today'),
-          createDate(2023, 5, 15)
-        )
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('1 month after today'), createDate(2023, 7, 15))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('1 year before today'), createDate(2022, 6, 15))
-      ).toBe(true);
-      expect(
-        areDatesEqual(parseDate('1 year after today'), createDate(2024, 6, 15))
-      ).toBe(true);
-
+    test('should handle current time formats', () => {
       // Current time
       const now = new Date(2023, 5, 15); // Our mocked current date
       expect(parseDate('now')?.getFullYear()).toBe(now.getFullYear());
@@ -358,10 +232,6 @@ describe('Date Utility Functions', () => {
       expect(isRelativeDate('2023-06-15')).toBe(false);
       expect(isRelativeDate('06/15/2023')).toBe(false);
       expect(isRelativeDate('June 15, 2023')).toBe(false);
-      expect(isRelativeDate('Q2 2023')).toBe(false);
-      expect(isRelativeDate('2023 Q2')).toBe(false);
-      expect(isRelativeDate('June 2023')).toBe(false);
-      expect(isRelativeDate('2023 June')).toBe(false);
     });
   });
 

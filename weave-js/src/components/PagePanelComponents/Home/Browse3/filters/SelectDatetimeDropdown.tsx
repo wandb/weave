@@ -4,7 +4,7 @@ import {
   TEAL_400,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {
   dateToISOString,
@@ -58,23 +58,19 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   }, [value]);
 
   // Compute yesterday's date string (date only, no time)
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayString = formatDateOnly(yesterdayDate);
+  const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayString = formatDateOnly(yesterdayDate);
 
-  const yesterdaySuggestion: PredefinedSuggestion = {
-    abbreviation: yesterdayString,
-    label: 'Yesterday (Absolute)',
-  };
-  const predefinedSuggestions: PredefinedSuggestion[] = [
-    ...PREDEFINED_SUGGESTIONS,
-    yesterdaySuggestion,
-  ];
+    const yesterdaySuggestion: PredefinedSuggestion = {
+      abbreviation: yesterdayString,
+      label: 'Yesterday (Absolute)',
+    };
+    return [...PREDEFINED_SUGGESTIONS, yesterdaySuggestion];
+  }, []);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newInputValue = event.target.value;
-    setInputValue(newInputValue);
-
+  const parseAndUpdateDate = (newInputValue: string) => {
     // Parse the input to get a date
     const date = parseDate(newInputValue);
     setParsedDate(date);
@@ -87,7 +83,12 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       // This allows for storing relative date strings like "3d" directly
       onChange(newInputValue);
     }
+  };
 
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newInputValue = event.target.value;
+    setInputValue(newInputValue);
+    parseAndUpdateDate(newInputValue);
     // Check against our predefined suggestions by their value
     const isPredefined = predefinedSuggestions.some(
       s => s.abbreviation === newInputValue
@@ -114,18 +115,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const handleSuggestionClick = (suggestionValue: string) => {
     setInputValue(suggestionValue);
-
-    // Parse the suggestion to get a date
-    const date = parseDate(suggestionValue);
-    setParsedDate(date);
-
-    // Call the parent onChange handler with the timestamp
-    if (date) {
-      onChange(dateToISOString(date));
-    } else {
-      // If we couldn't parse a date, pass the raw input
-      onChange(suggestionValue);
-    }
+    parseAndUpdateDate(suggestionValue);
 
     setSelectedSuggestion(suggestionValue);
     setDropdownVisible(false);
