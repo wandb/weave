@@ -4,8 +4,7 @@ import styled from 'styled-components';
 import TraceScrubber from '../TraceScrubber';
 import {TreeView} from './TreeView';
 import {TraceTreeFlat, TraceViewProps} from './types';
-import {buildCodeMap, CodeMapNode} from './utils';
-import {formatDuration} from './utils';
+import {buildCodeMap, CodeMapNode, formatDuration} from './utils';
 
 const Container = styled.div`
   height: 100%;

@@ -34,8 +34,8 @@ export interface TraceViewProps {
   rootCallId?: string;
   /** Current stack  */
   stack: StackState;
-  /** Callback when a call is selected */
+  /** Callback when a call is selected under the root call */
   setFocusedCallId: (callId: string) => void;
-  /** Callback when a call is selected */
+  /** Callback when a call is selected as the root call */
   setRootCallId: (callId: string) => void;
 }

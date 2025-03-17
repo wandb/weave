@@ -2,6 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
 
@@ -53,7 +54,7 @@ type NodeType =
   | 'none';
 
 // Helper function to get call type icon
-const getCallTypeIcon = (type: NodeType): IconName => {
+const getCallTypeIcon = (type: NodeType): null | IconName => {
   switch (type) {
     case 'agent':
       return 'robot-service-member';
@@ -67,10 +68,8 @@ const getCallTypeIcon = (type: NodeType): IconName => {
       return 'baseline-alt';
     case 'scorer':
       return 'number';
-    case 'none':
-      return 'circle';
     default:
-      return 'circle';
+      return null;
   }
 };
 
@@ -159,6 +158,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     }
     const searchLower = searchQuery.toLowerCase();
     const textLower = displayName.toLowerCase();
+
+    // Note: could highlight multiple matches for better UX
     const index = textLower.indexOf(searchLower);
 
     if (index === -1) {
@@ -168,7 +169,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     return (
       <>
         {displayName.slice(0, index)}
-        <span className="font-semibold text-teal-600 dark:text-teal-500">
+        <span
+          // Comment from Jamie: these look a bit too much like links
+          className={classNames(
+            'font-semibold',
+            'text-teal-600',
+            'dark:text-teal-500'
+          )}>
           {displayName.slice(index, index + searchQuery.length)}
         </span>
         {displayName.slice(index + searchQuery.length)}
@@ -185,6 +192,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     statusCode = 'DESCENDANT_ERROR';
   }
   const indentMultiplier = 14;
+  const callTypeIcon = getCallTypeIcon(typeName);
 
   return (
     <div style={style}>
@@ -260,10 +268,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                   )}
             </div>
 
-            <Icon
-              name={getCallTypeIcon(typeName)}
-              className={`max-w-16 max-h-16 ${opTypeColor}`}
-            />
+            {callTypeIcon && (
+              <Icon
+                name={callTypeIcon}
+                className={classNames('max-w-16', 'max-h-16', opTypeColor)}
+              />
+            )}
             <StatusChip value={statusCode} iconOnly />
           </div>
         </div>
@@ -328,7 +338,11 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
         icon={showDuration ? 'recent-clock' : 'database-artifacts'}
         onClick={onToggleView}
         className="ml-8"
-        tooltip={showDuration ? 'Latency' : 'Cost / duration'}
+        tooltip={
+          showDuration
+            ? 'Showing latency, click to show cost'
+            : 'Showing cost, click to show latency'
+        }
       />
     </div>
   );

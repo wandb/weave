@@ -177,13 +177,15 @@ export const TraceNavigatorInner: FC<
                 content={tooltipContent}
                 trigger={
                   <Button
-                    variant='ghost'
+                    variant="ghost"
                     active={traceViewId === view.id}
                     onClick={() => setTraceViewId(view.id)}
                     icon={view.icon}
                     size="small"
-                    disabled={isDisabled}/>
-                }/>
+                    disabled={isDisabled}
+                  />
+                }
+              />
             );
           })}
         </div>

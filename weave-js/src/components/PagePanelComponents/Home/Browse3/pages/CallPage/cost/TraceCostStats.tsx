@@ -4,6 +4,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {formatNumber} from '@wandb/weave/core/util/number';
+import classNames from 'classnames';
 import React, {ReactNode} from 'react';
 
 import {
@@ -20,7 +21,6 @@ import {
   getUsageInputTokens,
   getUsageOutputTokens,
 } from './costUtils';
-import classNames from 'classnames';
 
 const tooltipRowStyles = {
   display: 'flex',
@@ -135,7 +135,10 @@ export const TraceStat = ({
         label={label}
         color="moon"
         className={classNames(
-          'bg-transparent','text-moon-500','dark:bg-transparent','dark:text-moon-500',
+          'bg-transparent',
+          'text-moon-500',
+          'dark:bg-transparent',
+          'dark:text-moon-500',
           className
         )}
       />
