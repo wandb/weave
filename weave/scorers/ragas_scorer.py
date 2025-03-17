@@ -49,11 +49,11 @@ class ContextEntityRecallScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = Field(
         default=0.7,
-        description="Controls randomness in the LLM's responses (0.0 to 1.0)"
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
     )
     max_tokens: int = Field(
         default=4096,
-        description="Maximum number of tokens allowed in the LLM's response"
+        description="Maximum number of tokens allowed in the LLM's response",
     )
 
     async def _extract_entities(self, text: str) -> list[str]:
@@ -126,11 +126,11 @@ class ContextRelevancyScorer(LLMScorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = Field(
         default=0.7,
-        description="Controls randomness in the LLM's responses (0.0 to 1.0)"
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
     )
     max_tokens: int = Field(
         default=4096,
-        description="Maximum number of tokens allowed in the LLM's response"
+        description="Maximum number of tokens allowed in the LLM's response",
     )
 
     @weave.op
