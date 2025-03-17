@@ -5,6 +5,12 @@ import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {TraceCallSchema} from './traceServerClientTypes';
 import {LoadableWithError} from './wfDataModelHooksInterface';
 
+/**
+ * Fetches the "bare" trace calls for a given trace ID. Where "bare" means
+ * simply means calls without any additional json fields or feedback. The
+ * first load will optimize for speed and not have costs, where the second
+ * load will have costs.
+ */
 export const useBareTraceCalls = (
   entity: string,
   project: string,
@@ -73,6 +79,10 @@ export const useBareTraceCalls = (
   };
 };
 
+/**
+ * Fetches the "bare" trace calls for a given trace ID. Where "bare" means
+ * simply means calls without any additional json fields, costs, or feedback
+ */
 const fetchBareTraceCalls = (
   client: TraceServerClient,
   entity: string,
@@ -104,6 +114,11 @@ const fetchBareTraceCalls = (
   return traceCallsProm.then(res => res.calls);
 };
 
+/**
+ * Fetches the "bare" trace calls for a given trace ID. Where "bare" means
+ * simply means calls without any additional json fields or feedback, but
+ * does include costs
+ */
 const fetchBareTraceCallsWithCosts = (
   client: TraceServerClient,
   entity: string,
