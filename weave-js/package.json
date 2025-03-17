@@ -47,7 +47,7 @@
     "@mui/icons-material": "^5.14.12",
     "@mui/material": "^6.0.2",
     "@mui/x-data-grid-pro": "^7.18.0",
-    "@mui/x-date-pickers": "^6.16.0",
+    "@mui/x-date-pickers-pro": "^7.28.0",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",

@@ -16,6 +16,7 @@ import {
   isValuelessOperator,
   isWeaveRef,
 } from './common';
+import {DateRangePicker} from './DateRangePicker';
 import {IdList} from './IdList';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
@@ -30,8 +31,8 @@ type SelectValueProps = {
 export const SelectValue = ({
   field,
   operator,
-  value,
   onSetValue,
+  value,
 }: SelectValueProps) => {
   if (isValuelessOperator(operator)) {
     return null;
@@ -51,6 +52,10 @@ export const SelectValue = ({
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
   if (fieldType === 'datetime') {
+    if (operator === '(date): range') {
+      return <DateRangePicker value={value} onSetValue={onSetValue} />;
+    }
+
     const dateTimeValue = value ? moment(value) : null;
     return (
       <StyledDateTimePicker

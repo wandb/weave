@@ -20,6 +20,7 @@ import {
   isValuelessOperator,
   isWeaveRef,
 } from './common';
+import {DateRangeDisplay} from './DateRangePicker';
 import {FilterTag} from './FilterTag';
 import {IdList} from './IdList';
 
@@ -50,7 +51,11 @@ export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
   } else if (!isValuelessOperator(item.operator)) {
     const valueType = getOperatorValueType(item.operator);
     if (valueType === 'date') {
-      value = <Timestamp value={item.value} />;
+      if (item.operator === '(date): range') {
+        value = <DateRangeDisplay value={item.value} />;
+      } else {
+        value = <Timestamp value={item.value} />;
+      }
     } else {
       value = ' ' + quoteValue(valueType, item.value);
     }

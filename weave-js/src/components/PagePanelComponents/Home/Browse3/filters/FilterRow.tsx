@@ -48,8 +48,17 @@ export const FilterRow = ({
     [item.field]
   );
 
-  const onSelectOperator = (operator: string) => {
-    onUpdateFilter({...item, operator});
+  const onSelectOperator = (newOperator: string) => {
+    const newItem = {
+      ...item,
+      operator: newOperator,
+      // For range operator, initialize with empty JSON object
+      value:
+        newOperator === '(date): range'
+          ? JSON.stringify({start: null, end: null})
+          : item.value,
+    };
+    onUpdateFilter(newItem);
   };
 
   const onSetValue = (value: string) => {

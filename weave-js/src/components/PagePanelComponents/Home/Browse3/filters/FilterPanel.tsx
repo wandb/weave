@@ -3,8 +3,8 @@
  */
 
 import {GridFilterModel} from '@mui/x-data-grid-pro';
-import {LocalizationProvider} from '@mui/x-date-pickers';
-import {AdapterMoment} from '@mui/x-date-pickers/AdapterMoment';
+import {LocalizationProvider} from '@mui/x-date-pickers-pro';
+import {AdapterMoment} from '@mui/x-date-pickers-pro/AdapterMoment';
 import React from 'react';
 import {AutoSizer} from 'react-virtualized';
 
