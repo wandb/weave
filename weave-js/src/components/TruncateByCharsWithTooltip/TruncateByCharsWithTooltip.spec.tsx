@@ -5,7 +5,7 @@ import React from 'react';
 import {TruncateByCharsWithTooltip} from './TruncateByCharsWithTooltip';
 import {truncateTextByChars} from './utils';
 
-describe('TruncateTextByCharsWithTooltip', () => {
+describe('TruncateByCharsWithTooltip', () => {
   it('includes tooltip if text is truncated', async () => {
     render(
       <TruncateByCharsWithTooltip text="hello world" maxChars={5}>
