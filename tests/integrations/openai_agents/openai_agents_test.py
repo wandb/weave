@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from weave.trace.object_record import ObjectRecord
 from weave.trace.weave_client import WeaveClient
 
+# TODO: Responses should be updated once we have patching for the new Responses API
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -42,8 +44,15 @@ def test_openai_agents_quickstart(client: WeaveClient) -> None:
         }
     ]
 
-    # TODO
-    # assert response_call.output["output"][0]
+    val = response_call.output["output"][0]._val
+    assert isinstance(val, ObjectRecord)
+    assert val.role == "assistant"
+    assert val.type == "message"
+    assert val.status == "completed"
+    assert (
+        val.content[0].text
+        == "Code calls to itself,  \nInfinite loops in silence,  \nPatterns emerge clear."
+    )
 
 
 # @pytest.mark.skip(reason="Not clear why VCR fails for this test")
