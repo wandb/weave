@@ -53,7 +53,6 @@ def test_openai_agents_quickstart(client: WeaveClient) -> None:
     )
 
 
-# @pytest.mark.skip(reason="Not clear why VCR fails for this test")
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
