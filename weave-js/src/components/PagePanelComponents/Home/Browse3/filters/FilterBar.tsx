@@ -71,8 +71,6 @@ const combineRangeFilters = (
         value: {
           before: range.before.value,
           after: range.after.value,
-          beforeId: range.before.id,
-          afterId: range.after.id,
         },
       };
       result.push(combinedFilter);

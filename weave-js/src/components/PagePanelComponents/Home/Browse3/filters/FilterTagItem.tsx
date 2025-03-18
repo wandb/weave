@@ -7,7 +7,7 @@ import {RemoveAction} from '@wandb/weave/components/Tag';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Timestamp, TimestampMicro} from '../../../../Timestamp';
+import {Timestamp, TimestampMicro, TimestampRange} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -62,35 +62,11 @@ export const FilterTagItem = ({
     if (item.operator === '(date): after' && field === 'Called') {
       label = <TimestampMicro value={item.value} label="Past" />;
       disableRemove = true;
-    } else if (item.operator === '(date): range') {
-      // Handle the combined date range filter
-      const {before, after, beforeId} = item.value as {
-        before: string;
-        after: string;
-        beforeId: FilterId;
-      };
-      label = (
-        <span className="flex items-center gap-2">
-          {field}
-          <span className="flex items-center">
-            <Timestamp value={after} />
-          </span>
-          <span className="mx-2">→</span>
-          <span className="flex items-center">
-            <Timestamp value={before} />
-            <RemoveAction
-              className="ml-4 mt-8"
-              onClick={(e: any) => {
-                e.stopPropagation();
-                onRemoveFilter(beforeId);
-              }}
-            />
-          </span>
-        </span>
-      );
-      disableRemove = true; // We handle removal with individual buttons
+    } // Special case for when we have both before/after, show a range
+    else if (item.operator === '(date): range') {
+      label = <TimestampRange value={item.value} field={field} />;
     } else {
-      value = <Timestamp value={item.value} />;
+      value = <Timestamp value={item.value} dropTimeWhenDefault />;
     }
   } else {
     const valueType = getOperatorValueType(item.operator);
