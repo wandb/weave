@@ -262,6 +262,14 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  const {combinedItems, activeIds} = useMemo(() => {
+    const {items: combinedItems, activeIds} = combineRangeFilters(
+      completeItems,
+      activeEditId
+    );
+    return {combinedItems, activeIds};
+  }, [completeItems, activeEditId]);
+
   return (
     <>
       <div
@@ -275,20 +283,14 @@ export const FilterBar = ({
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {(() => {
-            const {items: combinedItems, activeIds} = combineRangeFilters(
-              completeItems,
-              activeEditId
-            );
-            return combinedItems.map(f => (
-              <FilterTagItem
-                key={f.id}
-                item={f}
-                onRemoveFilter={onRemoveFilter}
-                isEditing={activeIds.has(f.id) || f.id === activeEditId}
-              />
-            ));
-          })()}
+          {combinedItems.map(f => (
+            <FilterTagItem
+              key={f.id}
+              item={f}
+              onRemoveFilter={onRemoveFilter}
+              isEditing={activeIds.has(f.id) || f.id === activeEditId}
+            />
+          ))}
         </VariableChildrenDisplay>
       </div>
       <Popover
