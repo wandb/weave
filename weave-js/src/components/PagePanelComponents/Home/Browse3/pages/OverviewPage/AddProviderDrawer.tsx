@@ -1,14 +1,21 @@
-import {Box, Divider, Drawer, Typography} from '@mui/material';
+import {Box, Typography} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {useHandleScroll} from '@wandb/weave/common/hooks/useHandleScroll';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useState} from 'react';
 
+import {ResizableDrawer} from '../common/ResizableDrawer';
 import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
 import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
+
+// Shared typography style
+const sharedTypographyStyle = {
+  fontSize: '16px',
+  fontFamily: 'Source Sans Pro',
+};
+
 interface AddProviderDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,22 +42,22 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
 }) => {
   const createProvider = useCreateBuiltinObjectInstance('Provider');
   const createProviderModel = useCreateBuiltinObjectInstance('ProviderModel');
+  const [drawerWidth, setDrawerWidth] = useState(480);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Form state
   const [name, setName] = useState(editingProvider?.name || '');
   const [apiKey, setApiKey] = useState(editingProvider?.apiKey || '');
   const [baseUrl, setBaseUrl] = useState(editingProvider?.baseUrl || '');
   const [headers, setHeaders] = useState<Array<[string, string]>>(
-    editingProvider?.headers || []
+    editingProvider?.headers || [['', '']]
   );
   const [modelName, setModelName] = useState<string[]>(
-    editingProvider?.models || []
+    editingProvider?.models || ['']
   );
   const [maxTokens, setMaxTokens] = useState<number[]>(
-    editingProvider?.maxTokens || []
+    editingProvider?.maxTokens || [0]
   );
-
-  const {scrolled} = useHandleScroll();
 
   useEffect(() => {
     if (editingProvider) {
@@ -68,9 +75,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     setName('');
     setApiKey('');
     setBaseUrl('');
-    setModelName([]);
-    setMaxTokens([]);
-    setHeaders([]);
+    setModelName(['']);
+    setMaxTokens([0]);
+    setHeaders([['', '']]);
     onClose();
   };
 
@@ -86,10 +93,12 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             base_url: baseUrl,
             api_key_name: apiKey,
             extra_headers:
-              headers?.reduce((acc, [key, value]) => {
-                acc[key] = value;
-                return acc;
-              }, {} as Record<string, string>) || {},
+              headers
+                ?.filter(([key, value]) => key !== '')
+                .reduce((acc, [key, value]) => {
+                  acc[key] = value;
+                  return acc;
+                }, {} as Record<string, string>) || {},
           },
           project_id: projectId,
           object_id: name,
@@ -155,82 +164,130 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     !nameNoSpaces ||
     hasDuplicateModelNames;
 
+  const handleToggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
   return (
-    <Drawer
-      anchor="right"
+    <ResizableDrawer
       open={isOpen}
       onClose={handleClose}
-      PaperProps={{
-        sx: {
-          width: 480,
-          marginTop: scrolled ? '0px' : '60px',
-          height: scrolled ? '100%' : 'calc(100% - 60px)',
-        },
-      }}>
-      <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
-        {/* Header */}
+      defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
+      setWidth={width => !isFullscreen && setDrawerWidth(width)}
+      headerContent={
         <Box
           sx={{
-            px: '16px',
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'space-between',
-            height: '64px',
+            alignItems: 'center',
+            pl: 2,
+            pr: 1,
+            height: '44px',
+            minHeight: '44px',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
           }}>
-          <Typography variant="h6" fontWeight="semi-bold">
+          <Typography
+            variant="h6"
+            sx={{...sharedTypographyStyle, fontSize: '20px', fontWeight: 600}}>
             {editingProvider ? 'Edit provider' : 'Add a provider'}
           </Typography>
-          <Button variant="ghost" icon="close" onClick={handleClose} />
+          <Box sx={{display: 'flex', gap: 1}}>
+            <Button
+              onClick={handleToggleFullscreen}
+              variant="ghost"
+              icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
+              tooltip={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            />
+            <Button
+              onClick={handleClose}
+              variant="ghost"
+              icon="close"
+              tooltip="Close"
+            />
+          </Box>
         </Box>
-        <Divider />
-
+      }>
+      <Box 
+        sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
         {/* Content */}
-        <Box sx={{flex: 1, p: 3, overflowY: 'auto'}}>
-          <Box sx={{display: 'flex', flexDirection: 'column', gap: 3}}>
+        <Box 
+          sx={{
+            flex: 1,
+            p: 2,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}>
+          <Box sx={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
             <Box>
-              <Typography variant="subtitle2" sx={{mb: 1, fontWeight: 'bold'}}>
-                Name
+              <Typography
+                sx={{...sharedTypographyStyle, mb: 1, fontWeight: '600'}}>
+                Provider name
               </Typography>
               <TextField
-                placeholder="Enter provider name"
+                placeholder="Enter provider name..."
                 value={name}
                 onChange={value => setName(value)}
                 errorState={!nameIsUnique || !nameNoSpaces || name.length > 128}
               />
               {!nameIsUnique && (
-                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                <Typography
+                  variant="caption"
+                  color="error"
+                  sx={{...sharedTypographyStyle, mt: 0.5}}>
                   Provider with this name already exists
                 </Typography>
               )}
               {!nameNoSpaces && (
-                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                <Typography
+                  variant="caption"
+                  color="error"
+                  sx={{...sharedTypographyStyle, mt: 0.5}}>
                   Name cannot contain spaces
                 </Typography>
               )}
               {name.length > 128 && (
-                <Typography variant="caption" color="error" sx={{mt: 0.5}}>
+                <Typography
+                  variant="caption"
+                  color="error"
+                  sx={{...sharedTypographyStyle, mt: 0.5}}>
                   Name must be less than 128 characters
                 </Typography>
               )}
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{mb: 1, fontWeight: 'bold'}}>
-                API key name
+              <Typography
+                sx={{...sharedTypographyStyle, mb: 1, fontWeight: '600'}}>
+                API key / token
               </Typography>
               <TextField
-                placeholder="Enter API key name"
+                placeholder="Enter API key / token..."
                 value={apiKey}
                 onChange={value => setApiKey(value)}
               />
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{mb: 1, fontWeight: 'bold'}}>
-                API base URL
+              <Typography sx={{...sharedTypographyStyle, fontWeight: '600'}}>
+                Base URL
+              </Typography>
+              <Typography
+                sx={{
+                  ...sharedTypographyStyle,
+                  color: 'text.secondary',
+                  fontSize: '0.875rem',
+                  mb: 1,
+                }}>
+                For example: https://api.yourendpoint.com/v1
               </Typography>
               <TextField
-                placeholder="Enter base URL"
+                placeholder="Enter base URL..."
                 value={baseUrl}
                 onChange={value => setBaseUrl(value)}
               />
@@ -244,7 +301,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}>
-                <Typography variant="subtitle2" sx={{fontWeight: 'bold'}}>
+                <Typography sx={{...sharedTypographyStyle, fontWeight: '600'}}>
                   Headers
                 </Typography>
                 <Button
@@ -265,7 +322,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     key={index}
                     sx={{display: 'flex', alignItems: 'center', gap: 1}}>
                     <TextField
-                      placeholder="Enter header key"
+                      placeholder="Enter header key..."
                       value={key}
                       onChange={val =>
                         setHeaders(prev =>
@@ -276,7 +333,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                       }
                     />
                     <TextField
-                      placeholder="Enter header value"
+                      placeholder="Enter header value..."
                       value={value}
                       onChange={val =>
                         setHeaders(prev =>
@@ -288,7 +345,6 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     />
                     <Button
                       variant="ghost"
-                      size="small"
                       icon="delete"
                       onClick={() =>
                         setHeaders(prev => {
@@ -312,17 +368,22 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                   alignItems: 'center',
                 }}>
                 <Typography
-                  variant="subtitle2"
                   sx={{
-                    fontWeight: 'bold',
+                    ...sharedTypographyStyle,
+                    fontWeight: '600',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 1,
+                    gap: 0.5,
                   }}>
                   Models
                   <Tooltip
                     trigger={
-                      <Icon name="info" size="small" color="text-muted" />
+                      <Icon
+                        name="info"
+                        width={16}
+                        height={16}
+                        color="text-muted"
+                      />
                     }
                     content="Models are the specific AI models you want to use from the provider. You can add multiple models to the same provider."
                   />
@@ -350,7 +411,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     }}>
                     <Box sx={{width: '75%'}}>
                       <TextField
-                        placeholder="Enter model name"
+                        placeholder="Enter model name..."
                         value={model}
                         onChange={value => {
                           const newValue = value.replace(/\s/g, '');
@@ -368,11 +429,10 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     </Box>
                     <Box sx={{width: '25%'}}>
                       <TextField
-                        placeholder="Max tokens"
+                        placeholder="Max tokens..."
                         type="number"
                         value={String(maxTokens[index] || '')}
                         onChange={value => {
-                          // Only allow numeric input
                           const newValue = value.replace(/[^0-9]/g, '');
                           const numericValue = newValue
                             ? parseInt(newValue, 10)
@@ -387,7 +447,6 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     </Box>
                     <Button
                       variant="ghost"
-                      size="small"
                       icon="delete"
                       onClick={() => {
                         setModelName(prev =>
@@ -404,7 +463,11 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     <Typography
                       variant="caption"
                       color="error"
-                      sx={{mt: 0.5, display: 'block'}}>
+                      sx={{
+                        ...sharedTypographyStyle,
+                        mt: 0.5,
+                        display: 'block',
+                      }}>
                       {'<Provider>/<Model> cannot be more than 128 characters'}
                     </Typography>
                   )}
@@ -414,7 +477,11 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     <Typography
                       variant="caption"
                       color="error"
-                      sx={{mt: 0.5, display: 'block'}}>
+                      sx={{
+                        ...sharedTypographyStyle,
+                        mt: 0.5,
+                        display: 'block',
+                      }}>
                       Model name must be unique
                     </Typography>
                   )}
@@ -427,21 +494,36 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
         {/* Footer */}
         <Box
           sx={{
-            p: 3,
+            py: 2,
+            px: 0,
             borderTop: '1px solid',
             borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            width: '100%',
             display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 1,
+            flexShrink: 0,
+            position: 'sticky',
+            bottom: 0,
           }}>
-          <Button variant="secondary" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={disableSave}>
-            Save
-          </Button>
+          <Box sx={{display: 'flex', gap: 2, width: '100%', mx: 2}}>
+            <Button
+              onClick={handleClose}
+              variant="secondary"
+              style={{flex: 1}}
+              twWrapperStyles={{flex: 1}}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={disableSave}
+              variant="primary"
+              style={{flex: 1}}
+              twWrapperStyles={{flex: 1}}>
+              {editingProvider ? 'Save' : 'Add provider'}
+            </Button>
+          </Box>
         </Box>
       </Box>
-    </Drawer>
+    </ResizableDrawer>
   );
 };
