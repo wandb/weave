@@ -382,8 +382,9 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
-    while len(acc.output) <= value.output_index:
-        acc.output.append("")
+    if len(acc.output) <= value.output_index:
+        missing_len = value.output_index - len(acc.output) + 1
+        acc.output.extend([""] * missing_len)
     return acc
 
 
