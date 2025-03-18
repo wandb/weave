@@ -1,8 +1,8 @@
 import {
+  buildCodeMap,
   getSortedPeerPathCallIds,
   locateNodeForCallId,
-} from '../../TraceViews/CodeView';
-import {buildCodeMap} from '../../TraceViews/utils';
+} from '../../TraceViews/utils';
 import {createScrubber} from './BaseScrubber';
 
 export const TimelineScrubber = createScrubber({

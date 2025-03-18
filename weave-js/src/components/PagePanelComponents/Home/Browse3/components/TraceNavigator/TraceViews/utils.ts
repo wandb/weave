@@ -327,3 +327,33 @@ export const formatTimestamp = (timestamp: string): string => {
 export const getCallDisplayName = (call: TraceCallSchema): string => {
   return call.display_name || parseSpanName(call.op_name);
 };
+
+export const getSortedPeerPathCallIds = (
+  selectedCodeNode: CodeMapNode | null,
+  traceTreeFlat: TraceTreeFlat
+) => {
+  return (selectedCodeNode?.callIds ?? []).sort(
+    (a, b) =>
+      Date.parse(traceTreeFlat[a].call.started_at) -
+      Date.parse(traceTreeFlat[b].call.started_at)
+  );
+};
+
+export const locateNodeForCallId = (
+  codeMap: CodeMapNode[],
+  selectedCallId: string
+) => {
+  const findOpByCallId = (nodes: CodeMapNode[]): CodeMapNode | null => {
+    for (const node of nodes) {
+      if (node.callIds.includes(selectedCallId)) {
+        return node;
+      }
+      const found = findOpByCallId(node.children);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  };
+  return findOpByCallId(codeMap);
+};

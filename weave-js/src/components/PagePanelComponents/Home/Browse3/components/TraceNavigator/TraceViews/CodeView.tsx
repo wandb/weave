@@ -3,8 +3,14 @@ import styled from 'styled-components';
 
 import TraceScrubber from '../TraceScrubber';
 import {TreeView} from './TreeView';
-import {TraceTreeFlat, TraceViewProps} from './types';
-import {buildCodeMap, CodeMapNode, formatDuration} from './utils';
+import {TraceViewProps} from './types';
+import {
+  buildCodeMap,
+  CodeMapNode,
+  formatDuration,
+  getSortedPeerPathCallIds,
+  locateNodeForCallId,
+} from './utils';
 
 const Container = styled.div`
   height: 100%;
@@ -199,9 +205,11 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
         </div>
         <div className="whitespace-nowrap text-[11px] text-moon-500">
           {stats.finishedCallCount > 0
-            ? `${formatDuration(stats.minDuration)} - ${formatDuration(
-                stats.maxDuration
-              )}`
+            ? stats.minDuration === stats.maxDuration
+              ? formatDuration(stats.minDuration)
+              : `${formatDuration(stats.minDuration)} - ${formatDuration(
+                  stats.maxDuration
+                )}`
             : 'Running...'}
         </div>
       </NodeHeader>
@@ -226,36 +234,6 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
         <RecursionBlock key={ancestor}>{ancestor}</RecursionBlock>
       ))}
     </NodeContainer>
-  );
-};
-
-export const locateNodeForCallId = (
-  codeMap: CodeMapNode[],
-  selectedCallId: string
-) => {
-  const findOpByCallId = (nodes: CodeMapNode[]): CodeMapNode | null => {
-    for (const node of nodes) {
-      if (node.callIds.includes(selectedCallId)) {
-        return node;
-      }
-      const found = findOpByCallId(node.children);
-      if (found) {
-        return found;
-      }
-    }
-    return null;
-  };
-  return findOpByCallId(codeMap);
-};
-
-export const getSortedPeerPathCallIds = (
-  selectedCodeNode: CodeMapNode | null,
-  traceTreeFlat: TraceTreeFlat
-) => {
-  return (selectedCodeNode?.callIds ?? []).sort(
-    (a, b) =>
-      Date.parse(traceTreeFlat[a].call.started_at) -
-      Date.parse(traceTreeFlat[b].call.started_at)
   );
 };
 
