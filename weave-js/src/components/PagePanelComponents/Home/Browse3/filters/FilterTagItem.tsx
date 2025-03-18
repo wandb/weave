@@ -26,6 +26,7 @@ import {IdList} from './IdList';
 type FilterTagItemProps = {
   item: GridFilterItem;
   onRemoveFilter: (id: FilterId) => void;
+  isEditing?: boolean;
 };
 
 const quoteValue = (valueType: string, value: string): string => {
@@ -35,7 +36,11 @@ const quoteValue = (valueType: string, value: string): string => {
   return value;
 };
 
-export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
+export const FilterTagItem = ({
+  item,
+  onRemoveFilter,
+  isEditing = false,
+}: FilterTagItemProps) => {
   const field = getFieldLabel(item.field);
 
   const operator = getOperatorLabel(item.operator);
@@ -64,6 +69,7 @@ export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
           <div className="ml-4">{value}</div>
         </>
       }
+      isEditing={isEditing}
       removeAction={
         <RemoveAction
           onClick={(e: any) => {
