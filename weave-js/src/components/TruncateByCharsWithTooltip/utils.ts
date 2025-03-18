@@ -11,6 +11,10 @@ export const truncateTextByChars = (
   maxChars: number,
   truncatedPart: TruncatedPart
 ): string => {
+  if (maxChars <= 0) {
+    return text;
+  }
+
   if (text.length <= maxChars) {
     return text;
   }
@@ -29,6 +33,8 @@ export const truncateTextByChars = (
     return text.slice(0, maxChars) + '\u2026';
   }
 
-  // should never reach here but typescript is being silly
+  // This should never happen due to TypeScript's type checking,
+  // but providing a fallback for runtime safety
+  console.warn(`Unexpected truncatedPart value: ${truncatedPart}`);
   return text;
 };

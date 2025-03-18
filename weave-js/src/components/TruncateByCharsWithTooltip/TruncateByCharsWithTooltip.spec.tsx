@@ -40,7 +40,16 @@ describe('TruncateTextByCharsWithTooltip', () => {
 });
 
 describe('truncateTextByChars', () => {
-  it('does not truncate texts shorter than maxChars', () => {
+  it('handles empty strings', () => {
+    expect(truncateTextByChars('', 5, 'end')).toEqual('');
+  });
+
+  it('handles zero or negative maxChars', () => {
+    expect(truncateTextByChars('hello', 0, 'end')).toEqual('hello');
+    expect(truncateTextByChars('hello', -5, 'end')).toEqual('hello');
+  });
+
+  it('handles strings shorter than maxChars', () => {
     expect(truncateTextByChars('hello', 10, 'end')).toEqual('hello');
   });
 
