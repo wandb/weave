@@ -319,7 +319,9 @@ def _execute_op(
 
         return res, __call
 
-    def handle_exception(e: Exception) -> tuple[Any, Call]:
+    def handle_exception(
+        e: Exception | SystemExit | KeyboardInterrupt,
+    ) -> tuple[Any, Call]:
         finish(exception=e)
         if __should_raise:
             raise
@@ -339,7 +341,7 @@ def _execute_op(
 
     try:
         res = func(*args, **kwargs)
-    except Exception as e:
+    except (Exception, SystemExit, KeyboardInterrupt) as e:
         handle_exception(e)
     else:
         return process(res)
