@@ -7,6 +7,7 @@ import React from 'react';
 
 const COLOR_BORDER_OVER = hexToRGB(Colors.TEAL_500, 0.4);
 const COLOR_BG_SELECTED_TEXT = Colors.MOON_100;
+const COLOR_BORDER = Colors.MOON_250;
 
 export const StyledDateTimePicker = styled(
   (props: DateTimePickerProps<moment.Moment>) => <DateTimePicker {...props} />
@@ -14,6 +15,10 @@ export const StyledDateTimePicker = styled(
   '& .MuiOutlinedInput-root': {
     fontFamily: 'Source Sans Pro',
     padding: 4,
+    width: '202px',
+    '& fieldset': {
+      borderColor: COLOR_BORDER,
+    },
     '&:hover fieldset': {
       borderColor: COLOR_BORDER_OVER,
       borderWidth: 2,
