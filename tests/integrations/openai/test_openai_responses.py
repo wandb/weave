@@ -207,7 +207,6 @@ def test_openai_tool_calling(client: WeaveClient) -> None:
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    print(f"{output=}")
     assert output.model == "gpt-4o-2024-08-06"
     assert output.object == "response"
 
@@ -265,7 +264,6 @@ def test_openai_tool_calling_stream(client: WeaveClient) -> None:
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    print(f"{output=}")
     assert output.model == "gpt-4o-2024-08-06"
     assert output.object == "response"
 
