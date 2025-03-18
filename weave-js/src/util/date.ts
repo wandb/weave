@@ -20,8 +20,8 @@ export const parseDate = (dateStr: string): Date | null => {
   const trimmedStr = dateStr.trim();
   const lowerStr = trimmedStr.toLowerCase();
 
-  // Handle shorthand relative dates (e.g., "1d", "2w", "3m", "1y")
-  const shorthandPattern = /^(\d+)([dwmy])$/i;
+  // Handle shorthand relative dates (e.g., "1d", "2w", "3mo", "1y", "4h", "30m")
+  const shorthandPattern = /^(\d+)([dwymoh]|mo)$/i;
   const shorthandMatch = trimmedStr.match(shorthandPattern);
   if (shorthandMatch) {
     const amount = parseInt(shorthandMatch[1], 10);
@@ -35,8 +35,14 @@ export const parseDate = (dateStr: string): Date | null => {
       case 'w':
         result.setDate(result.getDate() - amount * 7);
         return result;
-      case 'm':
+      case 'mo':
         result.setMonth(result.getMonth() - amount);
+        return result;
+      case 'm':
+        result.setMinutes(result.getMinutes() - amount);
+        return result;
+      case 'h':
+        result.setHours(result.getHours() - amount);
         return result;
       case 'y':
         result.setFullYear(result.getFullYear() - amount);
@@ -68,7 +74,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle "X days/weeks/months/years ago"
-  const agoPattern = /^(\d+)\s+(day|week|month|year)s?\s+ago$/i;
+  const agoPattern = /^(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago$/i;
   const agoMatch = lowerStr.match(agoPattern);
   if (agoMatch) {
     const amount = parseInt(agoMatch[1], 10);
@@ -76,6 +82,12 @@ export const parseDate = (dateStr: string): Date | null => {
     const result = new Date(now);
 
     switch (unit) {
+      case 'minute':
+        result.setMinutes(result.getMinutes() - amount);
+        return result;
+      case 'hour':
+        result.setHours(result.getHours() - amount);
+        return result;
       case 'day':
         result.setDate(result.getDate() - amount);
         return result;
@@ -92,7 +104,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle "in X days/weeks/months/years"
-  const inFuturePattern = /^in\s+(\d+)\s+(day|week|month|year)s?$/i;
+  const inFuturePattern = /^in\s+(\d+)\s+(minute|hour|day|week|month|year)s?$/i;
   const inFutureMatch = lowerStr.match(inFuturePattern);
   if (inFutureMatch) {
     const amount = parseInt(inFutureMatch[1], 10);
@@ -100,6 +112,12 @@ export const parseDate = (dateStr: string): Date | null => {
     const result = new Date(now);
 
     switch (unit) {
+      case 'minute':
+        result.setMinutes(result.getMinutes() + amount);
+        return result;
+      case 'hour':
+        result.setHours(result.getHours() + amount);
+        return result;
       case 'day':
         result.setDate(result.getDate() + amount);
         return result;
@@ -116,7 +134,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle last/next for basic time units
-  const lastNextPattern = /^(last|next)\s+(day|week|month|year)$/i;
+  const lastNextPattern = /^(last|next)\s+(minute|hour|day|week|month|year)$/i;
   const lastNextMatch = lowerStr.match(lastNextPattern);
   if (lastNextMatch) {
     const direction = lastNextMatch[1].toLowerCase();
@@ -125,6 +143,12 @@ export const parseDate = (dateStr: string): Date | null => {
     const result = new Date(now);
 
     switch (unit) {
+      case 'minute':
+        result.setMinutes(result.getMinutes() + multiplier);
+        return result;
+      case 'hour':
+        result.setHours(result.getHours() + multiplier);
+        return result;
       case 'day':
         result.setDate(result.getDate() + multiplier);
         return result;
@@ -157,8 +181,8 @@ export const isRelativeDate = (value: string): boolean => {
 
   const trimmedValue = value.trim().toLowerCase();
 
-  // Check for shorthand patterns (e.g., "1d", "2w")
-  if (/^\d+[dwmy]$/i.test(trimmedValue)) {
+  // Check for shorthand patterns (e.g., "1d", "2w", "3mo", "5h", "10m")
+  if (/^\d+([dwymoh]|mo)$/i.test(trimmedValue)) {
     return true;
   }
 
@@ -209,14 +233,4 @@ export const formatDateOnly = (
     return '';
   }
   return moment(date).format(format);
-};
-
-/**
- * Converts a date to ISO string or returns empty string if null
- *
- * @param date The date to convert
- * @returns ISO string representation of the date, or empty string if date is invalid
- */
-export const dateToISOString = (date: Date | null | undefined): string => {
-  return date ? date.toISOString() : '';
 };

@@ -1,17 +1,25 @@
 import {vi} from 'vitest';
 
-import {
-  dateToISOString,
-  formatDate,
-  formatDateOnly,
-  isRelativeDate,
-  parseDate,
-} from './date';
+import {formatDate, formatDateOnly, isRelativeDate, parseDate} from './date';
 
 // Helper function to create a date with a specific year, month, day
 const createDate = (year: number, month: number, day: number): Date => {
   const date = new Date(year, month - 1, day);
   date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+// Helper function to create a date with specific time components
+const createDateTime = (
+  year: number,
+  month: number,
+  day: number,
+  hour: number = 0,
+  minute: number = 0,
+  second: number = 0
+): Date => {
+  const date = new Date(year, month - 1, day);
+  date.setHours(hour, minute, second, 0);
   return date;
 };
 
@@ -28,11 +36,26 @@ const areDatesEqual = (date1: Date | null, date2: Date | null): boolean => {
   );
 };
 
+// Helper function to compare dates including time
+const areDateTimesEqual = (date1: Date | null, date2: Date | null): boolean => {
+  if (!date1 || !date2) {
+    return date1 === date2;
+  }
+
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate() &&
+    date1.getHours() === date2.getHours() &&
+    date1.getMinutes() === date2.getMinutes()
+  );
+};
+
 describe('Date Utility Functions', () => {
   // Mock the current date for consistent testing
   beforeAll(() => {
-    // Mock current date to 2023-06-15
-    const mockDate = new Date(2023, 5, 15);
+    // Mock current date to 2023-06-15 12:30:00
+    const mockDate = new Date(2023, 5, 15, 12, 30, 0);
     vi.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
     vi.setSystemTime(mockDate);
   });
@@ -72,7 +95,23 @@ describe('Date Utility Functions', () => {
     });
 
     test('should parse shorthand relative dates', () => {
-      // Current date is 2023-06-15
+      // Current date is 2023-06-15 12:30:00
+
+      // Minutes ago
+      expect(
+        areDateTimesEqual(parseDate('30m'), createDateTime(2023, 6, 15, 12, 0))
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(parseDate('90m'), createDateTime(2023, 6, 15, 11, 0))
+      ).toBe(true);
+
+      // Hours ago
+      expect(
+        areDateTimesEqual(parseDate('1h'), createDateTime(2023, 6, 15, 11, 30))
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(parseDate('12h'), createDateTime(2023, 6, 15, 0, 30))
+      ).toBe(true);
 
       // Days ago
       expect(areDatesEqual(parseDate('1d'), createDate(2023, 6, 14))).toBe(
@@ -84,11 +123,11 @@ describe('Date Utility Functions', () => {
       expect(areDatesEqual(parseDate('1w'), createDate(2023, 6, 8))).toBe(true);
       expect(areDatesEqual(parseDate('2w'), createDate(2023, 6, 1))).toBe(true);
 
-      // Months ago
-      expect(areDatesEqual(parseDate('1m'), createDate(2023, 5, 15))).toBe(
+      // Months ago (now using 'mo' instead of 'm')
+      expect(areDatesEqual(parseDate('1mo'), createDate(2023, 5, 15))).toBe(
         true
       );
-      expect(areDatesEqual(parseDate('6m'), createDate(2022, 12, 15))).toBe(
+      expect(areDatesEqual(parseDate('6mo'), createDate(2022, 12, 15))).toBe(
         true
       );
 
@@ -102,7 +141,7 @@ describe('Date Utility Functions', () => {
     });
 
     test('should parse basic natural language dates', () => {
-      // Current date is 2023-06-15 (Thursday)
+      // Current date is 2023-06-15 (Thursday) 12:30:00
 
       // Today, yesterday, tomorrow
       expect(areDatesEqual(parseDate('today'), createDate(2023, 6, 15))).toBe(
@@ -116,6 +155,30 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
 
       // Last/next time units
+      expect(
+        areDateTimesEqual(
+          parseDate('last minute'),
+          createDateTime(2023, 6, 15, 12, 29)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('next minute'),
+          createDateTime(2023, 6, 15, 12, 31)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('last hour'),
+          createDateTime(2023, 6, 15, 11, 30)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('next hour'),
+          createDateTime(2023, 6, 15, 13, 30)
+        )
+      ).toBe(true);
       expect(
         areDatesEqual(parseDate('last day'), createDate(2023, 6, 14))
       ).toBe(true);
@@ -143,7 +206,19 @@ describe('Date Utility Functions', () => {
     });
 
     test('should parse "X units ago" format', () => {
-      // Current date is 2023-06-15
+      // Current date is 2023-06-15 12:30:00
+      expect(
+        areDateTimesEqual(
+          parseDate('30 minutes ago'),
+          createDateTime(2023, 6, 15, 12, 0)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('2 hours ago'),
+          createDateTime(2023, 6, 15, 10, 30)
+        )
+      ).toBe(true);
       expect(
         areDatesEqual(parseDate('1 day ago'), createDate(2023, 6, 14))
       ).toBe(true);
@@ -171,7 +246,19 @@ describe('Date Utility Functions', () => {
     });
 
     test('should parse "in X units" format', () => {
-      // Current date is 2023-06-15
+      // Current date is 2023-06-15 12:30:00
+      expect(
+        areDateTimesEqual(
+          parseDate('in 30 minutes'),
+          createDateTime(2023, 6, 15, 13, 0)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('in 2 hours'),
+          createDateTime(2023, 6, 15, 14, 30)
+        )
+      ).toBe(true);
       expect(
         areDatesEqual(parseDate('in 1 day'), createDate(2023, 6, 16))
       ).toBe(true);
@@ -200,10 +287,12 @@ describe('Date Utility Functions', () => {
 
     test('should handle current time formats', () => {
       // Current time
-      const now = new Date(2023, 5, 15); // Our mocked current date
+      const now = new Date(2023, 5, 15, 12, 30); // Our mocked current date
       expect(parseDate('now')?.getFullYear()).toBe(now.getFullYear());
       expect(parseDate('now')?.getMonth()).toBe(now.getMonth());
       expect(parseDate('now')?.getDate()).toBe(now.getDate());
+      expect(parseDate('now')?.getHours()).toBe(now.getHours());
+      expect(parseDate('now')?.getMinutes()).toBe(now.getMinutes());
       expect(parseDate('right now')?.getFullYear()).toBe(now.getFullYear());
       expect(parseDate('current time')?.getFullYear()).toBe(now.getFullYear());
     });
@@ -214,8 +303,10 @@ describe('Date Utility Functions', () => {
       // Shorthand formats
       expect(isRelativeDate('1d')).toBe(true);
       expect(isRelativeDate('2w')).toBe(true);
-      expect(isRelativeDate('3m')).toBe(true);
+      expect(isRelativeDate('3mo')).toBe(true);
       expect(isRelativeDate('4y')).toBe(true);
+      expect(isRelativeDate('5h')).toBe(true);
+      expect(isRelativeDate('30m')).toBe(true);
 
       // Natural language formats
       expect(isRelativeDate('today')).toBe(true);
@@ -226,6 +317,8 @@ describe('Date Utility Functions', () => {
       expect(isRelativeDate('this year')).toBe(true);
       expect(isRelativeDate('3 days ago')).toBe(true);
       expect(isRelativeDate('in 2 weeks')).toBe(true);
+      expect(isRelativeDate('5 hours ago')).toBe(true);
+      expect(isRelativeDate('in 10 minutes')).toBe(true);
     });
 
     test('should identify absolute date inputs', () => {
@@ -261,18 +354,6 @@ describe('Date Utility Functions', () => {
     test('should handle null or undefined inputs', () => {
       expect(formatDateOnly(null)).toBe('');
       expect(formatDateOnly(undefined)).toBe('');
-    });
-  });
-
-  describe('dateToISOString', () => {
-    test('should convert dates to ISO strings', () => {
-      const date = new Date(2023, 5, 15, 12, 30, 45);
-      expect(dateToISOString(date)).toBe(date.toISOString());
-    });
-
-    test('should handle null or undefined inputs', () => {
-      expect(dateToISOString(null)).toBe('');
-      expect(dateToISOString(undefined)).toBe('');
     });
   });
 });

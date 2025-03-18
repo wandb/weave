@@ -1,19 +1,16 @@
 import {
-  MOON_150,
+  MOON_100,
+  MOON_200,
   MOON_250,
+  MOON_500,
   TEAL_350,
   TEAL_400,
+  WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 
-import {
-  dateToISOString,
-  formatDate,
-  formatDateOnly,
-  isRelativeDate,
-  parseDate,
-} from '../../../../../util/date';
+import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -21,11 +18,12 @@ type PredefinedSuggestion = {
 };
 
 const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
+  {abbreviation: '1h', label: '1 Hour'},
   {abbreviation: '1d', label: '1 Day'},
   {abbreviation: '2d', label: '2 Days'},
   {abbreviation: '1w', label: '1 Week'},
   {abbreviation: '2w', label: '2 Weeks'},
-  {abbreviation: '1m', label: '1 Month'},
+  {abbreviation: '1mo', label: '1 Month'},
 ];
 
 type SelectDatetimeDropdownProps = {
@@ -38,7 +36,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
 }) => {
   const [inputValue, setInputValue] = useState(value || '');
-  const [parsedDate, setParsedDate] = useState<Date | null>(null);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -50,14 +47,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
 
-  // Initialize the parsed date from the initial value
-  useEffect(() => {
-    if (value) {
-      const date = parseDate(value);
-      setParsedDate(date);
-    }
-  }, [value]);
-
   // Compute yesterday's date string (date only, no time)
   const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
     const yesterdayDate = new Date();
@@ -66,7 +55,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
     const yesterdaySuggestion: PredefinedSuggestion = {
       abbreviation: yesterdayString,
-      label: 'Yesterday (Absolute)',
+      label: 'Yesterday',
     };
     return [...PREDEFINED_SUGGESTIONS, yesterdaySuggestion];
   }, []);
@@ -74,11 +63,10 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const parseAndUpdateDate = (newInputValue: string) => {
     // Parse the input to get a date
     const date = parseDate(newInputValue);
-    setParsedDate(date);
 
     // Call the parent onChange handler with the timestamp
     if (date) {
-      onChange(dateToISOString(date));
+      onChange(formatDate(date));
     } else {
       // If we couldn't parse a date, pass the raw input
       // This allows for storing relative date strings like "3d" directly
@@ -161,13 +149,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         handleInputMouseLeave={handleInputMouseLeave}
       />
 
-      <DateTypeLabel inputValue={inputValue} parsedDate={parsedDate} />
-
       <SuggestionsList
         isDropdownVisible={isDropdownVisible}
         dropdownRef={dropdownRef}
-        parsedDate={parsedDate}
-        inputValue={inputValue}
         predefinedSuggestions={predefinedSuggestions}
         selectedSuggestion={selectedSuggestion}
         hoveredIndex={hoveredIndex}
@@ -250,74 +234,6 @@ const DateInput: React.FC<DateInputProps> = ({
   );
 };
 
-type DateTypeLabelProps = {
-  inputValue: string;
-  parsedDate: Date | null;
-};
-
-const DateTypeLabel: React.FC<DateTypeLabelProps> = ({
-  inputValue,
-  parsedDate,
-}) => {
-  if (!inputValue.trim()) {
-    return null;
-  }
-
-  const dateLabel = parsedDate
-    ? isRelativeDate(inputValue)
-      ? 'Relative'
-      : 'Absolute'
-    : 'Unparsable';
-
-  return (
-    <span
-      title={parsedDate ? `Parsed Date: ${formatDate(parsedDate)}` : ''}
-      style={{
-        position: 'absolute',
-        right: '10px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        fontSize: '12px',
-        color: '#333',
-        cursor: parsedDate ? 'default' : 'help',
-        zIndex: 2, // Ensure the label sits on top of the input
-        pointerEvents: 'auto', // Make sure the label can receive pointer events
-        backgroundColor: MOON_150,
-        padding: '0px 4px',
-        borderRadius: '4px',
-      }}>
-      {dateLabel}
-    </span>
-  );
-};
-
-type ParsedDateInfoProps = {
-  parsedDate: Date | null;
-  inputValue: string;
-};
-
-const ParsedDateInfo: React.FC<ParsedDateInfoProps> = ({
-  parsedDate,
-  inputValue,
-}) => {
-  if (!parsedDate) {
-    return null;
-  }
-
-  return (
-    <li
-      style={{
-        padding: '8px',
-        borderBottom: '1px solid #eee',
-        color: '#555',
-        cursor: 'default',
-      }}>
-      <strong>{isRelativeDate(inputValue) ? 'Relative:' : 'Absolute:'}</strong>{' '}
-      {formatDate(parsedDate)}
-    </li>
-  );
-};
-
 type SuggestionItemProps = {
   suggestion: PredefinedSuggestion;
   index: number;
@@ -348,11 +264,11 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
         cursor: 'pointer',
         backgroundColor: isSelected
           ? isHovered
-            ? '#f8f8f8'
-            : '#E1F7FA'
+            ? MOON_100
+            : '#E1F7FA' // special super light teal
           : isHovered
-          ? '#f8f8f8'
-          : '#fff',
+          ? MOON_100
+          : WHITE,
       }}
       onMouseDown={e => e.preventDefault()}>
       <div
@@ -362,7 +278,7 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           alignItems: 'center',
         }}>
         <span>{suggestion.abbreviation}</span>
-        <span style={{color: '#999'}}>{suggestion.label}</span>
+        <span style={{color: MOON_500}}>{suggestion.label}</span>
       </div>
     </li>
   );
@@ -371,8 +287,6 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
 type SuggestionsListProps = {
   isDropdownVisible: boolean;
   dropdownRef: React.RefObject<HTMLUListElement>;
-  parsedDate: Date | null;
-  inputValue: string;
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
@@ -384,8 +298,6 @@ type SuggestionsListProps = {
 const SuggestionsList: React.FC<SuggestionsListProps> = ({
   isDropdownVisible,
   dropdownRef,
-  parsedDate,
-  inputValue,
   predefinedSuggestions,
   selectedSuggestion,
   hoveredIndex,
@@ -405,8 +317,8 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
         top: '100%',
         left: '0',
         right: '0',
-        backgroundColor: '#fff',
-        border: '1px solid #ccc',
+        backgroundColor: WHITE,
+        border: `1px solid ${MOON_200}`,
         borderRadius: '4px',
         marginTop: '4px',
         listStyle: 'none',
@@ -415,8 +327,6 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
         overflow: 'hidden',
         zIndex: 1000,
       }}>
-      <ParsedDateInfo parsedDate={parsedDate} inputValue={inputValue} />
-
       {predefinedSuggestions.map((suggestion, index) => (
         <SuggestionItem
           key={index}
