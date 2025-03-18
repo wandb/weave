@@ -606,7 +606,7 @@ def test_delete_calls(client):
     call1 = my_op(2)
     call2 = my_op(3)
 
-    calls = list(client.get_calls())
+    calls = client.get_calls()
     assert len(calls) == 3
 
     call_0_id = calls[0].id
@@ -614,22 +614,27 @@ def test_delete_calls(client):
     call_2_id = calls[2].id
 
     client.delete_calls([call_0_id, call_1_id])
-    assert len(list(client.get_calls())) == 1
-    assert list(client.get_calls())[0].id == call_2_id
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
 
+    # test idempotent
     client.delete_calls([call_0_id, call_1_id])
-    assert len(list(client.get_calls())) == 1
-    assert list(client.get_calls())[0].id == call_2_id
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
 
     client.delete_calls([])
-    assert len(list(client.get_calls())) == 1
-    assert list(client.get_calls())[0].id == call_2_id
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
 
     with pytest.raises(ValueError):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])
-    assert len(list(client.get_calls())) == 0
+    calls = client.get_calls()
+    assert len(calls) == 0
 
 
 def test_call_display_name(client):
