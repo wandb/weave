@@ -296,14 +296,81 @@ def _create_call(
     )
 
 
-def _execute_op(
-    __op: Op,
-    __call: Call,
+def _should_skip_tracing(op: Op) -> bool:
+    if settings.should_disable_weave():
+        return True
+    if weave_client_context.get_weave_client() is None:
+        return True
+    if not op._tracing_enabled:
+        return True
+    if not get_tracing_enabled():
+        return True
+    return False
+
+
+def _should_sample_traces(op: Op) -> bool:
+    if call_context.get_current_call():
+        return False  # Don't sample traces for child calls
+
+    if random.random() > op.tracing_sample_rate:
+        return True  # Sample traces for this call
+
+    return False
+
+
+def _placeholder_call() -> Call:
+    # Import here to avoid circular dependency
+    from weave.trace.weave_client import Call
+
+    return Call(
+        _op_name="",
+        trace_id="",
+        project_id="",
+        parent_id=None,
+        inputs={},
+    )
+
+
+def _call_sync_func(
+    op: Op,
     *args: Any,
-    __should_raise: bool = True,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
     **kwargs: Any,
-) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    func = __op.resolve_fn
+) -> tuple[Any, Call]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if _should_skip_tracing(op):
+        res = func(*args, **kwargs)
+        call.output = res
+        return res, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            res = func(*args, **kwargs)
+            call.output = res
+            return res, call
+
+    # Proceed with tracing. Note that we don't check the sample rate here.
+    # Only root calls get sampling applied.
+    # If the parent was traced (sampled in), the child will be too.
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        res = func(*args, **kwargs)
+        return res, call
+
+    # Execute the op and process the result
     client = weave_client_context.require_weave_client()
     has_finished = False
 
@@ -313,65 +380,129 @@ def _execute_op(
             raise ValueError("Should not call finish more than once")
 
         client.finish_call(
-            __call,
+            call,
             output,
             exception,
-            op=__op,
+            op=op,
         )
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, __call.inputs)
+        if handler := getattr(op, "_on_output_handler", None):
+            return handler(output, finish, call.inputs)
         finish(output)
         return output
 
-    def process(res: Any) -> tuple[Any, Call]:
-        res = box.box(res)
-        try:
-            # Here we do a try/catch because we don't want to
-            # break the user process if we trip up on processing
-            # the output
-            res = on_output(res)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-        finally:
-            # Is there a better place for this? We want to ensure that even
-            # if the final output fails to be captured, we still pop the call
-            # so we don't put future calls under the old call.
-            call_context.pop_call(__call.id)
-
-        return res, __call
-
-    def handle_exception(
-        e: Exception | SystemExit | KeyboardInterrupt,
-    ) -> tuple[Any, Call]:
+    try:
+        res = func(*args, **kwargs)
+    except Exception as e:
         finish(exception=e)
         if __should_raise:
             raise
-        return None, __call
+        return None, call
 
-    if inspect.iscoroutinefunction(func):
+    res = box.box(res)
+    try:
+        # Here we do a try/catch because we don't want to
+        # break the user process if we trip up on processing
+        # the output
+        res = on_output(res)
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+    finally:
+        # Is there a better place for this? We want to ensure that even
+        # if the final output fails to be captured, we still pop the call
+        # so we don't put future calls under the old call.
+        call_context.pop_call(call.id)
 
-        async def _call_async() -> tuple[Any, Call]:
-            try:
-                res = await func(*args, **kwargs)
-            except Exception as e:
-                return handle_exception(e)
-            else:
-                return process(res)
+    return res, call
 
-        return _call_async()
+
+async def _call_async_func(
+    op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if _should_skip_tracing(op):
+        res = await func(*args, **kwargs)
+        call.output = res
+        return res, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            res = await func(*args, **kwargs)
+            call.output = res
+            return res, call
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        res = await func(*args, **kwargs)
+        return res, call
+
+    # Execute the op and process the result
+    client = weave_client_context.require_weave_client()
+    has_finished = False
+
+    def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        nonlocal has_finished
+        if has_finished:
+            raise ValueError("Should not call finish more than once")
+
+        client.finish_call(
+            call,
+            output,
+            exception,
+            op=op,
+        )
+
+    def on_output(output: Any) -> Any:
+        if handler := getattr(op, "_on_output_handler", None):
+            return handler(output, finish, call.inputs)
+        finish(output)
+        return output
 
     try:
-        res = func(*args, **kwargs)
-    except (Exception, SystemExit, KeyboardInterrupt) as e:
-        handle_exception(e)
-    else:
-        return process(res)
+        res = await func(*args, **kwargs)
+    except Exception as e:
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return None, call
 
-    return None, __call
+    res = box.box(res)
+    try:
+        # Here we do a try/catch because we don't want to
+        # break the user process if we trip up on processing
+        # the output
+        res = on_output(res)
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+    finally:
+        # Is there a better place for this? We want to ensure that even
+        # if the final output fails to be captured, we still pop the call
+        # so we don't put future calls under the old call.
+        call_context.pop_call(call.id)
+
+    return res, call
 
 
 def call(
@@ -398,7 +529,7 @@ def call(
     ```
     """
     if inspect.iscoroutinefunction(op.resolve_fn):
-        return _do_call_async(
+        return _call_async_func(
             op,
             *args,
             __weave=__weave,
@@ -406,161 +537,13 @@ def call(
             **kwargs,
         )
     else:
-        return _do_call(
+        return _call_sync_func(
             op,
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
             **kwargs,
         )
-
-
-def _placeholder_call() -> Call:
-    # Import here to avoid circular dependency
-    from weave.trace.weave_client import Call
-
-    return Call(
-        _op_name="",
-        trace_id="",
-        project_id="",
-        parent_id=None,
-        inputs={},
-    )
-
-
-def _do_call(
-    op: Op,
-    *args: Any,
-    __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
-    **kwargs: Any,
-) -> tuple[Any, Call]:
-    func = op.resolve_fn
-    call = _placeholder_call()
-
-    pargs = None
-    if op._on_input_handler is not None:
-        pargs = op._on_input_handler(op, args, kwargs)
-    if not pargs:
-        pargs = _default_on_input_handler(op, args, kwargs)
-
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = func(*pargs.args, **pargs.kwargs)
-                call.output = res
-                return res, call
-
-    # Proceed with tracing. Note that we don't check the sample rate here.
-    # Only root calls get sampling applied.
-    # If the parent was traced (sampled in), the child will be too.
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise e
-    except Exception as e:
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
-        res = func(*pargs.args, **pargs.kwargs)
-    else:
-        execute_result = _execute_op(
-            op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
-        )
-        if inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a sync result"
-            )
-        execute_result = cast(tuple[Any, "Call"], execute_result)
-        res, call = execute_result
-    return res, call
-
-
-async def _do_call_async(
-    op: Op,
-    *args: Any,
-    __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
-    **kwargs: Any,
-) -> tuple[Any, Call]:
-    func = op.resolve_fn
-    call = _placeholder_call()
-
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = await func(*args, **kwargs)
-                call.output = res
-                return res, call
-
-    # Proceed with tracing
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise e
-    except Exception as e:
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
-        res = await func(*args, **kwargs)
-    else:
-        execute_result = _execute_op(
-            op, call, *args, __should_raise=__should_raise, **kwargs
-        )
-        if not inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a coroutine"
-            )
-        res, call = await execute_result
-    return res, call
 
 
 def calls(op: Op) -> CallsIter:
@@ -641,7 +624,7 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _do_call_async(
+                    res, _ = await _call_async_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
@@ -649,7 +632,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = _do_call(
+                    res, _ = _call_sync_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
