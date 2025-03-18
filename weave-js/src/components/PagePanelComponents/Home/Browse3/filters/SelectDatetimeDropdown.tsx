@@ -1,4 +1,5 @@
 import {
+  MOON_150,
   MOON_250,
   TEAL_350,
   TEAL_400,
@@ -20,11 +21,11 @@ type PredefinedSuggestion = {
 };
 
 const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
-  {abbreviation: '1d', label: '1 day'},
-  {abbreviation: '2d', label: '2 days'},
-  {abbreviation: '1w', label: '1 week'},
-  {abbreviation: '2w', label: '2 weeks'},
-  {abbreviation: '1m', label: '1 month'},
+  {abbreviation: '1d', label: '1 Day'},
+  {abbreviation: '2d', label: '2 Days'},
+  {abbreviation: '1w', label: '1 Week'},
+  {abbreviation: '2w', label: '2 Weeks'},
+  {abbreviation: '1m', label: '1 Month'},
 ];
 
 type SelectDatetimeDropdownProps = {
@@ -268,12 +269,6 @@ const DateTypeLabel: React.FC<DateTypeLabelProps> = ({
       : 'Absolute'
     : 'Unparsable';
 
-  const labelColor = parsedDate
-    ? isRelativeDate(inputValue)
-      ? '#4CAF50' // green for relative
-      : '#2196F3' // blue for absolute
-    : '#F44336'; // red for unparsable
-
   return (
     <span
       title={parsedDate ? `Parsed Date: ${formatDate(parsedDate)}` : ''}
@@ -283,10 +278,13 @@ const DateTypeLabel: React.FC<DateTypeLabelProps> = ({
         top: '50%',
         transform: 'translateY(-50%)',
         fontSize: '12px',
-        color: labelColor,
+        color: '#333',
         cursor: parsedDate ? 'default' : 'help',
         zIndex: 2, // Ensure the label sits on top of the input
         pointerEvents: 'auto', // Make sure the label can receive pointer events
+        backgroundColor: MOON_150,
+        padding: '0px 4px',
+        borderRadius: '4px',
       }}>
       {dateLabel}
     </span>
