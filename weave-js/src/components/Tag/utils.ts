@@ -1,5 +1,4 @@
 import {cyrb53} from '@wandb/weave/core';
-import {RefObject} from 'react';
 
 export const TAG_DEFAULT_MAX_CHARS = 24;
 
@@ -92,16 +91,4 @@ export function getTagContrastColor(index?: number): TagColorName {
     return TAG_COLOR_CONTRAST_WHEEL[0];
   }
   return TAG_COLOR_CONTRAST_WHEEL[index % TAG_COLOR_CONTRAST_WHEEL.length];
-}
-
-/**
- * Determines if a label's text exceeds the specified width
- */
-const MAX_TAG_LABEL_WIDTH_PX = 168;
-export function isTagLabelTruncated(
-  labelRef: RefObject<HTMLElement>,
-  maxWidth: number = MAX_TAG_LABEL_WIDTH_PX
-) {
-  const labelLen = labelRef?.current?.clientWidth ?? 0;
-  return labelLen >= maxWidth;
 }
