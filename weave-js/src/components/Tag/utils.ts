@@ -1,6 +1,8 @@
 import {cyrb53} from '@wandb/weave/core';
 import {RefObject} from 'react';
 
+export const TAG_DEFAULT_MAX_CHARS = 24;
+
 /**
  * The order of these colors are intentional!
  * This list includes all possible colors a label can be based ordered by hue.
