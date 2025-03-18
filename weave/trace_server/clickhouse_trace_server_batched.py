@@ -498,11 +498,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
         )
-        # only need to check non-root traces
-        all_children = [call for call in all_calls if call.parent_id is not None]
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
-            all_calls=all_children + parents,
+            all_calls=all_calls,
         )
 
         deleted_at = datetime.datetime.now()
