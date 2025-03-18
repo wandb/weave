@@ -1,5 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Loading} from '@wandb/weave/components/Loading';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {
   FC,
@@ -194,7 +194,7 @@ export const TraceNavigatorInner: FC<
         <div className="flex h-full flex-col">
           {loading ? (
             <div className="flex h-full w-full items-center justify-center">
-              <LoadingDots />
+              <Loading />
             </div>
           ) : (
             <>
