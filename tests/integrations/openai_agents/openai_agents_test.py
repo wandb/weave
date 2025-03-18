@@ -3,7 +3,6 @@ import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from pydantic import BaseModel
 
-from weave.trace.object_record import ObjectRecord
 from weave.trace.weave_client import WeaveClient
 
 # TODO: Responses should be updated once we have patching for the new Responses API
@@ -44,8 +43,7 @@ def test_openai_agents_quickstart(client: WeaveClient) -> None:
         }
     ]
 
-    val = response_call.output["output"][0]._val
-    assert isinstance(val, ObjectRecord)
+    val = response_call.output["output"][0]
     assert val.role == "assistant"
     assert val.type == "message"
     assert val.status == "completed"
@@ -159,8 +157,7 @@ async def test_openai_agents_quickstart_homework(client: WeaveClient) -> None:
     )
     assert call4.inputs["input"][0]["role"] == "user"
 
-    val4 = call4.output["output"][0]._val
-    assert isinstance(val4, ObjectRecord)
+    val4 = call4.output["output"][0]
     assert val4.name == "transfer_to_history_tutor"
     assert val4.type == "function_call"
     assert val4.status == "completed"
@@ -183,8 +180,7 @@ async def test_openai_agents_quickstart_homework(client: WeaveClient) -> None:
     )
     assert call6.inputs["input"][0]["role"] == "user"
 
-    val6 = call6.output["output"][0]._val
-    assert isinstance(val6, ObjectRecord)
+    val6 = call6.output["output"][0]
     assert val6.role == "assistant"
     assert val6.type == "message"
     assert val6.status == "completed"
@@ -211,8 +207,7 @@ async def test_openai_agents_quickstart_homework(client: WeaveClient) -> None:
     assert call8.inputs["input"][1]["type"] == "function_call"
     assert call8.inputs["input"][1]["status"] == "completed"
 
-    val8 = call8.output["output"][0]._val
-    assert isinstance(val8, ObjectRecord)
+    val8 = call8.output["output"][0]
     assert val8.role == "assistant"
     assert val8.type == "message"
     assert val8.status == "completed"
@@ -259,8 +254,7 @@ async def test_openai_agents_quickstart_homework(client: WeaveClient) -> None:
     assert call13.inputs["input"][0]["content"] == "what is life"
     assert call13.inputs["input"][0]["role"] == "user"
 
-    val13 = call13.output["output"][0]._val
-    assert isinstance(val13, ObjectRecord)
+    val13 = call13.output["output"][0]
     assert val13.role == "assistant"
     assert val13.type == "message"
     assert val13.status == "completed"
