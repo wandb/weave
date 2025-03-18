@@ -1338,6 +1338,8 @@ class WeaveClient:
     def delete_calls(self, call_ids: list[str]) -> None:
         """Delete calls by their IDs.
 
+        Deleting a call will also delete all of its children.
+
         Args:
             call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
         """
