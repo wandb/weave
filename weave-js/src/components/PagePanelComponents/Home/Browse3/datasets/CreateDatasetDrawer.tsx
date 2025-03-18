@@ -2,7 +2,11 @@ import {Box, Typography} from '@mui/material';
 import React, {useCallback, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 
-import {MOON_300,TEAL_200, TEAL_500} from '../../../../../common/css/color.styles';
+import {
+  MOON_300,
+  TEAL_200,
+  TEAL_500,
+} from '../../../../../common/css/color.styles';
 import {Button} from '../../../../Button';
 import {TextField} from '../../../../Form/TextField';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
@@ -333,7 +337,7 @@ const CreateDatasetDrawerContent: React.FC<{
                     <Typography
                       variant="body2"
                       sx={{...typographyStyle, fontWeight: 'bold', mt: 2}}
-                      style={{ color: TEAL_500 }}>
+                      style={{color: TEAL_500}}>
                       Release to upload
                     </Typography>
                   )}
