@@ -473,7 +473,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # get all parents
+        # get the requested calls to delete
         parents = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
@@ -481,29 +481,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
-                    # request minimal columns
                     columns=["id", "parent_id"],
                 )
             )
         )
+        parent_trace_ids = [p.trace_id for p in parents]
 
-        # get all calls with trace_ids matching parents
+        # get first 10k calls with trace_ids matching parents
         all_calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        trace_ids=[p.trace_id for p in parents],
-                    ),
-                    # request minimal columns
+                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
                     columns=["id", "parent_id"],
+                    limit=10_000,
                 )
             )
         )
-
+        # only need to check non-root traces
+        all_children = [call for call in all_calls if call.parent_id is not None]
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
-            all_calls=all_calls,
+            all_calls=all_children + parents,
         )
 
         deleted_at = datetime.datetime.now()
