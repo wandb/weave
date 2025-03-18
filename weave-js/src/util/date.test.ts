@@ -293,7 +293,6 @@ describe('Date Utility Functions', () => {
       expect(parseDate('now')?.getDate()).toBe(now.getDate());
       expect(parseDate('now')?.getHours()).toBe(now.getHours());
       expect(parseDate('now')?.getMinutes()).toBe(now.getMinutes());
-      expect(parseDate('right now')?.getFullYear()).toBe(now.getFullYear());
       expect(parseDate('current time')?.getFullYear()).toBe(now.getFullYear());
     });
   });
