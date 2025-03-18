@@ -473,31 +473,41 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # get the requested calls to delete
-        parents = list(
-            self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        call_ids=req.call_ids,
-                    ),
-                    columns=["id", "parent_id"],
-                )
+        def _calls_query_minimal(
+            call_ids: list[str], filter: tsi.CallsFilter, fields: list[str]
+        ) -> list[tuple[str, ...]]:
+            """Special calls query that only returns the requested call and parent ids"""
+            print(">>>>> _calls_query_minimal")
+            cq = CallsQuery(project_id=req.project_id)
+            for field in fields:
+                cq.add_field(field)
+            cq.set_hardcoded_filter(HardCodedFilter(filter=filter))
+            pb = ParamBuilder()
+            raw_res = self._query_stream(
+                cq.as_sql(pb),
+                pb.get_params(),
             )
-        )
-        parent_trace_ids = [p.trace_id for p in parents]
+            print(">>>>> _calls_query_minimal OUT", len(list(raw_res)))
+            return list(raw_res)
+
+        # get the requested calls to delete
+        ids_filter = tsi.CallsFilter(call_ids=req.call_ids)
+        fields = ["trace_id"]
+        parents = _calls_query_minimal(req.call_ids, ids_filter, fields)
+        parent_trace_ids = [p[0] for p in parents]
 
         # get first 10k calls with trace_ids matching parents
-        all_calls = list(
-            self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
-                    columns=["id", "parent_id"],
-                    limit=10_000,
-                )
-            )
-        )
+        trace_ids_filter = tsi.CallsFilter(trace_ids=parent_trace_ids)
+        fields = ["id", "parent_id"]
+        all_calls_raw = _calls_query_minimal(parent_trace_ids, trace_ids_filter, fields)
+        all_calls = [
+            {
+                "id": row[0],
+                "parent_id": row[1],
+            }
+            for row in all_calls_raw
+        ]
+
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
             all_calls=all_calls,
@@ -513,6 +523,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
+
+        print(">>>>> calls_delete insertables", len(insertables))
 
         with self.call_batch():
             for insertable in insertables:
@@ -2198,7 +2210,7 @@ def get_kind(val: Any) -> str:
 @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
-    all_calls: list[tsi.CallSchema],
+    all_calls: list[dict[str, Any]],
 ) -> list[str]:
     if root_span := ddtrace.tracer.current_span():
         root_span.set_tags(
@@ -2214,8 +2226,8 @@ def find_call_descendants(
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
-        if call.parent_id is not None:
-            children_map[call.parent_id].append(call.id)
+        if call["parent_id"] is not None:
+            children_map[call["parent_id"]].append(call["id"])
 
     # do DFS to get all descendants
     def find_all_descendants(root_ids: list[str]) -> set[str]:
