@@ -224,9 +224,16 @@ def split(self, pattern):
             types.optional(types.List(types.String())),
             self._artifact,
         )
+
+    if len(self._arrow_data) != len(pattern._arrow_data):
+        raise ValueError(
+            f"Length mismatch: input array length ({len(self._arrow_data)}) does not match pattern array length ({len(pattern._arrow_data)})"
+        )
+
     return ArrowWeaveList(
         pa.array(
-            self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
+            None if self._arrow_data[i].as_py() is None or pattern._arrow_data[i].as_py() is None
+            else self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
             for i in range(len(self._arrow_data))
         ),
         types.optional(types.List(types.String())),

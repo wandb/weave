@@ -47,3 +47,13 @@ class TestSplitOp:
             ["a", "", "b", "c"],
         ]
         assert result._arrow_data.to_pylist() == expected
+    
+    def test_split_vectorized_pattern(self):
+        arrow_data = ["a:b:c", "d|e|f", None, "g-h-i"]
+        pattern_data = [":", "|", "-", "-"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        pattern_awl = ArrowWeaveList(pa.array(pattern_data), types.String())
+        result = split.eager_call(awl, pattern_awl)
+        
+        expected = [["a", "b", "c"], ["d", "e", "f"], None, ["g", "h", "i"]]
+        assert result.to_pylist_notags() == expected
