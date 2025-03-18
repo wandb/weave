@@ -12,12 +12,7 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
-    from openai.types.responses import (
-        Response,
-        ResponseCompletedEvent,
-        ResponseCreatedEvent,
-        ResponseTextDeltaEvent,
-    )
+    from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
 
@@ -386,16 +381,47 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
+def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
+    while len(acc.output) <= value.output_index:
+        acc.output.append("")
+    return acc
+
+
 ### Responses API
-def responses_accumulator(
-    acc: Response | None,
-    value: ResponseCreatedEvent | ResponseCompletedEvent | ResponseTextDeltaEvent,
-) -> Response:
+def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
     from openai.types.responses import (
-        Response,
+        ResponseAudioDeltaEvent,
+        ResponseAudioDoneEvent,
+        ResponseAudioTranscriptDeltaEvent,
+        ResponseAudioTranscriptDoneEvent,
+        ResponseCodeInterpreterCallCodeDeltaEvent,
+        ResponseCodeInterpreterCallCodeDoneEvent,
+        ResponseCodeInterpreterCallCompletedEvent,
+        ResponseCodeInterpreterCallInProgressEvent,
+        ResponseCodeInterpreterCallInterpretingEvent,
         ResponseCompletedEvent,
+        ResponseContentPartAddedEvent,
+        ResponseContentPartDoneEvent,
         ResponseCreatedEvent,
+        ResponseErrorEvent,
+        ResponseFailedEvent,
+        ResponseFileSearchCallCompletedEvent,
+        ResponseFileSearchCallInProgressEvent,
+        ResponseFileSearchCallSearchingEvent,
+        ResponseFunctionCallArgumentsDeltaEvent,
+        ResponseFunctionCallArgumentsDoneEvent,
+        ResponseIncompleteEvent,
+        ResponseInProgressEvent,
+        ResponseOutputItemAddedEvent,
+        ResponseOutputItemDoneEvent,
+        ResponseRefusalDeltaEvent,
+        ResponseRefusalDoneEvent,
+        ResponseTextAnnotationDeltaEvent,
         ResponseTextDeltaEvent,
+        ResponseTextDoneEvent,
+        ResponseWebSearchCallCompletedEvent,
+        ResponseWebSearchCallInProgressEvent,
+        ResponseWebSearchCallSearchingEvent,
     )
 
     if acc is None:
@@ -410,18 +436,114 @@ def responses_accumulator(
             tools=[],
         )
 
-    if isinstance(value, ResponseCreatedEvent):
+    # 1. "Response" object events, either at the start or end of a slice of the stream
+    if isinstance(
+        value,
+        (
+            ResponseCreatedEvent,
+            ResponseInProgressEvent,
+            ResponseIncompleteEvent,
+            ResponseCompletedEvent,
+            ResponseFailedEvent,
+        ),
+    ):
+        # In the happy path, the final event is ResponseCompletedEvent with a fully
+        # populated response object.  This is the most faithful representation, so
+        # just use this if available.
+
+        # As an MVP this alone is probably sufficient for the streaming case (assuming
+        # the user does not close the stream mid-response).
         acc = value.response
 
-    elif isinstance(value, ResponseTextDeltaEvent):
-        # Accumulation is not strictly necessary, except in cases where the stream terminates prematurely.
+    # 2. "Delta" events, which are streamed parts appended to an InProgressEvent
+    # 2a. Events with an output_index
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCodeDeltaEvent,
+            ResponseFunctionCallArgumentsDeltaEvent,
+            ResponseRefusalDeltaEvent,
+            ResponseTextDeltaEvent,
+        ),
+    ):
+        acc = _pad_output(acc, value)
+        acc.output[value.output_index] += value.delta
+
+    # 2b. Events without an output_index
+    elif isinstance(
+        value,
+        ResponseAudioDeltaEvent,
+        ResponseAudioTranscriptDeltaEvent,
+    ):
+        # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
         acc.output[0] += value.delta
 
-    elif isinstance(value, ResponseCompletedEvent):
-        # This is the most faithful representation, so just use this
-        acc = value.response
+    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
+        # Not obvious how to handle this since there is no delta
+        ...
+
+    # Everything else
+    elif isinstance(
+        value,
+        (
+            ResponseContentPartAddedEvent,
+            ResponseErrorEvent,
+            ResponseOutputItemAddedEvent,
+        ),
+    ):
+        ...
+
+    # 3. No-op events: these are not needed for the accumulator
+    # 3a. "Done" events
+    elif isinstance(
+        value,
+        (
+            ResponseAudioDoneEvent,
+            ResponseAudioTranscriptDoneEvent,
+            ResponseCodeInterpreterCallCodeDoneEvent,
+            ResponseContentPartDoneEvent,
+            ResponseFunctionCallArgumentsDoneEvent,
+            ResponseOutputItemDoneEvent,
+            ResponseRefusalDoneEvent,
+            ResponseTextDoneEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3b. "Tool Completed" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCompletedEvent,
+            ResponseFileSearchCallCompletedEvent,
+            ResponseWebSearchCallCompletedEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3c. "Tool In Progress" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInProgressEvent,
+            ResponseFileSearchCallInProgressEvent,
+            ResponseWebSearchCallInProgressEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3d. "Tool Action" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInterpretingEvent,
+            ResponseFileSearchCallSearchingEvent,
+            ResponseWebSearchCallSearchingEvent,
+        ),
+    ):
+        pass  # Nothing to do here
 
     return acc
 
