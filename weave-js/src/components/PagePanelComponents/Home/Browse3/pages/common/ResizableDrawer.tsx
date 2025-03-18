@@ -99,7 +99,9 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
           width: `${internalWidth}px`,
           position: 'fixed',
           maxWidth: `${maxAllowedWidth}px`,
-          minWidth: '120px',
+          minWidth: '500px',
+          maxHeight: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 60px)',
         },
       }}>
       <Box
@@ -116,6 +118,7 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
         }}
         onMouseDown={handleMouseDown}
       />
+      {headerContent}
       {children}
     </Drawer>
   );

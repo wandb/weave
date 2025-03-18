@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -58,8 +59,12 @@ from weave.trace.refs import (
     parse_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
-from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.serialization.serialize import (
+    from_json,
+    isinstance_namedtuple,
+    to_json,
+)
+from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
@@ -70,6 +75,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -305,25 +311,24 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
-        response = server.calls_query(
-            CallsQueryReq(
-                project_id=project_id,
-                filter=filter,
-                offset=offset,
-                limit=limit,
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                query=query,
-                sort_by=sort_by,
-                columns=columns,
-                expand_columns=expand_columns,
+        return list(
+            server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=project_id,
+                    filter=filter,
+                    offset=offset,
+                    limit=limit,
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    query=query,
+                    sort_by=sort_by,
+                    columns=columns,
+                )
             )
         )
-        return response.calls
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
@@ -735,6 +740,7 @@ def make_client_call(
         id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -815,6 +821,10 @@ class WeaveClient:
     # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
     future_executor_fastlane: FutureExecutor | None
 
+    # Cache of files sent to the server to avoid sending the same file
+    # multiple times.
+    send_file_cache: WeaveClientSendFileCache
+
     """
     A client for interacting with the Weave trace server.
 
@@ -852,6 +862,7 @@ class WeaveClient:
         self._server_is_flushable = False
         if isinstance(self.server, RemoteHTTPTraceServer):
             self._server_is_flushable = self.server.should_batch
+        self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
 
@@ -1029,18 +1040,20 @@ class WeaveClient:
         Returns:
             A call object.
         """
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self._project_id(),
-                filter=CallsFilter(call_ids=[call_id]),
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                columns=columns,
+        calls = list(
+            self.server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self._project_id(),
+                    filter=CallsFilter(call_ids=[call_id]),
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    columns=columns,
+                )
             )
         )
-        if not response.calls:
+        if not calls:
             raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
+        response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
@@ -1964,17 +1977,161 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        cached_res = self.send_file_cache.get(req)
+        if cached_res:
+            return cached_res
+
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+        else:
+            res = self.future_executor.defer(self.server.file_create, req)
+
+        self.send_file_cache.put(req, res)
+        return res
+
+    @property
+    def num_outstanding_jobs(self) -> int:
+        """
+        Returns the total number of pending jobs across all executors and the server.
+
+        This property can be used to check the progress of background tasks
+        without blocking the main thread.
+
+        Returns:
+            int: The total number of pending jobs
+        """
+        total = self.future_executor.num_outstanding_futures
+        if self.future_executor_fastlane:
+            total += self.future_executor_fastlane.num_outstanding_futures
+
+        # Add call batch uploads if available
+        if self._server_is_flushable:
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            total += server.call_processor.num_outstanding_jobs
+        return total
+
+    def finish(
+        self,
+        use_progress_bar: bool = True,
+        callback: Callable[[FlushStatus], None] | None = None,
+    ) -> None:
+        """
+        Flushes all background tasks to ensure they are processed.
+
+        This method blocks until all currently enqueued jobs are processed,
+        displaying a progress bar to show the status of the pending tasks.
+        It ensures parallel processing during main thread execution and can
+        improve performance when user code completes before data has been
+        uploaded to the server.
+
+        Args:
+            use_progress_bar: Whether to display a progress bar during flush.
+                              Set to False for environments where a progress bar
+                              would not render well (e.g., CI environments).
+            callback: Optional callback function that receives status updates.
+                      Overrides use_progress_bar.
+        """
+        if use_progress_bar and callback is None:
+            from weave.trace.client_progress_bar import create_progress_bar_callback
+
+            callback = create_progress_bar_callback()
+
+        if callback is not None:
+            self._flush_with_callback(callback=callback)
+        else:
+            self._flush()
+
     def flush(self) -> None:
-        """
-        An optional flushing method for the client.
-        Forces all background tasks to be processed, which ensures parallel processing
-        during main thread execution. Can improve performance when user code completes
-        before data has been uploaded to the server.
-        """
+        """Flushes background asynchronous tasks, safe to call multiple times."""
         self._flush()
 
+    def _flush_with_callback(
+        self,
+        callback: Callable[[FlushStatus], None],
+        refresh_interval: float = 0.1,
+    ) -> None:
+        """Used to wait until all currently enqueued jobs are processed.
+
+        Args:
+            callback: Optional callback function that receives status updates.
+            refresh_interval: Time in seconds between status updates.
+        """
+        # Initialize tracking variables
+        prev_job_counts = self._get_pending_jobs()
+
+        total_completed = 0
+        while self._has_pending_jobs():
+            current_job_counts = self._get_pending_jobs()
+
+            # If new jobs were added, update the total
+            if (
+                current_job_counts["total_jobs"]
+                > prev_job_counts["total_jobs"] - total_completed
+            ):
+                new_jobs = current_job_counts["total_jobs"] - (
+                    prev_job_counts["total_jobs"] - total_completed
+                )
+                prev_job_counts["total_jobs"] += new_jobs
+
+            # Calculate completed jobs since last update
+            main_completed = max(
+                0, prev_job_counts["main_jobs"] - current_job_counts["main_jobs"]
+            )
+            fastlane_completed = max(
+                0,
+                prev_job_counts["fastlane_jobs"] - current_job_counts["fastlane_jobs"],
+            )
+            call_processor_completed = max(
+                0,
+                prev_job_counts["call_processor_jobs"]
+                - current_job_counts["call_processor_jobs"],
+            )
+            completed_this_iteration = (
+                main_completed + fastlane_completed + call_processor_completed
+            )
+
+            if completed_this_iteration > 0:
+                total_completed += completed_this_iteration
+
+            status = FlushStatus(
+                job_counts=current_job_counts,
+                completed_since_last_update=completed_this_iteration,
+                total_completed=total_completed,
+                max_total_jobs=prev_job_counts["total_jobs"],
+                has_pending_jobs=True,
+            )
+
+            callback(status)
+
+            # Store current counts for next iteration
+            prev_job_counts = current_job_counts
+
+            # Sleep briefly to allow background threads to make progress
+            time.sleep(refresh_interval)
+
+        # Do the actual flush
+        self._flush()
+
+        # Final callback with no pending jobs
+        final_status = FlushStatus(
+            job_counts=PendingJobCounts(
+                main_jobs=0,
+                fastlane_jobs=0,
+                call_processor_jobs=0,
+                total_jobs=0,
+            ),
+            completed_since_last_update=0,
+            total_completed=total_completed,
+            max_total_jobs=prev_job_counts["total_jobs"],
+            has_pending_jobs=False,
+        )
+        callback(final_status)
+
     def _flush(self) -> None:
-        # Used to wait until all currently enqueued jobs are processed
+        """Used to wait until all currently enqueued jobs are processed."""
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
         if self.future_executor_fastlane:
@@ -1983,15 +2140,74 @@ class WeaveClient:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
             # _server_is_flushable and only call this if we know the server is
-            # flushable. The # type: ignore is safe because we check the type
-            # first.
-            self.server.call_processor.wait_until_all_processed()  # type: ignore
+            # flushable.
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+            # Restart call processor processing thread after flushing
+            server.call_processor.accept_new_work()
+
+    def _get_pending_jobs(self) -> PendingJobCounts:
+        """Get the current number of pending jobs for each type.
+
+        Returns:
+            PendingJobCounts:
+                - main_jobs: Number of pending jobs in the main executor
+                - fastlane_jobs: Number of pending jobs in the fastlane executor
+                - call_processor_jobs: Number of pending jobs in the call processor
+                - total_jobs: Total number of pending jobs
+        """
+        main_jobs = self.future_executor.num_outstanding_futures
+        fastlane_jobs = 0
         if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
+            fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
+        call_processor_jobs = 0
+        if self._server_is_flushable:
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            call_processor_jobs = server.call_processor.num_outstanding_jobs
+
+        return PendingJobCounts(
+            main_jobs=main_jobs,
+            fastlane_jobs=fastlane_jobs,
+            call_processor_jobs=call_processor_jobs,
+            total_jobs=main_jobs + fastlane_jobs + call_processor_jobs,
+        )
+
+    def _has_pending_jobs(self) -> bool:
+        """Check if there are any pending jobs.
+
+        Returns:
+            True if there are pending jobs, False otherwise.
+        """
+        return self._get_pending_jobs()["total_jobs"] > 0
+
+
+class PendingJobCounts(TypedDict):
+    """Counts of pending jobs for each type."""
+
+    main_jobs: int
+    fastlane_jobs: int
+    call_processor_jobs: int
+    total_jobs: int
+
+
+class FlushStatus(TypedDict):
+    """Status information about the current flush operation."""
+
+    # Current job counts
+    job_counts: PendingJobCounts
+
+    # Tracking of completed jobs
+    completed_since_last_update: int
+    total_completed: int
+
+    # Maximum number of jobs seen during this flush operation
+    max_total_jobs: int
+
+    # Whether there are any pending jobs
+    has_pending_jobs: bool
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:

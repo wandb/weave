@@ -68,22 +68,22 @@ def build_evaluation():
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="red"),
         },
         {
             "question": "Who wrote 'To Kill a Mockingbird'?",
             "expected": "Harper Lee",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="green"),
         },
         {
             "question": "What is the square root of 64?",
             "expected": "8",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="blue"),
         },
         {
             "question": "What is the thing you say when you don't know something?",
             "expected": "I don't know",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="yellow"),
         },
     ]
 
@@ -159,7 +159,7 @@ async def test_evaluation_resilience(
         with pytest.raises(DummyTestException):
             res = await evaluation.evaluate(predict)
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
@@ -172,7 +172,7 @@ async def test_evaluation_resilience(
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])

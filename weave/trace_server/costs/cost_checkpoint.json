@@ -5091,6 +5091,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "anthropic",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-03-03 16:02:46"
     }
   ],
   "gemini-2.0-flash-exp": [
@@ -5883,6 +5889,214 @@
       "input": 2e-07,
       "output": 6e-07,
       "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o1-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-02-10 09:20:27"
+    }
+  ],
+  "azure/gpt-3.5-turbo-0125": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "azure/gpt-3.5-turbo": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cerebras/llama3.3-70b": [
+    {
+      "provider": "cerebras",
+      "input": 8.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "gemini-2.0-pro-exp-02-05": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "openrouter/google/gemini-2.0-flash-001": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "amazon.rerank-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cohere.rerank-v3-5:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "us.meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar": [
+    {
+      "provider": "perplexity",
+      "input": 1e-06,
+      "output": 1e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar-pro": [
+    {
+      "provider": "perplexity",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "jina-reranker-v2-base-multilingual": [
+    {
+      "provider": "jina_ai",
+      "input": 1.8e-08,
+      "output": 1.8e-08,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "claude-3-7-sonnet-20250219": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "gpt-4.5-preview": [
+    {
+      "provider": "openai",
+      "input": 7.5e-05,
+      "output": 0.00015,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "gpt-4.5-preview-2025-02-27": [
+    {
+      "provider": "openai",
+      "input": 7.5e-05,
+      "output": 0.00015,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "azure_ai/Phi-4": [
+    {
+      "provider": "azure_ai",
+      "input": 1.25e-07,
+      "output": 5e-07,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-5-haiku-latest": [
+    {
+      "provider": "anthropic",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-opus-latest": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-5-sonnet-latest": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-7-sonnet-latest": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "vertex_ai/claude-3-7-sonnet@20250219": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "openrouter/anthropic/claude-3.7-sonnet": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "openrouter/anthropic/claude-3.7-sonnet:beta": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "bedrock/invoke/anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "us.anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
     }
   ]
 }
