@@ -473,41 +473,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # Use a simpler query that finds all descendants without using CTE
-        recursive_query = """
-        SELECT DISTINCT id
-        FROM (
-            -- start with the root calls
+        # find all descendants of requested root calls
+        query = """
+        WITH RECURSIVE descendants AS (
+            -- Base case: get the root calls
             SELECT id, parent_id
             FROM call_parts
             WHERE project_id = {project_id:String}
-                AND id IN {root_ids:Array(String)}
+                AND id IN {call_ids:Array(String)}
                 AND deleted_at IS NULL
 
             UNION ALL
 
-            -- join with children
+            -- Recursive case: get children of descendants
             SELECT c.id, c.parent_id
             FROM call_parts c
-            INNER JOIN (
-                SELECT id, parent_id
-                FROM call_parts
-                WHERE project_id = {project_id:String}
-                    AND id IN {root_ids:Array(String)}
-                    AND deleted_at IS NULL
-            ) p ON c.parent_id = p.id
+            INNER JOIN descendants d ON c.parent_id = d.id
             WHERE c.project_id = {project_id:String}
                 AND c.deleted_at IS NULL
         )
-        LIMIT 1000000 -- 1 million call limit
+        SELECT DISTINCT id FROM descendants
+        LIMIT 1000000
+        -- TODO remove this once CH cloud updated to 24.8
+        SETTINGS allow_experimental_analyzer=1
         """
 
         # Execute recursive query to get all descendant IDs
         result = self.ch_client.query(
-            recursive_query,
+            query,
             parameters={
                 "project_id": req.project_id,
-                "root_ids": req.call_ids,
+                "call_ids": req.call_ids,
             },
         )
         all_descendants = [row[0] for row in result.result_rows]
