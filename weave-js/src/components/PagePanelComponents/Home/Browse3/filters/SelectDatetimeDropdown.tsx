@@ -22,8 +22,8 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
   {abbreviation: '1d', label: '1 Day'},
   {abbreviation: '2d', label: '2 Days'},
   {abbreviation: '1w', label: '1 Week'},
-  {abbreviation: '2w', label: '2 Weeks'},
   {abbreviation: '1mo', label: '1 Month'},
+  {abbreviation: '3mo', label: '3 Months'},
 ];
 
 type SelectDatetimeDropdownProps = {
@@ -201,6 +201,7 @@ const DateInput: React.FC<DateInputProps> = ({
       />
       <input
         type="text"
+        aria-label="Date input"
         value={inputValue}
         onChange={handleInputChange}
         onFocus={handleFocus}
@@ -256,6 +257,8 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
   return (
     <li
       key={index}
+      role="option"
+      aria-selected={isSelected}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -312,6 +315,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
   return (
     <ul
       ref={dropdownRef}
+      role="listbox"
       style={{
         position: 'absolute',
         top: '100%',

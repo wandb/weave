@@ -50,7 +50,11 @@ export const SelectValue = ({
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
   if (fieldType === 'datetime') {
-    return <SelectDatetimeDropdown value={value} onChange={onSetValue} />;
+    return (
+      <div className="min-w-[200px]">
+        <SelectDatetimeDropdown value={value} onChange={onSetValue} />
+      </div>
+    );
   }
 
   if (operator.startsWith('(bool): ')) {
