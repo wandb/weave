@@ -86,7 +86,11 @@ export const Tag: FC<TagProps> = ({
           )}
           <span>{truncatedText}</span>
           {endIconName && (
-            <Icon className="ml-4 h-14 w-14" name={endIconName} />
+            <Icon
+              role="presentation"
+              className="ml-4 h-14 w-14"
+              name={endIconName}
+            />
           )}
         </div>
       )}
