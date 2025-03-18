@@ -88,12 +88,12 @@ export const FilterRow = ({
           />
         )}
       </div>
-      <div className="flex items-center justify-center">
+      <div className="mb-0 flex items-center justify-center">
         {item.id != null && (
           <Button
             size="small"
             variant="ghost"
-            icon="delete"
+            icon="close"
             tooltip="Remove this filter"
             onClick={() => onRemoveFilter(item.id)}
           />
