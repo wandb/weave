@@ -2,6 +2,7 @@ import {Box, Typography} from '@mui/material';
 import React, {useCallback, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 
+import {MOON_300,TEAL_200, TEAL_500} from '../../../../../common/css/color.styles';
 import {Button} from '../../../../Button';
 import {TextField} from '../../../../Form/TextField';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
@@ -282,12 +283,12 @@ const CreateDatasetDrawerContent: React.FC<{
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: '2px dashed',
-                    borderColor: isDragging ? '#13A9BA' : '#D4D5D9',
+                    borderColor: isDragging ? TEAL_500 : MOON_300,
                     borderRadius: '8px',
                     p: 4,
                     flex: 1,
                     minHeight: '300px',
-                    backgroundColor: isDragging ? '#E1F7FA' : 'transparent',
+                    backgroundColor: isDragging ? TEAL_200 : 'transparent',
                     transition: 'all 0.2s ease',
                   }}
                   onDragEnter={handleDragEnter}
@@ -332,7 +333,7 @@ const CreateDatasetDrawerContent: React.FC<{
                     <Typography
                       variant="body2"
                       sx={{...typographyStyle, fontWeight: 'bold', mt: 2}}
-                      color="#13A9BA">
+                      style={{ color: TEAL_500 }}>
                       Release to upload
                     </Typography>
                   )}
