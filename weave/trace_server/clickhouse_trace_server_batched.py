@@ -476,8 +476,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         def _calls_query_minimal(
             call_ids: list[str], filter: tsi.CallsFilter, fields: list[str]
         ) -> list[tuple[str, ...]]:
-            """Special calls query that only returns the requested call and parent ids"""
-            print(">>>>> _calls_query_minimal")
+            """Special calls query that only returns the requested call and minimal fields.
+            Crucially this returns raw strings, rather than the CallSchema objects,
+            so it is much faster to process.
+            """
             cq = CallsQuery(project_id=req.project_id)
             for field in fields:
                 cq.add_field(field)
@@ -487,7 +489,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 cq.as_sql(pb),
                 pb.get_params(),
             )
-            print(">>>>> _calls_query_minimal OUT", len(list(raw_res)))
             return list(raw_res)
 
         # get the requested calls to delete
@@ -523,8 +524,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
-
-        print(">>>>> calls_delete insertables", len(insertables))
 
         with self.call_batch():
             for insertable in insertables:
