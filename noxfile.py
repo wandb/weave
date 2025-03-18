@@ -93,6 +93,9 @@ def tests(session, shard):
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
         env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
 
+    if shard == "openai_agents":
+        env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
+
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
