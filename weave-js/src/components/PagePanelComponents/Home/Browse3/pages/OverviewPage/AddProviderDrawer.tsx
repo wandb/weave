@@ -90,7 +90,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
         obj: {
           val: {
             name,
-            base_url: baseUrl,
+            base_url: baseUrl.replace(/\/+$/, ''),
             api_key_name: apiKey,
             extra_headers:
               headers
@@ -208,7 +208,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           </Box>
         </Box>
       }>
-      <Box 
+      <Box
         sx={{
           height: '100%',
           display: 'flex',
@@ -216,7 +216,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           overflow: 'hidden',
         }}>
         {/* Content */}
-        <Box 
+        <Box
           sx={{
             flex: 1,
             p: 2,
