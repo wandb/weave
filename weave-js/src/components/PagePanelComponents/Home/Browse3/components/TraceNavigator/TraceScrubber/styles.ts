@@ -1,24 +1,25 @@
+import * as Colors from '@wandb/weave/common/css/color.styles';
 import styled from 'styled-components';
 
 export const Container = styled.div<{$isCollapsed?: boolean}>`
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid ${Colors.MOON_200};
   margin-bottom: ${props => (props.$isCollapsed ? '-108px' : '0px')};
   padding: 8px 16px;
   transition: padding 0.2s ease;
-  background: #fff;
+  background: ${Colors.WHITE};
 `;
 Container.displayName = 'Container';
 
 export const CollapseButton = styled.button`
   position: absolute;
-  background: #f8fafc !important;
+  background: ${Colors.MOON_100} !important;
   right: 6px;
   top: -12px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid #d4d5d9;
+  background: ${Colors.WHITE};
+  border: 1px solid ${Colors.MOON_300};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,7 +30,7 @@ export const CollapseButton = styled.button`
 
   &:hover {
     transform: scale(1.05);
-    background: #e8e8e9;
+    background: ${Colors.MOON_200};
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
 
@@ -59,7 +60,7 @@ ScrubberRow.displayName = 'ScrubberRow';
 export const Label = styled.div`
   width: 50px;
   font-size: 12px;
-  color: #64748b;
+  color: ${Colors.MOON_500};
   flex-shrink: 0;
 `;
 Label.displayName = 'Label';
@@ -67,7 +68,7 @@ Label.displayName = 'Label';
 export const CountIndicator = styled.div`
   width: 50px;
   font-size: 12px;
-  color: #64748b;
+  color: ${Colors.MOON_500};
   flex-shrink: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -91,14 +92,14 @@ export const ArrowButton = styled.button<{disabled?: boolean}>`
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: ${props => (props.disabled ? '#CBD5E1' : '#64748B')};
+  color: ${props => (props.disabled ? Colors.MOON_300 : Colors.MOON_500)};
   cursor: ${props => (props.disabled ? 'not-allowed' : 'pointer')};
   transition: all 0.15s ease;
   flex-shrink: 0;
 
   &:hover:not(:disabled) {
-    background: #f1f5f9;
-    color: #0f172a;
+    background: ${Colors.MOON_100};
+    color: ${Colors.MOON_900};
   }
 
   &:active:not(:disabled) {
@@ -144,10 +145,10 @@ export const RangeInput = styled.input<RangeInputProps>`
   height: 8px;
   background: linear-gradient(
     to right,
-    #13a9ba 0%,
-    #13a9ba ${props => props.$progress}%,
-    #e2e8f0 ${props => props.$progress}%,
-    #e2e8f0 100%
+    ${Colors.TEAL_500} 0%,
+    ${Colors.TEAL_500} ${props => props.$progress}%,
+    ${Colors.MOON_200} ${props => props.$progress}%,
+    ${Colors.MOON_200} 100%
   );
   border-radius: 4px;
   cursor: pointer;
@@ -164,8 +165,8 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #13a9ba;
-    border: 2px solid white;
+    background: ${Colors.TEAL_500};
+    border: 2px solid ${Colors.WHITE};
     margin-top: -4px;
     transition: transform 0.1s;
   }
@@ -185,8 +186,8 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #13a9ba;
-    border: 2px solid white;
+    background: ${Colors.TEAL_500};
+    border: 2px solid ${Colors.WHITE};
     transition: transform 0.1s;
   }
 
@@ -214,8 +215,8 @@ export const TooltipContent = styled.div`
   left: 0;
   margin-bottom: 8px;
   padding: 8px 12px;
-  background: #1e293b;
-  color: white;
+  background: ${Colors.MOON_800};
+  color: ${Colors.WHITE};
   border-radius: 6px;
   font-size: 12px;
   white-space: nowrap;
@@ -235,7 +236,7 @@ export const TooltipContent = styled.div`
     top: 100%;
     left: 16px;
     border: 6px solid transparent;
-    border-top-color: #1e293b;
+    border-top-color: ${Colors.MOON_800};
   }
 `;
 TooltipContent.displayName = 'TooltipContent';
@@ -245,10 +246,10 @@ export const BreadcrumbWrapper = styled.div`
   align-items: center;
   overflow-x: hidden;
   font-size: 12px;
-  color: #64748b;
+  color: ${Colors.MOON_500};
   min-height: 32px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-bottom: 1px solid ${Colors.MOON_200};
+  background: ${Colors.MOON_100};
 `;
 BreadcrumbWrapper.displayName = 'BreadcrumbWrapper';
 
@@ -257,7 +258,7 @@ export const BreadcrumbNavigationButtons = styled.div`
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid ${Colors.MOON_200};
 `;
 BreadcrumbNavigationButtons.displayName = 'BreadcrumbNavigationButtons';
 
@@ -280,8 +281,8 @@ BreadcrumbList.displayName = 'BreadcrumbList';
 export const BreadcrumbItem = styled.button<{$active?: boolean}>`
   padding: 0px 4px !important;
   border-radius: 4px !important;
-  background: ${props => (props.$active ? '#E2E8F0' : 'transparent')};
-  color: ${props => (props.$active ? '#0F172A' : '#64748B')};
+  background: ${props => (props.$active ? Colors.MOON_200 : 'transparent')};
+  color: ${props => (props.$active ? Colors.MOON_900 : Colors.MOON_500)};
   font-weight: ${props => (props.$active ? '500' : '400')};
   cursor: pointer;
   border: none;
@@ -292,8 +293,8 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
   position: relative;
 
   &:hover {
-    background: ${props => (props.$active ? '#E2E8F0' : '#F1F5F9')};
-    color: #0f172a;
+    background: ${props => (props.$active ? Colors.MOON_200 : Colors.MOON_100)};
+    color: ${Colors.MOON_900};
   }
 
   &:active {
@@ -310,7 +311,7 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
       left: 4px;
       right: 4px;
       height: 2px;
-      background: #13A9BA;
+      background: ${Colors.TEAL_500};
       border-radius: 1px;
     }
   `}
@@ -318,7 +319,7 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
 BreadcrumbItem.displayName = 'BreadcrumbItem';
 
 export const BreadcrumbSeparator = styled.span`
-  color: #94a3b8;
+  color: ${Colors.MOON_400};
   user-select: none;
   font-size: 14px;
   margin: 0 -2px;

@@ -1,5 +1,6 @@
 import '@xyflow/react/dist/style.css';
 
+import * as Colors from '@wandb/weave/common/css/color.styles';
 import type {Node} from '@xyflow/react';
 import {
   Background,
@@ -25,12 +26,12 @@ const NODE_HEIGHT = 40;
 // Styles for the flow
 const flowStyles = `
   .react-flow__node.selectable.selected {
-    border-color: #0066FF;
-    box-shadow: 0 0 0 2px #0066FF;
+    border-color: ${Colors.TEAL_500};
+    box-shadow: 0 0 0 2px ${Colors.TEAL_500};
     border-radius: 8px;
   }
   .react-flow__node.selectable:hover {
-    box-shadow: 0 0 0 1px #0066FF;
+    box-shadow: 0 0 0 1px ${Colors.TEAL_500};
     border-radius: 8px;
   }
 `;
@@ -45,7 +46,7 @@ const TraceNode: React.FC<{
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         background: data.color,
-        border: '1px solid #CBD5E1',
+        border: `1px solid ${Colors.MOON_200}`,
         borderRadius: '8px',
         padding: '8px',
       }}>
@@ -136,7 +137,7 @@ const Flow: React.FC<TraceViewProps> = ({
           id: `${id}-${childId}`,
           source: id,
           target: childId,
-          style: {stroke: '#CBD5E1'},
+          style: {stroke: Colors.MOON_200},
         });
       });
     });

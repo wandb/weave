@@ -1,3 +1,4 @@
+import * as Colors from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -11,7 +12,6 @@ import {
   getSortedPeerPathCallIds,
   locateNodeForCallId,
 } from './utils';
-
 const Container = styled.div`
   height: 100%;
   display: flex;
@@ -25,17 +25,18 @@ const TreePanel = styled.div`
   min-height: 0;
   overflow-y: auto;
   padding: 8px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-bottom: 1px solid ${Colors.MOON_200};
+  background: ${Colors.MOON_100};
 `;
 TreePanel.displayName = 'TreePanel';
 
 const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   margin: 2px 0;
   padding: 8px;
-  border: 1px solid ${props => (props.$isSelected ? '#93C5FD' : '#E2e8f0')};
+  border: 1px solid
+    ${props => (props.$isSelected ? Colors.TEAL_500 : Colors.MOON_200)};
   border-radius: 4px;
-  background: ${props => (props.$isSelected ? '#EFF6FF' : 'white')};
+  background: ${props => (props.$isSelected ? Colors.MOON_100 : Colors.WHITE)};
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
 `;
@@ -70,7 +71,7 @@ NodeContent.displayName = 'NodeContent';
 const CallPanel = styled.div`
   height: 50%;
   overflow-y: auto;
-  background: #f8fafc;
+  background: ${Colors.MOON_100};
   display: flex;
   flex-direction: column;
 `;
@@ -78,11 +79,11 @@ CallPanel.displayName = 'CallPanel';
 
 const CallPanelHeader = styled.div`
   padding: 6px 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: ${Colors.MOON_100};
+  border-bottom: 1px solid ${Colors.MOON_200};
   font-size: 11px;
   font-weight: 500;
-  color: #64748b;
+  color: ${Colors.MOON_500};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -92,10 +93,10 @@ CallPanelHeader.displayName = 'CallPanelHeader';
 const RecursionBlock = styled.div`
   margin: 2px 0;
   padding: 8px 12px;
-  border: 1px dashed #6366f1;
+  border: 1px dashed ${Colors.TEAL_500};
   border-radius: 4px;
-  background: #f8fafc;
-  color: #6366f1;
+  background: ${Colors.MOON_100};
+  color: ${Colors.TEAL_500};
   font-size: 14px;
   display: flex;
   align-items: center;

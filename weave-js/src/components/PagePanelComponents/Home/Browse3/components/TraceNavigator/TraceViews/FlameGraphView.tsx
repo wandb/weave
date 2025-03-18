@@ -1,3 +1,4 @@
+import * as Colors from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 import {
   FlameGraph,
@@ -8,7 +9,6 @@ import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber from '../TraceScrubber';
 import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
-
 // Use the imported type directly
 type FlameGraphNode = FlameGraphNodeType;
 
@@ -99,9 +99,9 @@ export const FlameGraphView: React.FC<TraceViewProps> = props => {
           value: duration,
           children: children.length > 0 ? children : undefined,
           backgroundColor: isSelected
-            ? '#0066FF'
+            ? Colors.TEAL_500
             : getColorForOpName(opNameReal),
-          color: isSelected ? 'white' : undefined,
+          color: isSelected ? Colors.WHITE : undefined,
           timing: {
             start: startTime,
             end: endTime,
