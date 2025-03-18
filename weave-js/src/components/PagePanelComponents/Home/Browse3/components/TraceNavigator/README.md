@@ -9,7 +9,7 @@ The TraceNavigator is a React component that provides a comprehensive interface 
 TraceNavigator offers four different ways to visualize the same trace data:
 
 - **Tree View**: Displays the trace as a hierarchical tree structure, making it easy to understand parent-child relationships.
-- **Code View**: Shows the trace data in a code-oriented format, useful for understanding execution context.
+- **Composition View**: Shows the trace data in a code-oriented format, useful for understanding execution context.
 - **Flame Graph View**: Presents the trace as a flame graph, where the width represents execution time, making performance bottlenecks easy to spot.
 - **Graph View**: Shows the trace as a directional graph/network, visualizing relationships between different execution paths.
 
@@ -31,7 +31,7 @@ The component uses React Context (StackContextProvider) to manage navigation sta
 ## Architecture
 
 - **TraceNavigator**: Main component that orchestrates the visualization and navigation components
-- **TraceViews**: Pluggable visualization components (Tree, Code, Flame Graph, Graph)
+- **TraceViews**: Pluggable visualization components (Tree, Composition, Flame Graph, Graph)
 - **TraceScrubber**: Navigation controls for moving through the trace
 - **StackContext**: Manages the state of the current position in the trace
 

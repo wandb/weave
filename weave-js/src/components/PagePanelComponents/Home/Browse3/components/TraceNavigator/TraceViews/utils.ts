@@ -152,11 +152,11 @@ export interface VisTreeNode {
  * Represents a node in the code structure map.
  * This is used to transform the execution trace into a logical code structure view.
  */
-export interface CodeMapNode {
+export interface CodeCompositionMapNode {
   /** The operation name (key for this node) */
   opName: string;
   /** Child operations in the code structure */
-  children: CodeMapNode[];
+  children: CodeCompositionMapNode[];
   /** All trace call IDs that map to this operation */
   callIds: string[];
   /** Set of ancestor operation names that this node recursively calls */
@@ -175,15 +175,17 @@ export interface CodeMapNode {
  * - Handles recursive calls by marking nodes that call their ancestors
  *
  * @param traceTreeFlat The flattened trace tree to transform
- * @returns An array of root CodeMapNodes representing the code structure
+ * @returns An array of root CodeCompositionMapNodes representing the code structure
  */
-export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
+export const buildCodeCompositionMap = (
+  traceTreeFlat: TraceTreeFlat
+): CodeCompositionMapNode[] => {
   // Helper to find a node in the ancestor chain or peer group
   const findExistingOp = (
     opName: string,
-    current: CodeMapNode,
-    ancestors: CodeMapNode[]
-  ): CodeMapNode | null => {
+    current: CodeCompositionMapNode,
+    ancestors: CodeCompositionMapNode[]
+  ): CodeCompositionMapNode | null => {
     // Check ancestors first
     const ancestorMatch = ancestors.find(a => a.opName === opName);
     if (ancestorMatch) {
@@ -205,8 +207,8 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
   // Process a trace node at its target location in the code map
   const processNode = (
     callId: string,
-    target: CodeMapNode,
-    ancestors: CodeMapNode[]
+    target: CodeCompositionMapNode,
+    ancestors: CodeCompositionMapNode[]
   ) => {
     const node = traceTreeFlat[callId];
     if (!node) {
@@ -249,7 +251,7 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
         );
       } else {
         // New operation, create it as child of target
-        const newOp: CodeMapNode = {
+        const newOp: CodeCompositionMapNode = {
           opName: childOpName,
           children: [],
           callIds: [],
@@ -262,7 +264,7 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
   };
 
   // Start with root nodes
-  const rootMap = new Map<string, CodeMapNode>();
+  const rootMap = new Map<string, CodeCompositionMapNode>();
 
   Object.values(traceTreeFlat)
     .filter(node => !node.parentId || !traceTreeFlat[node.parentId])
@@ -329,7 +331,7 @@ export const getCallDisplayName = (call: TraceCallSchema): string => {
 };
 
 export const getSortedPeerPathCallIds = (
-  selectedCodeNode: CodeMapNode | null,
+  selectedCodeNode: CodeCompositionMapNode | null,
   traceTreeFlat: TraceTreeFlat
 ) => {
   return (selectedCodeNode?.callIds ?? []).sort(
@@ -340,10 +342,12 @@ export const getSortedPeerPathCallIds = (
 };
 
 export const locateNodeForCallId = (
-  codeMap: CodeMapNode[],
+  codeMap: CodeCompositionMapNode[],
   selectedCallId: string
 ) => {
-  const findOpByCallId = (nodes: CodeMapNode[]): CodeMapNode | null => {
+  const findOpByCallId = (
+    nodes: CodeCompositionMapNode[]
+  ): CodeCompositionMapNode | null => {
     for (const node of nodes) {
       if (node.callIds.includes(selectedCallId)) {
         return node;

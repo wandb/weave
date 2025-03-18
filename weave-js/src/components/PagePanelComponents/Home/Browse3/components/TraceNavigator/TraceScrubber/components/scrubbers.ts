@@ -1,5 +1,5 @@
 import {
-  buildCodeMap,
+  buildCodeCompositionMap,
   getSortedPeerPathCallIds,
   locateNodeForCallId,
 } from '../../TraceViews/utils';
@@ -48,7 +48,7 @@ export const CodePathScrubber = createScrubber({
       return [];
     }
 
-    const codeMap = buildCodeMap(traceTreeFlat);
+    const codeMap = buildCodeCompositionMap(traceTreeFlat);
     const codeNode = locateNodeForCallId(codeMap, selectedCallId);
     return getSortedPeerPathCallIds(codeNode, traceTreeFlat);
   },

@@ -6,8 +6,8 @@ import TraceScrubber from '../TraceScrubber';
 import {TreeView} from './TreeView';
 import {TraceViewProps} from './types';
 import {
-  buildCodeMap,
-  CodeMapNode,
+  buildCodeCompositionMap,
+  CodeCompositionMapNode,
   formatDuration,
   getSortedPeerPathCallIds,
   locateNodeForCallId,
@@ -112,7 +112,7 @@ const RecursionBlock = styled.div`
 RecursionBlock.displayName = 'RecursionBlock';
 
 interface CodeMapNodeProps extends TraceViewProps {
-  node: CodeMapNode;
+  node: CodeCompositionMapNode;
   level?: number;
 }
 
@@ -238,14 +238,17 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   );
 };
 
-export const CodeView: React.FC<TraceViewProps> = props => {
+export const CompositionView: React.FC<TraceViewProps> = props => {
   const {
     traceTreeFlat,
     focusedCallId: selectedCallId,
     setFocusedCallId: onCallSelect,
     stack,
   } = props;
-  const codeMap = useMemo(() => buildCodeMap(traceTreeFlat), [traceTreeFlat]);
+  const codeMap = useMemo(
+    () => buildCodeCompositionMap(traceTreeFlat),
+    [traceTreeFlat]
+  );
 
   // Find the selected operation's calls and update when selectedCallId changes
   const selectedCodeNode = useMemo(() => {

@@ -1,7 +1,7 @@
 import {IconName} from '@wandb/weave/components/Icon';
 import {FC} from 'react';
 
-import {CodeView, FlameGraphView, GraphView} from './TraceViews';
+import {CompositionView, FlameGraphView, GraphView} from './TraceViews';
 import {FilterableTreeView} from './TraceViews/TreeView';
 import {TraceViewProps} from './TraceViews/types';
 
@@ -39,9 +39,9 @@ export const traceViews: TraceViewRegistry = [
   },
   {
     id: 'code',
-    label: 'Code',
+    label: 'Code Composition',
     icon: 'code-alt',
-    component: CodeView,
+    component: CompositionView,
   },
   {
     id: 'flamegraph',
