@@ -212,7 +212,7 @@ const DateInput: React.FC<DateInputProps> = ({
         style={{
           padding: '4px 12px',
           paddingLeft: '32px',
-          paddingRight: '80px', // extra space for the label on the right
+          paddingRight: '8px',
           borderRadius: '4px',
           border: 0,
           boxShadow: isInputFocused

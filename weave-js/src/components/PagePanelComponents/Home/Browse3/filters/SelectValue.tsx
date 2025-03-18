@@ -51,7 +51,7 @@ export const SelectValue = ({
   }
   if (fieldType === 'datetime') {
     return (
-      <div className="min-w-[200px]">
+      <div className="min-w-[202px]">
         <SelectDatetimeDropdown value={value} onChange={onSetValue} />
       </div>
     );
