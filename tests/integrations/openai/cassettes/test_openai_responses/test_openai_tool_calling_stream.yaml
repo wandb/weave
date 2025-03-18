@@ -1,0 +1,1546 @@
+interactions:
+- request:
+    body: '{"input":"What was a positive news story from today?","model":"gpt-4o-2024-08-06","stream":true,"tools":[{"type":"web_search_preview"}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '136'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: 'event: response.created
+
+        data: {"type":"response.created","response":{"id":"resp_67d988a4e1a48192b904f4761ecb129d027110e9bec378eb","object":"response","created_at":1742309540,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.in_progress
+
+        data: {"type":"response.in_progress","response":{"id":"resp_67d988a4e1a48192b904f4761ecb129d027110e9bec378eb","object":"response","created_at":1742309540,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.output_item.added
+
+        data: {"type":"response.output_item.added","output_index":0,"item":{"type":"web_search_call","id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb","status":"in_progress"}}
+
+
+        event: response.web_search_call.in_progress
+
+        data: {"type":"response.web_search_call.in_progress","output_index":0,"item_id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb"}
+
+
+        event: response.web_search_call.searching
+
+        data: {"type":"response.web_search_call.searching","output_index":0,"item_id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb"}
+
+
+        event: response.web_search_call.completed
+
+        data: {"type":"response.web_search_call.completed","output_index":0,"item_id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb"}
+
+
+        event: response.output_item.done
+
+        data: {"type":"response.output_item.done","output_index":0,"item":{"type":"web_search_call","id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb","status":"completed"}}
+
+
+        event: response.output_item.added
+
+        data: {"type":"response.output_item.added","output_index":1,"item":{"type":"message","id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","status":"in_progress","role":"assistant","content":[]}}
+
+
+        event: response.content_part.added
+
+        data: {"type":"response.content_part.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"Today"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        March"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"18"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"202"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"5"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        European"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        markets"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        experienced"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        positive"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        trend"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        as"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        German"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        lawmakers"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        prepared"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        to"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        vote"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        on"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        significant"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        government"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        spending"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        overhaul"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"This"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        anticipated"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        decision"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        boosted"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        euro"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        above"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        $"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"1"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"09"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        and"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        elevated"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        German"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        bond"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        yields"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"The"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        STO"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"XX"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"600"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        index"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Europe"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        rose"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        by"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"0"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"7"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"%,"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        reflecting"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        investor"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        optimism"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        about"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        potential"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        economic"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        growth"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        region"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":0,"annotation":{"type":"url_citation","start_index":361,"end_index":463,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\nIn"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Asia"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        markets"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        also"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        saw"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        gains"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        with"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Hong"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Kong"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        shares"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        reaching"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        three"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-year"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        peak"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        and"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Japan"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"''s"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Nik"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"kei"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        rising"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        by"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"1"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"5"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"%."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"Chinese"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        stocks"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        benefited"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        from"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        U"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":".S"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        economic"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        uncertainties"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        and"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        investor"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        sentiment"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        improved"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        with"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        prospect"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        of"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Chinese"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        President"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Xi"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Jinping"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        visiting"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        U"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":".S"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":".,"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        suggesting"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        potential"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        tariff"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        reductions"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":1,"annotation":{"type":"url_citation","start_index":782,"end_index":884,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\nAdditionally"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        recent"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        study"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        published"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        journal"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        J"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"AMA"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Network"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        Open"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        found"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        that"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        transgender"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        adults"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        who"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        received"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        gender"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"affirm"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"ing"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        hormone"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        therapy"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        had"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        significantly"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        lower"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        risk"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        of"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        moderate"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-to"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-se"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"vere"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        depression"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        over"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        four"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        years"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        compared"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        to"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        those"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        who"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        did"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        not"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        receive"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        such"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        care"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"The"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        findings"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        support"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        mental"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        health"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-prom"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"oting"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        role"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        of"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        hormones"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        and"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        their"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        status"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        as"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        medically"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        necessary"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        treatment"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"([kffhealthnews.org](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai))"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":2,"annotation":{"type":"url_citation","start_index":1282,"end_index":1388,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n##
+        Positive Developments in Global Markets and Health:\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"-
+        [Euro, stocks rise ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":3,"annotation":{"type":"url_citation","start_index":1448,"end_index":1593,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n-
+        [Morning Bid: US stocks stabilise as Europe keeps surging](https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai)"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":4,"annotation":{"type":"url_citation","start_index":1596,"end_index":1744,"url":"https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai","title":"Morning
+        Bid: US stocks stabilise as Europe keeps surging"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"\n-
+        [Tuesday, March 18, 2025 - KFF Health News](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai)"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"annotation_index":5,"annotation":{"type":"url_citation","start_index":1747,"end_index":1875,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.done
+
+        data: {"type":"response.output_text.done","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"text":"Today,
+        March 18, 2025, European markets experienced a positive trend as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, reflecting investor optimism about
+        potential economic growth in the region. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nIn
+        Asia, markets also saw gains, with Hong Kong shares reaching a three-year
+        peak and Japan''s Nikkei rising by 1.5%. Chinese stocks benefited from U.S.
+        economic uncertainties, and investor sentiment improved with the prospect
+        of Chinese President Xi Jinping visiting the U.S., suggesting potential tariff
+        reductions. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nAdditionally,
+        a recent study published in the journal JAMA Network Open found that transgender
+        adults who received gender-affirming hormone therapy had a significantly lower
+        risk of moderate-to-severe depression over four years compared to those who
+        did not receive such care. The findings support the mental health-promoting
+        role of hormones and their status as a medically necessary treatment. ([kffhealthnews.org](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai))\n\n\n##
+        Positive Developments in Global Markets and Health:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)\n-
+        [Morning Bid: US stocks stabilise as Europe keeps surging](https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai)\n-
+        [Tuesday, March 18, 2025 - KFF Health News](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai)
+        "}
+
+
+        event: response.content_part.done
+
+        data: {"type":"response.content_part.done","item_id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","output_index":1,"content_index":0,"part":{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive trend as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, reflecting investor optimism about
+        potential economic growth in the region. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nIn
+        Asia, markets also saw gains, with Hong Kong shares reaching a three-year
+        peak and Japan''s Nikkei rising by 1.5%. Chinese stocks benefited from U.S.
+        economic uncertainties, and investor sentiment improved with the prospect
+        of Chinese President Xi Jinping visiting the U.S., suggesting potential tariff
+        reductions. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nAdditionally,
+        a recent study published in the journal JAMA Network Open found that transgender
+        adults who received gender-affirming hormone therapy had a significantly lower
+        risk of moderate-to-severe depression over four years compared to those who
+        did not receive such care. The findings support the mental health-promoting
+        role of hormones and their status as a medically necessary treatment. ([kffhealthnews.org](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai))\n\n\n##
+        Positive Developments in Global Markets and Health:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)\n-
+        [Morning Bid: US stocks stabilise as Europe keeps surging](https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai)\n-
+        [Tuesday, March 18, 2025 - KFF Health News](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":361,"end_index":463,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":782,"end_index":884,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1282,"end_index":1388,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"},{"type":"url_citation","start_index":1448,"end_index":1593,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1596,"end_index":1744,"url":"https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai","title":"Morning
+        Bid: US stocks stabilise as Europe keeps surging"},{"type":"url_citation","start_index":1747,"end_index":1875,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"}]}}
+
+
+        event: response.output_item.done
+
+        data: {"type":"response.output_item.done","output_index":1,"item":{"type":"message","id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive trend as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, reflecting investor optimism about
+        potential economic growth in the region. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nIn
+        Asia, markets also saw gains, with Hong Kong shares reaching a three-year
+        peak and Japan''s Nikkei rising by 1.5%. Chinese stocks benefited from U.S.
+        economic uncertainties, and investor sentiment improved with the prospect
+        of Chinese President Xi Jinping visiting the U.S., suggesting potential tariff
+        reductions. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nAdditionally,
+        a recent study published in the journal JAMA Network Open found that transgender
+        adults who received gender-affirming hormone therapy had a significantly lower
+        risk of moderate-to-severe depression over four years compared to those who
+        did not receive such care. The findings support the mental health-promoting
+        role of hormones and their status as a medically necessary treatment. ([kffhealthnews.org](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai))\n\n\n##
+        Positive Developments in Global Markets and Health:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)\n-
+        [Morning Bid: US stocks stabilise as Europe keeps surging](https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai)\n-
+        [Tuesday, March 18, 2025 - KFF Health News](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":361,"end_index":463,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":782,"end_index":884,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1282,"end_index":1388,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"},{"type":"url_citation","start_index":1448,"end_index":1593,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1596,"end_index":1744,"url":"https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai","title":"Morning
+        Bid: US stocks stabilise as Europe keeps surging"},{"type":"url_citation","start_index":1747,"end_index":1875,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"}]}]}}
+
+
+        event: response.completed
+
+        data: {"type":"response.completed","response":{"id":"resp_67d988a4e1a48192b904f4761ecb129d027110e9bec378eb","object":"response","created_at":1742309540,"status":"completed","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[{"type":"web_search_call","id":"ws_67d988a6774081929cb1601d242c6028027110e9bec378eb","status":"completed"},{"type":"message","id":"msg_67d988a8629481928eea3df1c48cc8c0027110e9bec378eb","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive trend as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, reflecting investor optimism about
+        potential economic growth in the region. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nIn
+        Asia, markets also saw gains, with Hong Kong shares reaching a three-year
+        peak and Japan''s Nikkei rising by 1.5%. Chinese stocks benefited from U.S.
+        economic uncertainties, and investor sentiment improved with the prospect
+        of Chinese President Xi Jinping visiting the U.S., suggesting potential tariff
+        reductions. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\nAdditionally,
+        a recent study published in the journal JAMA Network Open found that transgender
+        adults who received gender-affirming hormone therapy had a significantly lower
+        risk of moderate-to-severe depression over four years compared to those who
+        did not receive such care. The findings support the mental health-promoting
+        role of hormones and their status as a medically necessary treatment. ([kffhealthnews.org](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai))\n\n\n##
+        Positive Developments in Global Markets and Health:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)\n-
+        [Morning Bid: US stocks stabilise as Europe keeps surging](https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai)\n-
+        [Tuesday, March 18, 2025 - KFF Health News](https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":361,"end_index":463,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":782,"end_index":884,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1282,"end_index":1388,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"},{"type":"url_citation","start_index":1448,"end_index":1593,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":1596,"end_index":1744,"url":"https://www.reuters.com/markets/us/global-markets-view-usa-2025-03-18/?utm_source=openai","title":"Morning
+        Bid: US stocks stabilise as Europe keeps surging"},{"type":"url_citation","start_index":1747,"end_index":1875,"url":"https://kffhealthnews.org/morning-briefing/tuesday-march-18-2025/?utm_source=openai","title":"Tuesday,
+        March 18, 2025 - KFF Health News"}]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":328,"input_tokens_details":{"cached_tokens":0},"output_tokens":461,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":789},"user":null,"metadata":{}}}
+
+
+        '
+    headers:
+      CF-RAY:
+      - 92258da61828ac3a-YYZ
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 18 Mar 2025 14:52:20 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=CELuP391SAaXyI6SenL6kaeBxkL.Jn.nbAuZmiIhJF8-1742309540-1.0.1.1-Mvo7HNbllLg6V7fQcsXHMvxCK_Zd6mASDJxQc11JRugIhA6d6BKQooJnc3Dfn1LotOkbq7P8DY744ActyS8tSwxH9dZbdNE7UguEl8X8UsQ;
+        path=/; expires=Tue, 18-Mar-25 15:22:20 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=DlEooN3RGN39LKs0qIPpLq4fVV2s1rKJQppifGIgsqM-1742309540994-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '91'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_78b8f3beadb12a70826f583b0fddd661
+    status:
+      code: 200
+      message: OK
+version: 1

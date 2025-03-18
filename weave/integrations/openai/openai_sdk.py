@@ -390,6 +390,7 @@ def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
 ### Responses API
 def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
     from openai.types.responses import (
+        Response,
         ResponseAudioDeltaEvent,
         ResponseAudioDoneEvent,
         ResponseAudioTranscriptDeltaEvent,
@@ -472,8 +473,10 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
     # 2b. Events without an output_index
     elif isinstance(
         value,
-        ResponseAudioDeltaEvent,
-        ResponseAudioTranscriptDeltaEvent,
+        (
+            ResponseAudioDeltaEvent,
+            ResponseAudioTranscriptDeltaEvent,
+        ),
     ):
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
