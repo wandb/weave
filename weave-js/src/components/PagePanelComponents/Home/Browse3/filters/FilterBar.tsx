@@ -20,7 +20,6 @@ import {
   FIELD_DESCRIPTIONS,
   FilterId,
   getOperatorOptions,
-  isDateOperator,
   isValuelessOperator,
   UNFILTERABLE_FIELDS,
   upsertFilter,
@@ -192,16 +191,20 @@ export const FilterBar = ({
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
-      // Set this filter as the active edit
+      // Set this filter as active edit, highlighting filter bar children in teal
       setActiveEditId(item.id);
 
-      // Whether it's a new filter or updating an existing one,
-      // always preserve other filters
-      const newItems =
-        index === -1
-          ? [...oldItems, item] // Append new filter
-          : [...oldItems.slice(0, index), item, ...oldItems.slice(index + 1)]; // Update existing filter
+      if (index === -1) {
+        const newModel = {...localFilterModel, items: [item]};
+        updateLocalAndDebouncedFilterModel(newModel);
+        return;
+      }
 
+      const newItems = [
+        ...oldItems.slice(0, index),
+        item,
+        ...oldItems.slice(index + 1),
+      ];
       const newItemsModel = {...localFilterModel, items: newItems};
       updateLocalAndDebouncedFilterModel(newItemsModel);
     },
@@ -262,12 +265,9 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
-  const {combinedItems, activeIds} = useMemo(() => {
-    const {items: combinedItems, activeIds} = combineRangeFilters(
-      completeItems,
-      activeEditId
-    );
-    return {combinedItems, activeIds};
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
   }, [completeItems, activeEditId]);
 
   return (
@@ -288,7 +288,7 @@ export const FilterBar = ({
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
-              isEditing={activeIds.has(f.id) || f.id === activeEditId}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
             />
           ))}
         </VariableChildrenDisplay>
@@ -383,6 +383,8 @@ export const FilterBar = ({
 };
 
 const getNextFilterId = (items: GridFilterItem[]): number => {
+  // Naively returns the length of the list, but if we have removed earlier items
+  // use the max ID + 1
   if (items.length === 0) {
     return 0;
   }
@@ -410,8 +412,8 @@ const combineRangeFilters = (
 
   items.forEach(item => {
     if (
-      isDateOperator(item.operator) &&
-      (item.operator === '(date): before' || item.operator === '(date): after')
+      item.operator === '(date): before' ||
+      item.operator === '(date): after'
     ) {
       const range = dateRanges.get(item.field) || {};
       if (item.operator === '(date): before') {
@@ -428,21 +430,34 @@ const combineRangeFilters = (
   // Add combined range filters
   dateRanges.forEach((range, field) => {
     if (range.before && range.after) {
-      // Create a special combined filter
-      const combinedFilter = {
-        ...range.before,
-        operator: '(date): range',
-        value: {
-          before: range.before.value,
-          after: range.after.value,
-        },
-      };
-      result.push(combinedFilter);
+      // Only combine if the after date is before the before date
+      const afterDate = new Date(range.after.value);
+      const beforeDate = new Date(range.before.value);
 
-      // If either the before or after filter is being edited, add both IDs to activeIds
-      if (activeEditId === range.before.id || activeEditId === range.after.id) {
-        activeIds.add(range.before.id);
-        activeIds.add(range.after.id);
+      if (afterDate < beforeDate) {
+        // Create a special combined filter
+        const combinedFilter = {
+          ...range.before,
+          operator: '(date): range',
+          value: {
+            before: range.before.value,
+            after: range.after.value,
+          },
+        };
+        result.push(combinedFilter);
+
+        // If either the before or after filter is being edited, add both IDs to activeIds
+        if (
+          activeEditId === range.before.id ||
+          activeEditId === range.after.id
+        ) {
+          activeIds.add(range.before.id);
+          activeIds.add(range.after.id);
+        }
+      } else {
+        // If dates are incompatible, add both filters separately
+        result.push(range.after);
+        result.push(range.before);
       }
     } else {
       // Add individual filters back if we don't have both before and after
