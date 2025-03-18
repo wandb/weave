@@ -473,11 +473,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # Use recursive CTE to find all descendants efficiently
+        # Use a simpler query that finds all descendants without using CTE
         recursive_query = """
-        WITH RECURSIVE
-        call_tree AS (
-            -- Base case: start with the root calls
+        SELECT DISTINCT id
+        FROM (
+            -- start with the root calls
             SELECT id, parent_id
             FROM call_parts
             WHERE project_id = {project_id:String}
@@ -486,15 +486,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             UNION ALL
 
-            -- Recursive case: join with children
+            -- join with children
             SELECT c.id, c.parent_id
             FROM call_parts c
-            INNER JOIN call_tree p ON c.parent_id = p.id
+            INNER JOIN (
+                SELECT id, parent_id
+                FROM call_parts
+                WHERE project_id = {project_id:String}
+                    AND id IN {root_ids:Array(String)}
+                    AND deleted_at IS NULL
+            ) p ON c.parent_id = p.id
             WHERE c.project_id = {project_id:String}
                 AND c.deleted_at IS NULL
         )
-        SELECT DISTINCT id
-        FROM call_tree
         LIMIT 1000000 -- 1 million call limit
         """
 
