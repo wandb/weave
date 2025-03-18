@@ -1335,6 +1335,20 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    def delete_calls(self, call_ids: list[str]) -> None:
+        """Delete calls by their IDs.
+
+        Args:
+            call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
+        """
+        self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(

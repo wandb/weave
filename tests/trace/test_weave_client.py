@@ -597,6 +597,41 @@ def test_calls_delete_cascade(client):
     assert len(result) == 0
 
 
+def test_delete_calls(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    call0 = my_op(1)
+    call1 = my_op(2)
+    call2 = my_op(3)
+
+    calls = list(client.get_calls())
+    assert len(calls) == 3
+
+    call_0_id = calls[0].id
+    call_1_id = calls[1].id
+    call_2_id = calls[2].id
+
+    client.delete_calls([call_0_id, call_1_id])
+    assert len(list(client.get_calls())) == 1
+    assert list(client.get_calls())[0].id == call_2_id
+
+    client.delete_calls([call_0_id, call_1_id])
+    assert len(list(client.get_calls())) == 1
+    assert list(client.get_calls())[0].id == call_2_id
+
+    client.delete_calls([])
+    assert len(list(client.get_calls())) == 1
+    assert list(client.get_calls())[0].id == call_2_id
+
+    with pytest.raises(ValueError):
+        client.delete_calls([1111111111111111])
+
+    client.delete_calls([call_2_id])
+    assert len(list(client.get_calls())) == 0
+
+
 def test_call_display_name(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
 
