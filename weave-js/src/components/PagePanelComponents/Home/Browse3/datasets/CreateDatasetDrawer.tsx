@@ -2,7 +2,6 @@ import {Box, Typography} from '@mui/material';
 import React, {useCallback, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 
-import {GLOBAL_COLORS} from '../../../../../common/util/colors';
 import {Button} from '../../../../Button';
 import {TextField} from '../../../../Form/TextField';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
@@ -161,13 +160,13 @@ const CreateDatasetDrawerContent: React.FC<{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            py: 2,
+            height: 46,
             pl: 2,
             pr: 1,
             borderBottom: '1px solid',
             borderColor: 'divider',
           }}>
-          <Typography variant="h6" sx={{...typographyStyle}}>
+          <Typography variant="h6" sx={{...typographyStyle, fontWeight: 600}}>
             Create New Dataset
           </Typography>
           <Box sx={{display: 'flex', gap: 1}}>
@@ -235,9 +234,13 @@ const CreateDatasetDrawerContent: React.FC<{
                 </Box>
               )}
 
-              <Box sx={{mb: 4}}>
+              <Box sx={{mb: 2}}>
                 <Typography
-                  sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
+                  sx={{
+                    ...typographyStyle,
+                    fontWeight: 600,
+                    mb: '8px',
+                  }}>
                   Dataset Name
                 </Typography>
                 <TextField
@@ -261,6 +264,7 @@ const CreateDatasetDrawerContent: React.FC<{
                   sx={{
                     ...typographyStyle,
                     color: 'text.secondary',
+                    fontWeight: 400,
                     fontSize: '0.875rem',
                     mt: 1,
                   }}>
@@ -277,26 +281,27 @@ const CreateDatasetDrawerContent: React.FC<{
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: '2px dashed',
-                    borderColor: isDragging
-                      ? GLOBAL_COLORS.primary.string()
-                      : GLOBAL_COLORS.outline.string(),
+                    borderColor: isDragging ? '#13A9BA' : '#D4D5D9',
                     borderRadius: '8px',
                     p: 4,
                     flex: 1,
                     minHeight: '300px',
-                    backgroundColor: isDragging
-                      ? GLOBAL_COLORS.primary.alpha(0.05).string()
-                      : 'transparent',
+                    backgroundColor: isDragging ? '#E1F7FA' : 'transparent',
                     transition: 'all 0.2s ease',
                   }}
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}>
-                  <Typography variant="h6" sx={typographyStyle} gutterBottom>
-                    {isDragging
-                      ? 'Drop CSV file here'
-                      : 'Upload or drag & drop a CSV file'}
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      ...typographyStyle,
+                      fontSize: '1.125rem',
+                      fontWeight: 600,
+                    }}
+                    gutterBottom>
+                    {isDragging ? 'Drop CSV file here' : 'Upload your CSV file'}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -305,6 +310,7 @@ const CreateDatasetDrawerContent: React.FC<{
                     align="center"
                     gutterBottom>
                     Drag and drop your CSV file here, or click below to browse.
+                    <br />
                     Your file will be converted to a dataset that you can edit
                     before saving.
                   </Typography>
@@ -318,14 +324,14 @@ const CreateDatasetDrawerContent: React.FC<{
                       ref={fileInputRef}
                     />
                     <Button onClick={handleUploadClick} variant="secondary">
-                      Browse for CSV File
+                      Browse for CSV file
                     </Button>
                   </Box>
                   {isDragging && (
                     <Typography
                       variant="body2"
                       sx={{...typographyStyle, fontWeight: 'bold', mt: 2}}
-                      color="primary">
+                      color="#13A9BA">
                       Release to upload
                     </Typography>
                   )}
@@ -338,6 +344,10 @@ const CreateDatasetDrawerContent: React.FC<{
                     flexDirection: 'column',
                     minHeight: 0,
                     overflow: 'hidden',
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    mx: -2,
+                    mb: -2,
                   }}>
                   <EditableDatasetView
                     datasetObject={parsedData}
