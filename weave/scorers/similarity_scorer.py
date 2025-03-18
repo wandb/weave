@@ -2,14 +2,14 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from litellm import aembedding
 from pydantic import Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
+from weave.scorers.scorer_types import LLMScorer
 
 
-class EmbeddingSimilarityScorer(weave.Scorer):
+class EmbeddingSimilarityScorer(LLMScorer):
     """
     Computes the cosine similarity between the embeddings of a model output and a target text.
 
@@ -42,7 +42,7 @@ class EmbeddingSimilarityScorer(weave.Scorer):
     async def _compute_embeddings(
         self, output: str, target: str
     ) -> tuple[list[float], list[float]]:
-        embeddings = await aembedding(self.model_id, [output, target])
+        embeddings = await self._aembedding(self.model_id, [output, target])
         return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 
     def _cosine_similarity(self, vec1: Sequence[float], vec2: Sequence[float]) -> dict:

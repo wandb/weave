@@ -1,7 +1,6 @@
 import logging
 from typing import Union
 
-from litellm import acompletion
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
 import weave
@@ -128,8 +127,8 @@ class HallucinationFreeScorer(LLMScorer):
         user_prompt (str): The string template to pass the input and output data. The template must \
         contain placeholders for both `{input_data}` and `{output}`.
         model_id (str): The LLM model name, dependent on the LLM provider being used.
-        temperature (float): LLM temperature setting.
-        max_tokens (int): Maximum number of tokens in the LLM's response.
+        temperature (float): Controls randomness in the LLM's responses (0.0 to 1.0)
+        max_tokens (int): Maximum number of tokens allowed in the LLM's response
 
     Methods:
         score(output: str, context: str) -> HallucinationResponse:
@@ -139,13 +138,19 @@ class HallucinationFreeScorer(LLMScorer):
     system_prompt: str = DEFAULT_HALLUCINATION_SYSTEM_PROMPT
     user_prompt: str = DEFAULT_HALLUCINATION_USER_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens allowed in the LLM's response",
+    )
 
     @weave.op
-    async def score(self, output: str, context: str) -> HallucinationResponse:
+    async def score(self, output: str, context: str) -> dict:
         output = stringify(output)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {
