@@ -20,6 +20,7 @@ import {
   FIELD_DESCRIPTIONS,
   FilterId,
   getOperatorOptions,
+  isDateOperator,
   isValuelessOperator,
   UNFILTERABLE_FIELDS,
   upsertFilter,
@@ -30,6 +31,85 @@ import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 const DEBOUNCE_MS = 700;
+
+// Helper to combine before/after filters for the same field
+const combineRangeFilters = (
+  items: GridFilterItem[],
+  activeEditId: FilterId | null
+): {items: GridFilterItem[]; activeIds: Set<FilterId>} => {
+  const result: GridFilterItem[] = [];
+  const dateRanges = new Map<
+    string,
+    {before?: GridFilterItem; after?: GridFilterItem}
+  >();
+  const activeIds = new Set<FilterId>();
+
+  items.forEach(item => {
+    if (
+      isDateOperator(item.operator) &&
+      (item.operator === '(date): before' || item.operator === '(date): after')
+    ) {
+      const range = dateRanges.get(item.field) || {};
+      if (item.operator === '(date): before') {
+        range.before = item;
+      } else {
+        range.after = item;
+      }
+      dateRanges.set(item.field, range);
+    } else {
+      result.push(item);
+    }
+  });
+
+  // Add combined range filters
+  dateRanges.forEach((range, field) => {
+    if (range.before && range.after) {
+      // Create a special combined filter
+      const combinedFilter = {
+        ...range.before,
+        operator: '(date): range',
+        value: {
+          before: range.before.value,
+          after: range.after.value,
+          beforeId: range.before.id,
+          afterId: range.after.id,
+        },
+      };
+      result.push(combinedFilter);
+
+      // If either the before or after filter is being edited, add both IDs to activeIds
+      if (activeEditId === range.before.id || activeEditId === range.after.id) {
+        activeIds.add(range.before.id);
+        activeIds.add(range.after.id);
+      }
+    } else {
+      // Add individual filters back if we don't have both before and after
+      if (range.before) {
+        result.push(range.before);
+      }
+      if (range.after) {
+        result.push(range.after);
+      }
+    }
+  });
+
+  return {items: result, activeIds};
+};
+
+// Add this helper at the top with other constants
+const getNextFilterId = (items: GridFilterItem[]): number => {
+  if (items.length === 0) {
+    return 0;
+  }
+  const ids = items.map(item => {
+    const id = item.id;
+    if (id == null) {
+      return 0;
+    }
+    return typeof id === 'number' ? id : parseInt(String(id), 10) || 0;
+  });
+  return Math.max(...ids) + 1;
+};
 
 type FilterBarProps = {
   filterModel: GridFilterModel;
@@ -159,7 +239,7 @@ export const FilterBar = ({
         items: [
           ...localFilterModel.items,
           {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },
@@ -194,17 +274,13 @@ export const FilterBar = ({
       // Set this filter as the active edit
       setActiveEditId(item.id);
 
-      if (index === -1) {
-        const newModel = {...localFilterModel, items: [item]};
-        updateLocalAndDebouncedFilterModel(newModel);
-        return;
-      }
+      // Whether it's a new filter or updating an existing one,
+      // always preserve other filters
+      const newItems =
+        index === -1
+          ? [...oldItems, item] // Append new filter
+          : [...oldItems.slice(0, index), item, ...oldItems.slice(index + 1)]; // Update existing filter
 
-      const newItems = [
-        ...oldItems.slice(0, index),
-        item,
-        ...oldItems.slice(index + 1),
-      ];
       const newItemsModel = {...localFilterModel, items: newItems};
       updateLocalAndDebouncedFilterModel(newItemsModel);
     },
@@ -230,13 +306,13 @@ export const FilterBar = ({
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
@@ -278,14 +354,20 @@ export const FilterBar = ({
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
-            <FilterTagItem
-              key={f.id}
-              item={f}
-              onRemoveFilter={onRemoveFilter}
-              isEditing={f.id === activeEditId}
-            />
-          ))}
+          {(() => {
+            const {items: combinedItems, activeIds} = combineRangeFilters(
+              completeItems,
+              activeEditId
+            );
+            return combinedItems.map(f => (
+              <FilterTagItem
+                key={f.id}
+                item={f}
+                onRemoveFilter={onRemoveFilter}
+                isEditing={activeIds.has(f.id) || f.id === activeEditId}
+              />
+            ));
+          })()}
         </VariableChildrenDisplay>
       </div>
       <Popover

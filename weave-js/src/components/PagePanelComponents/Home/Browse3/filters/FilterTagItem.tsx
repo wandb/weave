@@ -62,6 +62,33 @@ export const FilterTagItem = ({
     if (item.operator === '(date): after' && field === 'Called') {
       label = <TimestampMicro value={item.value} label="Past" />;
       disableRemove = true;
+    } else if (item.operator === '(date): range') {
+      // Handle the combined date range filter
+      const {before, after, beforeId} = item.value as {
+        before: string;
+        after: string;
+        beforeId: FilterId;
+      };
+      label = (
+        <span className="flex items-center gap-2">
+          {field}
+          <span className="flex items-center">
+            <Timestamp value={after} />
+          </span>
+          <span className="mx-2">→</span>
+          <span className="flex items-center">
+            <Timestamp value={before} />
+            <RemoveAction
+              className="ml-4 mt-8"
+              onClick={(e: any) => {
+                e.stopPropagation();
+                onRemoveFilter(beforeId);
+              }}
+            />
+          </span>
+        </span>
+      );
+      disableRemove = true; // We handle removal with individual buttons
     } else {
       value = <Timestamp value={item.value} />;
     }
