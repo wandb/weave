@@ -24,14 +24,15 @@ export const Pill: FC<PillProps> = ({
   return (
     <Tailwind>
       <div
-        key={`pill-${label}`}
         className={twMerge(
           classes,
           'rounded-2xl',
           icon ? 'pl-4 pr-7' : 'px-7',
           className
         )}>
-        {icon && <Icon className="mr-4 h-14 w-14" name={icon} />}
+        {icon && (
+          <Icon role="presentation" className="mr-4 h-14 w-14" name={icon} />
+        )}
         <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
           {label}
         </span>
@@ -53,10 +54,8 @@ export const IconOnlyPill: FC<IconOnlyPillProps> = ({
   const classes = useTagClasses({color, isInteractive});
   return (
     <Tailwind>
-      <div
-        key={`pill-${icon}`}
-        className={twMerge(classes, 'rounded-2xl', 'max-w-[22px]')}>
-        <Icon className="m-4 h-14 w-14" name={icon} />
+      <div className={twMerge(classes, 'rounded-2xl', 'max-w-[22px]')}>
+        <Icon role="presentation" className="m-4 h-14 w-14" name={icon} />
       </div>
     </Tailwind>
   );
