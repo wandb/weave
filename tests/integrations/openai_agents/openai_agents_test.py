@@ -3,9 +3,20 @@ import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from pydantic import BaseModel
 
+from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
 
 # TODO: Responses should be updated once we have patching for the new Responses API
+
+
+@pytest.fixture
+def setup_tests():
+    # This is required because OpenAI by default adds its own trace processor which causes issues in the test.
+    # We can't just add our trace processor with autopatching because it wont remove the OpenAI trace processor.
+    # Instead, we manually set the trace processors to just be ours.  This simplifies testing.
+    # However, by default the autopatching keeps the default OpenAI trace processor, and additionally installs the Weave processor.
+
+    agents.set_trace_processors([WeaveTracingProcessor()])
 
 
 @pytest.mark.skip_clickhouse_client
@@ -13,7 +24,7 @@ from weave.trace.weave_client import WeaveClient
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_agents_quickstart(client: WeaveClient) -> None:
+def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent = Agent(name="Assistant", instructions="You are a helpful assistant")
 
     result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
@@ -53,14 +64,18 @@ def test_openai_agents_quickstart(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip(reason="This test works, but the order of requests to OpenAI can be mixed up (by the Agent framework).  This causes the test to fail more than reasonable in CI.")
+@pytest.mark.skip(
+    reason="This test works, but the order of requests to OpenAI can be mixed up (by the Agent framework).  This causes the test to fail more than reasonable in CI."
+)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
-async def test_openai_agents_quickstart_homework(client: WeaveClient) -> None:
+async def test_openai_agents_quickstart_homework(
+    client: WeaveClient, setup_tests
+) -> None:
     class HomeworkOutput(BaseModel):
         is_homework: bool
         reasoning: str
