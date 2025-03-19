@@ -26,8 +26,8 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
+import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
   Icon,
@@ -56,6 +56,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
+import {CallData} from '../../datasets/schemaUtils';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -115,6 +116,7 @@ import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
 const MAX_SELECT = 100;
+const MAX_EVAL_COMPARISONS = MAX_SELECT;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
@@ -138,6 +140,151 @@ export const DEFAULT_FILTER_CALLS: GridFilterModel = {
 const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
+};
+
+// Selection header (when rows are selected)
+const SelectionHeader: FC<{
+  selectedCount: number;
+  isEvaluateTable: boolean;
+  onCompareClick: () => void;
+  onClearSelection: () => void;
+  selectedCalls: string[];
+  callsTotal: number;
+  visibleColumns: string[];
+  expandedRefCols: Set<string>;
+  entity: string;
+  project: string;
+  effectiveFilter: WFHighLevelCallFilter;
+  filterModel?: GridFilterModel;
+  sortModel?: GridSortModel;
+  tableData: FlattenedCallData[];
+  callsResult: CallSchema[];
+}> = ({
+  selectedCount,
+  isEvaluateTable,
+  onCompareClick,
+  onClearSelection,
+  selectedCalls,
+  callsTotal,
+  visibleColumns,
+  expandedRefCols,
+  entity,
+  project,
+  effectiveFilter,
+  filterModel,
+  sortModel,
+  tableData,
+  callsResult,
+}) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const isReadonly =
+    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
+
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
+
+  // Get the full call objects for selected calls to send, for bulk actions (like delete)
+  const selectedCallObjects = useMemo(
+    () =>
+      tableData
+        .filter(row => selectedCalls.includes(row.id))
+        .map(traceCallToUICallSchema),
+    [tableData, selectedCalls]
+  );
+
+  // Get the call objects in CallData format for the dataset drawer
+  const selectedCallsForDataset = useMemo(
+    () =>
+      selectedCalls
+        .map(id => {
+          const call = callsResult.find(c => c.traceCall?.id === id);
+          if (!call?.traceCall) {
+            return null;
+          }
+          return {
+            digest: call.traceCall.id,
+            val: call.traceCall,
+          };
+        })
+        .filter((item): item is CallData => item !== null),
+    [selectedCalls, callsResult]
+  );
+
+  return (
+    <div className="flex w-full items-center gap-[8px]">
+      {/* Left side group */}
+      <span className="flex items-center text-sm text-moon-600">
+        <Button
+          icon="close"
+          variant="ghost"
+          size="small"
+          className="mr-[4px]"
+          onClick={onClearSelection}
+        />
+        {selectedCount} {isEvaluateTable ? 'evaluation' : 'trace'}
+        {selectedCount !== 1 ? 's' : ''} selected:
+      </span>
+      {isEvaluateTable ? (
+        <CompareEvaluationsTableButton
+          onClick={onCompareClick}
+          disabled={selectedCount === 0}
+          selectedCount={selectedCount}
+        />
+      ) : (
+        <CompareTracesTableButton
+          onClick={onCompareClick}
+          disabled={selectedCount < 2}
+          selectedCount={selectedCount}
+        />
+      )}
+      <BulkAddToDatasetButton
+        onClick={() => setAddToDatasetModalOpen(true)}
+        disabled={selectedCalls.length === 0}
+      />
+      <AddToDatasetDrawer
+        entity={entity}
+        project={project}
+        open={addToDatasetModalOpen}
+        onClose={() => setAddToDatasetModalOpen(false)}
+        selectedCalls={selectedCallsForDataset}
+      />
+      {!isReadonly && (
+        <div className="flex-none">
+          <BulkDeleteButton
+            onClick={() => setDeleteConfirmModalOpen(true)}
+            disabled={selectedCalls.length === 0}
+          />
+          <ConfirmDeleteModal
+            calls={selectedCallObjects}
+            confirmDelete={deleteConfirmModalOpen}
+            setConfirmDelete={setDeleteConfirmModalOpen}
+            onDeleteCallback={onClearSelection}
+          />
+        </div>
+      )}
+
+      {/* Right side group */}
+      <div className="ml-auto flex-none">
+        <ExportSelector
+          selectedCalls={selectedCalls}
+          numTotalCalls={callsTotal}
+          disabled={callsTotal === 0}
+          visibleColumns={visibleColumns}
+          refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+            visibleColumns.includes(col)
+          )}
+          callQueryParams={{
+            entity,
+            project,
+            filter: effectiveFilter,
+            gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+            gridSort: sortModel,
+          }}
+          defaultToSelected={true}
+        />
+      </div>
+    </div>
+  );
 };
 
 export const CallsTable: FC<{
@@ -189,11 +336,7 @@ export const CallsTable: FC<{
   setPaginationModel,
   allowedColumnPatterns,
 }) => {
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
-
-  const isReadonly =
-    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
@@ -232,6 +375,9 @@ export const CallsTable: FC<{
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set<string>().add('inputs.example')
   );
+
+  // Keep track of the display sort model separately from the actual sort model
+  const [displaySortModel, setDisplaySortModel] = useState<GridSortModel>([]);
 
   // Helpers to handle expansion
   const onExpand = (col: string) => {
@@ -569,6 +715,12 @@ export const CallsTable: FC<{
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  // Add useEffect to clear selections when isEvaluateTable changes
+  useEffect(() => {
+    setSelectedCalls([]);
+  }, [isEvaluateTable]);
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -581,29 +733,86 @@ export const CallsTable: FC<{
         disableExport: true,
         display: 'flex',
         renderHeader: (params: any) => {
+          // Get IDs of all rows on current page
+          const currentPageRowIds = tableData.map(row => row.id);
+          // Count how many of current page rows are selected
+          const currentPageSelectedCount = currentPageRowIds.filter(id =>
+            selectedCalls.includes(id)
+          ).length;
+
+          // Determine checkbox state:
+          // - false if none selected
+          // - true if all selected
+          // - 'indeterminate' if some selected
+          const isChecked =
+            currentPageSelectedCount === 0
+              ? false
+              : currentPageSelectedCount === currentPageRowIds.length
+              ? true
+              : 'indeterminate';
+
+          const maxForTable = isEvaluateTable
+            ? MAX_EVAL_COMPARISONS
+            : MAX_SELECT;
+          const isAtLimit = selectedCalls.length >= maxForTable;
+
+          // Determine tooltip text based on state
+          let tooltipText = '';
+          if (isChecked === false && isAtLimit) {
+            tooltipText = `Select limited to ${
+              isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT
+            } items`;
+          } else if (isChecked === 'indeterminate') {
+            tooltipText = 'De-select this page';
+          } else if (isChecked === false) {
+            const availableSlots = maxForTable - selectedCalls.length;
+            const pageSize = currentPageRowIds.length;
+            tooltipText =
+              availableSlots < pageSize
+                ? `Select ${availableSlots} items (max 100)`
+                : 'Select this page';
+          } else {
+            tooltipText = 'De-select this page';
+          }
+
           return (
-            <Checkbox
-              size="small"
-              checked={
-                selectedCalls.length === 0
-                  ? false
-                  : selectedCalls.length === tableData.length
-                  ? true
-                  : 'indeterminate'
-              }
-              onCheckedChange={() => {
-                if (
-                  selectedCalls.length ===
-                  Math.min(tableData.length, MAX_SELECT)
-                ) {
-                  setSelectedCalls([]);
-                } else {
-                  setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, MAX_SELECT)
-                  );
-                }
-              }}
-            />
+            <Tooltip title={tooltipText} placement="right" arrow>
+              <span>
+                <Checkbox
+                  size="small"
+                  checked={isChecked}
+                  disabled={isChecked === false && isAtLimit}
+                  onCheckedChange={() => {
+                    if (isChecked === 'indeterminate') {
+                      // If partially selected, deselect all items on current page
+                      setSelectedCalls(
+                        selectedCalls.filter(
+                          id => !currentPageRowIds.includes(id)
+                        )
+                      );
+                    } else if (isChecked === true) {
+                      // If all selected, deselect all items on current page
+                      setSelectedCalls(
+                        selectedCalls.filter(
+                          id => !currentPageRowIds.includes(id)
+                        )
+                      );
+                    } else {
+                      // If none selected, select all items on current page
+                      const missing = currentPageRowIds.filter(
+                        id => !selectedCalls.includes(id)
+                      );
+                      const availableSlots = maxForTable - selectedCalls.length;
+                      const additions =
+                        availableSlots < missing.length
+                          ? missing.slice(0, availableSlots)
+                          : missing;
+                      setSelectedCalls([...selectedCalls, ...additions]);
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
           );
         },
         renderCell: (params: any) => {
@@ -643,7 +852,7 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -665,26 +874,6 @@ export const CallsTable: FC<{
       ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
-
-  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
-  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
-
-  // Replace the state and effect with a single memo
-  const selectedCallObjects = useMemo(() => {
-    if (!callsResult) {
-      return [];
-    }
-    return callsResult
-      .filter(
-        call =>
-          call?.traceCall?.id != null &&
-          selectedCalls.includes(call.traceCall.id)
-      )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
-  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -717,18 +906,37 @@ export const CallsTable: FC<{
       }
 
       // handle feedback conversion from weave summary to backend filter
-      for (const sort of newModel) {
+      const processedModel = newModel.map(sort => {
         if (sort.field.startsWith('summary.weave.feedback')) {
           const parsed = parseFeedbackType(sort.field);
           if (parsed) {
-            const backendFilter = convertFeedbackFieldToBackendFilter(
-              parsed.field
-            );
-            sort.field = backendFilter;
+            return {
+              ...sort,
+              field: convertFeedbackFieldToBackendFilter(parsed.field),
+            };
           }
         }
+        return sort;
+      });
+
+      // Update the display sort model
+      setDisplaySortModel(processedModel);
+
+      // If there's no sort specified, use started_at desc only
+      if (processedModel.length === 0) {
+        setSortModel([{field: 'started_at', sort: 'desc'}]);
+        return;
       }
-      setSortModel(newModel);
+
+      // Only append started_at as secondary sort if it's not already present
+      const hasStartedAt = processedModel.some(
+        sort => sort.field === 'started_at'
+      );
+      if (!hasStartedAt) {
+        setSortModel([...processedModel, {field: 'started_at', sort: 'desc'}]);
+      } else {
+        setSortModel(processedModel);
+      }
     },
     [callsLoading, setSortModel, muiColumns]
   );
@@ -750,172 +958,161 @@ export const CallsTable: FC<{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
         alignItems: 'center',
+        width: '100%',
       }}
       filterListItems={
-        <TailwindContents>
-          <RefreshButton
-            onClick={() => calls.refetch()}
-            disabled={callsLoading}
-          />
-          {!hideOpSelector && (
-            <OpSelector
-              frozenFilter={frozenFilter}
-              filter={filter}
-              setFilter={setFilter}
-              selectedOpVersionOption={selectedOpVersionOption}
-              opVersionOptions={opVersionOptions}
-            />
-          )}
-          {filterModel && setFilterModel && (
-            <FilterPanel
-              filterModel={filterModel}
-              columnInfo={filterFriendlyColumnInfo}
-              setFilterModel={setFilterModel}
+        selectedCalls.length > 0 ? (
+          <TailwindContents>
+            <SelectionHeader
+              selectedCount={selectedCalls.length}
+              isEvaluateTable={isEvaluateTable}
+              onCompareClick={() => {
+                if (isEvaluateTable) {
+                  history.push(
+                    router.compareEvaluationsUri(
+                      entity,
+                      project,
+                      selectedCalls,
+                      null
+                    )
+                  );
+                } else {
+                  history.push(
+                    router.compareCallsUri(entity, project, selectedCalls)
+                  );
+                }
+              }}
+              onClearSelection={() => setSelectedCalls([])}
               selectedCalls={selectedCalls}
-              clearSelectedCalls={clearSelectedCalls}
-            />
-          )}
-          <div className="flex items-center gap-6">
-            <Switch.Root
-              id="tracesMetricsSwitch"
-              size="small"
-              checked={isMetricsChecked}
-              onCheckedChange={setMetricsChecked}>
-              <Switch.Thumb size="small" checked={isMetricsChecked} />
-            </Switch.Root>
-            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
-              Metrics
-            </label>
-          </div>
-          {selectedInputObjectVersion && (
-            <Chip
-              label={`Input: ${objectVersionNiceString(
-                selectedInputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  inputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedOutputObjectVersion && (
-            <Chip
-              label={`Output: ${objectVersionNiceString(
-                selectedOutputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  outputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedParentId && (
-            <Chip
-              label={`Parent: ${selectedParentId}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  parentId: undefined,
-                });
-              }}
-            />
-          )}
-          {isEvaluateTable ? (
-            <CompareEvaluationsTableButton
-              onClick={() => {
-                history.push(
-                  router.compareEvaluationsUri(
-                    entity,
-                    project,
-                    selectedCalls,
-                    null
-                  )
-                );
-              }}
-              disabled={selectedCalls.length === 0}
-            />
-          ) : (
-            <CompareTracesTableButton
-              onClick={() => {
-                history.push(
-                  router.compareCallsUri(entity, project, selectedCalls)
-                );
-              }}
-              disabled={selectedCalls.length < 2}
-            />
-          )}
-          {!isReadonly && selectedCalls.length !== 0 && (
-            <>
-              <div className="flex-none">
-                <BulkDeleteButton
-                  onClick={() => setDeleteConfirmModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
-                />
-                <ConfirmDeleteModal
-                  calls={tableData
-                    .filter(row => selectedCalls.includes(row.id))
-                    .map(traceCallToUICallSchema)}
-                  confirmDelete={deleteConfirmModalOpen}
-                  setConfirmDelete={setDeleteConfirmModalOpen}
-                  onDeleteCallback={() => {
-                    setSelectedCalls([]);
-                  }}
-                />
-              </div>
-              <ButtonDivider />
-              <div className="flex-none">
-                <BulkAddToDatasetButton
-                  onClick={() => setAddToDatasetModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
-                />
-                <AddToDatasetDrawer
-                  entity={entity}
-                  project={project}
-                  open={addToDatasetModalOpen}
-                  onClose={() => setAddToDatasetModalOpen(false)}
-                  selectedCalls={selectedCallObjects}
-                />
-              </div>
-              <ButtonDivider />
-            </>
-          )}
-
-          <div className="flex-none">
-            <ExportSelector
-              selectedCalls={selectedCalls}
-              numTotalCalls={callsTotal}
-              disabled={callsTotal === 0}
+              callsTotal={callsTotal}
               visibleColumns={visibleColumns}
-              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
-              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
-                visibleColumns.includes(col)
-              )}
-              callQueryParams={{
-                entity,
-                project,
-                filter: effectiveFilter,
-                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-                gridSort: sortModel,
-              }}
+              expandedRefCols={expandedRefCols}
+              entity={entity}
+              project={project}
+              effectiveFilter={effectiveFilter}
+              filterModel={filterModel}
+              sortModel={sortModel}
+              tableData={tableData}
+              callsResult={callsResult}
             />
-          </div>
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <>
-              <ButtonDivider />
-              <div className="flex-none">
-                <ManageColumnsButton
-                  columnInfo={columns}
-                  columnVisibilityModel={columnVisibilityModel}
-                  setColumnVisibilityModel={setColumnVisibilityModel}
+          </TailwindContents>
+        ) : (
+          <TailwindContents>
+            <div className="flex w-full items-center">
+              {/* Left side group */}
+              <div className="flex w-full items-center gap-[8px]">
+                <RefreshButton
+                  onClick={() => calls.refetch()}
+                  disabled={callsLoading}
                 />
+                {/* Column Visibility Button */}
+                {columnVisibilityModel && setColumnVisibilityModel && (
+                  <div className="flex-none">
+                    <ManageColumnsButton
+                      columnInfo={columns}
+                      columnVisibilityModel={columnVisibilityModel}
+                      setColumnVisibilityModel={setColumnVisibilityModel}
+                    />
+                  </div>
+                )}
+                {!hideOpSelector && (
+                  <OpSelector
+                    frozenFilter={frozenFilter}
+                    filter={filter}
+                    setFilter={setFilter}
+                    selectedOpVersionOption={selectedOpVersionOption}
+                    opVersionOptions={opVersionOptions}
+                  />
+                )}
+                {filterModel && setFilterModel && (
+                  <FilterPanel
+                    filterModel={filterModel}
+                    columnInfo={filterFriendlyColumnInfo}
+                    setFilterModel={setFilterModel}
+                    selectedCalls={selectedCalls}
+                    clearSelectedCalls={clearSelectedCalls}
+                  />
+                )}
+                {/* Special pills */}
+                {selectedInputObjectVersion && (
+                  <Chip
+                    label={`Input: ${objectVersionNiceString(
+                      selectedInputObjectVersion
+                    )}`}
+                    onDelete={() => {
+                      setFilter({
+                        ...filter,
+                        inputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                )}
+                {selectedOutputObjectVersion && (
+                  <Chip
+                    label={`Output: ${objectVersionNiceString(
+                      selectedOutputObjectVersion
+                    )}`}
+                    onDelete={() => {
+                      setFilter({
+                        ...filter,
+                        outputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                )}
+                {selectedParentId && (
+                  <Chip
+                    label={`Parent: ${selectedParentId}`}
+                    onDelete={() => {
+                      setFilter({
+                        ...filter,
+                        parentId: undefined,
+                      });
+                    }}
+                  />
+                )}
               </div>
-            </>
-          )}
-        </TailwindContents>
+
+              {/* Right side group */}
+              {/* Metrics Button */}
+              {!hideOpSelector && (
+                <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-6">
+                    <div className="flex-none">
+                      <Button
+                        icon="chart-vertical-bars"
+                        variant="ghost"
+                        active={isMetricsChecked}
+                        onClick={() => setMetricsChecked(!isMetricsChecked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Export Button */}
+              <div className="ml-[8px] flex items-center gap-[8px]">
+                <div className="flex-none">
+                  <ExportSelector
+                    selectedCalls={selectedCalls}
+                    numTotalCalls={callsTotal}
+                    disabled={callsTotal === 0}
+                    visibleColumns={visibleColumns}
+                    refColumnsToExpand={Array.from(expandedRefCols).filter(
+                      col => visibleColumns.includes(col)
+                    )}
+                    callQueryParams={{
+                      entity,
+                      project,
+                      filter: effectiveFilter,
+                      gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+                      gridSort: sortModel,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </TailwindContents>
+        )
       }>
       {isMetricsChecked && (
         <CallsCharts
@@ -955,7 +1152,7 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={displaySortModel}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
@@ -1100,25 +1297,44 @@ const OpSelector = ({
 
   return (
     <div className="flex-none">
-      <ListItem sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+      <ListItem sx={{minWidth: 190, width: 256, height: 32, padding: 0}}>
         <FormControl fullWidth sx={{borderColor: MOON_200}}>
           <Autocomplete
             PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+            ListboxProps={{
+              sx: {
+                fontSize: '14px',
+                fontFamily: 'Source Sans Pro',
+                '& .MuiAutocomplete-option': {
+                  fontSize: '14px',
+                  fontFamily: 'Source Sans Pro',
+                },
+                '& .MuiAutocomplete-groupLabel': {
+                  fontSize: '14px',
+                  fontFamily: 'Source Sans Pro',
+                },
+              },
+            }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 height: '32px',
+                fontFamily: 'Source Sans Pro',
                 '& fieldset': {
                   borderColor: MOON_200,
                 },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
               },
               '& .MuiOutlinedInput-input': {
+                fontSize: '14px',
                 height: '32px',
                 padding: '0 14px',
                 boxSizing: 'border-box',
+                fontFamily: 'Source Sans Pro',
               },
+              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
+                {
+                  backgroundColor: 'transparent',
+                  marginBottom: '2px',
+                },
             }}
             size="small"
             limitTags={1}
@@ -1134,18 +1350,14 @@ const OpSelector = ({
             }
             groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" />}
-            clearIcon={<Icon name="close" />}
+            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
+            clearIcon={<Icon name="close" width={16} height={16} />}
           />
         </FormControl>
       </ListItem>
     </div>
   );
 };
-
-const ButtonDivider = () => (
-  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
-);
 
 const useParentIdOptions = (
   entity: string,
