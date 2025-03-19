@@ -29,7 +29,7 @@ type TimestampProps = {
 };
 
 // Format a time difference to a micro string (1h, 1d, 1w, etc.)
-const formatMicroTime = (then: moment.Moment): string => {
+const formatSmallTime = (then: moment.Moment): string => {
   const now = moment();
   const diffMs = now.diff(then);
 
@@ -87,7 +87,7 @@ const formatTimestampInternal = (
     }
   }
 
-  const micro = formatMicroTime(then);
+  const small = formatSmallTime(then);
 
   return {
     // TODO: It would be nice if we could display a timezone string here to
@@ -97,7 +97,7 @@ const formatTimestampInternal = (
     //       REF: https://github.com/moment/moment/issues/162
     long: then.format('dddd, MMMM Do YYYY [at] h:mm:ss a'),
     short: then.format(format),
-    micro,
+    small,
   };
 };
 
@@ -158,20 +158,20 @@ export const Timestamp = ({
   return <Tooltip content={long} trigger={text} />;
 };
 
-export const TimestampMicro = ({
+export const TimestampSmall = ({
   value,
   label,
 }: TimestampProps & {label?: string}) => {
-  /* TimestampMicro displays a micro timestamp, e.g. "1d" or "1w".
+  /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
   const then = valueToMoment(value);
-  const {long, micro} = formatTimestampInternal(then);
+  const {long, small} = formatTimestampInternal(then);
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />
       <span className="font-semibold">
-        {label} {micro}
+        {label} {small}
       </span>
     </div>
   );

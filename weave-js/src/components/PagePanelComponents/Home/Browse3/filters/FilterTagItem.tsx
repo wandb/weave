@@ -7,7 +7,7 @@ import {RemoveAction} from '@wandb/weave/components/Tag';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Timestamp, TimestampMicro, TimestampRange} from '../../../../Timestamp';
+import {Timestamp, TimestampRange, TimestampSmall} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -60,7 +60,7 @@ export const FilterTagItem = ({
   } else if (isDateOperator(item.operator)) {
     // Special case for the Called after field, show the micro label
     if (item.operator === '(date): after' && field === 'Called') {
-      label = <TimestampMicro value={item.value} label="Past" />;
+      label = <TimestampSmall value={item.value} label="Past" />;
       disableRemove = true;
     } // Special case for when we have both before/after, show a range
     else if (item.operator === '(date): range') {
