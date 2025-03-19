@@ -1,5 +1,6 @@
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import { FilterId } from "./common";
+
+import {FilterId} from './common';
 
 // New file for filter-related utilities
 export const getNextFilterId = (items: GridFilterItem[]): number => {
@@ -21,13 +22,21 @@ export const combineRangeFilters = (
   activeEditId: FilterId | null
 ): {items: GridFilterItem[]; activeIds: Set<FilterId>} => {
   const result: GridFilterItem[] = [];
-  const dateRanges = new Map<string, {before?: GridFilterItem; after?: GridFilterItem}>();
+  const dateRanges = new Map<
+    string,
+    {before?: GridFilterItem; after?: GridFilterItem}
+  >();
   const activeIds = new Set<FilterId>();
 
   items.forEach(item => {
-    if (item.operator === '(date): before' || item.operator === '(date): after') {
+    if (
+      item.operator === '(date): before' ||
+      item.operator === '(date): after'
+    ) {
       const range = dateRanges.get(item.field) || {};
-      item.operator === '(date): before' ? (range.before = item) : (range.after = item);
+      item.operator === '(date): before'
+        ? (range.before = item)
+        : (range.after = item);
       dateRanges.set(item.field, range);
     } else {
       result.push(item);
@@ -47,7 +56,10 @@ export const combineRangeFilters = (
         };
         result.push(combinedFilter);
 
-        if (activeEditId === range.before.id || activeEditId === range.after.id) {
+        if (
+          activeEditId === range.before.id ||
+          activeEditId === range.after.id
+        ) {
           activeIds.add(range.before.id);
           activeIds.add(range.after.id);
         }
@@ -61,4 +73,4 @@ export const combineRangeFilters = (
   });
 
   return {items: result, activeIds};
-}; 
+};

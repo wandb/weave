@@ -26,9 +26,9 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
-import {getNextFilterId, combineRangeFilters} from './filterUtils';
 
 const DEBOUNCE_MS = 700;
 
@@ -152,18 +152,24 @@ export const FilterBar = ({
     setAnchorEl(null);
   };
 
-  const handleAddFilter = useCallback((field: string) => {
-    setLocalFilterModel({
-      items: [
-        ...localFilterModel.items,
-        {
-          id: getNextFilterId(localFilterModel.items),
-          field,
-          operator: defaultOperator,
-        },
-      ],
-    });
-  }, [localFilterModel, defaultOperator]);
+  const onAddFilter = useCallback(
+    (field: string) => {
+      const defaultOperator = getOperatorOptions(field)[0].value;
+      const newModel = {
+        ...localFilterModel,
+        items: [
+          ...localFilterModel.items,
+          {
+            id: localFilterModel.items.length,
+            field,
+            operator: defaultOperator,
+          },
+        ],
+      };
+      setLocalFilterModel(newModel);
+    },
+    [localFilterModel]
+  );
 
   const debouncedSetFilterModel = useMemo(
     () =>
@@ -331,7 +337,7 @@ export const FilterBar = ({
                   key={item.id}
                   item={item}
                   options={options}
-                  onAddFilter={handleAddFilter}
+                  onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
                 />
@@ -346,7 +352,7 @@ export const FilterBar = ({
                   value: undefined,
                 }}
                 options={options}
-                onAddFilter={handleAddFilter}
+                onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
               />
@@ -357,7 +363,7 @@ export const FilterBar = ({
                 variant="ghost"
                 icon="add-new"
                 disabled={localFilterModel.items.length === 0}
-                onClick={() => handleAddFilter('')}>
+                onClick={() => onAddFilter('')}>
                 Add filter
               </Button>
               <div className="flex-auto" />
