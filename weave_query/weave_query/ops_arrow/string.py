@@ -311,8 +311,10 @@ def endswith(self, suffix):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalpha(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alpha(self._arrow_data), types.Boolean(), self._artifact
+    return util.handle_dictionary_array(
+        self,
+        pc.ascii_is_alpha,
+        types.Boolean()
     )
 
 
@@ -322,8 +324,10 @@ def isalpha(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isnumeric(self):
-    return ArrowWeaveList(
-        pc.ascii_is_decimal(self._arrow_data), types.Boolean(), self._artifact
+    return util.handle_dictionary_array(
+        self,
+        pc.ascii_is_decimal,
+        types.Boolean()
     )
 
 
@@ -333,8 +337,10 @@ def isnumeric(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalnum(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alnum(self._arrow_data), types.Boolean(), self._artifact
+    return util.handle_dictionary_array(
+        self,
+        pc.ascii_is_alnum,
+        types.Boolean()
     )
 
 
@@ -344,8 +350,10 @@ def isalnum(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def lower(self):
-    return ArrowWeaveList(
-        pc.ascii_lower(self._arrow_data), types.String(), self._artifact
+    return util.handle_dictionary_array(
+        self,
+        pc.ascii_lower,
+        types.String()
     )
 
 
@@ -355,8 +363,10 @@ def lower(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def upper(self):
-    return ArrowWeaveList(
-        pc.ascii_upper(self._arrow_data), types.String(), self._artifact
+    return util.handle_dictionary_array(
+        self,
+        pc.ascii_upper,
+        types.String()
     )
 
 
