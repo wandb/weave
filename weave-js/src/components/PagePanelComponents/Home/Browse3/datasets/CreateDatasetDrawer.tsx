@@ -4,8 +4,8 @@ import {toast} from 'react-toastify';
 
 import {
   MOON_300,
-  TEAL_200,
   TEAL_500,
+  TEAL_300,
 } from '../../../../../common/css/color.styles';
 import {Button} from '../../../../Button';
 import {TextField} from '../../../../Form/TextField';
@@ -292,7 +292,7 @@ const CreateDatasetDrawerContent: React.FC<{
                     p: 4,
                     flex: 1,
                     minHeight: '300px',
-                    backgroundColor: isDragging ? TEAL_200 : 'transparent',
+                    backgroundColor: isDragging ? `${TEAL_300}52` : 'transparent',
                     transition: 'all 0.2s ease',
                   }}
                   onDragEnter={handleDragEnter}
