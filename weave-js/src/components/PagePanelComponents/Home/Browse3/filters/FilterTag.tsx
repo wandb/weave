@@ -6,10 +6,18 @@ import {RemoveAction, useTagClasses} from '../../../../Tag';
 export type FilterTagProps = {
   label: React.ReactNode;
   removeAction: ReactElement<typeof RemoveAction>;
+  isEditing?: boolean;
 };
 
-export const FilterTag = ({label, removeAction}: FilterTagProps) => {
-  const classes = useTagClasses({color: 'moon', isInteractive: true});
+export const FilterTag = ({
+  label,
+  removeAction,
+  isEditing = false,
+}: FilterTagProps) => {
+  const classes = useTagClasses({
+    color: isEditing ? 'teal' : 'moon',
+    isInteractive: true,
+  });
   return (
     <div key={`tag-${label}`} className={twMerge(classes, 'pl-6 pr-4')}>
       <div
