@@ -1,4 +1,5 @@
 import * as Colors from '@wandb/weave/common/css/color.styles';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -39,6 +40,13 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   background: ${props => (props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE)};
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
+
+  &:hover {
+    ${props => !props.$isSelected && `
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      border-color: ${Colors.MOON_300};
+    `}
+  }
 `;
 NodeContainer.displayName = 'NodeContainer';
 
@@ -54,10 +62,6 @@ const NodeHeader = styled.button`
   cursor: pointer;
   min-height: 32px;
   user-select: none;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.02);
-  }
 `;
 NodeHeader.displayName = 'NodeHeader';
 
@@ -95,7 +99,7 @@ const RecursionBlock = styled.div`
   padding: 8px 12px;
   border: 1px dashed ${Colors.TEAL_500};
   border-radius: 4px;
-  background: ${Colors.MOON_100};
+  background: ${Colors.WHITE};
   color: ${Colors.TEAL_500};
   font-size: 14px;
   display: flex;
@@ -189,29 +193,39 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   return (
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <div className="flex min-w-0 flex-col">
-            <div className="flex items-center truncate text-sm font-medium">
+        <div className="flex min-w-0 flex-1 flex-col group">
+          <div className="flex items-center w-full ">
+            <div className="truncate text-sm font-medium">
               {node.opName}
             </div>
-            <div className="truncate text-[11px] text-moon-500">
-              {stats.finishedCallCount} finished
-              {stats.unfinishedCallCount > 0 &&
-                ` • ${stats.unfinishedCallCount} running`}
-              {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
-              {stats.finishedCallCount > 0 &&
-                ` • ${formatDuration(avgDuration)} avg`}
+            <Icon 
+              name="forward-next" 
+              height={16} 
+              width={16}
+              className="ml-4 text-moon-500 opacity-0 group-hover:opacity-100" 
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-moon-500">
+            <span>{stats.finishedCallCount} finished</span>
+            {stats.unfinishedCallCount > 0 && (
+              <span>• {stats.unfinishedCallCount} running</span>
+            )}
+            {stats.errorCount > 0 && (
+              <span>• {stats.errorCount} errors</span>
+            )}
+            {stats.finishedCallCount > 0 && (
+              <span>• {formatDuration(avgDuration)} avg</span>
+            )}
+            <div className="ml-auto whitespace-nowrap text-[11px] text-moon-500">
+              {stats.finishedCallCount > 0
+                ? stats.minDuration === stats.maxDuration
+                  ? formatDuration(stats.minDuration)
+                  : `${formatDuration(stats.minDuration)} - ${formatDuration(
+                      stats.maxDuration
+                    )}`
+                : 'Running...'}
             </div>
           </div>
-        </div>
-        <div className="whitespace-nowrap text-[11px] text-moon-500">
-          {stats.finishedCallCount > 0
-            ? stats.minDuration === stats.maxDuration
-              ? formatDuration(stats.minDuration)
-              : `${formatDuration(stats.minDuration)} - ${formatDuration(
-                  stats.maxDuration
-                )}`
-            : 'Running...'}
         </div>
       </NodeHeader>
 
