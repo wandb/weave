@@ -478,13 +478,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Use recursive cte to get all children of requested calls, one batch
         # at a time. First: parents, then children, then grandchildren, etc.
-        query = """
+        depth_condition = "" if depth is None else "AND d.depth < {depth:Int32}"
+        query = f"""
         WITH RECURSIVE descendants AS (
             -- Base case: get the root calls
             SELECT id, parent_id, 1 as depth
             FROM call_parts
-            WHERE project_id = {project_id:String}
-                AND id IN {call_ids:Array(String)}
+            WHERE project_id = {{project_id:String}}
+                AND id IN {{call_ids:Array(String)}}
                 AND deleted_at IS NULL
 
             UNION ALL
@@ -493,24 +494,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             SELECT c.id, c.parent_id, d.depth + 1
             FROM call_parts c
             INNER JOIN descendants d ON c.parent_id = d.id
-            WHERE c.project_id = {project_id:String}
+            WHERE c.project_id = {{project_id:String}}
                 AND c.deleted_at IS NULL
-                {depth_limit:Optional(String)}
+                {depth_condition}
         )
         SELECT id FROM descendants
-        LIMIT {limit:Int32}
+        LIMIT {{limit:Int32}}
         SETTINGS allow_experimental_analyzer=1
         """
-        depth_limit = ""
-        if depth is not None:
-            depth_limit = "AND d.depth < {depth:Int32}"
-
         result = self._query(
             query,
             {
                 "project_id": project_id,
                 "call_ids": call_ids,
-                "depth_limit": depth_limit,
+                "depth": depth,
                 "limit": limit or MAX_CALLS_CHILDREN_LIMIT,
             },
         )
