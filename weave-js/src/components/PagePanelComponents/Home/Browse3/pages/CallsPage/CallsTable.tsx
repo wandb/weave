@@ -26,7 +26,7 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, TEAL_400} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
@@ -1297,7 +1297,7 @@ const OpSelector = ({
 
   return (
     <div className="flex-none">
-      <ListItem sx={{minWidth: 190, width: 240, height: 32, padding: 0}}>
+      <ListItem sx={{minWidth: 190, width: 256, height: 32, padding: 0}}>
         <FormControl fullWidth sx={{borderColor: MOON_200}}>
           <Autocomplete
             PaperComponent={paperProps => <StyledPaper {...paperProps} />}
@@ -1322,9 +1322,6 @@ const OpSelector = ({
                 '& fieldset': {
                   borderColor: MOON_200,
                 },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
               },
               '& .MuiOutlinedInput-input': {
                 fontSize: '14px',
@@ -1332,6 +1329,9 @@ const OpSelector = ({
                 padding: '0 14px',
                 boxSizing: 'border-box',
                 fontFamily: 'Source Sans Pro',
+              },
+              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
+                backgroundColor: 'transparent',
               },
             }}
             size="small"
@@ -1348,8 +1348,8 @@ const OpSelector = ({
             }
             groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" />}
-            clearIcon={<Icon name="close" />}
+            popupIcon={<Icon name="chevron-down" width={16} height={16} className="mb-[2px]" />}
+            clearIcon={<Icon name="close" width={16} height={16} className="mb-[2px]" />}
           />
         </FormControl>
       </ListItem>
