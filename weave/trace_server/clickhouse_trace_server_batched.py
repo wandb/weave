@@ -538,11 +538,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(ids) == 0:
             return
 
+        # exclude root calls from descendants
+        descendant_ids = [id for id in ids if id not in call_ids]
+
         calls = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 columns=req.columns,
-                filter=tsi.CallsFilter(call_ids=ids),
+                filter=tsi.CallsFilter(call_ids=descendant_ids),
             )
         )
         yield from calls
