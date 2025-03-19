@@ -14,7 +14,36 @@ from weave_query.ops_arrow.string import (
     strip,
     lstrip,
     rstrip,
+    arrowweavelist_len,
 )
+
+
+class TestLenOp:
+    def test_basic(self):
+        arrow_data = [
+            "abc",
+            "",
+            None,
+        ]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = arrowweavelist_len.eager_call(awl)
+        expected = [3, 0, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = [
+            "abc",
+            "def",
+            "",
+            None,
+        ]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([3, 2, 0, 3]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = arrowweavelist_len.eager_call(awl)
+        expected = [None, 0, 3, None]
+        assert result._arrow_data.to_pylist() == expected
 
 
 class TestIsAlphaOp:

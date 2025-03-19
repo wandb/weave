@@ -146,9 +146,7 @@ def in_(self, other):
     output_type=ARROW_WEAVE_LIST_INT_TYPE,
 )
 def arrowweavelist_len(self):
-    return ArrowWeaveList(
-        pc.binary_length(self._arrow_data), types.Int(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.binary_length, types.Int())
 
 
 @arrow_op(
