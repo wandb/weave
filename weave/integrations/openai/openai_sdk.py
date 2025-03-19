@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -332,7 +331,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
@@ -368,7 +367,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)

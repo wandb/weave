@@ -14,8 +14,7 @@ except ImportError:
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 _lc_nvidia_patcher: MultiPatcher | None = None
 
@@ -162,7 +161,7 @@ def nvidia_ai_endpoints_wrapper(settings: OpSettings) -> Callable[[Callable], Ca
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(postprocess_inputs_to_openai_format)
-        return add_accumulator(
+        return _add_accumulator(
             op,
             make_accumulator=lambda inputs: nvidia_accumulator,
             should_accumulate=should_use_accumulator,
