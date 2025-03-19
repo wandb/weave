@@ -32,6 +32,8 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
@@ -50,6 +52,8 @@ const isFilterIncomplete = (filter: GridFilterItem): boolean => {
 };
 
 export const FilterBar = ({
+  entity,
+  project,
   filterModel,
   setFilterModel,
   columnInfo,
@@ -329,6 +333,8 @@ export const FilterBar = ({
               {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
+                  entity={entity}
+                  project={project}
                   item={item}
                   options={options}
                   onAddFilter={onAddFilter}
@@ -339,6 +345,8 @@ export const FilterBar = ({
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
+                entity={entity}
+                project={project}
                 item={{
                   id: undefined,
                   field: '',

@@ -768,6 +768,8 @@ export const CallsTable: FC<{
           )}
           {filterModel && setFilterModel && (
             <FilterPanel
+              entity={entity}
+              project={project}
               filterModel={filterModel}
               columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}

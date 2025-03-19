@@ -8,8 +8,9 @@ import {
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
+import * as userEvents from '../../../../../integrations/analytics/userEvents';
 import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
@@ -27,11 +28,15 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
 ];
 
 type SelectDatetimeDropdownProps = {
+  entity: string;
+  project: string;
   value: string;
   onChange: (value: string) => void;
 };
 
 export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
+  entity,
+  project,
   value,
   onChange,
 }) => {
@@ -46,6 +51,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
+
+  // Add analytics hook
+  useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
 
   const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
     const yesterdaySuggestion = parseDate('yesterday')!;
@@ -342,4 +350,30 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
       ))}
     </ul>
   );
+};
+
+/**
+ * Fires an analytics event when the metrics plots are viewed.
+ * This is used to track the usage and latency of the metrics plots.
+ * Only fires once when opened.
+ */
+const useFireAnalyticsForDateFilterDropdownUsed = (
+  entity: string,
+  project: string,
+  inputValue: string,
+  date: string
+) => {
+  const sentEvent = useRef(false);
+  useEffect(() => {
+    if (sentEvent.current) {
+      return;
+    }
+    userEvents.dateFilterDropdownUsed({
+      entity,
+      project,
+      rawInput: inputValue,
+      date,
+    });
+    sentEvent.current = true;
+  }, [entity, project, inputValue, date]);
 };

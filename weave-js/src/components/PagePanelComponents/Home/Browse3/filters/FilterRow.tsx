@@ -17,6 +17,8 @@ import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';
 
 type FilterRowProps = {
+  entity: string;
+  project: string;
   item: GridFilterItem;
   options: SelectFieldOption[];
   onAddFilter: (field: string) => void;
@@ -25,6 +27,8 @@ type FilterRowProps = {
 };
 
 export const FilterRow = ({
+  entity,
+  project,
   item,
   options,
   onAddFilter,
@@ -81,6 +85,8 @@ export const FilterRow = ({
       <div className="flex items-center">
         {item.field && (
           <SelectValue
+            entity={entity}
+            project={project}
             field={item.field}
             operator={item.operator}
             value={item.value}

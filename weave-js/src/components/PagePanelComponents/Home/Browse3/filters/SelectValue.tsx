@@ -20,6 +20,8 @@ import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
 
 type SelectValueProps = {
+  entity: string;
+  project: string;
   field: string;
   operator: string;
   value: any;
@@ -27,6 +29,8 @@ type SelectValueProps = {
 };
 
 export const SelectValue = ({
+  entity,
+  project,
   field,
   operator,
   value,
@@ -52,7 +56,12 @@ export const SelectValue = ({
   if (fieldType === 'datetime') {
     return (
       <div className="min-w-[202px]">
-        <SelectDatetimeDropdown value={value} onChange={onSetValue} />
+        <SelectDatetimeDropdown
+          entity={entity}
+          project={project}
+          value={value}
+          onChange={onSetValue}
+        />
       </div>
     );
   }
