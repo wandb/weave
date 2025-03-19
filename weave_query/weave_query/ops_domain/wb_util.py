@@ -110,7 +110,6 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 width=val["width"],
                 height=val["height"],
                 sha256=val["sha256"],
-                caption=val.get("caption", ""),
                 # boxes=val.get("boxes", {}),
                 # masks=val.get("masks", {}),
             )

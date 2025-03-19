@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
+from weave.trace.op import _add_accumulator, _IteratorWrapper
 
 if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
@@ -76,7 +76,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
@@ -93,7 +93,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
@@ -162,7 +162,7 @@ def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,
             should_accumulate=lambda _: True,

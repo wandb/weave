@@ -8,6 +8,7 @@ from weave.scorers.utils import ensure_hf_imports
 
 if TYPE_CHECKING:
     import torch
+    from litellm import acompletion, aembedding, amoderation
     from transformers.modeling_utils import PreTrainedModel
     from transformers.pipelines.base import Pipeline
     from transformers.tokenization_utils import PreTrainedTokenizer
@@ -23,24 +24,29 @@ class LLMScorer(weave.Scorer):
 
     Attributes:
         model_id: The specific model identifier to use for scoring
-        temperature: Controls randomness in the LLM's responses (0.0 to 1.0)
-        max_tokens: Maximum number of tokens allowed in the LLM's response
     """
 
     model_id: str = Field(
         description="The model to use, check https://docs.litellm.ai/docs/providers for supported models"
     )
-    temperature: float = Field(
-        ..., description="The temperature to use for the response"
-    )
-    max_tokens: int = Field(
-        ..., description="The maximum number of tokens in the response"
-    )
 
-    # TODO: check if we can validate the model_id with litellm on a post_init method
+    _acompletion: "acompletion" = PrivateAttr()
+    _aembedding: "aembedding" = PrivateAttr()
+    _amoderation: "amoderation" = PrivateAttr()
+
+    def model_post_init(self, __context: Any) -> None:
+        try:
+            from litellm import acompletion, aembedding, amoderation  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
+            )
+        self._acompletion = acompletion
+        self._aembedding = aembedding
+        self._amoderation = amoderation
 
 
-class InstructorLLMScorer(LLMScorer):
+class InstructorLLMScorer:
     def __new__(cls, *args, **kwargs):  # type: ignore
         raise DeprecationWarning(
             "InstructorLLMScorer is deprecated and will be removed in a future version. "

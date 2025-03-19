@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
+    from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
 
@@ -343,7 +343,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        op = add_accumulator(
+        op = _add_accumulator(
             op,  # type: ignore
             make_accumulator=make_accumulator,
             should_accumulate=should_use_accumulator,
@@ -390,7 +390,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        op = add_accumulator(
+        op = _add_accumulator(
             op,  # type: ignore
             make_accumulator=make_accumulator,
             should_accumulate=should_use_accumulator,
@@ -398,6 +398,229 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         )
 
         return _add_stream_options(op)
+
+    return wrapper
+
+
+def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
+    if len(acc.output) <= value.output_index:
+        missing_len = value.output_index - len(acc.output) + 1
+        acc.output.extend([""] * missing_len)
+    return acc
+
+
+### Responses API
+def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
+    from openai.types.responses import (
+        Response,
+        ResponseAudioDeltaEvent,
+        ResponseAudioDoneEvent,
+        ResponseAudioTranscriptDeltaEvent,
+        ResponseAudioTranscriptDoneEvent,
+        ResponseCodeInterpreterCallCodeDeltaEvent,
+        ResponseCodeInterpreterCallCodeDoneEvent,
+        ResponseCodeInterpreterCallCompletedEvent,
+        ResponseCodeInterpreterCallInProgressEvent,
+        ResponseCodeInterpreterCallInterpretingEvent,
+        ResponseCompletedEvent,
+        ResponseContentPartAddedEvent,
+        ResponseContentPartDoneEvent,
+        ResponseCreatedEvent,
+        ResponseErrorEvent,
+        ResponseFailedEvent,
+        ResponseFileSearchCallCompletedEvent,
+        ResponseFileSearchCallInProgressEvent,
+        ResponseFileSearchCallSearchingEvent,
+        ResponseFunctionCallArgumentsDeltaEvent,
+        ResponseFunctionCallArgumentsDoneEvent,
+        ResponseIncompleteEvent,
+        ResponseInProgressEvent,
+        ResponseOutputItemAddedEvent,
+        ResponseOutputItemDoneEvent,
+        ResponseRefusalDeltaEvent,
+        ResponseRefusalDoneEvent,
+        ResponseTextAnnotationDeltaEvent,
+        ResponseTextDeltaEvent,
+        ResponseTextDoneEvent,
+        ResponseWebSearchCallCompletedEvent,
+        ResponseWebSearchCallInProgressEvent,
+        ResponseWebSearchCallSearchingEvent,
+    )
+
+    if acc is None:
+        acc = Response(
+            id="",
+            created_at=0,
+            model="",
+            object="response",
+            output=[],
+            parallel_tool_calls=False,
+            tool_choice="auto",
+            tools=[],
+        )
+
+    # 1. "Response" object events, either at the start or end of a slice of the stream
+    if isinstance(
+        value,
+        (
+            ResponseCreatedEvent,
+            ResponseInProgressEvent,
+            ResponseIncompleteEvent,
+            ResponseCompletedEvent,
+            ResponseFailedEvent,
+        ),
+    ):
+        # In the happy path, the final event is ResponseCompletedEvent with a fully
+        # populated response object.  This is the most faithful representation, so
+        # just use this if available.
+
+        # As an MVP this alone is probably sufficient for the streaming case (assuming
+        # the user does not close the stream mid-response).
+        acc = value.response
+
+    # 2. "Delta" events, which are streamed parts appended to an InProgressEvent
+    # 2a. Events with an output_index
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCodeDeltaEvent,
+            ResponseFunctionCallArgumentsDeltaEvent,
+            ResponseRefusalDeltaEvent,
+            ResponseTextDeltaEvent,
+        ),
+    ):
+        acc = _pad_output(acc, value)
+        acc.output[value.output_index] += value.delta
+
+    # 2b. Events without an output_index
+    elif isinstance(
+        value,
+        (
+            ResponseAudioDeltaEvent,
+            ResponseAudioTranscriptDeltaEvent,
+        ),
+    ):
+        # Not obvious how to handle these since there is no output_index
+        if not acc.output:
+            acc.output = [""]
+        acc.output[0] += value.delta
+
+    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
+        # Not obvious how to handle this since there is no delta
+        ...
+
+    # Everything else
+    elif isinstance(
+        value,
+        (
+            ResponseContentPartAddedEvent,
+            ResponseErrorEvent,
+            ResponseOutputItemAddedEvent,
+        ),
+    ):
+        ...
+
+    # 3. No-op events: these are not needed for the accumulator
+    # 3a. "Done" events
+    elif isinstance(
+        value,
+        (
+            ResponseAudioDoneEvent,
+            ResponseAudioTranscriptDoneEvent,
+            ResponseCodeInterpreterCallCodeDoneEvent,
+            ResponseContentPartDoneEvent,
+            ResponseFunctionCallArgumentsDoneEvent,
+            ResponseOutputItemDoneEvent,
+            ResponseRefusalDoneEvent,
+            ResponseTextDoneEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3b. "Tool Completed" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCompletedEvent,
+            ResponseFileSearchCallCompletedEvent,
+            ResponseWebSearchCallCompletedEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3c. "Tool In Progress" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInProgressEvent,
+            ResponseFileSearchCallInProgressEvent,
+            ResponseWebSearchCallInProgressEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3d. "Tool Action" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInterpretingEvent,
+            ResponseFileSearchCallSearchingEvent,
+            ResponseWebSearchCallSearchingEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    return acc
+
+
+def should_use_responses_accumulator(inputs: dict) -> bool:
+    return isinstance(inputs, dict) and inputs.get("stream") is True
+
+
+def create_wrapper_responses_sync(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        def _inner(*args: Any, **kwargs: Any) -> Any:
+            return fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
+        )
+
+    return wrapper
+
+
+def create_wrapper_responses_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        async def _inner(*args: Any, **kwargs: Any) -> Any:
+            return await fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
+        )
 
     return wrapper
 
@@ -440,6 +663,12 @@ def get_openai_patcher(
     )
     async_embeddings_create_settings = base.model_copy(
         update={"name": base.name or "openai.embeddings.create"}
+    )
+    responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
+    )
+    async_responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
     )
 
     _openai_patcher = MultiPatcher(
@@ -487,6 +716,18 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.embeddings"),
                 "AsyncEmbeddings.create",
                 create_wrapper_async(settings=async_embeddings_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.create",
+                create_wrapper_responses_sync(settings=responses_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.create",
+                create_wrapper_responses_async(
+                    settings=async_responses_create_settings
+                ),
             ),
         ]
     )

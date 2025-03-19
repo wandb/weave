@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
@@ -164,7 +164,7 @@ def cohere_stream_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(op, lambda inputs: cohere_accumulator)
+        return _add_accumulator(op, lambda inputs: cohere_accumulator)
 
     return wrapper
 
@@ -173,7 +173,7 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(op, lambda inputs: cohere_accumulator_v2)
+        return _add_accumulator(op, lambda inputs: cohere_accumulator_v2)
 
     return wrapper
 

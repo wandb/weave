@@ -6,7 +6,9 @@ import tempfile
 from collections.abc import Generator, Iterator, Mapping
 from io import BytesIO, StringIO
 
-from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
+from weave.trace.serialization import (
+    op_type,  # noqa: F401, Must import this to register op save/load
+)
 
 # This uses the older weave query_service's Artifact interface. We could
 # probably simplify a lot at this point by removing the internal requirement
