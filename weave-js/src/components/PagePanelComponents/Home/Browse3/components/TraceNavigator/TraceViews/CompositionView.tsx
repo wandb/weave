@@ -36,7 +36,7 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   border: 1px solid
     ${props => (props.$isSelected ? Colors.TEAL_500 : Colors.MOON_200)};
   border-radius: 4px;
-  background: ${props => (props.$isSelected ? Colors.MOON_100 : Colors.WHITE)};
+  background: ${props => (props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE)};
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
 `;
@@ -46,7 +46,7 @@ const NodeHeader = styled.button`
   width: 100%;
   padding: 8px 12px;
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 8px;
   border: none;
   background: none;
