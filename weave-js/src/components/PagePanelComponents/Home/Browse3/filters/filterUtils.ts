@@ -2,7 +2,13 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 
 import {FilterId} from './common';
 
-// New file for filter-related utilities
+/**
+ * Computes the next available filter ID based on existing filter items.
+ * - Returns 0 if items array is empty
+ * - Handles null/undefined IDs by defaulting to 0
+ * - Converts string IDs to numbers, defaulting to 0 if parsing fails
+ * - Returns the maximum ID + 1
+ */
 export const getNextFilterId = (items: GridFilterItem[]): number => {
   if (items.length === 0) {
     return 0;
@@ -17,6 +23,13 @@ export const getNextFilterId = (items: GridFilterItem[]): number => {
   return Math.max(...ids) + 1;
 };
 
+/**
+ * Combines range filters into a single filter item for each field.
+ * - Groups filters by field
+ * - Combines before and after filters into a single range filter
+ * - Keeps track of active edit IDs
+ * - Returns combined items and active edit IDs
+ */
 export const combineRangeFilters = (
   items: GridFilterItem[],
   activeEditId: FilterId | null
