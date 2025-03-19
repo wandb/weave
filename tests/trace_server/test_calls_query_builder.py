@@ -796,6 +796,96 @@ def test_calls_query_with_predicate_filters() -> None:
     )
 
 
+def test_query_with_summary_weave_status_sort() -> None:
+    """Test sorting by summary.weave.status field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("exception")
+    cq.add_field("ended_at")
+    cq.add_order("summary.weave.status", "asc")
+
+    # Assert that the query orders by the computed status field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.exception) AS exception,
+            any(calls_merged.ended_at) AS ended_at
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        ORDER BY CASE
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
+            ELSE {pb_2:String}
+        END ASC
+        """,
+        {"pb_0": "error", "pb_1": "running", "pb_2": "success", "pb_3": "project"},
+    )
+
+
+def test_query_with_summary_weave_status_sort_and_filter() -> None:
+    """Test filtering and sorting by summary.weave.status field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("exception")
+    cq.add_field("ended_at")
+
+    # Add a condition to filter for only successful calls
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "summary.weave.status"}, {"$literal": "success"}]}
+        )
+    )
+
+    # Sort by status descending
+    cq.add_order("summary.weave.status", "desc")
+
+    # Assert that the query includes both a filter and sort on the status field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.exception) AS exception,
+            any(calls_merged.ended_at) AS ended_at
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
+                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
+                ELSE {pb_2:String}
+            END = {pb_2:String}))
+        AND ((any(calls_merged.deleted_at) IS NULL))
+        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ORDER BY CASE
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
+            ELSE {pb_2:String}
+        END DESC
+        """,
+        {
+            "pb_0": "error",
+            "pb_1": "running",
+            "pb_2": "success",
+            "pb_3": "project",
+        },
+    )
+
+
 def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -1296,4 +1386,163 @@ def test_calls_query_filter_by_empty_str() -> None:
             "pb_1": "",
             "pb_2": "project",
         },
+    )
+
+
+def test_query_with_summary_weave_latency_ms_sort() -> None:
+    """Test sorting by summary.weave.latency_ms field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    cq.add_order("summary.weave.latency_ms", "desc")
+
+    # Assert that the query orders by the computed latency field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at,
+            any(calls_merged.ended_at) AS ended_at
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        ORDER BY CASE
+            WHEN any(calls_merged.ended_at) IS NULL THEN NULL
+            ELSE (toUnixTimestamp64Milli(any(calls_merged.ended_at)) - toUnixTimestamp64Milli(any(calls_merged.started_at)))
+        END DESC
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_with_summary_weave_latency_ms_filter() -> None:
+    """Test filtering by summary.weave.latency_ms field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+
+    # Add a condition to filter for calls with latency greater than 1000ms (1s)
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]}
+        )
+    )
+
+    # Assert that the query includes a filter on the latency field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at,
+            any(calls_merged.ended_at) AS ended_at
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((CASE
+              WHEN any(calls_merged.ended_at) IS NULL THEN NULL
+              ELSE (toUnixTimestamp64Milli(any(calls_merged.ended_at)) - toUnixTimestamp64Milli(any(calls_merged.started_at)))
+          END > {pb_0:UInt64}))
+        AND ((any(calls_merged.deleted_at) IS NULL))
+        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": 1000, "pb_1": "project"},
+    )
+
+
+def test_query_with_summary_weave_trace_name_sort() -> None:
+    """Test sorting by summary.weave.trace_name field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("op_name")
+    cq.add_field("display_name")
+    cq.add_order("summary.weave.trace_name", "asc")
+
+    # Assert that the query orders by the computed trace_name field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.op_name) AS op_name,
+            argMaxMerge(calls_merged.display_name) AS display_name
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        ORDER BY CASE
+            WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
+            WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
+                regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
+            ELSE any(calls_merged.op_name)
+        END ASC
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_with_summary_weave_trace_name_filter() -> None:
+    """Test filtering by summary.weave.trace_name field."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("op_name")
+    cq.add_field("display_name")
+
+    # Add a condition to filter for calls with a specific trace name
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "summary.weave.trace_name"},
+                    {"$literal": "my_model"},
+                ]
+            }
+        )
+    )
+
+    # Assert that the query includes a filter on the trace_name field
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.op_name) AS op_name,
+            argMaxMerge(calls_merged.display_name) AS display_name
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((CASE
+                WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
+                WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
+                    regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
+                ELSE any(calls_merged.op_name)
+            END = {pb_0:String}))
+        AND ((any(calls_merged.deleted_at) IS NULL))
+        AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": "my_model", "pb_1": "project"},
     )
