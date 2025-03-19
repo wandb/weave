@@ -1,3 +1,4 @@
+import {MOON_900,TEAL_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
@@ -69,7 +70,7 @@ const getCallTypeIcon = (type: NodeType): null | IconName => {
     case 'scorer':
       return 'number';
     default:
-      return null;
+      return 'circle';
   }
 };
 
@@ -89,7 +90,7 @@ const opTypeToColor = (typeName: NodeType): string => {
       return 'text-sienna-500 dark:text-sienna-400';
     // Other, probable noise
     default:
-      return 'text-moon-300 dark:text-moon-200';
+      return 'text-moon-300/0 dark:text-moon-200/0';
   }
 };
 
@@ -197,14 +198,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   return (
     <div style={style}>
       <Button
-        variant={id === focusedCallId ? 'secondary' : 'ghost'}
-        active={id === focusedCallId}
-        onClick={() => setFocusedCallId(id)}
-        onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm"
+        variant="ghost"
         style={{
           opacity: isDeemphasized ? 0.7 : 1,
-        }}>
+          backgroundColor: id === focusedCallId ? TEAL_200 : undefined,
+          color: id === focusedCallId ? MOON_900 : undefined,
+        }}
+        onClick={() => setFocusedCallId(id)}
+        onDoubleClick={() => setRootCallId(id)}
+        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150"
+      >
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
