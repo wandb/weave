@@ -46,7 +46,6 @@ export const MOONS = {
   MOON_950,
 };
 
-export const TEAL_200 = '#E1F7FA';
 export const TEAL_300 = '#A9EDF2';
 export const TEAL_350 = '#88E4EB';
 export const TEAL_400 = '#58D3DB';
@@ -57,7 +56,6 @@ export const TEAL_600 = '#038194';
 export const TEAL_650 = '#096A7A';
 export const TEAL_700 = '#155B69';
 export const NEW_TEALS = {
-  TEAL_200,
   TEAL_300,
   TEAL_350,
   TEAL_400,

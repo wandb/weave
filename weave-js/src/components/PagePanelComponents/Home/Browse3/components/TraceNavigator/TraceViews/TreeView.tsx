@@ -1,4 +1,4 @@
-import {MOON_900,TEAL_200} from '@wandb/weave/common/css/color.styles';
+import {MOON_900,TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
@@ -201,7 +201,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         variant="ghost"
         style={{
           opacity: isDeemphasized ? 0.7 : 1,
-          backgroundColor: id === focusedCallId ? TEAL_200 : undefined,
+          backgroundColor: id === focusedCallId ? `${TEAL_300}52` : undefined,
           color: id === focusedCallId ? MOON_900 : undefined,
         }}
         onClick={() => setFocusedCallId(id)}
