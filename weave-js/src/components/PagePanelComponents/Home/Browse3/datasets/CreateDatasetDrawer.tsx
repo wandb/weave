@@ -4,8 +4,8 @@ import {toast} from 'react-toastify';
 
 import {
   MOON_300,
-  TEAL_500,
   TEAL_300,
+  TEAL_500,
 } from '../../../../../common/css/color.styles';
 import {Button} from '../../../../Button';
 import {TextField} from '../../../../Form/TextField';
