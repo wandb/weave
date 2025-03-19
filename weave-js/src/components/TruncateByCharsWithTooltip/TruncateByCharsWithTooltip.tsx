@@ -53,7 +53,7 @@ export const TruncateByCharsWithTooltip = ({
         trigger={
           <div className="w-fit cursor-auto">{children({truncatedText})}</div>
         }
-        isTriggerAsChild={false}
+        isTriggerAsChild={false} // ensures trigger has accessible wrapper
         noTriggerWrap>
         {text}
       </Tooltip>
