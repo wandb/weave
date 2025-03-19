@@ -202,6 +202,10 @@ export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
 };
 
+export const isDateOperator = (operator: string) => {
+  return operator.startsWith('(date):');
+};
+
 export const getOperatorLabel = (operatorValue: string): string => {
   const label = operatorLabels[operatorValue];
   if (label) {
