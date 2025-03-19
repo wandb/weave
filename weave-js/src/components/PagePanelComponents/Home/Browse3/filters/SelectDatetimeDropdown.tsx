@@ -47,21 +47,18 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
 
-  // Compute yesterday's date string (date only, no time)
   const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayString = formatDateOnly(yesterdayDate);
-
-    const yesterdaySuggestion: PredefinedSuggestion = {
-      abbreviation: yesterdayString,
-      label: 'Yesterday',
-    };
-    return [...PREDEFINED_SUGGESTIONS, yesterdaySuggestion];
+    const yesterdaySuggestion = parseDate('yesterday')!;
+    return [
+      ...PREDEFINED_SUGGESTIONS,
+      {
+        abbreviation: formatDateOnly(yesterdaySuggestion),
+        label: 'Yesterday',
+      },
+    ];
   }, []);
 
   const parseAndUpdateDate = (newInputValue: string) => {
-    // Parse the input to get a date
     const date = parseDate(newInputValue);
 
     // Call the parent onChange handler with the timestamp
