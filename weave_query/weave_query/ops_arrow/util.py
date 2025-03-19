@@ -8,7 +8,6 @@ from weave_query import graph
 from weave_query.arrow.list_ import ArrowWeaveList
 
 
-
 # Reimplementation of Weave0 `toSafeCall` which
 # converts media to their digest
 def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
@@ -75,18 +74,19 @@ def equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array:
     result = pc.replace_with_mask(result, one_null, False)
     return result
 
+
 def handle_dictionary_array(
     self: ArrowWeaveList,
     operation: typing.Callable,
     output_type: types.Type,
     *args,
-    **kwargs
+    **kwargs,
 ) -> ArrowWeaveList:
     if isinstance(self._arrow_data, pa.DictionaryArray):
         return ArrowWeaveList(
             pa.DictionaryArray.from_arrays(
                 self._arrow_data.indices,
-                operation(self._arrow_data.dictionary, *args, **kwargs)
+                operation(self._arrow_data.dictionary, *args, **kwargs),
             ),
             output_type,
             self._artifact,
