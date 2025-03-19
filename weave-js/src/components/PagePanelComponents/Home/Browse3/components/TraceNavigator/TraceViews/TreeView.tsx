@@ -1,4 +1,4 @@
-import {MOON_900,TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {MOON_900, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
@@ -206,8 +206,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         }}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150"
-      >
+        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
