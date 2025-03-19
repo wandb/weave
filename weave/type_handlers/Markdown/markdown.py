@@ -1,13 +1,19 @@
-from typing import Any
+from typing import TypedDict
 
 from rich.markdown import Markdown
+from typing_extensions import NotRequired
 
 from weave.trace.serialization import serializer
 
 
-def save(obj: Markdown) -> dict[str, Any]:
-    # TODO: Serialize "justify" and "hyperlinks" attributes?
-    d = {
+# TODO: Serialize "justify" and "hyperlinks" attributes?
+class SerializedMarkdown(TypedDict):
+    markup: str
+    code_theme: NotRequired[str]
+
+
+def save(obj: Markdown) -> SerializedMarkdown:
+    d: SerializedMarkdown = {
         "markup": obj.markup,
     }
     if obj.code_theme:
@@ -15,7 +21,7 @@ def save(obj: Markdown) -> dict[str, Any]:
     return d
 
 
-def load(encoded: dict[str, Any]) -> Markdown:
+def load(encoded: SerializedMarkdown) -> Markdown:
     return Markdown(**encoded)
 
 
