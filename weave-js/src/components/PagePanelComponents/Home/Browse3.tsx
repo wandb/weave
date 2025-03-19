@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {debounce} from 'lodash';
 import React, {
   FC,
   useCallback,
@@ -37,8 +38,10 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  PATH_PARAM,
+  DESCENDENT_CALL_ID_PARAM,
+  HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
+  SHOW_FEEDBACK_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -618,18 +621,135 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
+const getOptionalBoolean = (
+  dict: Record<string, string>,
+  key: string
+): boolean | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value === '1';
+};
+
+const getOptionalString = (
+  dict: Record<string, string>,
+  key: string
+): string | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value;
+};
+
+const useURLBackedCallPageState = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+  const [rootCallId, setRootCallId] = useState(params.itemName);
+  useEffect(() => {
+    setRootCallId(params.itemName);
+  }, [params.itemName]);
+
+  const [descendentCallId, setDescendentCallId] = useState<string | undefined>(
+    getOptionalString(query, DESCENDENT_CALL_ID_PARAM)
+  );
+  useEffect(() => {
+    setDescendentCallId(getOptionalString(query, DESCENDENT_CALL_ID_PARAM));
+  }, [query]);
+
+  const [showFeedback, setShowFeedback] = useState<boolean | undefined>(
+    getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
+  );
+  useEffect(() => {
+    setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
+  }, [query]);
+
+  const [hideTraceTree, setHideTraceTree] = useState<boolean | undefined>(
+    getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
+  );
+  useEffect(() => {
+    setHideTraceTree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
+  }, [query]);
+
+  const debouncedHistoryPush = useMemo(() => {
+    return debounce((path: string) => {
+      if (history.location.pathname + history.location.search !== path) {
+        history.push(path);
+      }
+    }, 500);
+  }, [history]);
+
+  useEffect(() => {
+    debouncedHistoryPush(
+      currentRouter.callUIUrl(
+        params.entity,
+        params.project,
+        '',
+        rootCallId,
+        descendentCallId,
+        hideTraceTree,
+        showFeedback
+      )
+    );
+    return () => {
+      debouncedHistoryPush.cancel();
+    };
+  }, [
+    currentRouter,
+    debouncedHistoryPush,
+    params.entity,
+    params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+  ]);
+
+  return {
+    entity: params.entity,
+    project: params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  };
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
-  const params = useParamsDecoded<Browse3TabItemParams>();
-  const query = useURLSearchParamsDict();
+  const {
+    entity,
+    project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  } = useURLBackedCallPageState();
 
   return (
     <CallPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
-      path={query[PATH_PARAM]}
+      entity={entity}
+      project={project}
+      rootCallId={rootCallId}
+      setRootCallId={setRootCallId}
+      focusedCallId={descendentCallId}
+      setFocusedCallId={setDescendentCallId}
+      hideTraceTree={hideTraceTree}
+      setHideTraceTree={setHideTraceTree}
+      showFeedback={showFeedback}
+      setShowFeedback={setShowFeedback}
     />
   );
 };
