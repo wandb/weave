@@ -494,7 +494,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         SELECT DISTINCT id FROM descendants
         LIMIT 1000000
-        -- TODO remove this once CH cloud updated to 24.8
         SETTINGS allow_experimental_analyzer=1
         """
 
