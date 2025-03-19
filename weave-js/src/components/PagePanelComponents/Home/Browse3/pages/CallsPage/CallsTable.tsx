@@ -1005,21 +1005,6 @@ export const CallsTable: FC<{
                   onClick={() => calls.refetch()}
                   disabled={callsLoading}
                 />
-                {/* Metrics Button */}
-                {!hideOpSelector && (
-                  <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-6">
-                      <div className="flex-none">
-                        <Button
-                          icon="chart-vertical-bars"
-                          variant="ghost"
-                          active={isMetricsChecked}
-                          onClick={() => setMetricsChecked(!isMetricsChecked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {/* Column Visibility Button */}
                 {columnVisibilityModel && setColumnVisibilityModel && (
                   <div className="flex-none">
@@ -1089,6 +1074,22 @@ export const CallsTable: FC<{
               </div>
 
               {/* Right side group */}
+                {/* Metrics Button */}
+                {!hideOpSelector && (
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-6">
+                      <div className="flex-none">
+                        <Button
+                          icon="chart-vertical-bars"
+                          variant="ghost"
+                          active={isMetricsChecked}
+                          onClick={() => setMetricsChecked(!isMetricsChecked)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              {/* Export Button */}
               <div className="ml-[8px] flex items-center gap-[8px]">
                 <div className="flex-none">
                   <ExportSelector
