@@ -1327,32 +1327,34 @@ class WeaveClient:
         return self.finish_call(call, exception=exception)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call_descendants(self, call: Call, depth: int | None = None) -> list[Call]:
+    def call_descendants(
+        self, call: Call, depth: int | None = None, limit: int | None = None
+    ) -> list[Call]:
         """Get all descendant calls of a given call."""
-        return list(
-            self.server.calls_descendants(
-                CallsDescendantsReq(
-                    project_id=self._project_id(),
-                    call_ids=[call.id],
-                    depth=depth,
-                )
+        res = self.server.calls_descendants(
+            CallsDescendantsReq(
+                project_id=self._project_id(),
+                call_ids=[call.id],
+                depth=depth,
+                limit=limit,
             )
         )
+        return list(res)
 
     @trace_sentry.global_trace_sentry.watch()
     def calls_descendants(
-        self, call_ids: list[str], depth: int | None = None
+        self, call_ids: list[str], depth: int | None = None, limit: int | None = None
     ) -> list[Call]:
         """Get all descendant calls of a given list of call IDs."""
-        return list(
-            self.server.calls_descendants(
-                CallsDescendantsReq(
-                    project_id=self._project_id(),
-                    call_ids=call_ids,
-                    depth=depth,
-                )
+        res = self.server.calls_descendants(
+            CallsDescendantsReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
+                depth=depth,
+                limit=limit,
             )
         )
+        return list(res)
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:

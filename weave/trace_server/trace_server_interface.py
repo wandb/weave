@@ -260,6 +260,8 @@ class CallsDescendantsReq(BaseModel):
     # Default is all descendants. limit 1 would stop at grandchildren
     depth: Optional[int] = None
 
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
 
 class CompletionsCreateRequestInputs(BaseModel):
     model: str

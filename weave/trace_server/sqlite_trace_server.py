@@ -607,6 +607,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise RequestTooLarge(
                 f"Cannot get more than 100000 children at once (requested: {req.limit})."
             )
+        elif limit < 0:
+            raise ValueError("Limit must be a positive integer")
 
         conn, cursor = get_conn_cursor(self.db_path)
         # Get all child calls recursively
@@ -622,9 +624,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.op_name,
                     c.started_at,
                     c.ended_at,
-                    c.inputs_dump,
-                    c.output_dump,
-                    c.attributes_dump,
+                    c.inputs,
+                    c.output,
+                    c.attributes,
+                    c.summary,
                     c.exception,
                     c.wb_user_id,
                     c.wb_run_id,
@@ -632,7 +635,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.display_name,
                     1 as depth
                 FROM calls c
-                WHERE c.parent_id IN ({}) AND c.project_id = ?
+                WHERE c.parent_id IN ({})
+                    AND c.deleted_at IS NULL
+                    AND c.project_id = ?
 
                 UNION ALL
 
@@ -645,10 +650,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.op_name,
                     c.started_at,
                     c.ended_at,
-                    c.inputs_dump,
-                    c.output_dump,
-                    c.attributes_dump,
-                    c.summary_dump,
+                    c.inputs,
+                    c.output,
+                    c.attributes,
+                    c.summary,
                     c.exception,
                     c.wb_user_id,
                     c.wb_run_id,
@@ -658,7 +663,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 FROM calls c
                 JOIN call_tree ct ON c.parent_id = ct.id
                 WHERE c.project_id = ?
-                AND (? IS NULL OR ct.depth < ?)
+                    AND c.deleted_at IS NULL
+                    AND (? IS NULL OR ct.depth < ?)
             )
             SELECT * FROM call_tree
             ORDER BY started_at ASC
@@ -668,7 +674,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             + [req.project_id, req.project_id, req.depth, req.depth, limit],
         )
 
-        for row in cursor.fetchall():
+        rows = cursor.fetchall()
+
+        for row in rows:
             yield tsi.CallSchema(
                 id=row[0],
                 project_id=row[1],

@@ -36,6 +36,7 @@ from weave.trace.serialization.serializer import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -2391,8 +2392,8 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
-def test_calls_children_basic(client):
-    """Test basic functionality of calls_children including depth limits and multiple children."""
+def test_calls_descendants_basic(client):
+    """Test basic functionality of calls_descendants including depth limits and multiple children."""
 
     @weave.op()
     def parent_op(x: int) -> int:
@@ -2414,40 +2415,31 @@ def test_calls_children_basic(client):
 
     # Create a call that will have multiple children and grandchildren
     result = parent_op(5)
-    parent_call = client.get_calls(
-        query=tsi.CallsQueryReq(
-            project_id=client.project_id, filter=tsi.CallsFilter(op_names=["parent_op"])
-        )
-    ).next()
+    parent_call = client.get_calls(filter=tsi.CallsFilter(op_names=["%parent_op:*"]))[0]
 
     # Test getting immediate children only (depth=1)
     immediate_children = client.call_descendants(parent_call, depth=1)
     assert len(immediate_children) == 2
-    assert {child.op_name for child in immediate_children} == {"child_op1", "child_op2"}
+    for child in immediate_children:
+        assert "child_op" in child.op_name
 
     # Test getting all descendants (depth=2)
     all_descendants = client.call_descendants(parent_call, depth=2)
     assert len(all_descendants) == 3
-    assert {child.op_name for child in all_descendants} == {
-        "child_op1",
-        "child_op2",
-        "grandchild_op",
-    }
+    for child in all_descendants:
+        assert "child_op" in child.op_name or "grandchild_op" in child.op_name
 
     # Test getting children for multiple parents
     result2 = parent_op(10)
-    parent_calls = client.get_calls(
-        query=tsi.CallsQueryReq(
-            project_id=client.project_id,
-            filter=tsi.CallsFilter(op_names=["parent_op"]),
-        )
+    parent_calls = client.get_calls(filter=tsi.CallsFilter(op_names=["%parent_op:*"]))
+    multi_parent_children = client.calls_descendants(
+        call_ids=[call.id for call in parent_calls], depth=1
     )
-    multi_parent_children = client.call_descendants(parent_calls, depth=1)
     assert len(multi_parent_children) == 4  # 2 children per parent
 
 
-def test_calls_children_edge_cases(client):
-    """Test edge cases for calls_children including deleted calls and leaf nodes."""
+def test_calls_descendants_edge_cases(client):
+    """Test edge cases for calls_descendants including deleted calls and leaf nodes."""
 
     @weave.op()
     def parent_op(x: int) -> int:
@@ -2463,21 +2455,13 @@ def test_calls_children_edge_cases(client):
 
     # Test leaf node (no children)
     leaf_result = leaf_op(5)
-    leaf_call = client.get_calls(
-        query=tsi.CallsQueryReq(
-            project_id=client.project_id, filter=tsi.CallsFilter(op_names=["leaf_op"])
-        )
-    ).next()
+    leaf_call = client.get_calls(filter=tsi.CallsFilter(op_names=["%leaf_op:*"]))[0]
     leaf_children = client.call_descendants(leaf_call, depth=1)
     assert len(leaf_children) == 0
 
     # Test deleted parent
     parent_result = parent_op(5)
-    parent_call = client.get_calls(
-        query=tsi.CallsQueryReq(
-            project_id=client.project_id, filter=tsi.CallsFilter(op_names=["parent_op"])
-        )
-    )[0]
+    parent_call = client.get_calls(filter=tsi.CallsFilter(op_names=["%parent_op:*"]))[0]
 
     # Delete parent and verify no children are returned
     client.delete_calls(call_ids=[parent_call.id])
@@ -2486,11 +2470,9 @@ def test_calls_children_edge_cases(client):
 
     # Test deleted child
     parent_result2 = parent_op(10)
-    parent_call2 = client.get_calls(
-        query=tsi.CallsQueryReq(
-            project_id=client.project_id, filter=tsi.CallsFilter(op_names=["parent_op"])
-        )
-    )[0]
+    parent_call2 = client.get_calls(filter=tsi.CallsFilter(op_names=["%parent_op:*"]))[
+        0
+    ]
     all_children = client.calls_descendants(call_ids=[parent_call2.id])
     assert len(all_children) == 1
 
@@ -2500,10 +2482,13 @@ def test_calls_children_edge_cases(client):
     assert len(remaining_children) == 0
 
     with pytest.raises(ValueError, match="Depth must be a positive integer"):
+        client.calls_descendants(call_ids=[parent_call2.id], depth=-1)
+
+    with pytest.raises(ValueError, match="Limit must be a positive integer"):
         client.calls_descendants(call_ids=[parent_call2.id], limit=-1)
 
     with pytest.raises(
         RequestTooLarge,
-        match="Cannot get more than 100000 children at once (requested: 100001).",
+        match="Cannot get more than 100000 children at once",
     ):
-        client.calls_descendants(call_ids=[parent_call2.id], depth=100_001)
+        client.calls_descendants(call_ids=[parent_call2.id], limit=100_001)
