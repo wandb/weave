@@ -251,6 +251,13 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
+class CallsChildrenReq(BaseModel):
+    project_id: str
+    call_ids: list[str]
+    limit: Optional[int] = None
+    depth: Optional[int] = None
+
+
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
     messages: list = []
@@ -915,6 +922,7 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
+    def calls_children(self, req: CallsChildrenReq) -> Iterator[CallSchema]: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

@@ -129,14 +129,15 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_FLUSH_COUNT = 10000
+MAX_FLUSH_COUNT = 10_000
 MAX_FLUSH_AGE = 15
 
-FILE_CHUNK_SIZE = 100000
+FILE_CHUNK_SIZE = 100_000
 
-MAX_DELETE_CALLS_COUNT = 1000
+MAX_DELETE_CALLS_COUNT = 1_000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
+MAX_CALLS_CHILDREN_LIMIT = 100_000
 
 
 CallCHInsertable = Union[
@@ -455,6 +456,102 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
+
+    def _get_call_descendent_ids(
+        self,
+        project_id: str,
+        call_ids: list[str],
+        limit: Optional[int] = None,
+        depth: Optional[int] = None,
+    ) -> list[str]:
+        """
+        Helper function to get all descendant call ids of the requested root calls.
+
+        Args:
+            project_id: The project ID to search within
+            call_ids: List of root call IDs to find descendants for
+            limit: Optional maximum number of descendants to return
+            depth: Optional maximum depth of descendants to return (1 = immediate children only, 2 = children and grandchildren, etc.)
+        """
+        if depth is not None and depth < 1:
+            raise ValueError("Depth must be a positive integer")
+
+        # Use recursive cte to get all children of requested calls, one batch
+        # at a time. First: parents, then children, then grandchildren, etc.
+        query = """
+        WITH RECURSIVE descendants AS (
+            -- Base case: get the root calls
+            SELECT id, parent_id, 1 as depth
+            FROM call_parts
+            WHERE project_id = {project_id:String}
+                AND id IN {call_ids:Array(String)}
+                AND deleted_at IS NULL
+
+            UNION ALL
+
+            -- Recursive case: get children of descendants
+            SELECT c.id, c.parent_id, d.depth + 1
+            FROM call_parts c
+            INNER JOIN descendants d ON c.parent_id = d.id
+            WHERE c.project_id = {project_id:String}
+                AND c.deleted_at IS NULL
+                {depth_limit:Optional(String)}
+        )
+        SELECT id FROM descendants
+        {limit_clause:Optional(String)}
+        SETTINGS allow_experimental_analyzer=1
+        """
+        depth_limit = ""
+        if depth is not None:
+            depth_limit = "AND d.depth < {depth:Int32}"
+
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT {limit:Int32}"
+
+        result = self._query(
+            query,
+            {
+                "project_id": project_id,
+                "call_ids": call_ids,
+                "depth": depth,
+                "limit": limit,
+            },
+        )
+        return [row[0] for row in result.result_rows]
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_children")
+    def calls_children(self, req: tsi.CallsChildrenReq) -> Iterator[tsi.CallSchema]:
+        """Returns all descendant calls of the requested root calls."""
+        assert_non_null_wb_user_id(req)
+
+        limit = req.limit
+        if not limit:
+            limit = MAX_CALLS_CHILDREN_LIMIT
+        elif limit > MAX_CALLS_CHILDREN_LIMIT:
+            raise RequestTooLarge(
+                f"Cannot get more than {MAX_CALLS_CHILDREN_LIMIT} children at once (requested: {req.limit})."
+            )
+
+        call_ids = req.call_ids
+        if len(call_ids) == 0:
+            return
+
+        ids = self._get_call_descendent_ids(req.project_id, call_ids, limit)
+        if len(ids) == 0:
+            return
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                call_ids=ids,
+                columns=req.columns,
+                filter=tsi.CallsFilter(
+                    call_ids=call_ids,
+                ),
+            )
+        )
+        yield from calls
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
