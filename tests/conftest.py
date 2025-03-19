@@ -35,6 +35,101 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
+# Custom ClickHouse server for parallel testing
+class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceServer):
+    """Custom ClickHouse server that allows changing the database names for parallel testing."""
+
+    def __init__(self, *args, **kwargs):
+        self.db_management_name = "db_management"  # Default value
+        self.default_db_name = kwargs.get(
+            "database", "default"
+        )  # Get from constructor or use default
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def from_env(cls, use_async_insert: bool = False) -> "TestClickHouseTraceServer":
+        # Create the instance with standard env values
+        instance = cls(
+            host=ts_env.wf_clickhouse_host(),
+            port=ts_env.wf_clickhouse_port(),
+            user=ts_env.wf_clickhouse_user(),
+            password=ts_env.wf_clickhouse_pass(),
+            database=ts_env.wf_clickhouse_database(),
+            use_async_insert=use_async_insert,
+            file_storage_uri_str=ts_env.wf_file_storage_uri(),
+        )
+        return instance
+
+    def _mint_client(self):
+        """Override to use the custom database name."""
+        client = super()._mint_client()
+        # Set the database to our custom name
+        client.database = self.default_db_name
+        return client
+
+    def _run_migrations(self):
+        """Override to use our custom database names."""
+        logger = logging.getLogger("weave.trace_server.clickhouse_trace_server_batched")
+        logger.info(
+            f"Running migrations for {self.default_db_name} with management db {self.db_management_name}"
+        )
+
+        # Create a migrator with our custom db name
+        migrator = (
+            clickhouse_trace_server_batched.wf_migrator.ClickHouseTraceServerMigrator(
+                self._mint_client()
+            )
+        )
+
+        # First create and initialize the management database
+        self.ch_client.command(
+            f"CREATE DATABASE IF NOT EXISTS {self.db_management_name}"
+        )
+
+        # Initialize the management database for this specific instance
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.db_management_name}.migrations
+            (
+                db_name String,
+                curr_version UInt64,
+                partially_applied_version UInt64 NULL
+            )
+            ENGINE = MergeTree()
+            ORDER BY (db_name)
+        """
+        self.ch_client.command(create_table_sql)
+
+        # Apply migrations to our custom database
+        migrator.apply_migrations(self.default_db_name)
+
+    def _insert(self, table, data, column_names, settings=None):
+        """Override to prepend the database name to the table."""
+        # Only prepend if the table doesn't already include a database name
+        if "." not in table:
+            table = f"{self.default_db_name}.{table}"
+        return super()._insert(table, data, column_names, settings)
+
+    def _query(self, query, parameters, column_formats=None):
+        """Replace any references to the default database with our custom database."""
+        # Simple string replacement
+        query = query.replace(" default.", f" {self.default_db_name}.")
+        query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
+        query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
+        query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        return super()._query(query, parameters, column_formats)
+
+    def _query_stream(self, query, parameters, column_formats=None, settings=None):
+        """Replace any references to the default database with our custom database."""
+        # Simple string replacement
+        query = query.replace(" default.", f" {self.default_db_name}.")
+        query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
+        query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
+        query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        return super()._query_stream(query, parameters, column_formats, settings)
+
+
 @pytest.fixture(autouse=True)
 def disable_datadog():
     """
@@ -208,11 +303,7 @@ def clickhouse_server():
 
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
-    )
+    clickhouse_trace_server = TestClickHouseTraceServer.from_env(use_async_insert=False)
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
 
@@ -562,15 +653,16 @@ def create_client(
     entity = "shawn"
     project = "test-project"
     db_path = None
-    # Get worker id for parallel test execution
+
+    # Get worker id for parallel test execution, used by both SQLite and ClickHouse
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
+    worker_suffix = f"_{worker_id}_{uuid.uuid4().hex[:8]}" if worker_id else ""
 
     if weave_server_flag == "sqlite":
-        # Get worker id for parallel test execution
         if worker_id:
             temp_dir = tempfile.gettempdir()
             # Create a unique file-based database for each worker
-            db_path = f"{temp_dir}/weave_test_{worker_id}_{uuid.uuid4()}.db"
+            db_path = f"{temp_dir}/weave_test{worker_suffix}.db"
         else:
             # Use in-memory database for single process
             db_path = "file::memory:?cache=shared"
@@ -582,22 +674,30 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        # Create unique database names for parallel testing
-        unique_suffix = f"_{worker_id}_{uuid.uuid4().hex[:8]}" if worker_id else ""
-        db_management_name = f"db_management{unique_suffix}"
-        default_db_name = f"default{unique_suffix}"
+        # Create unique database names for parallel workers
+        db_management_name = f"db_management{worker_suffix}"
+        default_db_name = f"default{worker_suffix}"
 
-        # Set environment variables to use these database names
-        os.environ["CLICKHOUSE_DB_MANAGEMENT"] = db_management_name
-        os.environ["CLICKHOUSE_DEFAULT_DB"] = default_db_name
+        # Create a customized ClickHouse server with unique database names
+        ch_server = TestClickHouseTraceServer.from_env()
 
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+        # Set the custom database names
+        ch_server.db_management_name = db_management_name
+        ch_server.default_db_name = default_db_name
+
+        # First make sure the databases don't exist (might be from previous test runs)
         ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
         ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {default_db_name}")
+
+        # Run migrations with custom database names
         ch_server._run_migrations()
 
-        # Clean up function for Clickhouse databases
-        def cleanup_ch_dbs():
+        server = TestOnlyUserInjectingExternalTraceServer(
+            ch_server, DummyIdConverter(), entity
+        )
+
+        # Register finalizer to clean up the ClickHouse databases
+        def cleanup_clickhouse():
             try:
                 ch_server.ch_client.command(
                     f"DROP DATABASE IF EXISTS {db_management_name}"
@@ -608,11 +708,7 @@ def create_client(
             except Exception:
                 pass
 
-        request.addfinalizer(cleanup_ch_dbs)
-
-        server = TestOnlyUserInjectingExternalTraceServer(
-            ch_server, DummyIdConverter(), entity
-        )
+        request.addfinalizer(cleanup_clickhouse)
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
