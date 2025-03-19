@@ -520,8 +520,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return [row[0] for row in result.result_rows]
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_children")
-    def calls_children(self, req: tsi.CallsChildrenReq) -> Iterator[tsi.CallSchema]:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_descendants")
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
         """Returns all descendant calls of the requested root calls."""
         assert_non_null_wb_user_id(req)
 
@@ -544,11 +546,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
-                call_ids=ids,
                 columns=req.columns,
-                filter=tsi.CallsFilter(
-                    call_ids=call_ids,
-                ),
+                filter=tsi.CallsFilter(call_ids=ids),
             )
         )
         yield from calls

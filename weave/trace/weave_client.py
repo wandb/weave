@@ -87,6 +87,7 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsDescendantsReq,
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
@@ -1324,6 +1325,34 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def call_descendants(self, call: Call, depth: int | None = None) -> list[Call]:
+        """Get all descendant calls of a given call."""
+        return list(
+            self.server.calls_descendants(
+                CallsDescendantsReq(
+                    project_id=self._project_id(),
+                    call_ids=[call.id],
+                    depth=depth,
+                )
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def calls_descendants(
+        self, call_ids: list[str], depth: int | None = None
+    ) -> list[Call]:
+        """Get all descendant calls of a given list of call IDs."""
+        return list(
+            self.server.calls_descendants(
+                CallsDescendantsReq(
+                    project_id=self._project_id(),
+                    call_ids=call_ids,
+                    depth=depth,
+                )
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:

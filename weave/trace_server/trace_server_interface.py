@@ -251,10 +251,13 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
-class CallsChildrenReq(BaseModel):
+class CallsDescendantsReq(BaseModel):
     project_id: str
     call_ids: list[str]
     limit: Optional[int] = None
+
+    # If provided, the depth of the descendants to return.
+    # Default is all descendants. limit 1 would stop at grandchildren
     depth: Optional[int] = None
 
 
@@ -922,7 +925,7 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
-    def calls_children(self, req: CallsChildrenReq) -> Iterator[CallSchema]: ...
+    def calls_descendants(self, req: CallsDescendantsReq) -> Iterator[CallSchema]: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
