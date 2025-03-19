@@ -1333,6 +1333,7 @@ const OpSelector = ({
               '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
                 {
                   backgroundColor: 'transparent',
+                  marginBottom: '2px',
                 },
             }}
             size="small"
@@ -1354,11 +1355,10 @@ const OpSelector = ({
                 name="chevron-down"
                 width={16}
                 height={16}
-                className="mb-[2px]"
               />
             }
             clearIcon={
-              <Icon name="close" width={16} height={16} className="mb-[2px]" />
+              <Icon name="close" width={16} height={16} />
             }
           />
         </FormControl>
