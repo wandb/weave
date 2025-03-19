@@ -510,7 +510,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {
                 "project_id": project_id,
                 "call_ids": call_ids,
-                "depth": depth,
+                "depth_limit": depth_limit,
                 "limit": limit or MAX_CALLS_CHILDREN_LIMIT,
             },
         )
