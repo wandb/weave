@@ -27,31 +27,10 @@ export const useBareTraceCalls = (
       try {
         const client = getClient();
         const resProm = fetchBareTraceCalls(client, entity, project, traceId);
-        const resWithCostsProm = fetchBareTraceCallsWithCosts(
-          client,
-          entity,
-          project,
-          traceId
-        );
-
-        let firstDone = false;
-
-        // Create a race between the two promises
-        Promise.race([resProm, resWithCostsProm]).then(firstResult => {
-          // Only use result if nothing else has completed and component is mounted
-          if (!firstDone && mounted) {
-            firstDone = true;
-            setTraceCalls(firstResult);
-            setLoading(false);
-            setError(null);
-          }
-        });
-
-        // Always wait for costs version to complete
-        resWithCostsProm.then(withCostsResult => {
+        // TODO: Add back costs
+        resProm.then(res => {
           if (mounted) {
-            firstDone = true;
-            setTraceCalls(withCostsResult);
+            setTraceCalls(res);
             setLoading(false);
             setError(null);
           }
