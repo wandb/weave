@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from collections.abc import Mapping
 from typing import Any, Callable
 
@@ -14,6 +13,8 @@ from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
     get_serializer_for_obj,
+    is_file_save,
+    is_inline_save,
 )
 
 
@@ -63,11 +64,9 @@ def encode_custom_obj(obj: Any) -> dict | None:
     }
 
     # If the save method just takes one argument, it is an inline serializer
-    save_signature = inspect.signature(serializer.save)
-    param_count = len(save_signature.parameters)
-    if param_count == 1:
+    if is_inline_save(serializer.save):
         encoded["val"] = serializer.save(obj)
-    else:
+    elif is_file_save(serializer.save):
         art = MemTraceFilesArtifact()
         serializer.save(obj, art, "obj")
         encoded_path_contents = {
@@ -75,6 +74,8 @@ def encode_custom_obj(obj: Any) -> dict | None:
             for k, v in art.path_contents.items()
         }
         encoded["files"] = encoded_path_contents
+    else:
+        raise ValueError(f"Unknown serializer type: {type(serializer.save)}")
     return encoded
 
 

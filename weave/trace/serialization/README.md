@@ -78,16 +78,18 @@ Weave also ships with a set of first-class serializers for common types, defined
 - Images (`PIL.Image.Image`)
 - Audio (`wave.Wave_read`)
 - Op (`weave.Op`)
+- Datetime (`datetime.datetime`)
+- Markdown (`rich.markdown.Markdown`)
 
 These `KNOWN_TYPES` are implemented using `register_serializer`. Unlike other types, these will always be loaded using the SDK's current `load` function (instead of the one packaged with the object).
 
 #### File-based serialization
 
-Today, all custom object serialization is file-based via `MemTraceFilesArtifact`. Technicaly this supports many files per artifact, but in practice today we use just a single file (obj.py) for each artifact. Elements of this are hardcoded in both the SDK and App layers.
+Some custom object serialization is file-based via `MemTraceFilesArtifact`. Technically this supports many files per artifact, but in practice today we use just a single file (obj.py) for each artifact. Elements of this are hardcoded in both the SDK and App layers. File-based serialization is typically used for larger values, such as images.
 
 #### Inline serialization
 
-Notably, this system is missing the ability to register inline serializers for custom objects. For example, the user may have a simple type like a custom datetime. This is a known limitation and will be addressed in the future.
+Objects that have a small serialized representation, like a Python datetime object, can have that value stored "inline" with the other serialization information such as the class name and deserialization Op. This avoids needing to make a separate API request to retrieve the value.
 
 #### Other limitations
 
