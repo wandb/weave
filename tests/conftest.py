@@ -3,9 +3,11 @@ import contextlib
 import logging
 import os
 import subprocess
+import tempfile
 import time
 import typing
 import urllib
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -16,6 +18,7 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
@@ -558,10 +561,18 @@ def create_client(
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+    db_path = None
     if weave_server_flag == "sqlite":
-        sqlite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
+        # Get worker id for parallel test execution
+        if worker_id := os.environ.get("PYTEST_XDIST_WORKER"):
+            temp_dir = tempfile.gettempdir()
+            # Create a unique file-based database for each worker
+            db_path = f"{temp_dir}/weave_test_{worker_id}_{uuid.uuid4()}.db"
+        else:
+            # Use in-memory database for single process
+            db_path = "file::memory:?cache=shared"
+
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(db_path)
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
         server = TestOnlyUserInjectingExternalTraceServer(
@@ -594,6 +605,18 @@ def create_client(
         autopatch.autopatch(autopatch_settings)
         if global_attributes is not None:
             weave.trace.api._global_attributes = global_attributes
+
+        # Register finalizer to remove the temp SQLite file if we created one
+        if db_path and db_path.startswith(tempfile.gettempdir()):
+
+            def cleanup_db():
+                try:
+                    if os.path.exists(db_path):
+                        os.unlink(db_path)
+                except Exception:
+                    pass
+
+            request.addfinalizer(cleanup_db)
 
     return inited_client
 
@@ -687,3 +710,10 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True, scope="function")
+def clear_call_context(request):
+    """Ensure call context is empty at the start and end of each test."""
+    with set_call_stack([]):
+        yield

@@ -1,3 +1,5 @@
+import os
+
 import nox
 
 nox.options.default_venv_backend = "uv"
@@ -108,12 +110,14 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
+    n_cpus = env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
     session.run(
         "pytest",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
+        f"-n={n_cpus}",
         *session.posargs,
         *test_dirs,
         env=env,
