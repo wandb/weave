@@ -600,12 +600,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.depth is not None and req.depth < 0:
             raise ValueError("Depth must be a positive integer")
 
-        limit = req.limit
-        if limit is not None and limit > 100_000:
+        limit = req.limit or 100_000
+        if limit > 100_000:
             raise RequestTooLarge(
                 f"Cannot get more than 100000 children at once (requested: {req.limit})."
             )
-        elif limit is not None and limit < 0:
+        elif limit < 0:
             raise ValueError("Limit must be a positive integer")
 
         conn, cursor = get_conn_cursor(self.db_path)

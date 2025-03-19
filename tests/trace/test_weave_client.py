@@ -2515,10 +2515,10 @@ def test_calls_descendants_class_method(client):
     assert len(list(d)) == 2
 
     # Test getting descendants with depth
-    d = parent_call.descendants(depth=1)
-    assert len(list(d)) == 1
+    d2 = parent_call.descendants(depth=1)
+    assert len(list(d2)) == 1
 
     # Test getting descendants with limit, should be child
-    d = parent_call.descendants(limit=1)
-    assert len(list(d)) == 1
+    d3 = parent_call.descendants(limit=1)
+    assert len(list(d3)) == 1
     assert "grandchild_op" not in d[0].op_name
