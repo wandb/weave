@@ -10,6 +10,7 @@ import urllib
 import uuid
 from collections.abc import Iterator
 
+import clickhouse_connect
 import pytest
 import requests
 from fastapi import FastAPI
@@ -54,18 +55,42 @@ class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceS
             port=ts_env.wf_clickhouse_port(),
             user=ts_env.wf_clickhouse_user(),
             password=ts_env.wf_clickhouse_pass(),
-            database=ts_env.wf_clickhouse_database(),
+            database="default",  # Start with the standard default database
             use_async_insert=use_async_insert,
             file_storage_uri_str=ts_env.wf_file_storage_uri(),
         )
         return instance
 
-    def _mint_client(self):
-        """Override to use the custom database name."""
-        client = super()._mint_client()
-        # Set the database to our custom name
-        client.database = self.default_db_name
+    def _mint_client(self) -> "clickhouse_connect.driver.client.Client":
+        """Create a client that is safe to use before databases exist."""
+        client = clickhouse_connect.get_client(
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
+            database="default",  # Always start with the standard default database
+            secure=self._port == 8443,
+        )
         return client
+
+    def setup_for_testing(self):
+        """Set up databases for testing safely."""
+        # Use a client with the default database
+        client = self._mint_client()
+
+        # Drop the databases if they exist
+        client.command(f"DROP DATABASE IF EXISTS {self.db_management_name}")
+        client.command(f"DROP DATABASE IF EXISTS {self.default_db_name}")
+
+        # Create the databases
+        client.command(f"CREATE DATABASE {self.db_management_name}")
+        client.command(f"CREATE DATABASE {self.default_db_name}")
+
+        # Run migrations
+        self._run_migrations()
+
+        # Now set the client's database to our custom one
+        self.ch_client.database = self.default_db_name
 
     def _run_migrations(self):
         """Override to use our custom database names."""
@@ -74,16 +99,11 @@ class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceS
             f"Running migrations for {self.default_db_name} with management db {self.db_management_name}"
         )
 
-        # Create a migrator with our custom db name
+        # Create a migrator with the default client
         migrator = (
             clickhouse_trace_server_batched.wf_migrator.ClickHouseTraceServerMigrator(
                 self._mint_client()
             )
-        )
-
-        # First create and initialize the management database
-        self.ch_client.command(
-            f"CREATE DATABASE IF NOT EXISTS {self.db_management_name}"
         )
 
         # Initialize the management database for this specific instance
@@ -111,21 +131,27 @@ class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceS
 
     def _query(self, query, parameters, column_formats=None):
         """Replace any references to the default database with our custom database."""
-        # Simple string replacement
+        # Simple string replacement for database references
         query = query.replace(" default.", f" {self.default_db_name}.")
         query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
         query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
         query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        # Also handle db_management references
+        query = query.replace("db_management.", f"{self.db_management_name}.")
 
         return super()._query(query, parameters, column_formats)
 
     def _query_stream(self, query, parameters, column_formats=None, settings=None):
         """Replace any references to the default database with our custom database."""
-        # Simple string replacement
+        # Simple string replacement for database references
         query = query.replace(" default.", f" {self.default_db_name}.")
         query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
         query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
         query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        # Also handle db_management references
+        query = query.replace("db_management.", f"{self.db_management_name}.")
 
         return super()._query_stream(query, parameters, column_formats, settings)
 
@@ -304,7 +330,7 @@ def clickhouse_server():
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
     clickhouse_trace_server = TestClickHouseTraceServer.from_env(use_async_insert=False)
-    clickhouse_trace_server._run_migrations()
+    clickhouse_trace_server.setup_for_testing()
     yield clickhouse_trace_server
 
 
@@ -685,12 +711,8 @@ def create_client(
         ch_server.db_management_name = db_management_name
         ch_server.default_db_name = default_db_name
 
-        # First make sure the databases don't exist (might be from previous test runs)
-        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
-        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {default_db_name}")
-
-        # Run migrations with custom database names
-        ch_server._run_migrations()
+        # Set up all databases and migrations safely
+        ch_server.setup_for_testing()
 
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
@@ -699,12 +721,17 @@ def create_client(
         # Register finalizer to clean up the ClickHouse databases
         def cleanup_clickhouse():
             try:
-                ch_server.ch_client.command(
-                    f"DROP DATABASE IF EXISTS {db_management_name}"
+                # Use a new client to drop databases
+                client = clickhouse_connect.get_client(
+                    host=ts_env.wf_clickhouse_host(),
+                    port=ts_env.wf_clickhouse_port(),
+                    user=ts_env.wf_clickhouse_user(),
+                    password=ts_env.wf_clickhouse_pass(),
+                    database="default",
                 )
-                ch_server.ch_client.command(
-                    f"DROP DATABASE IF EXISTS {default_db_name}"
-                )
+                client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
+                client.command(f"DROP DATABASE IF EXISTS {default_db_name}")
+                client.close()
             except Exception:
                 pass
 
