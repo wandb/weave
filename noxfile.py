@@ -94,6 +94,16 @@ def tests(session, shard):
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
         env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
 
+    # seems to resolve ci issues
+    if shard == "llamaindex":
+        session.posargs.insert(0, "-n4")
+
+    # Only adding parallelism for trace tests since they are the slowest.
+    # Adding parallelism in other shards can lead to weird failures.
+    if shard == "trace":
+        n_cpus = env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
+        session.posargs.insert(0, f"-n={n_cpus}")
+
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
@@ -106,18 +116,12 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
-
-    n_cpus = env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
     session.run(
         "pytest",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
-        f"-n={n_cpus}",
         *session.posargs,
         *test_dirs,
         env=env,
