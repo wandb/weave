@@ -33,7 +33,7 @@ export type TruncateByCharsProps = Partial<
   >
 >;
 
-/**
+/*
  * A higher order component that truncates text to the specified max chars.
  * Supports start, middle, or end truncation. If text is truncated, tooltip
  * with full text will appear when element is hovered.
@@ -65,7 +65,7 @@ export const TruncateByCharsWithTooltip = ({
         trigger={
           <div className="w-fit cursor-auto">{children({truncatedText})}</div>
         }
-        isTriggerAsChild={false}
+        isTriggerAsChild={false} // ensures trigger has accessible wrapper
         noTriggerWrap>
         {text}
       </Tooltip>
