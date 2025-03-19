@@ -101,7 +101,7 @@ def tests(session, shard):
     # Only adding parallelism for trace tests since they are the slowest.
     # Adding parallelism in other shards can lead to weird failures.
     if shard == "trace":
-        n_cpus = env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
+        n_cpus = session.env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
         session.posargs.insert(0, f"-n={n_cpus}")
 
     default_test_dirs = [f"integrations/{shard}/"]
