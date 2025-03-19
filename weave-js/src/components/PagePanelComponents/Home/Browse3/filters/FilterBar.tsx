@@ -28,6 +28,7 @@ import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
+import {getNextFilterId, combineRangeFilters} from './filterUtils';
 
 const DEBOUNCE_MS = 700;
 
@@ -151,24 +152,18 @@ export const FilterBar = ({
     setAnchorEl(null);
   };
 
-  const onAddFilter = useCallback(
-    (field: string) => {
-      const defaultOperator = getOperatorOptions(field)[0].value;
-      const newModel = {
-        ...localFilterModel,
-        items: [
-          ...localFilterModel.items,
-          {
-            id: getNextFilterId(localFilterModel.items),
-            field,
-            operator: defaultOperator,
-          },
-        ],
-      };
-      setLocalFilterModel(newModel);
-    },
-    [localFilterModel]
-  );
+  const handleAddFilter = useCallback((field: string) => {
+    setLocalFilterModel({
+      items: [
+        ...localFilterModel.items,
+        {
+          id: getNextFilterId(localFilterModel.items),
+          field,
+          operator: defaultOperator,
+        },
+      ],
+    });
+  }, [localFilterModel, defaultOperator]);
 
   const debouncedSetFilterModel = useMemo(
     () =>
@@ -336,7 +331,7 @@ export const FilterBar = ({
                   key={item.id}
                   item={item}
                   options={options}
-                  onAddFilter={onAddFilter}
+                  onAddFilter={handleAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
                 />
@@ -351,7 +346,7 @@ export const FilterBar = ({
                   value: undefined,
                 }}
                 options={options}
-                onAddFilter={onAddFilter}
+                onAddFilter={handleAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
               />
@@ -362,7 +357,7 @@ export const FilterBar = ({
                 variant="ghost"
                 icon="add-new"
                 disabled={localFilterModel.items.length === 0}
-                onClick={() => onAddFilter('')}>
+                onClick={() => handleAddFilter('')}>
                 Add filter
               </Button>
               <div className="flex-auto" />
@@ -380,95 +375,4 @@ export const FilterBar = ({
       </Popover>
     </>
   );
-};
-
-const getNextFilterId = (items: GridFilterItem[]): number => {
-  // Naively returns the length of the list, but if we have removed earlier items
-  // use the max ID + 1
-  if (items.length === 0) {
-    return 0;
-  }
-  const ids = items.map(item => {
-    const id = item.id;
-    if (id == null) {
-      return 0;
-    }
-    return typeof id === 'number' ? id : parseInt(String(id), 10) || 0;
-  });
-  return Math.max(...ids) + 1;
-};
-
-// Helper to combine before/after filters for the same field
-const combineRangeFilters = (
-  items: GridFilterItem[],
-  activeEditId: FilterId | null
-): {items: GridFilterItem[]; activeIds: Set<FilterId>} => {
-  const result: GridFilterItem[] = [];
-  const dateRanges = new Map<
-    string,
-    {before?: GridFilterItem; after?: GridFilterItem}
-  >();
-  const activeIds = new Set<FilterId>();
-
-  items.forEach(item => {
-    if (
-      item.operator === '(date): before' ||
-      item.operator === '(date): after'
-    ) {
-      const range = dateRanges.get(item.field) || {};
-      if (item.operator === '(date): before') {
-        range.before = item;
-      } else {
-        range.after = item;
-      }
-      dateRanges.set(item.field, range);
-    } else {
-      result.push(item);
-    }
-  });
-
-  // Add combined range filters
-  dateRanges.forEach((range, field) => {
-    if (range.before && range.after) {
-      // Only combine if the after date is before the before date
-      const afterDate = new Date(range.after.value);
-      const beforeDate = new Date(range.before.value);
-
-      if (afterDate < beforeDate) {
-        // Create a special combined filter
-        const combinedFilter = {
-          ...range.before,
-          operator: '(date): range',
-          value: {
-            before: range.before.value,
-            after: range.after.value,
-          },
-        };
-        result.push(combinedFilter);
-
-        // If either the before or after filter is being edited, add both IDs to activeIds
-        if (
-          activeEditId === range.before.id ||
-          activeEditId === range.after.id
-        ) {
-          activeIds.add(range.before.id);
-          activeIds.add(range.after.id);
-        }
-      } else {
-        // If dates are incompatible, add both filters separately
-        result.push(range.after);
-        result.push(range.before);
-      }
-    } else {
-      // Add individual filters back if we don't have both before and after
-      if (range.before) {
-        result.push(range.before);
-      }
-      if (range.after) {
-        result.push(range.after);
-      }
-    }
-  });
-
-  return {items: result, activeIds};
 };
