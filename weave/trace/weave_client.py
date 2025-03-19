@@ -357,6 +357,39 @@ def _make_calls_iterator(
     )
 
 
+def _make_calls_descendants_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    call_ids: list[str],
+    depth: int | None = None,
+    limit_override: int | None = None,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+) -> CallsIter:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        return list(
+            server.calls_descendants(
+                CallsDescendantsReq(
+                    project_id=project_id,
+                    call_ids=call_ids,
+                    depth=depth,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+
+    def transform_func(call: CallSchema) -> WeaveObject:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        limit=limit_override,
+        page_size=page_size,
+    )
+
+
 def _add_scored_by_to_calls_query(
     scored_by: list[str] | str | None, query: Query | None
 ) -> Query | None:
@@ -614,6 +647,38 @@ class Call:
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
+            page_size=page_size,
+        )
+
+    def descendants(
+        self,
+        depth: int | None = None,
+        limit: int | None = None,
+        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+    ) -> CallsIter:
+        """
+        Get the descendants of the call.
+
+        Args:
+            depth: The depth of the descendants to get.
+                example: depth=2 will get all grandchildren of the call.
+            limit: The maximum number of descendants to get.
+            page_size: The page size of the descendants to get.
+        """
+        client = weave_client_context.require_weave_client()
+
+        call_id = self.id
+        if not call_id:
+            raise ValueError(
+                "Can't get descendants of call without ID, was `weave.init` called?"
+            )
+
+        return _make_calls_descendants_iterator(
+            client.server,
+            self.project_id,
+            [call_id],
+            depth=depth,
+            limit_override=limit,
             page_size=page_size,
         )
 

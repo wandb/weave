@@ -523,10 +523,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns all descendant calls of the requested root calls."""
         assert_non_null_wb_user_id(req)
 
-        limit = req.limit
-        if not limit:
-            limit = MAX_CALLS_CHILDREN_LIMIT
-        elif limit > MAX_CALLS_CHILDREN_LIMIT:
+        if req.limit is not None and req.limit > MAX_CALLS_CHILDREN_LIMIT:
             raise RequestTooLarge(
                 f"Cannot get more than {MAX_CALLS_CHILDREN_LIMIT} children at once (requested: {req.limit})."
             )
@@ -535,7 +532,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(call_ids) == 0:
             return
 
-        ids = self._get_call_descendent_ids(req.project_id, call_ids, limit)
+        ids = self._get_call_descendent_ids(
+            project_id=req.project_id,
+            call_ids=call_ids,
+            limit=req.limit,
+        )
         if len(ids) == 0:
             return
 

@@ -2492,3 +2492,33 @@ def test_calls_descendants_edge_cases(client):
         match="Cannot get more than 100000 children at once",
     ):
         client.calls_descendants(call_ids=[parent_call2.id], limit=100_001)
+
+
+def test_calls_descendants_class_method(client):
+    @weave.op()
+    def parent_op(x: int) -> int:
+        return child_op(x)
+
+    @weave.op()
+    def child_op(x: int) -> int:
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int) -> int:
+        return x * 3
+
+    parent_op(5)
+    parent_call = client.get_calls(filter=tsi.CallsFilter(op_names=["%parent_op:*"]))[0]
+
+    # Test getting descendants
+    d = parent_call.descendants()
+    assert len(list(d)) == 2
+
+    # Test getting descendants with depth
+    d = parent_call.descendants(depth=1)
+    assert len(list(d)) == 1
+
+    # Test getting descendants with limit, should be child
+    d = parent_call.descendants(limit=1)
+    assert len(list(d)) == 1
+    assert "grandchild_op" not in d[0].op_name
