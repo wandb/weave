@@ -1,4 +1,4 @@
-import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
+import {GridFilterItem} from '@mui/x-data-grid-pro';
 
 import {FilterId} from './common';
 
@@ -67,8 +67,12 @@ export const combineRangeFilters = (
         result.push(range.after, range.before);
       }
     } else {
-      if (range.before) result.push(range.before);
-      if (range.after) result.push(range.after);
+      if (range.before) {
+        result.push(range.before);
+      }
+      if (range.after) {
+        result.push(range.after);
+      }
     }
   });
 
