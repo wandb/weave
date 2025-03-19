@@ -567,7 +567,7 @@ def create_wrapper_responses_sync(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
                 acc, value
@@ -591,7 +591,7 @@ def create_wrapper_responses_async(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
                 acc, value
