@@ -3,6 +3,7 @@ import dataclasses
 import json
 import platform
 import sys
+import time
 
 import pydantic
 import pytest
@@ -28,7 +29,10 @@ from weave.trace.refs import (
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
 )
-from weave.trace.serializer import get_serializer_for_obj, register_serializer
+from weave.trace.serialization.serializer import (
+    get_serializer_for_obj,
+    register_serializer,
+)
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
@@ -591,6 +595,46 @@ def test_calls_delete_cascade(client):
     # check that all the calls are gone
     result = list(client.get_calls())
     assert len(result) == 0
+
+
+def test_delete_calls(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    call0 = my_op(1)
+    call1 = my_op(2)
+    call2 = my_op(3)
+
+    calls = client.get_calls()
+    assert len(calls) == 3
+
+    call_0_id = calls[0].id
+    call_1_id = calls[1].id
+    call_2_id = calls[2].id
+
+    client.delete_calls([call_0_id, call_1_id])
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
+
+    # test idempotent
+    client.delete_calls([call_0_id, call_1_id])
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
+
+    client.delete_calls([])
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].id == call_2_id
+
+    with pytest.raises(ValueError):
+        client.delete_calls([1111111111111111])
+
+    client.delete_calls([call_2_id])
+    calls = client.get_calls()
+    assert len(calls) == 0
 
 
 def test_call_display_name(client):
@@ -1883,3 +1927,65 @@ def test_global_attributes_with_call_attributes(client_creator):
 
         # Local attributes override global ones
         assert call.attributes["env"] == "override"
+
+
+def test_flush_progress_bar(client):
+    client.set_autoflush(False)
+
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+
+    # flush with progress bar
+    client.finish(use_progress_bar=True)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
+
+
+def test_flush_callback(client):
+    client.set_autoflush(False)
+
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+
+    def fake_logger(status):
+        assert "job_counts" in status
+
+    # flush with callback
+    client.finish(callback=fake_logger)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
+
+
+def test_repeated_flushing(client):
+    client.set_autoflush(False)
+
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+    client.flush()
+    op_1()
+    op_1()
+    client.flush()
+
+    calls = list(op_1.calls())
+    assert len(calls) == 3
+
+    op_1()
+    client.flush()
+    client.flush()
+    client.flush()
+
+    calls = list(op_1.calls())
+    assert len(calls) == 4

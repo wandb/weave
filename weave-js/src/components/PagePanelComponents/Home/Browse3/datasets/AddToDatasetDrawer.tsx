@@ -1,5 +1,5 @@
 import {Box, Typography} from '@mui/material';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect} from 'react';
 import {toast} from 'react-toastify';
 
 import {maybePluralize} from '../../../../../core/util/string';
@@ -8,17 +8,17 @@ import {WaveLoader} from '../../../../Loaders/WaveLoader';
 import {useWeaveflowRouteContext} from '../context';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
-import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {
-  DatasetEditProvider,
-  useDatasetEditContext,
-} from './DatasetEditorContext';
+  ACTION_TYPES,
+  DatasetDrawerProvider,
+  useDatasetDrawer,
+} from './DatasetDrawerContext';
 import {createNewDataset, updateExistingDataset} from './datasetOperations';
 import {DatasetPublishToast} from './DatasetPublishToast';
 import {EditAndConfirmStep} from './EditAndConfirmStep';
-import {FieldConfig, NewDatasetSchemaStep} from './NewDatasetSchemaStep';
+import {NewDatasetSchemaStep} from './NewDatasetSchemaStep';
 import {SchemaMappingStep} from './SchemaMappingStep';
-import {CallData, FieldMapping} from './schemaUtils';
+import {CallData, extractSourceSchema} from './schemaUtils';
 import {SelectDatasetStep} from './SelectDatasetStep';
 
 interface AddToDatasetDrawerProps {
@@ -33,9 +33,13 @@ const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
 export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = props => {
   return (
-    <DatasetEditProvider>
+    <DatasetDrawerProvider
+      selectedCalls={props.selectedCalls}
+      onClose={props.onClose}
+      entity={props.entity}
+      project={props.project}>
       <AddToDatasetDrawerInner {...props} />
-    </DatasetEditProvider>
+    </DatasetDrawerProvider>
   );
 };
 
@@ -46,20 +50,33 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   project,
   selectedCalls,
 }) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedDataset, setSelectedDataset] =
-    useState<ObjectVersionSchema | null>(null);
-  const [datasets, setDatasets] = useState<ObjectVersionSchema[]>([]);
-  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
-  const [datasetObject, setDatasetObject] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [drawerWidth, setDrawerWidth] = useState(800);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newDatasetName, setNewDatasetName] = useState<string | null>(null);
-  const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
-  const [isNameValid, setIsNameValid] = useState(false);
-  const [datasetKey, setDatasetKey] = useState<string>('');
+  const {
+    state,
+    dispatch,
+    handleNext,
+    handleBack,
+    handleDatasetSelect,
+    handleMappingChange,
+    handleDatasetObjectLoaded,
+    resetDrawerState,
+    isNextDisabled,
+    editorContext,
+  } = useDatasetDrawer();
+
+  const {
+    currentStep,
+    selectedDataset,
+    newDatasetName,
+    datasets,
+    isCreatingNew,
+    fieldMappings,
+    fieldConfigs,
+    datasetObject,
+    drawerWidth,
+    isFullscreen,
+    isCreating,
+    error,
+  } = state;
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useRootObjectVersions, useTableUpdate, useObjCreate, useTableCreate} =
@@ -67,30 +84,12 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   const tableUpdate = useTableUpdate();
   const objCreate = useObjCreate();
   const tableCreate = useTableCreate();
+
+  // Access edit context methods through the drawer context's editorContext property
   const {getRowsNoMeta, convertEditsToTableUpdateSpec, resetEditState} =
-    useDatasetEditContext();
+    editorContext;
 
-  // Update dataset key when the underlying dataset selection or mappings change
-  useEffect(() => {
-    if (currentStep === 1) {
-      // Only update key when on the selection/mapping step
-      setDatasetKey(
-        selectedDataset
-          ? `${selectedDataset.objectId}-${
-              selectedDataset.versionHash
-            }-${JSON.stringify(fieldMappings)}`
-          : `new-dataset-${newDatasetName}-${JSON.stringify(fieldMappings)}`
-      );
-    }
-  }, [currentStep, selectedDataset, newDatasetName, fieldMappings]);
-
-  // Reset edit state only when the dataset key changes
-  useEffect(() => {
-    if (datasetKey) {
-      resetEditState();
-    }
-  }, [datasetKey, resetEditState]);
-
+  // Fetch datasets on component mount
   const objectVersions = useRootObjectVersions(
     entity,
     project,
@@ -101,87 +100,37 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     true
   );
 
+  // Update datasets when data is loaded
   useEffect(() => {
     if (objectVersions.result) {
-      setDatasets(objectVersions.result);
+      dispatch({
+        type: ACTION_TYPES.SET_DATASETS,
+        payload: objectVersions.result,
+      });
     }
-  }, [objectVersions.result]);
+  }, [objectVersions.result, dispatch]);
 
-  const handleNext = () => {
-    const isNewDataset = selectedDataset === null;
-    if (isNewDataset) {
-      if (!newDatasetName?.trim()) {
-        setError('Please enter a dataset name');
-        return;
-      }
-      if (!fieldConfigs.some(config => config.included)) {
-        setError('Please select at least one field to include');
-        return;
-      }
-
-      // Create field mappings from field configs
-      const newMappings = fieldConfigs
-        .filter(config => config.included)
-        .map(config => ({
-          sourceField: config.sourceField,
-          targetField: config.targetField,
-        }));
-      setFieldMappings(newMappings);
-
-      // Create an empty dataset object structure
-      const newDatasetObject = {
-        rows: [],
-        schema: fieldConfigs
-          .filter(config => config.included)
-          .map(config => ({
-            name: config.targetField,
-            type: 'string', // You might want to infer the type from the source data
-          })),
-      };
-      setDatasetObject(newDatasetObject);
+  // Extract source schema from selected calls
+  useEffect(() => {
+    if (selectedCalls.length > 0) {
+      const extractedSchema = extractSourceSchema(selectedCalls);
+      dispatch({
+        type: ACTION_TYPES.SET_SOURCE_SCHEMA,
+        payload: extractedSchema,
+      });
     }
-    setCurrentStep(prev => Math.min(prev + 1, 2));
-  };
-
-  const handleBack = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleDatasetSelect = (dataset: ObjectVersionSchema | null) => {
-    if (dataset?.objectId !== selectedDataset?.objectId) {
-      resetEditState();
-      setSelectedDataset(dataset);
-    } else {
-      setSelectedDataset(dataset);
-    }
-  };
-
-  const handleMappingChange = (newMappings: FieldMapping[]) => {
-    if (JSON.stringify(newMappings) !== JSON.stringify(fieldMappings)) {
-      resetEditState();
-      setFieldMappings(newMappings);
-    } else {
-      setFieldMappings(newMappings);
-    }
-  };
+  }, [selectedCalls, dispatch]);
 
   const projectId = `${entity}/${project}`;
 
-  const resetDrawerState = useCallback(() => {
-    setCurrentStep(1);
-    setSelectedDataset(null);
-    setFieldMappings([]);
-    setDatasetObject(null);
-    setError(null);
-  }, []);
-
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     if (!datasetObject) {
       return;
     }
 
-    setError(null);
-    setIsCreating(true);
+    dispatch({type: ACTION_TYPES.SET_ERROR, payload: null});
+    dispatch({type: ACTION_TYPES.SET_IS_CREATING, payload: true});
+
     try {
       let result: any;
       const isNewDataset = selectedDataset === null;
@@ -236,27 +185,43 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
       );
 
       resetDrawerState();
+      resetEditState();
       onClose();
     } catch (error) {
       console.error('Failed to create dataset version:', error);
-      setError(
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
+      dispatch({
+        type: ACTION_TYPES.SET_ERROR,
+        payload:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred',
+      });
     } finally {
-      setIsCreating(false);
+      dispatch({type: ACTION_TYPES.SET_IS_CREATING, payload: false});
     }
-  };
-
-  const isNextDisabled =
-    currentStep === 1 &&
-    ((selectedDataset === null && (!newDatasetName?.trim() || !isNameValid)) ||
-      (selectedDataset === null &&
-        !fieldConfigs.some(config => config.included)));
+  }, [
+    datasetObject,
+    selectedDataset,
+    newDatasetName,
+    projectId,
+    entity,
+    project,
+    selectedCalls.length,
+    getRowsNoMeta,
+    tableCreate,
+    objCreate,
+    peekingRouter,
+    convertEditsToTableUpdateSpec,
+    tableUpdate,
+    dispatch,
+    resetDrawerState,
+    resetEditState,
+    onClose,
+  ]);
 
   const renderStepContent = () => {
     const isNewDataset = selectedDataset === null;
-    const hasDatasetChoice =
-      selectedDataset !== null || newDatasetName !== null;
+    const showSchemaConfig = selectedDataset !== null || isCreatingNew;
 
     switch (currentStep) {
       case 1:
@@ -267,12 +232,29 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
               setSelectedDataset={handleDatasetSelect}
               datasets={datasets}
               newDatasetName={newDatasetName}
-              setNewDatasetName={setNewDatasetName}
-              onValidationChange={setIsNameValid}
+              setNewDatasetName={name =>
+                dispatch({
+                  type: ACTION_TYPES.SET_NEW_DATASET_NAME,
+                  payload: name,
+                })
+              }
+              onValidationChange={isValid =>
+                dispatch({
+                  type: ACTION_TYPES.SET_IS_NAME_VALID,
+                  payload: isValid,
+                })
+              }
               entity={entity}
               project={project}
+              isCreatingNew={isCreatingNew}
+              setIsCreatingNew={isCreatingValue =>
+                dispatch({
+                  type: ACTION_TYPES.SET_IS_CREATING_NEW,
+                  payload: isCreatingValue,
+                })
+              }
             />
-            {hasDatasetChoice && (
+            {showSchemaConfig && (
               <>
                 {!isNewDataset && selectedDataset && (
                   <SchemaMappingStep
@@ -283,14 +265,19 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
                     fieldMappings={fieldMappings}
                     datasetObject={datasetObject}
                     onMappingChange={handleMappingChange}
-                    onDatasetObjectLoaded={setDatasetObject}
+                    onDatasetObjectLoaded={handleDatasetObjectLoaded}
                   />
                 )}
                 {isNewDataset && (
                   <NewDatasetSchemaStep
                     selectedCalls={selectedCalls}
                     fieldConfigs={fieldConfigs}
-                    onFieldConfigsChange={setFieldConfigs}
+                    onFieldConfigsChange={configs =>
+                      dispatch({
+                        type: ACTION_TYPES.SET_FIELD_CONFIGS,
+                        payload: configs,
+                      })
+                    }
                   />
                 )}
               </>
@@ -316,7 +303,10 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
       open={open}
       onClose={onClose}
       defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
-      setWidth={width => !isFullscreen && setDrawerWidth(width)}>
+      setWidth={width =>
+        !isFullscreen &&
+        dispatch({type: ACTION_TYPES.SET_DRAWER_WIDTH, payload: width})
+      }>
       {isCreating ? (
         <Box
           sx={{
@@ -374,7 +364,12 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
             <Box sx={{display: 'flex', gap: 1}}>
               {currentStep === 2 && (
                 <Button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  onClick={() =>
+                    dispatch({
+                      type: ACTION_TYPES.SET_IS_FULLSCREEN,
+                      payload: !isFullscreen,
+                    })
+                  }
                   variant="ghost"
                   icon="full-screen-mode-expand"
                   tooltip={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}

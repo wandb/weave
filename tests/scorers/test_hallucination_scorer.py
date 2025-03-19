@@ -39,7 +39,8 @@ def hallucination_scorer(monkeypatch):
         return Response(choices=[Choice(message=Message(content=json.dumps(content)))])
 
     monkeypatch.setattr(
-        "weave.scorers.hallucination_scorer.acompletion", _mock_acompletion
+        "weave.scorers.hallucination_scorer.HallucinationFreeScorer._acompletion",
+        _mock_acompletion,
     )
 
     return HallucinationFreeScorer(

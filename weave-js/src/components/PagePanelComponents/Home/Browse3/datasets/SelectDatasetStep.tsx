@@ -10,7 +10,9 @@ import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRef} from '../smallRef/SmallRef';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
+import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {useDatasetEditContext} from './DatasetEditorContext';
+import {validateDatasetName} from './datasetNameValidation';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -24,6 +26,8 @@ export interface SelectDatasetStepProps {
   onValidationChange?: (isValid: boolean) => void;
   entity: string;
   project: string;
+  isCreatingNew?: boolean;
+  setIsCreatingNew?: (isCreating: boolean) => void;
 }
 
 interface DatasetOptionProps {
@@ -186,49 +190,19 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   onValidationChange = () => {},
   entity,
   project,
+  isCreatingNew = false,
+  setIsCreatingNew = () => {},
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [showLatestOnly, setShowLatestOnly] = useState(true);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const {resetEditState} = useDatasetEditContext();
+  const {dispatch} = useDatasetDrawer();
 
   const handleNameChange = (value: string) => {
     setNewDatasetName(value);
-    if (!value.trim()) {
-      setError(null);
-      onValidationChange(false);
-      return;
-    }
-
-    try {
-      // First check if it starts with a letter or number
-      if (!/^[a-zA-Z0-9]/.test(value)) {
-        setError('Dataset name must start with a letter or number');
-        onValidationChange(false);
-        return;
-      }
-
-      // Then check if it only contains allowed characters
-      if (!/^[a-zA-Z0-9\-_]+$/.test(value)) {
-        const invalidChars = [
-          ...new Set(
-            value
-              .split('')
-              .filter(c => !/[a-zA-Z0-9\-_]/.test(c))
-              .map(c => (c === ' ' ? '<space>' : c))
-          ),
-        ].join(', ');
-        setError(`Invalid characters found: ${invalidChars}`);
-        onValidationChange(false);
-        return;
-      }
-
-      setError(null);
-      onValidationChange(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid dataset name');
-      onValidationChange(false);
-    }
+    const validationResult = validateDatasetName(value);
+    setError(validationResult.error);
+    onValidationChange(validationResult.isValid);
   };
 
   const filteredDatasets = useMemo(() => {
@@ -278,6 +252,9 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
       setSelectedDataset(null);
       setIsCreatingNew(true);
       resetEditState();
+      // Also clear any error from previous dataset name validation
+      setError(null);
+      dispatch({type: ACTION_TYPES.SET_ERROR, payload: null});
     } else {
       setSelectedDataset(option?.value ?? null);
       setIsCreatingNew(false);
@@ -285,65 +262,63 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   };
 
   return (
-    <Stack spacing={1} sx={{mt: 2}}>
-      <Typography sx={{...typographyStyle, fontWeight: 600, mb: 2}}>
-        Choose a dataset
-      </Typography>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 3,
-        }}>
-        <Box sx={{flex: '0 1 400px', minWidth: 0}}>
-          <Select
-            placeholder="Select Dataset"
-            value={
-              selectedDataset
-                ? dropdownOptions.find(opt => opt.value === selectedDataset)
-                : isCreatingNew
-                ? dropdownOptions.find(
-                    opt => opt.value === CREATE_NEW_OPTION_VALUE
-                  )
-                : null
-            }
-            options={dropdownOptions}
-            onChange={handleDatasetChange}
-            isSearchable={true}
-            isClearable={false}
-            filterOption={filterOption}
-            components={{MenuList: DatasetSelectMenu}}
-            maxMenuHeight={300}
-          />
-        </Box>
+    <Stack spacing={'24px'} sx={{mt: '24px'}}>
+      <Box>
+        <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
+          Choose a dataset
+        </Typography>
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: 1,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            mt: 1,
+            gap: 3,
           }}>
-          <Typography
-            onClick={() => setShowLatestOnly(!showLatestOnly)}
-            sx={{...typographyStyle, userSelect: 'none', cursor: 'pointer'}}>
-            Show latest versions only
-          </Typography>
-          <Checkbox
-            style={{
-              marginRight: 4,
-            }}
-            checked={showLatestOnly}
-            onCheckedChange={checked => setShowLatestOnly(checked === true)}
-            size="small"
-          />
+          <Box sx={{flex: '0 1 400px', minWidth: 0}}>
+            <Select
+              placeholder="Select Dataset"
+              value={
+                selectedDataset
+                  ? dropdownOptions.find(opt => opt.value === selectedDataset)
+                  : isCreatingNew
+                  ? dropdownOptions.find(
+                      opt => opt.value === CREATE_NEW_OPTION_VALUE
+                    )
+                  : null
+              }
+              options={dropdownOptions}
+              onChange={handleDatasetChange}
+              isSearchable={true}
+              isClearable={false}
+              filterOption={filterOption}
+              components={{MenuList: DatasetSelectMenu}}
+              maxMenuHeight={300}
+            />
+          </Box>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}>
+            <Checkbox
+              checked={showLatestOnly}
+              onCheckedChange={checked => setShowLatestOnly(checked === true)}
+              size="small"
+            />
+            <Typography
+              onClick={() => setShowLatestOnly(!showLatestOnly)}
+              sx={{...typographyStyle, userSelect: 'none', cursor: 'pointer'}}>
+              Show latest versions only
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
       {isCreatingNew && (
-        <Box sx={{mt: 4}}>
-          <Typography sx={{...typographyStyle, fontWeight: 600, mb: 2}}>
+        <Box>
+          <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
             Dataset name
           </Typography>
           <TextField

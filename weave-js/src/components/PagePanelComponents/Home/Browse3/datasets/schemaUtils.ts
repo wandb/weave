@@ -1,5 +1,3 @@
-import {v4 as uuidv4} from 'uuid';
-
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export interface SchemaField {
@@ -26,13 +24,13 @@ export const inferType = (value: any): string => {
 export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
   let fields: SchemaField[] = [];
 
+  // Return empty array for null or undefined inputs
+  if (obj == null) {
+    return fields;
+  }
+
   // Special handling for __ref__ and __val__ pattern
-  if (
-    obj != null &&
-    typeof obj === 'object' &&
-    '__ref__' in obj &&
-    '__val__' in obj
-  ) {
+  if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
     return flattenObject(obj.__val__, prefix);
   }
 
@@ -92,10 +90,42 @@ export interface FieldMapping {
   targetField: string;
 }
 
+/**
+ * Get a nested value from an object using a path array
+ * @param obj The object to extract value from
+ * @param path Array of property names to traverse
+ * @returns The value at the specified path or undefined if path doesn't exist
+ */
+export const getNestedValue = (obj: any, path: string[]): any => {
+  let current = obj;
+  for (const part of path) {
+    if (current == null) {
+      return undefined;
+    }
+    if (typeof current === 'object' && '__val__' in current) {
+      current = current.__val__;
+    }
+    if (typeof current !== 'object') {
+      return current;
+    }
+    current = current[part];
+  }
+  return current;
+};
+
 export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
   const allFields: SchemaField[] = [];
 
+  if (!calls || !Array.isArray(calls)) {
+    return allFields;
+  }
+
   calls.forEach(call => {
+    // Skip if call or call.val is undefined
+    if (!call || !call.val) {
+      return;
+    }
+
     if (call.val.inputs) {
       allFields.push(...flattenObject(call.val.inputs, 'inputs'));
     }
@@ -195,7 +225,7 @@ export const suggestMappings = (
  * Each returned row will:
  * - Be formatted for use in MUI DataGrid components
  * - Include a ___weave namespace containing metadata used by Weave's custom hooks and callbacks:
- *   - id: A unique identifier prefixed with "new-"
+ *   - id: The digest of the call
  *   - isNew: Flag indicating this is a newly created row
  * - Include mapped values from the call's inputs/outputs based on fieldMappings
  * - Only include fields where the source value is defined
@@ -248,10 +278,182 @@ export const mapCallsToDatasetRows = (
 
     return {
       ___weave: {
-        id: `new-${uuidv4()}`,
+        id: call.digest,
         isNew: true,
       },
       ...row,
     };
   });
+};
+
+/**
+ * Filters row data for new datasets based on target fields.
+ *
+ * @param mappedRows - The rows mapped from calls
+ * @param targetFields - Set of target field names to include
+ * @returns Filtered rows containing only the specified target fields
+ */
+export function filterRowsForNewDataset(
+  mappedRows: Array<{
+    ___weave: {id: string; isNew: boolean};
+    [key: string]: any;
+  }>,
+  targetFields: Set<string>
+): Array<{___weave: {id: string; isNew: boolean}; [key: string]: any}> {
+  return mappedRows
+    .map(row => {
+      try {
+        if (!row || typeof row !== 'object' || !row.___weave) {
+          return undefined;
+        }
+
+        const {___weave, ...rest} = row;
+        const filteredData = Object.fromEntries(
+          Object.entries(rest).filter(([key]) => targetFields.has(key))
+        );
+        return {
+          ___weave,
+          ...filteredData,
+        };
+      } catch (rowError) {
+        console.error('Error processing row:', rowError);
+        return undefined;
+      }
+    })
+    .filter(row => row !== undefined) as Array<{
+    ___weave: {id: string; isNew: boolean};
+    [key: string]: any;
+  }>;
+}
+
+/**
+ * Creates a map of processed rows with schema-based filtering.
+ *
+ * @param mappedRows - The rows mapped from calls
+ * @param datasetObject - The dataset object containing schema information
+ * @returns A Map of row IDs to processed row data
+ */
+export function createProcessedRowsMap(
+  mappedRows: Array<{
+    ___weave: {id: string; isNew: boolean};
+    [key: string]: any;
+  }>,
+  datasetObject: any
+): Map<string, any> {
+  return new Map(
+    mappedRows
+      .filter(row => row && row.___weave && row.___weave.id)
+      .map(row => {
+        // If datasetObject has a schema, filter row properties to match schema fields
+        if (datasetObject?.schema && Array.isArray(datasetObject.schema)) {
+          const schemaFields = new Set(
+            datasetObject.schema.map((f: {name: string}) => f.name)
+          );
+          const {___weave, ...rest} = row;
+
+          // Only include fields that are in the schema
+          const filteredData = Object.fromEntries(
+            Object.entries(rest).filter(([key]) => schemaFields.has(key))
+          );
+
+          return [
+            row.___weave.id,
+            {
+              ...filteredData,
+              ___weave: {...row.___weave, serverValue: filteredData},
+            },
+          ];
+        }
+
+        // Default case - keep all fields
+        return [
+          row.___weave.id,
+          {...row, ___weave: {...row.___weave, serverValue: row}},
+        ];
+      })
+  );
+}
+
+/**
+ * Suggests field mappings between source and target schemas.
+ *
+ * This function attempts to match fields between schemas using various strategies:
+ * 1. Preserves existing mappings if the fields still exist
+ * 2. Matches fields with identical names
+ * 3. Matches fields where one name contains the other
+ *
+ * @param sourceSchema - Array of fields in the source schema
+ * @param targetSchema - Array of fields in the target schema
+ * @param existingMappings - Optional array of existing mappings to preserve
+ * @returns Array of suggested field mappings
+ */
+export const suggestFieldMappings = (
+  sourceSchema: any[],
+  targetSchema: any[],
+  existingMappings: FieldMapping[] = []
+): FieldMapping[] => {
+  if (!sourceSchema.length || !targetSchema.length) {
+    return existingMappings;
+  }
+
+  // Create mapping table of existing mappings for quick lookup
+  const existingMappingsMap = new Map<string, string>();
+  existingMappings.forEach(mapping => {
+    existingMappingsMap.set(mapping.targetField, mapping.sourceField);
+  });
+
+  // Create a new array of suggested mappings
+  const newMappings: FieldMapping[] = [];
+
+  // Attempt to match fields by name
+  targetSchema.forEach(targetField => {
+    // If there's already a mapping for this target field, keep it
+    if (existingMappingsMap.has(targetField.name)) {
+      newMappings.push({
+        targetField: targetField.name,
+        sourceField: existingMappingsMap.get(targetField.name)!,
+      });
+      return;
+    }
+
+    // Try to find a matching source field by exact name
+    const exactMatch = sourceSchema.find(
+      sourceField => sourceField.name === targetField.name
+    );
+    if (exactMatch) {
+      newMappings.push({
+        targetField: targetField.name,
+        sourceField: exactMatch.name,
+      });
+      return;
+    }
+
+    // Try to find a matching source field by name containing the target field name
+    const containsMatch = sourceSchema.find(sourceField =>
+      sourceField.name.toLowerCase().includes(targetField.name.toLowerCase())
+    );
+    if (containsMatch) {
+      newMappings.push({
+        targetField: targetField.name,
+        sourceField: containsMatch.name,
+      });
+      return;
+    }
+
+    // Try to find a matching source field where the target field name contains the source field name
+    const reverseContainsMatch = sourceSchema.find(sourceField =>
+      targetField.name.toLowerCase().includes(sourceField.name.toLowerCase())
+    );
+    if (reverseContainsMatch) {
+      newMappings.push({
+        targetField: targetField.name,
+        sourceField: reverseContainsMatch.name,
+      });
+      return;
+    }
+
+    // No matches found, leave this target field unmapped
+  });
+
+  return newMappings;
 };

@@ -1,12 +1,12 @@
 import {Box, Stack, Typography} from '@mui/material';
-import {MOON_100, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import React, {useEffect, useMemo} from 'react';
 
+import {Checkbox} from '../../../../Checkbox';
 import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {useDatasetEditContext} from './DatasetEditorContext';
-import {CallData, extractSourceSchema} from './schemaUtils';
+import {CallData, extractSourceSchema, getNestedValue} from './schemaUtils';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -38,8 +38,12 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
     );
   }, [fieldConfigs]);
 
+  const someFieldsIncluded = useMemo(() => {
+    return fieldConfigs.some(config => config.included);
+  }, [fieldConfigs]);
+
   const handleToggleAll = () => {
-    const newIncluded = !allFieldsIncluded;
+    const newIncluded = !someFieldsIncluded;
     const newConfigs = fieldConfigs.map(config => ({
       ...config,
       included: newIncluded,
@@ -63,23 +67,6 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
   // Extract preview data for each source field
   const fieldPreviews = useMemo(() => {
     const previews = new Map<string, Array<Record<string, any>>>();
-
-    const getNestedValue = (obj: any, path: string[]): any => {
-      let current = obj;
-      for (const part of path) {
-        if (current == null) {
-          return undefined;
-        }
-        if (typeof current === 'object' && '__val__' in current) {
-          current = current.__val__;
-        }
-        if (typeof current !== 'object') {
-          return current;
-        }
-        current = current[part];
-      }
-      return current;
-    };
 
     sourceSchema.forEach(field => {
       const fieldData = selectedCalls.map(call => {
@@ -148,11 +135,12 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
   }
 
   return (
-    <Stack spacing={1} sx={{mt: 4}}>
-      <Typography sx={{...typographyStyle, fontWeight: 600}}>
+    <Stack spacing={'8px'} sx={{mt: '24px'}}>
+      <Typography component="div" sx={{...typographyStyle, fontWeight: 600}}>
         Configure dataset fields
       </Typography>
       <Typography
+        component="div"
         sx={{
           ...typographyStyle,
           color: 'text.secondary',
@@ -162,48 +150,13 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
         included field, you can customize the column name that will appear in
         the resulting dataset.
       </Typography>
-      <Box sx={{height: 16}} />
-      <Box sx={{bgcolor: '#F8F8F8', p: 2, borderRadius: 1}}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            mb: 3,
-            cursor: 'pointer',
-            userSelect: 'none',
-            width: 'fit-content',
-            '&:hover': {
-              opacity: 0.8,
-            },
-          }}
-          onClick={handleToggleAll}>
-          <Box
-            sx={{
-              width: 32,
-              height: 16,
-              borderRadius: 8,
-              bgcolor: allFieldsIncluded ? TEAL_500 : MOON_100,
-              position: 'relative',
-              transition: 'background-color 0.2s',
-            }}>
-            <Box
-              sx={{
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                bgcolor: 'white',
-                position: 'absolute',
-                top: 2,
-                left: allFieldsIncluded ? 18 : 2,
-                transition: 'left 0.2s',
-              }}
-            />
-          </Box>
-          <Typography sx={typographyStyle}>
-            {allFieldsIncluded ? 'Deselect All' : 'Select All'}
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          bgcolor: '#F8F8F8',
+          border: '1px solid #E0E0E0',
+          p: 2,
+          borderRadius: 1,
+        }}>
         <Box
           sx={{
             display: 'grid',
@@ -212,16 +165,33 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
             mb: 2,
           }}>
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
               fontSize: '0.875rem',
-              pl: 6, // Align with field name accounting for toggle width
-            }}>
+              pl: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+            onClick={handleToggleAll}>
+            <Checkbox
+              checked={
+                !allFieldsIncluded && someFieldsIncluded
+                  ? 'indeterminate'
+                  : allFieldsIncluded
+              }
+              onCheckedChange={handleToggleAll}
+              size="small"
+            />
             Call Fields
           </Typography>
           <Box /> {/* Spacer for arrow */}
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
@@ -248,32 +218,18 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                   gap: 2,
                   cursor: 'pointer',
                   userSelect: 'none',
+                  overflow: 'hidden',
                   '&:hover': {
                     opacity: 0.8,
                   },
                 }}>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 16,
-                    borderRadius: 8,
-                    bgcolor: config.included ? TEAL_500 : MOON_100,
-                    position: 'relative',
-                    transition: 'background-color 0.2s',
-                  }}>
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: '50%',
-                      bgcolor: 'white',
-                      position: 'absolute',
-                      top: 2,
-                      left: config.included ? 18 : 2,
-                      transition: 'left 0.2s',
-                    }}
-                  />
-                </Box>
+                <Checkbox
+                  checked={config.included}
+                  onCheckedChange={() =>
+                    handleIncludedChange(config.sourceField)
+                  }
+                  size="small"
+                />
                 <DataPreviewTooltip
                   rows={fieldPreviews.get(config.sourceField)}
                   tooltipProps={{
@@ -295,6 +251,10 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                     sx={{
                       ...typographyStyle,
                       color: config.included ? 'inherit' : 'text.disabled',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
                     }}>
                     {config.sourceField}
                   </Typography>
