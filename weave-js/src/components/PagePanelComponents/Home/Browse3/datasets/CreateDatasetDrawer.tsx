@@ -292,7 +292,9 @@ const CreateDatasetDrawerContent: React.FC<{
                     p: 4,
                     flex: 1,
                     minHeight: '300px',
-                    backgroundColor: isDragging ? `${TEAL_300}52` : 'transparent',
+                    backgroundColor: isDragging
+                      ? `${TEAL_300}52`
+                      : 'transparent',
                     transition: 'all 0.2s ease',
                   }}
                   onDragEnter={handleDragEnter}
