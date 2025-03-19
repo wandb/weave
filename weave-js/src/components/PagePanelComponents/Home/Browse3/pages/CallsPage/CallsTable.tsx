@@ -1350,16 +1350,8 @@ const OpSelector = ({
             }
             groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
-            popupIcon={
-              <Icon
-                name="chevron-down"
-                width={16}
-                height={16}
-              />
-            }
-            clearIcon={
-              <Icon name="close" width={16} height={16} />
-            }
+            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
+            clearIcon={<Icon name="close" width={16} height={16} />}
           />
         </FormControl>
       </ListItem>
