@@ -255,6 +255,8 @@ class CallsDescendantsReq(BaseModel):
     project_id: str
     call_ids: list[str]
     limit: Optional[int] = None
+    # list of columns to select, defaults to all columns
+    columns: Optional[list[str]] = None
 
     # If provided, the depth of the descendants to return.
     # Default is all descendants. limit 1 would stop at grandchildren

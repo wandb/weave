@@ -533,6 +533,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req.project_id,
             call_ids=call_ids,
             limit=req.limit,
+            depth=req.depth,
         )
         if len(ids) == 0:
             return
