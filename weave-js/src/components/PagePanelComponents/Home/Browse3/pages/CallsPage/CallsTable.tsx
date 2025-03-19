@@ -26,7 +26,7 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_400} from '@wandb/weave/common/css/color.styles';
+import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
@@ -1074,21 +1074,21 @@ export const CallsTable: FC<{
               </div>
 
               {/* Right side group */}
-                {/* Metrics Button */}
-                {!hideOpSelector && (
-                  <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-6">
-                      <div className="flex-none">
-                        <Button
-                          icon="chart-vertical-bars"
-                          variant="ghost"
-                          active={isMetricsChecked}
-                          onClick={() => setMetricsChecked(!isMetricsChecked)}
-                        />
-                      </div>
+              {/* Metrics Button */}
+              {!hideOpSelector && (
+                <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-6">
+                    <div className="flex-none">
+                      <Button
+                        icon="chart-vertical-bars"
+                        variant="ghost"
+                        active={isMetricsChecked}
+                        onClick={() => setMetricsChecked(!isMetricsChecked)}
+                      />
                     </div>
                   </div>
-                )}
+                </div>
+              )}
               {/* Export Button */}
               <div className="ml-[8px] flex items-center gap-[8px]">
                 <div className="flex-none">
@@ -1330,9 +1330,10 @@ const OpSelector = ({
                 boxSizing: 'border-box',
                 fontFamily: 'Source Sans Pro',
               },
-              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
-                backgroundColor: 'transparent',
-              },
+              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
+                {
+                  backgroundColor: 'transparent',
+                },
             }}
             size="small"
             limitTags={1}
@@ -1348,8 +1349,17 @@ const OpSelector = ({
             }
             groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" width={16} height={16} className="mb-[2px]" />}
-            clearIcon={<Icon name="close" width={16} height={16} className="mb-[2px]" />}
+            popupIcon={
+              <Icon
+                name="chevron-down"
+                width={16}
+                height={16}
+                className="mb-[2px]"
+              />
+            }
+            clearIcon={
+              <Icon name="close" width={16} height={16} className="mb-[2px]" />
+            }
           />
         </FormControl>
       </ListItem>
