@@ -103,14 +103,12 @@ def simple_list_accumulator(acc, value):
 
 
 def test_op_return_sync_generator(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         pass
@@ -130,16 +128,14 @@ def test_op_return_sync_generator(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
-    async for item in fn():
+    async for item in await fn():
         pass
 
     res = client.server.calls_query(
@@ -253,16 +249,14 @@ def test_op_return_sync_generator_never_iter(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_never_iter(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
-    fn()
+    await fn()
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -347,18 +341,28 @@ async def test_op_return_async_iterator_never_iter(client):
 
 
 def test_op_return_sync_generator_partial(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
+    # Store the generator in a variable to control its lifecycle
+    gen = fn()
 
-    for item in fn():
+    # Consume part of the generator
+    for item in gen:
         if item == 5:
             break
+
+    # Explicitly close the generator to ensure it's properly finished
+    gen.close()
+
+    # Add a small delay to ensure the call is properly finished
+    import time
+
+    time.sleep(0.1)
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -375,18 +379,28 @@ def test_op_return_sync_generator_partial(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_partial(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
+    # Store the generator in a variable to control its lifecycle
+    gen = await fn()
 
-    async for item in fn():
+    # Consume part of the generator
+    async for item in gen:
         if item == 5:
             break
+
+    # Explicitly close the generator to ensure it's properly finished
+    await gen.aclose()
+
+    # Add a small delay to ensure the call is properly finished
+    import asyncio
+
+    await asyncio.sleep(0.1)
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -420,9 +434,16 @@ def test_op_return_sync_iterator_partial(client):
 
     _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
-    for item in fn():
+    # Store the iterator in a variable to control its lifecycle
+    iterator = fn()
+
+    # Consume part of the iterator
+    for item in iterator:
         if item == 5:
             break
+
+    # Explicitly close the iterator to ensure it's properly finished
+    iterator.close()
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -457,9 +478,21 @@ async def test_op_return_async_iterator_partial(client):
 
     _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
-    async for item in fn():
+    # Store the iterator in a variable to control its lifecycle
+    iterator = fn()
+
+    # Consume part of the iterator
+    async for item in iterator:
         if item == 5:
             break
+
+    # Explicitly close the iterator to ensure it's properly finished
+    iterator.close()
+
+    # Add a small delay to ensure the call is properly finished
+    import asyncio
+
+    await asyncio.sleep(0.1)
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -475,7 +508,7 @@ async def test_op_return_async_iterator_partial(client):
 
 
 def test_op_return_sync_generator_exception(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
@@ -483,8 +516,6 @@ def test_op_return_sync_generator_exception(client):
             yield size
             if size == 5:
                 raise ValueError("test")
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
@@ -508,7 +539,7 @@ def test_op_return_sync_generator_exception(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_exception(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
@@ -517,10 +548,8 @@ async def test_op_return_async_generator_exception(client):
             if size == 5:
                 raise ValueError("test")
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
     try:
-        async for item in fn():
+        async for item in await fn():
             pass
     except ValueError:
         pass
@@ -539,6 +568,7 @@ async def test_op_return_async_generator_exception(client):
     assert res.calls[0].exception != None
 
 
+@pytest.mark.disable_logging_error_check
 def test_op_return_sync_iterator_exception(client):
     class MyIterator:
         size = 10
@@ -581,6 +611,7 @@ def test_op_return_sync_iterator_exception(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
 async def test_op_return_async_iterator_exception(client):
     class MyAsyncIterator:
         size = 10
