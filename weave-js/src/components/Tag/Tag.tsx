@@ -79,11 +79,13 @@ export const Tag: FC<TagProps> = ({
   const classes = useTagClasses({color, isInteractive, label});
 
   const nakedTag = (
-    <div
-      key={`tag-${label}`}
-      className={twMerge(classes, showIcon ? 'pl-4 pr-6' : 'px-6')}>
+    <div className={twMerge(classes, showIcon ? 'pl-4 pr-6' : 'px-6')}>
       {showIcon && (
-        <Icon className="mr-4 h-14 w-14" name={iconName ?? DEFAULT_TAG_ICON} />
+        <Icon
+          role="presentation"
+          className="mr-4 h-14 w-14"
+          name={iconName ?? DEFAULT_TAG_ICON}
+        />
       )}
       <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
@@ -122,11 +124,10 @@ export const RemovableTag: FC<RemovableTagProps> = ({
 
   const nakedTag = (
     <TagTooltip value={label} disabled={!isTruncated}>
-      <div
-        key={`tag-${label}`}
-        className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
+      <div className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
         {showIcon && (
           <Icon
+            role="presentation"
             className="mr-4 h-14 w-14"
             name={iconName ?? DEFAULT_TAG_ICON}
           />

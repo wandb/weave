@@ -1,7 +1,8 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_200} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
+import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useState} from 'react';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
@@ -19,7 +20,7 @@ import {
 export type PlaygroundChatProps = {
   entity: string;
   project: string;
-  setPlaygroundStates: (states: PlaygroundState[]) => void;
+  setPlaygroundStates: Dispatch<SetStateAction<PlaygroundState[]>>;
   playgroundStates: PlaygroundState[];
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   setSettingsTab: (callIndex: number | null) => void;
@@ -36,11 +37,10 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
-    setIsLoading,
+    setPlaygroundStateField,
     playgroundStates,
     entity,
     project,
@@ -56,6 +56,12 @@ export const PlaygroundChat = ({
     }
     setChatText('');
   };
+
+  // Check if any chat is loading
+  const isAnyLoading = useMemo(
+    () => playgroundStates.some(state => state.loading),
+    [playgroundStates]
+  );
 
   return (
     <Box
@@ -75,23 +81,6 @@ export const PlaygroundChat = ({
           display: 'flex',
           position: 'relative',
         }}>
-        {isLoading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              zIndex: 100,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <CircularProgress />
-          </Box>
-        )}
         {playgroundStates.map((state, idx) => (
           <React.Fragment key={idx}>
             {idx > 0 && (
@@ -112,6 +101,23 @@ export const PlaygroundChat = ({
                 flexDirection: 'column',
                 position: 'relative',
               }}>
+              {state.loading && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: hexToRGB(WHITE, 0.7),
+                    zIndex: 100,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <CircularProgress />
+                </Box>
+              )}
               <Box
                 sx={{
                   backgroundColor: 'white',
@@ -212,7 +218,7 @@ export const PlaygroundChat = ({
       <PlaygroundChatInput
         chatText={chatText}
         setChatText={setChatText}
-        isLoading={isLoading}
+        isLoading={isAnyLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
         settingsTab={settingsTab}
