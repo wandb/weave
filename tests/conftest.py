@@ -562,9 +562,12 @@ def create_client(
     entity = "shawn"
     project = "test-project"
     db_path = None
+    # Get worker id for parallel test execution
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
+
     if weave_server_flag == "sqlite":
         # Get worker id for parallel test execution
-        if worker_id := os.environ.get("PYTEST_XDIST_WORKER"):
+        if worker_id:
             temp_dir = tempfile.gettempdir()
             # Create a unique file-based database for each worker
             db_path = f"{temp_dir}/weave_test_{worker_id}_{uuid.uuid4()}.db"
@@ -579,10 +582,34 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
+        # Create unique database names for parallel testing
+        unique_suffix = f"_{worker_id}_{uuid.uuid4().hex[:8]}" if worker_id else ""
+        db_management_name = f"db_management{unique_suffix}"
+        default_db_name = f"default{unique_suffix}"
+
+        # Set environment variables to use these database names
+        os.environ["CLICKHOUSE_DB_MANAGEMENT"] = db_management_name
+        os.environ["CLICKHOUSE_DEFAULT_DB"] = default_db_name
+
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {default_db_name}")
         ch_server._run_migrations()
+
+        # Clean up function for Clickhouse databases
+        def cleanup_ch_dbs():
+            try:
+                ch_server.ch_client.command(
+                    f"DROP DATABASE IF EXISTS {db_management_name}"
+                )
+                ch_server.ch_client.command(
+                    f"DROP DATABASE IF EXISTS {default_db_name}"
+                )
+            except Exception:
+                pass
+
+        request.addfinalizer(cleanup_ch_dbs)
+
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
         )
