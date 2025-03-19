@@ -498,16 +498,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 {depth_limit:Optional(String)}
         )
         SELECT id FROM descendants
-        {limit_clause:Optional(String)}
+        LIMIT {limit:Int32}
         SETTINGS allow_experimental_analyzer=1
         """
         depth_limit = ""
         if depth is not None:
             depth_limit = "AND d.depth < {depth:Int32}"
-
-        limit_clause = ""
-        if limit is not None:
-            limit_clause = "LIMIT {limit:Int32}"
 
         result = self._query(
             query,
@@ -515,7 +511,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "project_id": project_id,
                 "call_ids": call_ids,
                 "depth": depth,
-                "limit": limit,
+                "limit": limit or MAX_CALLS_CHILDREN_LIMIT,
             },
         )
         return [row[0] for row in result.result_rows]
