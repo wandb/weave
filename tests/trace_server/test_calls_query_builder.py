@@ -285,16 +285,16 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         AND
             (calls_merged.id IN filtered_calls)
         AND
-            (calls_merged.inputs_dump LIKE {pb_5:String}
-            OR calls_merged.inputs_dump IS NULL)
+            (((calls_merged.inputs_dump LIKE {pb_5:String}
+            OR calls_merged.inputs_dump IS NULL))
         AND
-            (calls_merged.inputs_dump LIKE {pb_6:String}
-            OR calls_merged.inputs_dump IS NULL)
+            ((calls_merged.inputs_dump LIKE {pb_6:String}
+            OR calls_merged.inputs_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}))
             AND
-            JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) = {pb_8:String}
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) = {pb_8:String}))
         )
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
