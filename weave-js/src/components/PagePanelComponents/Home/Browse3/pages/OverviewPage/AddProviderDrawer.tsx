@@ -1,5 +1,8 @@
 import {Box, Typography} from '@mui/material';
+import {Link} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {TEAL_500, TEAL_600} from '@wandb/weave/common/css/color.styles';
+import {Alert} from '@wandb/weave/components/Alert';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -190,7 +193,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           <Typography
             variant="h6"
             sx={{...sharedTypographyStyle, fontSize: '20px', fontWeight: 600}}>
-            {editingProvider ? 'Edit provider' : 'Add a provider'}
+            {editingProvider ? 'Edit AI provider' : 'Add an AI provider'}
           </Typography>
           <Box sx={{display: 'flex', gap: 1}}>
             <Button
@@ -224,6 +227,10 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             overflowX: 'hidden',
           }}>
           <Box sx={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
+            <Alert severity="info">
+              Custom providers are made for connecting to OpenAI compatible API
+              endpoints.
+            </Alert>
             <Box>
               <Typography
                 sx={{...sharedTypographyStyle, mb: 1, fontWeight: '600'}}>
@@ -262,12 +269,42 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             </Box>
 
             <Box>
+              <Typography sx={{...sharedTypographyStyle, fontWeight: '600'}}>
+                API key (secret name)
+              </Typography>
               <Typography
-                sx={{...sharedTypographyStyle, mb: 1, fontWeight: '600'}}>
-                API key / token
+                sx={{
+                  ...sharedTypographyStyle,
+                  color: 'text.secondary',
+                  fontSize: '0.875rem',
+                }}>
+                API keys can be set in your
+                <Link
+                  href={`/${projectId.split('/')[0]}/settings`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    color: TEAL_600,
+                    '&:hover': {
+                      color: TEAL_500,
+                    },
+                    ml: 0.5,
+                    textDecoration: 'none',
+                  }}>
+                  team's secrets in settings →
+                </Link>
+              </Typography>
+              <Typography
+                sx={{
+                  ...sharedTypographyStyle,
+                  color: 'text.secondary',
+                  fontSize: '0.875rem',
+                  mb: 1,
+                }}>
+                Note: Secrets are only available to team admins.
               </Typography>
               <TextField
-                placeholder="Enter API key / token..."
+                placeholder="WANDB_KEY_NAME..."
                 value={apiKey}
                 onChange={value => setApiKey(value)}
               />
