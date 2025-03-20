@@ -982,11 +982,10 @@ class TraceServerInterface(Protocol):
 
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
-    
+
 
 class TraceService(Protocol):
     trace_server_interface: TraceServerInterface
-    
+
     def server_info(self) -> ServerInfoRes: ...
     def read_root(self) -> dict[str, str]: ...
-    

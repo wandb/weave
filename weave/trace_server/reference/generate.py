@@ -39,11 +39,24 @@ class AuthParams(NamedTuple):
 class NoopTraceServer(tsi.TraceServerInterface): ...
 
 
-def noop_trace_server_factory(auth: AuthParams) -> tsi.TraceServerInterface:
+class NoopTraceService:
+    def __init__(self) -> None:
+        self.trace_server_interface: tsi.TraceServerInterface = NoopTraceServer()  # type: ignore
+
+    def server_info(self) -> tsi.ServerInfoRes:
+        return tsi.ServerInfoRes(
+            min_required_weave_python_version="0.0.1",
+        )
+
+    def read_root(self) -> dict[str, str]:
+        return {"status": "ok"}
+
+
+def noop_trace_server_factory(auth: AuthParams) -> tsi.TraceService:
     # This type-ignore is safe, it's just used to instantiate a stub implementation
     # without having to redefine all of the methods (which would be pointless because
     # this is a stub that does nothing).
-    return NoopTraceServer()  # type: ignore
+    return NoopTraceService()
 
 
 class ServiceDependency:
@@ -97,13 +110,13 @@ def generate_routes(
     # settles, we should refactor this to be in the order of the TraceServerInterface.
     # Commented out blocks are technically not defined on the interface yet and thus
     # not part of the official spec.
-    
+
     @router.get("/server_info", tags=[SERVICE_TAG_NAME])
     def server_info(
         service: tsi.TraceService = Depends(get_service),
     ) -> tsi.ServerInfoRes:
         return service.server_info()
-    
+
     @router.get("/health", tags=[SERVICE_TAG_NAME])
     def health(
         service: tsi.TraceService = Depends(get_service),
@@ -182,7 +195,9 @@ def generate_routes(
         service: tsi.TraceService = Depends(get_service),
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(service.trace_server_interface.calls_query_stream(req), media_type=accept)
+        return StreamingResponse(
+            service.trace_server_interface.calls_query_stream(req), media_type=accept
+        )
 
     @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
     def calls_query(
@@ -262,7 +277,9 @@ def generate_routes(
         service: tsi.TraceService = Depends(get_service),
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(service.trace_server_interface.table_query_stream(req), media_type=accept)
+        return StreamingResponse(
+            service.trace_server_interface.table_query_stream(req), media_type=accept
+        )
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(

@@ -246,7 +246,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
-    
+
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         # Converts the user-provided call details into a clickhouse schema.
@@ -263,7 +263,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             id=ch_call.id,
             trace_id=ch_call.trace_id,
         )
-
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.

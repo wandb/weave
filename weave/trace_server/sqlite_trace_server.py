@@ -156,7 +156,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
-        
+
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
@@ -167,7 +167,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             else:
                 raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
-    
+
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -218,8 +218,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             id=req.start.id,
             trace_id=req.start.trace_id,
         )
-
-        
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         conn, cursor = get_conn_cursor(self.db_path)
