@@ -1074,10 +1074,6 @@ def _create_like_optimized_eq_condition(
     ):
         return None
 
-    # boolean literals cannot be used for LIKE conditions
-    if operation.eq_[1].literal_ in ("true", "false"):
-        return None
-
     field = get_field_by_name(operation.eq_[0].get_field_).field
     literal_value = operation.eq_[1].literal_
 
@@ -1085,7 +1081,11 @@ def _create_like_optimized_eq_condition(
         # Empty string is not a valid value for LIKE optimization
         return None
 
-    like_pattern = f'%"{literal_value}"%'
+    # Boolean literals are not wrapped in quotes in JSON payloads
+    if literal_value in ("true", "false"):
+        like_pattern = f'%{literal_value}%'
+    else:
+        like_pattern = f'%"{literal_value}"%'
 
     return _create_like_condition(field, like_pattern, pb, table_alias)
 
