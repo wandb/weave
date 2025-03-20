@@ -78,7 +78,7 @@ export const parseDate = (dateStr: string): Date | null => {
   const units = 'minute|hour|day|week|month|year|second';
 
   // Handle "X days/weeks/months/years ago"
-  const agoPattern = new RegExp(`^(\d+)\\s+(${units})s?\\s+ago$`, 'i');
+  const agoPattern = new RegExp(`^(\\d+)\\s+(${units})s?\\s+ago$`, 'i');
   const agoMatch = lowerStr.match(agoPattern);
   if (agoMatch) {
     const amount = parseInt(agoMatch[1], 10);
