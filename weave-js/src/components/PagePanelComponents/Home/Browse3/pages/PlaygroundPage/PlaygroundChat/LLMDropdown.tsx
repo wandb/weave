@@ -28,7 +28,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     useConfiguredProviders(entity);
 
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isAdmin = !loadingUserInfo && userInfo?.admin;
+  const isTeamAdmin = !loadingUserInfo && userInfo?.roles[entity] === 'admin';
 
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
@@ -105,7 +105,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               onChange={onChange}
               entity={entity}
               project={project}
-              isAdmin={isAdmin}
+              isAdmin={isTeamAdmin}
             />
           ),
         }}
