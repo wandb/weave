@@ -1067,17 +1067,24 @@ def _create_like_optimized_eq_condition(
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
         return None
+
     # Return if right-side isn't a string literal
     if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
         operation.eq_[1].literal_, str
     ):
         return None
 
+    # boolean literals cannot be used for LIKE conditions
+    if operation.eq_[1].literal_ in ("true", "false"):
+        return None
+
     field = get_field_by_name(operation.eq_[0].get_field_).field
     literal_value = operation.eq_[1].literal_
+
     if not literal_value:
         # Empty string is not a valid value for LIKE optimization
         return None
+
     like_pattern = f'%"{literal_value}"%'
 
     return _create_like_condition(field, like_pattern, pb, table_alias)
