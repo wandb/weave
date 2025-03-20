@@ -197,10 +197,8 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center w-full ">
-            <div className="truncate text-sm font-medium">
-              {node.opName}
-            </div>
+          <div className="flex w-full items-center ">
+            <div className="truncate text-sm font-medium">{node.opName}</div>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-moon-500">
             <span>{stats.finishedCallCount} finished</span>
