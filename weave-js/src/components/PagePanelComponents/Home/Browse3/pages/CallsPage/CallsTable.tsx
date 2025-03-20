@@ -1105,9 +1105,24 @@ const OpSelector = ({
         <FormControl fullWidth sx={{borderColor: MOON_200}}>
           <Autocomplete
             PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+            ListboxProps={{
+              sx: {
+                fontSize: '14px',
+                fontFamily: 'Source Sans Pro',
+                '& .MuiAutocomplete-option': {
+                  fontSize: '14px',
+                  fontFamily: 'Source Sans Pro',
+                },
+                '& .MuiAutocomplete-groupLabel': {
+                  fontSize: '14px',
+                  fontFamily: 'Source Sans Pro',
+                },
+              },
+            }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 height: '32px',
+                fontFamily: 'Source Sans Pro',
                 '& fieldset': {
                   borderColor: MOON_200,
                 },
@@ -1116,9 +1131,15 @@ const OpSelector = ({
                 },
               },
               '& .MuiOutlinedInput-input': {
+                fontSize: '14px',
                 height: '32px',
                 padding: '0 14px',
                 boxSizing: 'border-box',
+                fontFamily: 'Source Sans Pro',
+              },
+              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
+                backgroundColor: 'transparent',
+                marginBottom: '2px',
               },
             }}
             size="small"
@@ -1135,8 +1156,8 @@ const OpSelector = ({
             }
             groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" />}
-            clearIcon={<Icon name="close" />}
+            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
+            clearIcon={<Icon name="close" width={16} height={16} />}
           />
         </FormControl>
       </ListItem>
