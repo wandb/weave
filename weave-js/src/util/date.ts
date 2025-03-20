@@ -20,13 +20,13 @@ export const parseDate = (dateStr: string): Date | null => {
   const trimmedStr = dateStr.trim();
   const lowerStr = trimmedStr.toLowerCase();
 
-  // Handle last/next day of the week
-  const lastNextDayOfWeekPattern =
-    /^(last|next)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i;
-  const lastNextDayOfWeekMatch = lowerStr.match(lastNextDayOfWeekPattern);
-  if (lastNextDayOfWeekMatch) {
-    const direction = lastNextDayOfWeekMatch[1].toLowerCase();
-    const targetDay = lastNextDayOfWeekMatch[2].toLowerCase();
+  // Handle day of week patterns (standalone, last/next/this)
+  const dayOfWeekPattern =
+    /^(last|next|this)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i;
+  const dayOfWeekMatch = lowerStr.match(dayOfWeekPattern);
+  if (dayOfWeekMatch) {
+    const direction = dayOfWeekMatch[1]?.toLowerCase() || 'next';
+    const targetDay = dayOfWeekMatch[2].toLowerCase();
 
     // Get current day of week (0 = Sunday, 1 = Monday, etc.)
     const currentDay = now.getDay();
@@ -51,7 +51,7 @@ export const parseDate = (dateStr: string): Date | null => {
           daysToAdd -= 7;
         }
       } else {
-        // For 'next', if target day is before current day, we need to go forward 2 weeks
+        // For 'next', 'this', or standalone, if target day is before current day, we need to go forward 1 week
         if (daysToAdd < 0) {
           daysToAdd += 7;
         }
