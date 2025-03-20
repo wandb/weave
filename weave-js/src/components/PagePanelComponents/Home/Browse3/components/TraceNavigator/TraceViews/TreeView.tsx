@@ -112,12 +112,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         }}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[38px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
+        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
               style={{marginLeft: level * indentMultiplier}}
-              className={`h-[38px]`}
+              className={`h-[32px]`}
             />
             {/* Render vertical lines for each level of hierarchy */}
             {Array.from({length: level}).map((_, idx) => (
@@ -177,7 +177,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 />
               )}
               {duration !== null && (
-                <span className="min-w-[34px] text-moon-400">
+                <span className="min-w-[32px] text-moon-400">
                   {formatDuration(duration)}
                 </span>
               )}
@@ -487,7 +487,7 @@ export const TreeView: React.FC<
             width={width}
             height={height}
             rowCount={flattenedNodes.length}
-            rowHeight={38}
+            rowHeight={32}
             rowRenderer={rowRenderer}
             overscanRowCount={10}
             scrollToAlignment="auto"
