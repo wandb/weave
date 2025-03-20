@@ -2438,6 +2438,45 @@ def test_calls_descendants_basic(client):
     assert len(multi_parent_children) == 3  # child1, child2, child3
 
 
+def test_get_call_descendants_input_types(client):
+    """Test that get_call_descendants accepts different types of input for the calls parameter."""
+    # Create a call with a child
+    parent_call = client.create_call("parent_op", {"x": 5})
+    child_call = client.create_call("child_op", {"x": 5}, parent_call)
+    client.finish_call(child_call, 10)
+    client.finish_call(parent_call, 10)
+    client.flush()
+
+    # Test with a single Call object
+    descendants1 = list(client.get_call_descendants(parent_call))
+    assert len(descendants1) == 1
+    assert op_name_from_ref(descendants1[0].op_name) == "child_op"
+
+    # Test with a single call ID string
+    descendants2 = list(client.get_call_descendants(parent_call.id))
+    assert len(descendants2) == 1
+    assert op_name_from_ref(descendants2[0].op_name) == "child_op"
+
+    # Test with a list of Call objects
+    descendants3 = list(client.get_call_descendants([parent_call]))
+    assert len(descendants3) == 1
+    assert op_name_from_ref(descendants3[0].op_name) == "child_op"
+
+    # Test with a list of call ID strings
+    descendants4 = list(client.get_call_descendants([parent_call.id]))
+    assert len(descendants4) == 1
+    assert op_name_from_ref(descendants4[0].op_name) == "child_op"
+
+    # Test with a mixed list of Call objects and call ID strings, duplicate ids
+    descendants5 = list(client.get_call_descendants([parent_call, parent_call.id]))
+    assert len(descendants5) == 1
+    assert all(op_name_from_ref(d.op_name) == "child_op" for d in descendants5)
+
+    # Test with invalid input type
+    with pytest.raises(TypeError, match="Invalid call, CallId, or Iterable"):
+        list(client.get_call_descendants(123))  # type: ignore
+
+
 def test_calls_descendants_edge_cases(client):
     """Test edge cases for calls_descendants including deleted calls and leaf nodes."""
     # Test leaf node (no children)
