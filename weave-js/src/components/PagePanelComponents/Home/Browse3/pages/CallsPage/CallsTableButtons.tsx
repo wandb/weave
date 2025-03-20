@@ -438,12 +438,12 @@ export const CompareEvaluationsTableButton: FC<{
     <Button
       className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare
+      Compare evaluations
     </Button>
   </Box>
 );
@@ -462,11 +462,12 @@ export const CompareTracesTableButton: FC<{
     <Button
       className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
+      icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare
+      Compare traces
     </Button>
   </Box>
 );
@@ -515,7 +516,9 @@ export const BulkAddToDatasetButton: FC<{
       disabled={disabled}
       tooltip="Add selected rows to a dataset"
       icon="table"
-    />
+    >
+      Add to dataset
+    </Button>
   );
 };
 
