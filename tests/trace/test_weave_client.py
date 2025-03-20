@@ -2416,6 +2416,7 @@ def test_calls_descendants_basic(client):
 
     # Create a call that will have multiple children and grandchildren
     result = parent_op(5)
+    client.flush()
     parent_call = client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True))[0]
 
     # Test getting immediate children only (depth=1)
@@ -2435,6 +2436,7 @@ def test_calls_descendants_basic(client):
         ]
 
     parent_op(10)
+    client.flush()
     # Test getting children for multiple parents
     parent_calls = client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True))
     multi_parent_children = list(client.get_call_descendants(parent_calls, depth=1))
@@ -2458,6 +2460,7 @@ def test_calls_descendants_edge_cases(client):
 
     # Test leaf node (no children)
     leaf_result = leaf_op(5)
+    client.flush()
     leaf_call = client.get_calls(filter=tsi.CallsFilter(op_names=[f"{leaf_op.ref}:*"]))[
         0
     ]
@@ -2466,6 +2469,7 @@ def test_calls_descendants_edge_cases(client):
 
     # Test deleted parent
     parent_result = parent_op(5)
+    client.flush()
     parent_call = client.get_calls(
         filter=tsi.CallsFilter(op_names=[f"{parent_op.ref}:*"])
     )[0]
@@ -2477,6 +2481,7 @@ def test_calls_descendants_edge_cases(client):
 
     # Test deleted child
     parent_result2 = parent_op(10)
+    client.flush()
     parent_call2 = client.get_calls(
         filter=tsi.CallsFilter(op_names=[f"{parent_op.ref}:*"])
     )[0]
@@ -2514,6 +2519,7 @@ def test_get_call_descendants_input_types(client):
 
     # Create a call with a child
     parent_op(5)
+    client.flush()
     parent_call = client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True))[0]
 
     # Test with a single Call object
@@ -2562,6 +2568,7 @@ def test_calls_descendants_class_method(client):
         return x * 3
 
     parent_op(5)
+    client.flush()
     parent_call = client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True))[0]
 
     # Test getting descendants
