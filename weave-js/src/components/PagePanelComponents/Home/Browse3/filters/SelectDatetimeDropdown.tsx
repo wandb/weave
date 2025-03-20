@@ -1,3 +1,6 @@
+import {AdapterDateFns} from '@mui/x-date-pickers/AdapterDateFns';
+import {DateTimePicker} from '@mui/x-date-pickers/DateTimePicker';
+import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
 import {
   MOON_100,
   MOON_200,
@@ -5,6 +8,7 @@ import {
   MOON_500,
   TEAL_350,
   TEAL_400,
+  TEAL_500,
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -50,6 +54,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   );
   const [isInputHovered, setIsInputHovered] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isIconHovered, setIsIconHovered] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
@@ -103,19 +109,18 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     }
   };
 
-  const handleFocus = () => {
-    setDropdownVisible(true);
-    setIsInputFocused(true);
+  const handleDateChange = (date: Date | null) => {
+    if (date) {
+      const formattedDate = formatDate(date);
+      setInputValue(formattedDate);
+      onChange(formattedDate);
+      setIsCalendarOpen(false);
+    }
   };
 
-  const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => {
-    if (
-      dropdownRef.current &&
-      !dropdownRef.current.contains(event.relatedTarget as Node)
-    ) {
-      setDropdownVisible(false);
-    }
-    setIsInputFocused(false);
+  const handleIconClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsCalendarOpen(true);
   };
 
   const handleSuggestionClick = (suggestionValue: string) => {
@@ -137,14 +142,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setHoveredIndex(null);
   };
 
-  const handleInputMouseEnter = () => {
-    setIsInputHovered(true);
-  };
-
-  const handleInputMouseLeave = () => {
-    setIsInputHovered(false);
-  };
-
   return (
     <div
       style={{
@@ -153,17 +150,123 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         alignItems: 'center',
         marginBottom: '5px',
       }}>
-      <DateInput
-        inputValue={inputValue}
-        isInputFocused={isInputFocused}
-        isInputHovered={isInputHovered}
-        inputRef={inputRef}
-        handleInputChange={handleInputChange}
-        handleFocus={handleFocus}
-        handleBlur={handleBlur}
-        handleInputMouseEnter={handleInputMouseEnter}
-        handleInputMouseLeave={handleInputMouseLeave}
-      />
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <div style={{position: 'relative', width: '100%'}}>
+          <Icon
+            name="date"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '9px',
+              transform: 'translateY(-50%)',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: isIconHovered ? TEAL_500 : 'inherit',
+            }}
+            onClick={handleIconClick}
+            onMouseEnter={() => setIsIconHovered(true)}
+            onMouseLeave={() => setIsIconHovered(false)}
+          />
+          <input
+            type="text"
+            aria-label="Date input"
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => setDropdownVisible(true)}
+            onBlur={event => {
+              if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.relatedTarget as Node)
+              ) {
+                setDropdownVisible(false);
+              }
+              setIsInputFocused(false);
+            }}
+            onMouseEnter={() => setIsInputHovered(true)}
+            onMouseLeave={() => setIsInputHovered(false)}
+            placeholder="Enter a date..."
+            style={{
+              padding: '4px 12px',
+              paddingLeft: '34px',
+              paddingRight: '8px',
+              borderRadius: '4px',
+              border: 0,
+              boxShadow: isInputFocused
+                ? `0 0 0 2px ${TEAL_400}`
+                : isInputHovered || isIconHovered
+                ? `0 0 0 2px ${TEAL_350}`
+                : `inset 0 0 0 1px ${MOON_250}`,
+              outline: 'none',
+              flex: 1,
+              height: '32px',
+              minHeight: '32px',
+              boxSizing: 'border-box',
+              fontSize: '16px',
+              lineHeight: '24px',
+              cursor: 'default',
+              width: '100%',
+            }}
+            ref={inputRef}
+          />
+          <DateTimePicker
+            open={isCalendarOpen}
+            onClose={() => setIsCalendarOpen(false)}
+            value={parseDate(inputValue) || null}
+            onChange={handleDateChange}
+            slotProps={{
+              textField: {
+                style: {display: 'none'},
+              },
+              popper: {
+                style: {
+                  zIndex: 9999,
+                  marginTop: '4px',
+                  fontFamily: 'Source Sans Pro',
+                },
+                anchorEl: inputRef.current,
+                placement: 'bottom-start',
+                modifiers: [
+                  {
+                    name: 'offset',
+                    options: {
+                      offset: [0, 2],
+                    },
+                  },
+                  {
+                    name: 'flip',
+                    enabled: true,
+                  },
+                  {
+                    name: 'preventOverflow',
+                    enabled: true,
+                    options: {
+                      boundariesElement: 'viewport',
+                    },
+                  },
+                ],
+              },
+              desktopPaper: {
+                style: {
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                  borderRadius: '4px',
+                  border: `1px solid ${MOON_200}`,
+                  fontFamily: 'Source Sans Pro',
+                },
+              },
+              layout: {
+                sx: {
+                  fontFamily: 'Source Sans Pro',
+                  '& *': {
+                    fontFamily: 'Source Sans Pro',
+                  },
+                },
+              },
+            }}
+            ampm={false}
+            format="yyyy-MM-dd HH:mm:ss"
+          />
+        </div>
+      </LocalizationProvider>
 
       <SuggestionsList
         isDropdownVisible={isDropdownVisible}
@@ -180,77 +283,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 };
 
 // Subcomponents
-type DateInputProps = {
-  inputValue: string;
-  isInputFocused: boolean;
-  isInputHovered: boolean;
-  inputRef: React.RefObject<HTMLInputElement>;
-  handleInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  handleFocus: () => void;
-  handleBlur: (event: React.FocusEvent<HTMLInputElement>) => void;
-  handleInputMouseEnter: () => void;
-  handleInputMouseLeave: () => void;
-};
-
-const DateInput: React.FC<DateInputProps> = ({
-  inputValue,
-  isInputFocused,
-  isInputHovered,
-  inputRef,
-  handleInputChange,
-  handleFocus,
-  handleBlur,
-  handleInputMouseEnter,
-  handleInputMouseLeave,
-}) => {
-  return (
-    <>
-      <Icon
-        name="date"
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '9px',
-          transform: 'translateY(-50%)',
-          fontSize: '16px',
-        }}
-      />
-      <input
-        type="text"
-        aria-label="Date input"
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onMouseEnter={handleInputMouseEnter}
-        onMouseLeave={handleInputMouseLeave}
-        placeholder="Enter a date..."
-        style={{
-          padding: '4px 12px',
-          paddingLeft: '32px',
-          paddingRight: '8px',
-          borderRadius: '4px',
-          border: 0,
-          boxShadow: isInputFocused
-            ? `0 0 0 2px ${TEAL_400}`
-            : isInputHovered
-            ? `0 0 0 2px ${TEAL_350}`
-            : `inset 0 0 0 1px ${MOON_250}`,
-          outline: 'none',
-          flex: 1,
-          height: '32px',
-          minHeight: '32px',
-          boxSizing: 'border-box',
-          fontSize: '16px',
-          lineHeight: '24px',
-          cursor: 'default',
-        }}
-        ref={inputRef}
-      />
-    </>
-  );
-};
-
 type SuggestionItemProps = {
   suggestion: PredefinedSuggestion;
   index: number;
