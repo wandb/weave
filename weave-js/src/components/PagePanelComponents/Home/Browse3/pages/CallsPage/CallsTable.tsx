@@ -785,55 +785,6 @@ export const CallsTable: FC<{
               clearSelectedCalls={clearSelectedCalls}
             />
           )}
-          <div className="flex items-center gap-6">
-            <Switch.Root
-              id="tracesMetricsSwitch"
-              size="small"
-              checked={isMetricsChecked}
-              onCheckedChange={setMetricsChecked}>
-              <Switch.Thumb size="small" checked={isMetricsChecked} />
-            </Switch.Root>
-            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
-              Metrics
-            </label>
-          </div>
-          {selectedInputObjectVersion && (
-            <Chip
-              label={`Input: ${objectVersionNiceString(
-                selectedInputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  inputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedOutputObjectVersion && (
-            <Chip
-              label={`Output: ${objectVersionNiceString(
-                selectedOutputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  outputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedParentId && (
-            <Chip
-              label={`Parent: ${selectedParentId}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  parentId: undefined,
-                });
-              }}
-            />
-          )}
           {isEvaluateTable ? (
             <CompareEvaluationsTableButton
               onClick={() => {
@@ -894,6 +845,56 @@ export const CallsTable: FC<{
             </>
           )}
 
+          <div className="flex items-center gap-8 ml-auto">
+          {selectedInputObjectVersion && (
+            <Chip
+              label={`Input: ${objectVersionNiceString(
+                selectedInputObjectVersion
+              )}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  inputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
+          {selectedOutputObjectVersion && (
+            <Chip
+              label={`Output: ${objectVersionNiceString(
+                selectedOutputObjectVersion
+              )}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  outputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
+          {selectedParentId && (
+            <Chip
+              label={`Parent: ${selectedParentId}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  parentId: undefined,
+                });
+              }}
+            />
+          )}
+          <div className="flex items-center gap-6">
+            <Switch.Root
+              id="tracesMetricsSwitch"
+              size="small"
+              checked={isMetricsChecked}
+              onCheckedChange={setMetricsChecked}>
+              <Switch.Thumb size="small" checked={isMetricsChecked} />
+            </Switch.Root>
+            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
+              Metrics
+            </label>
+          </div>
           <div className="flex-none">
             <ExportSelector
               selectedCalls={selectedCalls}
@@ -912,6 +913,7 @@ export const CallsTable: FC<{
                 gridSort: sortModel,
               }}
             />
+          </div>
           </div>
         </TailwindContents>
       }>
