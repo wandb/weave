@@ -88,7 +88,7 @@ huggingface = ["huggingface-hub>=0.28.1"]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
-  "google-genai>=1.5.0"
+  "google-genai>=1.5.0",
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -103,9 +103,8 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
-llamaindex = [
-  "llama-index>=0.10.35,<0.12.0",
-] # temporary max pin b/c 0.12.0 changes call structure and therefor tests
+# temporary max pin b/c 0.12.0 changes call structure and therefor tests
+llamaindex = ["llama-index>=0.10.35,<0.12.0"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
@@ -153,6 +152,12 @@ test = [
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
+]
+dev = [
+  # codegen
+  "tomlkit",
+  "python-multipart",
+
 ]
 
 [project.urls]
