@@ -206,12 +206,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         }}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
+        className="h-[38px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
               style={{marginLeft: level * indentMultiplier}}
-              className={`h-[32px]`}
+              className={`h-[38px]`}
             />
             {/* Render vertical lines for each level of hierarchy */}
             {Array.from({length: level}).map((_, idx) => (
@@ -302,7 +302,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   onToggleStrictSearch,
 }) => {
   return (
-    <div className="flex items-center px-8 py-4 text-sm">
+    <div className="flex items-center p-8 text-sm">
       <TextField
         value={searchQuery}
         onChange={onSearchChange}
