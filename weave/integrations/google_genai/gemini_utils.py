@@ -38,10 +38,7 @@ def google_genai_gemini_on_finish(
     On finish handler for the Google GenAI Gemini API integration that ensures the usage
     metadata is added to the summary of the trace.
     """
-    model_name = None
-    if "model" in call.inputs:
-        model_name = call.inputs["model"]
-    else:
+    if not (model_name := call.inputs.get("model")):
         raise ValueError("Unknown model type")
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
