@@ -67,11 +67,10 @@ const columns: GridColDef[] = [
 ];
 
 export const ProvidersTabInner: React.FC<{
-  entityName?: string;
-  projectName?: string;
-}> = ({entityName = ''}) => {
+  entityName: string;
+}> = ({entityName}) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isAdmin = !loadingUserInfo && userInfo?.admin;
+  const isAdmin = !loadingUserInfo && userInfo?.roles[entityName] === 'admin';
 
   const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entityName);
@@ -117,15 +116,15 @@ export const ProvidersTabInner: React.FC<{
 };
 
 export const ProvidersTab: React.FC<{
-  entityName?: string;
-  projectName?: string;
-}> = ({entityName = '', projectName = ''}) => {
+  entityName: string;
+  projectName: string;
+}> = ({entityName, projectName}) => {
   return (
     <ApolloProvider client={makeGorillaApolloClient()}>
       <WFDataModelAutoProvider
         entityName={entityName}
         projectName={projectName}>
-        <ProvidersTabInner entityName={entityName} projectName={projectName} />
+        <ProvidersTabInner entityName={entityName} />
       </WFDataModelAutoProvider>
     </ApolloProvider>
   );
