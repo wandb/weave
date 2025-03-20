@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
 
@@ -109,7 +109,7 @@ def google_genai_gemini_wrapper_sync(
         op = weave.op(fn, **op_kwargs)
         if not op.name.endswith("count_tokens"):
             op._set_on_finish_handler(google_genai_gemini_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,
             make_accumulator=lambda inputs: google_genai_gemini_accumulator,
             should_accumulate=lambda inputs: op.name.endswith("stream"),
@@ -136,7 +136,7 @@ def google_genai_gemini_wrapper_async(
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if not op.name.endswith("count_tokens"):
             op._set_on_finish_handler(google_genai_gemini_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,
             make_accumulator=lambda inputs: google_genai_gemini_accumulator,
             should_accumulate=lambda inputs: op.name.endswith("stream"),
