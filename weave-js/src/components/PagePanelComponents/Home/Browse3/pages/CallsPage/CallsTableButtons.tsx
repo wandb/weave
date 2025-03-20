@@ -531,7 +531,7 @@ export const RefreshButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant="outline"
+        variant="ghost"
         size="medium"
         onClick={onClick}
         disabled={disabled}
