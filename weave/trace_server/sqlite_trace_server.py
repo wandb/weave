@@ -61,6 +61,8 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     conn_cursor = None
     if conn_cursor is None:
         conn = sqlite3.connect(db_path)
+        # Create an array reverse function.
+        conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
         conn_cursor = (conn, cursor)
         _conn_cursor.set(conn_cursor)
@@ -425,9 +427,55 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         json_path = field[len("output.") :]
                         field = "output"
                 elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
+                    field = "attributes" + field[len("attributes") :]
+                    if field.startswith("attributes."):
+                        json_path = field[len("attributes.") :]
+                        field = "attributes"
                 elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
+                    # Handle special summary fields that are calculated rather than stored directly
+                    if field == "summary.weave.status":
+                        # Create a CASE expression to properly determine the status
+                        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                ELSE 'success'
+                            END
+                        """
+                        json_path = None
+                    elif field == "summary.weave.latency_ms":
+                        # Calculate latency directly using julianday for millisecond precision
+                        field = """
+                            CASE
+                                WHEN ended_at IS NOT NULL THEN
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                ELSE 0
+                            END
+                        """
+                        json_path = None
+                    elif field == "summary.weave.trace_name":
+                        # Handle trace_name field similar to the ClickHouse implementation
+                        # If display_name is present, use that
+                        # Otherwise, check if op_name is an object reference and extract the name
+                        # If not, just use op_name directly
+                        field = """
+                            CASE
+                                WHEN display_name IS NOT NULL AND display_name != '' THEN display_name
+                                WHEN op_name IS NOT NULL AND op_name LIKE 'weave-trace-internal:///%' THEN
+                                    SUBSTR(
+                                        op_name,
+                                        LENGTH(op_name) - INSTR(REVERSE(op_name), '/') + 2,
+                                        INSTR(SUBSTR(op_name, LENGTH(op_name) - INSTR(REVERSE(op_name), '/') + 2), ':') - 1
+                                    )
+                                ELSE op_name
+                            END
+                        """
+                        json_path = None
+                    else:
+                        field = "summary" + field[len("summary") :]
+                        if field.startswith("summary."):
+                            json_path = field[len("summary.") :]
+                            field = "summary"
 
                 assert direction in [
                     "ASC",
@@ -944,6 +992,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     )
                 )
                 parameters.extend(req.filter.row_digests)
+            else:
+                conds.append("1 = 1")
         else:
             conds.append("1 = 1")
 

@@ -176,8 +176,8 @@ const useCall = (
   const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
@@ -232,7 +232,7 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }
@@ -1911,22 +1911,24 @@ export const privateRefToSimpleName = (ref: string) => {
   }
 };
 
+export const parseSpanName = (opName: string) => {
+  if (
+    opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    opName.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return opVersionRefOpName(opName);
+  }
+  if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+    return privateRefToSimpleName(opName);
+  }
+  return opName;
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  const parseSpanName = (opName: string) => {
-    if (
-      opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      opName.startsWith(WEAVE_REF_PREFIX)
-    ) {
-      return opVersionRefOpName(opName);
-    }
-    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
-      return privateRefToSimpleName(opName);
-    }
-    return opName;
-  };
+
   return {
     entity,
     project,

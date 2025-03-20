@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
 import inspect
 import logging
 import random
 import sys
 import traceback
-from collections.abc import Coroutine, Mapping
+import weakref
+from collections.abc import AsyncIterator, Coroutine, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -15,9 +17,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Generic,
     Optional,
     Protocol,
     TypedDict,
+    TypeVar,
     cast,
     overload,
     runtime_checkable,
@@ -33,11 +37,8 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
-
-logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -61,6 +62,29 @@ try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
     CEREBRAS_NOT_GIVEN = None
+
+
+S = TypeVar("S")
+V = TypeVar("V")
+
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
+        return obj.__aiter__()
+
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP007,UP045
+        try:
+            return await obj.__anext__()
+        except StopAsyncIteration:
+            if default is not None:
+                return default
+            else:
+                raise
+
+
+logger = logging.getLogger(__name__)
+
 
 CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
@@ -216,6 +240,9 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
+class OpCallError(Exception): ...
+
+
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     try:
         sig = inspect.signature(func)
@@ -255,7 +282,7 @@ def _create_call(
 
     parent_call = call_context.get_current_call()
     attributes = call_attributes.get()
-    from weave.trace.serialize import dictify
+    from weave.trace.serialization.serialize import dictify
 
     attributes = dictify(attributes)
 
@@ -269,14 +296,81 @@ def _create_call(
     )
 
 
-def _execute_op(
-    __op: Op,
-    __call: Call,
+def _should_skip_tracing(op: Op) -> bool:
+    if settings.should_disable_weave():
+        return True
+    if weave_client_context.get_weave_client() is None:
+        return True
+    if not op._tracing_enabled:
+        return True
+    if not get_tracing_enabled():
+        return True
+    return False
+
+
+def _should_sample_traces(op: Op) -> bool:
+    if call_context.get_current_call():
+        return False  # Don't sample traces for child calls
+
+    if random.random() > op.tracing_sample_rate:
+        return True  # Sample traces for this call
+
+    return False
+
+
+def _placeholder_call() -> Call:
+    # Import here to avoid circular dependency
+    from weave.trace.weave_client import Call
+
+    return Call(
+        _op_name="",
+        trace_id="",
+        project_id="",
+        parent_id=None,
+        inputs={},
+    )
+
+
+def _call_sync_func(
+    op: Op,
     *args: Any,
-    __should_raise: bool = True,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
     **kwargs: Any,
-) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    func = __op.resolve_fn
+) -> tuple[Any, Call]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if _should_skip_tracing(op):
+        res = func(*args, **kwargs)
+        call.output = res
+        return res, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            res = func(*args, **kwargs)
+            call.output = res
+            return res, call
+
+    # Proceed with tracing. Note that we don't check the sample rate here.
+    # Only root calls get sampling applied.
+    # If the parent was traced (sampled in), the child will be too.
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        res = func(*args, **kwargs)
+        return res, call
+
+    # Execute the op and process the result
     client = weave_client_context.require_weave_client()
     has_finished = False
 
@@ -286,63 +380,129 @@ def _execute_op(
             raise ValueError("Should not call finish more than once")
 
         client.finish_call(
-            __call,
+            call,
             output,
             exception,
-            op=__op,
+            op=op,
         )
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, __call.inputs)
+        if handler := getattr(op, "_on_output_handler", None):
+            return handler(output, finish, call.inputs)
         finish(output)
         return output
-
-    def process(res: Any) -> tuple[Any, Call]:
-        res = box.box(res)
-        try:
-            # Here we do a try/catch because we don't want to
-            # break the user process if we trip up on processing
-            # the output
-            res = on_output(res)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-        finally:
-            # Is there a better place for this? We want to ensure that even
-            # if the final output fails to be captured, we still pop the call
-            # so we don't put future calls under the old call.
-            call_context.pop_call(__call.id)
-
-        return res, __call
-
-    def handle_exception(e: Exception) -> tuple[Any, Call]:
-        finish(exception=e)
-        if __should_raise:
-            raise
-        return None, __call
-
-    if inspect.iscoroutinefunction(func):
-
-        async def _call_async() -> tuple[Any, Call]:
-            try:
-                res = await func(*args, **kwargs)
-            except Exception as e:
-                return handle_exception(e)
-            else:
-                return process(res)
-
-        return _call_async()
 
     try:
         res = func(*args, **kwargs)
     except Exception as e:
-        handle_exception(e)
-    else:
-        return process(res)
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return None, call
 
-    return None, __call
+    res = box.box(res)
+    try:
+        # Here we do a try/catch because we don't want to
+        # break the user process if we trip up on processing
+        # the output
+        res = on_output(res)
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+    finally:
+        # Is there a better place for this? We want to ensure that even
+        # if the final output fails to be captured, we still pop the call
+        # so we don't put future calls under the old call.
+        call_context.pop_call(call.id)
+
+    return res, call
+
+
+async def _call_async_func(
+    op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    func = op.resolve_fn
+    call = _placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if _should_skip_tracing(op):
+        res = await func(*args, **kwargs)
+        call.output = res
+        return res, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            res = await func(*args, **kwargs)
+            call.output = res
+            return res, call
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        res = await func(*args, **kwargs)
+        return res, call
+
+    # Execute the op and process the result
+    client = weave_client_context.require_weave_client()
+    has_finished = False
+
+    def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        nonlocal has_finished
+        if has_finished:
+            raise ValueError("Should not call finish more than once")
+
+        client.finish_call(
+            call,
+            output,
+            exception,
+            op=op,
+        )
+
+    def on_output(output: Any) -> Any:
+        if handler := getattr(op, "_on_output_handler", None):
+            return handler(output, finish, call.inputs)
+        finish(output)
+        return output
+
+    try:
+        res = await func(*args, **kwargs)
+    except Exception as e:
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return None, call
+
+    res = box.box(res)
+    try:
+        # Here we do a try/catch because we don't want to
+        # break the user process if we trip up on processing
+        # the output
+        res = on_output(res)
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+    finally:
+        # Is there a better place for this? We want to ensure that even
+        # if the final output fails to be captured, we still pop the call
+        # so we don't put future calls under the old call.
+        call_context.pop_call(call.id)
+
+    return res, call
 
 
 def call(
@@ -369,7 +529,7 @@ def call(
     ```
     """
     if inspect.iscoroutinefunction(op.resolve_fn):
-        return _do_call_async(
+        return _call_async_func(
             op,
             *args,
             __weave=__weave,
@@ -377,161 +537,13 @@ def call(
             **kwargs,
         )
     else:
-        return _do_call(
+        return _call_sync_func(
             op,
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
             **kwargs,
         )
-
-
-def _placeholder_call() -> Call:
-    # Import here to avoid circular dependency
-    from weave.trace.weave_client import Call
-
-    return Call(
-        _op_name="",
-        trace_id="",
-        project_id="",
-        parent_id=None,
-        inputs={},
-    )
-
-
-def _do_call(
-    op: Op,
-    *args: Any,
-    __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
-    **kwargs: Any,
-) -> tuple[Any, Call]:
-    func = op.resolve_fn
-    call = _placeholder_call()
-
-    pargs = None
-    if op._on_input_handler is not None:
-        pargs = op._on_input_handler(op, args, kwargs)
-    if not pargs:
-        pargs = _default_on_input_handler(op, args, kwargs)
-
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = func(*pargs.args, **pargs.kwargs)
-                call.output = res
-                return res, call
-
-    # Proceed with tracing. Note that we don't check the sample rate here.
-    # Only root calls get sampling applied.
-    # If the parent was traced (sampled in), the child will be too.
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise e
-    except Exception as e:
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
-        res = func(*pargs.args, **pargs.kwargs)
-    else:
-        execute_result = _execute_op(
-            op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
-        )
-        if inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a sync result"
-            )
-        execute_result = cast(tuple[Any, "Call"], execute_result)
-        res, call = execute_result
-    return res, call
-
-
-async def _do_call_async(
-    op: Op,
-    *args: Any,
-    __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
-    **kwargs: Any,
-) -> tuple[Any, Call]:
-    func = op.resolve_fn
-    call = _placeholder_call()
-
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = await func(*args, **kwargs)
-                call.output = res
-                return res, call
-
-    # Proceed with tracing
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise e
-    except Exception as e:
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
-        res = await func(*args, **kwargs)
-    else:
-        execute_result = _execute_op(
-            op, call, *args, __should_raise=__should_raise, **kwargs
-        )
-        if not inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a coroutine"
-            )
-        res, call = await execute_result
-    return res, call
 
 
 def calls(op: Op) -> CallsIter:
@@ -591,57 +603,8 @@ def op(
     tracing_sample_rate: float = 1.0,
 ) -> Callable[[Callable], Op] | Op:
     """
-    A decorator to weave op-ify a function or method.  Works for both sync and async.
-
-    Decorated functions and methods can be called as normal, but will also
-    automatically track calls in the Weave UI.
-
-    If you don't call `weave.init` then the function will behave as if it were
-    not decorated.
-
-
-    Args:
-        func (Optional[Callable]): The function to be decorated. If None, the decorator
-            is being called with parameters.
-        name (Optional[str]): Custom name for the op. If None, the function's name is used.
-        call_display_name (Optional[Union[str, Callable[["Call"], str]]]): Custom display name
-            for the call in the Weave UI. Can be a string or a function that takes a Call
-            object and returns a string.  When a function is passed, it can use any attributes
-            of the Call object (e.g. `op_name`, `trace_id`, etc.) to generate a custom display name.
-        postprocess_inputs (Optional[Callable[[dict[str, Any]], dict[str, Any]]]): A function
-            to process the inputs after they've been captured but before they're logged.  This
-            does not affect the actual inputs passed to the function, only the displayed inputs.
-        postprocess_output (Optional[Callable[..., Any]]): A function to process the output
-            after it's been returned from the function but before it's logged.  This does not
-            affect the actual output of the function, only the displayed output.
-        tracing_sample_rate (float): The sampling rate for tracing this function. Defaults to 1.0 (always trace).
-
-    Returns:
-        Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
-        If called with a function, returns the decorated function as an Op.
-
-    Raises:
-        ValueError: If the decorated object is not a function or method.
-
-
-    Example usage:
-
-    ```python
-    import weave
-    weave.init("my-project")
-
-    @weave.op
-    async def extract():
-        return await client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "user", "content": "Create a user as JSON"},
-            ],
-        )
-
-    await extract()  # calls the function and tracks the call in the Weave UI
-    ```
-
+    A decorator to weave op-ify a function or method. Works for both sync and async.
+    Automatically detects iterator functions and applies appropriate behavior.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
@@ -652,13 +615,16 @@ def op(
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
+        is_generator = inspect.isgeneratorfunction(func)
+        is_async_generator = inspect.isasyncgenfunction(func)
 
+        # Create the appropriate wrapper based on function type
         def create_wrapper(func: Callable) -> Op:
             if is_async:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _do_call_async(
+                    res, _ = await _call_async_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
@@ -666,7 +632,7 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = _do_call(
+                    res, _ = _call_sync_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
                     return res
@@ -715,8 +681,14 @@ def op(
                     )
             wrapper.call_display_name = call_display_name  # type: ignore
 
+            # Mark what type of function this is for runtime type checking
+            wrapper._is_async = is_async  # type: ignore
+            wrapper._is_generator = is_generator  # type: ignore
+            wrapper._is_async_generator = is_async_generator  # type: ignore
+
             return cast(Op, wrapper)
 
+        # Create the wrapper
         return create_wrapper(func)
 
     if func is None:
@@ -796,6 +768,298 @@ def as_op(fn: Callable) -> Op:
     # The unbinding is necessary for methods because `MethodType` is applied after the
     # func is decorated into an Op.
     return maybe_unbind_method(cast(Op, fn))
+
+
+_OnYieldType = Callable[[V], None]
+_OnErrorType = Callable[[Exception], None]
+_OnCloseType = Callable[[], None]
+ON_CLOSE_MSG = "Error closing iterator, call data may be incomplete:\n{}"
+ON_ERROR_MSG = "Error capturing error from iterator, call data may be incomplete:\n{}"
+ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete:\n{}"
+ON_AYIELD_MSG = (
+    "Error capturing async value from iterator, call data may be incomplete:\n{}"
+)
+
+
+class _IteratorWrapper(Generic[V]):
+    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
+
+    def __init__(
+        self,
+        iterator_or_ctx_manager: Iterator | AsyncIterator,
+        on_yield: _OnYieldType,
+        on_error: _OnErrorType,
+        on_close: _OnCloseType,
+    ) -> None:
+        self._iterator_or_ctx_manager = iterator_or_ctx_manager
+        self._on_yield = on_yield
+        self._on_error = on_error
+        self._on_close = on_close
+        self._on_finished_called = False
+
+        atexit.register(weakref.WeakMethod(self._call_on_close_once))
+
+    def _call_on_close_once(self) -> None:
+        if not self._on_finished_called:
+            try:
+                self._on_close()  # type: ignore
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
+            self._on_finished_called = True
+
+    def _call_on_error_once(self, e: Exception) -> None:
+        if not self._on_finished_called:
+            try:
+                self._on_error(e)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
+            self._on_finished_called = True
+
+    def __iter__(self) -> _IteratorWrapper:
+        return self
+
+    def __next__(self) -> Generator[None, None, V]:
+        if not hasattr(self._iterator_or_ctx_manager, "__next__"):
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call next on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
+        try:
+            value = next(self._iterator_or_ctx_manager)  # type: ignore
+            try:
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+                self._on_yield(value)
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
+        except (StopIteration, StopAsyncIteration) as e:
+            self._call_on_close_once()
+            raise
+        except Exception as e:
+            self._call_on_error_once(e)
+            raise
+        else:
+            return value
+
+    def __aiter__(self) -> _IteratorWrapper:
+        return self
+
+    async def __anext__(self) -> Generator[None, None, V]:
+        if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call anext on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
+        try:
+            value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
+            try:
+                self._on_yield(value)
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
+        except (StopAsyncIteration, StopIteration) as e:
+            self._call_on_close_once()
+            raise StopAsyncIteration
+        except Exception as e:
+            self._call_on_error_once(e)
+            raise
+        else:
+            return value
+
+    def __del__(self) -> None:
+        self._call_on_close_once()
+
+    def close(self) -> None:
+        self._call_on_close_once()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in [
+            "_iterator_or_ctx_manager",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_finished_called",
+            "_call_on_error_once",
+        ]:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator_or_ctx_manager, name)
+
+    def __enter__(self) -> _IteratorWrapper:
+        if hasattr(self._iterator_or_ctx_manager, "__enter__"):
+            # let's enter the context manager to get the stream iterator
+            self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Exception | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        if hasattr(
+            self._iterator_or_ctx_manager, "__exit__"
+        ):  # case where is a context mngr
+            self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
+        self._call_on_close_once()
+
+    async def __aenter__(self) -> _IteratorWrapper:
+        if hasattr(
+            self._iterator_or_ctx_manager, "__aenter__"
+        ):  # let's enter the context manager
+            self._iterator_or_ctx_manager = (
+                await self._iterator_or_ctx_manager.__aenter__()
+            )
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Exception | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()
+
+
+class _Accumulator(Generic[S, V]):
+    state: S | None
+
+    def __init__(
+        self,
+        accumulator: Callable[[S | None, V], S],
+        initial_state: S | None = None,
+    ):
+        self._accumulator = accumulator
+        self._state = initial_state
+
+    def next(self, value: V) -> None:
+        # the try-except hack to catch `StopIteration` inside `<integration>_accumulator`
+        # this `StopIteration` is raised when some condition is met, for example, when
+        # we don't want to surface last chunk (with usage info) from openai integration.
+        try:
+            self._state = self._accumulator(self._state, value)
+        except StopIteration as e:
+            self._state = e.value
+            raise
+
+    def get_state(self) -> S | None:
+        return self._state
+
+
+def _build_iterator_from_accumulator_for_op(
+    value: Iterator[V],
+    accumulator: Callable,
+    on_finish: FinishCallbackType,
+    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
+) -> _IteratorWrapper:
+    acc: _Accumulator = _Accumulator(accumulator)
+
+    def on_yield(value: V) -> None:
+        acc.next(value)
+
+    def on_error(e: Exception) -> None:
+        on_finish(acc.get_state(), e)
+
+    def on_close() -> None:
+        on_finish(acc.get_state(), None)
+
+    return iterator_wrapper(value, on_yield, on_error, on_close)
+
+
+def _add_accumulator(
+    op: Op,
+    make_accumulator: Callable[[dict], Callable[[S, V], S]],
+    *,
+    should_accumulate: Callable[[dict], bool] | None = None,
+    on_finish_post_processor: Callable[[Any], Any] | None = None,
+    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
+) -> Op:
+    """This is to be used internally only - specifically designed for integrations with streaming libraries.
+
+    Add an accumulator to an op. The accumulator will be called with the output of the op
+    after the op is resolved. The accumulator should return the output of the op. This is intended
+    for internal use only and may change in the future. The accumulator should take two arguments:
+    the current state of the accumulator and the value to accumulate. It should return the new state
+    of the accumulator. The first time the accumulator is called, the current state will be None.
+
+    The intended usage is:
+
+    ```
+    @weave.op()
+    def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+
+    def simple_list_accumulator(acc, value):
+        if acc is None:
+            acc = []
+        acc.append(value)
+        return acc
+    add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
+    """
+
+    def on_output(
+        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
+    ) -> Iterator:
+        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
+            if on_finish_post_processor is not None:
+                value = on_finish_post_processor(value)
+            on_finish(value, e)
+
+        if should_accumulate is None or should_accumulate(inputs):
+            # we build the accumulator here dependent on the inputs (optional)
+            accumulator = make_accumulator(inputs)
+            return _build_iterator_from_accumulator_for_op(
+                value,
+                accumulator,
+                wrapped_on_finish,
+                iterator_wrapper,
+            )
+        else:
+            wrapped_on_finish(value)
+            return value
+
+    op._set_on_output_handler(on_output)
+    return op
 
 
 __docspec__ = [call, calls]

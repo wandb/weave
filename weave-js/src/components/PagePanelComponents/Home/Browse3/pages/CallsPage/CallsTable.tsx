@@ -119,12 +119,13 @@ const MAX_SELECT = 100;
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'wb_run_id',
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
 
 export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
-  left: ['CustomCheckbox', 'op_name'],
+  left: ['CustomCheckbox', 'summary.weave.trace_name'],
 };
 
 export const DEFAULT_SORT_CALLS: GridSortModel = [

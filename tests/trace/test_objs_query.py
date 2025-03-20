@@ -185,3 +185,140 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     res = client._objects()
     assert len(res) == 3
     assert all(obj.wb_user_id == correct_id for obj in res)
+
+
+def test_objs_query_deleted_interaction(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 3
+    assert all(obj.val["i"] in [1, 2, 3] for obj in res.objs)
+
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id="obj_1",
+            digests=[res.objs[0].digest],
+        )
+    )
+
+    assert res.num_deleted == 1
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 2
+    assert all(obj.val["i"] in [2, 3] for obj in res.objs)
+
+    # Delete the remaining objects
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id="obj_1",
+            digests=[res.objs[0].digest, res.objs[1].digest],
+        )
+    )
+    assert res.num_deleted == 2
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 0
+
+
+def test_objs_query_delete_and_recreate(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 3
+
+    original_created_at = res.objs[0].created_at
+
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id="obj_1",
+        )
+    )
+    assert res.num_deleted == 3
+
+    weave.publish({"i": 1}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 1
+    assert res.objs[0].val["i"] == 1
+    assert res.objs[0].created_at > original_created_at
+
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 3
+
+    for i in range(3):
+        print("res.objs[i].val", res.objs[i].val)
+        assert res.objs[i].val["i"] == i + 1
+
+
+def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 3
+
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id="obj_1",
+        )
+    )
+
+    weave.publish({"i": 4}, name="obj_1")
+    weave.publish({"i": 5}, name="obj_1")
+    weave.publish({"i": 6}, name="obj_1")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(latest_only=False),
+        )
+    )
+    assert len(res.objs) == 3
+    assert all(obj.val["i"] in [4, 5, 6] for obj in res.objs)

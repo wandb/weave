@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from weave.trace import serializer
-from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.serialization import serializer
+from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
 
 try:
@@ -23,6 +23,7 @@ pil_format_to_ext = InvertableDict[str, str](
     {
         "JPEG": "jpg",
         "PNG": "png",
+        "WEBP": "webp",
     }
 )
 ext_to_pil_format = pil_format_to_ext.inv

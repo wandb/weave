@@ -107,6 +107,16 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
+  'gpt-4.5-preview': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview-2025-02-27': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
 
   // Anthropic models
   'claude-3-7-sonnet-20250219': {
@@ -484,7 +494,21 @@ export const LLM_MAX_TOKENS = {
     provider: 'xai',
     supports_function_calling: true,
   },
+
+  // DeepSeek models
+  'deepseek/deepseek-reasoner': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'deepseek/deepseek-chat': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
 };
+
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4o-mini-2024-07-18';
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
@@ -492,15 +516,20 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-export const LLM_PROVIDERS = [
-  'openai',
-  'anthropic',
-  'azure',
-  'gemini',
-  'groq',
-  'bedrock',
-  'xai',
-];
+export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
+  openai: ['OPENAI_API_KEY'],
+  anthropic: ['ANTHROPIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
+  xai: ['XAI_API_KEY'],
+  bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
+  azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
+  groq: ['GEMMA_API_KEY'],
+  deepseek: ['DEEPSEEK_API_KEY'],
+};
+
+export const LLM_PROVIDERS = Object.keys(LLM_PROVIDER_SECRETS) as Array<
+  keyof typeof LLM_PROVIDER_SECRETS
+>;
 
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
@@ -513,4 +542,5 @@ export const LLM_PROVIDER_LABELS: Record<
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
+  deepseek: 'DeepSeek',
 };
