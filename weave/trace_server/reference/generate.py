@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Callable, NamedTuple
 
 from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi.params import Header
 from fastapi.responses import StreamingResponse
 
 from weave.trace_server import trace_server_interface as tsi
@@ -65,6 +66,7 @@ class ServerDependency:
         self.auth_dependency = auth_dependency
         self.server_factory = server_factory
 
+    # Refactor to "tsi.ServiceImplementation"
     def get_server(self) -> Callable[[AuthParams], tsi.TraceServerInterface]:
         """Get a server dependency with the appropriate auth for the operation."""
 
@@ -146,30 +148,30 @@ def generate_routes(
     ) -> tsi.CallsQueryStatsRes:
         return server.calls_query_stats(req)
 
-    # @router.post(
-    #     "/calls/stream_query",
-    #     tags=[CALLS_TAG_NAME],
-    #     response_class=StreamingResponse,
-    #     responses={
-    #         200: {
-    #             "description": "Stream of data in JSONL format",
-    #             "content": {
-    #                 "application/jsonl": {
-    #                     "schema": {
-    #                         "type": "array",
-    #                         "items": {"$ref": "#/components/schemas/Schema"},
-    #                     }
-    #                 }
-    #             },
-    #         }
-    #     },
-    # )
-    # def calls_query_stream(
-    #     req: tsi.CallsQueryReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    #     accept: Annotated[str, Header()] = "application/jsonl",
-    # ) -> StreamingResponse:
-    #     return StreamingResponse(server.calls_query_stream(req), media_type=accept)
+    @router.post(
+        "/calls/stream_query",
+        tags=[CALLS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def calls_query_stream(
+        req: tsi.CallsQueryReq,
+        server: tsi.TraceServerInterface = Depends(get_server),
+        accept: Annotated[str, Header()] = "application/jsonl",
+    ) -> StreamingResponse:
+        return StreamingResponse(server.calls_query_stream(req), media_type=accept)
 
     @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
     def calls_query(
