@@ -1,3 +1,5 @@
+import os
+
 import nox
 
 nox.options.default_venv_backend = "uv"
@@ -54,6 +56,7 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "openai_agents",
         "vertexai",
         "bedrock",
         "scorers",
@@ -86,18 +89,24 @@ def tests(session, shard):
     if shard in ["google_ai_studio", "google_genai"]:
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
+    if shard == "google_ai_studio":
+        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
+
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
     if shard == "langchain_nvidia_ai_endpoints":
-        env["NVIDIA_API_KEY"] = session.env.get("NVIDIA_API_KEY")
+        env["NVIDIA_API_KEY"] = os.getenv("NVIDIA_API_KEY", "MISSING")
 
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
     if shard == "scorers":
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-        env["GEMINI_API_KEY"] = session.env.get("GEMINI_API_KEY")
-        env["ANTHROPIC_API_KEY"] = session.env.get("ANTHROPIC_API_KEY")
-        env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
-        env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
+        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
+        env["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "MISSING")
+        env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
+        env["MISTRAL_API_KEY"] = os.getenv("MISTRAL_API_KEY", "MISSING")
+        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+
+    if shard == "openai_agents":
+        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
