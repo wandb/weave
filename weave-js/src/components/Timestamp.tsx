@@ -38,6 +38,20 @@ const formatSmallTime = (then: moment.Moment): string => {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
+  // Calculate months using moment's diff
+  const months = now.diff(then, 'months');
+  if (months > 0) {
+    // Only show months if the remaining days are less than 7
+    const remainingDays = days - months * 30;
+    if (remainingDays < 7) {
+      if (months === 1) {
+        return '1mo';
+      } else if (months > 1) {
+        return `${months}mo`;
+      }
+    }
+  }
+
   // Only use weeks when it's an exact multiple
   if (days % 7 === 0) {
     const weeks = days / 7;
@@ -45,16 +59,6 @@ const formatSmallTime = (then: moment.Moment): string => {
       return '1w';
     } else if (weeks > 1) {
       return `${weeks}w`;
-    }
-  }
-
-  // Only use months when it's an exact multiple of 30
-  if (days % 30 === 0) {
-    const months = days / 30;
-    if (months === 1) {
-      return '1mo';
-    } else if (months > 1) {
-      return `${months}mo`;
     }
   }
 
