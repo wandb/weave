@@ -268,10 +268,14 @@ export const isRelativeDate = (value: string): boolean => {
  */
 export const formatDate = (
   date: Date | null | undefined,
-  format = 'YYYY-MM-DD HH:mm:ss'
+  format = 'YYYY-MM-DD HH:mm:ss',
+  utc = false
 ): string => {
   if (!date) {
     return '';
+  }
+  if (utc) {
+    return moment.utc(date).format(format);
   }
   return moment(date).local().format(format);
 };
@@ -291,4 +295,17 @@ export const formatDateOnly = (
     return '';
   }
   return moment(date).local().format(format);
+};
+
+/**
+ * Converts a UTC time string to a local time string
+ *
+ * @param utcTime The UTC time string to convert
+ * @returns A local time string in the format 'YYYY-MM-DD HH:mm:ss'
+ */
+export const utcToLocalTimeString = (utcTime: string): string => {
+  return moment
+    .utc(utcTime, 'YYYY-MM-DDTHH:mm:ss')
+    .local()
+    .format('YYYY-MM-DD HH:mm:ss');
 };

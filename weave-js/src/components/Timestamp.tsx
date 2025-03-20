@@ -30,8 +30,8 @@ type TimestampProps = {
 
 // Format a time difference to a micro string (1h, 1d, 1w, etc.)
 const formatSmallTime = (then: moment.Moment): string | null => {
-  const currentTime = moment();
-  const diffMs = currentTime.diff(then);
+  const now = moment();
+  const diffMs = now.diff(then);
 
   const seconds = Math.floor(diffMs / 1000);
   const minutes = Math.floor(diffMs / (1000 * 60));
@@ -39,7 +39,7 @@ const formatSmallTime = (then: moment.Moment): string | null => {
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   // Calculate months using moment's diff
-  const months = currentTime.diff(then, 'months');
+  const months = now.diff(then, 'months');
   if (months > 0) {
     // Only show months if the remaining days are less than 7
     const remainingDays = days - months * 30;
@@ -172,10 +172,10 @@ export const TimestampSmall = ({
   /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
-  const then = moment(value, 'YYYY-MM-DDTHH:mm:ss');
-  const {long, small} = formatTimestampInternal(then);
+  const valueMoment = valueToMoment(value);
+  const {long, small} = formatTimestampInternal(valueMoment);
   if (!small) {
-    // default to regular timestamp
+    // default to regular timestamp, which expects utc
     return <Timestamp value={value} dropTimeWhenDefault />;
   }
   const text = (
