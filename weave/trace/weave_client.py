@@ -46,7 +46,17 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
+from weave.trace.op import (
+    Op,
+    as_op,
+    is_op,
+    is_placeholder_call,
+    is_tracing_setting_disabled,
+    maybe_unbind_method,
+    placeholder_call,
+    print_call_link,
+    should_skip_tracing_for_op,
+)
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -726,6 +736,13 @@ class Call:
         )
 
 
+class NoOpCall(Call):
+    def __init__(self) -> None:
+        super().__init__(
+            _op_name="", trace_id="", project_id="", parent_id=None, inputs={}
+        )
+
+
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
@@ -1088,6 +1105,11 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        if is_tracing_setting_disabled() or (
+            is_op(op) and should_skip_tracing_for_op(cast(Op, op))
+        ):
+            return placeholder_call()
+
         from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
@@ -1223,6 +1245,13 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        if (
+            is_tracing_setting_disabled()
+            or (op is not None and should_skip_tracing_for_op(op))
+            or is_placeholder_call(call)
+        ):
+            return None
+
         from weave.trace.api import _global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
