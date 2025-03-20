@@ -603,7 +603,7 @@ export const TreeView: React.FC<
             width={width}
             height={height}
             rowCount={flattenedNodes.length}
-            rowHeight={32}
+            rowHeight={38}
             rowRenderer={rowRenderer}
             overscanRowCount={10}
             scrollToAlignment="auto"
