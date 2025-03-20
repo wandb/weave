@@ -1394,22 +1394,35 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get_call_descendants(
         self,
-        calls: Call | str | Iterable[Call | str],
+        calls: Call | WeaveObject | CallId | Iterable[Call | WeaveObject | CallId],
         depth: int | None = None,
         limit: int | None = None,
     ) -> Iterable[Call | WeaveObject]:
-        """Get all descendant calls of given list of calls or call IDs."""
+        """Get all descendant calls of given list of calls or call IDs.
+
+        Args:
+            calls: A single call/object/id or iterable of them
+            depth: Maximum depth of descendants to fetch
+            limit: Maximum number of descendants to fetch
+
+        Returns:
+            An iterable of descendant calls
+        """
+        # Convert input to a list of items we can process
+        if isinstance(calls, (Call, WeaveObject, CallId)):
+            items_to_process = [calls]
+        else:
+            items_to_process = list(calls)
+
         call_ids: list[str] = []
-        if not isinstance(calls, Iterable):
-            calls = [calls]
-        for call in calls:
-            if isinstance(call, Call) and call.id is not None:
-                call_ids.append(call.id)
-            elif isinstance(call, str):
-                call_ids.append(call)
+        for item in items_to_process:
+            if isinstance(item, (Call, WeaveObject)) and item.id is not None:
+                call_ids.append(item.id)
+            elif isinstance(item, CallId):
+                call_ids.append(item)
             else:
                 raise TypeError(
-                    f"Invalid call or call ID: {call}, expected Call or CallId (str)"
+                    f"Invalid call or call ID: {item}, expected Call or CallId (str)"
                 )
 
         res = self.server.calls_descendants(
@@ -2296,6 +2309,9 @@ class WeaveClient:
             True if there are pending jobs, False otherwise.
         """
         return self._get_pending_jobs()["total_jobs"] > 0
+
+
+CallId = str
 
 
 class PendingJobCounts(TypedDict):
