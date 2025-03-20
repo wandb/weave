@@ -73,10 +73,9 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         # Recursively serialize the dspy objects in the devset
         if isinstance(inputs["self"], Evaluate):
-            if hasattr(inputs["self"], "devset"):
-                dictified_inputs_self["devset"] = [
-                    dump_dspy_objects(example) for example in inputs["self"].devset
-                ]
+            dictified_inputs_self["devset"] = [
+                dump_dspy_objects(example) for example in inputs["self"].devset
+            ]
 
             # Convert the metric to a weave op if it is not already one
             if hasattr(inputs["self"], "metric"):
