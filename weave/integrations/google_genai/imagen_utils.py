@@ -46,10 +46,7 @@ def google_genai_gemini_postprocess_outputs(
 def google_genai_imagen_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
-    model_name = None
-    if "model" in call.inputs:
-        model_name = call.inputs["model"]
-    else:
+    if not (model_name := call.inputs.get("model")):
         raise ValueError("Unknown model type")
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
