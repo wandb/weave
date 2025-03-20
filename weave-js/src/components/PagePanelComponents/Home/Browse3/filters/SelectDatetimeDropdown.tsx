@@ -1,3 +1,6 @@
+import {AdapterDateFns} from '@mui/x-date-pickers/AdapterDateFns';
+import {DateTimePicker} from '@mui/x-date-pickers/DateTimePicker';
+import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
 import {
   MOON_100,
   MOON_200,
@@ -8,9 +11,6 @@ import {
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import {AdapterDateFns} from '@mui/x-date-pickers/AdapterDateFns';
-import {DateTimePicker} from '@mui/x-date-pickers/DateTimePicker';
-import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
