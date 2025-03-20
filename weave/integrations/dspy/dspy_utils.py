@@ -29,7 +29,7 @@ def get_symbol_patcher(
     )
 
 
-def serialize_dspy_objects(data: Any) -> Any:
+def dump_dspy_objects(data: Any) -> Any:
     import numpy as np
     from dspy import Example, Module
 
@@ -43,10 +43,10 @@ def serialize_dspy_objects(data: Any) -> Any:
         return data.tolist()
 
     elif isinstance(data, dict):
-        return {key: serialize_dspy_objects(value) for key, value in data.items()}
+        return {key: dump_dspy_objects(value) for key, value in data.items()}
 
     elif isinstance(data, list):
-        return [serialize_dspy_objects(item) for item in data]
+        return [dump_dspy_objects(item) for item in data]
 
     return data
 
@@ -67,13 +67,13 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                 else:
                     dictified_inputs_self["signature"] = inputs["self"].signature
 
-        dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
+        dictified_inputs_self = dump_dspy_objects(dictified_inputs_self)
 
         # Recursively serialize the dspy objects in the devset
         if isinstance(inputs["self"], Evaluate):
             if hasattr(inputs["self"], "devset"):
                 dictified_inputs_self["devset"] = [
-                    serialize_dspy_objects(example) for example in inputs["self"].devset
+                    dump_dspy_objects(example) for example in inputs["self"].devset
                 ]
 
             # Convert the metric to a weave op if it is not already one
@@ -86,7 +86,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         inputs["self"] = dictified_inputs_self
 
-    return serialize_dspy_objects(inputs)
+    return dump_dspy_objects(inputs)
 
 
 def dspy_postprocess_outputs(
@@ -104,7 +104,7 @@ def dspy_postprocess_outputs(
     if isinstance(outputs, np.ndarray):
         outputs = outputs.tolist()
 
-    return serialize_dspy_objects(outputs)
+    return dump_dspy_objects(outputs)
 
 
 def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:

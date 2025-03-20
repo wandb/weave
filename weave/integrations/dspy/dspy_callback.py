@@ -3,8 +3,8 @@ from typing import Any, Optional
 import weave
 from weave.integrations.dspy.dspy_utils import (
     dspy_postprocess_inputs,
+    dump_dspy_objects,
     get_op_name_for_callback,
-    serialize_dspy_objects,
 )
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.serialization.serialize import dictify
@@ -14,7 +14,7 @@ import_failed = False
 
 try:
     from dspy.utils.callback import BaseCallback
-except Exception:
+except ImportError:
     import_failed = True
 
 if not import_failed:
@@ -44,7 +44,7 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                    self._call_map[call_id], dump_dspy_objects(outputs), exception
                 )
 
         def on_module_start(
@@ -77,7 +77,7 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                    self._call_map[call_id], dump_dspy_objects(outputs), exception
                 )
 
         def on_tool_start(
@@ -108,5 +108,5 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                    self._call_map[call_id], dump_dspy_objects(outputs), exception
                 )
