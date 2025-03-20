@@ -178,7 +178,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        marginBottom: '5px',
       }}>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <div style={{position: 'relative', width: '100%'}}>
