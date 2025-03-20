@@ -1,5 +1,4 @@
 import * as Colors from '@wandb/weave/common/css/color.styles';
-import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -46,7 +45,8 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
     ${props =>
       !props.$isSelected &&
       `
-      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);;
+      background: ${Colors.MOON_100};
+      box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
       border-color: ${Colors.MOON_300};
     `}
   }
@@ -196,17 +196,11 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   return (
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
-        <div className="flex min-w-0 flex-1 flex-col group">
+        <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center w-full ">
             <div className="truncate text-sm font-medium">
               {node.opName}
             </div>
-            <Icon 
-              name="forward-next" 
-              height={16} 
-              width={16}
-              className="ml-4 text-moon-500 opacity-0 group-hover:opacity-100"
-            />
           </div>
           <div className="flex items-center gap-2 text-[11px] text-moon-500">
             <span>{stats.finishedCallCount} finished</span>
