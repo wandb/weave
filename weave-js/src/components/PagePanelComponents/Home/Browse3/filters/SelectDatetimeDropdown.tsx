@@ -8,6 +8,7 @@ import {
   MOON_500,
   TEAL_350,
   TEAL_400,
+  TEAL_500,
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -52,6 +53,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const [isInputHovered, setIsInputHovered] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isIconHovered, setIsIconHovered] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
@@ -148,9 +150,11 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               transform: 'translateY(-50%)',
               fontSize: '16px',
               cursor: 'pointer',
-              zIndex: 1,
+              color: isIconHovered ? TEAL_500 : 'inherit',
             }}
             onClick={handleIconClick}
+            onMouseEnter={() => setIsIconHovered(true)}
+            onMouseLeave={() => setIsIconHovered(false)}
           />
           <input
             type="text"
@@ -178,7 +182,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               border: 0,
               boxShadow: isInputFocused
                 ? `0 0 0 2px ${TEAL_400}`
-                : isInputHovered
+                : (isInputHovered || isIconHovered)
                 ? `0 0 0 2px ${TEAL_350}`
                 : `inset 0 0 0 1px ${MOON_250}`,
               outline: 'none',
