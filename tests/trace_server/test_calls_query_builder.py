@@ -321,11 +321,6 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
-    print(exp_formatted)
-    print(found_formatted)
-    print(exp_params)
-    print(params)
-
     assert exp_formatted == found_formatted
     assert exp_params == params
 
