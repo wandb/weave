@@ -127,10 +127,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               <div
                 key={`line-${idx}`}
                 style={{left: idx * indentMultiplier, marginLeft: 8}}
-                className="absolute top-0 h-full w-px border-l border-moon-300"
+                className="absolute top-0 h-full w-px border-l border-moon-200"
               />
             ))}
-            {hasChildren && (
+            {hasChildren ? (
               <Icon
                 name={chevronIcon}
                 size="small"
@@ -140,6 +140,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 }}
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
+            ) : (
+              <div className="w-[8px]" />
             )}
             <div className="truncate pl-4 font-medium">
               <Tooltip
