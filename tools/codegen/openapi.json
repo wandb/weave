@@ -5,6 +5,52 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/server_info": {
+      "get": {
+        "tags": [
+          "Service"
+        ],
+        "summary": "Server Info",
+        "operationId": "server_info_server_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerInfoRes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Service"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/call/start": {
       "post": {
         "tags": [
@@ -292,6 +338,62 @@
         }
       }
     },
+    "/calls/stream_query": {
+      "post": {
+        "tags": [
+          "Calls"
+        ],
+        "summary": "Calls Query Stream",
+        "operationId": "calls_query_stream_calls_stream_query_post",
+        "parameters": [
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "application/jsonl",
+              "title": "Accept"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallsQueryReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schema"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/obj/create": {
       "post": {
         "tags": [
@@ -562,6 +664,59 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TableQueryRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/table/query_stream": {
+      "post": {
+        "summary": "Table Query Stream",
+        "operationId": "table_query_stream_table_query_stream_post",
+        "parameters": [
+          {
+            "name": "accept",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "application/jsonl",
+              "title": "Accept"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableQueryReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schema"
+                  }
                 }
               }
             }
@@ -1626,6 +1781,136 @@
         },
         "type": "object",
         "title": "CallsFilter"
+      },
+      "CallsQueryReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallsFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SortBy"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Query"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "include_costs": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Costs",
+            "description": "Beta, subject to change. If true, the response will include any model costs for each call.",
+            "default": false
+          },
+          "include_feedback": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Feedback",
+            "description": "Beta, subject to change. If true, the response will include feedback for each call.",
+            "default": false
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "expand_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expand Columns",
+            "description": "Columns to expand, i.e. refs to other objects",
+            "examples": [
+              [
+                "inputs.self.message",
+                "inputs.model.prompt"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "CallsQueryReq"
       },
       "CallsQueryStatsReq": {
         "properties": {
@@ -3895,6 +4180,19 @@
           "vals"
         ],
         "title": "RefsReadBatchRes"
+      },
+      "ServerInfoRes": {
+        "properties": {
+          "min_required_weave_python_version": {
+            "type": "string",
+            "title": "Min Required Weave Python Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "min_required_weave_python_version"
+        ],
+        "title": "ServerInfoRes"
       },
       "SortBy": {
         "properties": {

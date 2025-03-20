@@ -181,17 +181,17 @@ def generate_code(
 
 
 @cli.command()  # type: ignore
-@click.argument("repo_path", type=click.Path(exists=True))
+@click.argument("python_output", type=click.Path(exists=True))
 @click.argument("package_name")
 @click.option("--release", is_flag=True, help="Update to the latest version")
-def update_pyproject(repo_path: str, package_name: str, release: bool = False) -> None:
+def update_pyproject(python_output: str, package_name: str, release: bool = False) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
     This command updates the dependency for the given package in pyproject.toml to either a specific version
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
-    path = Path(repo_path)
+    path = Path(python_output)
     if release:
         version = _get_package_version(path)
         _update_pyproject_toml(package_name, version, True)
@@ -213,7 +213,7 @@ def update_pyproject(repo_path: str, package_name: str, release: bool = False) -
     default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
     help="Path to config file",
 )
-@click.option("--repo-path", help="Path to the repository for code generation")
+@click.option("--python-output", help="Path for Python code generation output")
 @click.option("--package-name", help="Name of the package to update in pyproject.toml")
 @click.option("--openapi-output", help="Path to save the OpenAPI spec")
 @click.option("--node-output", help="Path for Node.js code generation output")
@@ -221,7 +221,7 @@ def update_pyproject(repo_path: str, package_name: str, release: bool = False) -
 @click.option("--release", is_flag=True, help="Update to the latest version")
 def all(
     config: str,
-    repo_path: str | None,
+    python_output: str | None,
     package_name: str | None,
     openapi_output: str | None,
     node_output: str | None,
@@ -247,8 +247,8 @@ def all(
     cfg = _load_config(config_path)
 
     # Override config with direct arguments if provided
-    if repo_path is not None:
-        cfg["repo_path"] = repo_path
+    if python_output is not None:
+        cfg["python_output"] = python_output
     if package_name is not None:
         cfg["package_name"] = package_name
     if openapi_output is not None:
@@ -261,9 +261,9 @@ def all(
         cfg["release"] = release
 
     # Validate required config
-    if not cfg.get("repo_path") or not cfg.get("package_name"):
+    if not cfg.get("python_output") or not cfg.get("package_name"):
         warning(
-            "repo_path and package_name must be specified either in config file or as arguments. "
+            "python_output and package_name must be specified either in config file or as arguments. "
             "Creating a config file with user inputs..."
         )
 
@@ -275,21 +275,21 @@ def all(
             with open(template_path) as src:
                 config_content = src.read()
 
-            # Prompt for repo_path
-            repo_path_input = input(
+            # Prompt for python_output
+            python_output_input = input(
                 "\nPlease enter the absolute path to your local Python repository: "
             )
-            if not repo_path_input:
+            if not python_output_input:
                 error("Repository path cannot be empty")
                 sys.exit(1)
 
             # Expand user path (e.g., ~/repo becomes /home/user/repo)
-            repo_path_input = os.path.expanduser(repo_path_input)
+            python_output_input = os.path.expanduser(python_output_input)
 
             # Ensure the path exists
-            if not os.path.exists(repo_path_input):
+            if not os.path.exists(python_output_input):
                 warning(
-                    f"Repository path '{repo_path_input}' does not exist. Please make sure it's correct."
+                    f"Repository path '{python_output_input}' does not exist. Please make sure it's correct."
                 )
                 create_anyway = input(
                     "Continue creating config anyway? (y/n): "
@@ -298,12 +298,12 @@ def all(
                     error("Config creation aborted")
                     sys.exit(1)
 
-            # Set the repo_path in the config
-            cfg["repo_path"] = repo_path_input
+            # Set the python_output in the config
+            cfg["python_output"] = python_output_input
 
-            # Replace the template repo_path with the provided value
+            # Replace the template python_output with the provided value
             config_content = config_content.replace(
-                "/path/to/your/local/python/repo", repo_path_input
+                "/path/to/your/local/python/repo", python_output_input
             )
 
             # Write the updated content to the config file
@@ -315,13 +315,13 @@ def all(
         else:
             error(f"Template file not found: {template_path}")
             error(
-                "repo_path and package_name must be specified either in config file or as arguments"
+                "python_output and package_name must be specified either in config file or as arguments"
             )
             sys.exit(1)
 
-    str_path = _ensure_absolute_path(cfg["repo_path"])
+    str_path = _ensure_absolute_path(cfg["python_output"])
     if str_path is None:
-        error("repo_path cannot be None")
+        error("python_output cannot be None")
         sys.exit(1)
 
     # 1. Get OpenAPI spec
@@ -336,7 +336,7 @@ def all(
     _format_announce_invoke(ctx, get_openapi_spec, output_file=output_path)
 
     # 2. Generate code
-    # Use repo_path as python_output
+    # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
     _format_announce_invoke(
@@ -352,7 +352,7 @@ def all(
     _format_announce_invoke(
         ctx,
         update_pyproject,
-        repo_path=str_path,
+        python_output=str_path,
         package_name=cfg["package_name"],
         release=release,
     )
@@ -433,16 +433,16 @@ class RepoInfo:
     remote_url: str
 
 
-def _get_repo_info(repo_path: Path) -> RepoInfo:
+def _get_repo_info(python_output: Path) -> RepoInfo:
     """Retrieve the latest git commit SHA and remote URL for the repository.
 
     Executes git commands in the specified repository path to obtain repository metadata.
     """
-    info(f"Getting SHA for {repo_path}")
+    info(f"Getting SHA for {python_output}")
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=repo_path,
+            cwd=python_output,
             capture_output=True,
             text=True,
             timeout=SUBPROCESS_TIMEOUT,
@@ -450,7 +450,7 @@ def _get_repo_info(repo_path: Path) -> RepoInfo:
 
         remote_url = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            cwd=repo_path,
+            cwd=python_output,
             capture_output=True,
             text=True,
             timeout=SUBPROCESS_TIMEOUT,
@@ -462,9 +462,9 @@ def _get_repo_info(repo_path: Path) -> RepoInfo:
         return RepoInfo(sha=sha, remote_url=remote_url)
 
 
-def _get_package_version(repo_path: Path) -> str:
+def _get_package_version(python_output: Path) -> str:
     """Extract the package version from the pyproject.toml file located in the repository."""
-    with open(repo_path / "pyproject.toml") as f:
+    with open(python_output / "pyproject.toml") as f:
         doc = tomlkit.parse(f.read())
     return doc["project"]["version"]
 
