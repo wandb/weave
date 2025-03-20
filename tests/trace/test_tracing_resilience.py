@@ -14,7 +14,7 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 
 
 def assert_no_current_call():
@@ -60,10 +60,11 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     assert res == "hello"
 
     assert_no_current_call()
+    client_with_throwing_server.flush()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
-    # Tim: This is very specific and intentiaion, please don't change
+    # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
     assert ag_res == {
         "Task failed: DummyTestException: ('FAILURE - call_end": 1,
@@ -143,7 +144,7 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
         def make_accumulator(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -178,7 +179,7 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
         def make_accumulator(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -211,7 +212,7 @@ def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -251,7 +252,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -290,7 +291,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client, log_collecto
         def should_accumulate(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             should_accumulate=should_accumulate,
@@ -335,7 +336,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
         def should_accumulate(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             should_accumulate=should_accumulate,
@@ -382,7 +383,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
         def on_finish_post_processor(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             on_finish_post_processor=on_finish_post_processor,
@@ -428,7 +429,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         def on_finish_post_processor(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             on_finish_post_processor=on_finish_post_processor,
@@ -467,7 +468,7 @@ def test_resilience_to_accumulator_internal_errors(client):
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -497,7 +498,7 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
