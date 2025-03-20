@@ -285,6 +285,90 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
     });
 
+    test('should parse "next/last day at time" format', () => {
+      // Current date is 2023-06-15 (Thursday) 12:30:00
+
+      // Next Friday at 4
+      expect(
+        areDateTimesEqual(
+          parseDate('next friday at 4'),
+          createDateTime(2023, 6, 16, 16, 0)
+        )
+      ).toBe(true);
+
+      // Next Friday at 4:30
+      expect(
+        areDateTimesEqual(
+          parseDate('next friday at 4:30'),
+          createDateTime(2023, 6, 16, 16, 30)
+        )
+      ).toBe(true);
+
+      // Last Monday at 9
+      expect(
+        areDateTimesEqual(
+          parseDate('last monday at 9'),
+          createDateTime(2023, 6, 12, 9, 0)
+        )
+      ).toBe(true);
+
+      // Last Monday at 9:15
+      expect(
+        areDateTimesEqual(
+          parseDate('last monday at 9:15'),
+          createDateTime(2023, 6, 12, 9, 15)
+        )
+      ).toBe(true);
+
+      // Friday at 4 (without next/last)
+      expect(
+        areDateTimesEqual(
+          parseDate('friday at 4'),
+          createDateTime(2023, 6, 16, 16, 0)
+        )
+      ).toBe(true);
+
+      // Monday at 9 (without next/last)
+      expect(
+        areDateTimesEqual(
+          parseDate('monday at 9'),
+          createDateTime(2023, 6, 19, 9, 0)
+        )
+      ).toBe(true);
+
+      // Wednesday at 15:30 (without next/last)
+      expect(
+        areDateTimesEqual(
+          parseDate('wednesday at 15:30'),
+          createDateTime(2023, 6, 21, 15, 30)
+        )
+      ).toBe(true);
+
+      // Next Friday (without time)
+      expect(
+        areDateTimesEqual(
+          parseDate('next friday'),
+          createDateTime(2023, 6, 16, 0, 0)
+        )
+      ).toBe(true);
+
+      // Last Monday (without time)
+      expect(
+        areDateTimesEqual(
+          parseDate('last monday'),
+          createDateTime(2023, 6, 12, 0, 0)
+        )
+      ).toBe(true);
+
+      // Friday (without time or next/last)
+      expect(
+        areDateTimesEqual(
+          parseDate('friday'),
+          createDateTime(2023, 6, 16, 0, 0)
+        )
+      ).toBe(true);
+    });
+
     test('should handle current time formats', () => {
       // Current time
       const now = new Date(2023, 5, 15, 12, 30); // Our mocked current date

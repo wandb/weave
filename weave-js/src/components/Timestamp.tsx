@@ -29,17 +29,17 @@ type TimestampProps = {
 };
 
 // Format a time difference to a micro string (1h, 1d, 1w, etc.)
-const formatSmallTime = (then: moment.Moment): string => {
-  const now = moment();
-  const diffMs = now.diff(then);
+const formatSmallTime = (then: moment.Moment): string | null => {
+  const currentTime = moment();
+  const diffMs = currentTime.diff(then);
 
   const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   // Calculate months using moment's diff
-  const months = now.diff(then, 'months');
+  const months = currentTime.diff(then, 'months');
   if (months > 0) {
     // Only show months if the remaining days are less than 7
     const remainingDays = days - months * 30;
@@ -67,8 +67,13 @@ const formatSmallTime = (then: moment.Moment): string => {
     return days === 1 ? '1d' : `${days}d`;
   } else if (hours >= 1) {
     return hours === 1 ? '1h' : `${hours}h`;
+  } else if (minutes >= 1) {
+    return minutes === 1 ? '1m' : `${minutes}m`;
+  } else if (seconds >= 1) {
+    return seconds === 1 ? '1s' : `${seconds}s`;
   } else {
-    return '<1h';
+    // If the time is in the future, return null
+    return null;
   }
 };
 
@@ -151,9 +156,7 @@ export const Timestamp = ({
 
   // Use different formats based on whether it's midnight
   const shortFormat = isMidnight ? 'MMM Do YYYY' : 'MMM Do YYYY [at] h:mma';
-  const longFormat = isMidnight
-    ? 'dddd, MMMM Do YYYY'
-    : 'dddd, MMMM Do YYYY [at] h:mm:ss a';
+  const longFormat = 'dddd, MMMM Do YYYY [at] h:mm:ss a';
 
   const short = then.format(shortFormat);
   const long = then.format(longFormat);
@@ -169,8 +172,12 @@ export const TimestampSmall = ({
   /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
-  const then = valueToMoment(value);
+  const then = moment(value, 'YYYY-MM-DDTHH:mm:ss');
   const {long, small} = formatTimestampInternal(then);
+  if (!small) {
+    // default to regular timestamp
+    return <Timestamp value={value} dropTimeWhenDefault />;
+  }
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />

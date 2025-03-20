@@ -6,13 +6,14 @@ import {
   MOON_200,
   MOON_250,
   MOON_500,
+  RED_300,
   TEAL_350,
   TEAL_400,
   TEAL_500,
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
 import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
@@ -56,9 +57,11 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isIconHovered, setIsIconHovered] = useState(false);
+  const [isInvalid, setIsInvalid] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
@@ -83,23 +86,49 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     ];
   }, []);
 
-  const parseAndUpdateDate = (newInputValue: string) => {
-    const date = parseDate(newInputValue);
+  // Memoize parseAndUpdateDate function
+  const parseAndUpdateDate = useCallback(
+    (newInputValue: string) => {
+      const date = parseDate(newInputValue);
+      if (date) {
+        onChange(formatDate(date));
+        setIsInvalid(false);
+      } else {
+        setIsInvalid(true);
+        onChange('');
+      }
+    },
+    [onChange]
+  );
 
-    // Call the parent onChange handler with the timestamp
-    if (date) {
-      onChange(formatDate(date));
-    } else {
-      // If we couldn't parse a date, pass the raw input
-      // This allows for storing relative date strings like "3d" directly
-      onChange(newInputValue);
-    }
-  };
+  // Debounced input change handler
+  const debouncedInputChange = useCallback(
+    (newInputValue: string) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+
+      debounceTimeoutRef.current = setTimeout(() => {
+        parseAndUpdateDate(newInputValue);
+      }, 500);
+    },
+    [parseAndUpdateDate]
+  );
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newInputValue = event.target.value;
     setInputValue(newInputValue);
-    parseAndUpdateDate(newInputValue);
+    debouncedInputChange(newInputValue);
+
     // Check against our predefined suggestions by their value
     const isPredefined = predefinedSuggestions.some(
       s => s.abbreviation === newInputValue
@@ -115,6 +144,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       setInputValue(formattedDate);
       onChange(formattedDate);
       setIsCalendarOpen(false);
+      setIsInvalid(false);
     }
   };
 
@@ -192,10 +222,10 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               borderRadius: '4px',
               border: 0,
               boxShadow: isInputFocused
-                ? `0 0 0 2px ${TEAL_400}`
+                ? `0 0 0 2px ${isInvalid ? RED_300 : TEAL_400}`
                 : isInputHovered || isIconHovered
-                ? `0 0 0 2px ${TEAL_350}`
-                : `inset 0 0 0 1px ${MOON_250}`,
+                ? `0 0 0 2px ${isInvalid ? RED_300 : TEAL_350}`
+                : `inset 0 0 0 1px ${isInvalid ? RED_300 : MOON_250}`,
               outline: 'none',
               flex: 1,
               height: '32px',
@@ -205,6 +235,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               lineHeight: '24px',
               cursor: 'default',
               width: '100%',
+              color: isInvalid ? '#ff4d4f' : 'inherit',
             }}
             ref={inputRef}
           />
