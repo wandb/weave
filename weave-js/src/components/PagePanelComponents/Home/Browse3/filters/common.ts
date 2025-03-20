@@ -38,6 +38,7 @@ export const UNFILTERABLE_FIELDS = [
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
+  'wb_run_id', // Option+Click works
 ];
 
 export type ColumnInfo = {
