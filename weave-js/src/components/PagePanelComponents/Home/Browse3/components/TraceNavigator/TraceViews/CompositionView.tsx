@@ -1,5 +1,4 @@
 import * as Colors from '@wandb/weave/common/css/color.styles';
-import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
@@ -38,12 +37,15 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   border: 1px solid
     ${props => (props.$isSelected ? Colors.TEAL_500 : Colors.MOON_200)};
   border-radius: 4px;
-  background: ${props => (props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE)};
+  background: ${props =>
+    props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE};
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
 
   &:hover {
-    ${props => !props.$isSelected && `
+    ${props =>
+      !props.$isSelected &&
+      `
       box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
       border-color: ${Colors.MOON_300};
     `}
@@ -282,23 +284,21 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   return (
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
-        <div className="flex min-w-0 flex-1 flex-col group">
-          <div className="flex items-center w-full">
-            <div className="truncate text-sm font-medium">
-              {node.opName}
-            </div>
-            <Icon 
-              name="forward-next" 
-              height={16} 
+        <div className="group flex min-w-0 flex-1 flex-col">
+          <div className="flex w-full items-center">
+            <div className="truncate text-sm font-medium">{node.opName}</div>
+            <Icon
+              name="forward-next"
+              height={16}
               width={16}
-              className="ml-4 text-moon-500 opacity-0 group-hover:opacity-100" 
+              className="ml-4 text-moon-500 opacity-0 group-hover:opacity-100"
             />
             {callTypeIcon && (
-              <Icon 
-                name={callTypeIcon} 
-                height={16} 
+              <Icon
+                name={callTypeIcon}
+                height={16}
                 width={16}
-                className={`ml-auto ${opTypeColor}`} 
+                className={`ml-auto ${opTypeColor}`}
               />
             )}
           </div>
@@ -307,9 +307,7 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
             {stats.unfinishedCallCount > 0 && (
               <span>• {stats.unfinishedCallCount} running</span>
             )}
-            {stats.errorCount > 0 && (
-              <span>• {stats.errorCount} errors</span>
-            )}
+            {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
             {stats.finishedCallCount > 0 && (
               <span>• {formatDuration(avgDuration)} avg</span>
             )}
