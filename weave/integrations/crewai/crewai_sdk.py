@@ -86,6 +86,14 @@ def get_crewai_patcher(
         }
     )
 
+    crew_kickoff_async_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Crew.kickoff_async",
+            "call_display_name": base.call_display_name,
+            "postprocess_inputs": crew_kickoff_postprocess_inputs,
+        }
+    )
+
     crew_kickoff_for_each_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Crew.kickoff_for_each",
@@ -94,7 +102,14 @@ def get_crewai_patcher(
         }
     )
 
-    # TODOs (ayulockin): kickoff_async and kickoff_for_each_async
+    kickoff_for_each_async_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Crew.kickoff_for_each_async",
+            "call_display_name": base.call_display_name,
+            "postprocess_inputs": crew_kickoff_postprocess_inputs,
+        }
+    )
+
     # TODO (ayulockin): replay?
 
     agent_execute_task_settings = base.model_copy(
@@ -178,8 +193,9 @@ def get_crewai_patcher(
     # CrewAI Tools
     tools_settings = {}
     with warnings.catch_warnings():
+        from pydantic import PydanticDeprecatedSince20
         warnings.filterwarnings(
-            "ignore", category=DeprecationWarning, message=".*Pydantic V1 style `@validator` validators are deprecated.*"
+            "ignore", category=PydanticDeprecatedSince20
         )
         warnings.simplefilter("ignore")
         try:    
@@ -213,8 +229,18 @@ def get_crewai_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
+            "Crew.kickoff_async",
+            crewai_wrapper(crew_kickoff_async_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai"),
             "Crew.kickoff_for_each",
             crewai_wrapper(crew_kickoff_for_each_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai"),
+            "Crew.kickoff_for_each_async",
+            crewai_wrapper(kickoff_for_each_async_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
