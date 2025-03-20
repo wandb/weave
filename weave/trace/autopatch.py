@@ -48,6 +48,7 @@ class AutopatchSettings(BaseModel):
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    openai_agents: IntegrationSettings = Field(default_factory=IntegrationSettings)
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
@@ -81,6 +82,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
+    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher(settings.openai).attempt_patch()
@@ -98,6 +100,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
     get_huggingface_patcher(settings.huggingface).attempt_patch()
+    get_openai_agents_patcher(settings.openai_agents).attempt_patch()
 
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -126,6 +129,7 @@ def reset_autopatch() -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
+    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher().undo_patch()
@@ -143,6 +147,7 @@ def reset_autopatch() -> None:
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
     get_huggingface_patcher().undo_patch()
+    get_openai_agents_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()

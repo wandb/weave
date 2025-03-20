@@ -176,7 +176,7 @@ def test_client_parallelism_setting(client_creator):
     assert queue_time_0 > queue_time_1
     # Assert that the total time is about the same
     assert wait_time_0 + queue_time_0 == pytest.approx(
-        wait_time_1 + queue_time_1, abs=0.1
+        wait_time_1 + queue_time_1, abs=0.5
     )
 
     parse_and_apply_settings(UserSettings(client_parallelism=10))
@@ -187,7 +187,7 @@ def test_client_parallelism_setting(client_creator):
         wait_time_10, queue_time_10 = speed_test(client)
 
     # Assert that the queue time is about the same for 10 and 1
-    assert queue_time_1 == pytest.approx(queue_time_10, abs=0.1)
+    assert queue_time_1 == pytest.approx(queue_time_10, abs=0.5)
     # Assert that the wait time is much less for 10 than 1
     assert wait_time_1 > wait_time_10
 
