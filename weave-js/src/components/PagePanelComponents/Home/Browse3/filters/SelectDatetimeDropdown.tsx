@@ -182,7 +182,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               border: 0,
               boxShadow: isInputFocused
                 ? `0 0 0 2px ${TEAL_400}`
-                : (isInputHovered || isIconHovered)
+                : isInputHovered || isIconHovered
                 ? `0 0 0 2px ${TEAL_350}`
                 : `inset 0 0 0 1px ${MOON_250}`,
               outline: 'none',
@@ -272,77 +272,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 };
 
 // Subcomponents
-type DateInputProps = {
-  inputValue: string;
-  isInputFocused: boolean;
-  isInputHovered: boolean;
-  inputRef: React.RefObject<HTMLInputElement>;
-  handleInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  handleFocus: () => void;
-  handleBlur: (event: React.FocusEvent<HTMLInputElement>) => void;
-  handleInputMouseEnter: () => void;
-  handleInputMouseLeave: () => void;
-};
-
-const DateInput: React.FC<DateInputProps> = ({
-  inputValue,
-  isInputFocused,
-  isInputHovered,
-  inputRef,
-  handleInputChange,
-  handleFocus,
-  handleBlur,
-  handleInputMouseEnter,
-  handleInputMouseLeave,
-}) => {
-  return (
-    <>
-      <Icon
-        name="date"
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '9px',
-          transform: 'translateY(-50%)',
-          fontSize: '16px',
-        }}
-      />
-      <input
-        type="text"
-        aria-label="Date input"
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onMouseEnter={handleInputMouseEnter}
-        onMouseLeave={handleInputMouseLeave}
-        placeholder="Enter a date..."
-        style={{
-          padding: '4px 12px',
-          paddingLeft: '36px',
-          paddingRight: '8px',
-          borderRadius: '4px',
-          border: 0,
-          boxShadow: isInputFocused
-            ? `0 0 0 2px ${TEAL_400}`
-            : isInputHovered
-            ? `0 0 0 2px ${TEAL_350}`
-            : `inset 0 0 0 1px ${MOON_250}`,
-          outline: 'none',
-          flex: 1,
-          height: '32px',
-          minHeight: '32px',
-          boxSizing: 'border-box',
-          fontSize: '16px',
-          lineHeight: '24px',
-          cursor: 'default',
-        }}
-        ref={inputRef}
-      />
-    </>
-  );
-};
-
 type SuggestionItemProps = {
   suggestion: PredefinedSuggestion;
   index: number;
