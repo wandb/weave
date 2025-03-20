@@ -20,8 +20,8 @@ export const parseDate = (dateStr: string): Date | null => {
   const trimmedStr = dateStr.trim();
   const lowerStr = trimmedStr.toLowerCase();
 
-  // Handle shorthand relative dates (e.g., "1d", "2w", "3mo", "1y", "4h", "30m")
-  const shorthandPattern = /^(\d+)([dwymoh]|mo)$/i;
+  // Handle shorthand relative dates (e.g., "1d", "2w", "3mo", "1y", "4h", "30m", "10s")
+  const shorthandPattern = /^(\d+)([dwymoh]|mo|s)$/i;
   const shorthandMatch = trimmedStr.match(shorthandPattern);
   if (shorthandMatch) {
     const amount = parseInt(shorthandMatch[1], 10);
@@ -46,6 +46,9 @@ export const parseDate = (dateStr: string): Date | null => {
         return result;
       case 'y':
         result.setFullYear(result.getFullYear() - amount);
+        return result;
+      case 's':
+        result.setSeconds(result.getSeconds() - amount);
         return result;
     }
   }
@@ -72,9 +75,10 @@ export const parseDate = (dateStr: string): Date | null => {
   } else if (lowerStr === 'now' || lowerStr === 'current time') {
     return new Date(now);
   }
+  const units = 'minute|hour|day|week|month|year|second';
 
   // Handle "X days/weeks/months/years ago"
-  const agoPattern = /^(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago$/i;
+  const agoPattern = /^(\d+)\s+(${units})s?\s+ago$/i;
   const agoMatch = lowerStr.match(agoPattern);
   if (agoMatch) {
     const amount = parseInt(agoMatch[1], 10);
@@ -104,7 +108,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle "in X days/weeks/months/years"
-  const inFuturePattern = /^in\s+(\d+)\s+(minute|hour|day|week|month|year)s?$/i;
+  const inFuturePattern = /^in\s+(\d+)\s+(${units})s?$/i;
   const inFutureMatch = lowerStr.match(inFuturePattern);
   if (inFutureMatch) {
     const amount = parseInt(inFutureMatch[1], 10);
@@ -134,7 +138,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle last/next for basic time units
-  const lastNextPattern = /^(last|next)\s+(minute|hour|day|week|month|year)$/i;
+  const lastNextPattern = /^(last|next)\s+(${units})$/i;
   const lastNextMatch = lowerStr.match(lastNextPattern);
   if (lastNextMatch) {
     const direction = lastNextMatch[1].toLowerCase();
@@ -161,6 +165,49 @@ export const parseDate = (dateStr: string): Date | null => {
       case 'year':
         result.setFullYear(result.getFullYear() + multiplier);
         return result;
+    }
+  }
+
+  // Handle last/next day of the week
+  const lastNextDayOfWeekPattern =
+    /^(last|next)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i;
+  const lastNextDayOfWeekMatch = lowerStr.match(lastNextDayOfWeekPattern);
+  if (lastNextDayOfWeekMatch) {
+    const direction = lastNextDayOfWeekMatch[1].toLowerCase();
+    const targetDay = lastNextDayOfWeekMatch[2].toLowerCase();
+    const result = new Date(now);
+
+    // Get current day of week (0 = Sunday, 1 = Monday, etc.)
+    const currentDay = result.getDay();
+
+    // Get target day index (0 = Sunday, 1 = Monday, etc.)
+    const targetDayIndex = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ].indexOf(targetDay);
+
+    if (targetDayIndex !== -1) {
+      // Calculate days to add/subtract
+      let daysToAdd = targetDayIndex - currentDay;
+      if (direction === 'last') {
+        // For 'last', if target day is after current day, we need to go back 2 weeks
+        if (daysToAdd > 0) {
+          daysToAdd -= 7;
+        }
+      } else {
+        // For 'next', if target day is before current day, we need to go forward 2 weeks
+        if (daysToAdd < 0) {
+          daysToAdd += 7;
+        }
+      }
+
+      result.setDate(result.getDate() + daysToAdd);
+      return result;
     }
   }
 
