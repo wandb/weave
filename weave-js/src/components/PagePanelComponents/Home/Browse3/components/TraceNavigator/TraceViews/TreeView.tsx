@@ -42,92 +42,7 @@ interface TreeNodeProps {
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
   searchQuery?: string;
-  showDuration?: boolean;
 }
-
-type NodeType =
-  | 'agent'
-  | 'tool'
-  | 'llm'
-  | 'model'
-  | 'evaluation'
-  | 'scorer'
-  | 'none';
-
-// Helper function to get call type icon
-const getCallTypeIcon = (type: NodeType): null | IconName => {
-  switch (type) {
-    case 'agent':
-      return 'robot-service-member';
-    case 'tool':
-      return 'code-alt';
-    case 'llm':
-      return 'forum-chat-bubble';
-    case 'model':
-      return 'model';
-    case 'evaluation':
-      return 'baseline-alt';
-    case 'scorer':
-      return 'number';
-    default:
-      return 'circle';
-  }
-};
-
-const opTypeToColor = (typeName: NodeType): string => {
-  switch (typeName) {
-    // Identifiers
-    case 'agent':
-    case 'model':
-      return 'text-blue-500 dark:text-blue-400';
-    // Evals
-    case 'tool':
-    case 'llm':
-      return 'text-magenta-600 dark:text-magenta-500';
-    // Evals
-    case 'evaluation':
-    case 'scorer':
-      return 'text-sienna-500 dark:text-sienna-400';
-    // Other, probable noise
-    default:
-      return 'text-moon-300/0 dark:text-moon-200/0';
-  }
-};
-
-// Note to future dev: this should probably be configurable at the database / attribute level
-// for now we use these simple heuristics but this can be improved
-const spanNameToTypeHeuristic = (spanName: string): NodeType => {
-  spanName = spanName.toLowerCase();
-  if (spanName.includes('agent')) {
-    return 'agent';
-  }
-  if (spanName.includes('tool')) {
-    return 'tool';
-  }
-  if (spanName.includes('score')) {
-    return 'scorer';
-  }
-  if (
-    spanName.includes('completion') ||
-    spanName.includes('generation') ||
-    spanName.includes('chat') ||
-    spanName.includes('llm')
-  ) {
-    return 'llm';
-  }
-  if (
-    spanName.includes('model') ||
-    spanName.includes('predict') ||
-    spanName.includes('generate') ||
-    spanName.includes('invoke')
-  ) {
-    return 'model';
-  }
-  if (spanName.includes('evaluation')) {
-    return 'evaluation';
-  }
-  return 'none';
-};
 
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
@@ -138,16 +53,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onToggleExpand,
   deemphasizeCallIds,
   searchQuery,
-  showDuration,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
 
-  const spanName = parseSpanName(call.op_name);
-  const typeName = spanNameToTypeHeuristic(spanName);
-  const {cost, costToolTipContent} = getCostFromCostData(
+  const {costNum, costToolTipContent} = getCostFromCostData(
     call.summary?.weave?.costs
   );
   const {tokens, tokenToolTipContent} = getTokensFromUsage(call.summary?.usage);
@@ -171,7 +83,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
       <>
         {displayName.slice(0, index)}
         <span
-          // Comment from Jamie: these look a bit too much like links
           className={classNames(
             'font-semibold',
             'text-teal-600',
@@ -184,7 +95,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     );
   };
 
-  const opTypeColor = opTypeToColor(typeName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
   const isDeemphasized = deemphasizeCallIds?.includes(id);
   const hasChildren = childrenIds.length > 0;
@@ -193,7 +103,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     statusCode = 'DESCENDANT_ERROR';
   }
   const indentMultiplier = 14;
-  const callTypeIcon = getCallTypeIcon(typeName);
 
   return (
     <div style={style}>
@@ -243,39 +152,31 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
-            <div className="text-right">
-              {showDuration
-                ? duration !== null
-                  ? formatDuration(duration)
-                  : ''
-                : cost && (
-                    <TraceStat
-                      label={cost}
-                      tooltip={
-                        <div className="text-white-800">
-                          {costToolTipContent}
-                          {tokens && (
-                            <>
-                              <br />
-                              <span style={{fontWeight: 600}}>
-                                Estimated tokens
-                              </span>
-                            </>
-                          )}
-                          {tokens && tokenToolTipContent}
-                        </div>
-                      }
-                      className="text-xs text-moon-400"
-                    />
-                  )}
+            <div className="flex items-center gap-2 text-right">
+              {costNum !== undefined && (
+                <TraceStat
+                  label={costNum !== 0 && costNum < 0.01 ? '<$0.01' : `$${costNum.toFixed(2)}`}
+                  tooltip={
+                    <div className="text-white-800">
+                      {costToolTipContent}
+                      {tokens && (
+                        <>
+                          <br />
+                          <span style={{fontWeight: 600}}>
+                            Estimated tokens
+                          </span>
+                        </>
+                      )}
+                      {tokens && tokenToolTipContent}
+                    </div>
+                  }
+                  className="text-xs text-moon-400"
+                />
+              )}
+              {duration !== null && (
+                <span className="text-moon-400 min-w-[34px]">{formatDuration(duration)}</span>
+              )}
             </div>
-
-            {callTypeIcon && (
-              <Icon
-                name={callTypeIcon}
-                className={classNames('max-w-16', 'max-h-16', opTypeColor)}
-              />
-            )}
             <StatusChip value={statusCode} iconOnly />
           </div>
         </div>
@@ -287,8 +188,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 interface TreeViewHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  showDuration: boolean;
-  onToggleView: () => void;
   strictSearch: boolean;
   onToggleStrictSearch: () => void;
 }
@@ -296,8 +195,6 @@ interface TreeViewHeaderProps {
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   searchQuery,
   onSearchChange,
-  showDuration,
-  onToggleView,
   strictSearch,
   onToggleStrictSearch,
 }) => {
@@ -335,24 +232,12 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
           )
         }
       />
-      <Button
-        variant="ghost"
-        icon={showDuration ? 'recent-clock' : 'database-artifacts'}
-        onClick={onToggleView}
-        className="ml-8"
-        tooltip={
-          showDuration
-            ? 'Showing latency, click to show cost'
-            : 'Showing cost, click to show latency'
-        }
-      />
     </div>
   );
 };
 
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDuration, setShowDuration] = useState(false);
   const [strictSearch, setStrictSearch] = useState(false);
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
@@ -442,8 +327,6 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
       <TreeViewHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        showDuration={showDuration}
-        onToggleView={() => setShowDuration(!showDuration)}
         strictSearch={strictSearch}
         onToggleStrictSearch={() => setStrictSearch(!strictSearch)}
       />
@@ -453,7 +336,6 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           filterCallIds={filteredCallIds}
           deemphasizeCallIds={deemphasizeCallIds}
           searchQuery={searchQuery}
-          showDuration={showDuration}
         />
       </div>
       <TraceScrubber
@@ -470,7 +352,6 @@ export const TreeView: React.FC<
     filterCallIds?: string[];
     deemphasizeCallIds?: string[];
     searchQuery?: string;
-    showDuration?: boolean;
   }
 > = ({
   traceTreeFlat,
@@ -480,7 +361,6 @@ export const TreeView: React.FC<
   deemphasizeCallIds,
   setRootCallId,
   searchQuery,
-  showDuration,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
@@ -568,7 +448,6 @@ export const TreeView: React.FC<
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
         searchQuery={searchQuery}
-        showDuration={showDuration}
       />
     );
   };
