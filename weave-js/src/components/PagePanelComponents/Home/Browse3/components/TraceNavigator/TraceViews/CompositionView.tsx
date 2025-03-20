@@ -46,7 +46,7 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
     ${props =>
       !props.$isSelected &&
       `
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);;
       border-color: ${Colors.MOON_300};
     `}
   }
@@ -117,90 +117,6 @@ const RecursionBlock = styled.div`
   }
 `;
 RecursionBlock.displayName = 'RecursionBlock';
-
-// Helper function to get call type icon
-const getCallTypeIcon = (type: NodeType): null | IconName => {
-  switch (type) {
-    case 'agent':
-      return 'robot-service-member';
-    case 'tool':
-      return 'code-alt';
-    case 'llm':
-      return 'forum-chat-bubble';
-    case 'model':
-      return 'model';
-    case 'evaluation':
-      return 'baseline-alt';
-    case 'scorer':
-      return 'number';
-    default:
-      return null;
-  }
-};
-
-const opTypeToColor = (typeName: NodeType): string => {
-  switch (typeName) {
-    // Identifiers
-    case 'agent':
-    case 'model':
-      return 'text-blue-500 dark:text-blue-400';
-    // Evals
-    case 'tool':
-    case 'llm':
-      return 'text-magenta-600 dark:text-magenta-500';
-    // Evals
-    case 'evaluation':
-    case 'scorer':
-      return 'text-sienna-500 dark:text-sienna-400';
-    // Other, probable noise
-    default:
-      return 'text-moon-300 dark:text-moon-200';
-  }
-};
-
-type NodeType =
-  | 'agent'
-  | 'tool'
-  | 'llm'
-  | 'model'
-  | 'evaluation'
-  | 'scorer'
-  | 'none';
-
-// Note to future dev: this should probably be configurable at the database / attribute level
-// for now we use these simple heuristics but this can be improved
-const spanNameToTypeHeuristic = (spanName: string): NodeType => {
-  spanName = spanName.toLowerCase();
-  if (spanName.includes('agent')) {
-    return 'agent';
-  }
-  if (spanName.includes('tool')) {
-    return 'tool';
-  }
-  if (spanName.includes('score')) {
-    return 'scorer';
-  }
-  if (
-    spanName.includes('completion') ||
-    spanName.includes('generation') ||
-    spanName.includes('chat') ||
-    spanName.includes('llm')
-  ) {
-    return 'llm';
-  }
-  if (
-    spanName.includes('model') ||
-    spanName.includes('predict') ||
-    spanName.includes('generate') ||
-    spanName.includes('invoke')
-  ) {
-    return 'model';
-  }
-  if (spanName.includes('evaluation')) {
-    return 'evaluation';
-  }
-  return 'none';
-};
 
 interface CodeMapNodeProps extends TraceViewProps {
   node: CodeCompositionMapNode;
@@ -277,30 +193,20 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
     }
   };
 
-  const typeName = spanNameToTypeHeuristic(node.opName);
-  const callTypeIcon = getCallTypeIcon(typeName);
-  const opTypeColor = opTypeToColor(typeName);
-
   return (
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
-        <div className="group flex min-w-0 flex-1 flex-col">
-          <div className="flex w-full items-center">
-            <div className="truncate text-sm font-medium">{node.opName}</div>
-            <Icon
-              name="forward-next"
-              height={16}
+        <div className="flex min-w-0 flex-1 flex-col group">
+          <div className="flex items-center w-full ">
+            <div className="truncate text-sm font-medium">
+              {node.opName}
+            </div>
+            <Icon 
+              name="forward-next" 
+              height={16} 
               width={16}
               className="ml-4 text-moon-500 opacity-0 group-hover:opacity-100"
             />
-            {callTypeIcon && (
-              <Icon
-                name={callTypeIcon}
-                height={16}
-                width={16}
-                className={`ml-auto ${opTypeColor}`}
-              />
-            )}
           </div>
           <div className="flex items-center gap-2 text-[11px] text-moon-500">
             <span>{stats.finishedCallCount} finished</span>
