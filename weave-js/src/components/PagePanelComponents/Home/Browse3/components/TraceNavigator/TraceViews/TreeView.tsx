@@ -529,7 +529,7 @@ export const TreeView: React.FC<
       result.push({
         id: node.id,
         call: node.call,
-        level: level,
+        level,
         isExpanded,
         isVisible: true,
         childrenIds: filteredChildren,
