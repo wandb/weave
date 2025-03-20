@@ -2393,6 +2393,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
+@pytest.mark.asyncio
 def test_calls_descendants_basic(client):
     """Test basic functionality of calls_descendants including depth limits and multiple children."""
 
@@ -2443,6 +2444,7 @@ def test_calls_descendants_basic(client):
     assert len(multi_parent_children) == 4  # 2 children per parent
 
 
+@pytest.mark.asyncio
 def test_calls_descendants_edge_cases(client):
     """Test edge cases for calls_descendants including deleted calls and leaf nodes."""
 
@@ -2460,7 +2462,7 @@ def test_calls_descendants_edge_cases(client):
 
     # Test leaf node (no children)
     leaf_result = leaf_op(5)
-    print(f"leaf_op: {leaf_op.ref.uri()}:*")
+
     client.flush()
     leaf_call = client.get_calls(filter=tsi.CallsFilter(op_names=[leaf_op.ref.uri()]))[
         0
@@ -2507,6 +2509,7 @@ def test_calls_descendants_edge_cases(client):
         list(client.get_call_descendants(parent_call2.id, limit=100_001))
 
 
+@pytest.mark.asyncio
 def test_get_call_descendants_input_types(client):
     """Test that get_call_descendants accepts different types of input for the calls parameter."""
 
