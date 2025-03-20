@@ -46,18 +46,19 @@ export const parseDate = (dateStr: string): Date | null => {
       // Calculate days to add/subtract
       let daysToAdd = targetDayIndex - currentDay;
       if (direction === 'last') {
-        // For 'last', if target day is after current day, we need to go back 2 weeks
-        if (daysToAdd > 0) {
+        // For 'last', if target day is after or equal to current day, we need to go back 1 week
+        if (daysToAdd >= 0) {
           daysToAdd -= 7;
         }
       } else {
-        // For 'next', 'this', or standalone, if target day is before current day, we need to go forward 1 week
-        if (daysToAdd < 0) {
+        // For 'next', 'this', or standalone, if target day is before or equal to current day, we need to go forward 1 week
+        if (daysToAdd <= 0) {
           daysToAdd += 7;
         }
       }
       const result = new Date(now);
       result.setDate(result.getDate() + daysToAdd);
+      result.setHours(0, 0, 0, 0);
       return result;
     }
   }
@@ -88,7 +89,6 @@ export const parseDate = (dateStr: string): Date | null => {
         return result;
       case 'h':
         result.setHours(result.getHours() - amount);
-        result.setMinutes(0, 0, 0);
         return result;
       case 'y':
         result.setFullYear(result.getFullYear() - amount);
