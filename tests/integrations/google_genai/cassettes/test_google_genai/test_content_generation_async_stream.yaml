@@ -3,6 +3,12 @@ interactions:
     body: '{"contents": [{"parts": [{"text": "What''s the capital of France?"}], "role":
       "user"}]}'
     headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
       content-length:
       - '86'
       content-type:
@@ -10,9 +16,9 @@ interactions:
       host:
       - generativelanguage.googleapis.com
       user-agent:
-      - google-genai-sdk/1.3.0 gl-python/3.12.8
+      - google-genai-sdk/1.7.0 gl-python/3.13.2
       x-goog-api-client:
-      - google-genai-sdk/1.3.0 gl-python/3.12.8
+      - google-genai-sdk/1.7.0 gl-python/3.13.2
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse
   response:
@@ -37,11 +43,11 @@ interactions:
       Content-Type:
       - text/event-stream
       Date:
-      - Tue, 04 Mar 2025 19:43:44 GMT
+      - Thu, 20 Mar 2025 04:33:59 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1704
+      - gfet4t7; dur=1957
       Transfer-Encoding:
       - chunked
       Vary:
