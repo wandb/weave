@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import warnings
 from typing import Callable
 
 import_failed = False
@@ -13,6 +14,7 @@ except ImportError:
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.serialization.serialize import dictify
 
 from weave.integrations.crewai.crewai_utils import (
     crewai_postprocess_inputs,
@@ -31,6 +33,33 @@ def crewai_wrapper(settings: OpSettings) -> Callable:
         return op
 
     return wrapper
+
+
+def flow_decorator_wrapper(op_settings):
+    def make_new_value(original_decorator):
+        def wrapped_decorator(*args, **kwargs):
+            original_decorated = original_decorator(*args, **kwargs)
+            
+            def combined_decorator(fn):
+                # Get the function name for naming the op
+                weave_op_name = getattr(fn, "__name__", "unknown_function")
+                op_settings_copy = op_settings.model_copy(
+                    update={
+                        "call_display_name": op_settings.name + "." + weave_op_name,
+                    }
+                )
+
+                # Apply weave.op to the function
+                weave_wrapped = weave.op(fn, **op_settings_copy.model_dump())
+
+                # Then apply the original decorator
+                return original_decorated(weave_wrapped)
+
+            return combined_decorator
+
+        return wrapped_decorator
+
+    return make_new_value
 
 
 def get_crewai_patcher(
@@ -97,36 +126,84 @@ def get_crewai_patcher(
         update={
             "name": base.name or "crewai.Flow.kickoff",
             "call_display_name": base.call_display_name,
-            # "postprocess_inputs": crewai_postprocess_inputs,
+            "postprocess_inputs": lambda inputs: dictify(inputs),
+            "postprocess_output": lambda output: dictify(output),
         }
     )
 
-    flow_start_settings = base.model_copy(
+    flow_kickoff_async_settings = base.model_copy(
         update={
-            "name": base.name or "crewai.flow.start",
+            "name": base.name or "crewai.Flow.kickoff_async",
             "call_display_name": base.call_display_name,
+            "postprocess_inputs": lambda inputs: dictify(inputs),
+            "postprocess_output": lambda output: dictify(output),
+        }
+    )
+
+    start_decorator_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.flow.flow.start",
+            "call_display_name": base.call_display_name or "flow.start",
+        }
+    )
+    
+    listen_decorator_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.flow.flow.listen",
+            "call_display_name": base.call_display_name or "flow.listen",
+        }
+    )
+    
+    router_decorator_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.flow.flow.router",
+            "call_display_name": base.call_display_name or "flow.router",
+        }
+    )
+    
+    or_function_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.flow.flow.or_",
+            "call_display_name": base.call_display_name or "flow.or_",
+        }
+    )
+
+    and_function_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.flow.flow.and_",
+            "call_display_name": base.call_display_name or "flow.and_",
         }
     )
 
     # CrewAI Tools
     tools_settings = {}
-    crewai_tools = dir(importlib.import_module("crewai_tools"))
-    crewai_tools = [tool for tool in crewai_tools if "Tool" in tool]
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", category=DeprecationWarning, message=".*Pydantic V1 style `@validator` validators are deprecated.*"
+        )
+        warnings.simplefilter("ignore")
+        try:    
+            crewai_tools_module = importlib.import_module("crewai_tools")
+            crewai_tools = dir(crewai_tools_module)
+            crewai_tools = [tool for tool in crewai_tools if "Tool" in tool]
 
-    for tool in crewai_tools:
-        try:
-            tool_class = getattr(importlib.import_module("crewai_tools"), tool)
-            if issubclass(tool_class, BaseTool):
-                tools_settings[tool] = base.model_copy(
-                    update={
-                        "name": base.name or f"crewai_tools.{tool}._run",
-                        "call_display_name": base.call_display_name or f"{tool}._run",
-                    }
-                )
-            else:
-                continue
-        except (AttributeError, ImportError):
-            continue
+            for tool in crewai_tools:
+                try:
+                    tool_class = getattr(crewai_tools_module, tool)
+                    if issubclass(tool_class, BaseTool):
+                        tools_settings[tool] = base.model_copy(
+                            update={
+                                "name": base.name or f"crewai_tools.{tool}._run",
+                                "call_display_name": base.call_display_name or f"{tool}._run",
+                            }
+                        )
+                    else:
+                        continue
+                except (AttributeError, ImportError):
+                        continue
+        except ImportError:
+            # if crewai_tools is not installed, we don't want to raise an error
+            pass
 
     patchers = [
         SymbolPatcher(
@@ -161,8 +238,33 @@ def get_crewai_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
-            "flow.start",
-            crewai_wrapper(flow_start_settings),
+            "Flow.kickoff_async",
+            crewai_wrapper(flow_kickoff_async_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai.flow.flow"),
+            "start",
+            flow_decorator_wrapper(start_decorator_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai.flow.flow"),
+            "listen",
+            flow_decorator_wrapper(listen_decorator_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai.flow.flow"),
+            "router",
+            flow_decorator_wrapper(router_decorator_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai.flow.flow"),
+            "or_",
+            flow_decorator_wrapper(or_function_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("crewai.flow.flow"),
+            "and_",
+            flow_decorator_wrapper(and_function_settings),
         ),
     ]
 
