@@ -53,12 +53,14 @@ export const SelectValue = ({
   if (fieldType === 'datetime') {
     const dateTimeValue = value ? moment(value) : null;
     return (
-      <StyledDateTimePicker
-        value={dateTimeValue}
-        onChange={(newValue: moment.Moment | null) =>
-          onSetValue(newValue ? newValue.toISOString() : '')
-        }
-      />
+      <div className="min-w-[200px]">
+        <StyledDateTimePicker
+          value={dateTimeValue}
+          onChange={(newValue: moment.Moment | null) =>
+            onSetValue(newValue ? newValue.toISOString() : '')
+          }
+        />
+      </div>
     );
   }
 
