@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import warnings
-from typing import Callable
+from typing import Any, Callable
 
 import_failed = False
 
@@ -12,16 +12,14 @@ except ImportError:
     import_failed = True
 
 import weave
-from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.serialization.serialize import dictify
-
 from weave.integrations.crewai.crewai_utils import (
-    crewai_postprocess_inputs,
     crew_kickoff_postprocess_inputs,
+    crewai_postprocess_inputs,
     default_call_display_name_execute_task,
 )
-
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.serialization.serialize import dictify
 
 _crewai_patcher: MultiPatcher | None = None
 
@@ -35,18 +33,24 @@ def crewai_wrapper(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def flow_decorator_wrapper(op_settings):
-    def make_new_value(original_decorator):
-        def wrapped_decorator(*args, **kwargs):
+def flow_decorator_wrapper(op_settings: OpSettings) -> Callable:
+    def make_new_value(original_decorator: Callable) -> Callable:
+        def wrapped_decorator(*args: Any, **kwargs: Any) -> Callable:
             original_decorated = original_decorator(*args, **kwargs)
-            
-            def combined_decorator(fn):
+
+            def combined_decorator(fn: Callable) -> Callable:
                 # Get the function name for naming the op
                 weave_op_name = getattr(fn, "__name__", "unknown_function")
+
+                base_name = op_settings.name or ""
+                display_name = (
+                    f"{base_name}.{weave_op_name}"
+                    if weave_op_name != "unknown_function"
+                    else base_name
+                )
+
                 op_settings_copy = op_settings.model_copy(
-                    update={
-                        "call_display_name": op_settings.name + "." + weave_op_name,
-                    }
+                    update={"call_display_name": display_name}
                 )
 
                 # Apply weave.op to the function
@@ -161,21 +165,21 @@ def get_crewai_patcher(
             "call_display_name": base.call_display_name or "flow.start",
         }
     )
-    
+
     listen_decorator_settings = base.model_copy(
         update={
             "name": base.name or "crewai.flow.flow.listen",
             "call_display_name": base.call_display_name or "flow.listen",
         }
     )
-    
+
     router_decorator_settings = base.model_copy(
         update={
             "name": base.name or "crewai.flow.flow.router",
             "call_display_name": base.call_display_name or "flow.router",
         }
     )
-    
+
     or_function_settings = base.model_copy(
         update={
             "name": base.name or "crewai.flow.flow.or_",
@@ -194,11 +198,10 @@ def get_crewai_patcher(
     tools_settings = {}
     with warnings.catch_warnings():
         from pydantic import PydanticDeprecatedSince20
-        warnings.filterwarnings(
-            "ignore", category=PydanticDeprecatedSince20
-        )
+
+        warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
         warnings.simplefilter("ignore")
-        try:    
+        try:
             crewai_tools_module = importlib.import_module("crewai_tools")
             crewai_tools = dir(crewai_tools_module)
             crewai_tools = [tool for tool in crewai_tools if "Tool" in tool]
@@ -210,13 +213,14 @@ def get_crewai_patcher(
                         tools_settings[tool] = base.model_copy(
                             update={
                                 "name": base.name or f"crewai_tools.{tool}._run",
-                                "call_display_name": base.call_display_name or f"{tool}._run",
+                                "call_display_name": base.call_display_name
+                                or f"{tool}._run",
                             }
                         )
                     else:
                         continue
                 except (AttributeError, ImportError):
-                        continue
+                    continue
         except ImportError:
             # if crewai_tools is not installed, we don't want to raise an error
             pass
