@@ -11,6 +11,7 @@ import classNames from 'classnames';
 import React from 'react';
 
 export const TextFieldSizes = {
+  Small: 'small',
   Medium: 'medium',
   Large: 'large',
 } as const;
@@ -65,7 +66,12 @@ export const TextField = ({
   isContainerNightAware,
 }: TextFieldProps) => {
   const textFieldSize = size ?? 'medium';
-  const leftPaddingForIcon = textFieldSize === 'medium' ? 'pl-34' : 'pl-36';
+  const leftPaddingForIcon =
+    textFieldSize === 'small'
+      ? 'pl-32'
+      : textFieldSize === 'medium'
+      ? 'pl-34'
+      : 'pl-36';
 
   const handleChange = onChange
     ? (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +94,11 @@ export const TextField = ({
       <div
         className={classNames(
           'relative rounded-sm',
-          textFieldSize === 'medium' ? 'h-32' : 'h-40',
+          textFieldSize === 'small'
+            ? 'h-30'
+            : textFieldSize === 'medium'
+            ? 'h-32'
+            : 'h-40',
           'bg-white dark:bg-moon-900',
           'text-moon-800 dark:text-moon-200',
           variant === 'default' &&
@@ -154,7 +164,9 @@ export const TextField = ({
             name={icon}
             className={classNames(
               'absolute left-8',
-              textFieldSize === 'medium'
+              textFieldSize === 'small'
+                ? 'top-6 h-16 w-16'
+                : textFieldSize === 'medium'
                 ? 'top-8 h-18 w-18'
                 : 'top-10 h-20 w-20',
               value ? 'text-moon-800 dark:text-moon-200' : 'text-moon-500'
