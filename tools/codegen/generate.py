@@ -184,7 +184,9 @@ def generate_code(
 @click.argument("python_output", type=click.Path(exists=True))
 @click.argument("package_name")
 @click.option("--release", is_flag=True, help="Update to the latest version")
-def update_pyproject(python_output: str, package_name: str, release: bool = False) -> None:
+def update_pyproject(
+    python_output: str, package_name: str, release: bool = False
+) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
     This command updates the dependency for the given package in pyproject.toml to either a specific version
