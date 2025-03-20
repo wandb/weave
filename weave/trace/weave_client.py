@@ -1411,8 +1411,12 @@ class WeaveClient:
         # Convert input to a list of items we can process
         if isinstance(calls, (Call, WeaveObject, CallId)):
             items_to_process = [calls]
-        else:
+        elif isinstance(calls, Iterable):
             items_to_process = list(calls)
+        else:
+            raise TypeError(
+                f"Invalid call, CallId, or Iterable: {calls}, expected Call, CallId (str), or Iterable[Call | CallId]"
+            )
 
         call_ids: list[str] = []
         for item in items_to_process:

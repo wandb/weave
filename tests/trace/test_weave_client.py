@@ -2460,8 +2460,9 @@ def test_calls_descendants_edge_cases(client):
 
     # Test leaf node (no children)
     leaf_result = leaf_op(5)
+    print(f"leaf_op: {leaf_op.ref.uri()}:*")
     client.flush()
-    leaf_call = client.get_calls(filter=tsi.CallsFilter(op_names=[f"{leaf_op.ref}:*"]))[
+    leaf_call = client.get_calls(filter=tsi.CallsFilter(op_names=[leaf_op.ref.uri()]))[
         0
     ]
     leaf_children = list(client.get_call_descendants(leaf_call, depth=1))
@@ -2471,7 +2472,7 @@ def test_calls_descendants_edge_cases(client):
     parent_result = parent_op(5)
     client.flush()
     parent_call = client.get_calls(
-        filter=tsi.CallsFilter(op_names=[f"{parent_op.ref}:*"])
+        filter=tsi.CallsFilter(op_names=[parent_op.ref.uri()])
     )[0]
 
     # Delete parent and verify no children are returned
@@ -2483,7 +2484,7 @@ def test_calls_descendants_edge_cases(client):
     parent_result2 = parent_op(10)
     client.flush()
     parent_call2 = client.get_calls(
-        filter=tsi.CallsFilter(op_names=[f"{parent_op.ref}:*"])
+        filter=tsi.CallsFilter(op_names=[parent_op.ref.uri()])
     )[0]
     all_children = list(client.get_call_descendants(parent_call2.id))
     assert len(all_children) == 1
@@ -2542,15 +2543,13 @@ def test_get_call_descendants_input_types(client):
     assert len(descendants4) == 1
     assert op_name_from_ref(descendants4[0].op_name) == "child_op"
 
-    # Test with a mixed list of Call objects and call ID strings
+    # Test with a mixed list of Call objects and call ID strings, duplicate ids
     descendants5 = list(client.get_call_descendants([parent_call, parent_call.id]))
-    assert (
-        len(descendants5) == 2
-    )  # Same call, but counted twice since we passed it twice
+    assert len(descendants5) == 1
     assert all(op_name_from_ref(d.op_name) == "child_op" for d in descendants5)
 
     # Test with invalid input type
-    with pytest.raises(TypeError, match="Invalid call or call ID"):
+    with pytest.raises(TypeError, match="Invalid call, CallId, or Iterable"):
         list(client.get_call_descendants(123))  # type: ignore
 
 
