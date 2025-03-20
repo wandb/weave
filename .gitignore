@@ -19,3 +19,4 @@ gha-creds-*.json
 *.log
 */file::memory:?cache=shared
 tests/weave_models/
+.cursor
