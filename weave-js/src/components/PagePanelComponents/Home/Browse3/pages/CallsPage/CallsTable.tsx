@@ -758,6 +758,15 @@ export const CallsTable: FC<{
             onClick={() => calls.refetch()}
             disabled={callsLoading}
           />
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <div className="flex-none">
+              <ManageColumnsButton
+                columnInfo={columns}
+                columnVisibilityModel={columnVisibilityModel}
+                setColumnVisibilityModel={setColumnVisibilityModel}
+              />
+            </div>
+          )}
           {!hideOpSelector && (
             <OpSelector
               frozenFilter={frozenFilter}
@@ -904,18 +913,6 @@ export const CallsTable: FC<{
               }}
             />
           </div>
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <>
-              <ButtonDivider />
-              <div className="flex-none">
-                <ManageColumnsButton
-                  columnInfo={columns}
-                  columnVisibilityModel={columnVisibilityModel}
-                  setColumnVisibilityModel={setColumnVisibilityModel}
-                />
-              </div>
-            </>
-          )}
         </TailwindContents>
       }>
       {isMetricsChecked && (
