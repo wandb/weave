@@ -27,13 +27,13 @@ const ProviderStatus = ({isActive}: {isActive: boolean}) => {
 const columns: GridColDef[] = [
   {
     field: 'name',
-    headerName: 'NAME',
+    headerName: 'Name',
     flex: 0.2,
     minWidth: 200,
   },
   {
     field: 'status',
-    headerName: 'STATUS',
+    headerName: 'Status',
     flex: 0.2,
     minWidth: 200,
     renderCell: (params: GridRenderCellParams) => (
@@ -57,7 +57,7 @@ const columns: GridColDef[] = [
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2">
-            {'Add team secret'}
+            Add team secret
             <Icon name="forward-next" />
           </Link>
         )}
