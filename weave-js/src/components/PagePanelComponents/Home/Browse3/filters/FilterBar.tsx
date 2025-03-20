@@ -26,6 +26,7 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
@@ -191,7 +192,7 @@ export const FilterBar = ({
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
-      // Set this filter as the active edit
+      // Set this filter as active edit, highlighting filter bar children in teal
       setActiveEditId(item.id);
 
       if (index === -1) {
@@ -230,13 +231,13 @@ export const FilterBar = ({
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
@@ -265,6 +266,11 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
+  }, [completeItems, activeEditId]);
+
   return (
     <>
       <div
@@ -278,12 +284,12 @@ export const FilterBar = ({
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
-              isEditing={f.id === activeEditId}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
             />
           ))}
         </VariableChildrenDisplay>
