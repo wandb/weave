@@ -106,7 +106,7 @@ class CallSchema(BaseModel):
     # Exception is present if the call failed
     exception: Optional[str] = None
 
-    # Outputs
+    # Output
     output: Optional[Any] = None
 
     # Summary: a summary of the call
@@ -163,7 +163,7 @@ class EndedCallSchemaForInsert(BaseModel):
     # Exception is present if the call failed
     exception: Optional[str] = None
 
-    # Outputs
+    # Output
     output: Optional[Any] = None
 
     # Summary: a summary of the call
@@ -255,13 +255,27 @@ class CallsDescendantsReq(BaseModel):
     project_id: str
     call_ids: list[str]
     limit: Optional[int] = None
-    # list of columns to select, defaults to all columns
-    columns: Optional[list[str]] = None
+    columns: Optional[list[str]] = Field(
+        default=None,
+        description="List of columns to select, defaults to all columns",
+        examples=[
+            [
+                "id",
+                "op_name",
+                "attributes",
+                "inputs",
+                "output",
+                "summary",
+            ]
+        ],
+    )
+    depth: Optional[int] = Field(
+        default=None,
+        description="The depth of the descendants to return. The default, None, is all descendants. Depth 2 would stop at grandchildren",
+        examples=[1],
+    )
 
-    # If provided, the depth of the descendants to return.
-    # Default is all descendants. limit 1 would stop at grandchildren
-    depth: Optional[int] = None
-
+    # wb_user_id is automatically populated by the server
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -323,7 +337,7 @@ class CallsFilter(BaseModel):
 
 class SortBy(BaseModel):
     # Field should be a key of `CallSchema`. For dictionary fields
-    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # (`attributes`, `inputs`, `output`, `summary`), the field can be
     # dot-separated.
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'

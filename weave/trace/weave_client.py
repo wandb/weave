@@ -9,7 +9,7 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
@@ -1392,25 +1392,26 @@ class WeaveClient:
         return self.finish_call(call, exception=exception)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call_descendants(
-        self, call: Call, depth: int | None = None, limit: int | None = None
-    ) -> list[Call]:
-        """Get all descendant calls of a given call."""
-        res = self.server.calls_descendants(
-            CallsDescendantsReq(
-                project_id=self._project_id(),
-                call_ids=[call.id],
-                depth=depth,
-                limit=limit,
-            )
-        )
-        return list(res)
+    def get_call_descendants(
+        self,
+        calls: Call | str | Iterable[Call | str],
+        depth: int | None = None,
+        limit: int | None = None,
+    ) -> Iterable[Call | WeaveObject]:
+        """Get all descendant calls of given list of calls or call IDs."""
+        call_ids: list[str] = []
+        if not isinstance(calls, Iterable):
+            calls = [calls]
+        for call in calls:
+            if isinstance(call, Call) and call.id is not None:
+                call_ids.append(call.id)
+            elif isinstance(call, str):
+                call_ids.append(call)
+            else:
+                raise TypeError(
+                    f"Invalid call or call ID: {call}, expected Call or CallId (str)"
+                )
 
-    @trace_sentry.global_trace_sentry.watch()
-    def calls_descendants(
-        self, call_ids: list[str], depth: int | None = None, limit: int | None = None
-    ) -> list[Call]:
-        """Get all descendant calls of a given list of call IDs."""
         res = self.server.calls_descendants(
             CallsDescendantsReq(
                 project_id=self._project_id(),
@@ -1419,7 +1420,8 @@ class WeaveClient:
                 limit=limit,
             )
         )
-        return list(res)
+        for server_call in res:
+            yield make_client_call(self.entity, self.project, server_call, self.server)
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:

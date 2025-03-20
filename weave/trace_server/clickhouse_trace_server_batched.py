@@ -478,9 +478,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if depth is not None and depth < 1:
             raise ValueError("Depth must be a positive integer")
 
+        depth_condition = "" if depth is None else "AND d.depth < {depth:Int32}"
+        limit = limit or MAX_CALLS_CHILDREN_LIMIT
+
         # Use recursive cte to get all children of requested calls, one batch
         # at a time. First: parents, then children, then grandchildren, etc.
-        depth_condition = "" if depth is None else "AND d.depth < {depth:Int32}"
         query = f"""
         WITH RECURSIVE descendants AS (
             -- Base case: get the root calls
@@ -502,6 +504,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         SELECT DISTINCT id FROM descendants
         LIMIT {{limit:Int32}}
+        -- TODO: Remove this once clickhouse cloud is updated to 24.8
         SETTINGS allow_experimental_analyzer=1
         """
         result = self._query(
@@ -510,7 +513,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "project_id": project_id,
                 "call_ids": call_ids,
                 "depth": depth,
-                "limit": limit or MAX_CALLS_CHILDREN_LIMIT,
+                "limit": limit,
             },
         )
         if include_root:
