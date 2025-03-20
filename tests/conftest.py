@@ -140,6 +140,40 @@ class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceS
         # Also handle db_management references
         query = query.replace("db_management.", f"{self.db_management_name}.")
 
+        # Handle tables without explicit database prefix - add all table names that appear in queries
+        tables_to_prefix = [
+            "tables",
+            "call_parts",
+            "object_versions",
+            "files",
+            "feedback",
+            "llm_token_prices",
+            "table_rows",
+            "migrations",
+        ]
+
+        for table in tables_to_prefix:
+            # Being careful with the patterns to avoid false positives
+            query = query.replace(f" {table} ", f" {self.default_db_name}.{table} ")
+            query = query.replace(
+                f"FROM {table}\n", f"FROM {self.default_db_name}.{table}\n"
+            )
+            query = query.replace(
+                f"FROM {table} ", f"FROM {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"INTO {table} ", f"INTO {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"JOIN {table} ", f"JOIN {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"UPDATE {table} ", f"UPDATE {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"DELETE FROM {table} ", f"DELETE FROM {self.default_db_name}.{table} "
+            )
+
         return super()._query(query, parameters, column_formats)
 
     def _query_stream(self, query, parameters, column_formats=None, settings=None):
@@ -152,6 +186,40 @@ class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceS
 
         # Also handle db_management references
         query = query.replace("db_management.", f"{self.db_management_name}.")
+
+        # Handle tables without explicit database prefix - add all table names that appear in queries
+        tables_to_prefix = [
+            "tables",
+            "call_parts",
+            "object_versions",
+            "files",
+            "feedback",
+            "llm_token_prices",
+            "table_rows",
+            "migrations",
+        ]
+
+        for table in tables_to_prefix:
+            # Being careful with the patterns to avoid false positives
+            query = query.replace(f" {table} ", f" {self.default_db_name}.{table} ")
+            query = query.replace(
+                f"FROM {table}\n", f"FROM {self.default_db_name}.{table}\n"
+            )
+            query = query.replace(
+                f"FROM {table} ", f"FROM {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"INTO {table} ", f"INTO {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"JOIN {table} ", f"JOIN {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"UPDATE {table} ", f"UPDATE {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"DELETE FROM {table} ", f"DELETE FROM {self.default_db_name}.{table} "
+            )
 
         return super()._query_stream(query, parameters, column_formats, settings)
 
