@@ -11,7 +11,14 @@ import {
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
@@ -20,6 +27,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
 import {CellValueString} from '../../../Browse2/CellValueString';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -179,6 +187,41 @@ export const useCallsTableColumns = (
     };
   }, [columns, setUserDefinedColumnWidths]);
 };
+
+const CallLinkCell: FC<{
+  rowParams: GridRenderCellParams;
+  entity: string;
+  project: string;
+  preservePath: boolean;
+}> = ({rowParams, entity, project, preservePath}) => {
+  const {getDescendantCallIdAtSelectionPath} = useContext(
+    TableRowSelectionContext
+  );
+
+  const opName =
+    rowParams.row.display_name ??
+    opVersionRefOpName(rowParams.row.op_name) ??
+    rowParams.row.op_name;
+  const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
+
+  return (
+    <CallLink
+      entityName={entity}
+      projectName={project}
+      opName={opName}
+      callId={rowParams.row.id}
+      fullWidth={true}
+      color={TEAL_600}
+      isEval={isEval}
+      focusedCallId={
+        preservePath
+          ? getDescendantCallIdAtSelectionPath?.(rowParams.row.id) ?? undefined
+          : undefined
+      }
+    />
+  );
+};
+
 function buildCallsTableColumns(
   entity: string,
   project: string,
@@ -219,7 +262,7 @@ function buildCallsTableColumns(
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
-      field: 'op_name',
+      field: 'summary.weave.trace_name',
       headerName: 'Trace',
       minWidth: 100,
       width: 250,
@@ -233,21 +276,12 @@ function buildCallsTableColumns(
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
-        const opName =
-          rowParams.row.display_name ??
-          opVersionRefOpName(rowParams.row.op_name) ??
-          rowParams.row.op_name;
-        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
-          <CallLink
-            entityName={entity}
-            projectName={project}
-            opName={opName}
-            callId={rowParams.row.id}
-            fullWidth={true}
+          <CallLinkCell
+            rowParams={rowParams}
+            entity={entity}
+            project={project}
             preservePath={preservePath}
-            color={TEAL_600}
-            isEval={isEval}
           />
         );
       },
@@ -306,10 +340,10 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'status',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
-      sortable: false,
+      sortable: true,
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
@@ -618,14 +652,14 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'latency',
+    field: 'summary.weave.latency_ms',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     // Should probably have a custom filter here.
     filterable: false,
-    sortable: false,
+    sortable: true,
     valueGetter: (unused: any, row: any) => {
       if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.

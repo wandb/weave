@@ -213,7 +213,9 @@ def split(self, pattern):
             # If we have a dictionary array, we need to split the dictionary and
             # then re-encode it as a dictionary array.
             return ArrowWeaveList(
-                pc.split_pattern(self._arrow_data.dictionary, pattern),
+                pa.DictionaryArray.from_arrays(
+                    self._arrow_data.indices, pc.split_pattern(self._arrow_data.dictionary, pattern)
+                ),
                 types.optional(types.List(types.String())),
                 self._artifact,
             )
