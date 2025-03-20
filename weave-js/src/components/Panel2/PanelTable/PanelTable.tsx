@@ -947,7 +947,7 @@ const PanelTableInner: React.FC<
                 }
               }}
             />
-            <span style={{lineHeight: '24px'}}>
+            <span style={{lineHeight: '24px'}} data-test="pagination-info">
               &nbsp;-{' '}
               {adjustedIndexOffset +
                 nonPinnedVisibleRows -

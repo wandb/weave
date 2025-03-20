@@ -11,8 +11,8 @@ type TextValueProps = {
 export const TextValue = ({value, onSetValue, type}: TextValueProps) => {
   // TODO: Need to debounce the value change.
   return (
-    <div className="min-w-[200px]">
-      <TextField type={type} value={value} onChange={onSetValue} />
+    <div className="ml-1 min-w-[200px]">
+      <TextField type={type} value={value} onChange={onSetValue} size="small" />
     </div>
   );
 };
