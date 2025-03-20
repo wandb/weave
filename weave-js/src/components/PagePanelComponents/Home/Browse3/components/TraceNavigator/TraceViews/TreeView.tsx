@@ -56,7 +56,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
 
-  const {costNum, costToolTipContent} = getCostFromCostData(
+  const {cost, costToolTipContent} = getCostFromCostData(
     call.summary?.weave?.costs
   );
   const {tokens, tokenToolTipContent} = getTokensFromUsage(call.summary?.usage);
@@ -152,13 +152,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
             <div className="flex items-center gap-2 text-right">
-              {costNum !== undefined && (
+              {cost !== undefined && (
                 <TraceStat
-                  label={
-                    costNum !== 0 && costNum < 0.01
-                      ? '<$0.01'
-                      : `$${costNum.toFixed(2)}`
-                  }
+                  label={cost}
                   tooltip={
                     <div className="text-white-800">
                       {costToolTipContent}
