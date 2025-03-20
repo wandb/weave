@@ -456,6 +456,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -463,7 +464,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # get all parents
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.calls_delete.count": str(
+                        len(req.call_ids)
+                    )
+                }
+            )
+
+        # get the requested calls to delete
         parents = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
@@ -471,26 +481,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
-                    # request minimal columns
                     columns=["id", "parent_id"],
                 )
             )
         )
+        parent_trace_ids = [p.trace_id for p in parents]
 
-        # get all calls with trace_ids matching parents
+        # get first 10k calls with trace_ids matching parents
         all_calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        trace_ids=[p.trace_id for p in parents],
-                    ),
-                    # request minimal columns
+                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
                     columns=["id", "parent_id"],
+                    limit=10_000,
                 )
             )
         )
-
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
             all_calls=all_calls,
@@ -1725,11 +1732,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
         if batch:
             settings = {}
             if self._use_async_insert:
                 settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
             self._insert(
                 "call_parts",
                 data=batch,
@@ -2177,10 +2195,22 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
+    if root_span := ddtrace.tracer.current_span():
+        root_span.set_tags(
+            {
+                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                    len(root_ids)
+                ),
+                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                    len(all_calls)
+                ),
+            }
+        )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:

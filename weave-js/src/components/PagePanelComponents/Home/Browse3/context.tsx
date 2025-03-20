@@ -100,8 +100,9 @@ export const browse2Context = {
     projectName: string,
     traceId: string,
     callId: string,
-    path?: string | null,
-    tracetree?: boolean
+    descendentCallId?: string,
+    hideTraceTree?: boolean,
+    showFeedback?: boolean
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
@@ -350,20 +351,20 @@ export const browse3ContextGen = (
       projectName: string,
       traceId: string,
       callId: string,
-      path?: string | null,
-      tracetree?: boolean,
-      feedbackExpand?: boolean
+      descendentCallId?: string,
+      hideTraceTree?: boolean,
+      showFeedback?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
       const params = new URLSearchParams();
-      if (path) {
-        params.set(PATH_PARAM, path);
+      if (descendentCallId) {
+        params.set(DESCENDENT_CALL_ID_PARAM, descendentCallId);
       }
-      if (tracetree !== undefined) {
-        params.set(TRACETREE_PARAM, tracetree ? '1' : '0');
+      if (hideTraceTree !== undefined) {
+        params.set(HIDE_TRACETREE_PARAM, hideTraceTree ? '1' : '0');
       }
-      if (feedbackExpand !== undefined) {
-        params.set(FEEDBACK_EXPAND_PARAM, feedbackExpand ? '1' : '0');
+      if (showFeedback !== undefined) {
+        params.set(SHOW_FEEDBACK_PARAM, showFeedback ? '1' : '0');
       }
       if (params.toString()) {
         url += '?' + params.toString();
@@ -390,7 +391,7 @@ export const browse3ContextGen = (
       return `${projectRoot(
         entityName,
         projectName
-      )}/calls?${searchParams.toString()}`;
+      )}/traces?${searchParams.toString()}`;
     },
     objectVersionsUIUrl: (
       entityName: string,
@@ -540,9 +541,9 @@ type RouteType = {
     projectName: string,
     traceId: string,
     callId: string,
-    path?: string | null,
-    tracetree?: boolean,
-    feedbackExpand?: boolean
+    descendentCallId?: string,
+    hideTraceTree?: boolean,
+    showFeedback?: boolean
   ) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
@@ -623,9 +624,9 @@ const useSetSearchParam = () => {
 };
 
 export const PEEK_PARAM = 'peekPath';
-export const TRACETREE_PARAM = 'tracetree';
-export const FEEDBACK_EXPAND_PARAM = 'feedbackExpand';
-export const PATH_PARAM = 'path';
+export const HIDE_TRACETREE_PARAM = 'hideTraceTree';
+export const SHOW_FEEDBACK_PARAM = 'showFeedback';
+export const DESCENDENT_CALL_ID_PARAM = 'descendentCallId';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {

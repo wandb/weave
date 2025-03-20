@@ -12,7 +12,7 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
-  {'image.jpg': string} | {'image.png': string}
+  {'image.jpg': string} | {'image.png': string} | {'image.webp': string}
 >;
 
 type PILImageImageProps = {
@@ -54,6 +54,7 @@ const PILImageImageWithSize = ({
   const imageTypes = {
     'image.jpg': 'jpg',
     'image.png': 'png',
+    'image.webp': 'webp',
   } as const;
 
   const imageKey = Object.keys(data.files).find(key => key in imageTypes) as
@@ -101,7 +102,7 @@ const loadImage = (setImageDim: any, imageUrl: string) => {
 };
 
 type PILImageImageWithDataProps = {
-  fileExt: 'jpg' | 'png';
+  fileExt: 'jpg' | 'png' | 'webp';
   buffer: ArrayBuffer;
   containerWidth: number;
   containerHeight: number;
@@ -146,7 +147,7 @@ const PILImageImageWithData = ({
 
 type PILImageImageLoadedProps = {
   url: string;
-  fileExt: 'jpg' | 'png';
+  fileExt: 'jpg' | 'png' | 'webp';
   imageWidth: number;
   imageHeight: number;
   containerWidth: number;
