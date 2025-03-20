@@ -1,6 +1,8 @@
 from functools import wraps
 from typing import Any, Callable, Optional
 
+import rich
+
 import weave
 from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,
@@ -14,18 +16,24 @@ def google_genai_gemini_postprocess_outputs(
 ) -> list[dict[str, Any]]:
     from io import BytesIO
 
-    from PIL import Image
+    from PIL import Image  # type: ignore
 
     modified_outputs = []
     if hasattr(outputs, "generated_images"):
         for image_data in outputs.generated_images:
+            pil_image = None
+            try:
+                pil_image = Image.open(BytesIO(image_data.image.image_bytes))
+            except Exception as e:
+                rich.print(f"Error converting image to `PIL.Image.Image`: {e}")
+
             modified_outputs.append(
                 {
                     "image": {
                         "gcs_uri": image_data.image.gcs_uri,
                         "image_bytes": image_data.image.image_bytes,
                         "mime_type": image_data.image.mime_type,
-                        "image": Image.open(BytesIO(image_data.image.image_bytes)),
+                        "image": pil_image,
                         "rai_filtered_reason": image_data.rai_filtered_reason,
                         "enhanced_prompt": image_data.enhanced_prompt,
                     }
