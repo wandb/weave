@@ -32,6 +32,7 @@ type SelectDatetimeDropdownProps = {
   project: string;
   value: string;
   onChange: (value: string) => void;
+  isActive?: boolean;
 };
 
 export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
@@ -39,6 +40,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   project,
   value,
   onChange,
+  isActive,
 }) => {
   const [inputValue, setInputValue] = useState(value || '');
   const [isDropdownVisible, setDropdownVisible] = useState(false);
@@ -54,6 +56,15 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
+
+  // Auto-expand dropdown when active
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+      setDropdownVisible(true);
+      setIsInputFocused(true);
+    }
+  }, [isActive]);
 
   const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
     const yesterdaySuggestion = parseDate('yesterday')!;

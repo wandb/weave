@@ -78,7 +78,7 @@ export const parseDate = (dateStr: string): Date | null => {
   const units = 'minute|hour|day|week|month|year|second';
 
   // Handle "X days/weeks/months/years ago"
-  const agoPattern = /^(\d+)\s+(${units})s?\s+ago$/i;
+  const agoPattern = new RegExp(`^(\d+)\\s+(${units})s?\\s+ago$`, 'i');
   const agoMatch = lowerStr.match(agoPattern);
   if (agoMatch) {
     const amount = parseInt(agoMatch[1], 10);
@@ -108,7 +108,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle "in X days/weeks/months/years"
-  const inFuturePattern = /^in\s+(\d+)\s+(${units})s?$/i;
+  const inFuturePattern = new RegExp(`^in\\s+(\\d+)\\s+(${units})s?$`, 'i');
   const inFutureMatch = lowerStr.match(inFuturePattern);
   if (inFutureMatch) {
     const amount = parseInt(inFutureMatch[1], 10);
@@ -138,7 +138,7 @@ export const parseDate = (dateStr: string): Date | null => {
   }
 
   // Handle last/next for basic time units
-  const lastNextPattern = /^(last|next)\s+(${units})$/i;
+  const lastNextPattern = new RegExp(`^(last|next)\\s+(${units})$`, 'i');
   const lastNextMatch = lowerStr.match(lastNextPattern);
   if (lastNextMatch) {
     const direction = lastNextMatch[1].toLowerCase();

@@ -259,6 +259,11 @@ export const FilterBar = ({
     setActiveEditId(null);
   }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
+  const onFilterTagClick = useCallback((filterId: FilterId) => {
+    setActiveEditId(filterId);
+    setAnchorEl(refBar.current);
+  }, []);
+
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
   const iconW = 20;
@@ -294,6 +299,7 @@ export const FilterBar = ({
               item={f}
               onRemoveFilter={onRemoveFilter}
               isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
+              onClick={() => onFilterTagClick(f.id)}
             />
           ))}
         </VariableChildrenDisplay>
@@ -346,6 +352,7 @@ export const FilterBar = ({
                   onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
+                  activeEditId={activeEditId}
                 />
               ))}
             </div>
@@ -363,6 +370,7 @@ export const FilterBar = ({
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
+                activeEditId={activeEditId}
               />
             )}
             <div className="mt-8 flex items-center">

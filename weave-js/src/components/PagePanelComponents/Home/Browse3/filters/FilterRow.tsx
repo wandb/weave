@@ -24,6 +24,7 @@ type FilterRowProps = {
   onAddFilter: (field: string) => void;
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
+  activeEditId?: FilterId | null;
 };
 
 export const FilterRow = ({
@@ -34,6 +35,7 @@ export const FilterRow = ({
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
+  activeEditId,
 }: FilterRowProps) => {
   const onSelectField = (field: string) => {
     if (item.id == null) {
@@ -91,6 +93,8 @@ export const FilterRow = ({
             operator={item.operator}
             value={item.value}
             onSetValue={onSetValue}
+            activeEditId={activeEditId}
+            itemId={item.id}
           />
         )}
       </div>

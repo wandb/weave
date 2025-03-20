@@ -8,6 +8,7 @@ import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
+  FilterId,
   getFieldType,
   getStringList,
   isNumericOperator,
@@ -26,6 +27,7 @@ type SelectValueProps = {
   operator: string;
   value: any;
   onSetValue: (value: string) => void;
+  activeEditId?: FilterId | null;
 };
 
 export const SelectValue = ({
@@ -35,7 +37,9 @@ export const SelectValue = ({
   operator,
   value,
   onSetValue,
-}: SelectValueProps) => {
+  activeEditId,
+  itemId,
+}: SelectValueProps & {itemId?: FilterId}) => {
   if (isValuelessOperator(operator)) {
     return null;
   }
@@ -46,6 +50,7 @@ export const SelectValue = ({
   }
 
   const fieldType = getFieldType(field);
+  const isActive = activeEditId === itemId;
 
   if (fieldType === 'id' && operator.endsWith('in')) {
     return <IdList ids={getStringList(value)} type="Call" />;
@@ -54,6 +59,12 @@ export const SelectValue = ({
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
   if (fieldType === 'datetime') {
+    // For date range, only show active state for the last filter
+    const isDateRange = operator === '(date): range';
+    const shouldBeActive = isDateRange
+      ? isActive && field.endsWith('after')
+      : isActive;
+
     return (
       <div className="min-w-[202px]">
         <SelectDatetimeDropdown
@@ -61,6 +72,7 @@ export const SelectValue = ({
           project={project}
           value={value}
           onChange={onSetValue}
+          isActive={shouldBeActive}
         />
       </div>
     );
@@ -71,5 +83,12 @@ export const SelectValue = ({
   }
 
   const type = isNumericOperator(operator) ? 'number' : 'text';
-  return <TextValue value={value} onSetValue={onSetValue} type={type} />;
+  return (
+    <TextValue
+      value={value}
+      onSetValue={onSetValue}
+      type={type}
+      isActive={isActive}
+    />
+  );
 };
