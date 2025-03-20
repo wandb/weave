@@ -1,20 +1,21 @@
-import pytest
 import pyarrow as pa
-from weave_query.arrow.list_ import ArrowWeaveList
+
 from weave_query import weave_types as types
+from weave_query.arrow.list_ import ArrowWeaveList
 from weave_query.ops_arrow.string import (
-    isalpha,
-    split,
-    isnumeric,
-    isalnum,
-    lower,
-    upper,
-    slice,
-    replace,
-    strip,
-    lstrip,
-    rstrip,
     arrowweavelist_len,
+    isalnum,
+    isalpha,
+    isnumeric,
+    lower,
+    lstrip,
+    replace,
+    rstrip,
+    slice,
+    split,
+    strip,
+    to_number,
+    upper,
 )
 
 
@@ -414,4 +415,38 @@ class TestSplitOp:
             ["abc"],
             ["a", "", "b", "c"],
         ]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestToNumberOp:
+    def test_basic(self):
+        arrow_data = [
+            "123",
+            "123.45",  # TODO: utf8_is_numeric returns false for this
+            "abc",
+            "",
+            None,
+        ]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = to_number.eager_call(awl)
+
+        expected = [123.0, None, None, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = [
+            "123",
+            "456",
+            "123.45",  # TODO: utf8_is_numeric returns false for this
+            "abc",
+            "",
+            None,
+        ]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([5, 4, 0, 5, 2, 3]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = to_number.eager_call(awl)
+
+        expected = [None, None, 123.0, None, None, None]
         assert result._arrow_data.to_pylist() == expected

@@ -432,14 +432,18 @@ def join_to_str(arr, sep):
 @arrow_op(
     name="ArrowWeaveListString-toNumber",
     input_type={"self": ArrowWeaveListType(types.String())},
-    output_type=ArrowWeaveListType(types.Number()),
+    output_type=ArrowWeaveListType(types.optional(types.Number())),
 )
 def to_number(self):
-    arrow_data = self._arrow_data
-    is_not_numeric = pc.invert(pc.utf8_is_numeric(arrow_data))
+    def _to_number(arrow_data):
+        is_not_numeric = pc.invert(pc.utf8_is_numeric(arrow_data))
 
-    # need to use kleene logic here for masking
-    mask = pc.and_kleene(is_not_numeric, pa.nulls(len(self)).cast(pa.bool_()))
+        # need to use kleene logic here for masking
+        mask = pc.and_kleene(is_not_numeric, pa.nulls(len(arrow_data)).cast(pa.bool_()))
 
-    new_data = pc.replace_with_mask(arrow_data, mask, arrow_data).cast(pa.float64())
-    return ArrowWeaveList(new_data, types.optional(types.Number()), self._artifact)
+        new_data = pc.replace_with_mask(arrow_data, mask, arrow_data).cast(pa.float64())
+        return new_data
+
+    return util.handle_dictionary_array(
+        self, _to_number, types.optional(types.Number())
+    )
