@@ -1,12 +1,12 @@
 from fastapi import APIRouter, FastAPI
 
 from weave.trace_server.reference.generate import (
-    ServerDependency,
+    ServiceDependency,
     generate_routes,
     noop_trace_server_factory,
 )
 
-server_dependency = ServerDependency(server_factory=noop_trace_server_factory)
+server_dependency = ServiceDependency(service_factory=noop_trace_server_factory)
 trace_service_router = generate_routes(APIRouter(), server_dependency)
 app = FastAPI()
 app.include_router(trace_service_router)

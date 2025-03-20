@@ -978,3 +978,15 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+
+class ServerInfoRes(BaseModel):
+    min_required_weave_python_version: str
+    
+
+class TraceService(Protocol):
+    trace_server_interface: TraceServerInterface
+    
+    def server_info(self) -> ServerInfoRes: ...
+    def read_root(self) -> dict[str, str]: ...
+    
