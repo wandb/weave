@@ -381,12 +381,22 @@ class SavedView:
         self.base.definition.filters = None
         return self
 
+    def _check_empty_call_filter(self) -> None:
+        """If all of the call filters are None, remove it."""
+        if self.base.definition.filter:
+            # Check if all fields in the filter are None
+            filter_fields = self.base.definition.filter.model_dump()
+            all_none = all(value is None for value in filter_fields.values())
+            if all_none:
+                self.base.definition.filter = None
+
     # TODO: Support other call filters such as parent_ids, call_ids, etc.
 
     def filter_op(self, op_name: str | None) -> SavedView:
         if op_name is None:
             if self.base.definition.filter:
                 self.base.definition.filter.op_names = None
+                self._check_empty_call_filter()
         else:
             op_uri = op_name
             if not op_uri.startswith("weave:///"):
@@ -539,6 +549,10 @@ class SavedView:
     @property
     def name(self) -> str:
         return self.base.label
+
+    @property
+    def table(self) -> str:
+        return self.base.table
 
     def _repr_pretty_(self, p: Any, cycle: bool) -> None:
         """Show a nicely formatted table in ipython."""

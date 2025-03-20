@@ -1,5 +1,7 @@
 import datetime
 
+import pytest
+
 import weave
 from weave.flow.saved_view import filters_to_query, to_seconds
 from weave.trace.api import ObjectRef
@@ -22,10 +24,105 @@ def test_filters_to_query():
     assert filters_to_query(Filters()) is None
 
 
+def test_filter_op_without_client():
+    """If we haven't done an init, we don't know what entity/project a non-qualified op name is in."""
+    with pytest.raises(
+        ValueError, match="Must specify Op URI if entity/project is not known"
+    ):
+        weave.SavedView("traces", "My saved view").filter_op(
+            "Evaluation.predict_and_score"
+        )
+
+
+def test_filter_op_with_client(client):
+    view = weave.SavedView("traces", "My saved view").filter_op(
+        "Evaluation.predict_and_score"
+    )
+    assert view.base.definition.filter.op_names == [
+        "weave:///shawn/test-project/op/Evaluation.predict_and_score:*"
+    ]
+    view.filter_op(None)
+    assert view.base.definition.filter is None
+
+
+def test_filter_manipulation():
+    view = weave.SavedView("traces", "My saved view")
+
+    view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
+    assert view.base.definition.filters is not None
+    assert view.base.definition.filters.items[0].field == "inputs.model"
+    assert view.base.definition.filters.items[0].operator == "(string): equals"
+    assert view.base.definition.filters.items[0].value == "gpt-3.5-turbo"
+    view.remove_filters()
+    assert view.base.definition.filters is None
+
+    view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
+    view.remove_filter("inputs.model")
+    assert view.base.definition.filters is None
+
+    view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
+    view.remove_filter("inputs.model")
+    assert view.base.definition.filters is None
+
+
+def test_column_manipulation():
+    view = weave.SavedView("traces", "My saved view")
+
+    # Removing a column that doesn't exist doesn't error
+    view.remove_column("inputs.foo")
+
+    # Removing all columns is same as having none specified
+    view.add_column("inputs.foo")
+    view.remove_column("inputs.foo")
+    assert view.base.definition.columns is None
+
+    view.set_columns("id", "inputs.model")
+    assert len(view.base.definition.columns) == 2
+    assert view.base.definition.columns[0].path == ["id"]
+    assert view.base.definition.columns[0].label is None
+    assert view.base.definition.columns[1].path == ["inputs", "model"]
+    assert view.base.definition.columns[1].label is None
+
+    assert view.column_index(1) == 1
+    assert view.column_index("inputs.model") == 1
+    with pytest.raises(ValueError, match='Column "foo" not found'):
+        view.column_index("foo")
+
+    view.remove_column(0)
+    assert len(view.base.definition.columns) == 1
+    assert view.base.definition.columns[0].path == ["inputs", "model"]
+
+    view.rename_column(0, "new_inputs_model_name")
+    assert view.base.definition.columns[0].label == "new_inputs_model_name"
+
+    view.remove_columns()
+    assert view.base.definition.columns is None
+
+    view.add_column("inputs.foo")
+    view.insert_column(0, "inputs.bar")
+    assert len(view.base.definition.columns) == 2
+    assert view.base.definition.columns[0].path == ["inputs", "bar"]
+    assert view.base.definition.columns[1].path == ["inputs", "foo"]
+    view.remove_columns("inputs.bar")
+    assert len(view.base.definition.columns) == 1
+    assert view.base.definition.columns[0].path == ["inputs", "foo"]
+
+
 def test_saved_view_create(client):
     view = weave.SavedView("traces", "My saved view").hide_column("feedback").save()
     assert view.name == "My saved view"
     assert isinstance(view.ref, ObjectRef)
+
+
+def test_saved_view_load(client):
+    saved_view = weave.SavedView("traces", "My saved view")
+    saved_view.show_column("attributes.weave.client_version")
+    saved_view.save()
+    uri = saved_view.ref.uri()
+    loaded_view = weave.SavedView.load(uri)
+    assert loaded_view.name == saved_view.name
+    assert loaded_view.table == saved_view.table
+    assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True
 
 
 def test_saved_view_column_pinning():
