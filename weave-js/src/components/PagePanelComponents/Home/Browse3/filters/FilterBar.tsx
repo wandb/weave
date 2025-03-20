@@ -26,6 +26,7 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
@@ -64,6 +65,7 @@ export const FilterBar = ({
   // local filter model is used to avoid triggering a re-render of the trace
   // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
+  const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
   useEffect(() => {
     setLocalFilterModel(filterModel);
   }, [filterModel]);
@@ -190,6 +192,9 @@ export const FilterBar = ({
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
+      // Set this filter as active edit, highlighting filter bar children in teal
+      setActiveEditId(item.id);
+
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
         updateLocalAndDebouncedFilterModel(newModel);
@@ -213,21 +218,26 @@ export const FilterBar = ({
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
       setFilterModel(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterId) {
+        setActiveEditId(null);
+      }
     },
-    [localFilterModel, setFilterModel]
+    [localFilterModel, setFilterModel, activeEditId]
   );
 
   const onSetSelected = useCallback(() => {
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
@@ -240,6 +250,9 @@ export const FilterBar = ({
     setFilterModel(newModel);
     clearSelectedCalls();
     setAnchorEl(null);
+
+    // Clear active edit when popover is closed
+    setActiveEditId(null);
   }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
   const outlineW = 2 * 2;
@@ -252,6 +265,11 @@ export const FilterBar = ({
   const completeItems = localFilterModel.items.filter(
     f => !isFilterIncomplete(f)
   );
+
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
+  }, [completeItems, activeEditId]);
 
   return (
     <>
@@ -266,11 +284,12 @@ export const FilterBar = ({
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
             />
           ))}
         </VariableChildrenDisplay>
@@ -295,7 +314,10 @@ export const FilterBar = ({
             },
           },
         }}
-        onClose={() => setAnchorEl(null)}
+        onClose={() => {
+          setAnchorEl(null);
+          setActiveEditId(null); // Clear active edit when popover is closed
+        }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="p-12">

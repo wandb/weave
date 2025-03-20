@@ -32,13 +32,13 @@ const ProviderStatus = ({isActive}: {isActive: boolean}) => {
 const columns: GridColDef[] = [
   {
     field: 'name',
-    headerName: 'NAME',
+    headerName: 'Name',
     flex: 0.2,
     minWidth: 200,
   },
   {
     field: 'status',
-    headerName: 'STATUS',
+    headerName: 'Status',
     flex: 0.2,
     minWidth: 200,
     renderCell: (params: GridRenderCellParams) => (
@@ -65,14 +65,14 @@ const columns: GridColDef[] = [
           }}>
           {params.value || 'None'}
         </span>
-        {params.row.isAdmin && (
+        {params.row.isAdmin && !params.row.status && (
           <Link
             to={`/${params.row.entityName}/settings`}
             $variant="secondary"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2">
-            {'Add team secret'}
+            Add team secret
             <Icon name="forward-next" />
           </Link>
         )}
@@ -124,9 +124,9 @@ const customColumns: GridColDef[] = [
 ];
 
 export const ProvidersTabInner: React.FC<{
-  entityName?: string;
-  projectName?: string;
-}> = ({entityName = '', projectName = ''}) => {
+  entityName: string;
+  projectName: string;
+}> = ({entityName, projectName}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const {objectDeleteAllVersions} = useObjectDeleteFunc();
 
@@ -134,7 +134,7 @@ export const ProvidersTabInner: React.FC<{
   const [editingProvider, setEditingProvider] = React.useState<any>(null);
   const [deletingProvider, setDeletingProvider] = React.useState<any>(null);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isAdmin = !loadingUserInfo && userInfo?.admin;
+  const isAdmin = !loadingUserInfo && userInfo?.roles[entityName] === 'admin';
 
   const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entityName);
@@ -386,9 +386,9 @@ export const ProvidersTabInner: React.FC<{
 };
 
 export const ProvidersTab: React.FC<{
-  entityName?: string;
-  projectName?: string;
-}> = ({entityName = '', projectName = ''}) => {
+  entityName: string;
+  projectName: string;
+}> = ({entityName, projectName}) => {
   return (
     <ApolloProvider client={makeGorillaApolloClient()}>
       <WFDataModelAutoProvider

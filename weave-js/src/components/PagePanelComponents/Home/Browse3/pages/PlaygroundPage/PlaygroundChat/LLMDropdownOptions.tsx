@@ -32,12 +32,14 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
   entity: string;
   project: string;
+  isAdmin?: boolean;
 }
 
 export const DisabledProviderTooltip: React.FC<{
   children: React.ReactNode;
   entity: string;
-}> = ({children, entity}) => {
+  isAdmin?: boolean;
+}> = ({children, entity, isAdmin = false}) => {
   return (
     <Tooltip
       trigger={children}
@@ -53,17 +55,21 @@ export const DisabledProviderTooltip: React.FC<{
           <div>This provider is not configured.</div>
           <div>
             Check{' '}
-            <Link
-              to={`/${entity}/settings`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: TEAL_500,
-                textDecoration: 'none',
-              }}
-              className="hover:opacity-80">
-              missing secrets
-            </Link>{' '}
+            {isAdmin ? (
+              <Link
+                to={`/${entity}/settings`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: TEAL_500,
+                  textDecoration: 'none',
+                }}
+                className="hover:opacity-80">
+                missing secrets
+              </Link>
+            ) : (
+              'missing secrets'
+            )}{' '}
             to enable it.
           </div>
         </Box>
@@ -132,6 +138,7 @@ const SubMenuOption = ({
   onChange,
   entity,
   project,
+  isAdmin,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -207,7 +214,7 @@ const SubMenuOption = ({
   }
 
   return isDisabled ? (
-    <DisabledProviderTooltip entity={entity}>
+    <DisabledProviderTooltip entity={entity} isAdmin={isAdmin}>
       {optionContent}
     </DisabledProviderTooltip>
   ) : (
@@ -220,6 +227,7 @@ export const CustomOption = ({
   onChange,
   entity,
   project,
+  isAdmin,
   ...props
 }: CustomOptionProps) => {
   const {inputValue} = props.selectProps;
@@ -291,7 +299,8 @@ export const CustomOption = ({
       {...props}
       onChange={onChange}
       entity={entity}
-      project={project}>
+      project={project}
+      isAdmin={isAdmin}>
       {children}
     </SubMenuOption>
   );
