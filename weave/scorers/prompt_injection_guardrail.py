@@ -1,8 +1,7 @@
 import warnings
 from typing import Any, Optional
 
-from litellm import acompletion
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
@@ -12,6 +11,7 @@ from weave.scorers.prompts import (
     PROMPT_INJECTION_GUARDRAIL_USER_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
+from weave.scorers.scorer_types import LLMScorer
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -24,7 +24,7 @@ class LLMGuardrailReasoning(BaseModel):
 SUPPORTED_MODELS = ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini", "o1", "o3-mini"]
 
 
-class PromptInjectionLLMGuardrail(weave.Scorer):
+class PromptInjectionLLMGuardrail(LLMScorer):
     """
     The `PromptInjectionLLMGuardrail` uses an LLM to assess whether a prompt
     is a prompt injection attack or not. It uses a prompting strategy that is based on
@@ -41,8 +41,14 @@ class PromptInjectionLLMGuardrail(weave.Scorer):
 
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens allowed in the LLM's response",
+    )
 
     def model_post_init(self, __context: Any) -> None:
         if self.model_id not in SUPPORTED_MODELS:
@@ -52,12 +58,12 @@ class PromptInjectionLLMGuardrail(weave.Scorer):
             )
 
     @weave.op
-    async def score(self, output: str) -> dict[str, Any]:
+    async def score(self, output: str) -> WeaveScorerResult:
         user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
             prompt=output,
         )
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},

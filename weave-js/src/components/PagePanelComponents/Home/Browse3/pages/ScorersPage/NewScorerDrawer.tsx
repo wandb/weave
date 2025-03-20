@@ -10,7 +10,6 @@ import React, {
   useState,
 } from 'react';
 
-import {useShowRunnableUI} from '../CallPage/CallPage';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
@@ -127,16 +126,13 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   }, [selectedScorerType, entity, project, formData, getClient, onClose]);
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
-  const showRunnableUI = useShowRunnableUI();
 
   // Here, we hide the LLM judge option from non-admins since the
   // feature is in active development. We want to be able to get
   // feedback without enabling for all users.
   const options = useMemo(() => {
-    return scorerTypeOptions.filter(
-      opt => showRunnableUI || opt.value !== LLM_JUDGE_VALUE
-    );
-  }, [showRunnableUI]);
+    return scorerTypeOptions.filter(opt => opt.value !== LLM_JUDGE_VALUE);
+  }, []);
 
   const handleClose = () => {
     setFormData(null);
