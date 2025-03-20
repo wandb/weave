@@ -1083,7 +1083,7 @@ def _create_like_optimized_eq_condition(
 
     # Boolean literals are not wrapped in quotes in JSON payloads
     if literal_value in ("true", "false"):
-        like_pattern = f'%{literal_value}%'
+        like_pattern = f"%{literal_value}%"
     else:
         like_pattern = f'%"{literal_value}"%'
 
