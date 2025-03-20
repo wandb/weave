@@ -194,9 +194,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const indentMultiplier = 14;
   const callTypeIcon = getCallTypeIcon(typeName);
 
-  // Ensure we never render with negative indentation
-  const safeLevel = Math.max(0, level);
-
   return (
     <div style={style}>
       <Button
@@ -211,18 +208,21 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
-              style={{marginLeft: safeLevel * indentMultiplier}}
+              style={{marginLeft: level * indentMultiplier}}
               className={`h-[32px]`}
             />
             {/* Render vertical lines for each level of hierarchy */}
-            {Array.from({length: safeLevel}).map((_, idx) => (
+            {Array.from({length: level}).map((_, idx) => (
               <div
                 key={`line-${idx}`}
-                style={{left: idx * indentMultiplier, marginLeft: 8}}
-                className="absolute top-0 h-full w-px border-l border-moon-300"
+                style={{
+                  left: idx * indentMultiplier + 8,
+                  height: '100%',
+                }}
+                className="absolute top-0 w-px border-l border-moon-300"
               />
             ))}
-            {hasChildren && (
+            {hasChildren ? (
               <Icon
                 name={chevronIcon}
                 size="small"
@@ -232,8 +232,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 }}
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
+            ) : (
+              /* Use an invisible icon to maintain consistent spacing */
+              <div className="h-5 w-5 shrink-0"></div>
             )}
-            <div className="truncate pl-4 font-medium">
+            <div className="truncate pl-2 font-medium">
               <Tooltip
                 trigger={
                   <div className="truncate">{renderHighlightedText()}</div>
@@ -523,13 +526,10 @@ export const TreeView: React.FC<
         return !filterSet || filterSet.has(childId);
       });
 
-      // Ensure level is always >= 0 to prevent negative indentation
-      const safeLevel = Math.max(0, level);
-
       result.push({
         id: node.id,
         call: node.call,
-        level: safeLevel,
+        level: level,
         isExpanded,
         isVisible: true,
         childrenIds: filteredChildren,
@@ -540,8 +540,7 @@ export const TreeView: React.FC<
         filteredChildren.forEach((childId: string) => {
           const child = traceTreeFlat[childId];
           if (child && (!filterSet || filterSet.has(childId))) {
-            // Ensure child level is always greater than parent level
-            processNode(child, safeLevel + 1);
+            processNode(child, level + 1);
           }
         });
       }
