@@ -46,6 +46,7 @@ def get_dspy_patcher(
 
     _dspy_patcher = DSPyPatcher(
         [
+            get_symbol_patcher("dspy", "LM.__call__", base),
             get_symbol_patcher("dspy", "Embedder.__call__", base),
             get_symbol_patcher("dspy", "ColBERTv2.__call__", base),
             get_symbol_patcher("dspy", "BootstrapFinetune.compile", base),

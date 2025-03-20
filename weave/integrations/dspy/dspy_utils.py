@@ -1,6 +1,8 @@
 import importlib
 from typing import TYPE_CHECKING, Any, Callable, Union
 
+from pydantic import BaseModel
+
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
@@ -60,7 +62,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], Predict) or isinstance(inputs["self"], Adapter):
             if hasattr(inputs["self"], "signature"):
-                if hasattr(inputs["self"].signature, "model_json_schema"):
+                if isinstance(inputs["self"].signature, BaseModel):
                     dictified_inputs_self["signature"] = inputs[
                         "self"
                     ].signature.model_json_schema()

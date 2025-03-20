@@ -23,30 +23,6 @@ if not import_failed:
         def __init__(self) -> None:
             self._call_map: dict[str, Call] = {}
 
-        def on_lm_start(
-            self, call_id: str, instance: Any, inputs: dict[str, Any]
-        ) -> None:
-            gc = weave_client_context.require_weave_client()
-            if instance is not None:
-                inputs = {"self": dictify(instance), **inputs}
-            self._call_map[call_id] = gc.create_call(
-                "dspy.LM",
-                inputs=dspy_postprocess_inputs(inputs),
-                display_name="dspy.LM",
-            )
-
-        def on_lm_end(
-            self,
-            call_id: str,
-            outputs: Optional[Any],
-            exception: Optional[Exception] = None,
-        ) -> None:
-            gc = weave_client_context.require_weave_client()
-            if call_id in self._call_map:
-                gc.finish_call(
-                    self._call_map[call_id], dump_dspy_objects(outputs), exception
-                )
-
         def on_module_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
