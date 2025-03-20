@@ -194,6 +194,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const indentMultiplier = 14;
   const callTypeIcon = getCallTypeIcon(typeName);
 
+  // Ensure we never render with negative indentation
+  const safeLevel = Math.max(0, level);
+
   return (
     <div style={style}>
       <Button
@@ -208,11 +211,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
-              style={{marginLeft: level * indentMultiplier}}
+              style={{marginLeft: safeLevel * indentMultiplier}}
               className={`h-[32px]`}
             />
             {/* Render vertical lines for each level of hierarchy */}
-            {Array.from({length: level}).map((_, idx) => (
+            {Array.from({length: safeLevel}).map((_, idx) => (
               <div
                 key={`line-${idx}`}
                 style={{left: idx * indentMultiplier, marginLeft: 8}}
@@ -519,10 +522,14 @@ export const TreeView: React.FC<
       const filteredChildren = node.childrenIds.filter(childId => {
         return !filterSet || filterSet.has(childId);
       });
+
+      // Ensure level is always >= 0 to prevent negative indentation
+      const safeLevel = Math.max(0, level);
+
       result.push({
         id: node.id,
         call: node.call,
-        level,
+        level: safeLevel,
         isExpanded,
         isVisible: true,
         childrenIds: filteredChildren,
@@ -533,7 +540,8 @@ export const TreeView: React.FC<
         filteredChildren.forEach((childId: string) => {
           const child = traceTreeFlat[childId];
           if (child && (!filterSet || filterSet.has(childId))) {
-            processNode(child, level + 1);
+            // Ensure child level is always greater than parent level
+            processNode(child, safeLevel + 1);
           }
         });
       }
