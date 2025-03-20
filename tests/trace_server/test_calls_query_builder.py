@@ -306,9 +306,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_3": '$."param"."val"',
             "pb_4": "hello",
             "pb_5": '$."param"."bool"',
-            "pb_6": 'true',
+            "pb_6": "true",
             "pb_7": '%"hello"%',
-            "pb_8": '%true%',
+            "pb_8": "%true%",
         },
     )
 
