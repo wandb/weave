@@ -19,7 +19,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     dictionary of attributes that can be displayed in the Weave UI.
     """
     # Extract the model name from the inputs and ensure it is present in the inputs
-    model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
+    model_name = getattr(inputs["self"], "_model", None)
     if model_name is not None:
         inputs["model"] = model_name
 
