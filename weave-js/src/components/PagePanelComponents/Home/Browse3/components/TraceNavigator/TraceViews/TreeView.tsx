@@ -14,10 +14,7 @@ import {
 } from '../../../pages/CallPage/cost';
 import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
-import {
-  parseSpanName,
-  traceCallStatusCode,
-} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
@@ -157,7 +154,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             <div className="flex items-center gap-2 text-right">
               {costNum !== undefined && (
                 <TraceStat
-                  label={costNum !== 0 && costNum < 0.01 ? '<$0.01' : `$${costNum.toFixed(2)}`}
+                  label={
+                    costNum !== 0 && costNum < 0.01
+                      ? '<$0.01'
+                      : `$${costNum.toFixed(2)}`
+                  }
                   tooltip={
                     <div className="text-white-800">
                       {costToolTipContent}
@@ -176,7 +177,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 />
               )}
               {duration !== null && (
-                <span className="text-moon-400 min-w-[34px]">{formatDuration(duration)}</span>
+                <span className="min-w-[34px] text-moon-400">
+                  {formatDuration(duration)}
+                </span>
               )}
             </div>
             <StatusChip value={statusCode} iconOnly />
