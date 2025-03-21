@@ -8,12 +8,7 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-def test_crewai_simple_crew(client: WeaveClient) -> None:
+def get_crew():
     from crewai import Agent, Crew, Process, Task
 
     researcher = Agent(
@@ -35,7 +30,17 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
         verbose=True,
     )
 
-    result = crew.kickoff()
+    return crew
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_crewai_simple_crew(client: WeaveClient) -> None:
+    crew = get_crew()
+    _ = crew.kickoff()
 
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
@@ -160,3 +165,45 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
         "I now can give a great answer  \nFinal Answer:"
         in call_5.output["choices"][0]["message"]["content"]
     )
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
+    crew = get_crew()
+    _ = crew.kickoff_for_each(inputs=[{"input1": "input1"}, {"input2": "input2"}])
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    assert len(flattened_calls) == 13
+    print(flattened_calls_to_names(flattened_calls))
+
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("crewai.Crew.kickoff_for_each", 0),
+        ("crewai.Crew.kickoff", 1),
+        ("crewai.Task.execute_sync", 2),
+        ("crewai.Agent.execute_task", 3),
+        ("crewai.LLM.call", 4),
+        ("litellm.completion", 5),
+        ("openai.chat.completions.create", 6),
+        ("crewai.Crew.kickoff", 1),
+        ("crewai.Task.execute_sync", 2),
+        ("crewai.Agent.execute_task", 3),
+        ("crewai.LLM.call", 4),
+        ("litellm.completion", 5),
+        ("openai.chat.completions.create", 6),
+    ]
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.exception is None
+    assert call_0.started_at < call_0.ended_at
+
+    inputs = call_0.inputs
+    assert inputs["inputs"] == [{"input1": "input1"}, {"input2": "input2"}]
+
+    outputs = call_0.output
+    assert len(outputs) == 2
