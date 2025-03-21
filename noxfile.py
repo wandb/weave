@@ -98,6 +98,16 @@ def tests(session, shard):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
+    # seems to resolve ci issues
+    if shard == "llamaindex":
+        session.posargs.insert(0, "-n4")
+
+    # Only adding parallelism for trace tests since they are the slowest.
+    # Adding parallelism in other shards can lead to weird failures.
+    if shard == "trace":
+        n_cpus = session.env.get("WEAVE_TEST_N_CPUS", os.cpu_count())
+        session.posargs.insert(0, f"-n={n_cpus}")
+
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
@@ -109,10 +119,6 @@ def tests(session, shard):
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
-
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
 
     session.run(
         "pytest",
