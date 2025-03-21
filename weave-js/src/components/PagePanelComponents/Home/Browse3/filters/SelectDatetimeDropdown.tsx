@@ -69,6 +69,18 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Set default value to 1mo if no valid date
+  useEffect(() => {
+    if (!value) {
+      const defaultDate = parseDate('1mo');
+      if (defaultDate) {
+        const utcDate = formatDate(defaultDate, 'YYYY-MM-DD HH:mm:ss', true);
+        onChange(utcDate);
+        setInputValue(utcToLocalTimeString(utcDate));
+      }
+    }
+  }, []);
+
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
 
