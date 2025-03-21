@@ -5,6 +5,7 @@ import React from 'react';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {
   make3MonthsLongDateFilter,
+  makeDefaultDateFilter,
   makeYearLongDateFilter,
 } from '../../filters/common';
 import {Empty} from '../common/Empty';
@@ -101,12 +102,17 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
     if (dateFilter?.value) {
       const filterDate = new Date(dateFilter.value);
       const now = new Date();
+
       const daysDifference = Math.round(
         (now.getTime() - filterDate.getTime()) / (24 * 60 * 60 * 1000)
       );
 
+      // If the filter is < 30 expand to 30
+      if (daysDifference < 30) {
+        newDateFilter = makeDefaultDateFilter();
+      }
       // If the current filter is approximately 30 days, expand to 3 months
-      if (daysDifference >= 25 && daysDifference <= 35) {
+      else if (daysDifference >= 25 && daysDifference <= 35) {
         newDateFilter = make3MonthsLongDateFilter();
       }
       // If the current filter is approximately 3 months, expand to 1 year
