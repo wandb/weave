@@ -315,7 +315,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 
 To apply scorers to your Weave ops, you'll need to use the `.call()` method which provides access to both the operation's result and its tracking information. This allows you to associate scorer results with specific calls in Weave's database.
 
-For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.mdx#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
+For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
