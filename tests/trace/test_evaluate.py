@@ -446,3 +446,18 @@ def test_evaluate_async_happens_in_parallel(client):
     end = time.time()
     print(f"Time taken: {end - start}")
     assert end - start < 2
+
+
+    class AsyncModel1(Model):
+        @weave.op()
+        async def predict(self, a):
+            await asyncio.sleep(1)
+            return a
+        
+
+    evaluation = Evaluation(dataset=simple_ds, scorers=[score_simple])
+    start = time.time()
+    result = asyncio.run(evaluation.evaluate(AsyncModel1()))
+    end = time.time()
+    print(f"Time taken: {end - start}")
+    assert end - start < 2
