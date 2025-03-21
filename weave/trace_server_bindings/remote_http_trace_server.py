@@ -39,9 +39,8 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
-REMOTE_REQUEST_BYTES_LIMIT = (
-    (32 - 1) * 1024 * 1024
-)  # 32 MiB (real limit) - 1 MiB (buffer)
+# 32 MiB (real limit) - 1 MiB (buffer)
+REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
