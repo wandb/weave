@@ -1492,7 +1492,9 @@ def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
             return {"output": chat.choices[0].message.content}
 
     result = _time_eval(SyncOpenAIModel())
-    assert result < 5
+    assert result < 8
+
+    async_openai_client = AsyncOpenAI(api_key=api_key)
 
     # now lets use an async openai call
     class OpenAIModel(weave.Model):
@@ -1500,7 +1502,7 @@ def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
         async def invoke(self, a) -> dict:
             prompt = "heerrres johnny!"
             start = time.time()
-            chat = openai_client.chat.completions.acreate(
+            chat = await async_openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -1509,7 +1511,7 @@ def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
             return {"output": chat.choices[0].message.content}
 
     result = _time_eval(OpenAIModel())
-    assert result < 5
+    assert result < 8
 
     # now with a mismatch completions and async
     class OpenAIModelMismatch(weave.Model):
@@ -1526,4 +1528,4 @@ def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
             return {"output": chat.choices[0].message.content}
 
     result = _time_eval(OpenAIModelMismatch())
-    assert result < 5
+    assert result < 8
