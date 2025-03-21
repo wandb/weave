@@ -42,6 +42,9 @@ export const MessagePanelPart = ({
       </div>
     );
   }
+  if (value.type === 'tool_result' && 'content' in value) {
+    return <CodeEditor value={value.content as string} readOnly/>;
+  }
   if ('name' in value) {
     return (
       <span>

@@ -109,6 +109,18 @@ export const isInternalMessage = (part: any): boolean => {
     }
     return true;
   }
+
+  // Anthropic tool result
+  if (part.type === 'tool_result') {
+    if (!hasStringProp(part, 'tool_use_id')) {
+      return false;
+    }
+    if (!hasStringProp(part, 'content')) {
+      return false;
+    }
+    return true;
+  }
+
   return false;
 };
 
