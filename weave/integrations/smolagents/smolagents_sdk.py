@@ -92,6 +92,25 @@ def get_smolagents_patcher(
         get_symbol_patcher("smolagents", "ToolCallingAgent.step", base),
         get_symbol_patcher("smolagents", "CodeAgent.initialize_system_prompt", base),
         get_symbol_patcher("smolagents", "CodeAgent.step", base),
+        # Patch relevant Tool functions
+        get_symbol_patcher("smolagents", "Tool.forward", base),
+        get_symbol_patcher("smolagents", "Tool.__call__", base),
+        get_symbol_patcher("smolagents", "PipelineTool.forward", base),
+        get_symbol_patcher("smolagents", "PipelineTool.__call__", base),
+        get_symbol_patcher("smolagents", "PythonInterpreterTool.forward", base),
+        get_symbol_patcher("smolagents", "PythonInterpreterTool.__call__", base),
+        get_symbol_patcher("smolagents", "FinalAnswerTool.forward", base),
+        get_symbol_patcher("smolagents", "FinalAnswerTool.__call__", base),
+        get_symbol_patcher("smolagents", "UserInputTool.forward", base),
+        get_symbol_patcher("smolagents", "UserInputTool.__call__", base),
+        get_symbol_patcher("smolagents", "DuckDuckGoSearchTool.forward", base),
+        get_symbol_patcher("smolagents", "DuckDuckGoSearchTool.__call__", base),
+        get_symbol_patcher("smolagents", "GoogleSearchTool.forward", base),
+        get_symbol_patcher("smolagents", "GoogleSearchTool.__call__", base),
+        get_symbol_patcher("smolagents", "VisitWebpageTool.forward", base),
+        get_symbol_patcher("smolagents", "VisitWebpageTool.__call__", base),
+        get_symbol_patcher("smolagents", "SpeechToTextTool.forward", base),
+        get_symbol_patcher("smolagents", "SpeechToTextTool.__call__", base),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
