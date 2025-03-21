@@ -425,3 +425,24 @@ def test_evaluate_table_lazy_iter(client):
     # so the first count can be different.
     count = counts_split_by_table_query[0]
     assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
+
+
+@pytest.mark.asyncio
+def test_evaluate_async_happens_in_parallel(client):
+    simple_ds = Dataset(rows=[{"a": i} for i in range(10)])
+
+    @weave.op()
+    def score_simple(a, output):
+        return a == output
+
+    @weave.op()
+    async def async_op(a):
+        await asyncio.sleep(1)
+        return a
+
+    evaluation = Evaluation(dataset=simple_ds, scorers=[score_simple])
+    start = time.time()
+    result = asyncio.run(evaluation.evaluate(async_op))
+    end = time.time()
+    print(f"Time taken: {end - start}")
+    assert end - start < 2
