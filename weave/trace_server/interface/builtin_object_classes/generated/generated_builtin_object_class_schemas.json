@@ -146,6 +146,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -161,66 +164,6 @@
         "target_words"
       ],
       "title": "ContainsWordsActionConfig",
-      "type": "object"
-    },
-    "LLMModel": {
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "provider_model": {
-          "title": "Provider Model",
-          "type": "string"
-        },
-        "prompt": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Prompt"
-        },
-        "default_params": {
-          "$ref": "#/$defs/ModelParams",
-          "default": {
-            "temperature": null,
-            "top_p": null,
-            "max_tokens": null,
-            "presence_penalty": null,
-            "frequency_penalty": null,
-            "stop": null
-          }
-        }
-      },
-      "required": [
-        "provider_model"
-      ],
-      "title": "LLMModel",
       "type": "object"
     },
     "Leaderboard": {
@@ -303,6 +246,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -330,205 +276,6 @@
       ],
       "title": "LlmJudgeActionConfig",
       "type": "object"
-    },
-    "ModelMode": {
-      "enum": [
-        "completion",
-        "chat"
-      ],
-      "title": "ModelMode",
-      "type": "string"
-    },
-    "ModelParams": {
-      "properties": {
-        "temperature": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Temperature"
-        },
-        "top_p": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Top P"
-        },
-        "max_tokens": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Max Tokens"
-        },
-        "presence_penalty": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Presence Penalty"
-        },
-        "frequency_penalty": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Frequency Penalty"
-        },
-        "stop": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Stop"
-        }
-      },
-      "title": "ModelParams",
-      "type": "object"
-    },
-    "Provider": {
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "base_url": {
-          "title": "Base Url",
-          "type": "string"
-        },
-        "api_key_name": {
-          "title": "Api Key Name",
-          "type": "string"
-        },
-        "extra_headers": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {},
-          "title": "Extra Headers",
-          "type": "object"
-        },
-        "return_type": {
-          "$ref": "#/$defs/ReturnType",
-          "default": "openai"
-        }
-      },
-      "required": [
-        "base_url",
-        "api_key_name"
-      ],
-      "title": "Provider",
-      "type": "object"
-    },
-    "ProviderModel": {
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "provider": {
-          "title": "Provider",
-          "type": "string"
-        },
-        "max_tokens": {
-          "title": "Max Tokens",
-          "type": "integer"
-        },
-        "mode": {
-          "$ref": "#/$defs/ModelMode",
-          "default": "chat"
-        }
-      },
-      "required": [
-        "provider",
-        "max_tokens"
-      ],
-      "title": "ProviderModel",
-      "type": "object"
-    },
-    "ReturnType": {
-      "enum": [
-        "openai"
-      ],
-      "title": "ReturnType",
-      "type": "string"
     },
     "TestOnlyExample": {
       "properties": {
@@ -642,15 +389,6 @@
     },
     "AnnotationSpec": {
       "$ref": "#/$defs/AnnotationSpec"
-    },
-    "Provider": {
-      "$ref": "#/$defs/Provider"
-    },
-    "LLMModel": {
-      "$ref": "#/$defs/LLMModel"
-    },
-    "ProviderModel": {
-      "$ref": "#/$defs/ProviderModel"
     }
   },
   "required": [
@@ -658,10 +396,7 @@
     "TestOnlyNestedBaseObject",
     "Leaderboard",
     "ActionSpec",
-    "AnnotationSpec",
-    "Provider",
-    "LLMModel",
-    "ProviderModel"
+    "AnnotationSpec"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
