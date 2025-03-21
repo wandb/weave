@@ -111,6 +111,7 @@
     "react-datetime": "^3",
     "react-diff-viewer": "^3.1.1",
     "react-dom": "^18.3.1",
+    "react-flame-graph": "^1.4.0",
     "react-hook-mousetrap": "^2.0.4",
     "react-intersection-observer": "^8.31.0",
     "react-markdown": "^8.0.7",
