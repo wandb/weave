@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.params import Header
 from fastapi.responses import StreamingResponse
 
+import weave.trace_server.trace_service
 from weave.trace_server import trace_server_interface as tsi
 
 SERVICE_TAG_NAME = "Service"
@@ -46,8 +47,8 @@ class NoopTraceService:
         # this is a stub that does nothing).
         self.trace_server_interface: tsi.TraceServerInterface = NoopTraceServer()  # type: ignore
 
-    def server_info(self) -> tsi.ServerInfoRes:
-        return tsi.ServerInfoRes(
+    def server_info(self) -> weave.trace_server.trace_service.ServerInfoRes:
+        return weave.trace_server.trace_service.ServerInfoRes(
             min_required_weave_python_version="0.0.1",
         )
 
@@ -55,7 +56,9 @@ class NoopTraceService:
         return {"status": "ok"}
 
 
-def noop_trace_server_factory(auth: AuthParams) -> tsi.TraceService:
+def noop_trace_server_factory(
+    auth: AuthParams,
+) -> weave.trace_server.trace_service.TraceService:
     return NoopTraceService()
 
 
@@ -64,9 +67,9 @@ class ServiceDependency:
 
     def __init__(
         self,
-        service_factory: Callable[[AuthParams], tsi.TraceService] = (
-            noop_trace_server_factory
-        ),
+        service_factory: Callable[
+            [AuthParams], weave.trace_server.trace_service.TraceService
+        ] = (noop_trace_server_factory),
         auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
     ):
         """
@@ -79,12 +82,14 @@ class ServiceDependency:
         self.auth_dependency = auth_dependency
         self.service_factory = service_factory
 
-    def get_service(self) -> Callable[[AuthParams], tsi.TraceService]:
+    def get_service(
+        self,
+    ) -> Callable[[AuthParams], weave.trace_server.trace_service.TraceService]:
         """Get a server dependency with the appropriate auth for the operation."""
 
         def _get_server(
             auth_params: AuthParams = Depends(self.auth_dependency),
-        ) -> tsi.TraceService:
+        ) -> weave.trace_server.trace_service.TraceService:
             return self.service_factory(auth_params)
 
         return _get_server
@@ -113,62 +118,62 @@ def generate_routes(
 
     @router.get("/server_info", tags=[SERVICE_TAG_NAME])
     def server_info(
-        service: tsi.TraceService = Depends(get_service),
-    ) -> tsi.ServerInfoRes:
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
+    ) -> weave.trace_server.trace_service.ServerInfoRes:
         return service.server_info()
 
     @router.get("/health", tags=[SERVICE_TAG_NAME])
     def read_root(
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> dict[str, str]:
         return service.read_root()
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
         req: tsi.CallStartReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallStartRes:
         return service.trace_server_interface.call_start(req)
 
     @router.post("/call/end", tags=[CALLS_TAG_NAME])
     def call_end(
         req: tsi.CallEndReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallEndRes:
         return service.trace_server_interface.call_end(req)
 
     @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
     def call_start_batch(
         req: tsi.CallCreateBatchReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallCreateBatchRes:
         return service.trace_server_interface.call_start_batch(req)
 
     @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
     def calls_delete(
         req: tsi.CallsDeleteReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallsDeleteRes:
         return service.trace_server_interface.calls_delete(req)
 
     @router.post("/call/update", tags=[CALLS_TAG_NAME])
     def call_update(
         req: tsi.CallUpdateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallUpdateRes:
         return service.trace_server_interface.call_update(req)
 
     @router.post("/call/read", tags=[CALLS_TAG_NAME])
     def call_read(
         req: tsi.CallReadReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallReadRes:
         return service.trace_server_interface.call_read(req)
 
     @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
     def calls_query_stats(
         req: tsi.CallsQueryStatsReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallsQueryStatsRes:
         return service.trace_server_interface.calls_query_stats(req)
 
@@ -192,7 +197,7 @@ def generate_routes(
     )
     def calls_query_stream(
         req: tsi.CallsQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
         return StreamingResponse(
@@ -202,56 +207,56 @@ def generate_routes(
     @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
     def calls_query(
         req: tsi.CallsQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CallsQueryRes:
         return service.trace_server_interface.calls_query(req)
 
     @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
     def obj_create(
         req: tsi.ObjCreateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.ObjCreateRes:
         return service.trace_server_interface.obj_create(req)
 
     @router.post("/obj/read", tags=[OBJECTS_TAG_NAME])
     def obj_read(
         req: tsi.ObjReadReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.ObjReadRes:
         return service.trace_server_interface.obj_read(req)
 
     @router.post("/objs/query", tags=[OBJECTS_TAG_NAME])
     def objs_query(
         req: tsi.ObjQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.ObjQueryRes:
         return service.trace_server_interface.objs_query(req)
 
     @router.post("/obj/delete", tags=[OBJECTS_TAG_NAME])
     def obj_delete(
         req: tsi.ObjDeleteReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.ObjDeleteRes:
         return service.trace_server_interface.obj_delete(req)
 
     @router.post("/table/create", tags=[TABLES_TAG_NAME])
     def table_create(
         req: tsi.TableCreateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.TableCreateRes:
         return service.trace_server_interface.table_create(req)
 
     @router.post("/table/update", tags=[TABLES_TAG_NAME])
     def table_update(
         req: tsi.TableUpdateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.TableUpdateRes:
         return service.trace_server_interface.table_update(req)
 
     @router.post("/table/query", tags=[TABLES_TAG_NAME])
     def table_query(
         req: tsi.TableQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.TableQueryRes:
         return service.trace_server_interface.table_query(req)
 
@@ -274,7 +279,7 @@ def generate_routes(
     )
     def table_query_stream(
         req: tsi.TableQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
         return StreamingResponse(
@@ -284,14 +289,14 @@ def generate_routes(
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
         req: tsi.TableQueryStatsReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.TableQueryStatsRes:
         return service.trace_server_interface.table_query_stats(req)
 
     @router.post("/refs/read_batch", tags=[REFS_TAG_NAME])
     def refs_read_batch(
         req: tsi.RefsReadBatchReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.RefsReadBatchRes:
         return service.trace_server_interface.refs_read_batch(req)
 
@@ -300,7 +305,7 @@ def generate_routes(
     async def file_create(
         project_id: Annotated[str, Form()],
         file: UploadFile,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.FileCreateRes:
         req = tsi.FileCreateReq(
             project_id=project_id,
@@ -313,7 +318,7 @@ def generate_routes(
     @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
     def file_content(
         req: tsi.FileContentReadReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> StreamingResponse:
         res = service.trace_server_interface.file_content_read(req)
         return StreamingResponse(iter([res.content]))
@@ -342,28 +347,28 @@ def generate_routes(
     @router.post("/cost/create", tags=[COST_TAG_NAME])
     def cost_create(
         req: tsi.CostCreateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CostCreateRes:
         return service.trace_server_interface.cost_create(req)
 
     @router.post("/cost/query", tags=[COST_TAG_NAME])
     def cost_query(
         req: tsi.CostQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CostQueryRes:
         return service.trace_server_interface.cost_query(req)
 
     @router.post("/cost/purge", tags=[COST_TAG_NAME])
     def cost_purge(
         req: tsi.CostPurgeReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CostPurgeRes:
         return service.trace_server_interface.cost_purge(req)
 
     @router.post("/feedback/create", tags=[FEEDBACK_TAG_NAME])
     def feedback_create(
         req: tsi.FeedbackCreateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.FeedbackCreateRes:
         """Add feedback to a call or object."""
         return service.trace_server_interface.feedback_create(req)
@@ -371,7 +376,7 @@ def generate_routes(
     @router.post("/feedback/query", tags=[FEEDBACK_TAG_NAME])
     def feedback_query(
         req: tsi.FeedbackQueryReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.FeedbackQueryRes:
         """Query for feedback."""
         return service.trace_server_interface.feedback_query(req)
@@ -379,7 +384,7 @@ def generate_routes(
     @router.post("/feedback/purge", tags=[FEEDBACK_TAG_NAME])
     def feedback_purge(
         req: tsi.FeedbackPurgeReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.FeedbackPurgeRes:
         """Permanently delete feedback."""
         return service.trace_server_interface.feedback_purge(req)
@@ -387,7 +392,7 @@ def generate_routes(
     @router.post("/feedback/replace", tags=[FEEDBACK_TAG_NAME])
     def feedback_replace(
         req: tsi.FeedbackReplaceReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.FeedbackReplaceRes:
         return service.trace_server_interface.feedback_replace(req)
 
@@ -396,7 +401,7 @@ def generate_routes(
     )
     def actions_execute_batch(
         req: tsi.ActionsExecuteBatchReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.ActionsExecuteBatchRes:
         return service.trace_server_interface.actions_execute_batch(req)
 
@@ -405,7 +410,7 @@ def generate_routes(
     )
     def completions_create(
         req: tsi.CompletionsCreateReq,
-        service: tsi.TraceService = Depends(get_service),
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> tsi.CompletionsCreateRes:
         return service.trace_server_interface.completions_create(req)
 
