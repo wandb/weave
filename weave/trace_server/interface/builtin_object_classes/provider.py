@@ -16,12 +16,6 @@ class Provider(base_object_def.BaseObject):
     return_type: ProviderReturnType = Field(default=ProviderReturnType.OPENAI)
 
 
-class ProviderModelMode(str, Enum):
-    COMPLETION = "completion"
-    CHAT = "chat"
-
-
 class ProviderModel(base_object_def.BaseObject):
     provider: base_object_def.RefStr
     max_tokens: int
-    mode: ProviderModelMode = Field(default=ProviderModelMode.CHAT)
