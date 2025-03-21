@@ -139,6 +139,8 @@ INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 MAX_CALLS_CHILDREN_LIMIT = 100_000
 
+DESCENDANT_IDS_BATCH_SIZE = 5000
+
 
 CallCHInsertable = Union[
     CallStartCHInsertable,
@@ -550,14 +552,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(ids) == 0:
             return
 
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
+        # Process IDs in batches
+        for i in range(0, len(ids), DESCENDANT_IDS_BATCH_SIZE):
+            batch_ids = ids[i : i + DESCENDANT_IDS_BATCH_SIZE]
+            batch_req = tsi.CallsQueryReq(
                 project_id=req.project_id,
                 columns=req.columns,
-                filter=tsi.CallsFilter(call_ids=ids),
+                filter=tsi.CallsFilter(call_ids=batch_ids),
             )
-        )
-        yield from calls
+            yield from self.calls_query_stream(batch_req)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
