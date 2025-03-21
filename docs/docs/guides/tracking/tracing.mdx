@@ -351,7 +351,7 @@ However, often LLM applications have additional logic (such as pre/post processi
   </TabItem>
 </Tabs>
 
-### 3. Manual call tracking
+### 3. Manual Call tracking
 
 You can also manually create Calls using the API directly.
 
@@ -527,11 +527,11 @@ All of these mutations can be performed from the UI by navigating to the call de
 
 Please see the [Feedback Documentation](./feedback.md) for more details.
 
-### Delete a call
+### Delete a Call
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To delete a call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
+    To delete a Call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
 
     ```python showLineNumbers
     import weave
@@ -569,15 +569,15 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     </TabItem>
 </Tabs>
 
-### Delete multiple calls
+### Delete multiple Calls
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To delete large batches of calls using the Python API, pass a list of call IDs to `delete_calls()`.
+    To delete large batches of Calls using the Python API, pass a list of Call IDs to `delete_calls()`.
 
     :::important
-    - The maximum amount of calls that can be deleted is `1000`.
-    - Deleting a call also deletes all of its children.
+    - The maximum amount of Calls that can be deleted is `1000`.
+    - Deleting a Call also deletes all of its children.
     :::
 
     ```python showLineNumbers
@@ -589,13 +589,13 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     # Get all calls from client 
     all_calls = client.get_calls()
 
-    # Get list of first 1000 call objects
+    # Get list of first 1000 Call objects
     first_1000_calls = all_calls[:1000]
 
-    # Get list of first 1000 call IDs
+    # Get list of first 1000 Call IDs
     first_1000_calls_ids = [c.id for c in first_1000_calls]
 
-    # Delete first 1000 call objects by ID
+    # Delete first 1000 Call objects by ID
     client.delete_calls(call_ids=first_1000_calls_ids)
     ```
 
@@ -607,7 +607,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     </TabItem>
 </Tabs>
 
-## Querying & Exporting Calls
+## Querying and exporting Calls
 
 <DesktopWindow 
   images={[
@@ -763,11 +763,11 @@ Calculated Fields:
 
 ### How do I disable tracing?
 
-**Environment Variable:**
+#### Environment variable
 
 In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_DISABLED=true`.
 
-**Client Initialization:**
+#### Client initialization
 
 Sometimes, you may want to conditionally enable tracing for a specific initialization based on some condition. In this case, you can initialize the client with the `disabled` flag in init settings.
 
@@ -778,7 +778,7 @@ import weave
 client = weave.init(..., settings={"disabled": True})
 ```
 
-**Context Manager:**
+#### Context manager
 
 Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be imported from `weave.trace.context.call_context`.
 
@@ -796,7 +796,7 @@ with set_tracing_enabled(False):
     my_op()
 ```
 
-### How do I capture information about a call?
+### How do I capture information about a Call?
 
 Typically you would call an op directly:
 
