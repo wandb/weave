@@ -15,8 +15,8 @@ import weave
 from weave.integrations.crewai.crewai_utils import (
     crew_kickoff_postprocess_inputs,
     crewai_postprocess_inputs,
-    default_call_display_name_execute_task,
     default_call_display_name_execute_sync,
+    default_call_display_name_execute_task,
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
