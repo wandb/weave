@@ -1,7 +1,7 @@
-import copy
 import warnings
 from typing import Any
 
+from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
 
 
@@ -104,29 +104,29 @@ def crewai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def crew_kickoff_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Postprocess the inputs to the Crew.kickoff method.
+
+    The method has a self which should be an instance of `Crew` which is a pydantic model.
+    The method also has an inputs which is a dict or list[dict] of arguments to pass to the `kickoff` method.
+    """
     results = {}
     for k, v in inputs.items():
         if k == "self":
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                results["self"] = v.model_dump()
-            for k2, v2 in copy.deepcopy(results["self"]).items():
-                if v2 is None:
-                    results["self"].pop(k2)
-                if isinstance(v2, list) and len(v2) == 0:
-                    results["self"].pop(k2)
+            if hasattr(v, "model_dump"):
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    crew_dict = v.model_dump()
+                    if isinstance(crew_dict, dict):
+                        results["self"] = {
+                            k2: v2
+                            for k2, v2 in crew_dict.items()
+                            if v2 is not None
+                            and not (isinstance(v2, list) and len(v2) == 0)
+                        }
+                    else:
+                        results["self"] = crew_dict
         if k == "inputs":
-            if isinstance(v, dict):
-                results["inputs"] = {
-                    k: safe_serialize_crewai_object(v) for k, v in v.items()
-                }
-            elif isinstance(v, list):
-                results["inputs"] = [
-                    {k: safe_serialize_crewai_object(v) for k, v in item.items()}
-                    for item in v
-                ]
-            else:
-                results["inputs"] = v
+            results["inputs"] = dictify(v)
 
     return results
 

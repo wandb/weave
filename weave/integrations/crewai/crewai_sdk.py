@@ -81,38 +81,23 @@ def get_crewai_patcher(
 
     base = settings.op_settings
 
-    # Naming convention -- module_method_settings
-    crew_kickoff_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Crew.kickoff",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": crew_kickoff_postprocess_inputs,
-        }
-    )
+    # Create settings for different Crew methods
+    crew_methods = [
+        ("crew_kickoff_settings", "kickoff"),
+        ("crew_kickoff_async_settings", "kickoff_async"),
+        ("crew_kickoff_for_each_settings", "kickoff_for_each"),
+        ("kickoff_for_each_async_settings", "kickoff_for_each_async"),
+    ]
+    crew_settings = {}
 
-    crew_kickoff_async_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Crew.kickoff_async",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": crew_kickoff_postprocess_inputs,
-        }
-    )
-
-    crew_kickoff_for_each_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Crew.kickoff_for_each",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": crew_kickoff_postprocess_inputs,
-        }
-    )
-
-    kickoff_for_each_async_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Crew.kickoff_for_each_async",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": crew_kickoff_postprocess_inputs,
-        }
-    )
+    for settings_name, method_name in crew_methods:
+        crew_settings[settings_name] = base.model_copy(
+            update={
+                "name": base.name or f"crewai.Crew.{method_name}",
+                "call_display_name": base.call_display_name,
+                "postprocess_inputs": crew_kickoff_postprocess_inputs,
+            }
+        )
 
     # TODO (ayulockin): replay?
 
@@ -225,27 +210,18 @@ def get_crewai_patcher(
             # if crewai_tools is not installed, we don't want to raise an error
             pass
 
+    crew_patchers = []
+    for settings_name, method_name in crew_methods:
+        crew_patchers.append(
+            SymbolPatcher(
+                lambda: importlib.import_module("crewai"),
+                f"Crew.{method_name}",
+                crewai_wrapper(crew_settings[settings_name]),
+            )
+        )
+
     patchers = [
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff",
-            crewai_wrapper(crew_kickoff_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff_async",
-            crewai_wrapper(crew_kickoff_async_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff_for_each",
-            crewai_wrapper(crew_kickoff_for_each_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Crew.kickoff_for_each_async",
-            crewai_wrapper(kickoff_for_each_async_settings),
-        ),
+        *crew_patchers,
         SymbolPatcher(
             lambda: importlib.import_module("crewai"),
             "Agent.execute_task",
