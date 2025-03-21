@@ -884,16 +884,13 @@ export const CallsTable: FC<{
             />
           )}
           <div className="flex items-center gap-6">
-            <Switch.Root
-              id="tracesMetricsSwitch"
-              size="small"
-              checked={isMetricsChecked}
-              onCheckedChange={setMetricsChecked}>
-              <Switch.Thumb size="small" checked={isMetricsChecked} />
-            </Switch.Root>
-            <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
-              Metrics
-            </label>
+            <Button
+              variant="ghost"
+              icon="chart-vertical-bars"
+              active={isMetricsChecked}
+              onClick={() => setMetricsChecked(!isMetricsChecked)}
+              tooltip={isMetricsChecked ? "Hide metrics" : "Show metrics"}
+            />
           </div>
           <div className="flex-none">
             <ExportSelector
