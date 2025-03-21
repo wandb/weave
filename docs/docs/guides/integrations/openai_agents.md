@@ -37,10 +37,6 @@ class Weather(BaseModel):
 def get_weather(city: str) -> Weather:
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
-examples = [
-    {"query": "What's the weather in Tokyo?", "reference_answer": "The weather in Tokyo is sunny with a temperature of 14-20C."}
-]
-
 agent = Agent(
     name="Hello world",
     instructions="You are a helpful agent.",
