@@ -236,15 +236,6 @@ def get_smolagents_patcher(
                 )
             ),
         ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "SpeechToTextTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.SpeechToTextTool"}
-                )
-            ),
-        ),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
