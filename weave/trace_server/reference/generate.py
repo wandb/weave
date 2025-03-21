@@ -41,6 +41,9 @@ class NoopTraceServer(tsi.TraceServerInterface): ...
 
 class NoopTraceService:
     def __init__(self) -> None:
+        # This type-ignore is safe, it's just used to instantiate a stub implementation
+        # without having to redefine all of the methods (which would be pointless because
+        # this is a stub that does nothing).
         self.trace_server_interface: tsi.TraceServerInterface = NoopTraceServer()  # type: ignore
 
     def server_info(self) -> tsi.ServerInfoRes:
@@ -53,9 +56,6 @@ class NoopTraceService:
 
 
 def noop_trace_server_factory(auth: AuthParams) -> tsi.TraceService:
-    # This type-ignore is safe, it's just used to instantiate a stub implementation
-    # without having to redefine all of the methods (which would be pointless because
-    # this is a stub that does nothing).
     return NoopTraceService()
 
 
