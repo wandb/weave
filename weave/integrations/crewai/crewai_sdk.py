@@ -129,58 +129,38 @@ def get_crewai_patcher(
     )
 
     # Create setting for CrewAI Flows
-    flow_kickoff_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Flow.kickoff",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": lambda inputs: dictify(inputs),
-            "postprocess_output": lambda output: dictify(output),
-        }
-    )
+    flow_settings = {}
 
-    flow_kickoff_async_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Flow.kickoff_async",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": lambda inputs: dictify(inputs),
-            "postprocess_output": lambda output: dictify(output),
-        }
-    )
+    flow_kickoff_methods = [
+        ("flow_kickoff_settings", "kickoff"),
+        ("flow_kickoff_async_settings", "kickoff_async"),
+    ]
 
-    start_decorator_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.flow.flow.start",
-            "call_display_name": base.call_display_name or "flow.start",
-        }
-    )
+    for settings_var, method_name in flow_kickoff_methods:
+        flow_settings[settings_var] = base.model_copy(
+            update={
+                "name": base.name or f"crewai.Flow.{method_name}",
+                "call_display_name": base.call_display_name,
+                "postprocess_inputs": lambda inputs: dictify(inputs),
+                "postprocess_output": lambda output: dictify(output),
+            }
+        )
 
-    listen_decorator_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.flow.flow.listen",
-            "call_display_name": base.call_display_name or "flow.listen",
-        }
-    )
+    flow_functions = [
+        ("start_decorator_settings", "start"),
+        ("listen_decorator_settings", "listen"),
+        ("router_decorator_settings", "router"),
+        ("or_function_settings", "or_"),
+        ("and_function_settings", "and_"),
+    ]
 
-    router_decorator_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.flow.flow.router",
-            "call_display_name": base.call_display_name or "flow.router",
-        }
-    )
-
-    or_function_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.flow.flow.or_",
-            "call_display_name": base.call_display_name or "flow.or_",
-        }
-    )
-
-    and_function_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.flow.flow.and_",
-            "call_display_name": base.call_display_name or "flow.and_",
-        }
-    )
+    for settings_var, method_name in flow_functions:
+        flow_settings[settings_var] = base.model_copy(
+            update={
+                "name": base.name or f"crewai.flow.flow.{method_name}",
+                "call_display_name": base.call_display_name or f"flow.{method_name}",
+            }
+        )
 
     # CrewAI Tools
     tools_settings = {}
@@ -223,6 +203,35 @@ def get_crewai_patcher(
             )
         )
 
+    flow_patchers = []
+    for settings_var, method_name in flow_kickoff_methods:
+        flow_patchers.append(
+            SymbolPatcher(
+                lambda: importlib.import_module("crewai"),
+                f"Flow.{method_name}",
+                crewai_wrapper(flow_settings[settings_var]),
+            )
+        )
+
+    for settings_var, method_name in flow_functions:
+        flow_patchers.append(
+            SymbolPatcher(
+                lambda: importlib.import_module("crewai.flow.flow"),
+                f"{method_name}",
+                flow_decorator_wrapper(flow_settings[settings_var]),
+            )
+        )
+
+    tools_patchers = []
+    for tool_name, tool_settings in tools_settings.items():
+        tools_patchers.append(
+            SymbolPatcher(
+                lambda: importlib.import_module("crewai_tools"),
+                f"{tool_name}._run",
+                crewai_wrapper(tool_settings),
+            )
+        )
+
     patchers = [
         *crew_patchers,
         SymbolPatcher(
@@ -240,51 +249,9 @@ def get_crewai_patcher(
             "Task.execute_sync",
             crewai_wrapper(task_execute_sync_settings),
         ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Flow.kickoff",
-            crewai_wrapper(flow_kickoff_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai"),
-            "Flow.kickoff_async",
-            crewai_wrapper(flow_kickoff_async_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai.flow.flow"),
-            "start",
-            flow_decorator_wrapper(start_decorator_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai.flow.flow"),
-            "listen",
-            flow_decorator_wrapper(listen_decorator_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai.flow.flow"),
-            "router",
-            flow_decorator_wrapper(router_decorator_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai.flow.flow"),
-            "or_",
-            flow_decorator_wrapper(or_function_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("crewai.flow.flow"),
-            "and_",
-            flow_decorator_wrapper(and_function_settings),
-        ),
+        *flow_patchers,
+        *tools_patchers,
     ]
-
-    for tool_name, tool_settings in tools_settings.items():
-        patchers.append(
-            SymbolPatcher(
-                lambda: importlib.import_module("crewai_tools"),
-                f"{tool_name}._run",
-                crewai_wrapper(tool_settings),
-            )
-        )
 
     _crewai_patcher = MultiPatcher(patchers)
 
