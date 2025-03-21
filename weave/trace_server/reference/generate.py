@@ -118,10 +118,10 @@ def generate_routes(
         return service.server_info()
 
     @router.get("/health", tags=[SERVICE_TAG_NAME])
-    def health(
+    def read_root(
         service: tsi.TraceService = Depends(get_service),
     ) -> dict[str, str]:
-        return {"status": "ok"}
+        return service.read_root()
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
