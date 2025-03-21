@@ -31,8 +31,8 @@
         "tags": [
           "Service"
         ],
-        "summary": "Health",
-        "operationId": "health_health_get",
+        "summary": "Read Root",
+        "operationId": "read_root_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -43,7 +43,7 @@
                     "type": "string"
                   },
                   "type": "object",
-                  "title": "Response Health Health Get"
+                  "title": "Response Read Root Health Get"
                 }
               }
             }
