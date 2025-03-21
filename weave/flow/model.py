@@ -126,11 +126,12 @@ async def apply_model_async(
     model_predict_fn_name = model_predict_op.name
 
     predict_signature = inspect.signature(model_predict_op)
-    model_predict_arg_names = list(predict_signature.parameters.keys())
+    model_predict_args = predict_signature.bind(**model_input).kwargs
+    # model_predict_arg_names = list(predict_signature.parameters.keys())
 
-    model_predict_args = {
-        k: v for k, v in model_input.items() if k in model_predict_arg_names
-    }
+    # model_predict_args = {
+    #     k: v for k, v in model_input.items() if k in model_predict_arg_names
+    # }
     try:
         model_predict_op = as_op(model_predict_op)
         if model_self is not None:

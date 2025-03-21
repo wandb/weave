@@ -69,6 +69,7 @@ import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
+import {EvalStudioPage} from './Browse3/pages/EvalStudio/EvalStudio';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
@@ -444,6 +445,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
+        </Route>
+        <Route path={`${projectRoot}/eval-studio`}>
+          <EvalStudioPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(scorers)`}>
           <ScorersPageBinding />
@@ -1076,6 +1080,11 @@ const CompareEvaluationsBinding = () => {
       setSelectedMetrics={setSelectedMetrics}
     />
   );
+};
+
+const EvalStudioPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <EvalStudioPage entity={entity} project={project} />;
 };
 
 const ScorersPageBinding = () => {

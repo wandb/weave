@@ -176,6 +176,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'EvalStudio',
+            slug: 'weave/eval-studio',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.Spiral,
+          },
+          {
+            type: 'button' as const,
             name: 'Prompts',
             slug: 'weave/prompts',
             isShown: isWeaveOnly,
