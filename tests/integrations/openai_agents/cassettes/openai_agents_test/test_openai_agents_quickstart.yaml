@@ -1,0 +1,94 @@
+interactions:
+- request:
+    body: '{"input":[{"content":"Write a haiku about recursion in programming.","role":"user"}],"model":"gpt-4o","include":[],"instructions":"You
+      are a helpful assistant","stream":false,"tools":[]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '186'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - Agents/Python 0.0.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RUwW7bMAy95ysInZvCdhzbyXWn3XYdusJgbDpVJ4uGRA0tivz7YNlx4q29BBGf
+        3iP5KPpjA6B0q46gHPmhLsq2orZLduk+r9JDVp3yKj/sT1le7rNsVyZlUuT7MjkUHVGbkXoYBfj0
+        So1cRdj6Od44QqG2xhFLyzzLisNhV0TMC0rwI6fhfjAk1E4kco6dOoINxsSAttcbdUuC2vg16sWF
+        RjTbqPaTA6AjQHghM3TBAHqvvaCVSb/Ht5qDDEFq4d9kV2o9t2RGmfMg25y3WZLl26TaJsXcaSSq
+        IzxtAAA+4i+AkveBRlpP3uN5aj8Ck7e9Py/W4h6r0dpTmaRpkVHRpdV+t6NPrY0aX1kVQccmZl53
+        GaGGrZC9VXtf8arqqx30dmNPF8bIEdQ3bgkaNMaDMGjxZLoHgF/2u+201UJgmAcP2oLXhmxDEf2B
+        IuSsB+rJnQkaQ+ge1ynQWha8ju/pecEu878pMp6e4wgGdGgMmVqYTR2LUkcQF2iCHf3RHHx9fYp1
+        HMEyYUfo2Wp7VsfZDEVdx07uLgGoM1lyKFT70Pfo3md0A3CZny87us8r1A8jI8Rw+pjM0WjgnKhj
+        1+PtfDeBeG9pdEox9ffCupkGHITVAkxmzcehHu5zumCb6OhIa7XHk7kuV4ivcylI29Ua5LuH/+N3
+        S7eU3WDzQu2NmEylz+x/tystPwM+012G85W0sKC5gUWyuBU8rb4aPQm2KDjKXzaXvwAAAP//AwBA
+        W3tF6QQAAA==
+    headers:
+      CF-RAY:
+      - 9221c6bccef336b3-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 03:52:16 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=Tqnkbc7A4PgF5SM.gzWaijlDAAnDOk9Zieo6zRFmpd4-1742269936-1.0.1.1-9U42TycTKwZ6d4ISt9Qix_e2j6Latc3s8rPzobIIvSxaXqbrj.2XcpXF2GDI88LQyM0sRkP63Fw5_2JqEPAcJqt3OQPH5IESe3_.Iu0IofY;
+        path=/; expires=Tue, 18-Mar-25 04:22:16 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=KqFFy64fH2k1v0MoM0hYELHA_M66ltXaaJFWGlP2Kng-1742269936949-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '728'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_f9ec95d382e76a8e0ef8eb42aa207c3b
+    status:
+      code: 200
+      message: OK
+version: 1
