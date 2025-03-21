@@ -457,7 +457,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
-    def _get_call_descendent_ids(
+    def _get_call_descendant_ids(
         self,
         project_id: str,
         call_ids: list[str],
@@ -540,7 +540,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(call_ids) == 0:
             return
 
-        ids = self._get_call_descendent_ids(
+        ids = self._get_call_descendant_ids(
             project_id=req.project_id,
             call_ids=call_ids,
             limit=req.limit,

@@ -874,6 +874,7 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+CallId = str
 
 
 class WeaveClient:
@@ -1392,7 +1393,7 @@ class WeaveClient:
         return self.finish_call(call, exception=exception)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get_call_descendants(
+    def get_calls_descendants(
         self,
         calls: Call | WeaveObject | CallId | Iterable[Call | WeaveObject | CallId],
         depth: int | None = None,
@@ -1420,7 +1421,11 @@ class WeaveClient:
 
         call_ids: list[str] = []
         for item in items_to_process:
-            if isinstance(item, (Call, WeaveObject)) and item.id is not None:
+            if isinstance(item, (Call, WeaveObject)):
+                if item.id is None:
+                    raise ValueError(
+                        f"Call has no ID: {item}, expected Call with an ID"
+                    )
                 call_ids.append(item.id)
             elif isinstance(item, CallId):
                 call_ids.append(item)
@@ -2313,9 +2318,6 @@ class WeaveClient:
             True if there are pending jobs, False otherwise.
         """
         return self._get_pending_jobs()["total_jobs"] > 0
-
-
-CallId = str
 
 
 class PendingJobCounts(TypedDict):

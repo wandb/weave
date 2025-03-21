@@ -253,8 +253,15 @@ class CallsDeleteRes(BaseModel):
 
 class CallsDescendantsReq(BaseModel):
     project_id: str
-    call_ids: list[str]
-    limit: Optional[int] = None
+    call_ids: list[str] = Field(
+        description="List of call IDs to get descendants for",
+        examples=[["0193e107-8fcf-7630-b576-977cc3062e2e"]],
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        description="The maximum number of descendants to return. The default, None, is all descendants.",
+        examples=[100],
+    )
     columns: Optional[list[str]] = Field(
         default=None,
         description="List of columns to select, defaults to all columns",
