@@ -233,8 +233,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._call_batch = []
             self._flush_immediately = True
 
-    # TODO: Technically this is a no-op because of how the trace server implements
-    # the batching.
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
             res = []

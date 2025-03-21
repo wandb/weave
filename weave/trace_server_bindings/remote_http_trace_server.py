@@ -256,8 +256,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
 
-    # TODO: Technically this is a no-op because of how the trace server implements
-    # the batching.
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         return self._generic_request(
             "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
