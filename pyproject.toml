@@ -60,6 +60,8 @@ trace_server = [
   "azure-storage-blob>=12.24.0",
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
+  # LLM Support
+  "litellm>=1.36.1",
 ]
 trace_server_tests = [
   # BYOB - S3

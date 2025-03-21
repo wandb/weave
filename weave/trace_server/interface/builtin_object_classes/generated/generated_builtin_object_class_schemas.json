@@ -277,6 +277,113 @@
       "title": "LlmJudgeActionConfig",
       "type": "object"
     },
+    "Provider": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "api_key_name": {
+          "title": "Api Key Name",
+          "type": "string"
+        },
+        "extra_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Extra Headers",
+          "type": "object"
+        },
+        "return_type": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ProviderReturnType"
+            }
+          ],
+          "default": "openai"
+        }
+      },
+      "required": [
+        "base_url",
+        "api_key_name"
+      ],
+      "title": "Provider",
+      "type": "object"
+    },
+    "ProviderModel": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "max_tokens": {
+          "title": "Max Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "provider",
+        "max_tokens"
+      ],
+      "title": "ProviderModel",
+      "type": "object"
+    },
+    "ProviderReturnType": {
+      "const": "openai",
+      "enum": [
+        "openai"
+      ],
+      "title": "ProviderReturnType",
+      "type": "string"
+    },
     "TestOnlyExample": {
       "properties": {
         "name": {
@@ -389,6 +496,12 @@
     },
     "AnnotationSpec": {
       "$ref": "#/$defs/AnnotationSpec"
+    },
+    "Provider": {
+      "$ref": "#/$defs/Provider"
+    },
+    "ProviderModel": {
+      "$ref": "#/$defs/ProviderModel"
     }
   },
   "required": [
@@ -396,7 +509,9 @@
     "TestOnlyNestedBaseObject",
     "Leaderboard",
     "ActionSpec",
-    "AnnotationSpec"
+    "AnnotationSpec",
+    "Provider",
+    "ProviderModel"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
