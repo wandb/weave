@@ -798,7 +798,8 @@ export const CallsTable: FC<{
                 tooltip="Clear selection"
               />
               <div className="text-sm">
-                {selectedCalls.length} {isEvaluateTable ? 'evaluations' : 'traces'} selected:
+                {selectedCalls.length}{' '}
+                {isEvaluateTable ? 'evaluations' : 'traces'} selected:
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
@@ -858,72 +859,72 @@ export const CallsTable: FC<{
               )}
             </div>
           )}
-          <div className="flex items-center gap-8 ml-auto">
-          {selectedInputObjectVersion && (
-            <Chip
-              label={`Input: ${objectVersionNiceString(
-                selectedInputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  inputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedOutputObjectVersion && (
-            <Chip
-              label={`Output: ${objectVersionNiceString(
-                selectedOutputObjectVersion
-              )}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  outputObjectVersionRefs: undefined,
-                });
-              }}
-            />
-          )}
-          {selectedParentId && (
-            <Chip
-              label={`Parent: ${selectedParentId}`}
-              onDelete={() => {
-                setFilter({
-                  ...filter,
-                  parentId: undefined,
-                });
-              }}
-            />
-          )}
-          <div className="flex items-center gap-6">
-            <Button
-              variant="ghost"
-              icon="chart-vertical-bars"
-              active={isMetricsChecked}
-              onClick={() => setMetricsChecked(!isMetricsChecked)}
-              tooltip={isMetricsChecked ? "Hide metrics" : "Show metrics"}
-            />
-          </div>
-          <div className="flex-none">
-            <ExportSelector
-              selectedCalls={selectedCalls}
-              numTotalCalls={callsTotal}
-              disabled={callsTotal === 0}
-              visibleColumns={visibleColumns}
-              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
-              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
-                visibleColumns.includes(col)
-              )}
-              callQueryParams={{
-                entity,
-                project,
-                filter: effectiveFilter,
-                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-                gridSort: sortModel,
-              }}
-            />
-          </div>
+          <div className="ml-auto flex items-center gap-8">
+            {selectedInputObjectVersion && (
+              <Chip
+                label={`Input: ${objectVersionNiceString(
+                  selectedInputObjectVersion
+                )}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    inputObjectVersionRefs: undefined,
+                  });
+                }}
+              />
+            )}
+            {selectedOutputObjectVersion && (
+              <Chip
+                label={`Output: ${objectVersionNiceString(
+                  selectedOutputObjectVersion
+                )}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    outputObjectVersionRefs: undefined,
+                  });
+                }}
+              />
+            )}
+            {selectedParentId && (
+              <Chip
+                label={`Parent: ${selectedParentId}`}
+                onDelete={() => {
+                  setFilter({
+                    ...filter,
+                    parentId: undefined,
+                  });
+                }}
+              />
+            )}
+            <div className="flex items-center gap-6">
+              <Button
+                variant="ghost"
+                icon="chart-vertical-bars"
+                active={isMetricsChecked}
+                onClick={() => setMetricsChecked(!isMetricsChecked)}
+                tooltip={isMetricsChecked ? 'Hide metrics' : 'Show metrics'}
+              />
+            </div>
+            <div className="flex-none">
+              <ExportSelector
+                selectedCalls={selectedCalls}
+                numTotalCalls={callsTotal}
+                disabled={callsTotal === 0}
+                visibleColumns={visibleColumns}
+                // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+                refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                  visibleColumns.includes(col)
+                )}
+                callQueryParams={{
+                  entity,
+                  project,
+                  filter: effectiveFilter,
+                  gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+                  gridSort: sortModel,
+                }}
+              />
+            </div>
           </div>
         </TailwindContents>
       }>
@@ -1146,10 +1147,11 @@ const OpSelector = ({
                 boxSizing: 'border-box',
                 fontFamily: 'Source Sans Pro',
               },
-              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
-                backgroundColor: 'transparent',
-                marginBottom: '2px',
-              },
+              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
+                {
+                  backgroundColor: 'transparent',
+                  marginBottom: '2px',
+                },
             }}
             size="small"
             limitTags={1}
