@@ -145,6 +145,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 logger.debug(f"Requeueing batch with {ids=}")
             self.call_processor.enqueue(batch)
 
+<<<<<<< HEAD
     @with_retry
     def _generic_request_executor(
         self,
@@ -204,6 +205,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 yield res_model.model_validate_json(line)
 
     @with_retry
+=======
+    @validate_call
+>>>>>>> cb2220243 (test)
     def server_info(self) -> ServerInfoRes:
         return self.stainless_client.services.server_info()
 
