@@ -18,6 +18,7 @@ export interface WBImage {
   path: string;
   width: number;
   height: number;
+  caption?: string;
   boxes?: {
     [boxGroup: string]: BoundingBox2D[];
   };
@@ -25,7 +26,6 @@ export interface WBImage {
     [maskName: string]: MaskFile;
   };
   classes?: ClassesFile;
-  caption?: string;
 }
 
 export interface ClassSet {

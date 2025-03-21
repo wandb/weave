@@ -96,7 +96,11 @@ export const CardImage: FC<CardImageProps> = ({
         <>
           {!hideImage && (
             <>
-              <div style={{position: 'relative', height: '80%'}}>
+              <div
+                style={{
+                  position: 'relative',
+                  height: image.caption ? '80%' : '100%',
+                }}>
                 <img style={imageStyle} alt={image.path} src={signedUrl} />
                 {masks != null &&
                   maskControls?.map((maskControl, i) => {
