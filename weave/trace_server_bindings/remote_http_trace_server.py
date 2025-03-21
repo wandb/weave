@@ -184,13 +184,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 logger.debug(f"Requeueing batch with {ids=}")
             self.call_processor.enqueue(batch)
 
-    @with_retry
     @validate_call
     def server_info(self) -> ServerInfoRes:
-        # TODO: This is not implemented on the stub.
-        # return self.stainless_client.services.server_info()
-        return httpx.get(self.trace_server_url + "/server_info").json()
-
+        return self.stainless_client.services.server_info()
+    
+    @validate_call
+    def health_check(self) -> dict[str, str]:
+        return self.stainless_client.services.health_check()
+    
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
