@@ -245,6 +245,12 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                         ]
                     },  # <-- heavy condition
                     {
+                        "$eq": [
+                            {"$getField": "inputs.param.bool"},
+                            {"$literal": "true"},
+                        ]
+                    },  # <-- heavy condition with boolean literal
+                    {
                         "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
                     },  # <-- light condition
                 ]
@@ -279,11 +285,16 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         AND
             (calls_merged.id IN filtered_calls)
         AND
-            (calls_merged.inputs_dump LIKE {pb_5:String}
-            OR calls_merged.inputs_dump IS NULL)
+            (((calls_merged.inputs_dump LIKE {pb_7:String}
+            OR calls_merged.inputs_dump IS NULL))
+        AND
+            ((calls_merged.inputs_dump LIKE {pb_8:String}
+            OR calls_merged.inputs_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}))
+            AND
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) = {pb_6:String}))
         )
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
@@ -294,7 +305,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_2": "project",
             "pb_3": '$."param"."val"',
             "pb_4": "hello",
-            "pb_5": '%"hello"%',
+            "pb_5": '$."param"."bool"',
+            "pb_6": "true",
+            "pb_7": '%"hello"%',
+            "pb_8": "%true%",
         },
     )
 
