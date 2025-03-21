@@ -75,7 +75,9 @@ def encode_custom_obj(obj: Any) -> dict | None:
         }
         encoded["files"] = encoded_path_contents
     else:
-        raise ValueError(f"Unknown serializer type: {type(serializer.save)}")
+        raise ValueError(
+            f"Serializer save function could not be identified as inline or file-based: {type(serializer.save)}"
+        )
     return encoded
 
 

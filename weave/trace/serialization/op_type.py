@@ -412,14 +412,18 @@ def _get_code_deps(
                     import_code.append(import_line)
 
         else:
+            # _name will work for typing_extensions.NotRequired in 3.9
+            var_value_name = getattr(
+                var_value, "__name__", getattr(var_value, "_name", None)
+            )
             if (
-                hasattr(var_value, "__name__")
+                var_value_name
                 and hasattr(var_value, "__module__")
                 and var_value.__module__ != fn.__module__
             ):
-                import_line = f"from {var_value.__module__} import {var_value.__name__}"
-                if var_value.__name__ != var_name:
-                    import_line += f"as {var_name}"
+                import_line = f"from {var_value.__module__} import {var_value_name}"
+                if var_value_name != var_name:
+                    import_line += f" as {var_name}"
                 import_code.append(import_line)
             else:
                 try:

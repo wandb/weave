@@ -64,10 +64,19 @@ def is_file_save(value: Callable) -> TypeGuard[FileSave]:
     params = list(signature.parameters.values())
     # Check parameter count and return type without relying on annotations
     # that would cause circular import
+    name_annotation = params[2].annotation
     return (
         len(params) == 3
-        and params[2].annotation == "str"
-        and signature.return_annotation == "None"
+        and (
+            name_annotation is str
+            or name_annotation == "str"
+            or name_annotation == inspect._empty
+        )
+        and (
+            signature.return_annotation is None
+            or signature.return_annotation == "None"
+            or signature.return_annotation == inspect._empty
+        )
     )
 
 
