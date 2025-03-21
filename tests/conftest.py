@@ -682,7 +682,7 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = post
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+            trace_server_url="http://testserver"
         )
         yield (client, remote_client, records)
 
