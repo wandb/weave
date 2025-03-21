@@ -53,7 +53,6 @@ def get_symbol_patcher(
     )
 
 
-
 def get_smolagents_patcher(
     settings: Optional[IntegrationSettings] = None,
 ) -> Union[MultiPatcher, NoOpPatcher]:
