@@ -1,5 +1,3 @@
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # OpenAI Agents SDK
 
@@ -26,7 +24,7 @@ import weave
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 
 # highlight-next-line
-weave.init("openai-agents-evaluation")
+weave.init("openai-agents")
 # highlight-next-line
 set_trace_processors(WeaveTracingProcessor())
 
