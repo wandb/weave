@@ -16,6 +16,7 @@ from weave.integrations.crewai.crewai_utils import (
     crew_kickoff_postprocess_inputs,
     crewai_postprocess_inputs,
     default_call_display_name_execute_task,
+    default_call_display_name_execute_sync,
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -99,8 +100,7 @@ def get_crewai_patcher(
             }
         )
 
-    # TODO (ayulockin): replay?
-
+    # Create setting for Agent.execute_task
     agent_execute_task_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Agent.execute_task",
@@ -110,6 +110,17 @@ def get_crewai_patcher(
         }
     )
 
+    # Create setting for Task.execute_sync
+    task_execute_sync_settings = base.model_copy(
+        update={
+            "name": base.name or "crewai.Task.execute_sync",
+            "call_display_name": base.call_display_name
+            or default_call_display_name_execute_sync,
+            "postprocess_inputs": crewai_postprocess_inputs,
+        }
+    )
+
+    # Create setting for LLM.call
     llm_call_settings = base.model_copy(
         update={
             "name": base.name or "crewai.LLM.call",
@@ -117,15 +128,7 @@ def get_crewai_patcher(
         }
     )
 
-    task_execute_sync_settings = base.model_copy(
-        update={
-            "name": base.name or "crewai.Task.execute_sync",
-            "call_display_name": base.call_display_name,
-            "postprocess_inputs": crewai_postprocess_inputs,
-        }
-    )
-
-    # CrewAI Flows
+    # Create setting for CrewAI Flows
     flow_kickoff_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Flow.kickoff",

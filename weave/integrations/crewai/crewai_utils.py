@@ -1,7 +1,7 @@
 import warnings
 from typing import Any
 
-from weave.trace.serialization.serialize import dictify
+from weave.trace.serialization.serialize import dictify, stringify
 from weave.trace.weave_client import Call
 
 
@@ -14,13 +14,13 @@ def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
         "type": "Agent",
     }
 
-    # Core identity attributes
+    # Core identity attributes. We want to surface these first.
     core_attributes = ["role", "goal", "backstory", "id"]
     for attr in core_attributes:
         if hasattr(obj, attr):
             value = getattr(obj, attr)
             if attr == "id" and value is not None:
-                result[attr] = str(value)
+                result[attr] = stringify(value)
             elif value is not None:
                 result[attr] = value
 
@@ -29,19 +29,10 @@ def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
         attr_dict = obj.model_dump()
 
     for attr, value in attr_dict.items():
-        if value is None:
+        if value is None or attr == "crew":
             continue
-        if attr == "crew":
-            continue
-
-        if attr == "i18n":
-            if value.get("prompt_file", None):
-                result[f"{attr}.prompt_file"] = str(value.get("prompt_file"))
         else:
-            try:
-                result[attr] = str(value)
-            except Exception as e:
-                result[attr] = f"Unable to serialize {attr}: {e}"
+            result[attr] = stringify(value)
 
     return result
 
@@ -54,13 +45,13 @@ def safe_serialize_crewai_task(obj: Any) -> dict[str, Any]:
         "type": "Task",
     }
 
-    # Core identity attributes
+    # Core identity attributes. We want to surface these first.
     core_attributes = ["name", "description", "expected_output", "id"]
     for attr in core_attributes:
         if hasattr(obj, attr):
             value = getattr(obj, attr)
             if attr == "id" and value is not None:
-                result[attr] = str(value)
+                result[attr] = stringify(value)
             elif value is not None:
                 result[attr] = value
 
@@ -71,13 +62,11 @@ def safe_serialize_crewai_task(obj: Any) -> dict[str, Any]:
     for attr, value in attr_dict.items():
         if attr.startswith("_") or value is None or value == "":
             continue
+        # we don't want to serialize agent again. just knowing which agent is used is enough.
         if attr == "agent" and isinstance(value, dict):
             result[f"{attr}.role"] = value.get("role", "")
         else:
-            try:
-                result[attr] = str(value)
-            except Exception as e:
-                result[attr] = f"Unable to serialize {attr}: {e}"
+            result[attr] = stringify(value)
 
     return result
 
@@ -89,13 +78,13 @@ def safe_serialize_crewai_object(obj: Any) -> Any:
         return obj
 
     # Everything else is serialized as a dict
-    if hasattr(obj, "__class__") and obj.__class__.__module__.startswith("crewai"):
+    if hasattr(obj, "__class__"):
         if obj.__class__.__name__ == "Agent":
             return safe_serialize_crewai_agent(obj)
         elif obj.__class__.__name__ == "Task":
             return safe_serialize_crewai_task(obj)
         else:
-            return obj
+            return dictify(obj)
 
 
 def crewai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -137,5 +126,6 @@ def default_call_display_name_execute_task(call: Call) -> str:
 
 
 def default_call_display_name_execute_sync(call: Call) -> str:
-    name = call.inputs["self"].name
+    name = call.inputs["self"].get("name", "").strip()
+    name = name.replace("\n", "").strip()
     return f"crewai.Task.execute_sync - {name}"
