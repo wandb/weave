@@ -791,6 +791,16 @@ export const CallsTable: FC<{
             </>
           ) : (
             <div className="flex items-center gap-8">
+              <Button
+                variant="ghost"
+                size="small"
+                icon="close"
+                onClick={() => setSelectedCalls([])}
+                tooltip="Clear selection"
+              />
+              <div className="text-sm">
+                {selectedCalls.length} {isEvaluateTable ? 'evaluations' : 'traces'} selected:
+              </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
                   onClick={() => {

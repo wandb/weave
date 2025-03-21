@@ -442,7 +442,7 @@ export const CompareEvaluationsTableButton: FC<{
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare evaluations
+      Compare
     </Button>
   </Box>
 );
@@ -465,7 +465,7 @@ export const CompareTracesTableButton: FC<{
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare traces
+      Compare
     </Button>
   </Box>
 );
