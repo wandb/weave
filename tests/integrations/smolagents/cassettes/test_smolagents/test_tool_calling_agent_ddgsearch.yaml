@@ -358,13 +358,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Fri, 21 Mar 2025 13:13:52 GMT
+      - Fri, 21 Mar 2025 13:24:29 GMT
       ETag:
       - W/"57aec3db82e144a0dffd7b737b39170d3610da24cec924de91a2dd480a4e62d0"
       Expires:
-      - Fri, 21 Mar 2025 13:18:52 GMT
+      - Fri, 21 Mar 2025 13:29:29 GMT
       Source-Age:
-      - '52'
+      - '38'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -378,15 +378,15 @@ interactions:
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - d38843e9a84b9476181c7db1f0ce3c8378ba612d
+      - 570ab3058d58b4d1fd908fc91ecb95325f1508c3
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - D511:267807:1924EE:3E8284:67DCCD0E
       X-Served-By:
-      - cache-ccu830034-CCU
+      - cache-ccu830025-CCU
       X-Timer:
-      - S1742562832.417016,VS0,VE1
+      - S1742563469.002659,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -440,7 +440,7 @@ interactions:
       answer.\n4. Never re-do a tool call that you previously did with the exact same
       parameters.\n\nNow Begin! If you solve the task correctly, you will receive
       a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
-      task:\nCould you get me the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
       tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
       a duckduckgo web search based on your query (think a Google search) then returns
       the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
@@ -455,7 +455,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '4681'
+      - '4676'
       content-type:
       - application/json
       host:
@@ -485,19 +485,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFPbbtswDH33Vwh8jgvn1nR+a9B1LTpgA7a2wJbCYCTG0SZLnkQvzYL8
-        +2A7jd3LgPnBEHh0yMNDahcJAVpBKkCukWVRmnh+cX87zbc355s/nz5fnS8vb+23/OtQXd7ZeYBB
-        zXDLHyT5iXUiXVEaYu1sC0tPyFRnHc4mo+np6Gw8boDCKTI1LS85nrh4lIwmcXIWJ6cH4tppSQFS
-        8T0SQohd868lWkWPkIpk8BQpKATMCdLjJSHAO1NHAEPQgdEyDDpQOstka9W2MqYHsHMmk2hMV7j9
-        dr1z5xMak5Xh+uPN1aO6fXTJ3Wzyxd2/H/n55qJXr029LRtBq8rKoz89/BhPXxQTAiwWDXdDyywQ
-        erl+wRYC0OdVQZZr5bBbwK+K/HYB6QKCZko3aNXyBLWYV9oobfMY4w9kz6/j1iFSMVbsCmQt48DO
-        b2NtTBXYIzsvWLOhBezhWdl99Nb5oWeop1UV0Lx2Gq11jHXDjdUPB2R/nKpxeendMrygwkpbHdaZ
-        JwyNWf2ZRU9CGglQPVsLKL0rSs7Y/aSm6DAZTtu00K1tB49HB5Ado+nTJrPBGxkzRYy62ZzjskqU
-        a1Idt1tarJR2PSDqdf9azlu5Wwe0zf8nfQdISSWTykpPSsvnLXfXPNXP+l/Xjj43giGQ/60lZazJ
-        1xNRtMLKtC8OwjYwFdlK25x86XXz7GBVZu8SNR7L4VRNINpHfwEAAP//AwBQ1TiHfwQAAA==
+        H4sIAAAAAAAAAwAAAP//jFNhT9swEP2eX2HdZ4qaNlDINxAa2rQJNk1D24qiq31JDY4d7AusVP3v
+        UxJo0sKk5UNk3fN79/x8XkdCgFaQCpBLZFlWZnR+cUNfHlx8HX+eHD0+P578LE+fv376Zk3+/QMc
+        NAy3uCPJr6xD6crKEGtnO1h6QqZGNZ4lk6PjaTIbt0DpFJmGVlQ8StxoMp4ko/HJaHz8Qlw6LSlA
+        Kn5HQgixbv+NRavoD6SilWkrJYWABUG63SQEeGeaCmAIOjBahoMelM4y2ca1rY0ZAOycySQa0zfu
+        vvVg3eeExmTVxSXnk7MrnP24+hUbdX9z7xfXdyeDfp30qmoN5bWV23wG+Lae7jUTAiyWLfeJFlkg
+        9HK5xxYC0Bd1SZYb57Cew0NNfjWHdA5BM6VPaNXiELU4r7VR2hYCxSXZs4+jLiFSAmt2JbKWIrDz
+        K6GNqQN7ZOfnsIGdhpvovfXtIEpPeR3QvM0YrXWMzVHbkG9fkM32Po0rKu8WYY8KubY6LDNPGNqY
+        hrcVvRppLUC9MxBQeVdWnLG7p7ZpPI6TThb6ge3hyewFZMdohrQkPnhHMVPEqNuZ2Y6pRLkk1XP7
+        ccVaaTcAosHp39p5T7tLQNvif+R7QEqqmFRWeVJa7h653+apedD/2rbNuTUMgfyjlpSxJt/ciKIc
+        a9O9NQirwFRmubYF+crr9sFBXmWnYzWdyvhIJRBtor8AAAD//wMAj8nwhHkEAAA=
     headers:
       CF-RAY:
-      - 923db58abb3b4924-BOM
+      - 923dc5150fd14413-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -505,14 +505,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 21 Mar 2025 13:13:54 GMT
+      - Fri, 21 Mar 2025 13:24:30 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=vspUxChMYEd7zoL8QGD0D208WswLIiXvmFHi70c.T10-1742562834-1.0.1.1-EJCT791Bq1AlRyjN2mvs1VyXa7NxMRF88CxahMzX2ZbiPj1ivhNUT7_S.Wlak_pnEvvsNZupVt3ttluSy06bsON6BMSFn6iCXjKfjeLccOQ;
-        path=/; expires=Fri, 21-Mar-25 13:43:54 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=vU_DryGLytjXArd6yRy7KNPQ7QiSUBTTfSxQSUfsN1U-1742563470-1.0.1.1-jmftVsWJN2xEeQ_4uVC_OfnULW3fjA9cxAvoLm36Fo_goXpeWwhN9d7sHxrsbIkJVwdP787dECh8j82qgAvfJOcIt8eaIZyOWJD.bejZdAY;
+        path=/; expires=Fri, 21-Mar-25 13:54:30 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=RQSyvu4lAL9ztUhVwrcZyEOmhgaxKqHxq7ePDKJP7SA-1742562834116-0.0.1.1-604800000;
+      - _cfuvid=s5MXZbr4Fb8d_cTlledxkEK96W32r2eTuf_rUiMjxXw-1742563470638-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -527,7 +527,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '756'
+      - '718'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -539,132 +539,84 @@ interactions:
       x-ratelimit-remaining-requests:
       - '49999'
       x-ratelimit-remaining-tokens:
-      - '149999081'
+      - '149999082'
       x-ratelimit-reset-requests:
       - 1ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_f7e8c1463075b72ff5bece7af52b87ee
+      - req_821f528e0b54669843d8e637364f74b6
     status:
       code: 200
       message: OK
 - request:
-    body: "{\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You
-      are an expert assistant who can solve any task using tool calls. You will be
-      given a task to solve as best you can.\\nTo do so, you have been given access
-      to some tools.\\n\\nThe tool call you write is an action: after the tool is
-      executed, you will get the result of the tool call as an \\\"observation\\\".\\nThis
-      Action/Observation can repeat N times, you should take several steps when needed.\\n\\nYou
-      can use the result of the previous action as input for the next action.\\nThe
-      observation will always be a string: it can represent a file, like \\\"image_1.jpg\\\".\\nThen
-      you can use it as input for the next action. You can do it for instance as follows:\\n\\nObservation:
-      \\\"image_1.jpg\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_transformer\\\",\\n
-      \ \\\"arguments\\\": {\\\"image\\\": \\\"image_1.jpg\\\"}\\n}\\n\\nTo provide
-      the final answer to the task, use an action blob with \\\"name\\\": \\\"final_answer\\\"
-      tool. It is the only way to complete the task, else you will be stuck on a loop.
-      So your final output should look like this:\\nAction:\\n{\\n  \\\"name\\\":
-      \\\"final_answer\\\",\\n  \\\"arguments\\\": {\\\"answer\\\": \\\"insert your
-      final answer here\\\"}\\n}\\n\\n\\nHere are a few examples using notional tools:\\n---\\nTask:
-      \\\"Generate an image of the oldest person in this document.\\\"\\n\\nAction:\\n{\\n
-      \ \\\"name\\\": \\\"document_qa\\\",\\n  \\\"arguments\\\": {\\\"document\\\":
-      \\\"document.pdf\\\", \\\"question\\\": \\\"Who is the oldest person mentioned?\\\"}\\n}\\nObservation:
-      \\\"The oldest person in the document is John Doe, a 55 year old lumberjack
-      living in Newfoundland.\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_generator\\\",\\n
-      \ \\\"arguments\\\": {\\\"prompt\\\": \\\"A portrait of John Doe, a 55-year-old
-      man living in Canada.\\\"}\\n}\\nObservation: \\\"image.png\\\"\\n\\nAction:\\n{\\n
-      \ \\\"name\\\": \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"image.png\\\"\\n}\\n\\n---\\nTask:
-      \\\"What is the result of the following operation: 5 + 3 + 1294.678?\\\"\\n\\nAction:\\n{\\n
-      \   \\\"name\\\": \\\"python_interpreter\\\",\\n    \\\"arguments\\\": {\\\"code\\\":
-      \\\"5 + 3 + 1294.678\\\"}\\n}\\nObservation: 1302.678\\n\\nAction:\\n{\\n  \\\"name\\\":
-      \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"1302.678\\\"\\n}\\n\\n---\\nTask:
-      \\\"Which city has the highest population , Guangzhou or Shanghai?\\\"\\n\\nAction:\\n{\\n
-      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Guangzhou\\\"\\n}\\nObservation:
-      ['Guangzhou has a population of 15 million inhabitants as of 2021.']\\n\\n\\nAction:\\n{\\n
-      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Shanghai\\\"\\n}\\nObservation:
-      '26 million (2019)'\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"final_answer\\\",\\n
-      \ \\\"arguments\\\": \\\"Shanghai\\\"\\n}\\n\\nAbove example were using notional
-      tools that might not exist for you. You only have access to these tools:\\n-
-      web_search: Performs a duckduckgo web search based on your query (think a Google
-      search) then returns the top search results.\\n    Takes inputs: {'query': {'type':
-      'string', 'description': 'The search query to perform.'}}\\n    Returns an output
-      of type: string\\n- final_answer: Provides a final answer to the given problem.\\n
-      \   Takes inputs: {'answer': {'type': 'any', 'description': 'The final answer
-      to the problem'}}\\n    Returns an output of type: any\\n\\nHere are the rules
-      you should always follow to solve your task:\\n1. ALWAYS provide a tool call,
-      else you will fail.\\n2. Always use the right arguments for the tools. Never
-      use variable names as the action arguments, use the value instead.\\n3. Call
-      a tool only when needed: do not call the search agent if you do not need information,
-      try to solve the task yourself.\\nIf no tool call is needed, use final_answer
-      tool to return your answer.\\n4. Never re-do a tool call that you previously
-      did with the exact same parameters.\\n\\nNow Begin! If you solve the task correctly,
-      you will receive a reward of $1,000,000.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
-      task:\\nCould you get me the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Calling
-      tools:\\n[{'id': 'call_psILKHxdUxo0V74SoWE2rBwD', 'type': 'function', 'function':
-      {'name': 'web_search', 'arguments': {'query': 'site:wandb.ai Building-a-GenAI-assisted-automatic-story-illustrator
-      title'}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call
-      id: call_psILKHxdUxo0V74SoWE2rBwD\\nObservation:\\n## Search Results\\n\\n[Building
-      a GenAI-assisted automatic story illustrator](https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-Automatic-Story-Illustrator--Vmlldzo5MTYxNTkw)\\nRecent
-      advances in diffusion models have enabled text-to-image generation models to
-      achieve drastic improvements. Open-source text-to-image generation models such
-      as FLUX from Black Forest Labs, Stable Diffusion 3 from StabilityAI, and PixArt-\u03A3
-      not only demonstrate higher quality of generated images but also improve factors
-      such as spatial consistency in the images and the ability to follow ...\\n\\n[Soumik
-      Rakshit - Machine Learning Portfolio in Weights & Biases - W&B](https://wandb.ai/geekyrakshit)\\nA
-      comprehensive guide to building an object detection workflow using Ultralytics
-      YOLOv8 and Weights & Biases. 4554 views. ... Building a GenAI-assisted automatic
-      story illustrator. Until September 27th Weights & Biases users can illustrate
-      their own stories for free using Flux and GPT-4. 1350 views.\\n\\n[Llama 3.2-Vision
-      for multi-modal RAG in financial services](https://wandb.ai/geekyrakshit/finance_multi_modal_rag/reports/Llama-3-2-Vision-for-multi-modal-RAG-in-financial-services--Vmlldzo5NTIyODkw)\\nBuilding
-      a vector indexing using bge-small-en-v1.5. ... Building a GenAI-assisted automatic
-      story illustrator. Until September 27th Weights & Biases users can illustrate
-      their own stories for free using Flux and GPT-4. Announcing our newest GenAI
-      course: RAG++.\\n\\n[How is W&B different from TensorBoard?](https://docs.wandb.ai/support/different_tensorboard/)\\nW&B
-      integrates with TensorBoard and improves experiment tracking tools. The founders
-      created W&B to address common frustrations faced by TensorBoard users. Key improvements
-      include: Model Reproducibility: W&B facilitates experimentation, exploration,
-      and model reproduction. It captures metrics, hyperparameters, code versions,
-      and saves model checkpoints to ensure reproducibility. Automatic ...\\n\\n[How
-      do I plot multiple lines on a plot with a legend? | Weights ...](https://docs.wandb.ai/support/plot_multiple_lines_plot_legend/)\\nCreate
-      a multi-line custom chart with wandb.plot.line_series(). Navigate to the project
-      page to view the line chart. To add a legend, include the keys argument in wandb.plot.line_series().
-      For example: wandb.log( { \\\"my_plot\\\": wandb.plot.line_series( xs=x_data,
-      ys=y_data, keys=[\\\"metric_A\\\", \\\"metric_B\\\"] ) } ) Refer to additional
-      details about multi-line plots here under the Multi-line tab.\\n\\n[Announcing
-      our newest GenAI course: RAG++ | prompting-course - Weights ...](https://wandb.ai/agatamlyn/prompting-course/reports/Announcing-our-newest-GenAI-course-RAG---Vmlldzo5Mzk3NzU5)\\nAnnouncing
-      our newest GenAI course: RAG++. ... Weights & Biases' own chatbot, as they share
-      their firsthand experience building a real-world RAG system. This in-depth case
-      study provides a practical lens, examining Wandbot's design choices, evaluation
-      metrics, and iterative improvements. Gain valuable insights into the challenges
-      and solutions ...\\n\\n[Tutorial: Building AI agents with CrewAI](https://wandb.ai/byyoung3/Generative-AI/reports/Tutorial-Building-AI-agents-with-CrewAI--VmlldzoxMTUwNTA4Ng)\\nThis
-      prompt guides the AI Story Investigator to conduct in-depth research and produce
-      a comprehensive 300-word analysis for each news item. The agent gathers multiple
-      sources so that each story is thoroughly contextualized. By verifying with sources
-      and including full URLs, the agent maintains transparency and credibility.\\n\\n[Integrating
-      with Weave - Production Dashboard | W&B Weave](https://weave-docs.wandb.ai/reference/gen_notebooks/online_monitoring/)\\nWeave
-      aims to be a one-stop-shop for all your GenAI monitoring and evaluation needs.
-      This also means that sometimes it is necessary to integrate with existing platforms
-      or extend Weave to fit the specific needs of your project or organization. ...
-      (xaxis_title = \\\"Model\\\", yaxis_title = \\\"Cost (USD)\\\") return fig #
-      See the source code for all the ...\\n\\n[Prompt Engineering LLMs with LangChain
-      and W&B](https://wandb.ai/a-sh0ts/langchain_callback_demo/reports/Prompt-Engineering-LLMs-with-LangChain-and-W-B--VmlldzozNjk1NTUw)\\nAutomatic
-      Prompt Engineer (APE) is a framework that generates instructions and selects
-      the most appropriate one for a given task. ... Given the title of play, it is
-      your job to write a synopsis for that title. Title: ... Understanding how to
-      use it to get the outputs you want, fine-tune the models you're building, and
-      understand more deeply how ...\\n\\n[Building an AI teacher's assistant using
-      LlamaIndex and Groq](https://wandb.ai/geekyrakshit/groq-rag/reports/Building-an-AI-teacher-s-assistant-using-LlamaIndex-and-Groq--Vmlldzo4NTU2NzA1)\\n\U0001F9D1\U0001F3FC\u200D\U0001F3EB
-      Building a simple assistant to answer student questions. We're going to use
-      weave.Model to write our assistants. A weave.Model is a combination of data
-      (including configuration, trained model weights, or other information) and code
-      that defines the model's operation. By structuring your code to be compatible
-      with this API, you ...\"}]}],\"model\":\"gpt-4o\",\"stop\":[\"Observation:\",\"Calling
-      tools:\"],\"tool_choice\":\"required\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"web_search\",\"description\":\"Performs
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using tool calls. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to some
+      tools.\n\nThe tool call you write is an action: after the tool is executed,
+      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
+      can repeat N times, you should take several steps when needed.\n\nYou can use
+      the result of the previous action as input for the next action.\nThe observation
+      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
+      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
+      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
+      use an action blob with \"name\": \"final_answer\" tool. It is the only way
+      to complete the task, else you will be stuck on a loop. So your final output
+      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
+      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
+      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
+      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
+      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
+      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
+      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
+      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
+      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
+      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
+      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
+      for you. You only have access to these tools:\n- web_search: Performs a duckduckgo
+      web search based on your query (think a Google search) then returns the top
+      search results.\n    Takes inputs: {''query'': {''type'': ''string'', ''description'':
+      ''The search query to perform.''}}\n    Returns an output of type: string\n-
+      final_answer: Provides a final answer to the given problem.\n    Takes inputs:
+      {''answer'': {''type'': ''any'', ''description'': ''The final answer to the
+      problem''}}\n    Returns an output of type: any\n\nHere are the rules you should
+      always follow to solve your task:\n1. ALWAYS provide a tool call, else you will
+      fail.\n2. Always use the right arguments for the tools. Never use variable names
+      as the action arguments, use the value instead.\n3. Call a tool only when needed:
+      do not call the search agent if you do not need information, try to solve the
+      task yourself.\nIf no tool call is needed, use final_answer tool to return your
+      answer.\n4. Never re-do a tool call that you previously did with the exact same
+      parameters.\n\nNow Begin! If you solve the task correctly, you will receive
+      a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]},{"role":"assistant","content":[{"type":"text","text":"Calling
+      tools:\n[{''id'': ''call_pDGtf2AOa7VOZ1ldkWkrbPj8'', ''type'': ''function'',
+      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''site:wandb.ai
+      Building a GenAI-assisted automatic story illustrator''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_pDGtf2AOa7VOZ1ldkWkrbPj8\nError:\nError when executing tool web_search
+      with arguments {''query'': ''site:wandb.ai Building a GenAI-assisted automatic
+      story illustrator''}: DuckDuckGoSearchException: https://html.duckduckgo.com/html
+      202 Ratelimit\nYou should only use this tool with a correct input.\nAs a reminder,
+      this tool''s description is the following: ''Performs a duckduckgo web search
+      based on your query (think a Google search) then returns the top search results.''.\nIt
+      takes inputs: {''query'': {''type'': ''string'', ''description'': ''The search
+      query to perform.''}} and returns output type string\nNow let''s retry: take
+      care not to repeat previous errors! If you have retried several times, try a
+      completely different approach.\n"}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
       a duckduckgo web search based on your query (think a Google search) then returns
-      the top search results.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"The
-      search query to perform.\"}},\"required\":[\"query\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"final_answer\",\"description\":\"Provides
-      a final answer to the given problem.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"answer\":{\"type\":\"string\",\"description\":\"The
-      final answer to the problem\"}},\"required\":[\"answer\"]}}}]}"
+      the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
+      search query to perform."}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
+      final answer to the problem"}},"required":["answer"]}}}]}'
     headers:
       accept:
       - application/json
@@ -673,12 +625,12 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '10155'
+      - '5739'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=vspUxChMYEd7zoL8QGD0D208WswLIiXvmFHi70c.T10-1742562834-1.0.1.1-EJCT791Bq1AlRyjN2mvs1VyXa7NxMRF88CxahMzX2ZbiPj1ivhNUT7_S.Wlak_pnEvvsNZupVt3ttluSy06bsON6BMSFn6iCXjKfjeLccOQ;
-        _cfuvid=RQSyvu4lAL9ztUhVwrcZyEOmhgaxKqHxq7ePDKJP7SA-1742562834116-0.0.1.1-604800000
+      - __cf_bm=vU_DryGLytjXArd6yRy7KNPQ7QiSUBTTfSxQSUfsN1U-1742563470-1.0.1.1-jmftVsWJN2xEeQ_4uVC_OfnULW3fjA9cxAvoLm36Fo_goXpeWwhN9d7sHxrsbIkJVwdP787dECh8j82qgAvfJOcIt8eaIZyOWJD.bejZdAY;
+        _cfuvid=s5MXZbr4Fb8d_cTlledxkEK96W32r2eTuf_rUiMjxXw-1742563470638-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -706,19 +658,20 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNRb9owEH7Pr7DuGSYItAXe2rFN6+u0de2oosM+gjvH9uzL2grx36sk
-        QAJl0vIQWffdd/fd5/MmEQK0gpkAuUaWhTf9m/nd9yt1N70rHtT4zzA+/XieLFf69vM6Lz5Cr2K4
-        5RNJ3rM+SFd4Q6ydbWAZCJmqqsOrcXpxmU5GFzVQOEWmouWe+2PXTwfpuD+Y9AeXO+LaaUkRZuJX
-        IoQQm/pfSbSKXmAmBr19pKAYMSeYHZKEgOBMFQGMUUdGy9BrQeksk61U29KYDsDOmUyiMW3j5tt0
-        zq1PaEx2zy/3n8Zz1COPeepV/lBe386//ez0a0q/+lrQqrTy4E8HP8RnJ82EAItFw9UWTYY2PlM4
-        4QsBGPKyIMuVdtgsoMlbwGwBN6U2SttcoPhC9vprv7GFlMCSXYGspYjswqvQxpSRA7ILC9jCUY9t
-        cu782PEv0KqMaN4bi9Y6xmq+2tnHHbI9XKJxuQ9uGU+o1cg6rrNAGGtvuleU7IXUEqA82gLwwRWe
-        M3a/qW6appNpUxbaLe3CO5Ado+nER8Nh70zFTBGjrhflsJsS5ZpUy213FEulXQdIOtO/l3OuduOA
-        tvn/lG8BKckzqcwHUloej9ymBape8b/SDj7XgiFS+KslZawpVDeiaIWlaR4YxNfIVGQrbXMKPuj6
-        lcHKZ9OBGo3k8EKNIdkmbwAAAP//AwDuZTg/bgQAAA==
+        H4sIAAAAAAAAAwAAAP//jFTJbtswEL3rKwY824Ety07jY9A23VskKXqoA4EmRxITiiTIkV3D8L8X
+        ohxLWQpUB4HimzfzZtM+AWBKsiUwUXEStdPjy7e/8Lur7jW6q83cX13YbL6bpd8eJvbmMxu1DLu+
+        R0GPrDNha6eRlDUdLDxywtbr9DxL54tZdp5GoLYSdUsrHY0zO04naTaevBlPFkdiZZXAwJbwOwEA
+        2Md3K9FI/MOWMBk93tQYAi+RLU9GAMxb3d4wHoIKxA2xUQ8KawhNq9o0Wg8AslbngmvdB+6e/eDc
+        14lrnd9Xt5fvtzfX61v+4WuqqX4nH6afim+DeJ3rnYuCisaIU30G+Ol++SwYADO87rjKcJ1zE7bo
+        n/EBGPdlU6OhVjvbr1hnt2LLFfsIghtjCaTyKEjvgAuBIQBVCMdqgC3ip/N2oyRK+Hn9BawHh76w
+        voYtriEg96LCAIX1oOgMfmjkAWGjgqLIbkmnIMrAzjYe1t5uA3ogCxuF22hIijQCN/JFfF7i2Yod
+        2JP8Dslr57tB7zwWTeD6ZVNj5rytbezq3RE5nAZI29J5uw7PqG25VahyjzzEvgzHI3kUEiWw5skE
+        Mudt7Sgn+4Ax6DRdnHduWb8hPZxdHEGyxPWANpsuRq94zCUSV3FIT3shuKhQ9tx+P3gjlR0AySD7
+        l3Je891VQJnyf9z3gBDoCGXuPEolnqbcm3ls/yD/MjvVOQpmAf1GCcxJoW87IrHgje6Wm4VdIKzz
+        QpkSvfMqbjgrXH4xkbOZmM5lxpJD8hcAAP//AwB+ttXP6gQAAA==
     headers:
       CF-RAY:
-      - 923db5989f184924-BOM
+      - 923dc5250ed94413-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -726,7 +679,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 21 Mar 2025 13:13:56 GMT
+      - Fri, 21 Mar 2025 13:24:33 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -742,7 +695,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '699'
+      - '1026'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -754,13 +707,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '49999'
       x-ratelimit-remaining-tokens:
-      - '149997749'
+      - '149998845'
       x-ratelimit-reset-requests:
       - 1ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_13278fa87a15d5e0745c87fdcdbbb781
+      - req_28176e153c0a85a144189f28f26d8e51
     status:
       code: 200
       message: OK

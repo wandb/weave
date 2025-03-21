@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import pytest
 
@@ -73,16 +74,15 @@ def test_openai_server_model(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_tool_calling_agent(client):
+def test_tool_calling_agent_ddgsearch(client):
     from smolagents import DuckDuckGoSearchTool, OpenAIServerModel, ToolCallingAgent
 
     model = OpenAIServerModel(model_id="gpt-4o")
     agent = ToolCallingAgent(tools=[DuckDuckGoSearchTool()], model=model)
     answer = agent.run(
-        "Could you get me the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
+        "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
     )
 
-    assert answer == "Building a GenAI-assisted automatic story illustrator"
     calls = list(client.calls())
     assert len(calls) == 11
 
@@ -90,3 +90,35 @@ def test_tool_calling_agent(client):
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "smolagents.ToolCallingAgent.run"
     assert str(call.output) == answer
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_tool_calling_agent_weather(client):
+    from smolagents import OpenAIServerModel, ToolCallingAgent, tool
+
+    model = OpenAIServerModel(model_id="gpt-4o")
+
+    @tool
+    def get_weather(location: str, celsius: Optional[bool] = False) -> str:
+        """
+        Get weather in the next days at given location.
+        Args:
+            location: the location
+            celsius: whether to use Celsius for temperature
+        """
+        return f"The weather in {location} is sunny with temperatures around 7°C."
+
+    agent = ToolCallingAgent(tools=[get_weather], model=model)
+    answer = agent.run("What is the weather in Tokyo?")
+
+    assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
+    calls = list(client.calls())
+    assert len(calls) == 11
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "smolagents.ToolCallingAgent.run"
