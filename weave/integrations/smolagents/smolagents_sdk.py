@@ -11,7 +11,15 @@ _smolagents_patcher: Optional[MultiPatcher] = None
 
 def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     if "self" in inputs:
-        inputs["self"] = dictify(inputs["self"])
+        dictified_self = dictify(inputs["self"])
+        # Make sure that the object type is rendered correctly in the Weave UI
+        if "__class__" not in dictified_self:
+            dictified_self["__class__"] = {
+                "module": inputs["self"].__class__.__module__,
+                "qualname": inputs["self"].__class__.__qualname__,
+                "name": inputs["self"].__class__.__name__,
+            }
+        inputs["self"] = dictified_self
     return inputs
 
 
@@ -25,6 +33,25 @@ def smolagents_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
         return op
 
     return wrapper
+
+
+def get_symbol_patcher(
+    base_symbol: str, attribute_name: str, settings: OpSettings
+) -> SymbolPatcher:
+    display_name = base_symbol + "." + attribute_name
+    display_name = (
+        display_name.replace(".__call__", "")
+        if attribute_name.endswith(".__call__")
+        else display_name
+    )
+    return SymbolPatcher(
+        lambda: importlib.import_module(base_symbol),
+        attribute_name,
+        smolagents_wrapper(
+            settings.model_copy(update={"name": settings.name or display_name})
+        ),
+    )
+
 
 
 def get_smolagents_patcher(
@@ -42,200 +69,13 @@ def get_smolagents_patcher(
 
     base = settings.op_settings
     patchers = [
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.execute_tool_call",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.MultiStepAgent.execute_tool_call"
-                    }
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.extract_action",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name or "smolagents.MultiStepAgent.extract_action"
-                    }
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.provide_final_answer",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.MultiStepAgent.provide_final_answer"
-                    }
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.run",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.MultiStepAgent.run"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.MultiStepAgent"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.write_memory_to_messages",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.MultiStepAgent.write_memory_to_messages"
-                    }
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "CodeAgent.step",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.CodeAgent.step"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "ToolCallingAgent.step",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.ToolCallingAgent.step"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents.models"),
-            "HfApiModel.__call__",
-            smolagents_wrapper(
-                base.model_copy(update={"name": base.name or "smolagents.HfApiModel"})
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents.models"),
-            "OpenAIServerModel.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.OpenAIServerModel"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents.models"),
-            "TransformersModel.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.TransformersModel"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents.models"),
-            "LiteLLMModel.__call__",
-            smolagents_wrapper(
-                base.model_copy(update={"name": base.name or "smolagents.LiteLLMModel"})
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents.models"),
-            "AzureOpenAIServerModel.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.AzureOpenAIServerModel"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "Tool.__call__",
-            smolagents_wrapper(
-                base.model_copy(update={"name": base.name or "smolagents.Tool"})
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "PythonInterpreterTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.PythonInterpreterTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "FinalAnswerTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.FinalAnswerTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "UserInputTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.UserInputTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "DuckDuckGoSearchTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.DuckDuckGoSearchTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "GoogleSearchTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.GoogleSearchTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "VisitWebpageTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.VisitWebpageTool"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "SpeechToTextTool.__call__",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.SpeechToTextTool"}
-                )
-            ),
-        ),
+        get_symbol_patcher("smolagents", "TransformersModel.__call__", base),
+        get_symbol_patcher("smolagents", "HfApiModel.__call__", base),
+        get_symbol_patcher("smolagents", "LiteLLMModel.__call__", base),
+        get_symbol_patcher("smolagents", "OpenAIServerModel.__call__", base),
+        get_symbol_patcher("smolagents", "AzureOpenAIServerModel.__call__", base),
+        get_symbol_patcher("smolagents", "MLXModel.__call__", base),
+        get_symbol_patcher("smolagents", "VLLMModel.__call__", base),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
