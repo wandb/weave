@@ -121,3 +121,42 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
 
     outputs = call_2.output
     assert "In summary, as the AI in healthcare market continues to develop" in outputs
+
+    call_3, _ = flattened_calls[3]
+    assert call_3.exception is None
+    assert call_3.started_at < call_3.ended_at
+
+    inputs = call_3.inputs
+    assert len(inputs["messages"]) == 2
+    assert inputs["messages"][0]["role"] == "system"
+    assert "You are Market Research Specialist" in inputs["messages"][0]["content"]
+    assert inputs["messages"][1]["role"] == "user"
+
+    assert "I now can give a great answer  \nFinal Answer:" in call_3.output
+
+    call_4, _ = flattened_calls[4]
+    assert call_4.exception is None
+    assert call_4.started_at < call_4.ended_at
+
+    inputs = call_4.inputs
+    assert inputs["model"] == "gpt-4o-mini"
+    assert inputs["stop"] == ["\nObservation:"]
+
+    outputs = call_4.output
+    assert outputs["choices"][0]["message"]["role"] == "assistant"
+    assert outputs["usage"]["completion_tokens"] == 666
+    assert outputs["usage"]["prompt_tokens"] == 187
+    assert outputs["usage"]["total_tokens"] == 853
+
+    call_5, _ = flattened_calls[5]
+    assert call_5.exception is None
+    assert call_5.started_at < call_5.ended_at
+
+    assert len(call_5.inputs["messages"]) == 2
+    assert call_5.inputs["messages"][0]["role"] == "system"
+    assert call_5.inputs["messages"][1]["role"] == "user"
+
+    assert (
+        "I now can give a great answer  \nFinal Answer:"
+        in call_5.output["choices"][0]["message"]["content"]
+    )
