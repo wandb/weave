@@ -68,6 +68,7 @@ def get_smolagents_patcher(
 
     base = settings.op_settings
     patchers = [
+        # Patch model-related classes
         get_symbol_patcher("smolagents", "TransformersModel.__call__", base),
         get_symbol_patcher("smolagents", "HfApiModel.__call__", base),
         get_symbol_patcher("smolagents", "LiteLLMModel.__call__", base),
@@ -75,6 +76,22 @@ def get_smolagents_patcher(
         get_symbol_patcher("smolagents", "AzureOpenAIServerModel.__call__", base),
         get_symbol_patcher("smolagents", "MLXModel.__call__", base),
         get_symbol_patcher("smolagents", "VLLMModel.__call__", base),
+        # Patch relevant MultiStepAgent functions
+        get_symbol_patcher("smolagents", "MultiStepAgent.run", base),
+        get_symbol_patcher(
+            "smolagents", "MultiStepAgent.write_memory_to_messages", base
+        ),
+        get_symbol_patcher("smolagents", "MultiStepAgent.extract_action", base),
+        get_symbol_patcher("smolagents", "MultiStepAgent.provide_final_answer", base),
+        get_symbol_patcher("smolagents", "MultiStepAgent.execute_tool_call", base),
+        get_symbol_patcher("smolagents", "MultiStepAgent.__call__", base),
+        # Patch relevant Agent functions
+        get_symbol_patcher(
+            "smolagents", "ToolCallingAgent.initialize_system_prompt", base
+        ),
+        get_symbol_patcher("smolagents", "ToolCallingAgent.step", base),
+        get_symbol_patcher("smolagents", "CodeAgent.initialize_system_prompt", base),
+        get_symbol_patcher("smolagents", "CodeAgent.step", base),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
