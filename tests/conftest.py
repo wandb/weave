@@ -13,6 +13,7 @@ import pytest
 import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from weave_server_sdk import DefaultHttpxClient
 
 import weave
 from tests.trace.util import DummyTestException
@@ -28,7 +29,6 @@ from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
-from weave_server_sdk import DefaultHttpxClient
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -675,9 +675,10 @@ def network_proxy_client(client):
         return client.server.table_update(req)
 
     with TestClient(app) as test_client:
+
         def post(url, data=None, json=None, **kwargs):
             kwargs.pop("stream", None)
-            
+
             # For TestClient, we need just the path portion (without the domain)
             if url.startswith("http://"):
                 # Extract path from full URL
@@ -685,32 +686,36 @@ def network_proxy_client(client):
             else:
                 # If it's already a path, use it directly
                 path = url
-                
+
             return test_client.post(path, data=data, json=json, **kwargs)
 
         # This adapter specifically mocks the HttpxClient used by Stainless
         class TestClientAdapter(DefaultHttpxClient):
             def send(self, request, **kwargs):
-                kwargs.pop('stream', None)
-                
+                kwargs.pop("stream", None)
+
                 # Extract the path from the URL
-                path = "/" + str(request.url).split("/", 3)[-1] if "/" in str(request.url) else "/"
-                
+                path = (
+                    "/" + str(request.url).split("/", 3)[-1]
+                    if "/" in str(request.url)
+                    else "/"
+                )
+
                 # Use the TestClient to handle the request
                 response = test_client.request(
                     method=request.method,
                     url=path,
                     headers=dict(request.headers),
                     content=request.content,
-                    **kwargs
+                    **kwargs,
                 )
-                
+
                 # Convert the TestClient response to an httpx response
                 return httpx.Response(
                     status_code=response.status_code,
                     headers=response.headers,
                     content=response.content,
-                    request=request
+                    request=request,
                 )
 
         orig_post = weave.trace_server.requests.post
@@ -719,10 +724,10 @@ def network_proxy_client(client):
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url="http://testing",
         )
-        
+
         # Replace the stainless client's HTTP client with our adapter
         remote_client.stainless_client._client = TestClientAdapter()
-        
+
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
