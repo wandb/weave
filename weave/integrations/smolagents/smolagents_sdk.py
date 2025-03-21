@@ -11,15 +11,18 @@ _smolagents_patcher: Optional[MultiPatcher] = None
 
 def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     if "self" in inputs:
-        dictified_self = dictify(inputs["self"])
-        # Make sure that the object type is rendered correctly in the Weave UI
-        if "__class__" not in dictified_self:
-            dictified_self["__class__"] = {
-                "module": inputs["self"].__class__.__module__,
-                "qualname": inputs["self"].__class__.__qualname__,
-                "name": inputs["self"].__class__.__name__,
-            }
-        inputs["self"] = dictified_self
+        try:
+            dictified_self = dictify(inputs["self"])
+            # Make sure that the object type is rendered correctly in the Weave UI
+            if "__class__" not in dictified_self:
+                dictified_self["__class__"] = {
+                    "module": inputs["self"].__class__.__module__,
+                    "qualname": inputs["self"].__class__.__qualname__,
+                    "name": inputs["self"].__class__.__name__,
+                }
+            inputs["self"] = dictified_self
+        except Exception as e:
+            pass
     return inputs
 
 
@@ -53,6 +56,22 @@ def get_symbol_patcher(
     )
 
 
+def get_multi_step_agent_patchers(
+    agent_class_name: str, settings: OpSettings
+) -> list[SymbolPatcher]:
+    return [
+        get_symbol_patcher("smolagents", f"{agent_class_name}.run", settings),
+        get_symbol_patcher(
+            "smolagents", f"{agent_class_name}.provide_final_answer", settings
+        ),
+        get_symbol_patcher(
+            "smolagents", f"{agent_class_name}.execute_tool_call", settings
+        ),
+        get_symbol_patcher("smolagents", f"{agent_class_name}.__call__", settings),
+        get_symbol_patcher("smolagents", f"{agent_class_name}.step", settings),
+    ]
+
+
 def get_smolagents_patcher(
     settings: Optional[IntegrationSettings] = None,
 ) -> Union[MultiPatcher, NoOpPatcher]:
@@ -76,22 +95,10 @@ def get_smolagents_patcher(
         get_symbol_patcher("smolagents", "AzureOpenAIServerModel.__call__", base),
         get_symbol_patcher("smolagents", "MLXModel.__call__", base),
         get_symbol_patcher("smolagents", "VLLMModel.__call__", base),
-        # Patch relevant MultiStepAgent functions
-        get_symbol_patcher("smolagents", "MultiStepAgent.run", base),
-        get_symbol_patcher(
-            "smolagents", "MultiStepAgent.write_memory_to_messages", base
-        ),
-        get_symbol_patcher("smolagents", "MultiStepAgent.extract_action", base),
-        get_symbol_patcher("smolagents", "MultiStepAgent.provide_final_answer", base),
-        get_symbol_patcher("smolagents", "MultiStepAgent.execute_tool_call", base),
-        get_symbol_patcher("smolagents", "MultiStepAgent.__call__", base),
         # Patch relevant Agent functions
-        get_symbol_patcher(
-            "smolagents", "ToolCallingAgent.initialize_system_prompt", base
-        ),
-        get_symbol_patcher("smolagents", "ToolCallingAgent.step", base),
-        get_symbol_patcher("smolagents", "CodeAgent.initialize_system_prompt", base),
-        get_symbol_patcher("smolagents", "CodeAgent.step", base),
+        *get_multi_step_agent_patchers("MultiStepAgent", base),
+        *get_multi_step_agent_patchers("ToolCallingAgent", base),
+        *get_multi_step_agent_patchers("CodeAgent", base),
         # Patch relevant Tool functions
         get_symbol_patcher("smolagents", "Tool.forward", base),
         get_symbol_patcher("smolagents", "Tool.__call__", base),

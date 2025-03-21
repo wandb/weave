@@ -66,3 +66,27 @@ def test_openai_server_model(client):
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert "paris" in call.output["choices"][0]["message"]["content"].lower()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_tool_calling_agent(client):
+    from smolagents import DuckDuckGoSearchTool, OpenAIServerModel, ToolCallingAgent
+
+    model = OpenAIServerModel(model_id="gpt-4o")
+    agent = ToolCallingAgent(tools=[DuckDuckGoSearchTool()], model=model)
+    answer = agent.run(
+        "Could you get me the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
+    )
+
+    assert answer == "Building a GenAI-assisted automatic story illustrator"
+    calls = list(client.calls())
+    assert len(calls) == 11
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "smolagents.ToolCallingAgent.run"
+    assert str(call.output) == answer
