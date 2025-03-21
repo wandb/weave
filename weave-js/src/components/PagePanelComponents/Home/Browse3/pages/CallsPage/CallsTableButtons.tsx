@@ -436,7 +436,6 @@ export const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
       variant="ghost"
       disabled={disabled}
@@ -460,7 +459,6 @@ export const CompareTracesTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
       variant="ghost"
       disabled={disabled}
