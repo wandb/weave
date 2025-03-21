@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from weave.integrations.integration_utilities import (
@@ -196,6 +198,97 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
         ("crewai.LLM.call", 4),
         ("litellm.completion", 5),
         ("openai.chat.completions.create", 6),
+    ]
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.exception is None
+    assert call_0.started_at < call_0.ended_at
+
+    inputs = call_0.inputs
+    assert inputs["inputs"] == [{"input1": "input1"}, {"input2": "input2"}]
+
+    outputs = call_0.output
+    assert len(outputs) == 2
+
+    # Rest is same as test_crewai_simple_crew
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
+    crew = get_crew()
+
+    async def async_crew_execution():
+        result = await crew.kickoff_async()
+
+    result = asyncio.run(async_crew_execution())
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    assert len(flattened_calls) == 7
+
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("crewai.Crew.kickoff_async", 0),
+        ("crewai.Crew.kickoff", 1),
+        ("crewai.Task.execute_sync", 2),
+        ("crewai.Agent.execute_task", 3),
+        ("crewai.LLM.call", 4),
+        ("litellm.completion", 5),
+        ("openai.chat.completions.create", 6),
+    ]
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.exception is None
+    assert call_0.started_at < call_0.ended_at
+
+    # Rest is same as test_crewai_simple_crew
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
+    crew = get_crew()
+
+    async def async_crew_execution():
+        result = await crew.kickoff_for_each_async(
+            inputs=[{"input1": "input1"}, {"input2": "input2"}]
+        )
+
+    result = asyncio.run(async_crew_execution())
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    print(flattened_calls_to_names(flattened_calls))
+
+    assert len(flattened_calls) == 19
+
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("crewai.Crew.kickoff_for_each_async", 0),
+        ("crewai.Crew.kickoff_async", 1),
+        ("crewai.Crew.kickoff", 2),
+        ("crewai.Task.execute_sync", 3),
+        ("crewai.Agent.execute_task", 4),
+        ("crewai.LLM.call", 5),
+        ("litellm.completion", 6),
+        ("openai.chat.completions.create", 7),
+        ("crewai.Agent.execute_task", 5),
+        ("crewai.LLM.call", 6),
+        ("litellm.completion", 7),
+        ("openai.chat.completions.create", 8),
+        ("crewai.Crew.kickoff_async", 1),
+        ("crewai.Crew.kickoff", 2),
+        ("crewai.Task.execute_sync", 3),
+        ("crewai.Agent.execute_task", 4),
+        ("crewai.LLM.call", 5),
+        ("litellm.completion", 6),
+        ("openai.chat.completions.create", 7),
     ]
 
     call_0, _ = flattened_calls[0]
