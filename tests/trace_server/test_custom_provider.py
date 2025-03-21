@@ -294,11 +294,18 @@ def test_custom_provider_completions_create(client):
     model_name = f"{provider_id}/{model_id}"
 
     # Create a Provider object with test configuration
-    provider_obj = create_provider_obj(client._project_id(), provider_id)
+    provider_obj = create_provider_obj(
+        project_id=client._project_id(),
+        provider_id=provider_id,
+        extra_headers={"X-Custom-Header": "value"},
+    )
 
     # Create a ProviderModel object with test configuration
     provider_model_obj = create_provider_model_obj(
-        client._project_id(), provider_id, model_id
+        project_id=client._project_id(),
+        provider_id=provider_id,
+        model_id=model_id,
+        model_name=model_name,  # Use the full model name
     )
 
     # Mock responses for obj_read calls to return our test configurations
@@ -311,7 +318,7 @@ def test_custom_provider_completions_create(client):
     }
 
     # Mock response from LiteLLM to simulate successful API call
-    mock_response = create_mock_completion_response(model_name)
+    mock_response = create_mock_completion_response(model_name=model_name)
 
     # Run test with tracing disabled to avoid interference
     with with_tracing_disabled():
