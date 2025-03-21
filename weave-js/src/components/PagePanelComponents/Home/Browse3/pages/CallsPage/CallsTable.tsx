@@ -755,96 +755,100 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <TailwindContents>
-          <RefreshButton
-            onClick={() => calls.refetch()}
-            disabled={callsLoading}
-          />
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <div className="flex-none">
-              <ManageColumnsButton
-                columnInfo={columns}
-                columnVisibilityModel={columnVisibilityModel}
-                setColumnVisibilityModel={setColumnVisibilityModel}
-              />
-            </div>
-          )}
-          {!hideOpSelector && (
-            <OpSelector
-              frozenFilter={frozenFilter}
-              filter={filter}
-              setFilter={setFilter}
-              selectedOpVersionOption={selectedOpVersionOption}
-              opVersionOptions={opVersionOptions}
-            />
-          )}
-          {filterModel && setFilterModel && (
-            <FilterPanel
-              filterModel={filterModel}
-              columnInfo={filterFriendlyColumnInfo}
-              setFilterModel={setFilterModel}
-              selectedCalls={selectedCalls}
-              clearSelectedCalls={clearSelectedCalls}
-            />
-          )}
-          {selectedCalls.length > 0 && (
-            isEvaluateTable ? (
-              <CompareEvaluationsTableButton
-                onClick={() => {
-                  history.push(
-                    router.compareEvaluationsUri(
-                      entity,
-                      project,
-                      selectedCalls,
-                      null
-                    )
-                  );
-                }}
-              />
-            ) : (
-              <CompareTracesTableButton
-                onClick={() => {
-                  history.push(
-                    router.compareCallsUri(entity, project, selectedCalls)
-                  );
-                }}
-                disabled={selectedCalls.length < 2}
-              />
-            )
-          )}
-          {!isReadonly && selectedCalls.length !== 0 && (
+          {selectedCalls.length === 0 ? (
             <>
-              <div className="flex-none">
-                <BulkAddToDatasetButton
-                  onClick={() => setAddToDatasetModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
+              <RefreshButton
+                onClick={() => calls.refetch()}
+                disabled={callsLoading}
+              />
+              {columnVisibilityModel && setColumnVisibilityModel && (
+                <div className="flex-none">
+                  <ManageColumnsButton
+                    columnInfo={columns}
+                    columnVisibilityModel={columnVisibilityModel}
+                    setColumnVisibilityModel={setColumnVisibilityModel}
+                  />
+                </div>
+              )}
+              {!hideOpSelector && (
+                <OpSelector
+                  frozenFilter={frozenFilter}
+                  filter={filter}
+                  setFilter={setFilter}
+                  selectedOpVersionOption={selectedOpVersionOption}
+                  opVersionOptions={opVersionOptions}
                 />
-                <AddToDatasetDrawer
-                  entity={entity}
-                  project={project}
-                  open={addToDatasetModalOpen}
-                  onClose={() => setAddToDatasetModalOpen(false)}
-                  selectedCalls={selectedCallObjects}
+              )}
+              {filterModel && setFilterModel && (
+                <FilterPanel
+                  filterModel={filterModel}
+                  columnInfo={filterFriendlyColumnInfo}
+                  setFilterModel={setFilterModel}
+                  selectedCalls={selectedCalls}
+                  clearSelectedCalls={clearSelectedCalls}
                 />
-              </div>
-              <div className="flex-none">
-                <BulkDeleteButton
-                  onClick={() => setDeleteConfirmModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
-                />
-                <ConfirmDeleteModal
-                  calls={tableData
-                    .filter(row => selectedCalls.includes(row.id))
-                    .map(traceCallToUICallSchema)}
-                  confirmDelete={deleteConfirmModalOpen}
-                  setConfirmDelete={setDeleteConfirmModalOpen}
-                  onDeleteCallback={() => {
-                    setSelectedCalls([]);
+              )}
+            </>
+          ) : (
+            <div className="flex items-center gap-8">
+              {isEvaluateTable ? (
+                <CompareEvaluationsTableButton
+                  onClick={() => {
+                    history.push(
+                      router.compareEvaluationsUri(
+                        entity,
+                        project,
+                        selectedCalls,
+                        null
+                      )
+                    );
                   }}
                 />
-              </div>
-            </>
+              ) : (
+                <CompareTracesTableButton
+                  onClick={() => {
+                    history.push(
+                      router.compareCallsUri(entity, project, selectedCalls)
+                    );
+                  }}
+                  disabled={selectedCalls.length < 2}
+                />
+              )}
+              {!isReadonly && (
+                <>
+                  <div className="flex-none">
+                    <BulkAddToDatasetButton
+                      onClick={() => setAddToDatasetModalOpen(true)}
+                      disabled={selectedCalls.length === 0}
+                    />
+                    <AddToDatasetDrawer
+                      entity={entity}
+                      project={project}
+                      open={addToDatasetModalOpen}
+                      onClose={() => setAddToDatasetModalOpen(false)}
+                      selectedCalls={selectedCallObjects}
+                    />
+                  </div>
+                  <div className="flex-none">
+                    <BulkDeleteButton
+                      onClick={() => setDeleteConfirmModalOpen(true)}
+                      disabled={selectedCalls.length === 0}
+                    />
+                    <ConfirmDeleteModal
+                      calls={tableData
+                        .filter(row => selectedCalls.includes(row.id))
+                        .map(traceCallToUICallSchema)}
+                      confirmDelete={deleteConfirmModalOpen}
+                      setConfirmDelete={setDeleteConfirmModalOpen}
+                      onDeleteCallback={() => {
+                        setSelectedCalls([]);
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           )}
-
           <div className="flex items-center gap-8 ml-auto">
           {selectedInputObjectVersion && (
             <Chip
