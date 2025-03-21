@@ -1671,17 +1671,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Handle custom provider case
             # We fetch the provider object and provider model object
             try:
-                (
-                    base_url,
-                    api_key,
-                    extra_headers,
-                    return_type,
-                    actual_model_name,
-                ) = get_custom_provider_info(
+                custom_provider_info = get_custom_provider_info(
                     project_id=req.project_id,
                     model_name=model_name,
                     obj_read_func=self.obj_read,
                 )
+
+                base_url = custom_provider_info.base_url
+                api_key = custom_provider_info.api_key
+                extra_headers = custom_provider_info.extra_headers
+                return_type = custom_provider_info.return_type
+                actual_model_name = custom_provider_info.actual_model_name
+
             except Exception as e:
                 return tsi.CompletionsCreateRes(response={"error": str(e)})
 

@@ -13,7 +13,6 @@ from weave.trace_server.errors import NotFoundError
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
-    ProviderModelMode,
     ProviderReturnType,
 )
 from weave.trace_server.llm_completion import get_custom_provider_info
@@ -86,7 +85,6 @@ def create_provider_model_obj(
     model_id: str,
     model_name: str = None,
     max_tokens: int = 4096,
-    mode: str = "chat",
 ) -> tsi.ObjSchema:
     """Create a ProviderModel object for testing.
 
@@ -96,7 +94,6 @@ def create_provider_model_obj(
         model_id: The model ID
         model_name: The actual model name to use (defaults to model_id)
         max_tokens: Maximum tokens for the model
-        mode: The model mode (chat/completion)
 
     Returns:
         tsi.ObjSchema: A provider model object
@@ -105,7 +102,6 @@ def create_provider_model_obj(
         name=model_name or model_id,
         provider=provider_id,
         max_tokens=max_tokens,
-        mode=ProviderModelMode(mode),
     )
 
     return tsi.ObjSchema(
@@ -248,7 +244,6 @@ def test_custom_provider_model_classes():
     provider_model = ProviderModel(
         provider="provider_id",
         max_tokens=4096,
-        mode=ProviderModelMode.CHAT,
     )
 
     # Verify ProviderModel attributes
@@ -259,10 +254,6 @@ def test_custom_provider_model_classes():
     assert provider_model.max_tokens == 4096, (
         f"ProviderModel max_tokens mismatch. Expected 4096, "
         f"got {provider_model.max_tokens}"
-    )
-    assert provider_model.mode == ProviderModelMode.CHAT, (
-        f"ProviderModel mode mismatch. Expected {ProviderModelMode.CHAT}, "
-        f"got {provider_model.mode}"
     )
 
 
@@ -498,20 +489,18 @@ def test_get_custom_provider_info():
     mock_secret_fetcher, token = setup_test_environment()
     try:
         # Call the function
-        base_url, api_key, extra_headers, return_type, actual_model_name = (
-            get_custom_provider_info(
-                project_id=project_id,
-                model_name=model_name,
-                obj_read_func=mock_obj_read,
-            )
+        provider_info = get_custom_provider_info(
+            project_id=project_id,
+            model_name=model_name,
+            obj_read_func=mock_obj_read,
         )
 
         # Verify the results
-        assert base_url == "https://api.example.com"
-        assert api_key == "DUMMY_SECRET_VALUE"
-        assert extra_headers == {"X-Custom-Header": "value"}
-        assert return_type == "openai"
-        assert actual_model_name == "test-model"
+        assert provider_info.base_url == "https://api.example.com"
+        assert provider_info.api_key == "DUMMY_SECRET_VALUE"
+        assert provider_info.extra_headers == {"X-Custom-Header": "value"}
+        assert provider_info.return_type == "openai"
+        assert provider_info.actual_model_name == "test-model"
     finally:
         _secret_fetcher_context.reset(token)
 
