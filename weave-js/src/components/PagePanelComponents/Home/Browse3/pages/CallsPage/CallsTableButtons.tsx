@@ -513,8 +513,7 @@ export const BulkAddToDatasetButton: FC<{
       onClick={handleClick}
       disabled={disabled}
       tooltip="Add selected rows to a dataset"
-      icon="table"
-    >
+      icon="table">
       Add to dataset
     </Button>
   );

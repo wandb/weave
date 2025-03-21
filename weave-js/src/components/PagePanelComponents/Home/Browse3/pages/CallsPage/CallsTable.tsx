@@ -27,7 +27,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
+import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
   Icon,
@@ -113,7 +113,6 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import {Button} from '@wandb/weave/components/Button';
 
 const MAX_SELECT = 100;
 
@@ -1174,10 +1173,6 @@ const OpSelector = ({
     </div>
   );
 };
-
-const ButtonDivider = () => (
-  <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
-);
 
 const useParentIdOptions = (
   entity: string,
