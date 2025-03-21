@@ -31,6 +31,7 @@ LLM providers are the vendors that offer access to large language models for gen
 
 Frameworks help orchestrate the actual execution pipelines in AI applications. They provide tools and abstractions for building complex workflows. Weave integrates with these frameworks to trace the entire pipeline:
 
+- **[OpenAI Agents SDK](/guides/integrations/openai_agents)**
 - **[LangChain](/guides/integrations/langchain)**
 - **[LlamaIndex](/guides/integrations/llamaindex)**
 - **[DSPy](/guides/integrations/dspy)**
