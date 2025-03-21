@@ -1510,3 +1510,20 @@ def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
 
     result = _time_eval(OpenAIModel())
     assert result < 5
+
+    # now with a mismatch completions and async
+    class OpenAIModelMismatch(weave.Model):
+        @weave.op()
+        async def invoke(self, a) -> dict:
+            prompt = "heerrres johnny!"
+            start = time.time()
+            chat = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            end = time.time()
+            print(f"Time taken: {end - start}")
+            return {"output": chat.choices[0].message.content}
+
+    result = _time_eval(OpenAIModelMismatch())
+    assert result < 5
