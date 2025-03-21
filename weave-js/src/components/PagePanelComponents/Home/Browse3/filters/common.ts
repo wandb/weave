@@ -388,3 +388,43 @@ export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
 };
+
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
+  };
+};
+
+// Default time ranges for date filters in days
+const DEFAULT_DATE_RANGE_DAYS = 30;
+const EXTENDED_DATE_RANGE_DAYS = 90;
+const YEAR_LONG_DATE_RANGE_DAYS = 365;
+
+export const makeDefaultDateFilter = (): GridFilterItem => {
+  return makeDateFilter(DEFAULT_DATE_RANGE_DAYS);
+};
+
+export const make3MonthsLongDateFilter = (): GridFilterItem => {
+  return makeDateFilter(EXTENDED_DATE_RANGE_DAYS);
+};
+
+export const makeYearLongDateFilter = (): GridFilterItem => {
+  return makeDateFilter(YEAR_LONG_DATE_RANGE_DAYS);
+};

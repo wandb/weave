@@ -61,8 +61,10 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_FILTER_CALLS,
+  DEFAULT_FILTER_CALLS_WITH_DATE,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
+  filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
@@ -756,8 +758,9 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
+  const isEvaluationsTab = tab === 'evaluations';
   const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
+    if (isEvaluationsTab) {
       return {
         frozen: true,
         opVersionRefs: [
@@ -779,9 +782,13 @@ const CallsPageBinding = () => {
       console.log(e);
       return {};
     }
-  }, [query.filter, entity, project, tab]);
+  }, [query.filter, entity, project, isEvaluationsTab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
+
+  // Track if the user has explicitly removed the date filter
+  const hasRemovedDateFilter = useRef(false);
+
   const onFilterUpdate = useCallback(
     filter => {
       history.push(routerContext.callsUIUrl(entity, project, filter));
@@ -816,14 +823,28 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  // Only show the date filter if not evals and we haven't explicitly removed it
+  const defaultDateFilter =
+    isEvaluationsTab || hasRemovedDateFilter.current
+      ? DEFAULT_FILTER_CALLS
+      : DEFAULT_FILTER_CALLS_WITH_DATE;
+
   const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
-    [query.filters]
+    () => getValidFilterModel(query.filters, defaultDateFilter),
+    [query.filters, defaultDateFilter]
   );
+
   const setFilterModel = (newModel: GridFilterModel) => {
+    // If there was a date filter and now there isn't, mark it as explicitly removed
+    // so we don't add it back on subsequent navigations
+    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
+    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
+      hasRemovedDateFilter.current = true;
+    }
+
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
-      newQuery.delete('filters');
+      newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));
     }
