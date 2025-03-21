@@ -487,7 +487,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         WITH RECURSIVE descendants AS (
             -- Base case: get the root calls
             SELECT id, parent_id, 0 as depth
-            FROM call_parts
+            FROM calls_merged
             WHERE project_id = {{project_id:String}}
                 AND id IN {{call_ids:Array(String)}}
                 AND deleted_at IS NULL
@@ -496,7 +496,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             -- Recursive case: get children of descendants
             SELECT c.id, c.parent_id, d.depth + 1
-            FROM call_parts c
+            FROM calls_merged c
             INNER JOIN descendants d ON c.parent_id = d.id
             WHERE c.project_id = {{project_id:String}}
                 AND c.deleted_at IS NULL
