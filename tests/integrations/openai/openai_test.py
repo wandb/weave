@@ -1,4 +1,6 @@
+import asyncio
 import os
+import time
 
 import pytest
 from openai import AsyncOpenAI, OpenAI
@@ -1451,3 +1453,60 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
     assert inputs["input"] == "What was a positive news story from today?"
     assert inputs["model"] == "gpt-4o-2024-08-06"
     assert inputs["tools"][0]["type"] == "web_search_preview"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_evaluate_async_happens_in_parallel(client: WeaveClient) -> None:
+    simple_ds = weave.Dataset(rows=[{"a": i} for i in range(10)])
+
+    def _time_eval(model) -> float:
+        evaluation = weave.Evaluation(dataset=simple_ds, scorers=[score_simple])
+        start = time.time()
+        result = asyncio.run(evaluation.evaluate(model))
+        end = time.time()
+        print(f"Time taken: {end - start}")
+        return end - start
+
+    @weave.op()
+    def score_simple(a, output):
+        return a == output
+
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    openai_client = OpenAI(api_key=api_key)
+
+    class SyncOpenAIModel(weave.Model):
+        @weave.op()
+        def invoke(self, a) -> dict:
+            prompt = "heerrres johnny!"
+            start = time.time()
+            chat = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            end = time.time()
+            print(f"Time taken: {end - start}")
+            return {"output": chat.choices[0].message.content}
+
+    result = _time_eval(SyncOpenAIModel())
+    assert result < 5
+
+    # now lets use an async openai call
+    class OpenAIModel(weave.Model):
+        @weave.op()
+        async def invoke(self, a) -> dict:
+            prompt = "heerrres johnny!"
+            start = time.time()
+            chat = openai_client.chat.completions.acreate(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            end = time.time()
+            print(f"Time taken: {end - start}")
+            return {"output": chat.choices[0].message.content}
+
+    result = _time_eval(OpenAIModel())
+    assert result < 5

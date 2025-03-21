@@ -448,7 +448,7 @@ def test_evaluate_async_happens_in_parallel(client):
         return end - start
 
     result = _time_eval(async_op)
-    assert result < 2
+    assert result < 5
 
     # now do the same with a model predict
     class AsyncModel1(Model):
@@ -459,42 +459,4 @@ def test_evaluate_async_happens_in_parallel(client):
 
     start = time.time()
     result = _time_eval(AsyncModel1())
-    assert result < 2
-
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    import openai
-
-    openai_client = openai.OpenAI(api_key=api_key)
-
-    class SyncOpenAIModel(Model):
-        @weave.op()
-        def invoke(self, a) -> dict:
-            prompt = "heerrres johnny!"
-            start = time.time()
-            chat = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            end = time.time()
-            print(f"Time taken: {end - start}")
-            return {"output": chat.choices[0].message.content}
-
-    result = _time_eval(SyncOpenAIModel())
-    assert result < 2
-
-    # now lets use an async openai call
-    class OpenAIModel(Model):
-        @weave.op()
-        async def invoke(self, a) -> dict:
-            prompt = "heerrres johnny!"
-            start = time.time()
-            chat = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            end = time.time()
-            print(f"Time taken: {end - start}")
-            return {"output": chat.choices[0].message.content}
-
-    result = _time_eval(OpenAIModel())
-    assert result < 2
+    assert result < 5

@@ -1,0 +1,2307 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Connection:
+      - close
+      Host:
+      - raw.githubusercontent.com
+      User-Agent:
+      - Python-urllib/3.12
+    method: GET
+    uri: https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/index.xml
+  response:
+    body:
+      string: "<?xml version=\"1.0\"?>\n<?xml-stylesheet href=\"index.xsl\" type=\"text/xsl\"?>\n<nltk_data>\n
+        \ <packages>\n    <package id=\"abc\" name=\"Australian Broadcasting Commission
+        2006\" webpage=\"http://www.abc.net.au/\" author=\"Australian Broadcasting
+        Commission\" unzip=\"1\" unzipped_size=\"4054966\" size=\"1487851\" checksum=\"ffb36b67ff24cbf7daaf171c897eb904\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/abc.zip\"
+        />\n    <package id=\"alpino\" name=\"Alpino Dutch Treebank\" webpage=\"http://www.let.rug.nl/~vannoord/trees/\"
+        contact=\"Gertjan van Noord\" license=\"Distributed with permission of Gertjan
+        van Noord\" unzip=\"1\" unzipped_size=\"21604821\" size=\"2797255\" checksum=\"ae529a1c5f13d6074f5b0d68d8edb537\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/alpino.zip\"
+        />\n    <package id=\"averaged_perceptron_tagger\" name=\"Averaged Perceptron
+        Tagger\" languages=\"English\" license=\"MIT License\" webpage=\"https://github.com/sloria/textblob-aptagger\"
+        unzip=\"1\" unzipped_size=\"6138625\" size=\"2526731\" checksum=\"05c91d607ee1043181233365b3f76978\"
+        subdir=\"taggers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/averaged_perceptron_tagger.zip\"
+        />\n    <package id=\"averaged_perceptron_tagger_eng\" name=\"Averaged Perceptron
+        Tagger (JSON)\" languages=\"English\" license=\"MIT License\" webpage=\"https://github.com/sloria/textblob-aptagger\"
+        unzip=\"1\" unzipped_size=\"5703817\" size=\"1539115\" checksum=\"729e2255f83045670374180de9bdb613\"
+        subdir=\"taggers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/averaged_perceptron_tagger_eng.zip\"
+        />\n    <package id=\"averaged_perceptron_tagger_ru\" name=\"Averaged Perceptron
+        Tagger (Russian)\" webpage=\"http://www.ruscorpora.ru/en/\" languages=\"Russian\"
+        license=\"MIT License\" unzip=\"1\" unzipped_size=\"23247411\" size=\"8628828\"
+        checksum=\"f7051368e4aff6718f8b38c1362dfdb1\" subdir=\"taggers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/averaged_perceptron_tagger_ru.zip\"
+        />\n    <package id=\"averaged_perceptron_tagger_rus\" name=\"Averaged Perceptron
+        Tagger (Russian)\" webpage=\"http://www.ruscorpora.ru/en/\" languages=\"Russian\"
+        license=\"MIT License\" unzip=\"1\" unzipped_size=\"30246815\" size=\"5997187\"
+        checksum=\"073f704b73bf8d88037e464852e34420\" subdir=\"taggers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/averaged_perceptron_tagger_rus.zip\"
+        />\n    <package id=\"basque_grammars\" name=\"Grammars for Basque\" author=\"Kepa
+        Sarasola\" languages=\"Spanish\" unzip=\"1\" unzipped_size=\"5550\" size=\"4704\"
+        checksum=\"0e3518cb2aeb2600cb2841df7f035606\" subdir=\"grammars\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/grammars/basque_grammars.zip\"
+        />\n    <package id=\"bcp47\" name=\"BCP-47 Language Tags\" license=\"IETF
+        Trust and Unicode Inc.\" copyright=\"Copyright (c) 2022 IETF Trust and Copyright
+        (c) 1991-2022 Unicode\" webpage=\"https://www.rfc-editor.org/rfc/rfc5646.html\"
+        unzip=\"0\" unzipped_size=\"1433135\" size=\"222952\" checksum=\"8ef6c0dfa7661e3338dd99c495a7d9b6\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/bcp47.zip\"
+        />\n    <package id=\"biocreative_ppi\" name=\"BioCreAtIvE (Critical Assessment
+        of Information Extraction Systems in Biology)\" webpage=\"http://www.mitre.org/public/biocreative/\"
+        copyright=\"Public Domain (not copyrighted)\" license=\"Public Domain\" unzip=\"1\"
+        unzipped_size=\"1537086\" size=\"223566\" checksum=\"d3be36b53ab201372f1cd63ffc75e9a9\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/biocreative_ppi.zip\"
+        />\n    <package id=\"bllip_wsj_no_aux\" name=\"BLLIP Parser: WSJ Model\"
+        webpage=\"http://nlp.stanford.edu/~mcclosky/models/\" unzip=\"1\" unzipped_size=\"54298623\"
+        size=\"24516205\" checksum=\"51d0c9c288b4f790bf255b5c9c3533ab\" subdir=\"models\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/models/bllip_wsj_no_aux.zip\"
+        />\n    <package id=\"book_grammars\" name=\"Grammars from NLTK Book\" author=\"Ewan
+        Klein\" languages=\"English\" unzip=\"1\" unzipped_size=\"21179\" size=\"9103\"
+        checksum=\"2e6bc2e5d678fc5d14e4c0747c69083e\" subdir=\"grammars\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/grammars/book_grammars.zip\"
+        />\n    <package id=\"brown\" name=\"Brown Corpus\" author=\"W. N. Francis
+        and H. Kucera\" license=\"May be used for non-commercial purposes.\" webpage=\"http://www.hit.uib.no/icame/brown/bcm.html\"
+        unzip=\"1\" unzipped_size=\"10117565\" size=\"3314357\" checksum=\"a0a8630959d3d937873b1265b0a05497\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/brown.zip\"
+        />\n    <package id=\"brown_tei\" name=\"Brown Corpus (TEI XML Version)\"
+        author=\"W. N. Francis and H. Kucera\" license=\"May be used for non-commercial
+        purposes.\" webpage=\"http://www.hit.uib.no/icame/brown/bcm.html\" contact=\"Lou
+        Burnard -- lou.burnard@oucs.ox.ac.uk\" unzip=\"1\" unzipped_size=\"56814689\"
+        size=\"8737738\" checksum=\"3c7fe43ebf0a4c7ad3ebb63dab027e09\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/brown_tei.zip\"
+        />\n    <package id=\"cess_cat\" name=\"CESS-CAT Treebank\" webpage=\"http://clic.ub.edu/cessece/\"
+        license=\"If you use these corpora for research, please cite thusly: CESS-Cat
+        project (M. Antonia Mart&#237;, MarionaTaul&#233;, Llu&#237;s M&#225;rquez,
+        Manuel Bertran (2007) ?CESS-ECE: A Multilingual and Multilevel Annotated Corpus?
+        in http://www.lsi.upc.edu/~mbertran/cess-ece/publications).\" unzip=\"1\"
+        unzipped_size=\"33720460\" size=\"5396688\" checksum=\"e91ac59ec6e98e3b297e2d2eab83084d\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/cess_cat.zip\"
+        />\n    <package id=\"cess_esp\" name=\"CESS-ESP Treebank\" webpage=\"http://clic.ub.edu/cessece/\"
+        license=\"If you use these corpora for research, please cite thusly: CESS-Cat
+        project (M. Antonia Mart&#237;, MarionaTaul&#233;, Llu&#237;s M&#225;rquez,
+        Manuel Bertran (2007) ?CESS-ECE: A Multilingual and Multilevel Annotated Corpus?
+        in http://www.lsi.upc.edu/~mbertran/cess-ece/publications).\" unzip=\"1\"
+        unzipped_size=\"13233272\" size=\"2220392\" checksum=\"684432d4f6384b8f0bd19fee5dc15925\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/cess_esp.zip\"
+        />\n    <package id=\"chat80\" name=\"Chat-80 Data Files\" copyright=\"Copyright
+        (C) 1982 David Warren and Fernando Pereira\" license=\"This program may be
+        used, copied, altered or included in other programs only for academic purposes
+        and provided that the authorship of the initial program is aknowledged.  Use
+        for commercial purposes without the previous written agreement of the authors
+        is forbidden.\" author=\"David Warren and Fernando Pereira\" webpage=\"http://www.cis.upenn.edu/~pereira/oldies.html\"
+        unzip=\"1\" unzipped_size=\"63817\" size=\"19209\" checksum=\"6832873fe92996846ac5bb21c5d84eb8\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/chat80.zip\"
+        />\n    <package id=\"city_database\" name=\"City Database\" note=\"A very
+        small database of information about cities\" unzip=\"1\" unzipped_size=\"4096\"
+        size=\"1708\" checksum=\"29cbf1aa02ad8abc72dd955fe74f882c\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/city_database.zip\"
+        />\n    <package id=\"cmudict\" name=\"The Carnegie Mellon Pronouncing Dictionary
+        (0.6)\" webpage=\"ftp://ftp.cs.cmu.edu/project/speech/dict/\" copyright=\"Copyright
+        1998 Carnegie Mellon University\" license=\"Use of this dictionary, for any
+        research or commercial purpose, is completely unrestricted.  If you use or
+        redistribute this material, we would appreciate acknowlegement of its origin.\"
+        unzip=\"1\" unzipped_size=\"3824638\" size=\"896069\" checksum=\"58f743ff818b983b89ef9302b509fc41\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/cmudict.zip\"
+        />\n    <package id=\"comparative_sentences\" name=\"Comparative Sentence
+        Dataset\" copyright=\"Copyright (C) 2006 Nitin Jindal and Bing Liu\" author=\"Nitin
+        Jindal and Bing Liu\" license=\"Creative Commons Attribution 4.0 International\"
+        licenseurl=\"http://creativecommons.org/licenses/by/4.0/\" webpage=\"http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#datasets\"
+        unzip=\"1\" unzipped_size=\"774200\" size=\"279121\" checksum=\"df2d005f455afb760fa37d7f565400f1\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/comparative_sentences.zip\"
+        />\n    <package id=\"comtrans\" name=\"ComTrans Corpus Sample\" author=\"Reinhard
+        Rapp\" webpage=\"http://www.fask.uni-mainz.de/user/rapp/comtrans/\" unzip=\"0\"
+        unzipped_size=\"35387522\" size=\"11904518\" checksum=\"8e1e34e2f052d8188fd877b2c821b42d\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/comtrans.zip\"
+        />\n    <package id=\"conll2000\" name=\"CONLL 2000 Chunking Corpus\" webpage=\"http://www.cnts.ua.ac.be/conll2000/chunking/\"
+        contact=\"Erik Tjong Kim Sang (erikt@uia.ua.ac.be)\" unzip=\"1\" unzipped_size=\"3495903\"
+        size=\"756607\" checksum=\"9529b285edd5fe47271da69df1052301\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/conll2000.zip\"
+        />\n    <package id=\"conll2002\" name=\"CONLL 2002 Named Entity Recognition
+        Corpus\" webpage=\"http://www.cnts.ua.ac.be/conll2002/ner/\" unzip=\"1\" unzipped_size=\"7785638\"
+        size=\"1867449\" checksum=\"67bb4ca75fa81544d42a159524726e78\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/conll2002.zip\"
+        />\n    <package id=\"conll2007\" name=\"Dependency Treebanks from CoNLL 2007
+        (Catalan and Basque Subset)\" webpage=\"http://nextens.uvt.nl/depparse-wiki/DataDownload\"
+        contact=\"Kepa Sarasola\" copyright=\"Copyright (C) 2007 The University of
+        the Basque Country\" license=\"Creative Commons Attribution-NonCommercial-NoDerivativeWorks
+        license\" unzip=\"0\" unzipped_size=\"6399295\" size=\"1242958\" checksum=\"b9015928e35c41f0695525289df5208f\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/conll2007.zip\"
+        />\n    <package id=\"crubadan\" name=\"Crubadan Corpus\" copyright=\"Copyright
+        (C) 2010 Kevin Scannell\" author=\"Kevin Scannell\" license=\"GPLv3\" webpage=\"http://borel.slu.edu/crubadan/\"
+        unzip=\"1\" unzipped_size=\"11256183\" size=\"5288655\" checksum=\"3cc831382dec41b8d9a06d93ef300352\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/crubadan.zip\"
+        />\n    <package id=\"dependency_treebank\" name=\"Dependency Parsed Treebank\"
+        sample=\"True\" copyright=\"Copyright (C) 1995 University of Pennsylvania\"
+        license=\"This is a 10% fragment of Penn Treebank, (C) LDC 1995, which has
+        been dependency parsed.  It is made available under fair use for the purposes
+        of illustrating NLTK tools for tokenizing, tagging, chunking and parsing.
+        \ This data is for non-commercial use only.\" unzip=\"1\" unzipped_size=\"1069540\"
+        size=\"457429\" checksum=\"631e959acaa42eea718daf04c5cdfa76\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/dependency_treebank.zip\"
+        />\n    <package id=\"dolch\" name=\"Dolch Word List\" webpage=\"https://en.wikipedia.org/wiki/Dolch_word_list\"
+        unzip=\"1\" unzipped_size=\"1917\" size=\"2116\" checksum=\"6f9c042774b96366c93fd0f9a9adb697\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/dolch.zip\"
+        />\n    <package id=\"english_wordnet\" name=\"Open English Wordnet\" version=\"2024\"
+        license=\"This resource is derived from Princeton WordNet under the WordNet
+        License and further developed under the Creative Commons Attribution 4.0 International
+        License. You may share and adapt this resource providing attribution is given
+        to both Princeton WordNet and the Open English WordNet team.\" copyright=\"Open
+        English Wordnet 2024 Copyright 2024 by the Open English Wordnet team. WordNet
+        3.1 Copyright 2011 by Princeton University. All rights reserved.\" webpage=\"https://en-word.net/\"
+        unzip=\"1\" unzipped_size=\"38860076\" size=\"11458203\" checksum=\"a82dfe03cab9f6c9d85f8da8de88613b\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip\"
+        />\n    <package id=\"europarl_raw\" name=\"Sample European Parliament Proceedings
+        Parallel Corpus\" author=\"Philipp Koehn, University of Edinburgh\" webpage=\"http://www.statmt.org/europarl\"
+        unzip=\"1\" unzipped_size=\"41396100\" size=\"12594977\" checksum=\"7621d5675990b1decc012c823716ee76\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/europarl_raw.zip\"
+        />\n    <package id=\"extended_omw\" name=\"Extended Open Multilingual WordNet\"
+        copyright=\"Copyright (C) 2013 Francis Bond and Ryan Foster\" license=\"CC
+        by SA 3.0 Licence (for data from Wikitionary) and Unicode, Inc. Licence Agreement
+        (for data from CLDR)\" webpage=\"http://compling.hss.ntu.edu.sg/omw/summx.html\"
+        unzip=\"0\" unzipped_size=\"36087752\" size=\"11251284\" checksum=\"8cc3931b20fdc2a2fe1ed9d42567d51b\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/extended_omw.zip\"
+        />\n    <package id=\"floresta\" name=\"Portuguese Treebank\" license=\"Non-commercial
+        use only\" webpage=\"http://www.linguateca.pt/Floresta/\" unzip=\"1\" unzipped_size=\"16414136\"
+        size=\"1882021\" checksum=\"de5f1df09949f080e0f616f0bc55967d\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/floresta.zip\"
+        />\n    <package id=\"framenet_v15\" name=\"FrameNet 1.5\" author=\"Collin
+        F. Baker\" license=\"May be used for non-commercial purposes.\" webpage=\"http://framenet.icsi.berkeley.edu\"
+        unzip=\"1\" unzipped_size=\"579133737\" size=\"69337891\" checksum=\"cf68365950b2f048bcb48619de81f50a\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/framenet_v15.zip\"
+        />\n    <package id=\"framenet_v17\" name=\"FrameNet 1.7\" author=\"Collin
+        F. Baker\" license=\"Creative Commons Attribution 3.0 Unported License\" webpage=\"http://framenet.icsi.berkeley.edu\"
+        unzip=\"1\" unzipped_size=\"855026962\" size=\"99207152\" checksum=\"aaef1cfdcf37000cf2a5c562407fbddb\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/framenet_v17.zip\"
+        />\n    <package id=\"gazetteers\" name=\"Gazeteer Lists\" license=\"GNU Free
+        Documentation License; or public domain (depending on the file)\" unzip=\"1\"
+        unzipped_size=\"12711\" size=\"8265\" checksum=\"1dd15c714a2be985c482a13d90e9caa4\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/gazetteers.zip\"
+        />\n    <package id=\"genesis\" name=\"Genesis Corpus\" copyright=\"public
+        domain\" license=\"public domain\" unzip=\"1\" unzipped_size=\"1426122\" size=\"473239\"
+        checksum=\"2a76432753c01fe179684e0ae3a4d023\" subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/genesis.zip\"
+        />\n    <package id=\"gutenberg\" name=\"Project Gutenberg Selections\" webpage=\"https://gutenberg.org/\"
+        license=\"public domain\" copyright=\"public domain\" unzip=\"1\" unzipped_size=\"11802669\"
+        size=\"4251829\" checksum=\"48c9c8605cd70b0230687557ee543633\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/gutenberg.zip\"
+        />\n    <package id=\"ieer\" name=\"NIST IE-ER DATA SAMPLE\" webpage=\"http://www.itl.nist.gov/iad/894.01/tests/ie-er/er_99/er_99.htm\"
+        unzip=\"1\" unzipped_size=\"541349\" size=\"166156\" checksum=\"34157f569624bc8d642ef8da5722b14a\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/ieer.zip\"
+        />\n    <package id=\"inaugural\" name=\"C-Span Inaugural Address Corpus\"
+        copyright=\"public domain\" license=\"public domain\" unzip=\"1\" unzipped_size=\"824408\"
+        size=\"344679\" checksum=\"76d672e2268b2e52523d1df54ce9e074\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/inaugural.zip\"
+        />\n    <package id=\"indian\" name=\"Indian Language POS-Tagged Corpus\"
+        author=\"A Kumaran\" license=\"Distributed with permission\" unzip=\"1\" unzipped_size=\"1091033\"
+        size=\"199187\" checksum=\"599a684793935ecbcf8276133945037c\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/indian.zip\"
+        />\n    <package id=\"jeita\" name=\"JEITA Public Morphologically Tagged Corpus
+        (in ChaSen format)\" webpage=\"http://lilyx.net/pages/nltkjapanesecorpus.html\"
+        license=\"Freely re-distributable under the same license as the original JEITA
+        corpus. Each document retains its own license from Aozora bunko and Project
+        Sugita Genpaku.\" unzip=\"0\" unzipped_size=\"134170650\" size=\"16531215\"
+        checksum=\"96e30423d6887fad17fc44f2f30d920d\" subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/jeita.zip\"
+        />\n    <package id=\"kimmo\" name=\"PC-KIMMO Data Files\" webpage=\"http://www.sil.org/pckimmo/\"
+        unzip=\"1\" unzipped_size=\"814609\" size=\"186958\" checksum=\"68a8716e0233ad9c0ed0947952e4eb3e\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/kimmo.zip\"
+        />\n    <package id=\"knbc\" name=\"KNB Corpus (Annotated blog corpus)\" webpage=\"http://lilyx.net/pages/nltkjapanesecorpus.html\"
+        license=\"Freely re-distributable under the same license as the original KNB
+        Corpus.\" unzip=\"0\" unzipped_size=\"23601139\" size=\"8760788\" checksum=\"992f8a3647f333e28a9958eba4bd67c7\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/knbc.zip\"
+        />\n    <package id=\"large_grammars\" name=\"Large context-free and feature-based
+        grammars for parser comparison\" webpage=\"http://www.informatics.sussex.ac.uk/research/groups/nlp/carroll/elsps.html\"
+        contact=\"John A. Carroll\" license=\"See the individual grammar files\" languages=\"English\"
+        unzip=\"1\" unzipped_size=\"4115732\" size=\"283747\" checksum=\"135aa813bd721d59ae595d9d7f115dc8\"
+        subdir=\"grammars\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/grammars/large_grammars.zip\"
+        />\n    <package id=\"lin_thesaurus\" name=\"Lin's Dependency Thesaurus\"
+        author=\"Dekang Lin\" webpage=\"http://webdocs.cs.ualberta.ca/~lindek/downloads.htm\"
+        license=\"Distributed with permission of Dekang Lin\" unzip=\"1\" unzipped_size=\"210421609\"
+        size=\"89154019\" checksum=\"288cc15e4ed257c8598d6f7a30199db9\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/lin_thesaurus.zip\"
+        />\n    <package id=\"mac_morpho\" name=\"MAC-MORPHO: Brazilian Portuguese
+        news text with part-of-speech tags\" webpage=\"http://www.nilc.icmc.usp.br/lacioweb/\"
+        license=\"Distributed with permission of N&#250;cleo Interinstitucional de
+        Ling&#252;&#237;stica Computacional (NILC), Universidade de S&#227;o Paulo
+        (USP) in S&#227;o Carlos, Universidade Federal de S&#227;o Carlos (UFSCar),
+        Universidade Estadual Paulista (UNESP) of Araraquara.\" unzip=\"1\" unzipped_size=\"10941402\"
+        size=\"3013904\" checksum=\"cf216ae5b37cca24866909f8594c5395\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/mac_morpho.zip\"
+        />\n    <package id=\"machado\" name=\"Machado de Assis -- Obra Completa\"
+        author=\"Machado de Assis\" license=\"Public Domain\" webpage=\"http://machado.mec.gov.br/\"
+        unzip=\"0\" unzipped_size=\"14855338\" size=\"6151774\" checksum=\"d186f7d6715479a8bec48b8b8030858e\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/machado.zip\"
+        />\n    <package id=\"masc_tagged\" name=\"MASC Tagged Corpus\" copyright=\"Copyright
+        (C) 2014 American National Corpus\" author=\"Nancy Ide\" license=\"This data
+        may be used for the purposes of linguistic education, research, and development,
+        including commercial development.\" webpage=\"http://www.anc.org/\" unzip=\"0\"
+        unzipped_size=\"4963879\" size=\"1602143\" checksum=\"a03d3ae8c6c2a1707885066e4d62582a\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/masc_tagged.zip\"
+        />\n    <package id=\"maxent_ne_chunker\" name=\"ACE Named Entity Chunker
+        (Maximum entropy)\" languages=\"English\" unzip=\"1\" unzipped_size=\"23604982\"
+        size=\"13404747\" checksum=\"d577c2cd0fdae148b36d046b14eb48e6\" subdir=\"chunkers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/chunkers/maxent_ne_chunker.zip\"
+        />\n    <package id=\"maxent_ne_chunker_tab\" name=\"ACE Named Entity Chunker
+        (Maximum entropy)\" languages=\"English\" unzip=\"1\" unzipped_size=\"14621652\"
+        size=\"5449208\" checksum=\"a50bea2481daf9b26e01ea0128780b20\" subdir=\"chunkers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/chunkers/maxent_ne_chunker_tab.zip\"
+        />\n    <package id=\"maxent_treebank_pos_tagger\" name=\"Treebank Part of
+        Speech Tagger (Maximum entropy)\" languages=\"English\" unzip=\"1\" unzipped_size=\"17961132\"
+        size=\"10156853\" checksum=\"e3b8a5353056073e164c5b06d0cc1fa7\" subdir=\"taggers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/maxent_treebank_pos_tagger.zip\"
+        />\n    <package id=\"maxent_treebank_pos_tagger_tab\" name=\"Treebank Part
+        of Speech Tagger (Maximum entropy)\" languages=\"English\" unzip=\"1\" unzipped_size=\"10649197\"
+        size=\"3731431\" checksum=\"c89cb1171d5026200ab2083811245a77\" subdir=\"taggers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/maxent_treebank_pos_tagger_tab.zip\"
+        />\n    <package id=\"moses_sample\" name=\"Moses Sample Models\" webpage=\"http://www.statmt.org/moses/?n=Moses.SampleData\"
+        unzip=\"1\" unzipped_size=\"10985045\" size=\"10961490\" checksum=\"715531d058ec253bd0683d0df23ec868\"
+        subdir=\"models\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/models/moses_sample.zip\"
+        />\n    <package id=\"movie_reviews\" name=\"Sentiment Polarity Dataset Version
+        2.0\" author=\"Bo Pang and Lillian Lee\" copyright=\"Copyright (C) 2004 Bo
+        Pang and Lillian Lee\" webpage=\"http://www.cs.cornell.edu/people/pabo/movie-review-data/\"
+        license=\"Creative Commons Attribution 4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        unzip=\"1\" unzipped_size=\"7790571\" size=\"4004848\" checksum=\"155de2b77c6834dd8eea7cbe88e93acb\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/movie_reviews.zip\"
+        />\n    <package id=\"mte_teip5\" name=\"MULTEXT-East 1984 annotated corpus
+        4.0\" author=\"Erjavec, Toma&#382;; Barbu, Ana-Maria; Derzhanski, Ivan; Dimitrova,
+        Ludmila; Garab&#237;k, Radovan; Ide, Nancy; Kaalep, Heiki-Jaan; Kotsyba, Natalia;
+        Krstev, Cvetana; Oravecz, Csaba; Petkevi&#269;, Vladim&#237;r; Priest-Dorman,
+        Greg; QasemiZadeh, Behrang; Radziszewski, Adam; Simov, Kiril; Tufi&#351;,
+        Dan and Zdravkova, Katerina\" license=\"Creative Commons - Attribution-NonCommercial-ShareAlike
+        4.0 International (CC BY-NC-SA 4.0)\" webpage=\"https://www.clarin.si/repository/xmlui/handle/11356/1043\"
+        unzip=\"1\" unzipped_size=\"122461442\" size=\"14800561\" checksum=\"27aa12b3546cb241df8699506ab15128\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/mte_teip5.zip\"
+        />\n    <package id=\"mwa_ppdb\" name=\"The monolingual word aligner (Sultan
+        et al. 2015) subset of the Paraphrase Database.\" webpage=\"http://www.cis.upenn.edu/~ccb/ppdb/\"
+        license=\"Creative Commons Attribution 3.0 Unported (CC-BY)\" unzip=\"1\"
+        unzipped_size=\"3657054\" size=\"1594711\" checksum=\"e5836f76779020b225ad6114372b954a\"
+        subdir=\"misc\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/misc/mwa_ppdb.zip\"
+        />\n    <package id=\"names\" name=\"Names Corpus, Version 1.3 (1994-03-29)\"
+        copyright=\"Copyright (C) 1991 Mark Kantrowitz\" author=\"Mark Kantrowitz
+        and Bill Ross\" license=\"You may use the lists of names for any purpose,
+        so long as credit is given in any published work. You may also redistribute
+        the list if you provide the recipients with a copy of this README file. The
+        lists are not in the public domain (I retain the copyright on the lists) but
+        are freely redistributable.  If you have any additions to the lists of names,
+        I would appreciate receiving them.\" webpage=\"http://www-2.cs.cmu.edu/afs/cs/project/ai-repository/ai/areas/nlp/corpora/names/\"
+        unzip=\"1\" unzipped_size=\"56572\" size=\"21326\" checksum=\"93844d7c995ad28f40528c08a3430175\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/names.zip\"
+        />\n    <package id=\"nombank.1.0\" name=\"NomBank Corpus 1.0\" contact=\"Adam
+        Meyers\" webpage=\"http://nlp.cs.nyu.edu/meyers/NomBank.html\" license=\"Distributed
+        with permission\" unzip=\"0\" unzipped_size=\"42315496\" size=\"6728397\"
+        checksum=\"57afdc46230ea33208e4e277de24765b\" subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/nombank.1.0.zip\"
+        />\n    <package id=\"nonbreaking_prefixes\" name=\"Non-Breaking Prefixes
+        (Moses Decoder)\" webpage=\"https://github.com/moses-smt/mosesdecoder/tree/master/scripts/share/nonbreaking_prefixes\"
+        license=\"Gnu LGPL\" unzip=\"1\" unzipped_size=\"43361\" size=\"25437\" checksum=\"5e7d700390745114cd3a52160d6f2eac\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/nonbreaking_prefixes.zip\"
+        />\n    <package id=\"nps_chat\" name=\"NPS Chat\" author=\"Craig Martell
+        (cmartell@nps.edu)\" webpage=\"http://faculty.nps.edu/cmartell/NPSChat.htm\"
+        license=\"This corpus is distributed solely for non-commercial, non-profit
+        educational and research use. It is a derivative compilation work of multiple
+        works whose copyrights are held by the respective original authors.\" unzip=\"1\"
+        unzipped_size=\"2578726\" size=\"301366\" checksum=\"72d1b905ba2be48d711690b012856c79\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/nps_chat.zip\"
+        />\n    <package id=\"omw\" name=\"Open Multilingual Wordnet\" author=\"Francis
+        Bond\" license=\"Please consult the LICENSE files included with the individual
+        Wordnets. Note that all permit redistribution.\" copyright=\"Please consult
+        the copyright statements of the individual Wordnets\" webpage=\"https://omwn.org/\"
+        unzip=\"0\" unzipped_size=\"50269427\" size=\"12110409\" checksum=\"8e2adf0627365f0c51a05807737a5e5c\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/omw.zip\"
+        />\n    <package id=\"omw-1.4\" name=\"Open Multilingual Wordnet\" author=\"Francis
+        Bond\" license=\"Please consult the LICENSE files included with the individual
+        Wordnets. Note that all permit redistribution.\" copyright=\"Please consult
+        the copyright statements of the individual Wordnets\" webpage=\"https://omwn.org/\"
+        unzip=\"0\" unzipped_size=\"96786003\" size=\"26634772\" checksum=\"e2acd8d3aa9c7c3dca4d8d4d169a29b8\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/omw-1.4.zip\"
+        />\n    <package id=\"opinion_lexicon\" name=\"Opinion Lexicon\" author=\"Bing
+        Liu\" copyright=\"Copyright (C) 2011 Bing Liu\" license=\"Creative Commons
+        Attribution 4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        webpage=\"http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#datasets\"
+        unzip=\"1\" unzipped_size=\"67865\" size=\"24947\" checksum=\"43a521f055063e001845b9d484a50173\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/opinion_lexicon.zip\"
+        />\n    <package id=\"panlex_swadesh\" name=\"PanLex Swadesh Corpora\" author=\"Jonathan
+        Pool (editor)\" license=\"CC0 1.0 Universal\" webpage=\"http://panlex.org/\"
+        unzip=\"0\" unzipped_size=\"4418150\" size=\"2861668\" checksum=\"66dd080f09ac17db3d31bb4d667d0794\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/panlex_swadesh.zip\"
+        />\n    <package id=\"paradigms\" name=\"Paradigm Corpus\" author=\"Cathy
+        Bow, University of Melbourne\" license=\"Distributed with the permission of
+        the author\" unzip=\"1\" unzipped_size=\"361186\" size=\"24902\" checksum=\"745ee9036c5ca3226be24c97515f5707\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/paradigms.zip\"
+        />\n    <package id=\"pe08\" name=\"Cross-Framework and Cross-Domain Parser
+        Evaluation Shared Task\" version=\"Release 3 (20 April 2008)\" webpage=\"
+        http://www-tsujii.is.s.u-tokyo.ac.jp/pe08-st/\" license=\"Distributed with
+        permission\" unzip=\"1\" unzipped_size=\"296619\" size=\"80735\" checksum=\"e72135042dc48772acad309a6adbb6f0\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/pe08.zip\"
+        />\n    <package id=\"perluniprops\" name=\"perluniprops: Index of Unicode
+        Version 7.0.0 character properties in Perl\" webpage=\"http://perldoc.perl.org/perluniprops.html\"
+        license=\"\" unzip=\"1\" unzipped_size=\"136038\" size=\"100266\" checksum=\"721ecf418efbfefb183d0559a7ef9f2d\"
+        subdir=\"misc\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/misc/perluniprops.zip\"
+        />\n    <package id=\"pil\" name=\"The Patient Information Leaflet (PIL) Corpus\"
+        version=\"Version 2.0 (31 March 2006)\" webpage=\"http://mcs.open.ac.uk/nlg/old_projects/pills/corpus/\"
+        license=\"Distributed with permission\" unzip=\"1\" unzipped_size=\"4170899\"
+        size=\"1510205\" checksum=\"d07b2ca7b5b351a24f4db8ae8fbc9e98\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/pil.zip\"
+        />\n    <package id=\"pl196x\" name=\"Polish language of the XX century sixties\"
+        author=\"I. Kurcz, A. Lewicki, J. Sambor, K. Szafran, J. Woronczak\" license=\"GNU
+        General Public License\" webpage=\"http://www.mimuw.edu.pl/polszczyzna/pl196x/index_en.htm\"
+        unzip=\"1\" unzipped_size=\"58299303\" size=\"7051453\" checksum=\"bcbdcf0fc2420fac238ca17dc7bfe423\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/pl196x.zip\"
+        />\n    <package id=\"porter_test\" name=\"Porter Stemmer Test Files\" unzip=\"1\"
+        unzipped_size=\"680060\" size=\"200510\" checksum=\"6af70bbc602aecd18aa0b9cfa7be2aa1\"
+        subdir=\"stemmers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/stemmers/porter_test.zip\"
+        />\n    <package id=\"ppattach\" name=\"Prepositional Phrase Attachment Corpus\"
+        author=\"Adwait Ratnaparkhi\" webpage=\"ftp://ftp.cis.upenn.edu/pub/adwait/PPattachData/\"
+        copyright=\"(C) 1994 Adwait Ratnaparkhi\" license=\"Distributed with the permission
+        of the author.\" unzip=\"1\" unzipped_size=\"3113650\" size=\"781714\" checksum=\"cce212b7ace8e64722ba2f41f802a5d0\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/ppattach.zip\"
+        />\n    <package id=\"problem_reports\" name=\"Problem Report Corpus\" webpage=\"http://www.cs.cmu.edu/~marmalade/reports.html\"
+        author=\"Andrew Ko, Carnegie Mellon University\" unzip=\"1\" unzipped_size=\"3467763\"
+        size=\"1032942\" checksum=\"8781ace4c0a181c5875cdbfc01e895fb\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/problem_reports.zip\"
+        />\n    <package id=\"product_reviews_1\" name=\"Product Reviews (5 Products)\"
+        author=\"Bing Liu\" copyright=\"Copyright (C) 2004 Bing Liu\" license=\"Creative
+        Commons Attribution 4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        webpage=\"http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#datasets\"
+        unzip=\"1\" unzipped_size=\"396548\" size=\"141287\" checksum=\"c13be66052027a4605ca456d7cda0917\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/product_reviews_1.zip\"
+        />\n    <package id=\"product_reviews_2\" name=\"Product Reviews (9 Products)\"
+        author=\"Bing Liu\" copyright=\"Copyright (C) 2007 Bing Liu\" license=\"Creative
+        Commons Attribution 4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        webpage=\"http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#datasets\"
+        unzip=\"1\" unzipped_size=\"438549\" size=\"170698\" checksum=\"522134e8b91086473299c3800c4adbae\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/product_reviews_2.zip\"
+        />\n    <package id=\"propbank\" name=\"Proposition Bank Corpus 1.0\" contact=\"Martha
+        Palmer\" webpage=\"http://verbs.colorado.edu/~mpalmer/projects/ace.html\"
+        license=\"Distributed with permission\" unzip=\"0\" unzipped_size=\"18831005\"
+        size=\"5323498\" checksum=\"2397782c6e6f46c9657f85db8a5421f6\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/propbank.zip\"
+        />\n    <package id=\"pros_cons\" name=\"Pros and Cons\" author=\"Bing Liu\"
+        copyright=\"Copyright (C) 2008 Bing Liu\" license=\"Creative Commons Attribution
+        4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        webpage=\"http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#datasets\"
+        unzip=\"1\" unzipped_size=\"2921218\" size=\"746276\" checksum=\"c4c7e61fb4d57a2f6c95317194da0f17\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/pros_cons.zip\"
+        />\n    <package id=\"ptb\" name=\"Penn Treebank\" copyright=\"Copyright (C)
+        1995 University of Pennsylvania\" license=\"This is a stub for the full Penn
+        Treebank Corpus version 3.\" unzip=\"1\" unzipped_size=\"63036\" size=\"6289\"
+        checksum=\"7b633a1b7770279eab00bc1108769c67\" subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/ptb.zip\"
+        />\n    <package id=\"punkt\" name=\"Punkt Tokenizer Models\" author=\"Jan
+        Strunk\" languages=\"Czech, Danish, Dutch, English, Estonian, Finnish, French,
+        German, Greek, Italian, Malayalam, Norwegian, Polish, Portuguese, Russian,
+        Slovene, Spanish, Swedish, Turkish\" unzip=\"1\" unzipped_size=\"37245719\"
+        size=\"13905355\" checksum=\"8dd1d8760a0976f96e5c262decd75165\" subdir=\"tokenizers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip\"
+        />\n    <package id=\"punkt_tab\" name=\"Punkt Tokenizer Models\" author=\"Jan
+        Strunk\" languages=\"Czech, Danish, Dutch, English, Estonian, Finnish, French,
+        German, Greek, Italian, Malayalam, Norwegian, Polish, Portuguese, Russian,
+        Slovene, Spanish, Swedish, Turkish\" unzip=\"1\" unzipped_size=\"10885330\"
+        size=\"4319076\" checksum=\"27ea9ee08fe27fe4484e4c5585cce748\" subdir=\"tokenizers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt_tab.zip\"
+        />\n    <package id=\"qc\" name=\"Experimental Data for Question Classification\"
+        author=\"Xin Li and Dan Roth, UIUC\" webpage=\"http://l2r.cs.uiuc.edu/~cogcomp/Data/QA/QC/\"
+        unzip=\"1\" unzipped_size=\"361090\" size=\"125456\" checksum=\"afd4145ac31cb8d7db715974b9b8b57a\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/qc.zip\"
+        />\n    <package id=\"reuters\" name=\"The Reuters-21578 benchmark corpus,
+        ApteMod version\" webpage=\"http://kdd.ics.uci.edu/databases/reuters21578/reuters21578.html\"
+        license=\"The copyright for the text of newswire articles and Reuters annotations
+        in the Reuters-21578 collection resides with Reuters Ltd. Reuters Ltd. and
+        Carnegie Group, Inc. have agreed to allow the free distribution of this data
+        *for research purposes only*.  If you publish results based on this data set,
+        please acknowledge its use, refer to the data set by the name 'Reuters-21578,
+        Distribution 1.0', and inform your readers of the current location of the
+        data set.\" unzip=\"0\" unzipped_size=\"9073648\" size=\"6378691\" checksum=\"c2acb24d5cccf8035e0fe8d29f440a68\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/reuters.zip\"
+        />\n    <package id=\"rslp\" name=\"RSLP Stemmer (Removedor de Sufixos da
+        Lingua Portuguesa)\" author=\"Viviane Moreira Orengo (vmorengo@inf.ufrgs.br)
+        and Christian Huyck\" languages=\"Portuguese\" unzip=\"1\" unzipped_size=\"7269\"
+        size=\"3805\" checksum=\"648798996224694251834699fa6e55f7\" subdir=\"stemmers\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/stemmers/rslp.zip\"
+        />\n    <package id=\"rte\" name=\"PASCAL RTE Challenges 1, 2, and 3\" webpage=\"http://www.pascal-network.org/Challenges/RTE/\"
+        unzip=\"1\" unzipped_size=\"1279930\" size=\"386303\" checksum=\"ca21663daa326a3bb53001c3d82e62d6\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/rte.zip\"
+        />\n    <package id=\"sample_grammars\" name=\"Sample Grammars\" author=\"\"
+        languages=\"English\" unzip=\"1\" unzipped_size=\"61718\" size=\"20293\" checksum=\"c4a2a01345d1e61c8febd8d498c5d2d6\"
+        subdir=\"grammars\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/grammars/sample_grammars.zip\"
+        />\n    <package id=\"semcor\" name=\"SemCor 3.0\" author=\"Rada Mihalcea
+        (rada@cs.unt.edu)\" webpage=\"http://www.cse.unt.edu/~rada/downloads.html#semcor\"
+        license=\"You are granted permission to use, copy, modify and distribute this
+        database for any purpose and without fee and royalty is hereby granted, provided
+        that you agree to comply with the Princeton copyright notice and statements,
+        including the disclaimer, and that the same appear on ALL copies of the database,
+        including modifications that you make for internal use or for distribution.
+        \ See semcor/README for more information.\" unzip=\"0\" unzipped_size=\"37425596\"
+        size=\"4397021\" checksum=\"46c095f0ab7090132567f87252af724f\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/semcor.zip\"
+        />\n    <package id=\"senseval\" name=\"SENSEVAL 2 Corpus: Sense Tagged Text\"
+        contact=\"Ted Pedersen (tpederse@umn.edu)\" license=\"Distributed with permission.\"
+        webpage=\"http://www.senseval.org/\" unzip=\"1\" unzipped_size=\"16463075\"
+        size=\"2151350\" checksum=\"bfc6a33c62ddc2ec24b02701a2f364ff\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/senseval.zip\"
+        />\n    <package id=\"sentence_polarity\" name=\"Sentence Polarity Dataset
+        v1.0\" author=\"Bo Pang and Lillian Lee\" copyright=\"Copyright (C) 2005 Bo
+        Pang and Lillian Lee\" license=\"Creative Commons Attribution 4.0 International\"
+        licenseurl=\"http://creativecommons.org/licenses/by/4.0/\" webpage=\"http://www.cs.cornell.edu/People/pabo/people/pabo/movie-review-data\"
+        unzip=\"1\" unzipped_size=\"1241127\" size=\"490256\" checksum=\"5cdc0cae7f558040d050c90eb2b72e97\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/sentence_polarity.zip\"
+        />\n    <package id=\"sentiwordnet\" name=\"SentiWordNet\" copyright=\"Copyright
+        (C) 2013 SentiWordNet Project\" author=\"Stefano Baccianella, Andrea Esuli,
+        and Fabrizio Sebastiani\" license=\"Creative Commons Attribution ShareAlike
+        3.0 Unported license\" webpage=\"http://sentiwordnet.isti.cnr.it/\" unzip=\"1\"
+        unzipped_size=\"13591402\" size=\"4686546\" checksum=\"5043f00829b7db4dd5f21507e092b76a\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/sentiwordnet.zip\"
+        />\n    <package id=\"shakespeare\" name=\"Shakespeare XML Corpus Sample\"
+        license=\"public domain\" copyright=\"public domain\" webpage=\"http://www.andrew.cmu.edu/user/akj/shakespeare/\"
+        sample=\"True\" unzip=\"1\" unzipped_size=\"1727210\" size=\"475458\" checksum=\"2332b32a7d83d657092ba4667c2c84c3\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/shakespeare.zip\"
+        />\n    <package id=\"sinica_treebank\" name=\"Sinica Treebank Corpus Sample\"
+        webpage=\"http://rocling.iis.sinica.edu.tw/CKIP/engversion/treebank.htm\"
+        license=\"Distributed with the Natural Language Toolkit under the terms of
+        the Creative Commons Attribution-NonCommercial-ShareAlike License [http://creativecommons.org/licenses/by-nc-sa/2.5/].\"
+        sample=\"True\" unzip=\"1\" unzipped_size=\"3293083\" size=\"906706\" checksum=\"979a905010d475a74475064211cd63c8\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/sinica_treebank.zip\"
+        />\n    <package id=\"smultron\" name=\"SMULTRON Corpus Sample\" author=\"Sofia
+        Gustafson-Capkova, Yvonne Samuelsson, and Martin Volk\" webpage=\"http://www.ling.su.se/DaLi/research/smultron/index.htm\"
+        unzip=\"1\" unzipped_size=\"1677647\" size=\"166207\" checksum=\"8743ff232d76aaf2ff8a10523503a659\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/smultron.zip\"
+        />\n    <package id=\"snowball_data\" name=\"Snowball Data\" languages=\"Danish,
+        Dutch, English, Finnish, French, German,          Hungarian, Italian, Norwegian,
+        Portuguese, Romanian, Russian,          Spanish, Swedish, Turkish\" webpage=\"https://github.com/snowballstem/snowball-data\"
+        unzip=\"0\" unzipped_size=\"36360836\" size=\"6785405\" checksum=\"cba1cf17b887789e6df5f2c87c6e56fb\"
+        subdir=\"stemmers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/stemmers/snowball_data.zip\"
+        />\n    <package id=\"spanish_grammars\" name=\"Grammars for Spanish\" author=\"Kepa
+        Sarasola\" languages=\"Spanish\" unzip=\"1\" unzipped_size=\"3980\" size=\"4047\"
+        checksum=\"12f66b8e22beadd6ed202e95453465af\" subdir=\"grammars\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/grammars/spanish_grammars.zip\"
+        />\n    <package id=\"state_union\" name=\"C-Span State of the Union Address
+        Corpus\" webpage=\"http://www.c-span.org/executive/stateoftheunion.asp\" copyright=\"public
+        domain\" license=\"public domain\" unzip=\"1\" unzipped_size=\"2073917\" size=\"808757\"
+        checksum=\"044f2d20c592b17a26ac0102111833c9\" subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/state_union.zip\"
+        />\n    <package id=\"stopwords\" name=\"Stopwords Corpus\" webpage=\"ftp://ftp.cs.cornell.edu/pub/smart/english.stop
+        and http://snowball.tartarus.org/ and others\" unzip=\"1\" unzipped_size=\"87088\"
+        size=\"36779\" checksum=\"0bba32b6547378c1ed3c0a345ec22895\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/stopwords.zip\"
+        />\n    <package id=\"subjectivity\" name=\"Subjectivity Dataset v1.0\" author=\"Bo
+        Pang and Lillian Lee\" copyright=\"Copyright (C) 2004 Bo Pang and Lillian
+        Lee\" license=\"Creative Commons Attribution 4.0 International\" licenseurl=\"http://creativecommons.org/licenses/by/4.0/\"
+        webpage=\" http://www.cs.cornell.edu/People/pabo/people/pabo/movie-review-data\"
+        unzip=\"1\" unzipped_size=\"1303352\" size=\"521628\" checksum=\"a81a44513903ba6bb86f85aeff149561\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/subjectivity.zip\"
+        />\n    <package id=\"swadesh\" name=\"Swadesh Wordlists\" webpage=\"http://en.wiktionary.org/wiki/Appendix:Swadesh_list\"
+        license=\"GNU Free Documentation License\" unzip=\"1\" unzipped_size=\"39998\"
+        size=\"22828\" checksum=\"6612ccb71f327e85780dc7813dee40f6\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/swadesh.zip\"
+        />\n    <package id=\"switchboard\" name=\"Switchboard Corpus Sample\" sample=\"True\"
+        license=\"Permission is granted for use of this material in accordance with
+        the Open Content License [http://opencontent.org/opl.shtml].  This corpus
+        contains transcripts and annotations for 36 calls from the Switchboard Corpus
+        [http://www.ldc.upenn.edu/Catalog/LDC93S7.html].\" unzip=\"1\" unzipped_size=\"2541179\"
+        size=\"791161\" checksum=\"878df010a9f2c2d0a6546a8365f10595\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/switchboard.zip\"
+        />\n    <package id=\"tagsets\" name=\"Help on Tagsets\" author=\"UCREL, Lancaster
+        University\" languages=\"English\" unzip=\"1\" unzipped_size=\"79723\" size=\"34531\"
+        checksum=\"e15834e0dd89b107925af6bb11a8eaa4\" subdir=\"help\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/help/tagsets.zip\"
+        />\n    <package id=\"tagsets_json\" name=\"Help on Tagsets (JSON)\" author=\"UCREL,
+        Lancaster University\" languages=\"English\" unzip=\"1\" unzipped_size=\"33915\"
+        size=\"13239\" checksum=\"d24a59844f8bead484652330ae7c9abd\" subdir=\"help\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/help/tagsets_json.zip\"
+        />\n    <package id=\"timit\" name=\"TIMIT Corpus Sample\" sample=\"True\"
+        license=\"This corpus sample is Copyright 1993 Linguistic Data Consortium,
+        and is distributed under the terms of the Creative Commons Attribution, Non-Commercial,
+        ShareAlike license.  http://creativecommons.org/\" webpage=\"http://www.ldc.upenn.edu/Catalog/CatalogEntry.jsp?catalogId=LDC93S1\"
+        unzip=\"1\" unzipped_size=\"31932925\" size=\"22251869\" checksum=\"34c047c4749a811287f2c652104d7849\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/timit.zip\"
+        />\n    <package id=\"toolbox\" name=\"Toolbox Sample Files\" unzip=\"1\"
+        unzipped_size=\"829593\" size=\"250616\" checksum=\"26657c1b8b5f5afdc3d5d754393a9216\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/toolbox.zip\"
+        />\n    <package id=\"treebank\" name=\"Penn Treebank Sample\" sample=\"True\"
+        copyright=\"Copyright (C) 1995 University of Pennsylvania\" license=\"This
+        is a 10% fragment of Penn Treebank, (C) LDC 1995.  It is made available under
+        fair use for the purposes of illustrating NLTK tools for tokenizing, tagging,
+        chunking and parsing.  This data is for non-commercial use only.\" unzip=\"1\"
+        unzipped_size=\"5963497\" size=\"1740034\" checksum=\"78c24a97940c2504d0ad35dd3f8a560b\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/treebank.zip\"
+        />\n    <package id=\"twitter_samples\" name=\"Twitter Samples\" copyright=\"Copyright
+        (C) 2015 Twitter, Inc\" license=\"Must be used subject to Twitter Developer
+        Agreement     (https://dev.twitter.com/overview/terms/agreement)\" note=\"Sample
+        of Tweets collected from the Twitter APIs,         observing the 50k limit
+        required by https://dev.twitter.com/overview/terms/policy#6._Be_a_Good_Partner_to_Twitter
+        \" unzip=\"1\" unzipped_size=\"122350791\" size=\"16007673\" checksum=\"02fc79b5adc0357bc1e14747246fd3c1\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/twitter_samples.zip\"
+        />\n    <package id=\"udhr\" name=\"Universal Declaration of Human Rights
+        Corpus\" webpage=\"http://www.un.org/Overview/rights.html\" license=\"public
+        domain\" copyright=\"public domain\" unzip=\"1\" unzipped_size=\"3261577\"
+        size=\"1170177\" checksum=\"745b3a90feb25c95fc805ebbd1ef5258\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/udhr.zip\"
+        />\n    <package id=\"udhr2\" name=\"Universal Declaration of Human Rights
+        Corpus (Unicode Version)\" webpage=\"http://unicode.org/udhr/\" license=\"public
+        domain\" copyright=\"public domain\" unzip=\"1\" unzipped_size=\"5677920\"
+        size=\"1653975\" checksum=\"e604482d2dc8dd2580af7d97c1bf0a80\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/udhr2.zip\"
+        />\n    <package id=\"unicode_samples\" name=\"Unicode Samples\" note=\"A
+        very small corpus used to demonstrate unicode encoding in chapter 10 of the
+        book\" unzip=\"1\" unzipped_size=\"643\" size=\"1212\" checksum=\"d46699450dd2287f5c115d8c1a0819f1\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/unicode_samples.zip\"
+        />\n    <package id=\"universal_tagset\" name=\"Mappings to the Universal
+        Part-of-Speech Tagset\" author=\"Slav Petrov\" license=\"CC-BY-SA-4.0\" webpage=\"https://github.com/slavpetrov/universal-pos-tags\"
+        unzip=\"1\" unzipped_size=\"37147\" size=\"19095\" checksum=\"ba5a69f2148a8cea6fb5084585e20890\"
+        subdir=\"taggers\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/universal_tagset.zip\"
+        />\n    <package id=\"universal_treebanks_v20\" name=\"Universal Treebanks
+        Version 2.0\" license=\"Creative Commons Attribution-NonCommercial-ShareAlike
+        3.0 United States\" webpage=\"https://code.google.com/p/uni-dep-tb/\" unzip=\"0\"
+        unzipped_size=\"119113962\" size=\"25908853\" checksum=\"4acd3991768a727be019a8021fe376d2\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/universal_treebanks_v20.zip\"
+        />\n    <package id=\"vader_lexicon\" name=\"VADER Sentiment Lexicon\" author=\"C.J.
+        Hutto and Eric Gilbert\" webpage=\"https://github.com/cjhutto/vaderSentiment\"
+        license=\"MIT License\" unzip=\"0\" unzipped_size=\"434147\" size=\"90486\"
+        checksum=\"8b3824e2c39b655dd225fb266c8bea53\" subdir=\"sentiment\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/sentiment/vader_lexicon.zip\"
+        />\n    <package id=\"verbnet\" name=\"VerbNet Lexicon, Version 2.1\" version=\"2.1\"
+        author=\"Karin Kipper-Schuler\" webpage=\"https://verbs.colorado.edu/verbnet/\"
+        license=\"Distributed with permission of the author.\" unzip=\"1\" unzipped_size=\"2474526\"
+        size=\"323661\" checksum=\"427dac60e4a94ae910248ccd9986a22a\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/verbnet.zip\"
+        />\n    <package id=\"verbnet3\" name=\"VerbNet Lexicon, Version 3.3\" version=\"3.3\"
+        author=\"Karin Kipper-Schuler\" webpage=\"https://verbs.colorado.edu/verbnet/\"
+        license=\"Distributed with permission of the author.\" unzip=\"1\" unzipped_size=\"3723345\"
+        size=\"482025\" checksum=\"60efc5ed90ab8a18ef4a436e4c39ffbf\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/verbnet3.zip\"
+        />\n    <package id=\"webtext\" name=\"Web Text Corpus\" unzip=\"1\" unzipped_size=\"1726918\"
+        size=\"646297\" checksum=\"6c7680030aae5c997b1370f832545c6a\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/webtext.zip\"
+        />\n    <package id=\"wmt15_eval\" name=\"Evaluation data from WMT15\" webpage=\"http://www.statmt.org/wmt15/\"
+        unzip=\"1\" unzipped_size=\"1247631\" size=\"383096\" checksum=\"2067e40eaf94ccb632007b91073aa433\"
+        subdir=\"models\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/models/wmt15_eval.zip\"
+        />\n    <package id=\"word2vec_sample\" name=\"Word2Vec Sample\" webpage=\"https://code.google.com/p/word2vec/\"
+        unzip=\"1\" unzipped_size=\"138432415\" size=\"49396025\" checksum=\"d1d1a23377f9ab4c12d77c7a078318ac\"
+        subdir=\"models\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/models/word2vec_sample.zip\"
+        />\n    <package id=\"wordnet\" name=\"WordNet\" version=\"3.0\" license=\"Permission
+        to use, copy, modify and distribute this software and database and its documentation
+        for any purpose and without fee or royalty is hereby granted, provided that
+        you agree to comply with the following copyright notice and statements, including
+        the disclaimer, and that the same appear on ALL copies of the software, database
+        and documentation, including modifications that you make for internal use
+        or for distribution.... [see webpage for full license]\" copyright=\"WordNet
+        3.0 Copyright 2006 by Princeton University.  All rights reserved.\" webpage=\"http://wordnet.princeton.edu/\"
+        unzip=\"0\" unzipped_size=\"36353991\" size=\"10775600\" checksum=\"b3f38606f626e54c6f060548546f71f0\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip\"
+        />\n    <package id=\"wordnet2021\" name=\"Open English Wordnet 2021\" version=\"2021\"
+        license=\"This resource is derived from Princeton WordNet under the WordNet
+        License and further developed under the Creative Commons Attribution 4.0 International
+        License. You may share and adapt this resource providing attribution is given
+        to both Princeton WordNet and the Open English WordNet team.\" copyright=\"Open
+        English Wordnet 2021 Copyright 2021 by the Open English Wordnet team. WordNet
+        3.1 Copyright 2011 by Princeton University. All rights reserved.\" webpage=\"https://en-word.net/\"
+        unzip=\"0\" unzipped_size=\"38408913\" size=\"11332750\" checksum=\"99da08a34df218457c3233d6a3dd31b8\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet2021.zip\"
+        />\n    <package id=\"wordnet2022\" name=\"Open English Wordnet 2022\" version=\"2022\"
+        license=\"This resource is derived from Princeton WordNet under the WordNet
+        License and further developed under the Creative Commons Attribution 4.0 International
+        License. You may share and adapt this resource providing attribution is given
+        to both Princeton WordNet and the Open English WordNet team.\" copyright=\"Open
+        English Wordnet 2022 Copyright 2022 by the Open English Wordnet team. WordNet
+        3.1 Copyright 2011 by Princeton University. All rights reserved.\" webpage=\"https://en-word.net/\"
+        unzip=\"1\" unzipped_size=\"38474234\" size=\"11353460\" checksum=\"0b17803d0d8b85ad25b5037af83d6a1c\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet2022.zip\"
+        />\n    <package id=\"wordnet31\" name=\"Wordnet 3.1\" version=\"3.1\" license=\"Permission
+        to use, copy, modify and distribute this software and database and its documentation
+        for any purpose and without fee or royalty is hereby granted, provided that
+        you agree to comply with the following copyright notice and statements, including
+        the disclaimer, and that the same appear on ALL copies of the software, database
+        and documentation, including modifications that you make for internal use
+        or for distribution.... [see webpage for full license]\" copyright=\"WordNet
+        3.1 Copyright 2011 by Princeton University.  All rights reserved.\" webpage=\"http://wordnet.princeton.edu/\"
+        unzip=\"0\" unzipped_size=\"37411975\" size=\"11058667\" checksum=\"d3392d6facef35433ffcef838b47cae1\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet31.zip\"
+        />\n    <package id=\"wordnet_ic\" name=\"WordNet-InfoContent\" version=\"3.0\"
+        webpage=\"http://wn-similarity.sourceforge.net\" unzip=\"1\" unzipped_size=\"34220359\"
+        size=\"12056682\" checksum=\"25f0185b31693fa11ea898e4feda528c\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet_ic.zip\"
+        />\n    <package id=\"words\" name=\"Word Lists\" webpage=\"http://en.wikipedia.org/wiki/Words_(Unix)\"
+        license=\"public domain\" copyright=\"public domain\" unzip=\"1\" unzipped_size=\"2498552\"
+        size=\"757777\" checksum=\"8594d9d5422e01d993dfbbc3f38d3ae5\" subdir=\"corpora\"
+        url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/words.zip\"
+        />\n    <package id=\"ycoe\" name=\"York-Toronto-Helsinki Parsed Corpus of
+        Old English Prose\" webpage=\"http://www.ota.ahds.ac.uk/\" available=\"False\"
+        unzip=\"1\" unzipped_size=\"277\" size=\"477\" checksum=\"6582cd98ca26c35d9c4eaaa4350ce8f3\"
+        subdir=\"corpora\" url=\"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/ycoe.zip\"
+        />\n  </packages>\n  <collections>\n    <collection id=\"all\" name=\"All
+        packages\">\n      <item ref=\"abc\" />\n      <item ref=\"alpino\" />\n      <item
+        ref=\"averaged_perceptron_tagger\" />\n      <item ref=\"averaged_perceptron_tagger_eng\"
+        />\n      <item ref=\"averaged_perceptron_tagger_ru\" />\n      <item ref=\"averaged_perceptron_tagger_rus\"
+        />\n      <item ref=\"basque_grammars\" />\n      <item ref=\"bcp47\" />\n
+        \     <item ref=\"biocreative_ppi\" />\n      <item ref=\"bllip_wsj_no_aux\"
+        />\n      <item ref=\"book_grammars\" />\n      <item ref=\"brown\" />\n      <item
+        ref=\"brown_tei\" />\n      <item ref=\"cess_cat\" />\n      <item ref=\"cess_esp\"
+        />\n      <item ref=\"chat80\" />\n      <item ref=\"city_database\" />\n
+        \     <item ref=\"cmudict\" />\n      <item ref=\"comparative_sentences\"
+        />\n      <item ref=\"comtrans\" />\n      <item ref=\"conll2000\" />\n      <item
+        ref=\"conll2002\" />\n      <item ref=\"conll2007\" />\n      <item ref=\"crubadan\"
+        />\n      <item ref=\"dependency_treebank\" />\n      <item ref=\"dolch\"
+        />\n      <item ref=\"english_wordnet\" />\n      <item ref=\"europarl_raw\"
+        />\n      <item ref=\"extended_omw\" />\n      <item ref=\"floresta\" />\n
+        \     <item ref=\"framenet_v15\" />\n      <item ref=\"framenet_v17\" />\n
+        \     <item ref=\"gazetteers\" />\n      <item ref=\"genesis\" />\n      <item
+        ref=\"gutenberg\" />\n      <item ref=\"ieer\" />\n      <item ref=\"inaugural\"
+        />\n      <item ref=\"indian\" />\n      <item ref=\"jeita\" />\n      <item
+        ref=\"kimmo\" />\n      <item ref=\"knbc\" />\n      <item ref=\"large_grammars\"
+        />\n      <item ref=\"lin_thesaurus\" />\n      <item ref=\"mac_morpho\" />\n
+        \     <item ref=\"machado\" />\n      <item ref=\"masc_tagged\" />\n      <item
+        ref=\"maxent_ne_chunker\" />\n      <item ref=\"maxent_ne_chunker_tab\" />\n
+        \     <item ref=\"maxent_treebank_pos_tagger\" />\n      <item ref=\"maxent_treebank_pos_tagger_tab\"
+        />\n      <item ref=\"moses_sample\" />\n      <item ref=\"movie_reviews\"
+        />\n      <item ref=\"mte_teip5\" />\n      <item ref=\"mwa_ppdb\" />\n      <item
+        ref=\"names\" />\n      <item ref=\"nombank.1.0\" />\n      <item ref=\"nonbreaking_prefixes\"
+        />\n      <item ref=\"nps_chat\" />\n      <item ref=\"omw\" />\n      <item
+        ref=\"omw-1.4\" />\n      <item ref=\"opinion_lexicon\" />\n      <item ref=\"panlex_swadesh\"
+        />\n      <item ref=\"paradigms\" />\n      <item ref=\"pe08\" />\n      <item
+        ref=\"perluniprops\" />\n      <item ref=\"pil\" />\n      <item ref=\"pl196x\"
+        />\n      <item ref=\"porter_test\" />\n      <item ref=\"ppattach\" />\n
+        \     <item ref=\"problem_reports\" />\n      <item ref=\"product_reviews_1\"
+        />\n      <item ref=\"product_reviews_2\" />\n      <item ref=\"propbank\"
+        />\n      <item ref=\"pros_cons\" />\n      <item ref=\"ptb\" />\n      <item
+        ref=\"punkt\" />\n      <item ref=\"punkt_tab\" />\n      <item ref=\"qc\"
+        />\n      <item ref=\"reuters\" />\n      <item ref=\"rslp\" />\n      <item
+        ref=\"rte\" />\n      <item ref=\"sample_grammars\" />\n      <item ref=\"semcor\"
+        />\n      <item ref=\"senseval\" />\n      <item ref=\"sentence_polarity\"
+        />\n      <item ref=\"sentiwordnet\" />\n      <item ref=\"shakespeare\" />\n
+        \     <item ref=\"sinica_treebank\" />\n      <item ref=\"smultron\" />\n
+        \     <item ref=\"snowball_data\" />\n      <item ref=\"spanish_grammars\"
+        />\n      <item ref=\"state_union\" />\n      <item ref=\"stopwords\" />\n
+        \     <item ref=\"subjectivity\" />\n      <item ref=\"swadesh\" />\n      <item
+        ref=\"switchboard\" />\n      <item ref=\"tagsets\" />\n      <item ref=\"tagsets_json\"
+        />\n      <item ref=\"timit\" />\n      <item ref=\"toolbox\" />\n      <item
+        ref=\"treebank\" />\n      <item ref=\"twitter_samples\" />\n      <item ref=\"udhr\"
+        />\n      <item ref=\"udhr2\" />\n      <item ref=\"unicode_samples\" />\n
+        \     <item ref=\"universal_tagset\" />\n      <item ref=\"universal_treebanks_v20\"
+        />\n      <item ref=\"vader_lexicon\" />\n      <item ref=\"verbnet\" />\n
+        \     <item ref=\"verbnet3\" />\n      <item ref=\"webtext\" />\n      <item
+        ref=\"wmt15_eval\" />\n      <item ref=\"word2vec_sample\" />\n      <item
+        ref=\"wordnet\" />\n      <item ref=\"wordnet2021\" />\n      <item ref=\"wordnet2022\"
+        />\n      <item ref=\"wordnet31\" />\n      <item ref=\"wordnet_ic\" />\n
+        \     <item ref=\"words\" />\n      <item ref=\"ycoe\" />\n    </collection>\n
+        \   <collection id=\"all-corpora\" name=\"All the corpora\">\n      <item
+        ref=\"abc\" />\n      <item ref=\"alpino\" />\n      <item ref=\"bcp47\" />\n
+        \     <item ref=\"biocreative_ppi\" />\n      <item ref=\"brown\" />\n      <item
+        ref=\"brown_tei\" />\n      <item ref=\"cess_cat\" />\n      <item ref=\"cess_esp\"
+        />\n      <item ref=\"chat80\" />\n      <item ref=\"city_database\" />\n
+        \     <item ref=\"cmudict\" />\n      <item ref=\"comparative_sentences\"
+        />\n      <item ref=\"comtrans\" />\n      <item ref=\"conll2000\" />\n      <item
+        ref=\"conll2002\" />\n      <item ref=\"conll2007\" />\n      <item ref=\"crubadan\"
+        />\n      <item ref=\"dependency_treebank\" />\n      <item ref=\"dolch\"
+        />\n      <item ref=\"english_wordnet\" />\n      <item ref=\"europarl_raw\"
+        />\n      <item ref=\"extended_omw\" />\n      <item ref=\"floresta\" />\n
+        \     <item ref=\"framenet_v15\" />\n      <item ref=\"framenet_v17\" />\n
+        \     <item ref=\"gazetteers\" />\n      <item ref=\"genesis\" />\n      <item
+        ref=\"gutenberg\" />\n      <item ref=\"ieer\" />\n      <item ref=\"inaugural\"
+        />\n      <item ref=\"indian\" />\n      <item ref=\"jeita\" />\n      <item
+        ref=\"kimmo\" />\n      <item ref=\"knbc\" />\n      <item ref=\"lin_thesaurus\"
+        />\n      <item ref=\"mac_morpho\" />\n      <item ref=\"machado\" />\n      <item
+        ref=\"masc_tagged\" />\n      <item ref=\"movie_reviews\" />\n      <item
+        ref=\"mte_teip5\" />\n      <item ref=\"names\" />\n      <item ref=\"nombank.1.0\"
+        />\n      <item ref=\"nonbreaking_prefixes\" />\n      <item ref=\"nps_chat\"
+        />\n      <item ref=\"omw\" />\n      <item ref=\"omw-1.4\" />\n      <item
+        ref=\"opinion_lexicon\" />\n      <item ref=\"panlex_swadesh\" />\n      <item
+        ref=\"paradigms\" />\n      <item ref=\"pe08\" />\n      <item ref=\"pil\"
+        />\n      <item ref=\"pl196x\" />\n      <item ref=\"ppattach\" />\n      <item
+        ref=\"problem_reports\" />\n      <item ref=\"product_reviews_1\" />\n      <item
+        ref=\"product_reviews_2\" />\n      <item ref=\"propbank\" />\n      <item
+        ref=\"pros_cons\" />\n      <item ref=\"ptb\" />\n      <item ref=\"qc\" />\n
+        \     <item ref=\"reuters\" />\n      <item ref=\"rte\" />\n      <item ref=\"semcor\"
+        />\n      <item ref=\"senseval\" />\n      <item ref=\"sentence_polarity\"
+        />\n      <item ref=\"sentiwordnet\" />\n      <item ref=\"shakespeare\" />\n
+        \     <item ref=\"sinica_treebank\" />\n      <item ref=\"smultron\" />\n
+        \     <item ref=\"state_union\" />\n      <item ref=\"stopwords\" />\n      <item
+        ref=\"subjectivity\" />\n      <item ref=\"swadesh\" />\n      <item ref=\"switchboard\"
+        />\n      <item ref=\"timit\" />\n      <item ref=\"toolbox\" />\n      <item
+        ref=\"treebank\" />\n      <item ref=\"twitter_samples\" />\n      <item ref=\"udhr\"
+        />\n      <item ref=\"udhr2\" />\n      <item ref=\"unicode_samples\" />\n
+        \     <item ref=\"universal_treebanks_v20\" />\n      <item ref=\"verbnet\"
+        />\n      <item ref=\"verbnet3\" />\n      <item ref=\"webtext\" />\n      <item
+        ref=\"wordnet\" />\n      <item ref=\"wordnet2021\" />\n      <item ref=\"wordnet2022\"
+        />\n      <item ref=\"wordnet31\" />\n      <item ref=\"wordnet_ic\" />\n
+        \     <item ref=\"words\" />\n      <item ref=\"ycoe\" />\n    </collection>\n
+        \   <collection id=\"all-nltk\" name=\"All packages available on nltk_data
+        gh-pages branch\">\n      <item ref=\"abc\" />\n      <item ref=\"alpino\"
+        />\n      <item ref=\"averaged_perceptron_tagger\" />\n      <item ref=\"averaged_perceptron_tagger_eng\"
+        />\n      <item ref=\"averaged_perceptron_tagger_ru\" />\n      <item ref=\"averaged_perceptron_tagger_rus\"
+        />\n      <item ref=\"basque_grammars\" />\n      <item ref=\"bcp47\" />\n
+        \     <item ref=\"biocreative_ppi\" />\n      <item ref=\"bllip_wsj_no_aux\"
+        />\n      <item ref=\"book_grammars\" />\n      <item ref=\"brown\" />\n      <item
+        ref=\"brown_tei\" />\n      <item ref=\"cess_cat\" />\n      <item ref=\"cess_esp\"
+        />\n      <item ref=\"chat80\" />\n      <item ref=\"city_database\" />\n
+        \     <item ref=\"cmudict\" />\n      <item ref=\"comparative_sentences\"
+        />\n      <item ref=\"comtrans\" />\n      <item ref=\"conll2000\" />\n      <item
+        ref=\"conll2002\" />\n      <item ref=\"conll2007\" />\n      <item ref=\"crubadan\"
+        />\n      <item ref=\"dependency_treebank\" />\n      <item ref=\"dolch\"
+        />\n      <item ref=\"english_wordnet\" />\n      <item ref=\"europarl_raw\"
+        />\n      <item ref=\"extended_omw\" />\n      <item ref=\"floresta\" />\n
+        \     <item ref=\"framenet_v15\" />\n      <item ref=\"framenet_v17\" />\n
+        \     <item ref=\"gazetteers\" />\n      <item ref=\"genesis\" />\n      <item
+        ref=\"gutenberg\" />\n      <item ref=\"ieer\" />\n      <item ref=\"inaugural\"
+        />\n      <item ref=\"indian\" />\n      <item ref=\"jeita\" />\n      <item
+        ref=\"kimmo\" />\n      <item ref=\"knbc\" />\n      <item ref=\"large_grammars\"
+        />\n      <item ref=\"lin_thesaurus\" />\n      <item ref=\"mac_morpho\" />\n
+        \     <item ref=\"machado\" />\n      <item ref=\"masc_tagged\" />\n      <item
+        ref=\"maxent_ne_chunker\" />\n      <item ref=\"maxent_ne_chunker_tab\" />\n
+        \     <item ref=\"maxent_treebank_pos_tagger\" />\n      <item ref=\"maxent_treebank_pos_tagger_tab\"
+        />\n      <item ref=\"moses_sample\" />\n      <item ref=\"movie_reviews\"
+        />\n      <item ref=\"mte_teip5\" />\n      <item ref=\"mwa_ppdb\" />\n      <item
+        ref=\"names\" />\n      <item ref=\"nombank.1.0\" />\n      <item ref=\"nonbreaking_prefixes\"
+        />\n      <item ref=\"nps_chat\" />\n      <item ref=\"omw\" />\n      <item
+        ref=\"omw-1.4\" />\n      <item ref=\"opinion_lexicon\" />\n      <item ref=\"panlex_swadesh\"
+        />\n      <item ref=\"paradigms\" />\n      <item ref=\"pe08\" />\n      <item
+        ref=\"perluniprops\" />\n      <item ref=\"pil\" />\n      <item ref=\"pl196x\"
+        />\n      <item ref=\"porter_test\" />\n      <item ref=\"ppattach\" />\n
+        \     <item ref=\"problem_reports\" />\n      <item ref=\"product_reviews_1\"
+        />\n      <item ref=\"product_reviews_2\" />\n      <item ref=\"propbank\"
+        />\n      <item ref=\"pros_cons\" />\n      <item ref=\"ptb\" />\n      <item
+        ref=\"punkt\" />\n      <item ref=\"punkt_tab\" />\n      <item ref=\"qc\"
+        />\n      <item ref=\"reuters\" />\n      <item ref=\"rslp\" />\n      <item
+        ref=\"rte\" />\n      <item ref=\"sample_grammars\" />\n      <item ref=\"semcor\"
+        />\n      <item ref=\"senseval\" />\n      <item ref=\"sentence_polarity\"
+        />\n      <item ref=\"sentiwordnet\" />\n      <item ref=\"shakespeare\" />\n
+        \     <item ref=\"sinica_treebank\" />\n      <item ref=\"smultron\" />\n
+        \     <item ref=\"snowball_data\" />\n      <item ref=\"spanish_grammars\"
+        />\n      <item ref=\"state_union\" />\n      <item ref=\"stopwords\" />\n
+        \     <item ref=\"subjectivity\" />\n      <item ref=\"swadesh\" />\n      <item
+        ref=\"switchboard\" />\n      <item ref=\"tagsets\" />\n      <item ref=\"tagsets_json\"
+        />\n      <item ref=\"timit\" />\n      <item ref=\"toolbox\" />\n      <item
+        ref=\"treebank\" />\n      <item ref=\"twitter_samples\" />\n      <item ref=\"udhr\"
+        />\n      <item ref=\"udhr2\" />\n      <item ref=\"unicode_samples\" />\n
+        \     <item ref=\"universal_tagset\" />\n      <item ref=\"universal_treebanks_v20\"
+        />\n      <item ref=\"vader_lexicon\" />\n      <item ref=\"verbnet\" />\n
+        \     <item ref=\"verbnet3\" />\n      <item ref=\"webtext\" />\n      <item
+        ref=\"wmt15_eval\" />\n      <item ref=\"word2vec_sample\" />\n      <item
+        ref=\"wordnet\" />\n      <item ref=\"wordnet2021\" />\n      <item ref=\"wordnet2022\"
+        />\n      <item ref=\"wordnet31\" />\n      <item ref=\"wordnet_ic\" />\n
+        \     <item ref=\"words\" />\n      <item ref=\"ycoe\" />\n    </collection>\n
+        \   <collection id=\"book\" name=\"Everything used in the NLTK Book\">\n      <item
+        ref=\"abc\" />\n      <item ref=\"brown\" />\n      <item ref=\"chat80\" />\n
+        \     <item ref=\"cmudict\" />\n      <item ref=\"conll2000\" />\n      <item
+        ref=\"conll2002\" />\n      <item ref=\"dependency_treebank\" />\n      <item
+        ref=\"genesis\" />\n      <item ref=\"gutenberg\" />\n      <item ref=\"ieer\"
+        />\n      <item ref=\"inaugural\" />\n      <item ref=\"movie_reviews\" />\n
+        \     <item ref=\"nps_chat\" />\n      <item ref=\"names\" />\n      <item
+        ref=\"ppattach\" />\n      <item ref=\"reuters\" />\n      <item ref=\"senseval\"
+        />\n      <item ref=\"state_union\" />\n      <item ref=\"stopwords\" />\n
+        \     <item ref=\"swadesh\" />\n      <item ref=\"timit\" />\n      <item
+        ref=\"treebank\" />\n      <item ref=\"toolbox\" />\n      <item ref=\"udhr\"
+        />\n      <item ref=\"udhr2\" />\n      <item ref=\"unicode_samples\" />\n
+        \     <item ref=\"webtext\" />\n      <item ref=\"wordnet\" />\n      <item
+        ref=\"wordnet_ic\" />\n      <item ref=\"words\" />\n      <item ref=\"maxent_treebank_pos_tagger\"
+        />\n      <item ref=\"maxent_ne_chunker\" />\n      <item ref=\"universal_tagset\"
+        />\n      <item ref=\"punkt\" />\n      <item ref=\"book_grammars\" />\n      <item
+        ref=\"city_database\" />\n      <item ref=\"tagsets\" />\n      <item ref=\"panlex_swadesh\"
+        />\n      <item ref=\"averaged_perceptron_tagger\" />\n    </collection>\n
+        \   <collection id=\"popular\" name=\"Popular packages\">\n      <item ref=\"cmudict\"
+        />\n      <item ref=\"gazetteers\" />\n      <item ref=\"genesis\" />\n      <item
+        ref=\"gutenberg\" />\n      <item ref=\"inaugural\" />\n      <item ref=\"movie_reviews\"
+        />\n      <item ref=\"names\" />\n      <item ref=\"shakespeare\" />\n      <item
+        ref=\"stopwords\" />\n      <item ref=\"treebank\" />\n      <item ref=\"twitter_samples\"
+        />\n      <item ref=\"omw\" />\n      <item ref=\"omw-1.4\" />\n      <item
+        ref=\"wordnet\" />\n      <item ref=\"wordnet2021\" />\n      <item ref=\"wordnet31\"
+        />\n      <item ref=\"wordnet_ic\" />\n      <item ref=\"words\" />\n      <item
+        ref=\"maxent_ne_chunker\" />\n      <item ref=\"punkt\" />\n      <item ref=\"snowball_data\"
+        />\n      <item ref=\"averaged_perceptron_tagger\" />\n    </collection>\n
+        \   <collection id=\"tests\" name=\"Packages for running tests\">\n      <item
+        ref=\"averaged_perceptron_tagger\" />\n      <item ref=\"porter_test\" />\n
+        \     <item ref=\"twitter_samples\" />\n      <item ref=\"wmt15_eval\" />\n
+        \     <item ref=\"subjectivity\" />\n      <item ref=\"framenet_v17\" />\n
+        \     <item ref=\"product_reviews_1\" />\n      <item ref=\"product_reviews_2\"
+        />\n      <item ref=\"vader_lexicon\" />\n      <item ref=\"crubadan\" />\n
+        \     <item ref=\"mte_teip5\" />\n      <item ref=\"sentence_polarity\" />\n
+        \     <item ref=\"universal_treebanks_v20\" />\n      <item ref=\"panlex_swadesh\"
+        />\n      <item ref=\"nonbreaking_prefixes\" />\n      <item ref=\"perluniprops\"
+        />\n      <item ref=\"pros_cons\" />\n      <item ref=\"opinion_lexicon\"
+        />\n      <item ref=\"comparative_sentences\" />\n    </collection>\n    <collection
+        id=\"third-party\" name=\"Third-party data packages\">\n      <item ref=\"dolch\"
+        />\n    </collection>\n  </collections>\n</nltk_data>\n"
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - max-age=300
+      Connection:
+      - close
+      Content-Length:
+      - '67715'
+      Content-Security-Policy:
+      - default-src 'none'; style-src 'unsafe-inline'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Cross-Origin-Resource-Policy:
+      - cross-origin
+      Date:
+      - Fri, 21 Mar 2025 02:57:21 GMT
+      ETag:
+      - '"fba81c2b376c36b769764218e8f5a175aef21bb909a9a5eaf6e1aea88c05b514"'
+      Expires:
+      - Fri, 21 Mar 2025 03:02:21 GMT
+      Source-Age:
+      - '224'
+      Strict-Transport-Security:
+      - max-age=31536000
+      Vary:
+      - Authorization,Accept-Encoding,Origin
+      Via:
+      - 1.1 varnish
+      X-Cache:
+      - HIT
+      X-Cache-Hits:
+      - '4'
+      X-Content-Type-Options:
+      - nosniff
+      X-Fastly-Request-ID:
+      - f3fe466c653d22a8838c895905498a0b2dcee528
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - 3420:3AC940:1034C5B:1515FA7:67CE8A33
+      X-Served-By:
+      - cache-pao-kpao1770047-PAO
+      X-Timer:
+      - S1742525842.830879,VS0,VE0
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - raw.githubusercontent.com
+      user-agent:
+      - python-httpx/0.27.0
+    method: GET
+    uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+  response:
+    body:
+      string: !!binary |
+        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
+        xwUA
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - max-age=300
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Length:
+      - '18243'
+      Content-Security-Policy:
+      - default-src 'none'; style-src 'unsafe-inline'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Cross-Origin-Resource-Policy:
+      - cross-origin
+      Date:
+      - Fri, 21 Mar 2025 02:57:22 GMT
+      ETag:
+      - W/"57aec3db82e144a0dffd7b737b39170d3610da24cec924de91a2dd480a4e62d0"
+      Expires:
+      - Fri, 21 Mar 2025 03:02:22 GMT
+      Source-Age:
+      - '227'
+      Strict-Transport-Security:
+      - max-age=31536000
+      Vary:
+      - Authorization,Accept-Encoding,Origin
+      Via:
+      - 1.1 varnish
+      X-Cache:
+      - HIT
+      X-Cache-Hits:
+      - '9'
+      X-Content-Type-Options:
+      - nosniff
+      X-Fastly-Request-ID:
+      - 8cdb0ccb172410340bc7af49789c71ef5c9cc9a4
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - 08E7:F39C:E5E4C4:12403EF:67DB842F
+      X-Served-By:
+      - cache-pao-kpao1770046-PAO
+      X-Timer:
+      - S1742525843.585266,VS0,VE0
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xSTY/TMBC951cMvnBpVm3a0m4vCBYkhBaBYG/sKnKcSTLgeCzbKVSr/veV04+k
+        LEhcfJg3b/zem3lMAASVYgNCNTKo1ur07btP7m65+vwKt1Xxq3wfitulvLmlr1lHX8QkMrj4gSqc
+        WFeKW6sxEJsDrBzKgHHqbLXIltlyvZj3QMsl6kirbUgXnLZkKM2m2SKdrtLZ+shumBR6sYHvCQDA
+        Y/9GnabE32ID08mp0qL3skaxOTcBCMc6VoT0nnyQJojJACo2AU0v/QM6fOnhIzfG7F7AjY4EBZoM
+        QuW4hXtx1yB8a8iQqa/uBbxxCDvuQEIlDXAFoUFoeUv4evyHw6rzMvo0ndYjQBrDQcacencPR2R/
+        9qO5to4L/wdVVGTIN7lD6dlE7T6wFT26TwAe+ty6iyiEddzakAf+if13s/lhnBi2NYDZMVMROEg9
+        1Ocn0sW0vMQgSftR7kJJ1WA5MIclya4kHgHJyPNzMX+bffBNpv6f8QOgFNqAZW4dlqQuDQ9tDuMt
+        /6vtnHEvWHh0W1KYB0IX91BiJTt9uDDhdz5gm1dkanTW0eHMKpsX60JdL+VUKpHskycAAAD//wMA
+        hE0SfnQDAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77df02f7ad-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=2jH7yuCbuoWjOr6xFE4jRR7DJXDi0FHUcoTu519nzT4-1742525843-1.0.1.1-6cZBO1iCbpr5AWzcT6YdBN5nSUGI3l6lsyjsRQ2zMEPT4CNI9pJ7tUOsP.6TToYVYYxVwIPEpNzgyYdFl2jdlLYcWs9nlC5ZDdMbDm7t1ZE;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=u9jimfSyQgLT3BYJexhDUFRbE8SoM3O0v7OG74XH4FA-1742525843763-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '494'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29998'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_d0b085ffff1f2860adcb13310625a965
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jJLBbtswDIbvfgpOl17iIrGdNc1laLvDUCC7rKethSHLtK1WFgWJ7hYU
+        efdBThqnWwfsYsD8+FP8Sb4kAELXYg1CdZJV70x6/Xnj77bV7VfOAxnaZDffrwq8xs3PNndiFhVU
+        PaLiV9W5ot4ZZE12j5VHyRirLi6KbJktV0U+gp5qNFHWOk4LSnttdZrNsyKdX6SL1UHdkVYYxBp+
+        JAAAL+M39mlr/CXWMJ+9RnoMQbYo1sckAOHJxIiQIejA0rKYTVCRZbRj618QET2eBbilztrtB7gx
+        UaPAaIvQeOrhXtx1CN86bbVtz+8FXHmELQ0goZEWqAHuEHp61gjkx5+K6OnT6ZMemyHIaNsOxpwA
+        aS2xjGMbzT4cyO5oz1DrPFXhD6lotNWhKz3KQDZaCUxOjHSXADyMYxzeTEY4T73jkukJx+cW+b6c
+        mJY3wezjATKxNFM8v5y9U62skaU24WQNQknVYT0pp53JodZ0ApITz383817tvW9t2/8pPwGl0DHW
+        pfNYa/XW8JTmMZ72v9KOMx4bFgH9s1ZYskYf91BjIwezPzgRtoGxLxttW/TO6/3VNa6sVpW6XMq5
+        VCLZJb8BAAD//wMA67JE/IMDAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77df63f642-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=qEH_jBri8fVeSpZk6RvqgomZhTWYhoPpNLJ6LWJQyKI-1742525843-1.0.1.1-Wz4gPZpLLHPPVQgL5_xtuL2rRA59DCidv.ZSd0Vxy7Ul_QL6z21PpHGIpshvHAmnBkO7w2.1ekpUA9.YbSwkWAwZRK_lNVxGXrtEtmO2rFQ;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=fH33XXlAdCX4QB0wKXNBEAtYAlZa9d5lIUDsRv64LEw-1742525843815-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '570'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_d758264ab7423aff069047aab62a9100
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNNb9QwEL3nVwy+9LKp9pPd7gVROCAkJBCVeqBV5DiTZKjjce1Jxarq
+        f0fObjdbKBIXH+bNe37zxn7MABRVagvKtFpM521++fFLuIqry6b/+rbpyay/lddGzL3s7tcXapIY
+        XP5EI8+sc8OdtyjEbg+bgFowqc7Wy/lqvtosFwPQcYU20Rov+ZLzjhzl8+l8mU/X+WxzYLdMBqPa
+        wo8MAOBxOJNPV+EvtYXp5LnSYYy6QbU9NgGowDZVlI6RomgnajKChp2gG6x/QsSAZxE+c+vc7g18
+        sIliwJJDqAN3cKOuWoTvLTlyzfmNgvcBYcc9aKi1A65BWoSOHwgnwAEopkJAiNyhtOQaiB4N1WRA
+        l9wLkCT+WQWW7hCEoaJo+hjfnZoMWPdRp6Bcb+0JoJ1j0SnoIZ7bA/J0DMRy4wOX8Q+qqslRbIuA
+        OrJLw0dhrwb0KQO4HYLvX2SpfODOSyF8h8N1s8VeTo3rHsHF6gAKi7ZjfbmZvKJWVCiabDxZnDLa
+        tFiNzHHLuq+IT4DsZOa/zbymvZ+bXPM/8iNgDHrBqvABKzIvBx7bAqbP8K+2Y8aDYRUxPJDBQghD
+        2kOFte7t/omquIuCXVGTazD4QPt3Wvui3JTmYqWn2qjsKfsNAAD//wMApkR7B7UDAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77ee9cf7bf-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=.aXdz6a3136crae6oLhY9Gg8yBOMmslLzkBArFjnKj0-1742525843-1.0.1.1-2HR7Myf8E8TgYkw0O0LCYCx2_P.wJ9OylnkgSg6Ilh1KqO.ydFuwMRkkMFtKV60pJDYk_LQVKdj8SGJrttPZJPP8icL49jxbpMT_jx1mVUw;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=AST7s3WViqyTEEYLpSJ3X9cBJJZ_sA4BXQsTZckZ.UU-1742525843855-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '601'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_faab59a997613fd8b57dd62b40af30d5
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFJNb9swDL37V3C67BIXiZMsaS7D2qEoBhQ7tLe2MBSZtpnJoivRwYIi
+        /32Qk9bJPoBddODje+Lj42sCoKhQK1Cm1mKa1qZXX+/8w3Rz4xb3l3fX43CVfdru7PRmwd9vX9Qo
+        Mni9QSNvrAvDTWtRiN0BNh61YFSdLGbZPJsvZ9MeaLhAG2lVK+mM04Ycpdk4m6XjRTpZHtk1k8Gg
+        VvCYAAC89m+c0xX4U61gPHqrNBiCrlCt3psAlGcbK0qHQEG0EzUaQMNO0PWj3yKix48BvnHt3O4D
+        XNtIMWDJIZSeG3hSDzXCfU2OXHXxpOCLR9hxBxpK7YBLkBqh4S0hsIdNFwReOhZyFZB8Pv3YY9kF
+        Hc27ztoTQDvHouPyesvPR2T/btJy1Xpeh9+oqiRHoc496sAuGgrCrerRfQLw3C+zO9uPaj03reTC
+        P7D/bjI9yKkhwgHMFkdQWLQd6rNjAOdqeYGiyYaTMJTRpsZiYA7J6a4gPgGSE89/DvM37YNvctX/
+        yA+AMdgKFnnrsSBzbnho8xgP/F9t7zvuB1YB/ZYM5kLoYw4Flrqzh7NTYRcEm7wkV6FvPR1ur2zz
+        9XJtLud6rI1K9skvAAAA//8DAEBUm0SJAwAA
+    headers:
+      CF-RAY:
+      - 923a2e77ea6a7c68-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=dXKk8KpO4.gHIoGGh.xJIayo_AlW7ZNhHuQVUqxAXa8-1742525843-1.0.1.1-UDos107ghz34Ooo7N.xxrjveuDa4KxSRinScBhLk1QAYYP6cHFUrivcuEJoqFDAhAhzqqK5U3rIg7FYNiYW1KpSaopOchy37H2ZY5wftONY;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=NSnodfw5we_qC1_psWS95VEuO0vSAlnD6sVWdhGI0aY-1742525843914-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '648'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29983'
+      x-ratelimit-remaining-tokens:
+      - '149933910'
+      x-ratelimit-reset-requests:
+      - 32ms
+      x-ratelimit-reset-tokens:
+      - 26ms
+      x-request-id:
+      - req_31d3f6809bf7e46408fc5b599715344f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jJPBbtswDIbveQpOl12SIk1jtM1lWJEBW4Htsh42LIWhSLTNVRY1US4a
+        FAX6ELvs9fokg5w2TrcO2MUHfvxp8id1OwJQZNUClGl0Mm1wk7Plx3gRvizl+LS6qb8yNT+K6mZZ
+        4Afz7kyNs4LX39GkJ9WB4TY4TMR+i01EnTBXPTyez4pZcTI/6kHLFl2W1SFN5jxpydNkNp3NJ9Pj
+        yeHJo7phMihqAd9GAAC3/Tf36S3eqAVMx0+RFkV0jWqxSwJQkV2OKC1CkrRPajxAwz6h71tfqfcY
+        8eH+l8A5N95vXq0UPNz/BA3GZbEBRx6hitzCSl00CJ8b8uTr8UpBpVvuxG3AoqNrjGhhvYFzba7g
+        E5mGnbA/gLcRYcMdaKi0B64gNQgtXxOOgSOQ5EBEEG4xNeRrkICGKjJZ9tqCoyuExGBJTCcCes1d
+        Akpv9oeKWHWis7G+c24PaO856byY3s7LR3K3M9BxHSKv5Q+pqsiTNGVELeyzWZI4qJ7ejQAu+0V1
+        z7xXIXIbUpn4CvvfHR5ty6nhPAY4nz3CxEm7IV4U4xeqlRaTJid7i1ZGmwbtoByuQneWeA+M9mb+
+        u5mXam/nJl//T/kBGIMhoS1DREvm+cBDWsT8eP6VtvO4b1gJxmsyWCbCmPdgsdKd2560ko0kbMuK
+        fI0xRNredRXK9cnanBZ6qo0a3Y1+AwAA//8DAEaOakPlAwAA
+    headers:
+      CF-RAY:
+      - 923a2e77fd0908fe-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=7mwPYHhpe7lRPOoGPGQE0gytU8shrapYOkwVhKV4En8-1742525843-1.0.1.1-LPy0t2vDoI0qSVwmvJMUvoVjKQ5BKkN_SWdvjhn.lW9ZcGkeyvnh3ibGiEu3jEfP27tnzOowqQdckxhw.wdCvJoCWlTxVjGXAmhktokvHJU;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=wmr0P3k7z7CKzmSv_A7ih..d7.ypQ7XJ8se8D1dLDXY-1742525843940-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '644'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_3aa52c3373839aab228b7877102e1b59
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFJNi9swEL37V8zqUljikjgJm+ZStpTSLfTULfSDxSjy2J5E0qiSvGy6
+        5L8XOR9O+gG96DBv3ui9N/OcAQiqxBKEamVUxun8zduP/n6ymf4sNnT3pTBf5Xhzt/5G9fbp3Wcx
+        SgxerVHFI+ulYuM0RmK7h5VHGTFNndzMinkxX8ymPWC4Qp1ojYv5jHNDlvJiXMzy8U0+WRzYLZPC
+        IJbwPQMAeO7fpNNW+CSWMB4dKwZDkA2K5akJQHjWqSJkCBSitFGMBlCxjWh76e8R0eOLAB+4tXZ7
+        BbegdCIp0GQRas8Gru9bhE8tWbLN9RXceoQtdyChlha4htgiGH4kBPaw7kKEHx1Hsk3fYrgLEBRa
+        fH0uwmPdBZmCsJ3WZ4C0lqNMQfb2Hw7I7mRYc+M8r8JvVFGTpdCWHmVgm8yFyE706C4DeOiD7S6y
+        Es6zcbGMvMH+u8l0P04M6xzA6SF0ETlKPdRnR9LFtLLCKEmHs8UIJVWL1cActii7ivgMyM48/ynm
+        b7P3vsk2/zN+AJRCF7EqnceK1KXhoc1jOvZ/tZ0y7gWLgP6RFJaR0Kc9VFjLTu9PUIRtiGjKmmyD
+        3nna32HtytVipV7N5Vgqke2yXwAAAP//AwDjgf+JlQMAAA==
+    headers:
+      CF-RAY:
+      - 923a2e77df3d7e88-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=7rzCwUeH38Dq3SmRjkR7.XiT9NMm_YFIMsz7gEPJ9RY-1742525843-1.0.1.1-PmaypScHVFzgj39fWU7p.JLnAvMLEi4OtpPWoDyJi89efrQrGFhHIftx3CjnqidWYEozuhWexdckEL52oRZ.Sp3zEY8Qlu5BbA4m0a3P_80;
+        path=/; expires=Fri, 21-Mar-25 03:27:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=vWKmxWtP11tz62mUBQsDrtv1sd.58hjHR_gszR26ZhM-1742525843983-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '711'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29987'
+      x-ratelimit-remaining-tokens:
+      - '149951621'
+      x-ratelimit-reset-requests:
+      - 25ms
+      x-ratelimit-reset-tokens:
+      - 19ms
+      x-request-id:
+      - req_24c23eb335dbb91e84339ce6d6fd3dd9
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jJNNbxNBDIbv+RVmLr1kqyRNScgFgRAqhQISlQCRajXxeHdNZsfLzGza
+        UPW/o9mk3ZQPicse/Pj12n49twMAxUYtQGGlI9aNzV6+uvCXP67XJ+PJm68Xr999+DJ7e7a5ufhZ
+        bT9+VsOkkNV3wnivOkapG0uRxe0wetKRUtXxbDo5nZzOpycdqMWQTbKyidlUspodZ5PRZJqNZtl4
+        vldXwkhBLeDbAADgtvumPp2hG7WA0fA+UlMIuiS1eEgCUF5siigdAoeoXVTDHqK4SK5rfanOyNNR
+        gHOpnNs+WSrIQAPaJESw7AgKLzUs1WVF8Klix64cLhUUupY22C0YsrwhTwZWWzjXuIb3jJXYIO4o
+        AFbaa4zkhzt2Kd5rh3QMLzzBVlrQUGgHUkCsCGrZMA1BPHBIAU8QpKZYsSshNIRcMCbZkQHLa4Io
+        YDhgGwLolbQROD4/nNVT0Qad9u1aaw+Adk6iTn51W77ak7uHvVopGy+r8JtUFew4VLknHcSlHYYo
+        jero3QDgqvOvfWSJarzUTcyjrKn73fhkV071V9PD6WwPo0Rt+/jTveePq+WGomYbDvxXqLEi0yv7
+        Y9GtYTkAg4OZ/2zmb7V3c7Mr/6d8DxCpiWTyxpNhfDxwn+Ypval/pT3suGtYBfIbRsojk08+GCp0
+        a3eXrsI2RKrzgl1JvvG8O/eiyVfzFT471SONanA3+AUAAP//AwCbfC1q/AMAAA==
+    headers:
+      CF-RAY:
+      - 923a2e77eb3508cb-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:24 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=AvxDvsjxfAVbYxKPeg6SFiwoiAs9go4ganvCBjpO5lo-1742525844-1.0.1.1-W4ZOh.alEpv5iFpVi21Yv3iJDVAYv0igBbM5WWTzk5AZ8zzJbpZNkFv9boO5ZaPecrRnJKizjRnOJAVVwl2I73xVbRTjnYVgvw9GW4RWJKI;
+        path=/; expires=Fri, 21-Mar-25 03:27:24 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=eb1aVeX1aKXjTkrTL.nPtWyn2DYRxp3oFmrUB1W770k-1742525844145-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '880'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_eeaa99d9ea727917da3713e860bade8a
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNNbxMxEL3nVwy+VKqSKk1SUuWCoCCgAgSi4kKraNaeXQ/Z9aw83rRR
+        VYm/wd/jl6DdpN2UD4mLD/PmPc/4Pd8OAAw7swBjPSZb1eXoxcv38eL1avpqbfGcp/zl46aJ7z5l
+        2Zmbn5lhy5DsG9l0zzqyUtUlJZawhW0kTNSqHs9nk5PJyels2gGVOCpbWlGn0UxGFQceTcaT2Wg8
+        Hx2f7the2JKaBXwdAADcdmc7Z3B0YxYwHt5XKlLFgszioQnARCnbikFV1oQhmWEPWgmJQjf6pXlD
+        kX5+/6FwLj6EzZNLA6yAkGMljULJgSCPUkHyBJWsmeDwwhN89hw4FIdDcFTymiI5yDZwjnYFH9h6
+        KVXCgYL1GNEmisMtdiExYrB0BG/TQXtRRZVEzMpWvaKQIHlMoF6uLSppxzpQcKS2RTkkgQpdIFVA
+        BU+QRcKVQvJRmsIDghOJcM3JAwbAGzqC55FgI023VwDJ97aR2GpSJE3kgAM4VtuocigAocaY2DYl
+        RkCtyaaWzOnZ/ntGyhvF1tPQlOUegCFIwjYTnZNXO+TuwbtSijpKpr9RTc6B1S8joUpofdIktenQ
+        uwHAVZeR5pHtpo5S1WmZZEXddcfTrZzpk9mDT+c7MEnCsq+f7nL1WG3pKCGXupcxY9F6cj2zDyQ2
+        jmUPGOzt/Ocwf9Pe7s2h+B/5HrCW6kRuWUdybB8v3LdFav/tv9oe3rgb2CjFNVtaJqbY+uAox6bc
+        /iajG01ULXMOBcU68vZL5fWSZjlO5+OJy83gbvALAAD//wMAAJ4gPWAEAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77d8782af0-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:24 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=jCyWtjmMQKFZDvOzO2KSxjr2kvuAjhiIItKHKAVGX1Y-1742525844-1.0.1.1-GYWwhv9FUDQvcTedi_HZEYp8.H6rs095Lc.TcjpLtvkI1qAA5lPy83muTUwUEB7SGvVJAoQWek7t0fAuSBCn6bwZAkAb6N0RMjSMEgCghYk;
+        path=/; expires=Fri, 21-Mar-25 03:27:24 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=yvwGFFx_dHr_BXYZhLaU4_kjorJguXLtq2AWNsHVO4s-1742525844266-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1013'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29988'
+      x-ratelimit-remaining-tokens:
+      - '149951539'
+      x-ratelimit-reset-requests:
+      - 23ms
+      x-ratelimit-reset-tokens:
+      - 19ms
+      x-request-id:
+      - req_a02dbf9f4fe28ea81227041f5ab3dabc
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFPBThsxEL3nK6a+cNmgJASR5lIBPbTQUiE4VGpQ5LVn10Nsz8r2BiIU
+        qb/R3+uXVLsb2NBy6GW18pv3/Gbm+WkAIEiLOQhlZFKussOzj1/DrVxff//y7ei0Pr8yDxdjN7k+
+        0+fu0oisYXB+jyo9sw4Vu8piIvYdrALKhI3q+GQ6OZ4cz6ZHLeBYo21oZZWGUx468jScjCbT4ehk
+        OJ7t2IZJYRRz+DEAAHhqv41Pr/FRzGGUPZ84jFGWKOYvRQAisG1OhIyRYpI+iawHFfuEvrW+EJ8w
+        4EGECzbeb94tBFAECYV0XEew5BGKwA5uElYGPVySLw8iLMStQbgx5MmX2ULsCHYDGi2tMaCGfAMX
+        Uq3gipRhG9kfRFBGBqkShqzDbjkE6RVmQB6SQSDFnhQUZB1ILaskm5GCpoAqdaI3SXqLG7is80Bq
+        dQif0++fvxrXypC15Etw7NAneDAYsLsoDyhXEZIJXJcGJGjmAA+UDEgP8hEP4TQgbLgGy7xqRBKD
+        pqjqGFtnjteEWfubM68y4ACRHSbTFKONCAFts/MP+8MOWNRRNgv3tbV7gPSeu+7aNd/tkO3LYi2X
+        VeA8/kUVBXmKZhlQRvbNEmPiSrTodgBw1waofpUJUQV2VVomXmF73fiokxN9bHvwZLwDEydp+/PZ
+        NHtDbakxSbJxL4BCSWVQ98w+rbLWxHvAYK/nf828pd31Tb78H/keUAqrhHpZBdSkXjfclwW8b3P2
+        dtnLjFvDImJYk8JlIgzNHjQWsrbdUxNxExO6ZUG+xFAF6t5bUS3zWa7eH8uRVGKwHfwBAAD//wMA
+        Y9tI+30EAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77e8e17bb5-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:24 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=3oZ1vAtYyt35HAB4djVGeag_iPkcQ1BsWBoULJVxQFs-1742525844-1.0.1.1-DPXOwR80UDCGAs6rU8Zh8f_rIA8SKthIq5l5OOTqzpWco5LchwelfOJ3L5ktP96osIlF0zRO2DzJPOcFAJvRfogJ0rrdGSPx_oLweo_Uth8;
+        path=/; expires=Fri, 21-Mar-25 03:27:24 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=cW2PgN.B0rlWPw6UwZg55UPDmmZN5u5wXPmtjprnH0g-1742525844759-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1489'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29998'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 3ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_e7d4d5f400446f9184b2f845f8d07f23
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": "heerrres johnny!"}], "model":
+      "gpt-4o-mini"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '87'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.5
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xTwU4bQQy95yvcuXBJUBISCLlUVBwKCHooh0oNWnlnvTsmM+PtzCwlQkj9jf5e
+        v6TaDbChpVIvc/Dz8zz72Q8DAMWFWoLSBpN2tR19OL0M18d6/eX4qrrwi/z04tP8xFwe8lm4nKhh
+        y5D8lnR6Zu1rcbWlxOK3sA6Eidqqk6PZdD6dL2YHHeCkINvSqjqNZjJy7Hk0HU9no/HRaLJ4Yhth
+        TVEt4esAAOChe1udvqB7tYTx8DniKEasSC1fkgBUENtGFMbIMaFPatiDWnwi30lfqY8U6NePnxHO
+        xXi/ebdSwBEQSnTSRLDsCcogDlbq2hB8NuzZV8OVgoIs31GgAvINnKNewxVrIzaK34ugDQbUiQJg
+        BEOQB8J1hGSCNJUBhEIkwHdOBtAD3tM+nKW9CDlpcdTGWItnDU4c+QTsoWTrwHBMEjb7cBIINtJ0
+        Uj1ICckQOLljAglw28QE3xpJ7CtA0LadhH6/O4ZAZROxtcI31u4A6L0kbK3sDLh5Qh5fRm6lqoPk
+        8Q+qKtlzNFkgjOLb8cYkterQxwHATWdt88otVQdxdcqSrKn7bnKwLaf6herB+ewJTJLQ9vHDo+Eb
+        1bKCErKNO6uhNGpDRc/s9wibgmUHGOz0/LeYt2pv+2Zf/U/5HtCa6kRFVgcqWL9uuE8L1J7bv9Je
+        ZtwJVpHCHWvKElNofSioxMZuj0DFTUzkspJ9RaEOvL2Ess7yRa6P5zhGrQaPg98AAAD//wMAtr2K
+        DRcEAAA=
+    headers:
+      CF-RAY:
+      - 923a2e77df802a86-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Mar 2025 02:57:24 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=IHetzG0.BmrXSr_8GKF274HEh.8ueL29Mwl._dQiLbM-1742525844-1.0.1.1-OOJgmQwA20QDAPAaxKWYiwZQ5yB_326oJKdNkdYlLF113F_zvWX.itiA4r7DLp09cYuYLsyylxmz4zHTuXeKyxp49tTeawrfRv9mLv7Yd1I;
+        path=/; expires=Fri, 21-Mar-25 03:27:24 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=Yc9duIe2EfKQQDHu1lh9mX9Z2Y6rL74Wb6Cui8ZNhdo-1742525844805-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1543'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29998'
+      x-ratelimit-remaining-tokens:
+      - '149999993'
+      x-ratelimit-reset-requests:
+      - 3ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_73351bc3a2df59eb5b1cf617bb09303d
+    status:
+      code: 200
+      message: OK
+version: 1
