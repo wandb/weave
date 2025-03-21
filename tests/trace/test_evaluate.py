@@ -439,12 +439,16 @@ def test_evaluate_async_happens_in_parallel(client):
         await asyncio.sleep(1)
         return a
 
-    evaluation = Evaluation(dataset=simple_ds, scorers=[score_simple])
-    start = time.time()
-    result = asyncio.run(evaluation.evaluate(async_op))
-    end = time.time()
-    print(f"Time taken: {end - start}")
-    assert end - start < 2
+    def _time_eval(model) -> float:
+        evaluation = Evaluation(dataset=simple_ds, scorers=[score_simple])
+        start = time.time()
+        result = asyncio.run(evaluation.evaluate(model))
+        end = time.time()
+        print(f"Time taken: {end - start}")
+        return end - start
+
+    result = _time_eval(async_op)
+    assert result < 2
 
     # now do the same with a model predict
     class AsyncModel1(Model):
@@ -454,17 +458,31 @@ def test_evaluate_async_happens_in_parallel(client):
             return a
 
     start = time.time()
-    result = asyncio.run(evaluation.evaluate(AsyncModel1()))
-    end = time.time()
-    print(f"Time taken: {end - start}")
-    assert end - start < 2
+    result = _time_eval(AsyncModel1())
+    assert result < 2
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     import openai
 
     openai_client = openai.OpenAI(api_key=api_key)
 
-    # now lets use an openai call
+    class SyncOpenAIModel(Model):
+        @weave.op()
+        def invoke(self, a) -> dict:
+            prompt = "heerrres johnny!"
+            start = time.time()
+            chat = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            end = time.time()
+            print(f"Time taken: {end - start}")
+            return {"output": chat.choices[0].message.content}
+
+    result = _time_eval(SyncOpenAIModel())
+    assert result < 2
+
+    # now lets use an async openai call
     class OpenAIModel(Model):
         @weave.op()
         async def invoke(self, a) -> dict:
@@ -478,8 +496,5 @@ def test_evaluate_async_happens_in_parallel(client):
             print(f"Time taken: {end - start}")
             return {"output": chat.choices[0].message.content}
 
-    start = time.time()
-    result = asyncio.run(evaluation.evaluate(OpenAIModel()))
-    end = time.time()
-    print(f"Time taken: {end - start}")
-    assert end - start < 2
+    result = _time_eval(OpenAIModel())
+    assert result < 2
