@@ -26,7 +26,7 @@ from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 # highlight-next-line
 weave.init("openai-agents")
 # highlight-next-line
-set_trace_processors(WeaveTracingProcessor())
+set_trace_processors([WeaveTracingProcessor()])
 
 class Weather(BaseModel):
     city: str
