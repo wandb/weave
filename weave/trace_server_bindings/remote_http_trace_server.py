@@ -48,9 +48,8 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
-REMOTE_REQUEST_BYTES_LIMIT = (
-    (32 - 1) * 1024 * 1024
-)  # 32 MiB (real limit) - 1 MiB (buffer)
+# 32 MiB (real limit) - 1 MiB (buffer)
+REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -205,8 +204,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
         return self.stainless_client.calls.start(start=req.start)
 
-    # TODO: Technically this is a no-op because of how the trace server implements
-    # the batching.
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         return self.stainless_client.calls.upsert_batch(batch=req.batch)
 
@@ -235,9 +232,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @validate_call
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        # TODO: Technically this does not exist on the interface yet.
-        # return self.stainless_client.calls.stream_query(query=req.query)
-        return iter([])
+        return self.stainless_client.calls.stream_query(query=req.query)
 
     @validate_call
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
