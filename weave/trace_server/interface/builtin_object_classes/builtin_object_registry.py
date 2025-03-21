@@ -6,11 +6,11 @@ from weave.trace_server.interface.builtin_object_classes.base_object_def import 
     BaseObject,
 )
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
-from weave.trace_server.interface.builtin_object_classes.llm_model import (
-    LLMModel,
+from weave.trace_server.interface.builtin_object_classes.llm_model import LLMModel
+from weave.trace_server.interface.builtin_object_classes.provider import (
+    Provider,
     ProviderModel,
 )
-from weave.trace_server.interface.builtin_object_classes.provider import Provider
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyExample,
     TestOnlyNestedBaseObject,

@@ -63,6 +63,14 @@ def lite_llm_completion(
             error_message = str(e)
             error_message = error_message.replace("litellm.", "")
             return tsi.CompletionsCreateRes(response={"error": error_message})
+    elif provider == "custom" and not base_url:
+        raise InvalidRequest(
+            "Invalid provider configuration: must provide base_url if provider is 'custom'"
+        )
+    elif base_url and provider != "custom":
+        raise InvalidRequest(
+            f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
+        )
 
     try:
         res = litellm.completion(
