@@ -69,6 +69,20 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Set default value to 1mo if no valid date
+  useEffect(() => {
+    if (!value) {
+      const defaultDate = parseDate('1mo');
+      if (defaultDate) {
+        const utcDate = formatDate(defaultDate, 'YYYY-MM-DD HH:mm:ss', true);
+        onChange(utcDate);
+        setInputValue(utcToLocalTimeString(utcDate));
+      }
+    }
+    // Only run on first render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
 
@@ -81,7 +95,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     }
   }, [isActive]);
 
-  const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
+  const predefinedSuggestions = useMemo(() => {
     const yesterdaySuggestion = parseDate('yesterday')!;
     return [
       ...PREDEFINED_SUGGESTIONS,
@@ -93,7 +107,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   }, []);
 
   const parseAndUpdateDate = useCallback(
-    (newInputValue: string) => {
+    (newInputValue: string, skipDebounce = false) => {
       const date = parseDate(newInputValue);
       if (date) {
         const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
@@ -157,24 +171,56 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setIsCalendarOpen(true);
   };
 
-  const handleSuggestionClick = (suggestionValue: string) => {
-    setInputValue(suggestionValue);
-    parseAndUpdateDate(suggestionValue);
+  const handleSuggestionClick = useCallback(
+    (suggestionValue: string) => {
+      setInputValue(suggestionValue);
+      // Skip debounce when selecting from suggestions
+      parseAndUpdateDate(suggestionValue, true);
 
-    setSelectedSuggestion(suggestionValue);
-    setDropdownVisible(false);
-    if (inputRef.current) {
-      inputRef.current.blur();
-    }
-  };
+      setSelectedSuggestion(suggestionValue);
+      setDropdownVisible(false);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    },
+    [parseAndUpdateDate]
+  );
 
-  const handleMouseEnter = (index: number) => {
-    setHoveredIndex(index);
-  };
+  const handleMouseEnter = useCallback(
+    (index: number) => {
+      setHoveredIndex(index);
+    },
+    [setHoveredIndex]
+  );
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setHoveredIndex(null);
-  };
+  }, [setHoveredIndex]);
+
+  // Memoize the suggestions list component to prevent unnecessary re-renders
+  const suggestionsList = useMemo(
+    () => (
+      <SuggestionsList
+        isDropdownVisible={isDropdownVisible}
+        dropdownRef={dropdownRef}
+        predefinedSuggestions={predefinedSuggestions}
+        selectedSuggestion={selectedSuggestion}
+        hoveredIndex={hoveredIndex}
+        handleSuggestionClick={handleSuggestionClick}
+        handleMouseEnter={handleMouseEnter}
+        handleMouseLeave={handleMouseLeave}
+      />
+    ),
+    [
+      isDropdownVisible,
+      predefinedSuggestions,
+      selectedSuggestion,
+      hoveredIndex,
+      handleSuggestionClick,
+      handleMouseEnter,
+      handleMouseLeave,
+    ]
+  );
 
   return (
     <div
@@ -302,16 +348,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         </div>
       </LocalizationProvider>
 
-      <SuggestionsList
-        isDropdownVisible={isDropdownVisible}
-        dropdownRef={dropdownRef}
-        predefinedSuggestions={predefinedSuggestions}
-        selectedSuggestion={selectedSuggestion}
-        hoveredIndex={hoveredIndex}
-        handleSuggestionClick={handleSuggestionClick}
-        handleMouseEnter={handleMouseEnter}
-        handleMouseLeave={handleMouseLeave}
-      />
+      {suggestionsList}
     </div>
   );
 };
