@@ -22,10 +22,9 @@ from agents import Agent, Runner, function_tool, set_trace_processors
 import agents
 import weave
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
+import asyncio
 
-# highlight-next-line
 weave.init("openai-agents")
-# highlight-next-line
 set_trace_processors([WeaveTracingProcessor()])
 
 class Weather(BaseModel):
@@ -43,7 +42,12 @@ agent = Agent(
     tools=[get_weather]
 )
 
-await Runner.run(agent, input="What's the weather in Tokyo?")
+async def main():
+    result = await Runner.run(agent, input="What's the weather in Tokyo?")    
+    print(result.final_output)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## View your traces
