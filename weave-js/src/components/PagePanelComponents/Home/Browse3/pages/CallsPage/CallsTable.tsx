@@ -113,6 +113,7 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {Button} from '@wandb/weave/components/Button';
 
 const MAX_SELECT = 100;
 
