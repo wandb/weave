@@ -785,32 +785,46 @@ export const CallsTable: FC<{
               clearSelectedCalls={clearSelectedCalls}
             />
           )}
-          {isEvaluateTable ? (
-            <CompareEvaluationsTableButton
-              onClick={() => {
-                history.push(
-                  router.compareEvaluationsUri(
-                    entity,
-                    project,
-                    selectedCalls,
-                    null
-                  )
-                );
-              }}
-              disabled={selectedCalls.length === 0}
-            />
-          ) : (
-            <CompareTracesTableButton
-              onClick={() => {
-                history.push(
-                  router.compareCallsUri(entity, project, selectedCalls)
-                );
-              }}
-              disabled={selectedCalls.length < 2}
-            />
+          {selectedCalls.length > 0 && (
+            isEvaluateTable ? (
+              <CompareEvaluationsTableButton
+                onClick={() => {
+                  history.push(
+                    router.compareEvaluationsUri(
+                      entity,
+                      project,
+                      selectedCalls,
+                      null
+                    )
+                  );
+                }}
+              />
+            ) : (
+              <CompareTracesTableButton
+                onClick={() => {
+                  history.push(
+                    router.compareCallsUri(entity, project, selectedCalls)
+                  );
+                }}
+                disabled={selectedCalls.length < 2}
+              />
+            )
           )}
           {!isReadonly && selectedCalls.length !== 0 && (
             <>
+              <div className="flex-none">
+                <BulkAddToDatasetButton
+                  onClick={() => setAddToDatasetModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <AddToDatasetDrawer
+                  entity={entity}
+                  project={project}
+                  open={addToDatasetModalOpen}
+                  onClose={() => setAddToDatasetModalOpen(false)}
+                  selectedCalls={selectedCallObjects}
+                />
+              </div>
               <div className="flex-none">
                 <BulkDeleteButton
                   onClick={() => setDeleteConfirmModalOpen(true)}
@@ -827,21 +841,6 @@ export const CallsTable: FC<{
                   }}
                 />
               </div>
-              <ButtonDivider />
-              <div className="flex-none">
-                <BulkAddToDatasetButton
-                  onClick={() => setAddToDatasetModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
-                />
-                <AddToDatasetDrawer
-                  entity={entity}
-                  project={project}
-                  open={addToDatasetModalOpen}
-                  onClose={() => setAddToDatasetModalOpen(false)}
-                  selectedCalls={selectedCallObjects}
-                />
-              </div>
-              <ButtonDivider />
             </>
           )}
 
