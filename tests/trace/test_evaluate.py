@@ -427,7 +427,6 @@ def test_evaluate_table_lazy_iter(client):
     assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
 
 
-@pytest.mark.asyncio
 def test_evaluate_async_happens_in_parallel(client):
     simple_ds = Dataset(rows=[{"a": i} for i in range(10)])
 
@@ -447,17 +446,40 @@ def test_evaluate_async_happens_in_parallel(client):
     print(f"Time taken: {end - start}")
     assert end - start < 2
 
-
+    # now do the same with a model predict
     class AsyncModel1(Model):
         @weave.op()
         async def predict(self, a):
             await asyncio.sleep(1)
             return a
-        
 
-    evaluation = Evaluation(dataset=simple_ds, scorers=[score_simple])
     start = time.time()
     result = asyncio.run(evaluation.evaluate(AsyncModel1()))
+    end = time.time()
+    print(f"Time taken: {end - start}")
+    assert end - start < 2
+
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    import openai
+
+    openai_client = openai.OpenAI(api_key=api_key)
+
+    # now lets use an openai call
+    class OpenAIModel(Model):
+        @weave.op()
+        async def invoke(self, a) -> dict:
+            prompt = "heerrres johnny!"
+            start = time.time()
+            chat = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            end = time.time()
+            print(f"Time taken: {end - start}")
+            return {"output": chat.choices[0].message.content}
+
+    start = time.time()
+    result = asyncio.run(evaluation.evaluate(OpenAIModel()))
     end = time.time()
     print(f"Time taken: {end - start}")
     assert end - start < 2
