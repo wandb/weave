@@ -1,0 +1,559 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"This is an example of the
+      task, though some input or output fields are not supplied.\n\n[[ ## question
+      ## ]]\nHow would a typical person answer each of the following questions about
+      causation?\nLong ago, when John was only 17 years old, he got a job working
+      for a large manufacturing company. He started out working on an assembly line
+      for minimum wage, but after a few years at the company, he was given a choice
+      between two line manager positions. He could stay in the woodwork division,
+      which is where he was currently working. Or he could move to the plastics division.
+      John was unsure what to do because he liked working in the woodwork division,
+      but he also thought it might be worth trying something different. He finally
+      decided to switch to the plastics division and try something new. For the last
+      30 years, John has worked as a production line supervisor in the plastics division.
+      After the first year there, the plastics division was moved to a different building
+      with more space. Unfortunately, through the many years he worked there, John
+      was exposed to asbestos, a highly carcinogenic substance. Most of the plastics
+      division was quite safe, but the small part in which John worked was exposed
+      to asbestos fibers. And now, although John has never smoked a cigarette in his
+      life and otherwise lives a healthy lifestyle, he has a highly progressed and
+      incurable case of lung cancer at the age of 50. John had seen three cancer specialists,
+      all of whom confirmed the worst: that, except for pain, John''s cancer was untreatable
+      and he was absolutely certain to die from it very soon (the doctors estimated
+      no more than 2 months). Yesterday, while John was in the hospital for a routine
+      medical appointment, a new nurse accidentally administered the wrong medication
+      to him. John was allergic to the drug and he immediately went into shock and
+      experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate
+      him but he died minutes after the medication was administered. Did John''s job
+      cause his premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
+      answer ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker
+      for `[[ ## completed ## ]]`."},{"role":"assistant","content":"[[ ## reasoning
+      ## ]]\nNot supplied for this particular example. \n\n[[ ## answer ## ]]\nNo\n\n[[
+      ## explanation ## ]]\nNot supplied for this particular example. \n\n[[ ## completed
+      ## ]]"},{"role":"user","content":"This is an example of the task, though some
+      input or output fields are not supplied.\n\n[[ ## question ## ]]\nHow would
+      a typical person answer each of the following questions about causation?\nLong
+      ago, when John was only 17 years old, he got a job working for a large manufacturing
+      company. He started out working on an assembly line for minimum wage, but after
+      a few years at the company, he was given a choice between two line manager positions.
+      He could stay in the woodwork division, which is where he was currently working.
+      Or he could move to the plastics division. John was unsure what to do because
+      he liked working in the woodwork division, but he also thought it might be worth
+      trying something different. He finally decided to switch to the plastics division
+      and try something new. For the last 30 years, John has worked as a production
+      line supervisor in the plastics division. After the first year there, the plastics
+      division was moved to a different building with more space. Unfortunately, through
+      the many years he worked there, John was exposed to asbestos, a highly carcinogenic
+      substance. Most of the plastics division was quite safe, but the small part
+      in which John worked was exposed to asbestos fibers. And now, although John
+      has never smoked a cigarette in his life and otherwise lives a healthy lifestyle,
+      he has a highly progressed and incurable case of lung cancer at the age of 50.
+      John had seen three cancer specialists, all of whom confirmed the worst: that,
+      except for pain, John''s cancer was untreatable and he was absolutely certain
+      to die from it very soon (the doctors estimated no more than 2 months). Yesterday,
+      while John was in the hospital for a routine medical appointment, a new nurse
+      accidentally administered the wrong medication to him. John was allergic to
+      the drug and he immediately went into shock and experienced cardiac arrest (a
+      heart attack). Doctors attempted to resuscitate him but he died minutes after
+      the medication was administered. Did misadministration of medication cause John''s
+      premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding output
+      fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## answer
+      ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker for
+      `[[ ## completed ## ]]`."},{"role":"assistant","content":"[[ ## reasoning ##
+      ]]\nNot supplied for this particular example. \n\n[[ ## answer ## ]]\nYes\n\n[[
+      ## explanation ## ]]\nNot supplied for this particular example. \n\n[[ ## completed
+      ## ]]"},{"role":"user","content":"[[ ## question ## ]]\nHow would a typical
+      person answer each of the following questions about causation?\nA machine is
+      set up in such a way that it will short circuit if both the black wire and the
+      red wire touch the battery at the same time. The machine will not short circuit
+      if just one of these wires touches the battery. The black wire is designated
+      as the one that is supposed to touch the battery, while the red wire is supposed
+      to remain in some other part of the machine. One day, the black wire and the
+      red wire both end up touching the battery at the same time. There is a short
+      circuit. Did the black wire cause the short circuit?\nOptions:\n- Yes\n- No\n\nRespond
+      with the corresponding output fields, starting with the field `[[ ## reasoning
+      ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation ## ]]`, and then
+      ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '6633'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//rFXBbhoxEL3zFSPn0AtEhEBCOFZKj5Wi5hA1iZDXnmXdeD2WPVuCqvx7
+        Ze8Cuw2RcugFiXkz4zdvhsefEYAwWqxAqEqyqr2dfL1ZqIdvpfY/Zq+0LZZ3sbgtft4+0NXDXSHG
+        qYKKX6h4X3WuqPYW2ZBrYRVQMqauF9fzi8X0ara4zkBNGm0q23iezGkym87mk+lyMr3qCisyCqNY
+        weMIAOBP/kwUncZXsYLpeB+pMUa5QbE6JAGIQDZFhIzRRJaOxfgIKnKMLrN+fISzMwgoIznjNunL
+        8/OTu68QYkWBQZmgGsNASjUhAjm7g22FDgriCrhCKKxUL7A1AUE6nUMBdRtgalSXJZkx7CCaurEs
+        HVIT7e4c7ocdTITYeE8RNTCdqJcRvAwMVOZwLVVlHH6J4CjU0gJ5DDItYAzbylgc8jEpj/OrAUsK
+        OM64DxjRKdx37RHKDJIyfRImggSHKikfdqDIaZPehJJCThxoN4aiYTDcvd4mkEVQsonYSjAUO/VX
+        3Ehrd22ShmKX6xTVhXF5wEQ2LyHxjKeJyu41WSOwqfH8yT25dufSxS2G/cK/0xHBV29l90bvHvp7
+        tuQQtNF5nszw/dhQYIu0A/2ntZ6SayvjJ2T61K3+K+CJc90fzvG8hvc7vIzak0PHYFyrkEIng6Hx
+        h/ewl2AwYm9vncWgbnfT/10HLJsok624xtou/nYwCksbH6iIHX6Il8aZWK1bE0imEJm8yOjbCOA5
+        G1Iz8BjhA9We10wv6FLDi8v5vG0ojh7Yg5c3HcrE0vaAxeXl+ETLtUaWxsaeqwklVYW6VztbHl1Q
+        NtrQEZuOerO/p3Sq/cEEe10+bH8ElELPqNc+oDZqOPYxLWD6n/go7aB1Jiwiht9G4ZoNhrQPjaVs
+        bGvhIu4iY70ujdtg8MG0Pl76NRY3WuHiSi7F6G30FwAA//8DAL10J+rQBgAA
+    headers:
+      CF-RAY:
+      - 91d8f23a4f9a6a31-SAN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Sun, 09 Mar 2025 07:44:22 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '5600'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '149997416'
+      x-ratelimit-reset-requests:
+      - 1ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_874f80fc48a873910bf1b309fb4f663a
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"This is an example of the
+      task, though some input or output fields are not supplied.\n\n[[ ## question
+      ## ]]\nHow would a typical person answer each of the following questions about
+      causation?\nLong ago, when John was only 17 years old, he got a job working
+      for a large manufacturing company. He started out working on an assembly line
+      for minimum wage, but after a few years at the company, he was given a choice
+      between two line manager positions. He could stay in the woodwork division,
+      which is where he was currently working. Or he could move to the plastics division.
+      John was unsure what to do because he liked working in the woodwork division,
+      but he also thought it might be worth trying something different. He finally
+      decided to switch to the plastics division and try something new. For the last
+      30 years, John has worked as a production line supervisor in the plastics division.
+      After the first year there, the plastics division was moved to a different building
+      with more space. Unfortunately, through the many years he worked there, John
+      was exposed to asbestos, a highly carcinogenic substance. Most of the plastics
+      division was quite safe, but the small part in which John worked was exposed
+      to asbestos fibers. And now, although John has never smoked a cigarette in his
+      life and otherwise lives a healthy lifestyle, he has a highly progressed and
+      incurable case of lung cancer at the age of 50. John had seen three cancer specialists,
+      all of whom confirmed the worst: that, except for pain, John''s cancer was untreatable
+      and he was absolutely certain to die from it very soon (the doctors estimated
+      no more than 2 months). Yesterday, while John was in the hospital for a routine
+      medical appointment, a new nurse accidentally administered the wrong medication
+      to him. John was allergic to the drug and he immediately went into shock and
+      experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate
+      him but he died minutes after the medication was administered. Did misadministration
+      of medication cause John''s premature death?\nOptions:\n- Yes\n- No\n\nRespond
+      with the corresponding output fields, starting with the field `[[ ## reasoning
+      ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation ## ]]`, and then
+      ending with the marker for `[[ ## completed ## ]]`."},{"role":"assistant","content":"[[
+      ## reasoning ## ]]\nNot supplied for this particular example. \n\n[[ ## answer
+      ## ]]\nYes\n\n[[ ## explanation ## ]]\nNot supplied for this particular example.
+      \n\n[[ ## completed ## ]]"},{"role":"user","content":"This is an example of
+      the task, though some input or output fields are not supplied.\n\n[[ ## question
+      ## ]]\nHow would a typical person answer each of the following questions about
+      causation?\nA machine is set up in such a way that it will short circuit if
+      both the black wire and the red wire touch the battery at the same time. The
+      machine will not short circuit if just one of these wires touches the battery.
+      The black wire is designated as the one that is supposed to touch the battery,
+      while the red wire is supposed to remain in some other part of the machine.
+      One day, the black wire and the red wire both end up touching the battery at
+      the same time. There is a short circuit. Did the black wire cause the short
+      circuit?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding output fields,
+      starting with the field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`,
+      then `[[ ## explanation ## ]]`, and then ending with the marker for `[[ ## completed
+      ## ]]`."},{"role":"assistant","content":"[[ ## reasoning ## ]]\nNot supplied
+      for this particular example. \n\n[[ ## answer ## ]]\nNo\n\n[[ ## explanation
+      ## ]]\nNot supplied for this particular example. \n\n[[ ## completed ## ]]"},{"role":"user","content":"[[
+      ## question ## ]]\nHow would a typical person answer each of the following questions
+      about causation?\nLong ago, when John was only 17 years old, he got a job working
+      for a large manufacturing company. He started out working on an assembly line
+      for minimum wage, but after a few years at the company, he was given a choice
+      between two line manager positions. He could stay in the woodwork division,
+      which is where he was currently working. Or he could move to the plastics division.
+      John was unsure what to do because he liked working in the woodwork division,
+      but he also thought it might be worth trying something different. He finally
+      decided to switch to the plastics division and try something new. For the last
+      30 years, John has worked as a production line supervisor in the plastics division.
+      After the first year there, the plastics division was moved to a different building
+      with more space. Unfortunately, through the many years he worked there, John
+      was exposed to asbestos, a highly carcinogenic substance. Most of the plastics
+      division was quite safe, but the small part in which John worked was exposed
+      to asbestos fibers. And now, although John has never smoked a cigarette in his
+      life and otherwise lives a healthy lifestyle, he has a highly progressed and
+      incurable case of lung cancer at the age of 50. John had seen three cancer specialists,
+      all of whom confirmed the worst: that, except for pain, John''s cancer was untreatable
+      and he was absolutely certain to die from it very soon (the doctors estimated
+      no more than 2 months). Yesterday, while John was in the hospital for a routine
+      medical appointment, a new nurse accidentally administered the wrong medication
+      to him. John was allergic to the drug and he immediately went into shock and
+      experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate
+      him but he died minutes after the medication was administered. Did John''s job
+      cause his premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
+      answer ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker
+      for `[[ ## completed ## ]]`."}],"model":"gpt-4o","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '6633'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//lFTBbuM4DL3nKwjNYS9JkbZppu1tt9jLXvYywOygLQJaoi12ZMmQ6KbB
+        oP++kOzE7mwLzF4MmI+PIh+l92MBoNioW1Daoui2c6s/bq60+dMc7u66O4eV/ra/xr+/fGV9+bT/
+        Ry0zI1RPpOXIOtOh7RwJBz/AOhIK5arnnzfnV+vtxfayAG0w5DKt6WS1CauL9cVmtb5erbcj0QbW
+        lNQt3C8AAH6Ub27RG3pRt7BeHiMtpYQNqdtTEoCKweWIwpQ4CXpRywnUwQv50vX9PXz6BJEwBc++
+        yT+Pjw/+r2D9bwmeQgX00oVEBiy3IAEwVZQkpCXsLWsLjkwOW07AXvcRK0fget+ARq8pnsHvTmzo
+        GwtiCbhtyTAKgcY+EYS6UA2hWNhjKkloWvacJGJWMufk6D4G30Cm6xJfFmZuMfMQEjeea9boBWrU
+        EiKwLznhmSI6B5bQiQVD2rEnQG8KLBRb9uhAB284lz6DL5am6ftI89HH87KKkatesm7jgaMSXaQW
+        JdPKYEvABCzDyKYMM1MIxKJAi4YGjcdu3AHYubMH/+CHJaFPe4rHDX2jNEH00jn0g1oj/tWyo48k
+        H9f7k+rOUWxY59ugSykJ/1v4Xxdl0PhdfVEKYR/i986hpqNwb5Y1U/B4F7teioTsAeG5d56G6zju
+        PQkKlWMj1SHSNAd7w5G0uMP8qJ8ahuoAjtDkyUZlThfmV3c4+gOZYU3zRxmp7hNmT/C9c2P89fTK
+        XWi6GKo04qd4nV+K3Q0vOL/oJKFTBX1dADwWN+nfGITqYmg72Un4Tj4XPL/cbIaCajKwGby9GVEJ
+        gm4GXJ1fLt8puTMkyC7NLElp1JbMjHtxPVkY9obDhK0Xs9n/29J75U8ONqvyYfkJ0Jo6IbPrYr7d
+        b8ee0iJlk/8o7aR1aVglis+saSdMMe/DUI29G/xXpUMSanc1+4ZiF3kw4brbUXVjNF1t8VotXhf/
+        AgAA//8DAMlh7Y2NBgAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 91d8f25e9b406a31-SAN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Sun, 09 Mar 2025 07:44:25 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2891'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '149997415'
+      x-ratelimit-reset-requests:
+      - 1ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_03d6aea962be5d53acdee28d27c4dfe3
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (str)\n3.
+      `explanation` (str)\n\nAll interactions will be structured in the following
+      way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## explanation
+      ## ]]\n{explanation}\n\n[[ ## completed ## ]]\n\nIn adhering to this structure,
+      your objective is: \n        Given the fields `question`, produce the fields
+      `answer`, `explanation`."},{"role":"user","content":"This is an example of the
+      task, though some input or output fields are not supplied.\n\n[[ ## question
+      ## ]]\nHow would a typical person answer each of the following questions about
+      causation?\nLong ago, when John was only 17 years old, he got a job working
+      for a large manufacturing company. He started out working on an assembly line
+      for minimum wage, but after a few years at the company, he was given a choice
+      between two line manager positions. He could stay in the woodwork division,
+      which is where he was currently working. Or he could move to the plastics division.
+      John was unsure what to do because he liked working in the woodwork division,
+      but he also thought it might be worth trying something different. He finally
+      decided to switch to the plastics division and try something new. For the last
+      30 years, John has worked as a production line supervisor in the plastics division.
+      After the first year there, the plastics division was moved to a different building
+      with more space. Unfortunately, through the many years he worked there, John
+      was exposed to asbestos, a highly carcinogenic substance. Most of the plastics
+      division was quite safe, but the small part in which John worked was exposed
+      to asbestos fibers. And now, although John has never smoked a cigarette in his
+      life and otherwise lives a healthy lifestyle, he has a highly progressed and
+      incurable case of lung cancer at the age of 50. John had seen three cancer specialists,
+      all of whom confirmed the worst: that, except for pain, John''s cancer was untreatable
+      and he was absolutely certain to die from it very soon (the doctors estimated
+      no more than 2 months). Yesterday, while John was in the hospital for a routine
+      medical appointment, a new nurse accidentally administered the wrong medication
+      to him. John was allergic to the drug and he immediately went into shock and
+      experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate
+      him but he died minutes after the medication was administered. Did John''s job
+      cause his premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
+      answer ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker
+      for `[[ ## completed ## ]]`."},{"role":"assistant","content":"[[ ## reasoning
+      ## ]]\nNot supplied for this particular example. \n\n[[ ## answer ## ]]\nNo\n\n[[
+      ## explanation ## ]]\nNot supplied for this particular example. \n\n[[ ## completed
+      ## ]]"},{"role":"user","content":"This is an example of the task, though some
+      input or output fields are not supplied.\n\n[[ ## question ## ]]\nHow would
+      a typical person answer each of the following questions about causation?\nA
+      machine is set up in such a way that it will short circuit if both the black
+      wire and the red wire touch the battery at the same time. The machine will not
+      short circuit if just one of these wires touches the battery. The black wire
+      is designated as the one that is supposed to touch the battery, while the red
+      wire is supposed to remain in some other part of the machine. One day, the black
+      wire and the red wire both end up touching the battery at the same time. There
+      is a short circuit. Did the black wire cause the short circuit?\nOptions:\n-
+      Yes\n- No\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`, then `[[ ## explanation
+      ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."},{"role":"assistant","content":"[[
+      ## reasoning ## ]]\nNot supplied for this particular example. \n\n[[ ## answer
+      ## ]]\nNo\n\n[[ ## explanation ## ]]\nNot supplied for this particular example.
+      \n\n[[ ## completed ## ]]"},{"role":"user","content":"[[ ## question ## ]]\nHow
+      would a typical person answer each of the following questions about causation?\nLong
+      ago, when John was only 17 years old, he got a job working for a large manufacturing
+      company. He started out working on an assembly line for minimum wage, but after
+      a few years at the company, he was given a choice between two line manager positions.
+      He could stay in the woodwork division, which is where he was currently working.
+      Or he could move to the plastics division. John was unsure what to do because
+      he liked working in the woodwork division, but he also thought it might be worth
+      trying something different. He finally decided to switch to the plastics division
+      and try something new. For the last 30 years, John has worked as a production
+      line supervisor in the plastics division. After the first year there, the plastics
+      division was moved to a different building with more space. Unfortunately, through
+      the many years he worked there, John was exposed to asbestos, a highly carcinogenic
+      substance. Most of the plastics division was quite safe, but the small part
+      in which John worked was exposed to asbestos fibers. And now, although John
+      has never smoked a cigarette in his life and otherwise lives a healthy lifestyle,
+      he has a highly progressed and incurable case of lung cancer at the age of 50.
+      John had seen three cancer specialists, all of whom confirmed the worst: that,
+      except for pain, John''s cancer was untreatable and he was absolutely certain
+      to die from it very soon (the doctors estimated no more than 2 months). Yesterday,
+      while John was in the hospital for a routine medical appointment, a new nurse
+      accidentally administered the wrong medication to him. John was allergic to
+      the drug and he immediately went into shock and experienced cardiac arrest (a
+      heart attack). Doctors attempted to resuscitate him but he died minutes after
+      the medication was administered. Did misadministration of medication cause John''s
+      premature death?\nOptions:\n- Yes\n- No\n\nRespond with the corresponding output
+      fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## answer
+      ## ]]`, then `[[ ## explanation ## ]]`, and then ending with the marker for
+      `[[ ## completed ## ]]`."}],"model":"gpt-4o","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '6632'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//hFTBbuM2EL37KwbaQy+2YXsdJ5tbtyhQ9NCiRdFFmwTGmBxJbCiOljOK
+        Yyzy7wVF25K3a/QiQHyc4ZvHx/dlAlA4W9xDYWpU07R+9vHDjak+7n67NX/+8iv/+DfeLu3qh+fF
+        svy99MU0VfDuHzJ6qpobblpP6jhk2ERCpdR1ebte3iw2q82mBxq25FNZ1epszbPVYrWeLe5mi82x
+        sGZnSIp7eJgAAHzpv4lisPRa3MNielppSAQrKu7PmwCKyD6tFCjiRDFoMR1Aw0Ep9KwfHuDdO4iE
+        wsGFKv08PT2GP2qCzx1JmgRQngX2NWlNEbQmaJygbVxwohH7LVxCQ9aZ/GewE7LwM9fhO4E2UoPa
+        RQJLqPW8X4c9CqCPhPYA0pUlxXR8GbkBpdi4gB58FyowGAxFsB2BMqDsSJQF6LVl6SJNYe+0BoQ2
+        chVYnCQyHPwBdM/QcNBaUqV3LzSHn3hPLxSn/RyuSaRRKTNOhbWTTLMnmDah9xQrZ5JIJusRLEi3
+        E/rcUVAwGK1DAxgjiZ6G3x366n3kUI20mcOn2nnqseNkp4O6YCn6Q5LBcLCuP0trVNhz5y3U+ELg
+        yaZhBprCHPI0owugGDmCdZGM+sO4aBg5X8ZjeAzZAxhkT/FkgL9IBoheW48htx4Z5P9scD7/0g9f
+        UeiViq6qsgMwXFH8UuY5fO+15q6qBzudfOMP4LzPvsgaXxHopHwb+dU1V3yAmi+h4YaCTqHB58TT
+        aV+aZ7ys+9rwg5DHeCCbZRy/yUhlJ5giIXTeH9ffzo/cc9VG3skRP6+XSf56mx9wetCi3BY9+jYB
+        eOrDpLvIh6KN3LS6VX6mkBou36/XuWEx5NcI3rw/osqKfgTcLG6n32i5taTovIwSqTBoarKj2tXd
+        kGDYWccDtpiMZv8vpW+1PwfYqMvV9gNgDLVKdtvGZI3LsYdtkVLGX9t21ronXAjFF2doq45iug9L
+        JXY+x28hB1FqtqULFcU2upzBZbul3Qdr6GaDd8XkbfIvAAAA//8DAFykb8eMBgAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 91d8f2720eee6a31-SAN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Sun, 09 Mar 2025 07:44:29 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '3440'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '149997415'
+      x-ratelimit-reset-requests:
+      - 1ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_660d32201543703baead6c1d9c66be8e
+    status:
+      code: 200
+      message: OK
+version: 1
