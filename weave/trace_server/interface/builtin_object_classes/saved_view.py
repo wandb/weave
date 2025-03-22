@@ -78,7 +78,7 @@ class SavedView(base_object_def.BaseObject):
     # TODO: Should we have a spec_version literal?
 
     # "traces" or "evaluations", type is str for extensibility
-    table: str
+    view_type: str
 
     # Avoiding confusion around object_id + name
     label: str

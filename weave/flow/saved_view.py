@@ -101,6 +101,13 @@ def to_seconds(value: Any) -> float | None:
         return None
 
 
+EVALUATE_OP_NAME_POST_PYDANTIC = "Evaluation.evaluate"
+
+
+def make_eval_op_name(entity: str, project: str) -> str:
+    return f"weave:///{entity}/{project}/op/{EVALUATE_OP_NAME_POST_PYDANTIC}:*"
+
+
 DEFAULT_PIN = Pin(left=["CustomCheckbox", "op_name"], right=[])
 DEFAULT_FILTER = Filters(items=[], logicOperator="and")
 
@@ -322,9 +329,9 @@ class SavedView:
     base: SavedViewBase
     ref: ObjectRef | None = None
 
-    def __init__(self, table: str = "traces", label: str = "SavedView") -> None:
+    def __init__(self, view_type: str = "traces", label: str = "SavedView") -> None:
         self.base = SavedViewBase(
-            table=table,
+            view_type=view_type,
             label=label,
             definition={},
         )
@@ -551,8 +558,8 @@ class SavedView:
         return self.base.label
 
     @property
-    def table(self) -> str:
-        return self.base.table
+    def view_type(self) -> str:
+        return self.base.view_type
 
     def _repr_pretty_(self, p: Any, cycle: bool) -> None:
         """Show a nicely formatted table in ipython."""
@@ -570,7 +577,7 @@ class SavedView:
             table.add_row("Description", self.base.description)
         if self.ref:
             table.add_row("Ref", self.ref.uri())
-        table.add_row("Table", self.base.table)
+        table.add_row("View type", self.base.view_type)
         if self.base.definition.filter is not None:
             table.add_row(
                 "Call Filter",
@@ -626,7 +633,7 @@ class SavedView:
                 .replace(":", "-")
                 .replace(".", "-")[:-1]
             )
-            name = f"{self.base.table}_{formatted_now}"
+            name = f"{self.base.view_type}_{formatted_now}"
         self.ref = weave_publish(self.base, name)
         return self
 
@@ -652,7 +659,14 @@ class SavedView:
             else:
                 columns = None
             query = filters_to_query(self.base.definition.filters)
-            filter = py_to_api_filter(self.base.definition.filter)
+
+            # For evaluations, inject a frozen filter.
+            py_filter = self.base.definition.filter
+            if self.view_type == "evaluations":
+                py_filter = py_filter.model_copy() if py_filter else CallsFilter()
+                py_filter.op_names = [make_eval_op_name(client.entity, client.project)]
+            filter = py_to_api_filter(py_filter)
+
             sort_by = py_to_api_sort_by(self.base.definition.sort)
             return client.get_calls(
                 columns=columns,

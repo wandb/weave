@@ -121,7 +121,7 @@ def test_saved_view_load(client):
     uri = saved_view.ref.uri()
     loaded_view = weave.SavedView.load(uri)
     assert loaded_view.name == saved_view.name
-    assert loaded_view.table == saved_view.table
+    assert loaded_view.view_type == saved_view.view_type
     assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True
 
 
