@@ -62,7 +62,9 @@ class SavedViewDefinition(BaseModel):
     filter: Optional[CallsFilter] = Field(default=None)
     filters: Optional[Filters] = Field(default=None)
 
-    # cols is legacy column visibility config
+    # cols is the current UI column visibility config that
+    # doesn't allow specifying column order - prefer use of
+    # explicit columns list which is what we should work towards.
     cols: Optional[dict[str, bool]] = Field(default=None)
 
     # columns is specifying exactly which columns to include
@@ -78,7 +80,7 @@ class SavedView(base_object_def.BaseObject):
     # TODO: Should we have a spec_version literal?
 
     # "traces" or "evaluations", type is str for extensibility
-    table: str
+    view_type: str
 
     # Avoiding confusion around object_id + name
     label: str
