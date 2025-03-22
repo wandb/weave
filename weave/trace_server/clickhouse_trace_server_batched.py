@@ -473,35 +473,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # get the requested calls to delete
-        parents = list(
-            self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        call_ids=req.call_ids,
-                    ),
-                    columns=["id", "parent_id"],
-                )
-            )
-        )
-        parent_trace_ids = [p.trace_id for p in parents]
+        # find all descendants of requested root calls
+        query = """
+        WITH RECURSIVE descendants AS (
+            -- Base case: get the root calls
+            SELECT id, parent_id
+            FROM call_parts
+            WHERE project_id = {project_id:String}
+                AND id IN {call_ids:Array(String)}
+                AND deleted_at IS NULL
 
-        # get first 10k calls with trace_ids matching parents
-        all_calls = list(
-            self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
-                    columns=["id", "parent_id"],
-                    limit=10_000,
-                )
-            )
+            UNION ALL
+
+            -- Recursive case: get children of descendants
+            SELECT c.id, c.parent_id
+            FROM call_parts c
+            INNER JOIN descendants d ON c.parent_id = d.id
+            WHERE c.project_id = {project_id:String}
+                AND c.deleted_at IS NULL
         )
-        all_descendants = find_call_descendants(
-            root_ids=req.call_ids,
-            all_calls=all_calls,
+        SELECT DISTINCT id FROM descendants
+        LIMIT 1000000
+        SETTINGS allow_experimental_analyzer=1
+        """
+
+        # Execute recursive query to get all descendant IDs
+        result = self.ch_client.query(
+            query,
+            parameters={
+                "project_id": req.project_id,
+                "call_ids": req.call_ids,
+            },
         )
+        all_descendants = [row[0] for row in result.result_rows]
 
         deleted_at = datetime.datetime.now()
         insertables = [
@@ -2193,44 +2197,3 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
-def find_call_descendants(
-    root_ids: list[str],
-    all_calls: list[tsi.CallSchema],
-) -> list[str]:
-    if root_span := ddtrace.tracer.current_span():
-        root_span.set_tags(
-            {
-                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
-                    len(root_ids)
-                ),
-                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
-                    len(all_calls)
-                ),
-            }
-        )
-    # make a map of call_id to children list
-    children_map = defaultdict(list)
-    for call in all_calls:
-        if call.parent_id is not None:
-            children_map[call.parent_id].append(call.id)
-
-    # do DFS to get all descendants
-    def find_all_descendants(root_ids: list[str]) -> set[str]:
-        descendants = set()
-        stack = root_ids
-
-        while stack:
-            current_id = stack.pop()
-            if current_id not in descendants:
-                descendants.add(current_id)
-                stack += children_map.get(current_id, [])
-
-        return descendants
-
-    # Find descendants for each initial id
-    descendants = find_all_descendants(root_ids)
-
-    return list(descendants)
