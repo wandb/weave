@@ -1,8 +1,6 @@
-import {Box, Typography} from '@mui/material';
-import {Link} from '@mui/material';
+import {Box, Typography, Link} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {TEAL_500, TEAL_600} from '@wandb/weave/common/css/color.styles';
-import {Alert} from '@wandb/weave/components/Alert';
+import {MOON_200,TEAL_500, TEAL_600} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -193,7 +191,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           <Typography
             variant="h6"
             sx={{...sharedTypographyStyle, fontSize: '20px', fontWeight: 600}}>
-            {editingProvider ? 'Edit AI provider' : 'Add an AI provider'}
+            {editingProvider ? 'Edit AI provider' : 'Add AI provider'}
           </Typography>
           <Box sx={{display: 'flex', gap: 1}}>
             <Button
@@ -227,10 +225,29 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             overflowX: 'hidden',
           }}>
           <Box sx={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
-            <Alert severity="info">
-              Custom providers are made for connecting to OpenAI compatible API
-              endpoints.
-            </Alert>
+            <Box
+              style={{
+                backgroundColor: MOON_200,
+                padding: '16px',
+                borderRadius: '8px',
+                marginBottom: '-8px',
+              }}>
+              Custom providers are made for connecting to OpenAI compatible API endpoints. Please refer to the{' '}
+              <Link
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  color: TEAL_600,
+                  '&:hover': {
+                    color: TEAL_500,
+                  },
+                  textDecoration: 'none',
+                }}>
+                custom AI provider documentation
+              </Link>{' '}
+              for more information.
+            </Box>
             <Box>
               <Typography
                 sx={{...sharedTypographyStyle, mb: 1, fontWeight: '600'}}>
