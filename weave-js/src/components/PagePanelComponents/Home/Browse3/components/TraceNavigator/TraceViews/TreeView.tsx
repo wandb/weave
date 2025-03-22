@@ -215,11 +215,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             {Array.from({length: level}).map((_, idx) => (
               <div
                 key={`line-${idx}`}
-                style={{left: idx * indentMultiplier, marginLeft: 8}}
-                className="absolute top-0 h-full w-px border-l border-moon-300"
+                style={{
+                  left: idx * indentMultiplier + 8,
+                  height: '100%',
+                }}
+                className="absolute top-0 w-px border-l border-moon-300"
               />
             ))}
-            {hasChildren && (
+            {hasChildren ? (
               <Icon
                 name={chevronIcon}
                 size="small"
@@ -229,8 +232,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 }}
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
+            ) : (
+              /* Use an invisible icon to maintain consistent spacing */
+              <div className="h-5 w-5 shrink-0"></div>
             )}
-            <div className="truncate pl-4 font-medium">
+            <div className="truncate pl-2 font-medium">
               <Tooltip
                 trigger={
                   <div className="truncate">{renderHighlightedText()}</div>
@@ -519,6 +525,7 @@ export const TreeView: React.FC<
       const filteredChildren = node.childrenIds.filter(childId => {
         return !filterSet || filterSet.has(childId);
       });
+
       result.push({
         id: node.id,
         call: node.call,
