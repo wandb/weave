@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, OpRef, parse_uri
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
@@ -13,6 +13,8 @@ from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
     get_serializer_for_obj,
+    is_file_save,
+    is_inline_save,
 )
 
 
@@ -26,6 +28,8 @@ KNOWN_TYPES = {
     "Op",
     "PIL.Image.Image",
     "wave.Wave_read",
+    "datetime.datetime",
+    "rich.markdown.Markdown",
 }
 
 
@@ -35,8 +39,6 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get
         return None
-    art = MemTraceFilesArtifact()
-    serializer.save(obj, art, "obj")
 
     # Save the load_instance function as an op, and store a reference
     # to that op in the saved value record. We don't do this if what
@@ -47,7 +49,7 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # Ensure load_instance is an op
         if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
-        # Save the load_intance_op
+        # Save the load_instance_op
         wc = require_weave_client()
 
         # TODO(PR): this can fail right? Or does it return None?
@@ -55,19 +57,57 @@ def encode_custom_obj(obj: Any) -> dict | None:
         load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
         load_op_uri = load_instance_op_ref.uri()
 
-    encoded_path_contents = {
-        k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-        for k, v in art.path_contents.items()
-    }
-    return {
+    encoded = {
         "_type": "CustomWeaveType",
         "weave_type": {"type": serializer.id()},
-        "files": encoded_path_contents,
         "load_op": load_op_uri,
     }
 
+    # If the save method just takes one argument, it is an inline serializer
+    if is_inline_save(serializer.save):
+        encoded["val"] = serializer.save(obj)
+    elif is_file_save(serializer.save):
+        art = MemTraceFilesArtifact()
+        serializer.save(obj, art, "obj")
+        encoded_path_contents = {
+            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
+            for k, v in art.path_contents.items()
+        }
+        encoded["files"] = encoded_path_contents
+    else:
+        raise ValueError(
+            f"Serializer save function could not be identified as inline or file-based: {type(serializer.save)}"
+        )
+    return encoded
 
-def _decode_custom_obj(
+
+def decode_custom_inline_obj(obj: dict) -> Any:
+    _type = obj["weave_type"]["type"]
+    if _type in KNOWN_TYPES:
+        serializer = get_serializer_by_id(_type)
+        if serializer is not None:
+            return serializer.load(obj["val"])
+
+    load_op_uri = obj.get("load_op")
+    if load_op_uri is None:
+        raise ValueError(f"No serializer found for `{_type}`")
+
+    ref = parse_uri(load_op_uri)
+    if not isinstance(ref, OpRef):
+        raise TypeError(f"Expected OpRef, got `{type(ref)}`")
+
+    wc = require_weave_client()
+    load_instance_op = wc.get(ref)
+    if load_instance_op is None:
+        raise ValueError(
+            f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
+        )
+
+    load_instance_op._tracing_enabled = False  # type: ignore
+    return load_instance_op(obj.get("val"))
+
+
+def _decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op: Callable[..., Any],
 ) -> Any:
@@ -79,7 +119,7 @@ def _decode_custom_obj(
     return res
 
 
-def decode_custom_obj(
+def decode_custom_files_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
@@ -95,7 +135,7 @@ def decode_custom_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_obj(encoded_path_contents, load_instance_op)
+                return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
             except Exception as e:
                 pass
 
@@ -116,7 +156,7 @@ def decode_custom_obj(
             )
 
     try:
-        return _decode_custom_obj(encoded_path_contents, load_instance_op)
+        return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{_type}`. See logs above for more information."

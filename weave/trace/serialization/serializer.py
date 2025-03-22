@@ -36,14 +36,54 @@ registered.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Union
+
+from typing_extensions import TypeGuard
+
+# Not locking down the return type for inline encoding but
+# it would be expected to be something like a str or dict.
+InlineSave = Callable[[Any], Any]
+# Second parameter should really be MemTraceFilesArtifact
+# but we are avoiding a circular import.
+FileSave = Callable[[Any, Any, str], None]
+Save = Union[InlineSave, FileSave]
+
+
+def is_inline_save(value: Callable) -> TypeGuard[InlineSave]:
+    """Check if a function is an inline save function."""
+    signature = inspect.signature(value)
+    param_count = len(signature.parameters)
+    return param_count == 1
+
+
+def is_file_save(value: Callable) -> TypeGuard[FileSave]:
+    """Check if a function is a file-based save function."""
+    signature = inspect.signature(value)
+    params = list(signature.parameters.values())
+    # Check parameter count and return type without relying on annotations
+    # that would cause circular import
+    name_annotation = params[2].annotation
+    return (
+        len(params) == 3
+        and (
+            name_annotation is str
+            or name_annotation == "str"
+            or name_annotation == inspect._empty
+        )
+        and (
+            signature.return_annotation is None
+            or signature.return_annotation == "None"
+            or signature.return_annotation == inspect._empty
+        )
+    )
 
 
 @dataclass
 class Serializer:
     target_class: type
-    save: Callable
+    save: Save
     load: Callable
 
     # Added to provide a function to check if an object is an instance of the
@@ -53,8 +93,8 @@ class Serializer:
     def id(self) -> str:
         ser_id = self.target_class.__module__ + "." + self.target_class.__name__
         if ser_id.startswith("weave."):
-            # Special case for weave.Op (which is current weave.trace.op.Op).
-            # The id is just Op, since we've already already stored this as
+            # Special case for weave.Op (which is currently weave.trace.op.Op).
+            # The id is just Op, since we've already stored this as
             # "Op" in the database.
             if ser_id.endswith(".Op"):
                 return "Op"
