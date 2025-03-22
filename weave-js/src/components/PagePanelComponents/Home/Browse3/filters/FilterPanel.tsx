@@ -12,6 +12,8 @@ import {ColumnInfo} from '../types';
 import {FilterBar} from './FilterBar';
 
 type FilterPanelProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
