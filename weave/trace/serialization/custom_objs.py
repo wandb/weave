@@ -81,7 +81,7 @@ def encode_custom_obj(obj: Any) -> dict | None:
     return encoded
 
 
-def decode_inline_obj(obj: dict) -> Any:
+def decode_custom_inline_obj(obj: dict) -> Any:
     _type = obj["weave_type"]["type"]
     if _type in KNOWN_TYPES:
         serializer = get_serializer_by_id(_type)
@@ -107,7 +107,7 @@ def decode_inline_obj(obj: dict) -> Any:
     return load_instance_op(obj.get("val"))
 
 
-def _decode_custom_obj(
+def _decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op: Callable[..., Any],
 ) -> Any:
@@ -119,7 +119,7 @@ def _decode_custom_obj(
     return res
 
 
-def decode_custom_obj(
+def decode_custom_files_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
@@ -135,7 +135,7 @@ def decode_custom_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_obj(encoded_path_contents, load_instance_op)
+                return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
             except Exception as e:
                 pass
 
@@ -156,7 +156,7 @@ def decode_custom_obj(
             )
 
     try:
-        return _decode_custom_obj(encoded_path_contents, load_instance_op)
+        return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{_type}`. See logs above for more information."
