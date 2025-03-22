@@ -299,10 +299,10 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             )
         elif val_type == "CustomWeaveType":
             if _is_inline_custom_obj(obj):
-                return custom_objs.decode_inline_obj(obj)
+                return custom_objs.decode_custom_inline_obj(obj)
             else:
                 files = _load_custom_obj_files(project_id, server, obj["files"])
-                return custom_objs.decode_custom_obj(
+                return custom_objs.decode_custom_files_obj(
                     obj["weave_type"], files, obj.get("load_op")
                 )
         elif (

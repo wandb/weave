@@ -6,8 +6,8 @@ from PIL import Image
 import weave
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
-    decode_custom_obj,
-    decode_inline_obj,
+    decode_custom_files_obj,
+    decode_custom_inline_obj,
     encode_custom_obj,
 )
 
@@ -22,12 +22,12 @@ def test_encode_custom_obj_unknown_type(client):
     assert encode_custom_obj(unknown) is None
 
 
-def test_decode_custom_obj_known_type(client):
+def test_decode_custom_files_obj_known_type(client):
     img = Image.new("RGB", (100, 100))
     encoded = encode_custom_obj(img)
 
     # Even though something is wrong with the deserializer op, we can still decode
-    decoded = decode_custom_obj(
+    decoded = decode_custom_files_obj(
         encoded["weave_type"], encoded["files"], "weave:///totally/invalid/uri"
     )
 
@@ -44,7 +44,7 @@ def test_inline_custom_obj(client):
     assert "load_op" in encoded
     assert encoded["val"] == "2025-03-07T00:00:00+00:00"
 
-    decoded = decode_inline_obj(encoded)
+    decoded = decode_custom_inline_obj(encoded)
     assert isinstance(decoded, datetime)
     dt_with_tz = dt.replace(tzinfo=timezone.utc)
     assert decoded == dt_with_tz
