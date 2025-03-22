@@ -56,7 +56,18 @@ OverlayMessage.displayName = 'S.OverlayMessage';
 export const ButtonOverlay = ({url, text, children}: ButtonOverlayProps) => {
   const history = useHistory();
   const onClick = () => {
-    history.push(url);
+    const currentUrl = new URL(window.location.href);
+    const currentCols = currentUrl.searchParams.get('cols');
+
+    // Get the target URL from baseRouter
+    const targetUrl = new URL(url, window.location.origin);
+
+    // If we have current column visibility state, add it to the target URL
+    if (currentCols) {
+      targetUrl.searchParams.set('cols', currentCols);
+    }
+
+    history.push(targetUrl.pathname + targetUrl.search);
   };
   return (
     <Container onClick={onClick}>
