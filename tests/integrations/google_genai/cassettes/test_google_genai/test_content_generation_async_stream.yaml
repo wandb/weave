@@ -1,0 +1,66 @@
+interactions:
+- request:
+    body: '{"contents": [{"parts": [{"text": "What''s the capital of France?"}], "role":
+      "user"}]}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '86'
+      content-type:
+      - application/json
+      host:
+      - generativelanguage.googleapis.com
+      user-agent:
+      - google-genai-sdk/1.7.0 gl-python/3.13.2
+      x-goog-api-client:
+      - google-genai-sdk/1.7.0 gl-python/3.13.2
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse
+  response:
+    body:
+      string: "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"The\"}],\"role\":
+        \"model\"}}],\"usageMetadata\": {\"promptTokenCount\": 9,\"totalTokenCount\":
+        9,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 9}]},\"modelVersion\":
+        \"gemini-2.0-flash\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\":
+        [{\"text\": \" capital of France\"}],\"role\": \"model\"}}],\"usageMetadata\":
+        {\"promptTokenCount\": 9,\"totalTokenCount\": 9,\"promptTokensDetails\": [{\"modality\":
+        \"TEXT\",\"tokenCount\": 9}]},\"modelVersion\": \"gemini-2.0-flash\"}\r\n\r\ndata:
+        {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \" is Paris.\\n\"}],\"role\":
+        \"model\"},\"finishReason\": \"STOP\"}],\"usageMetadata\": {\"promptTokenCount\":
+        8,\"candidatesTokenCount\": 8,\"totalTokenCount\": 16,\"promptTokensDetails\":
+        [{\"modality\": \"TEXT\",\"tokenCount\": 8}],\"candidatesTokensDetails\":
+        [{\"modality\": \"TEXT\",\"tokenCount\": 8}]},\"modelVersion\": \"gemini-2.0-flash\"}\r\n\r\n"
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Disposition:
+      - attachment
+      Content-Type:
+      - text/event-stream
+      Date:
+      - Thu, 20 Mar 2025 04:33:59 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=1957
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
