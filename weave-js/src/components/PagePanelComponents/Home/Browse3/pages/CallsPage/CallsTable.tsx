@@ -178,7 +178,7 @@ export const CallsTable: FC<{
   frozenFilter,
   hideControls,
   hideOpSelector,
-  columnVisibilityModel,
+  columnVisibilityModel: columnVisibilityModelProp,
   setColumnVisibilityModel,
   pinModel,
   setPinModel,
@@ -532,10 +532,9 @@ export const CallsTable: FC<{
     project
   );
 
-  // Set default hidden columns to be hidden
-  useEffect(() => {
-    if (!setColumnVisibilityModel || !columnVisibilityModel) {
-      return;
+  const columnVisibilityModel = useMemo(() => {
+    if (!columnVisibilityModelProp) {
+      return undefined;
     }
     const hiddenColumns: string[] = [];
     for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
@@ -544,26 +543,20 @@ export const CallsTable: FC<{
       );
       hiddenColumns.push(...cols.map(col => col.field));
     }
-    // Check if we need to update - only update if any annotation columns are missing from the model
-    const needsUpdate = hiddenColumns.some(
-      col => columnVisibilityModel[col] === undefined
-    );
-    if (!needsUpdate) {
-      return;
-    }
+
     const hiddenColumnVisibilityFalse = hiddenColumns.reduce((acc, col) => {
       // Only add columns=false when not already in the model
-      if (columnVisibilityModel[col] === undefined) {
+      if (columnVisibilityModelProp[col] === undefined) {
         acc[col] = false;
       }
       return acc;
     }, {} as Record<string, boolean>);
 
-    setColumnVisibilityModel({
-      ...columnVisibilityModel,
+    return {
+      ...columnVisibilityModelProp,
       ...hiddenColumnVisibilityFalse,
-    });
-  }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
+    };
+  }, [columns.cols, columnVisibilityModelProp]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
