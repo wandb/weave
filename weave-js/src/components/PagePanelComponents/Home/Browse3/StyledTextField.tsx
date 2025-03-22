@@ -5,7 +5,7 @@ import {hexToRGB} from '@wandb/weave/common/css/utils';
 import React from 'react';
 
 const COLOR_LABEL = Colors.TEAL_500;
-const COLOR_BORDER_OVER = hexToRGB(Colors.TEAL_500, 0.4);
+const COLOR_BORDER_OVER = hexToRGB(Colors.TEAL_400);
 const COLOR_BG_SELECTED_TEXT = Colors.MOON_100;
 
 export const StyledTextField = styled((props: TextFieldProps) => (
