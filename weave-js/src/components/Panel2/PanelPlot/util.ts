@@ -117,22 +117,28 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
       const dims = allDims[i];
       const labelSelectFn = table.columnSelectFunctions[dims.label];
       const colorSelectFn = table.columnSelectFunctions[dims.color];
-      if (labelSelectFn.nodeType !== 'void') {
-        const labelType = TableState.getTableColType(table, dims.label);
-        if (frame.runColors != null) {
-          let runNode: Node | undefined;
-          if (isAssignableTo(labelType, maybe('run'))) {
-            runNode = labelSelectFn;
-          } else if (
-            labelSelectFn.nodeType === 'output' &&
-            labelSelectFn.fromOp.name === 'run-name'
-          ) {
-            runNode = labelSelectFn.fromOp.inputs.run;
-          } else {
-            return table;
-          }
 
-          let retTable = table;
+      if (labelSelectFn.nodeType === 'void') {
+        return table;
+      }
+
+      const labelType = TableState.getTableColType(table, dims.label);
+      let retTable = table;
+
+      if (frame.runColors != null) {
+        let runNode: Node | undefined;
+
+        if (isAssignableTo(labelType, maybe('run'))) {
+          runNode = labelSelectFn;
+        } else if (
+          labelSelectFn.nodeType === 'output' &&
+          labelSelectFn.fromOp.name === 'run-name'
+        ) {
+          runNode = labelSelectFn.fromOp.inputs.run;
+        }
+
+        // Set run-specific coloring and labeling
+        if (runNode) {
           retTable = TableState.updateColumnSelect(
             table,
             dims.color,
@@ -149,6 +155,7 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
             'runColor'
           );
 
+          // Set custom run name if available
           if (frame.customRunNames != null) {
             const customRunNamePickNode = opPick({
               obj: varNode(frame.customRunNames.type, 'customRunNames'),
@@ -187,21 +194,25 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
 
           return retTable;
         }
-
-        if (
-          isAssignableTo(
-            labelType,
-            oneOrMany(maybe(union(['number', 'string', 'boolean'])))
-          ) &&
-          isVoidNode(colorSelectFn)
-        ) {
-          return TableState.updateColumnSelect(
-            table,
-            dims.color,
-            labelSelectFn
-          );
-        }
       }
+
+      // Fallback when colorSelectFn is a voidNode
+      if (
+        isVoidNode(colorSelectFn) &&
+        isAssignableTo(
+          labelType,
+          oneOrMany(maybe(union(['number', 'string', 'boolean'])))
+        )
+      ) {
+        retTable = TableState.updateColumnSelect(
+          table,
+          dims.color,
+          labelSelectFn
+        );
+
+        return retTable;
+      }
+
       return table;
     });
   }, [series, frame.runColors, frame.customRunNames]);
