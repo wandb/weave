@@ -40,6 +40,7 @@ def lint(session):
         "anthropic",
         "cerebras",
         "cohere",
+        "crewai",
         "dspy",
         "google_ai_studio",
         "groq",
