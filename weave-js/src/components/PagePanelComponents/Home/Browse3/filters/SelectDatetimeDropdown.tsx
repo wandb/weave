@@ -172,7 +172,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       setInputValue(formatDate(date));
       const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
       onChange(utcDate);
-      setIsCalendarOpen(false);
       setIsInvalid(false);
     }
   };
@@ -180,6 +179,13 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const handleIconClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     setIsCalendarOpen(true);
+  };
+
+  // Add handler for closing when Ok button is clicked
+  const handleAccept = (date: Date | null) => {
+    if (date) {
+      setIsCalendarOpen(false);
+    }
   };
 
   const handleSuggestionClick = useCallback(
@@ -307,6 +313,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             onClose={() => setIsCalendarOpen(false)}
             value={parseDate(inputValue) ?? null}
             onChange={handleDateChange}
+            onAccept={handleAccept}
             slotProps={{
               textField: {
                 style: {display: 'none'},
