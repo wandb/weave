@@ -413,8 +413,10 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-        <span>{suggestion.abbreviation}</span>
-        <span style={{color: MOON_500}}>{suggestion.label}</span>
+        <span>{suggestion.absoluteDateTime}</span>
+        <span style={{color: MOON_500}}>
+          {suggestion.abbreviation}
+        </span>
       </div>
     </li>
   );
@@ -426,7 +428,7 @@ type SuggestionsListProps = {
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
-  handleSuggestionClick: (suggestionValue: string) => void;
+  handleSuggestionClick: (suggestionValue: string, absoluteDateTime?: string) => void;
   handleMouseEnter: (index: number) => void;
   handleMouseLeave: () => void;
 };
@@ -471,7 +473,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           index={index}
           isSelected={selectedSuggestion === suggestion.abbreviation}
           isHovered={hoveredIndex === index}
-          onClick={() => handleSuggestionClick(suggestion.abbreviation)}
+          onClick={() => handleSuggestionClick(suggestion.abbreviation, suggestion.absoluteDateTime)}
           onMouseEnter={() => handleMouseEnter(index)}
           onMouseLeave={handleMouseLeave}
         />
