@@ -26,6 +26,7 @@ import {
 type PredefinedSuggestion = {
   abbreviation: string;
   label: string;
+  absoluteDateTime?: string;
 };
 
 const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
@@ -96,14 +97,24 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   }, [isActive]);
 
   const predefinedSuggestions = useMemo(() => {
-    const yesterdaySuggestion = parseDate('yesterday')!;
-    return [
-      ...PREDEFINED_SUGGESTIONS,
-      {
-        abbreviation: formatDateOnly(yesterdaySuggestion),
-        label: 'Yesterday',
-      },
-    ];
+    // Map all predefined suggestions to include absolute datetime
+    return PREDEFINED_SUGGESTIONS.map(suggestion => {
+      const date = parseDate(suggestion.abbreviation)!;
+      
+      // Format the date differently if time is 00:00:00
+      const onlyDate = date.getHours() === 0 && 
+                      date.getMinutes() === 0 && 
+                      date.getSeconds() === 0;
+      
+      const formattedDateTime = onlyDate 
+        ? formatDateOnly(date) 
+        : formatDate(date);
+      
+      return {
+        ...suggestion,
+        absoluteDateTime: formattedDateTime,
+      };
+    });
   }, []);
 
   const parseAndUpdateDate = useCallback(
@@ -172,8 +183,11 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   };
 
   const handleSuggestionClick = useCallback(
-    (suggestionValue: string) => {
-      setInputValue(suggestionValue);
+    (suggestionValue: string, absoluteDateTime?: string) => {
+      // Use the absolute date time if provided, otherwise use the abbreviation
+      const valueToUse = absoluteDateTime || suggestionValue;
+      setInputValue(valueToUse);
+      
       // Skip debounce when selecting from suggestions
       parseAndUpdateDate(suggestionValue, true);
 
