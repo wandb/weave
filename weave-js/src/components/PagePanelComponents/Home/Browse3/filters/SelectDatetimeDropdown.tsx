@@ -360,6 +360,47 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
                   '& *': {
                     fontFamily: 'Source Sans Pro',
                   },
+                  '& .MuiPickersDay-root.Mui-selected': {
+                    backgroundColor: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: TEAL_400,
+                    },
+                    '&:focus': {
+                      backgroundColor: TEAL_500,
+                    },
+                  },
+                  '& .MuiButton-root': {
+                    fontFamily: 'Source Sans Pro',
+                    color: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 140, 140, 0.1)',
+                    },
+                  },
+                  '& .MuiPickersCalendarHeader-switchViewButton': {
+                    color: TEAL_500,
+                  },
+                  '& .MuiPickersYear-yearButton.MuiPickersYear-yearButton.MuiPickersYear-yearButton': {
+                    fontFamily: 'Source Sans Pro',
+                    '&.Mui-selected': {
+                      backgroundColor: TEAL_500,
+                      color: WHITE,
+                    },
+                  },
+                  '& .MuiButtonBase-root.MuiMultiSectionDigitalClockSection-item.MuiMultiSectionDigitalClockSection-item.Mui-selected': {
+                    backgroundColor: TEAL_500,
+                    color: WHITE,
+                  },
+                },
+              },
+              actionBar: {
+                sx: {
+                  '& .MuiButton-root': {
+                    fontFamily: 'Source Sans Pro',
+                    color: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 140, 140, 0.1)',
+                    },
+                  },
                 },
               },
             }}
