@@ -1,7 +1,7 @@
 import {ID} from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
 import {Ref} from 'semantic-ui-react';
-import {createEditor, Editor, Transforms} from 'slate';
+import {createEditor, Editor, Node as SlateNode, Transforms} from 'slate';
 import {withHistory} from 'slate-history';
 import {ReactEditor, Slate, withReact} from 'slate-react';
 import styled from 'styled-components';
@@ -60,6 +60,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     onFocus,
     onBlur,
   } = useWeaveExpressionState(props, editor, weave);
+  const {customInput} = props;
   const decorate = useWeaveDecorate(editor, tsRoot);
   const {takeSuggestion, suggestionIndex, setSuggestionIndex} =
     useSuggestionTaker(suggestions, weave, editor);
@@ -72,19 +73,20 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     props.truncate
   );
 
-  // Store the editor on the window, so we can modify its state
-  // from automation.ts (test automation)
-  const [editorId] = useState(ID());
+  // Use a ref to track the last processed customInput
+  const lastProcessedInputRef = React.useRef<string | null>(null);
+
+  // Monitor when the expression becomes empty to reset the lastProcessedInputRef
   useEffect(() => {
-    window.weaveExpressionEditors[editorId] = {
-      applyPendingExpr,
-      editor,
-      onChange: (newValue: any) => onChange(newValue, stack),
-    };
-    return () => {
-      delete window.weaveExpressionEditors[editorId];
-    };
-  }, [applyPendingExpr, editor, editorId, onChange, stack]);
+    // Check if the editor content is empty (just an empty paragraph)
+    const isEmpty =
+      editor.children.length === 1 && SlateNode.string(editor).trim() === '';
+
+    // If the editor is empty, reset the ref so we can reapply the same expression
+    if (isEmpty) {
+      lastProcessedInputRef.current = null;
+    }
+  }, [editor.children]);
 
   const [showSuggestions, setShowSuggestions] = useState(
     props.expr?.nodeType === 'void'
@@ -181,6 +183,58 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
       takeSuggestion,
     ]
   );
+
+  useEffect(() => {
+    if (customInput && customInput.children[0].text) {
+      const inputText = customInput.children[0].text;
+
+      // Update our ref with the current input
+      lastProcessedInputRef.current = inputText;
+
+      // Focus the editor first to ensure it's ready to receive input
+      ReactEditor.focus(editor);
+
+      // Select all existing text
+      Transforms.select(editor, {
+        anchor: Editor.start(editor, []),
+        focus: Editor.end(editor, []),
+      });
+
+      // Delete the selection (all text)
+      Transforms.delete(editor);
+
+      // Insert the new text
+      Transforms.insertText(editor, inputText);
+
+      // Force onChange to be called
+      const currentValue = editor.children;
+      onChange(currentValue, stack);
+      forceRender({});
+
+      // Hide suggestions when applying expression from card click
+      setShowSuggestions(false);
+
+      setTimeout(() => {
+        // Apply the expression changes directly
+        applyPendingExpr();
+        forceRender({});
+      }, 50);
+    }
+  }, [customInput, editor, onChange, stack, applyPendingExpr, forceRender]);
+
+  // Store the editor on the window, so we can modify its state
+  // from automation.ts (test automation)
+  const [editorId] = useState(ID());
+  useEffect(() => {
+    window.weaveExpressionEditors[editorId] = {
+      applyPendingExpr,
+      editor,
+      onChange: (newValue: any) => onChange(newValue, stack),
+    };
+    return () => {
+      delete window.weaveExpressionEditors[editorId];
+    };
+  }, [applyPendingExpr, editor, editorId, onChange, stack]);
 
   trace(
     `Render WeaveExpression ${editorId}`,
