@@ -256,7 +256,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             style={{
               position: 'absolute',
               top: '50%',
-              left: '9px',
+              right: '9px',
               transform: 'translateY(-50%)',
               fontSize: '16px',
               cursor: 'pointer',
@@ -286,8 +286,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             placeholder="Enter a date..."
             style={{
               padding: '4px 12px',
-              paddingLeft: '34px',
-              paddingRight: '8px',
+              paddingLeft: '8px',
+              paddingRight: '34px',
               borderRadius: '4px',
               border: 0,
               boxShadow: isInputFocused
