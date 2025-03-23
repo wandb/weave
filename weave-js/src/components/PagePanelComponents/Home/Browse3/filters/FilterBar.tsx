@@ -164,7 +164,7 @@ export const FilterBar = ({
         items: [
           ...localFilterModel.items,
           {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },

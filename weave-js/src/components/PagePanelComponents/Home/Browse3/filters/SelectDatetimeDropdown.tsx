@@ -6,16 +6,22 @@ import {
   MOON_200,
   MOON_250,
   MOON_500,
+  RED_300,
   TEAL_350,
   TEAL_400,
   TEAL_500,
   WHITE,
 } from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
-import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
+import {
+  formatDate,
+  formatDateOnly,
+  parseDate,
+  utcToLocalTimeString,
+} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -46,7 +52,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
   isActive,
 }) => {
-  const [inputValue, setInputValue] = useState(value || '');
+  // We have to play this game because
+  const [inputValue, setInputValue] = useState(utcToLocalTimeString(value));
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -56,9 +63,25 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isIconHovered, setIsIconHovered] = useState(false);
+  const [isInvalid, setIsInvalid] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Set default value to 1mo if no valid date
+  useEffect(() => {
+    if (!value) {
+      const defaultDate = parseDate('1mo');
+      if (defaultDate) {
+        const utcDate = formatDate(defaultDate, 'YYYY-MM-DD HH:mm:ss', true);
+        onChange(utcDate);
+        setInputValue(utcToLocalTimeString(utcDate));
+      }
+    }
+    // Only run on first render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
@@ -72,7 +95,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     }
   }, [isActive]);
 
-  const predefinedSuggestions: PredefinedSuggestion[] = useMemo(() => {
+  const predefinedSuggestions = useMemo(() => {
     const yesterdaySuggestion = parseDate('yesterday')!;
     return [
       ...PREDEFINED_SUGGESTIONS,
@@ -83,23 +106,47 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     ];
   }, []);
 
-  const parseAndUpdateDate = (newInputValue: string) => {
-    const date = parseDate(newInputValue);
+  const parseAndUpdateDate = useCallback(
+    (newInputValue: string, skipDebounce = false) => {
+      const date = parseDate(newInputValue);
+      if (date) {
+        const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
+        onChange(utcDate);
+        setIsInvalid(false);
+      } else {
+        setIsInvalid(true);
+        onChange('');
+      }
+    },
+    [onChange]
+  );
 
-    // Call the parent onChange handler with the timestamp
-    if (date) {
-      onChange(formatDate(date));
-    } else {
-      // If we couldn't parse a date, pass the raw input
-      // This allows for storing relative date strings like "3d" directly
-      onChange(newInputValue);
-    }
-  };
+  const debouncedInputChange = useCallback(
+    (newInputValue: string) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        parseAndUpdateDate(newInputValue);
+      }, 500);
+    },
+    [parseAndUpdateDate]
+  );
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newInputValue = event.target.value;
     setInputValue(newInputValue);
-    parseAndUpdateDate(newInputValue);
+    debouncedInputChange(newInputValue);
+
     // Check against our predefined suggestions by their value
     const isPredefined = predefinedSuggestions.some(
       s => s.abbreviation === newInputValue
@@ -111,10 +158,11 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const handleDateChange = (date: Date | null) => {
     if (date) {
-      const formattedDate = formatDate(date);
-      setInputValue(formattedDate);
-      onChange(formattedDate);
+      setInputValue(formatDate(date));
+      const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
+      onChange(utcDate);
       setIsCalendarOpen(false);
+      setIsInvalid(false);
     }
   };
 
@@ -123,24 +171,56 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setIsCalendarOpen(true);
   };
 
-  const handleSuggestionClick = (suggestionValue: string) => {
-    setInputValue(suggestionValue);
-    parseAndUpdateDate(suggestionValue);
+  const handleSuggestionClick = useCallback(
+    (suggestionValue: string) => {
+      setInputValue(suggestionValue);
+      // Skip debounce when selecting from suggestions
+      parseAndUpdateDate(suggestionValue, true);
 
-    setSelectedSuggestion(suggestionValue);
-    setDropdownVisible(false);
-    if (inputRef.current) {
-      inputRef.current.blur();
-    }
-  };
+      setSelectedSuggestion(suggestionValue);
+      setDropdownVisible(false);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    },
+    [parseAndUpdateDate]
+  );
 
-  const handleMouseEnter = (index: number) => {
-    setHoveredIndex(index);
-  };
+  const handleMouseEnter = useCallback(
+    (index: number) => {
+      setHoveredIndex(index);
+    },
+    [setHoveredIndex]
+  );
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setHoveredIndex(null);
-  };
+  }, [setHoveredIndex]);
+
+  // Memoize the suggestions list component to prevent unnecessary re-renders
+  const suggestionsList = useMemo(
+    () => (
+      <SuggestionsList
+        isDropdownVisible={isDropdownVisible}
+        dropdownRef={dropdownRef}
+        predefinedSuggestions={predefinedSuggestions}
+        selectedSuggestion={selectedSuggestion}
+        hoveredIndex={hoveredIndex}
+        handleSuggestionClick={handleSuggestionClick}
+        handleMouseEnter={handleMouseEnter}
+        handleMouseLeave={handleMouseLeave}
+      />
+    ),
+    [
+      isDropdownVisible,
+      predefinedSuggestions,
+      selectedSuggestion,
+      hoveredIndex,
+      handleSuggestionClick,
+      handleMouseEnter,
+      handleMouseLeave,
+    ]
+  );
 
   return (
     <div
@@ -148,7 +228,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        marginBottom: '5px',
       }}>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <div style={{position: 'relative', width: '100%'}}>
@@ -192,10 +271,10 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               borderRadius: '4px',
               border: 0,
               boxShadow: isInputFocused
-                ? `0 0 0 2px ${TEAL_400}`
+                ? `0 0 0 2px ${isInvalid ? RED_300 : TEAL_400}`
                 : isInputHovered || isIconHovered
-                ? `0 0 0 2px ${TEAL_350}`
-                : `inset 0 0 0 1px ${MOON_250}`,
+                ? `0 0 0 2px ${isInvalid ? RED_300 : TEAL_350}`
+                : `inset 0 0 0 1px ${isInvalid ? RED_300 : MOON_250}`,
               outline: 'none',
               flex: 1,
               height: '32px',
@@ -205,13 +284,14 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               lineHeight: '24px',
               cursor: 'default',
               width: '100%',
+              color: isInvalid ? '#ff4d4f' : 'inherit',
             }}
             ref={inputRef}
           />
           <DateTimePicker
             open={isCalendarOpen}
             onClose={() => setIsCalendarOpen(false)}
-            value={parseDate(inputValue) || null}
+            value={parseDate(inputValue) ?? null}
             onChange={handleDateChange}
             slotProps={{
               textField: {
@@ -268,16 +348,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         </div>
       </LocalizationProvider>
 
-      <SuggestionsList
-        isDropdownVisible={isDropdownVisible}
-        dropdownRef={dropdownRef}
-        predefinedSuggestions={predefinedSuggestions}
-        selectedSuggestion={selectedSuggestion}
-        hoveredIndex={hoveredIndex}
-        handleSuggestionClick={handleSuggestionClick}
-        handleMouseEnter={handleMouseEnter}
-        handleMouseLeave={handleMouseLeave}
-      />
+      {suggestionsList}
     </div>
   );
 };

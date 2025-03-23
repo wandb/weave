@@ -106,6 +106,7 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
 
       // Hours ago
+      console.log(parseDate('1h'), createDateTime(2023, 6, 15, 11, 30));
       expect(
         areDateTimesEqual(parseDate('1h'), createDateTime(2023, 6, 15, 11, 30))
       ).toBe(true);
@@ -296,7 +297,7 @@ describe('Date Utility Functions', () => {
       expect(parseDate('current time')?.getFullYear()).toBe(now.getFullYear());
     });
 
-    test('should parse last/next day of week', () => {
+    test('should parse last/next/this day of week', () => {
       // Current date is 2023-06-15 (Thursday) 12:30:00
 
       // Test "last" day of week
@@ -345,6 +346,52 @@ describe('Date Utility Functions', () => {
         areDatesEqual(parseDate('next sunday'), createDate(2023, 6, 18))
       ).toBe(true);
 
+      // Test "this" day of week (should behave like "next")
+      expect(
+        areDatesEqual(parseDate('this monday'), createDate(2023, 6, 19))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this tuesday'), createDate(2023, 6, 20))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this wednesday'), createDate(2023, 6, 21))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this thursday'), createDate(2023, 6, 22))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this friday'), createDate(2023, 6, 16))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this saturday'), createDate(2023, 6, 17))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('this sunday'), createDate(2023, 6, 18))
+      ).toBe(true);
+
+      // Test standalone day names (should behave like "next")
+      expect(areDatesEqual(parseDate('monday'), createDate(2023, 6, 19))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('tuesday'), createDate(2023, 6, 20))).toBe(
+        true
+      );
+      expect(
+        areDatesEqual(parseDate('wednesday'), createDate(2023, 6, 21))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('thursday'), createDate(2023, 6, 22))
+      ).toBe(true);
+      expect(areDatesEqual(parseDate('friday'), createDate(2023, 6, 16))).toBe(
+        true
+      );
+      expect(
+        areDatesEqual(parseDate('saturday'), createDate(2023, 6, 17))
+      ).toBe(true);
+      expect(areDatesEqual(parseDate('sunday'), createDate(2023, 6, 18))).toBe(
+        true
+      );
+
       // Test case insensitivity
       expect(
         areDatesEqual(parseDate('LAST MONDAY'), createDate(2023, 6, 12))
@@ -352,6 +399,12 @@ describe('Date Utility Functions', () => {
       expect(
         areDatesEqual(parseDate('Next Friday'), createDate(2023, 6, 16))
       ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('THIS MONDAY'), createDate(2023, 6, 19))
+      ).toBe(true);
+      expect(areDatesEqual(parseDate('MONDAY'), createDate(2023, 6, 19))).toBe(
+        true
+      );
     });
   });
 
