@@ -27,6 +27,7 @@ type PredefinedSuggestion = {
   abbreviation: string;
   label: string;
   absoluteDateTime?: string;
+  isCustomDate?: boolean;
 };
 
 const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
@@ -36,6 +37,7 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
   {abbreviation: '1w', label: '1 Week'},
   {abbreviation: '1mo', label: '1 Month'},
   {abbreviation: '3mo', label: '3 Months'},
+  {abbreviation: 'custom', label: 'Custom datetime', isCustomDate: true},
 ];
 
 type SelectDatetimeDropdownProps = {
@@ -99,6 +101,11 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const predefinedSuggestions = useMemo(() => {
     // Map all predefined suggestions to include absolute datetime
     return PREDEFINED_SUGGESTIONS.map(suggestion => {
+      // Skip adding absoluteDateTime for the custom date option
+      if (suggestion.isCustomDate) {
+        return suggestion;
+      }
+      
       const date = parseDate(suggestion.abbreviation)!;
       
       // Format the date differently if time is 00:00:00
@@ -189,7 +196,12 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   };
 
   const handleSuggestionClick = useCallback(
-    (suggestionValue: string, absoluteDateTime?: string) => {
+    (suggestionValue: string, absoluteDateTime?: string, isCustomDate?: boolean) => {
+      if (isCustomDate) {
+        setIsCalendarOpen(true);
+        return;
+      }
+      
       // Use the absolute date time if provided, otherwise use the abbreviation
       const valueToUse = absoluteDateTime || suggestionValue;
       setInputValue(valueToUse);
@@ -435,6 +447,8 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const isCustomDate = suggestion.isCustomDate;
+  
   return (
     <li
       key={index}
@@ -453,6 +467,7 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           : isHovered
           ? MOON_100
           : WHITE,
+        borderTop: isCustomDate ? `1px solid ${MOON_200}` : 'none',
       }}
       onMouseDown={e => e.preventDefault()}>
       <div
@@ -461,10 +476,19 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-        <span>{suggestion.absoluteDateTime}</span>
-        <span style={{color: MOON_500}}>
-          {suggestion.abbreviation}
-        </span>
+        {isCustomDate ? (
+          <span style={{ display: 'flex', alignItems: 'center' }}>
+            <Icon name="date" style={{ marginRight: '4px', fontSize: '14px' }} />
+            {suggestion.label}
+          </span>
+        ) : (
+          <span>{suggestion.absoluteDateTime}</span>
+        )}
+        {!isCustomDate && (
+          <span style={{color: MOON_500}}>
+            {suggestion.abbreviation}
+          </span>
+        )}
       </div>
     </li>
   );
@@ -476,7 +500,7 @@ type SuggestionsListProps = {
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
-  handleSuggestionClick: (suggestionValue: string, absoluteDateTime?: string) => void;
+  handleSuggestionClick: (suggestionValue: string, absoluteDateTime?: string, isCustomDate?: boolean) => void;
   handleMouseEnter: (index: number) => void;
   handleMouseLeave: () => void;
 };
@@ -521,7 +545,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           index={index}
           isSelected={selectedSuggestion === suggestion.abbreviation}
           isHovered={hoveredIndex === index}
-          onClick={() => handleSuggestionClick(suggestion.abbreviation, suggestion.absoluteDateTime)}
+          onClick={() => handleSuggestionClick(suggestion.abbreviation, suggestion.absoluteDateTime, suggestion.isCustomDate)}
           onMouseEnter={() => handleMouseEnter(index)}
           onMouseLeave={handleMouseLeave}
         />
