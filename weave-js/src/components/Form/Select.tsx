@@ -243,7 +243,7 @@ const getStyles = <
         fontSize,
         cursor: props.cursor ?? 'default',
         border: 0,
-        borderRadius: '3px',
+        borderRadius: '5px',
         outline:
           state.menuIsOpen || state.isFocused
             ? `2px solid ${colorBorderOpen}`
