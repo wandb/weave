@@ -151,7 +151,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Frameworks",
           items: [
-            ,
+            "guides/integrations/openai_agents",
             "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",

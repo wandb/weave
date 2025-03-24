@@ -38,6 +38,7 @@ export const UNFILTERABLE_FIELDS = [
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
+  'wb_run_id', // Option+Click works
 ];
 
 export type ColumnInfo = {
@@ -200,6 +201,10 @@ export const isValuelessOperator = (operator: string) => {
 
 export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
+};
+
+export const isDateOperator = (operator: string) => {
+  return operator.startsWith('(date):');
 };
 
 export const getOperatorLabel = (operatorValue: string): string => {
