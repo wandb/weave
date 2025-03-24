@@ -1,6 +1,7 @@
-import {Box, Drawer} from '@material-ui/core';
-import {Button} from '@wandb/weave/components/Button';
-import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
+import { Box, Typography } from '@material-ui/core';
+import { Button } from '@wandb/weave/components/Button';
+import { Icon, IconName, IconNames } from '@wandb/weave/components/Icon';
+import { MOON_200, MOON_300 } from '@wandb/weave/common/css/color.styles';
 import React, {
   FC,
   ReactNode,
@@ -9,13 +10,15 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { Link } from '@wandb/weave/common/util/links';
 
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import { ResizableDrawer } from '../common/ResizableDrawer';
+import { TraceServerClient } from '../wfReactInterface/traceServerClient';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
-import {AutocompleteWithLabel} from './FormComponents';
+import { AutocompleteWithLabel } from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
-import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
+import { ProgrammaticScorerForm, ScorerFormProps } from './ScorerForms';
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
@@ -28,7 +31,7 @@ export type ScorerType =
   | typeof HUMAN_ANNOTATION_VALUE
   | typeof LLM_JUDGE_VALUE
   | typeof PROGRAMMATIC_VALUE;
-type OptionType = {label: string; value: ScorerType; icon: IconName};
+type OptionType = { label: string; value: ScorerType; icon: IconName };
 
 interface ScorerTypeConfig<T> extends OptionType {
   Component: FC<ScorerFormProps<T>>;
@@ -68,7 +71,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
 };
 
 const scorerTypeOptions: OptionType[] = Object.values(scorerTypeRecord).map(
-  ({label, value, icon}) => ({label, value, icon})
+  ({ label, value, icon }) => ({ label, value, icon })
 );
 
 interface NewScorerDrawerProps {
@@ -86,21 +89,10 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   onClose,
   initialScorerType,
 }) => {
-  const [selectedScorerType, setSelectedScorerType] = useState<ScorerType>(
-    initialScorerType ?? HUMAN_ANNOTATION_VALUE
-  );
   const [formData, setFormData] = useState<any>(null);
   const [isFormValid, setIsFormValid] = useState(false);
-
-  const setScorerTypeAndResetForm = useCallback((scorerType: ScorerType) => {
-    setSelectedScorerType(scorerType);
-    setFormData(null);
-    setIsFormValid(false);
-  }, []);
-
-  useEffect(() => {
-    setScorerTypeAndResetForm(initialScorerType ?? HUMAN_ANNOTATION_VALUE);
-  }, [initialScorerType, setScorerTypeAndResetForm]);
+  const [drawerWidth, setDrawerWidth] = useState(600);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleFormDataChange = useCallback((isValid: boolean, data: any) => {
     setIsFormValid(isValid);
@@ -111,7 +103,7 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
 
   const onSave = useCallback(async () => {
     try {
-      await scorerTypeRecord[selectedScorerType].onSave(
+      await scorerTypeRecord[HUMAN_ANNOTATION_VALUE].onSave(
         entity,
         project,
         formData,
@@ -123,137 +115,122 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
       console.error('Failed to create scorer:', error);
       // Handle error appropriately
     }
-  }, [selectedScorerType, entity, project, formData, getClient, onClose]);
-
-  const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
-
-  // Here, we hide the LLM judge option from non-admins since the
-  // feature is in active development. We want to be able to get
-  // feedback without enabling for all users.
-  const options = useMemo(() => {
-    return scorerTypeOptions.filter(opt => opt.value !== LLM_JUDGE_VALUE);
-  }, []);
+  }, [entity, project, formData, getClient, onClose]);
 
   const handleClose = () => {
     setFormData(null);
     onClose();
   };
 
+  const handleToggleFullscreen = useCallback(() => {
+    setIsFullscreen(!isFullscreen);
+  }, [isFullscreen]);
+
   return (
-    <SaveableDrawer
+    <ResizableDrawer
       open={open}
-      title="Create scorer"
       onClose={handleClose}
-      onSave={onSave}
-      saveDisabled={!isFormValid}>
-      <AutocompleteWithLabel
-        label="Scorer type"
-        options={options}
-        value={options.find(opt => opt.value === selectedScorerType)}
-        formatOptionLabel={option => (
-          <Box display="flex" alignItems="center" style={{gap: '4px'}}>
-            <Icon name={option.icon} />
-            {option.label}
+      defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
+      setWidth={width => !isFullscreen && setDrawerWidth(width)}
+      headerContent={
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            height: 44,
+            minHeight: 44,
+            pl: 2,
+            pr: 1,
+            borderBottom: `1px solid ${MOON_300}`,
+          }}>
+          <Typography variant="h6" style={{ fontFamily: 'Source Sans Pro', fontWeight: 600 }}>
+            Create new scorer
+          </Typography>
+          <Box sx={{ display: 'flex', marginLeft: 1 }}>
+            <Button
+              onClick={handleToggleFullscreen}
+              variant="ghost"
+              icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
+              tooltip={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            />
+            <Button
+              onClick={handleClose}
+              variant="ghost"
+              icon="close"
+              tooltip="Close"
+            />
           </Box>
-        )}
-        onChange={value =>
-          value && setScorerTypeAndResetForm(value.value as ScorerType)
-        }
-      />
-      <ScorerFormComponent
-        data={formData}
-        onDataChange={handleFormDataChange}
-      />
-    </SaveableDrawer>
-  );
-};
-
-interface SaveableDrawerProps {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  onSave: () => void;
-  saveDisabled?: boolean;
-  children: ReactNode;
-}
-
-export const SaveableDrawer: FC<SaveableDrawerProps> = ({
-  open,
-  title,
-  onClose,
-  onSave,
-  saveDisabled,
-  children,
-}) => {
-  return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={() => {
-        // do nothing - stops clicking outside from closing
-        return;
-      }}
-      ModalProps={{
-        keepMounted: true, // Better open performance on mobile
-      }}>
+        </Box>
+      }>
       <Box
         sx={{
-          width: '40vw',
-          marginTop: '60px',
-          height: '100%',
           display: 'flex',
           flexDirection: 'column',
+          height: '100%',
           overflow: 'hidden',
         }}>
         <Box
           sx={{
-            flex: '0 0 auto',
-            borderBottom: '1px solid #e0e0e0',
-            px: '24px',
-            py: '20px',
-            display: 'flex',
-            fontWeight: 600,
-            fontSize: '24px',
-            lineHeight: '40px',
+            p: 4,
+            flexGrow: 1,
+            overflow: 'auto',
           }}>
-          <Box sx={{flexGrow: 1}}>{title}</Box>
-          <Box>
-            <Button
-              size="large"
-              variant="ghost"
-              icon="close"
-              onClick={onClose}
+
+
+          <Box
+            style={{
+              backgroundColor: MOON_200,
+              padding: '16px',
+              borderRadius: '8px',
+            }}>
+            <Box mb={1}>
+              This form will allow you to create a <span style={{ fontWeight: 'semibold' }}>Human Annotation</span> scorer which can be used in the trace interface.
+            </Box>
+            <Box>
+              If you would like to create a <span style={{ fontWeight: 'semibold' }}>Programmatic Scorer</span>, please use Python and refer to the{' '}
+              <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+                scorer documentation
+              </Link>{' '}
+              for more information.
+            </Box>
+          </Box>
+
+          <Box sx={{ mt: 4 }}>
+            <AnnotationScorerForm.AnnotationScorerForm
+              data={formData}
+              onDataChange={handleFormDataChange}
             />
           </Box>
         </Box>
-
         <Box
           sx={{
-            flexGrow: 1,
-            overflow: 'auto',
-            p: 4,
-          }}>
-          {children}
-        </Box>
-
-        <Box
-          sx={{
+            pt: "10px",
+            pb: "9px",
+            px: 0,
+            borderTop: `1px solid ${MOON_300}`,
+            bgcolor: 'background.paper',
+            width: '100%',
             display: 'flex',
-            flex: '0 0 auto',
-            borderTop: '1px solid #e0e0e0',
-            px: '24px',
-            py: '20px',
+            flexShrink: 0,
           }}>
           <Button
             onClick={onSave}
-            color="primary"
-            size="large"
-            disabled={saveDisabled}
-            className="w-full">
-            Create scorer
+            variant="primary"
+            disabled={!isFormValid}
+            style={{
+              width: '100%',
+              margin: '0 16px',
+              borderRadius: '4px',
+            }}
+            twWrapperStyles={{
+              width: 'calc(100% - 32px)',
+              display: 'block',
+            }}>
+            Create Scorer
           </Button>
         </Box>
       </Box>
-    </Drawer>
+    </ResizableDrawer>
   );
 };
