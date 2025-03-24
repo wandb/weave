@@ -493,7 +493,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 AND c.deleted_at IS NULL
         )
         SELECT DISTINCT id FROM descendants
-        LIMIT 1000000
+        LIMIT 100000
         SETTINGS allow_experimental_analyzer=1
         """
 
