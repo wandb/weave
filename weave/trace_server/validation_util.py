@@ -9,6 +9,28 @@ class CHValidationError(Exception):
     pass
 
 
+def require_otel_trace_id(s: str) -> str:
+    lower_s = s.lower()
+    if lower_s != s:
+        raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be lowercase")
+
+    # 16 Bytes is a hex string of len 32
+    if len(s) != 32:
+        raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be 8 bytes")
+    return s
+
+
+def require_otel_span_id(s: str) -> str:
+    lower_s = s.lower()
+    if lower_s != s:
+        raise CHValidationError(f"Invalid Span ID: {s}. Span ID must be lowercase")
+
+    # 8 Bytes is a hex string of len 16
+    if len(s) != 16:
+        raise CHValidationError(f"Invalid Span ID: {s}. Span ID must be 8 bytes")
+    return s
+
+
 def require_uuid(s: str) -> str:
     lower_s = s.lower()
     if lower_s != s:

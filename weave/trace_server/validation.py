@@ -11,11 +11,17 @@ def project_id_validator(s: str) -> str:
 
 
 def call_id_validator(s: str) -> str:
-    return validation_util.require_uuid(s)
+    try:
+        return validation_util.require_otel_span_id(s)
+    except:
+        return validation_util.require_uuid(s)
 
 
 def trace_id_validator(s: str) -> str:
-    return validation_util.require_uuid(s)
+    try:
+        return validation_util.require_otel_trace_id(s)
+    except:
+        return validation_util.require_uuid(s)
 
 
 def parent_id_validator(s: Optional[str]) -> Optional[str]:
