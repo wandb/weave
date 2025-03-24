@@ -497,7 +497,8 @@ class WeaveTable(Traceable):
 
                 def process_row(val: Any, new_ref: RefWithExtra) -> Any:
                     if not self.table_ref:
-                        raise ValueError("No table ref found")
+                        # Should never happen, we need table_ref to remote_iter
+                        return None
                     return make_trace_obj(
                         from_json(val, self.table_ref.project_id, self.server),
                         new_ref,
