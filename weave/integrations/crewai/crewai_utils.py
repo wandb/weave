@@ -128,4 +128,6 @@ def default_call_display_name_execute_task(call: Call) -> str:
 def default_call_display_name_execute_sync(call: Call) -> str:
     name = call.inputs["self"].get("name", "").strip()
     name = name.replace("\n", "").strip()
+    if name is None or name == "":
+        return "crewai.Task.execute_sync"
     return f"crewai.Task.execute_sync - {name}"
