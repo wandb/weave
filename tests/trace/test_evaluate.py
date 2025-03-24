@@ -430,10 +430,23 @@ def test_evaluate_table_lazy_iter(client):
 def test_evaluate_table_order(client):
     """
     Test that evaluation results maintain the original order of the dataset
-    when using a published dataset.
+    when using a published dataset with images.
     """
+    import random
+
+    from PIL import Image
+
+    def make_image(i):
+        return Image.new(
+            "RGB",
+            (1024, 1024),
+            (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+        )
+
     # Create a dataset with ordered values
-    dataset_rows = [{"input": i, "target": i} for i in range(100)]
+    dataset_rows = [
+        {"input": i, "target": i, "image": make_image(i)} for i in range(100)
+    ]
     dataset = Dataset(rows=dataset_rows)
     ref = weave.publish(dataset)
     dataset = ref.get()
