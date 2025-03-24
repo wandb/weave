@@ -1,4 +1,4 @@
-import {Box, Typography, Link} from '@mui/material';
+import {Box, Link,Typography} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_200,TEAL_500, TEAL_600} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
