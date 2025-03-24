@@ -1,7 +1,8 @@
-import { Box, Typography } from '@material-ui/core';
-import { Button } from '@wandb/weave/components/Button';
-import { Icon, IconName, IconNames } from '@wandb/weave/components/Icon';
-import { MOON_200, MOON_300 } from '@wandb/weave/common/css/color.styles';
+import {Box, Typography} from '@material-ui/core';
+import {MOON_200, MOON_300} from '@wandb/weave/common/css/color.styles';
+import {Link} from '@wandb/weave/common/util/links';
+import {Button} from '@wandb/weave/components/Button';
+import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   ReactNode,
@@ -10,15 +11,14 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Link } from '@wandb/weave/common/util/links';
 
-import { ResizableDrawer } from '../common/ResizableDrawer';
-import { TraceServerClient } from '../wfReactInterface/traceServerClient';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+import {ResizableDrawer} from '../common/ResizableDrawer';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
-import { AutocompleteWithLabel } from './FormComponents';
+import {AutocompleteWithLabel} from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
-import { ProgrammaticScorerForm, ScorerFormProps } from './ScorerForms';
+import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
 
 const HUMAN_ANNOTATION_LABEL = 'Human annotation';
 export const HUMAN_ANNOTATION_VALUE = 'ANNOTATION';
@@ -31,7 +31,7 @@ export type ScorerType =
   | typeof HUMAN_ANNOTATION_VALUE
   | typeof LLM_JUDGE_VALUE
   | typeof PROGRAMMATIC_VALUE;
-type OptionType = { label: string; value: ScorerType; icon: IconName };
+type OptionType = {label: string; value: ScorerType; icon: IconName};
 
 interface ScorerTypeConfig<T> extends OptionType {
   Component: FC<ScorerFormProps<T>>;
@@ -71,7 +71,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
 };
 
 const scorerTypeOptions: OptionType[] = Object.values(scorerTypeRecord).map(
-  ({ label, value, icon }) => ({ label, value, icon })
+  ({label, value, icon}) => ({label, value, icon})
 );
 
 interface NewScorerDrawerProps {
@@ -140,14 +140,16 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
             alignItems: 'center',
             height: 44,
             minHeight: 44,
-            pl: 2,
-            pr: 1,
+            pl: 4,
+            pr: 2,
             borderBottom: `1px solid ${MOON_300}`,
           }}>
-          <Typography variant="h6" style={{ fontFamily: 'Source Sans Pro', fontWeight: 600 }}>
+          <Typography
+            variant="h6"
+            style={{fontFamily: 'Source Sans Pro', fontWeight: 600}}>
             Create new scorer
           </Typography>
-          <Box sx={{ display: 'flex', marginLeft: 1 }}>
+          <Box sx={{display: 'flex', marginLeft: 1}}>
             <Button
               onClick={handleToggleFullscreen}
               variant="ghost"
@@ -176,8 +178,6 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
             flexGrow: 1,
             overflow: 'auto',
           }}>
-
-
           <Box
             style={{
               backgroundColor: MOON_200,
@@ -185,10 +185,14 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
               borderRadius: '8px',
             }}>
             <Box mb={1}>
-              This form will allow you to create a <span style={{ fontWeight: 'semibold' }}>Human Annotation</span> scorer which can be used in the trace interface.
+              This form will allow you to create a{' '}
+              <span style={{fontWeight: '600'}}>Human Annotation</span> scorer
+              which can be used in the trace interface.
             </Box>
             <Box>
-              If you would like to create a <span style={{ fontWeight: 'semibold' }}>Programmatic Scorer</span>, please use Python and refer to the{' '}
+              If you would like to create a{' '}
+              <span style={{fontWeight: '600'}}>Programmatic Scorer</span>,
+              please use Python and refer to the{' '}
               <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
                 scorer documentation
               </Link>{' '}
@@ -196,7 +200,7 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
             </Box>
           </Box>
 
-          <Box sx={{ mt: 4 }}>
+          <Box sx={{mt: 4}}>
             <AnnotationScorerForm.AnnotationScorerForm
               data={formData}
               onDataChange={handleFormDataChange}
@@ -205,8 +209,8 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
         </Box>
         <Box
           sx={{
-            pt: "10px",
-            pb: "9px",
+            pt: '10px',
+            pb: '9px',
             px: 0,
             borderTop: `1px solid ${MOON_300}`,
             bgcolor: 'background.paper',

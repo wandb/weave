@@ -119,6 +119,7 @@ const DiscriminatedUnionField: React.FC<{
     <Box style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
       <AutocompleteWithLabel
         label={keyName}
+        description={getFieldDescription(fieldSchema)}
         options={options.map(option => ({
           value: distiminatorOptionToValue(option, discriminator),
           label: distiminatorOptionToValue(option, discriminator),
@@ -338,6 +339,7 @@ const NestedForm: React.FC<{
     <TextFieldWithLabel
       isOptional={isOptional}
       label={!hideLabel ? keyName : undefined}
+      description={getFieldDescription(fieldSchema)}
       type={fieldType}
       value={currentValue ?? ''}
       onChange={handleChange}
@@ -507,6 +509,7 @@ const EnumField: React.FC<{
   return (
     <AutocompleteWithLabel
       label={noLabel ? undefined : keyName}
+      description={getFieldDescription(fieldSchema)}
       options={options.map(option => ({value: option, label: option}))}
       value={{
         value: selectedValue,
