@@ -209,3 +209,66 @@ print(result)
 :::note
 The integration automatically patches the `Flow.kickoff` entry point and all the available decorators -- `@start`, `@listen`, `@router`, `@or_` and `@and_`.
 :::
+
+
+## Crew Guardrail - Track your own ops
+
+Task guardrails provide a way to validate and transform task outputs before they are passed to the next task. We can use a simple python function to validate the agent's execution on-the-fly.
+
+Wrapping this function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data is validated through your agents. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
+
+Let's take the example of research analyst and writer. We add a guardrail to validate the length of the generated report.
+
+```python
+# .... existing imports and weave initialization ....
+
+# Decorate your guardrail function with `@weave.op()`
+# highlight-next-line
+@weave.op(name="guardrail-validate_blog_content")
+def validate_blog_content(result: TaskOutput) -> Tuple[bool, Any]:
+    # Get raw string result
+    result = result.raw
+
+    """Validate blog content meets requirements."""
+    try:
+        # Check word count
+        word_count = len(result.split())
+        print("word_count", word_count)
+        if word_count > 200:
+            return (False, {
+                "error": "Blog content exceeds 200 words",
+                "code": "WORD_COUNT_ERROR",
+                "context": {"word_count": word_count}
+            })
+
+        # Additional validation logic here
+        return (True, result.strip())
+    except Exception as e:
+        return (False, {
+            "error": "Unexpected error during validation",
+            "code": "SYSTEM_ERROR"
+        })
+
+
+# .... existing agents and research analyst task ....
+
+writing_task = Task(
+    description='Write a detailed report based on the research under 200 words',
+    expected_output='The report should be easy to read and understand. Use bullet points where applicable.',
+    agent=writer,
+    # highlight-next-line
+    guardrail=validate_blog_content,
+)
+
+# .... existing code to run crew ....
+```
+
+By simply decorating the guardrail function with `@weave.op` we are able to keep track of the input and output to this function along with execution time, token information if an LLM is used under the hood, code version and more.
+
+[![guardrail.png](imgs/crewai/crew_with_guardrail.png)](https://wandb.ai/ayut/crewai_demo/weave/traces?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fayut%2Fcrewai_demo%2Fop%2Fcrewai.Crew.kickoff%3A*%22%5D%7D&peekPath=%2Fayut%2Fcrewai_demo%2Fcalls%2F0195c838-38cb-71a2-8a15-651ecddf9d89%3FdescendentCallId%3D0195c838-8632-7173-846d-f230e7272c20&cols=%7B%22wb_run_id%22%3Afalse%2C%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
+
+## Conclusion
+
+Do let us know what we should improve about this integration. Please open an issue if you encounter one [here](https://github.com/wandb/weave/issues/new/choose).
+
+Learn more about how to build powerful multiagent systems using CrewAI through their [many examples](https://github.com/crewAIInc/crewAI-examples) and [documentation](https://docs.crewai.com/introduction).
