@@ -105,18 +105,19 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       if (suggestion.isCustomDate) {
         return suggestion;
       }
-      
+
       const date = parseDate(suggestion.abbreviation)!;
-      
+
       // Format the date differently if time is 00:00:00
-      const onlyDate = date.getHours() === 0 && 
-                      date.getMinutes() === 0 && 
-                      date.getSeconds() === 0;
-      
-      const formattedDateTime = onlyDate 
-        ? formatDateOnly(date) 
+      const onlyDate =
+        date.getHours() === 0 &&
+        date.getMinutes() === 0 &&
+        date.getSeconds() === 0;
+
+      const formattedDateTime = onlyDate
+        ? formatDateOnly(date)
         : formatDate(date);
-      
+
       return {
         ...suggestion,
         absoluteDateTime: formattedDateTime,
@@ -196,16 +197,20 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   };
 
   const handleSuggestionClick = useCallback(
-    (suggestionValue: string, absoluteDateTime?: string, isCustomDate?: boolean) => {
+    (
+      suggestionValue: string,
+      absoluteDateTime?: string,
+      isCustomDate?: boolean
+    ) => {
       if (isCustomDate) {
         setIsCalendarOpen(true);
         return;
       }
-      
+
       // Use the absolute date time if provided, otherwise use the abbreviation
       const valueToUse = absoluteDateTime || suggestionValue;
       setInputValue(valueToUse);
-      
+
       // Skip debounce when selecting from suggestions
       parseAndUpdateDate(suggestionValue, true);
 
@@ -391,17 +396,19 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
                   '& .MuiPickersCalendarHeader-switchViewButton': {
                     color: TEAL_500,
                   },
-                  '& .MuiPickersYear-yearButton.MuiPickersYear-yearButton.MuiPickersYear-yearButton': {
-                    fontFamily: 'Source Sans Pro',
-                    '&.Mui-selected': {
+                  '& .MuiPickersYear-yearButton.MuiPickersYear-yearButton.MuiPickersYear-yearButton':
+                    {
+                      fontFamily: 'Source Sans Pro',
+                      '&.Mui-selected': {
+                        backgroundColor: TEAL_500,
+                        color: WHITE,
+                      },
+                    },
+                  '& .MuiButtonBase-root.MuiMultiSectionDigitalClockSection-item.MuiMultiSectionDigitalClockSection-item.Mui-selected':
+                    {
                       backgroundColor: TEAL_500,
                       color: WHITE,
                     },
-                  },
-                  '& .MuiButtonBase-root.MuiMultiSectionDigitalClockSection-item.MuiMultiSectionDigitalClockSection-item.Mui-selected': {
-                    backgroundColor: TEAL_500,
-                    color: WHITE,
-                  },
                 },
               },
               actionBar: {
@@ -448,7 +455,7 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
   onMouseLeave,
 }) => {
   const isCustomDate = suggestion.isCustomDate;
-  
+
   return (
     <li
       key={index}
@@ -477,17 +484,15 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           alignItems: 'center',
         }}>
         {isCustomDate ? (
-          <span style={{ display: 'flex', alignItems: 'center' }}>
-            <Icon name="date" style={{ marginRight: '4px', fontSize: '14px' }} />
+          <span style={{display: 'flex', alignItems: 'center'}}>
+            <Icon name="date" style={{marginRight: '4px', fontSize: '14px'}} />
             {suggestion.label}
           </span>
         ) : (
           <span>{suggestion.absoluteDateTime}</span>
         )}
         {!isCustomDate && (
-          <span style={{color: MOON_500}}>
-            {suggestion.abbreviation}
-          </span>
+          <span style={{color: MOON_500}}>{suggestion.abbreviation}</span>
         )}
       </div>
     </li>
@@ -500,7 +505,11 @@ type SuggestionsListProps = {
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
-  handleSuggestionClick: (suggestionValue: string, absoluteDateTime?: string, isCustomDate?: boolean) => void;
+  handleSuggestionClick: (
+    suggestionValue: string,
+    absoluteDateTime?: string,
+    isCustomDate?: boolean
+  ) => void;
   handleMouseEnter: (index: number) => void;
   handleMouseLeave: () => void;
 };
@@ -545,7 +554,13 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           index={index}
           isSelected={selectedSuggestion === suggestion.abbreviation}
           isHovered={hoveredIndex === index}
-          onClick={() => handleSuggestionClick(suggestion.abbreviation, suggestion.absoluteDateTime, suggestion.isCustomDate)}
+          onClick={() =>
+            handleSuggestionClick(
+              suggestion.abbreviation,
+              suggestion.absoluteDateTime,
+              suggestion.isCustomDate
+            )
+          }
           onMouseEnter={() => handleMouseEnter(index)}
           onMouseLeave={handleMouseLeave}
         />
