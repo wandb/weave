@@ -242,17 +242,34 @@ def split(self, pattern):
     output_type=ARROW_WEAVE_LIST_LIST_OF_STR_TYPE,
 )
 def partition(self, sep):
-    def data_iterator():
-        for i in range(len(self._arrow_data)):
-            item = self._arrow_data[i].as_py()
-            separator = sep if isinstance(sep, str) else sep._arrow_data[i].as_py()
-            if not (item is None or separator is None):
-                yield item.partition(separator)
-            else:
-                yield None
+    if sep is None:
+        return ArrowWeaveList(
+            pa.array([None] * len(self._arrow_data)),
+            types.optional(types.List(types.String())),
+            self._artifact,
+        )
+
+    if isinstance(sep, str):
+        return ArrowWeaveList(
+            pa.array(
+                [
+                    item.as_py().partition(sep) if item.as_py() is not None else None
+                    for item in self._arrow_data
+                ]
+            ),
+            types.optional(types.List(types.String())),
+            self._artifact,
+        )
 
     return ArrowWeaveList(
-        pa.array(data_iterator()),
+        pa.array(
+            [
+                item.as_py().partition(s.as_py())
+                if item.as_py() is not None and s.as_py() is not None
+                else None
+                for item, s in zip(self._arrow_data, sep._arrow_data)
+            ]
+        ),
         types.optional(types.List(types.String())),
         self._artifact,
     )

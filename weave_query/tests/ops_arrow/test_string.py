@@ -11,6 +11,7 @@ from weave_query.ops_arrow.string import (
     join_to_str,
     lower,
     lstrip,
+    partition,
     replace,
     rstrip,
     slice,
@@ -48,6 +49,62 @@ class TestLenOp:
         result = arrowweavelist_len.eager_call(awl)
         expected = [None, 0, 3, None]
         assert result._arrow_data.to_pylist() == expected
+
+
+class TestPartitionOp:
+    def _expected_partition(self, arrow_data, sep):
+        if sep is None:
+            return [None] * len(arrow_data)
+        return [
+            list(item.partition(sep)) if item is not None else None
+            for item in arrow_data
+        ]
+
+    def test_basic(self):
+        arrow_data = [
+            "hello world",
+            "hello there",
+            "goodbye",
+            None,
+        ]
+        partition_patterns = [" ", "e", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        for pattern in partition_patterns:
+            result = partition.eager_call(awl, pattern)
+            expected = self._expected_partition(arrow_data, pattern)
+            assert result.to_pylist_notags() == expected
+
+    def test_awl_sep(self):
+        sep_data = [" ", "e", "foo", None]
+        arrow_data = ["hello world", "hello there", None, "foo"]
+        sep = ArrowWeaveList(pa.array(sep_data), types.optional(types.String()))
+        awl = ArrowWeaveList(pa.array(arrow_data), types.optional(types.String()))
+        result = partition.eager_call(awl, sep)
+        expected = [
+            list(item.partition(s)) if item is not None and s is not None else None
+            for item, s in zip(arrow_data, sep_data)
+        ]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = [
+            "hello world",
+            "hello there",
+            "goodbye",
+        ]
+        sep = " "
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.optional(types.String()))
+        result = partition.eager_call(awl, sep)
+        expected = [
+            list("goodbye".partition(" ")),
+            list("hello there".partition(" ")),
+            list("hello world".partition(" ")),
+            list("goodbye".partition(" ")),
+        ]
+        assert result.to_pylist_notags() == expected
 
 
 class TestStartsWithOp:
