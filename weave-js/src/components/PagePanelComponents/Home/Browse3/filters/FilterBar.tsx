@@ -275,6 +275,9 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  // Determine if we should show a border based on whether there are active filters
+  const hasBorder = completeItems.length > 0;
+
   const {combinedItems, activeEditIds} = useMemo(() => {
     const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
     return {combinedItems: items, activeEditIds: activeIds};
@@ -284,12 +287,20 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+          hasBorder
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-700 dark:hover:border-teal-300 dark:hover:ring-teal-300'
+            : ''
+        } ${
+          !hasBorder
+            ? 'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400'
+            : ''
+        }`}
         onClick={onClick}>
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none">
+        <div ref={refLabel} className="select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>

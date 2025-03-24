@@ -69,6 +69,7 @@ docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
+crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 groq = ["groq>=0.13.0"]
@@ -255,7 +256,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.38-dev0"
+current_version = "0.51.39-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
