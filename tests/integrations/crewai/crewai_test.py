@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from weave.integrations.integration_utilities import (
@@ -36,7 +34,7 @@ def get_crew():
 
 
 def get_flow_with_router_or():
-    from crewai.flow.flow import Flow, listen, router, start, or_, and_
+    from crewai.flow.flow import Flow, listen, or_, router, start
     from pydantic import BaseModel
 
     # Define structured state
@@ -55,14 +53,18 @@ def get_flow_with_router_or():
             # In a real app, this might come from an API
             self.state.ticket_id = "TKT-12345"
             self.state.customer_name = "Alex Johnson"
-            self.state.issue_description = "Unable to access premium features after payment"
+            self.state.issue_description = (
+                "Unable to access premium features after payment"
+            )
             return "Ticket received"
 
         @listen(receive_ticket)
         def categorize_ticket(self, _):
             # Use a direct LLM call for categorization
-            from crewai import LLM
             import os
+
+            from crewai import LLM
+
             api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
             print(api_key)
             llm = LLM(model="openai/gpt-4o-mini", api_key=api_key)
@@ -101,7 +103,7 @@ def get_flow_with_router_or():
             self.state.priority = "high"
             # More access-specific processing...
             return "Access issue handled"
-        
+
         @listen(or_("billing", "account_access"))
         def resolve_ticket(self, resolution_info):
             # Final resolution step
@@ -386,9 +388,19 @@ def test_simple_flow(client: WeaveClient) -> None:
 
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    
+
     assert len(flattened_calls) == 9
-    assert flattened_calls_to_names(flattened_calls) == [('crewai.Flow.kickoff', 0), ('crewai.Flow.kickoff_async', 1), ('crewai.flow.flow.start', 2), ('crewai.flow.flow.listen', 2), ('crewai.LLM.call', 3), ('litellm.completion', 4), ('openai.chat.completions.create', 5), ('crewai.flow.flow.router', 2), ('crewai.flow.flow.listen', 2)]
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("crewai.Flow.kickoff", 0),
+        ("crewai.Flow.kickoff_async", 1),
+        ("crewai.flow.flow.start", 2),
+        ("crewai.flow.flow.listen", 2),
+        ("crewai.LLM.call", 3),
+        ("litellm.completion", 4),
+        ("openai.chat.completions.create", 5),
+        ("crewai.flow.flow.router", 2),
+        ("crewai.flow.flow.listen", 2),
+    ]
 
     call_0, _ = flattened_calls[0]
     assert call_0.exception is None
@@ -412,5 +424,3 @@ def test_simple_flow(client: WeaveClient) -> None:
     outputs = call_1.output
     print(inputs)
     print(outputs)
-    
-
