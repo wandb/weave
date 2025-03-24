@@ -567,6 +567,41 @@ class TestSplitOp:
         expected = [["a", "b", "c"], ["a", "", "b", "c"], ["abc"], [""], None]
         assert result.to_pylist_notags() == expected
 
+    def test_vectorized_pattern(self):
+        arrow_data = [
+            "a,b,c",
+            "a|b|c",
+            "a^b^c",
+            None,
+        ]
+        pattern = [",", "|", "^", "|"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        pattern_awl = ArrowWeaveList(pa.array(pattern), types.String())
+        result = split.eager_call(awl, pattern_awl)
+
+        expected = [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"], None]
+        assert result.to_pylist_notags() == expected
+
+    def test_vectorized_item_ignored(self):
+        arrow_data = ["a,b,c", "a|b|c", "a^b^c", None, "foo"]
+        pattern = [",", "|", "^", "|"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        pattern_awl = ArrowWeaveList(pa.array(pattern), types.String())
+        result = split.eager_call(awl, pattern_awl)
+
+        expected = [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"], None]
+        assert result.to_pylist_notags() == expected
+
+    def test_vectorized_pattern_ignored(self):
+        arrow_data = ["a,b,c", "a|b|c", "a^b^c", None]
+        pattern = [",", "|", "^", "|", "/"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        pattern_awl = ArrowWeaveList(pa.array(pattern), types.String())
+        result = split.eager_call(awl, pattern_awl)
+
+        expected = [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"], None]
+        assert result.to_pylist_notags() == expected
+
     def test_split_dictionary_array(self):
         arrow_data = [
             "a,b,c",

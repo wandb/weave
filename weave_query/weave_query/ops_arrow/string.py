@@ -206,30 +206,19 @@ def prepend(self, other):
     output_type=ARROW_WEAVE_LIST_LIST_OF_STR_TYPE,
 )
 def split(self, pattern):
-    if isinstance(pattern, str):
-        if isinstance(self._arrow_data, pa.DictionaryArray):
-            # If we have a dictionary array, we need to split the dictionary and
-            # then re-encode it as a dictionary array.
-            return ArrowWeaveList(
-                pa.DictionaryArray.from_arrays(
-                    self._arrow_data.indices,
-                    pc.split_pattern(self._arrow_data.dictionary, pattern),
-                ),
-                types.optional(types.List(types.String())),
-                self._artifact,
+    def _split(arrow_data):
+        if isinstance(pattern, str):
+            return pc.split_pattern(arrow_data, pattern)
+        else:
+            return pa.array(
+                item.as_py().split(p.as_py())
+                if item.as_py() is not None and p.as_py() is not None
+                else None
+                for item, p in zip(arrow_data, pattern._arrow_data)
             )
-        return ArrowWeaveList(
-            pc.split_pattern(self._arrow_data, pattern),
-            types.optional(types.List(types.String())),
-            self._artifact,
-        )
-    return ArrowWeaveList(
-        pa.array(
-            self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
-            for i in range(len(self._arrow_data))
-        ),
-        types.optional(types.List(types.String())),
-        self._artifact,
+
+    return util.handle_dictionary_array(
+        self, _split, types.optional(types.List(types.String()))
     )
 
 
