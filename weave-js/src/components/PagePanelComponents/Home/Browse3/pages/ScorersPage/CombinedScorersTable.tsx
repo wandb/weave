@@ -7,12 +7,10 @@ import {
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Icon, IconNames} from '@wandb/weave/components/Icon';
 import {UserLink} from '@wandb/weave/components/UserLink';
-import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {Pill} from '../../../../../Tag';
 import {Timestamp} from '../../../../../Timestamp';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
@@ -26,10 +24,7 @@ import {
   prepareFlattenedDataForTable,
 } from '../common/tabularListViews/columnBuilder';
 import {useURLSearchParamsDict} from '../util';
-import {
-  KNOWN_BASE_OBJECT_CLASSES,
-  OBJECT_ATTR_EDGE_NAME,
-} from '../wfReactInterface/constants';
+import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   isTableRef,
@@ -58,7 +53,7 @@ const ScorerObjectVersionsTable: React.FC<{
     const flat = prepareFlattenedDataForTable(vals);
 
     return props.objectVersions.map((ov, i) => {
-      let val = flat[i];
+      const val = flat[i];
       return {
         id: objectVersionKeyToRefUri(ov),
         obj: {

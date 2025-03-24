@@ -2,21 +2,13 @@ import {Box, Typography} from '@material-ui/core';
 import {MOON_200, MOON_300} from '@wandb/weave/common/css/color.styles';
 import {Link} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
-import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
-import React, {
-  FC,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import {IconName, IconNames} from '@wandb/weave/components/Icon';
+import React, {FC, useCallback, useState} from 'react';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
-import {AutocompleteWithLabel} from './FormComponents';
 import * as LLMJudgeScorerForm from './LLMJudgeScorerForm';
 import {ProgrammaticScorerForm, ScorerFormProps} from './ScorerForms';
 
@@ -69,10 +61,6 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     },
   },
 };
-
-const scorerTypeOptions: OptionType[] = Object.values(scorerTypeRecord).map(
-  ({label, value, icon}) => ({label, value, icon})
-);
 
 interface NewScorerDrawerProps {
   entity: string;

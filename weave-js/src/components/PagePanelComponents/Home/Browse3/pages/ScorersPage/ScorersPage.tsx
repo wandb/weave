@@ -4,19 +4,14 @@ import React, {useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CombinedScorersTable} from './CombinedScorersTable';
-import {
-  HUMAN_ANNOTATION_VALUE,
-  NewScorerDrawer,
-  ScorerType,
-  scorerTypeRecord,
-} from './NewScorerDrawer';
+import {NewScorerDrawer, ScorerType, scorerTypeRecord} from './NewScorerDrawer';
 
 export const ScorersPage: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedScorerType, setSelectedScorerType] = useState<ScorerType>(
+  const [selectedScorerType] = useState<ScorerType>(
     scorerTypeRecord.ANNOTATION.value
   );
 
