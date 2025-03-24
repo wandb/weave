@@ -208,9 +208,9 @@ export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
 };
 
 export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
-  icon: 'forum-chat-bubble' as const,
+  icon: 'type-number-alt' as const,
   heading: 'No annotations yet',
-  description: 'Create annotations in the UI or python.',
+  description: 'Create annotations in the UI or Python.',
   moreInformation: (
     <>
       More information about creating and using annotation specifications for

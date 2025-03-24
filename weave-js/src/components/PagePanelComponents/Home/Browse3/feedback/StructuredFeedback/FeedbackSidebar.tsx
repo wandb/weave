@@ -128,7 +128,7 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mr-10 mt-12 items-center justify-center">
+        <div className="px-12 mt-12 items-center justify-center">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
