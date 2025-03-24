@@ -85,7 +85,7 @@ export type CardAction = {
   id: string;
 };
 
-const DEFAULT_CARD_ACTIONS: CardAction[] = [
+export const DEFAULT_CARD_ACTIONS: CardAction[] = [
   {
     id: 'config',
     title: 'Explore configuration',

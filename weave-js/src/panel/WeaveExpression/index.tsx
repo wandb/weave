@@ -301,15 +301,15 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
               </S.ApplyButton>
             </Ref>
           )}
+          {!props.frozen && (
+            <Suggestions
+              forceHidden={!showSuggestions}
+              {...suggestions}
+              suggestionIndex={suggestionIndex}
+              setSuggestionIndex={setSuggestionIndex}
+            />
+          )}
         </S.EditableContainer>
-        {!props.frozen && (
-          <Suggestions
-            forceHidden={!showSuggestions}
-            {...suggestions}
-            suggestionIndex={suggestionIndex}
-            setSuggestionIndex={setSuggestionIndex}
-          />
-        )}
       </Slate>
     </Container>
   );

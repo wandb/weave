@@ -13,6 +13,7 @@ import {EmptyExpressionPanel} from '../EmptyExpressionPanel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
+import {PanelShortcuts} from '../PanelShortcuts';
 import {ExpressionEditorActions} from './actions';
 import type {PanelExpressionProps} from './common';
 import {ConfigComponent} from './ConfigComponent';
@@ -81,6 +82,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
     <ThemeProvider theme={themes.light}>
       <S.Main>
         <S.EditorBar style={{pointerEvents: isLoading ? 'none' : 'auto'}}>
+          <PanelShortcuts setEditorValue={setEditorValue} />
           {
             <div style={{width: '100%'}}>
               <Menu
