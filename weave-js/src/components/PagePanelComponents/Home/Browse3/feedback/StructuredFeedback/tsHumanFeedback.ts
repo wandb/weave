@@ -12,7 +12,11 @@ import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 export const useHumanAnnotationSpecs = (
   entity: string,
   project: string
-): {humanAnnotationSpecs: tsHumanAnnotationSpec[]; specsLoading: boolean} => {
+): {
+  humanAnnotationSpecs: tsHumanAnnotationSpec[];
+  specsLoading: boolean;
+  refetch: () => void;
+} => {
   const req: TraceObjQueryReq = {
     project_id: projectIdFromParts({entity, project}),
     filter: {
@@ -31,7 +35,11 @@ export const useHumanAnnotationSpecs = (
 
   return useMemo(() => {
     if (cols == null) {
-      return {humanAnnotationSpecs: [], specsLoading: res.loading};
+      return {
+        humanAnnotationSpecs: [],
+        specsLoading: res.loading,
+        refetch: res.refetch,
+      };
     }
     return {
       humanAnnotationSpecs: cols.map(col => ({
@@ -48,6 +56,7 @@ export const useHumanAnnotationSpecs = (
         }),
       })),
       specsLoading: res.loading,
+      refetch: res.refetch,
     };
-  }, [cols, entity, project, res.loading]);
+  }, [cols, entity, project, res.loading, res.refetch]);
 };

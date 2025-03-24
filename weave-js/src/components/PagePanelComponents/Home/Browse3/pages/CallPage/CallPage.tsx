@@ -280,7 +280,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
     }
   }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
 
-  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
+  const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
     focusedCall.entity,
     focusedCall.project
   );
@@ -336,6 +336,8 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
               callID={focusedCallId}
               entity={focusedCall.entity}
               project={focusedCall.project}
+              onReloadSpecs={refetch}
+              onClose={() => setShowFeedback(false)}
             />
           </div>
         </Tailwind>

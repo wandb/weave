@@ -254,7 +254,7 @@ export const ReactionsLoaded = ({
             )}
             {onToggleFeedback && (
               <WeaveTooltip
-                content={`${showFeedback ? 'Hide' : 'Show'} feedback sidebar`}
+                content={`${showFeedback ? 'Hide' : 'Show'} annotation sidebar`}
                 trigger={
                   <Button
                     icon="marker"

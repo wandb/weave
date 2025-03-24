@@ -24,6 +24,8 @@ type FeedbackSidebarProps = {
   callID: string;
   entity: string;
   project: string;
+  onReloadSpecs?: () => void;
+  onClose?: () => void;
 };
 
 export const FeedbackSidebar = ({
@@ -32,6 +34,8 @@ export const FeedbackSidebar = ({
   callID,
   entity,
   project,
+  onReloadSpecs,
+  onClose,
 }: FeedbackSidebarProps) => {
   const history = useHistory();
   const router = useWeaveflowRouteContext().baseRouter;
@@ -109,9 +113,17 @@ export const FeedbackSidebar = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="justify-left flex w-full p-12">
-        <div className="text-lg font-semibold">Feedback</div>
-        <div className="flex-grow" />
+      <div className="justify-between flex items-center w-full px-12 min-h-[32px]">
+        <div className="text-sm font-semibold">Annotations</div>
+        {onClose && (
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="small"
+            icon="close"
+            aria-label="Close feedback sidebar"
+          />
+        )}
       </div>
       <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
@@ -162,6 +174,7 @@ export const FeedbackSidebar = ({
             onClose={() => {
               setIsNewScorerDrawerOpen(false);
               query.refetch();
+              onReloadSpecs?.();
             }}
             initialScorerType="ANNOTATION"
           />
@@ -199,7 +212,7 @@ const HumanAnnotationInputs = ({
   return (
     <div>
       {humanAnnotationSpecs?.map((field, index) => (
-        <div key={field.ref} className="px-16">
+        <div key={field.ref} className="px-8">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
             <div className="bg-gray-50 font-italic text-sm text-moon-700 ">
