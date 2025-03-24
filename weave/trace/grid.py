@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import csv
+import html
 import locale
 import os
 import sys
 import termios
 import tty
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from importlib.util import find_spec
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from rich.console import Console
 from rich.table import Table
@@ -28,6 +31,10 @@ locale.setlocale(locale.LC_ALL, "")
 ColumnType = Literal["str", "int", "bool"]
 ColumnValues = list[Any]
 RowValues = list[Any]
+
+
+def has_pandas() -> bool:
+    return find_spec("pandas") is not None
 
 
 @dataclass
@@ -183,6 +190,10 @@ class Row:
             ]
             p.text(f"Row({', '.join(items)})")
 
+    def _repr_html_(self) -> str:
+        tds = ["<td>" + html.escape(str(c)) + "</td>" for c in self.to_list()]
+        return "<tr>" + "".join(tds) + "</tr>"
+
 
 class Column:
     grid: Grid
@@ -191,6 +202,22 @@ class Column:
     def __init__(self, grid: Grid, column_id: str) -> None:
         self.grid = grid
         self.column_id = column_id
+
+    @property
+    def index(self) -> int:
+        """Get the index of this column in the grid.
+
+        Returns:
+            The index of this column
+
+        Raises:
+            KeyError: If the column is not found in the grid
+        """
+        col_index = self.grid._column_id_to_index.get(self.column_id)
+        if col_index is None:
+            raise KeyError(f"Column '{self.column_id}' not found")
+        return col_index
+
 
     def rename(self, label: str) -> Column:
         """Rename the column."""
@@ -292,6 +319,16 @@ class Column:
         else:
             p.text(self.to_rich_table_str())
 
+    def _repr_html_(self) -> str:
+        thead = f"<thead><tr><th>{self.column_id}</th></tr></thead>"
+        trs = [f"<tr><td>{html.escape(str(c))}</td></tr>" for c in self.to_list()]
+        return (
+            "<table>"
+            + thead
+            + "<tbody>"
+            + "\n".join(trs)
+            + "</tbody></table>"
+        )
 
 class Grid:
     columns: list[ColumnDefinition]
@@ -302,6 +339,26 @@ class Grid:
         self.columns = []
         self.rows = []
         self._column_id_to_index = {}
+
+    def __iter__(self) -> Iterator[Row]:
+        """Allow iterating over the grid, yielding Row objects.
+
+        Returns:
+            An iterator that yields Row objects for each row in the grid.
+        """
+        for i in range(len(self.rows)):
+            yield self.get_row(i)
+
+    def column_index(self, column_id: str) -> int:
+        """Get the index of a column by its ID.
+
+        Args:
+            column_id: The ID of the column to find
+
+        Returns:
+            The index of the column if found, or -1 if the column doesn't exist
+        """
+        return self._column_id_to_index.get(column_id, -1)
 
     def set_cell_value(self, row_index: int, column: str | int, value: Any) -> Grid:
         """Set the value of a specific cell in the grid.
@@ -466,6 +523,17 @@ class Grid:
             )
         return Column(self, column_id)
 
+    def map_column(self, key: str | int, func: Callable[[Any], Any]) -> Grid:
+        return self.map_columns([key], func)
+
+    def map_columns(self, keys: list[str | int], func: Callable[[Any], Any]) -> Grid:
+        # TODO: Need to think about how this interacts with column types
+        for key in keys:
+            idx = key if isinstance(key, int) else self.column_index(key)
+            for row in self.rows:
+                row[idx] = func(row[idx])
+        return self
+
     def __getitem__(self, key: str | int | slice) -> Column | Row | Grid:
         """
         Allow accessing column values using grid['column_name'] syntax,
@@ -526,6 +594,40 @@ class Grid:
             p.text("Grid(...)")
         else:
             p.text(self.to_rich_table_str())
+
+    def _repr_html_(self) -> str:
+        # Create the header row with column names
+        thead = (
+            "<thead><tr>"
+            + "".join(
+                [
+                    f'<th style="text-align: left;">{html.escape(col.display_name)}</th>'
+                    for col in self.columns
+                ]
+            )
+            + "</tr></thead>"
+        )
+
+        # Create the body rows
+        trs = [r._repr_html_() for r in self]
+
+        caption = ""
+        if len(trs) == 0:
+            caption = '<caption style="white-space: nowrap">No rows</caption>'
+        # TODO: Considered giving user a caption recommending to_pandas() for interactivity,
+        # but it gets annoying
+        # elif has_pandas() and util.is_marimo():
+        #     caption = '<caption style="white-space: nowrap">Use <code>to_pandas()</code> for an interactive display.</caption>'
+
+        # Combine header and body into a complete table
+        return (
+            "<table>"
+            + caption
+            + thead
+            + "<tbody>"
+            + "\n".join(trs)
+            + "</tbody></table>"
+        )
 
     def to_rich_table_str(self) -> str:
         table = self.to_rich_table()

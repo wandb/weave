@@ -6,6 +6,7 @@ import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInte
 const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Prompt: 'purple',
   Model: 'blue',
+  Dashboard: 'teal',
   Dataset: 'green',
   Evaluation: 'cactus',
   Leaderboard: 'gold',

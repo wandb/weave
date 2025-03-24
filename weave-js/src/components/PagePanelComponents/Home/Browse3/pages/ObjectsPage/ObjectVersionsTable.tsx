@@ -21,6 +21,7 @@ import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
   EMPTY_PROPS_ANNOTATIONS,
+  EMPTY_PROPS_DASHBOARDS,
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
@@ -436,7 +437,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   if (isEmpty) {
     let propsEmpty = EMPTY_PROPS_OBJECTS;
     const base = props.initialFilter?.baseObjectClass;
-    if ('Prompt' === base) {
+    if ('Dashboard' === base) {
+      propsEmpty = EMPTY_PROPS_DASHBOARDS;
+    } else if ('Prompt' === base) {
       propsEmpty = EMPTY_PROPS_PROMPTS;
     } else if ('Model' === base) {
       propsEmpty = EMPTY_PROPS_MODEL;

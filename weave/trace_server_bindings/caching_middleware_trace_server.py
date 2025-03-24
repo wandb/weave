@@ -421,6 +421,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         return self._next_trace_server.feedback_replace(req)
 
+    def query_execute(self, req: tsi.QueryExecuteReq) -> tsi.QueryExecuteRes:
+        return self._next_trace_server.query_execute(req)
+
     # Action API
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq

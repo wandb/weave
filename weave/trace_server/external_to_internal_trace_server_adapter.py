@@ -365,6 +365,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 cost["pricing_level_id"] = original_project_id
         return res
 
+    def query_execute(self, req: tsi.QueryExecuteReq) -> tsi.QueryExecuteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.query_execute(req)
+
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:

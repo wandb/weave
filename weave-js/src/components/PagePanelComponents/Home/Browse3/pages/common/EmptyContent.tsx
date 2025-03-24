@@ -118,6 +118,21 @@ export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_DASHBOARDS: EmptyProps = {
+  icon: 'chart-pie' as const,
+  heading: 'No dashboards yet',
+  description: 'Build dashboards to visualize your data.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_dashboards">
+        dashboard basics
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
 export const EMPTY_PROPS_PROMPTS: EmptyProps = {
   icon: 'forum-chat-bubble' as const,
   heading: 'No prompts yet',

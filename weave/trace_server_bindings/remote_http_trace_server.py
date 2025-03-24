@@ -509,6 +509,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
         )
 
+    def query_execute(
+        self, req: Union[tsi.QueryExecuteReq, dict[str, Any]]
+    ) -> tsi.QueryExecuteRes:
+        return self._generic_request(
+            "/query/execute", req, tsi.QueryExecuteReq, tsi.QueryExecuteRes
+        )
+
     def actions_execute_batch(
         self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
     ) -> tsi.ActionsExecuteBatchRes:

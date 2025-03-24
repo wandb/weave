@@ -5,6 +5,7 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
 from weave.trace_server.interface.builtin_object_classes.base_object_def import (
     BaseObject,
 )
+from weave.trace_server.interface.builtin_object_classes.dashboard import Dashboard
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
@@ -30,6 +31,7 @@ def register_base_object(cls: type[BaseObject]) -> None:
 
 register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
+register_base_object(Dashboard)
 register_base_object(Leaderboard)
 register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)

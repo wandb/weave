@@ -153,6 +153,15 @@ def is_notebook() -> bool:
     return True
 
 
+def is_marimo() -> bool:
+    try:
+        import marimo
+
+        return marimo.running_in_notebook()
+    except Exception:
+        return False
+
+
 def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to mark a function as deprecated and redirect users to `new_name`."""
 

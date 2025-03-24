@@ -802,6 +802,20 @@ class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
+class QueryExecuteReq(BaseModel):
+    project_id: str
+    query: str
+    parameters: Optional[dict[str, Any]] = None
+
+
+class QueryExecuteRes(BaseModel):
+    prepared: str
+    error: Optional[str] = None
+    column_names: list[str] = []
+    column_types: list[str] = []
+    rows: list[Any] = []
+
+
 class FileCreateReq(BaseModel):
     project_id: str
     name: str
@@ -970,6 +984,9 @@ class TraceServerInterface(Protocol):
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
+
+    # Query API
+    def query_execute(self, req: QueryExecuteReq) -> QueryExecuteRes: ...
 
     # Action API
     def actions_execute_batch(

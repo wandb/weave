@@ -181,6 +181,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Dashboards',
+            slug: 'weave/dashboards',
+            isShown: isWeaveOnly,
+            iconName: IconNames.ChartPie,
+          },
+          {
+            type: 'button' as const,
             name: 'Prompts',
             slug: 'weave/prompts',
             isShown: isWeaveOnly,
@@ -249,6 +256,7 @@ export const useProjectSidebar = (
             key: 'moreWeaveBoth',
             isShown: isShowAll,
             menu: [
+              'weave/dashboards',
               'weave/prompts',
               'weave/models',
               'weave/datasets',

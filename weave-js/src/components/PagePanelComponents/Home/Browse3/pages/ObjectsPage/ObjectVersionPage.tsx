@@ -49,6 +49,7 @@ import {
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
+import {TabDashboard} from './Tabs/TabDashboard';
 import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
@@ -60,6 +61,7 @@ type ObjectIconProps = {
 const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
+  Dashboard: 'chart-pie',
   Dataset: 'table',
   Evaluation: 'baseline-alt',
   EvaluationResults: 'baseline-alt',
@@ -150,6 +152,7 @@ const ObjectVersionPageInner: React.FC<{
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
+  const showDashboardTab = objectVersion.val._class_name === 'Dashboard';
   const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
 
   const minimalColumns = useMemo(() => {
@@ -361,6 +364,26 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showDashboardTab
+          ? [
+              {
+                label: 'Dashboard',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabDashboard
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         ...(showPromptTab
           ? [
               {

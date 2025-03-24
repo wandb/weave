@@ -58,6 +58,7 @@ export const objectRefDisplayName = (
 const ICON_MAP: Record<string, IconName> = {
   ActionSpec: IconNames.RocketLaunch,
   AnnotationSpec: IconNames.ForumChatBubble,
+  Dashboard: IconNames.ChartPie,
   Dataset: IconNames.Table,
   Evaluation: IconNames.BaselineAlt,
   Leaderboard: IconNames.BenchmarkSquare,

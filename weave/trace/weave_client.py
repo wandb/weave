@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+import textwrap
 import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
@@ -26,6 +27,7 @@ from typing import (
 
 import pydantic
 from requests import HTTPError
+from rich import print as rprint
 
 from weave import version
 from weave.trace import trace_sentry, urls
@@ -34,6 +36,7 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.grid import Grid
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -111,6 +114,7 @@ from weave.trace_server.trace_server_interface import (
     ObjSchema,
     ObjSchemaForInsert,
     Query,
+    QueryExecuteReq,
     RefsReadBatchReq,
     SortBy,
     StartedCallSchemaForInsert,
@@ -1457,6 +1461,113 @@ class WeaveClient:
         return self.get_feedback(
             query=query, reaction=reaction, offset=offset, limit=limit
         )
+
+    def query(self, query: str, params: dict | None = None) -> Grid:
+        project_id = self._project_id()
+        response = self.server.query_execute(
+            QueryExecuteReq(
+                project_id=project_id,
+                query=query,
+                params=params,
+            )
+        )
+        if response.error:
+            rprint(f"[red]Error: {response.error}[/]\n")
+        if os.environ.get("WEAVE_DEBUG_QUERY") == "1":
+            print("Parsed query:")
+            print(textwrap.indent(response.prepared, "    "))
+        grid = Grid()
+        for col in response.column_names:
+            grid.add_column(col)
+        for row in response.rows:
+            grid.add_row(row)
+        return grid
+
+    def query_english(self, query: str) -> Grid:
+        from openai import OpenAI
+        from pydantic import BaseModel
+
+        client = OpenAI()
+
+        class SelectStatement(BaseModel):
+            sql: str
+
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-2024-08-06",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are a helpful assistant that translates english into a SQL query in the ClickHouse dialect.
+You must return exactly one SQL SELECT statement. You must use only the table and columns specified below.
+
+The schema you have to work with is:
+
+Table: calls
+
+Columns:
+project_id	String
+id	String
+trace_id	SimpleAggregateFunction(any, Nullable(String))
+parent_id	SimpleAggregateFunction(any, Nullable(String))
+op_name	SimpleAggregateFunction(any, Nullable(String))
+started_at	SimpleAggregateFunction(any, Nullable(DateTime64(6)))
+attributes_dump	SimpleAggregateFunction(any, Nullable(String))
+inputs_dump	SimpleAggregateFunction(any, Nullable(String))
+input_refs	SimpleAggregateFunction(groupArrayArray, Array(String))
+ended_at	SimpleAggregateFunction(any, Nullable(DateTime64(6)))
+output_dump	SimpleAggregateFunction(any, Nullable(String))
+summary_dump	SimpleAggregateFunction(any, Nullable(String))
+exception	SimpleAggregateFunction(any, Nullable(String))
+output_refs	SimpleAggregateFunction(groupArrayArray, Array(String))
+wb_user_id	SimpleAggregateFunction(any, Nullable(String))
+wb_run_id	SimpleAggregateFunction(any, Nullable(String))
+deleted_at	SimpleAggregateFunction(any, Nullable(DateTime64(3)))
+display_name	AggregateFunction(argMax, Nullable(String), DateTime64(3))
+""",
+                },
+                {"role": "user", "content": query},
+            ],
+            response_format=SelectStatement,
+        )
+
+        statement = completion.choices[0].message.parsed
+        return self.query(statement.sql)
+
+    #         from pydantic import BaseModel
+    #         import openai
+    #         from openai import OpenAI
+
+    #         class SelectStatement(BaseModel):
+    #             query: str
+
+    #         client = OpenAI()
+    #         result = client.beta.chat.completions.parse(
+    #             model="gpt-4o-mini",
+    #             messages=[
+    #                 {
+    #                     "role": "system",
+    #                 },
+    #                 {
+    #                     "role": "user",
+    #                     "content": query
+    #                 }
+    #             ],
+    #             response_format={"type": "json_object", "schema": SelectStatement.model_json_schema()},
+    #         )
+    #         choice = result.choices[0]
+    #         print(choice)
+    #         message = choice.message
+    #         print(message)
+    #         parsed = message.parsed
+    #         print(type(parsed))
+    #         print(parsed)
+    #         return None
+    #         # statement = SelectStatement.model_validate_json(choice.message.content)
+    # print(type(statement))
+    # print(f"{statement=}")
+    # print(statement.query)
+    #        return self.query(statement.query)
 
     def add_cost(
         self,

@@ -100,6 +100,7 @@ from weave.trace_server.objects_query_builder import (
     make_objects_val_query_and_parameters,
 )
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.query import prepare_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -1621,6 +1622,51 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=create_result.wb_user_id,
             payload=create_result.payload,
         )
+
+    def query_execute(self, req: tsi.QueryExecuteReq) -> tsi.QueryExecuteRes:
+        print("in clickhouse trace server")
+        print(req)
+        pb = ParamBuilder()
+        prepared = prepare_query(req.query, req.project_id)
+        print(prepared)
+        # query_result = self._query(
+        #     # "SELECT * FROM calls_merged WHERE project_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk0ODkwMjc=' LIMIT 10",
+        #     prepared,
+        #     pb.get_params(),
+        # )
+        try:
+            query_result = self.ch_client.query(prepared)
+        except clickhouse_connect.driver.exceptions.ClickHouseError as e:
+            # print(f"ClickHouse error: {e}")
+            # print(type(e))
+            # print(dir(e))
+            # print("str")
+            # print(str(e))
+            # print("repr")
+            # print(repr(e))
+            return tsi.QueryExecuteRes(prepared=prepared, error=str(e))
+
+        # print(query_result)
+        # print(query_result.row_count)
+        # print(dir(query_result))
+        colnames = [str(n) for n in query_result.column_names]
+        # print(colnames)
+        coltypes = [str(t) for t in query_result.column_types]
+        # first_type = coltypes[0]
+        # print(first_type)
+        # print(type(first_type))
+        # print(dir(first_type))
+        # print(coltypes)
+        rows = list(query_result.result_rows)
+        # print(rows)
+        # print(query_result.summary)
+        res = tsi.QueryExecuteRes(
+            prepared=prepared,
+            column_names=colnames,
+            column_types=coltypes,
+            rows=rows,
+        )
+        return res
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
