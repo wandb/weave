@@ -7,6 +7,7 @@ from weave_query.ops_arrow.string import (
     isalnum,
     isalpha,
     isnumeric,
+    join_to_str,
     lower,
     lstrip,
     replace,
@@ -415,6 +416,63 @@ class TestSplitOp:
             ["abc"],
             ["a", "", "b", "c"],
         ]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestJoinToStrOp:
+    def _expected_join(self, arrow_data, sep):
+        if arrow_data is None:
+            return ""
+        arrow_data = [item if item is not None else "" for item in arrow_data]
+        return sep.join(arrow_data)
+
+    def test_basic(self):
+        arrow_data = [
+            ["a", "b", "c"],
+            ["a", "", "b", "c"],
+            ["abc"],
+            [],
+            [None],
+            [None, None],
+            ["a", None, "c"],
+            ["1", "2", "3"],
+            None,
+        ]
+        separators = [",", "|", " ", "||", "\n", "\t", ""]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.List(types.String()))
+
+        for sep in separators:
+            result = join_to_str.eager_call(awl, sep)
+            expected = [self._expected_join(item, sep) for item in arrow_data]
+            assert result.to_pylist_notags() == expected
+
+    def test_sep_is_awl(self):
+        arrow_data = [
+            ["a", "b", "c"],
+            ["a", "", "b", "c"],
+            ["abc"],
+        ]
+        sep = ArrowWeaveList(pa.array([",", "|", " "]), types.String())
+        awl = ArrowWeaveList(pa.array(arrow_data), types.List(types.String()))
+        result = join_to_str.eager_call(awl, sep)
+
+        expected = ["a,b,c", "a||b|c", "abc"]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = [
+            ["a", "b", "c"],
+            ["x", "y", "z"],
+            ["1", "2", "3"],
+        ]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.List(types.String()))
+        sep = ","
+        result = join_to_str.eager_call(awl, sep)
+
+        expected = ["1,2,3", "x,y,z", "a,b,c", "1,2,3"]
         assert result._arrow_data.to_pylist() == expected
 
 

@@ -419,14 +419,16 @@ def rstrip(self):
 def join_to_str(arr, sep):
     if isinstance(sep, ArrowWeaveList):
         sep = sep._arrow_data
-    # match Weave0 - join nulls to empty string
-    filled_arr = pa.ListArray.from_arrays(
-        offsets_starting_at_zero(arr._arrow_data),
-        arr._arrow_data.flatten().fill_null(""),
-    )
-    return ArrowWeaveList(
-        pc.binary_join(filled_arr, sep), types.String(), arr._artifact
-    )
+
+    def _join_to_str(arrow_data):
+        # match Weave0 - join nulls to empty string
+        filled_arr = pa.ListArray.from_arrays(
+            offsets_starting_at_zero(arrow_data),
+            arrow_data.flatten().fill_null(""),
+        )
+        return pc.binary_join(filled_arr, sep)
+
+    return util.handle_dictionary_array(arr, _join_to_str, types.String())
 
 
 @arrow_op(
