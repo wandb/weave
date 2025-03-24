@@ -1,7 +1,6 @@
 # CrewAI
 
-TODO: add correct colab link
-<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_crewai.ipynb">
+<a target="_blank" href="https://colab.research.google.com/drive/1t8qlH99j-cCU2CceyGQQQY-p4oDbegxd?usp=sharing">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
