@@ -35,8 +35,8 @@ export const ScorersPage: React.FC<{
           <Button
             icon={IconNames.AddNew}
             onClick={() => setIsModalOpen(true)}
-            variant="secondary">
-            Create scorer
+            variant="ghost">
+            New scorer
           </Button>
         }
         headerContent={undefined}
