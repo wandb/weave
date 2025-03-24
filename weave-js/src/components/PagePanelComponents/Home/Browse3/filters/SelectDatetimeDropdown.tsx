@@ -26,6 +26,8 @@ import {
 type PredefinedSuggestion = {
   abbreviation: string;
   label: string;
+  absoluteDateTime?: string;
+  isCustomDate?: boolean;
 };
 
 const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
@@ -35,6 +37,7 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
   {abbreviation: '1w', label: '1 Week'},
   {abbreviation: '1mo', label: '1 Month'},
   {abbreviation: '3mo', label: '3 Months'},
+  {abbreviation: 'custom', label: 'Custom datetime', isCustomDate: true},
 ];
 
 type SelectDatetimeDropdownProps = {
@@ -96,14 +99,30 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   }, [isActive]);
 
   const predefinedSuggestions = useMemo(() => {
-    const yesterdaySuggestion = parseDate('yesterday')!;
-    return [
-      ...PREDEFINED_SUGGESTIONS,
-      {
-        abbreviation: formatDateOnly(yesterdaySuggestion),
-        label: 'Yesterday',
-      },
-    ];
+    // Map all predefined suggestions to include absolute datetime
+    return PREDEFINED_SUGGESTIONS.map(suggestion => {
+      // Skip adding absoluteDateTime for the custom date option
+      if (suggestion.isCustomDate) {
+        return suggestion;
+      }
+
+      const date = parseDate(suggestion.abbreviation)!;
+
+      // Format the date differently if time is 00:00:00
+      const onlyDate =
+        date.getHours() === 0 &&
+        date.getMinutes() === 0 &&
+        date.getSeconds() === 0;
+
+      const formattedDateTime = onlyDate
+        ? formatDateOnly(date)
+        : formatDate(date);
+
+      return {
+        ...suggestion,
+        absoluteDateTime: formattedDateTime,
+      };
+    });
   }, []);
 
   const parseAndUpdateDate = useCallback(
@@ -161,7 +180,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       setInputValue(formatDate(date));
       const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
       onChange(utcDate);
-      setIsCalendarOpen(false);
       setIsInvalid(false);
     }
   };
@@ -171,9 +189,28 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setIsCalendarOpen(true);
   };
 
+  // Add handler for closing when Ok button is clicked
+  const handleAccept = (date: Date | null) => {
+    if (date) {
+      setIsCalendarOpen(false);
+    }
+  };
+
   const handleSuggestionClick = useCallback(
-    (suggestionValue: string) => {
-      setInputValue(suggestionValue);
+    (
+      suggestionValue: string,
+      absoluteDateTime?: string,
+      isCustomDate?: boolean
+    ) => {
+      if (isCustomDate) {
+        setIsCalendarOpen(true);
+        return;
+      }
+
+      // Use the absolute date time if provided, otherwise use the abbreviation
+      const valueToUse = absoluteDateTime || suggestionValue;
+      setInputValue(valueToUse);
+
       // Skip debounce when selecting from suggestions
       parseAndUpdateDate(suggestionValue, true);
 
@@ -236,7 +273,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             style={{
               position: 'absolute',
               top: '50%',
-              left: '9px',
+              right: '9px',
               transform: 'translateY(-50%)',
               fontSize: '16px',
               cursor: 'pointer',
@@ -266,8 +303,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             placeholder="Enter a date..."
             style={{
               padding: '4px 12px',
-              paddingLeft: '34px',
-              paddingRight: '8px',
+              paddingLeft: '8px',
+              paddingRight: '34px',
               borderRadius: '4px',
               border: 0,
               boxShadow: isInputFocused
@@ -293,6 +330,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             onClose={() => setIsCalendarOpen(false)}
             value={parseDate(inputValue) ?? null}
             onChange={handleDateChange}
+            onAccept={handleAccept}
             slotProps={{
               textField: {
                 style: {display: 'none'},
@@ -339,6 +377,49 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
                   '& *': {
                     fontFamily: 'Source Sans Pro',
                   },
+                  '& .MuiPickersDay-root.Mui-selected': {
+                    backgroundColor: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: TEAL_400,
+                    },
+                    '&:focus': {
+                      backgroundColor: TEAL_500,
+                    },
+                  },
+                  '& .MuiButton-root': {
+                    fontFamily: 'Source Sans Pro',
+                    color: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 140, 140, 0.1)',
+                    },
+                  },
+                  '& .MuiPickersCalendarHeader-switchViewButton': {
+                    color: TEAL_500,
+                  },
+                  '& .MuiPickersYear-yearButton.MuiPickersYear-yearButton.MuiPickersYear-yearButton':
+                    {
+                      fontFamily: 'Source Sans Pro',
+                      '&.Mui-selected': {
+                        backgroundColor: TEAL_500,
+                        color: WHITE,
+                      },
+                    },
+                  '& .MuiButtonBase-root.MuiMultiSectionDigitalClockSection-item.MuiMultiSectionDigitalClockSection-item.Mui-selected':
+                    {
+                      backgroundColor: TEAL_500,
+                      color: WHITE,
+                    },
+                },
+              },
+              actionBar: {
+                sx: {
+                  '& .MuiButton-root': {
+                    fontFamily: 'Source Sans Pro',
+                    color: TEAL_500,
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 140, 140, 0.1)',
+                    },
+                  },
                 },
               },
             }}
@@ -373,6 +454,8 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const isCustomDate = suggestion.isCustomDate;
+
   return (
     <li
       key={index}
@@ -391,6 +474,7 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           : isHovered
           ? MOON_100
           : WHITE,
+        borderTop: isCustomDate ? `1px solid ${MOON_200}` : 'none',
       }}
       onMouseDown={e => e.preventDefault()}>
       <div
@@ -399,8 +483,17 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-        <span>{suggestion.abbreviation}</span>
-        <span style={{color: MOON_500}}>{suggestion.label}</span>
+        {isCustomDate ? (
+          <span style={{display: 'flex', alignItems: 'center'}}>
+            <Icon name="date" style={{marginRight: '4px', fontSize: '14px'}} />
+            {suggestion.label}
+          </span>
+        ) : (
+          <span>{suggestion.absoluteDateTime}</span>
+        )}
+        {!isCustomDate && (
+          <span style={{color: MOON_500}}>{suggestion.abbreviation}</span>
+        )}
       </div>
     </li>
   );
@@ -412,7 +505,11 @@ type SuggestionsListProps = {
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
-  handleSuggestionClick: (suggestionValue: string) => void;
+  handleSuggestionClick: (
+    suggestionValue: string,
+    absoluteDateTime?: string,
+    isCustomDate?: boolean
+  ) => void;
   handleMouseEnter: (index: number) => void;
   handleMouseLeave: () => void;
 };
@@ -457,7 +554,13 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           index={index}
           isSelected={selectedSuggestion === suggestion.abbreviation}
           isHovered={hoveredIndex === index}
-          onClick={() => handleSuggestionClick(suggestion.abbreviation)}
+          onClick={() =>
+            handleSuggestionClick(
+              suggestion.abbreviation,
+              suggestion.absoluteDateTime,
+              suggestion.isCustomDate
+            )
+          }
           onMouseEnter={() => handleMouseEnter(index)}
           onMouseLeave={handleMouseLeave}
         />
