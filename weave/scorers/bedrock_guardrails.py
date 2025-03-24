@@ -6,6 +6,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.integrations.bedrock import patch_client
 
+
 class BedrockGuardrailScorer(weave.Scorer):
     """
     The `BedrockGuardrailScorer` class is a guardrail that leverages AWS Bedrock's
@@ -28,7 +29,7 @@ class BedrockGuardrailScorer(weave.Scorer):
     source: str = Field(
         default="OUTPUT",
         description="The source of the content to evaluate, either 'INPUT' or 'OUTPUT'.",
-        choices=["INPUT", "OUTPUT"]
+        choices=["INPUT", "OUTPUT"],
     )
     bedrock_runtime_kwargs: dict[str, Any] = Field(
         default_factory=dict,
@@ -53,7 +54,7 @@ class BedrockGuardrailScorer(weave.Scorer):
                 "to use the BedrockGuardrailScorer."
             )
         except Exception as e:
-            raise Exception(f"Failed to initialize Bedrock runtime client: {e}")
+            raise RuntimeError(f"Failed to initialize Bedrock runtime client: {e}")
 
     def format_content(self, output: str) -> dict[str, Any]:
         """Format the content for the guardrail API."""
