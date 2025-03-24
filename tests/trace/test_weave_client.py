@@ -2555,3 +2555,21 @@ def test_calls_descendants_class_method(client):
     limited_descendants = list(parent_call.descendants(limit=1))
     assert len(limited_descendants) == 1
     assert op_name_from_ref(limited_descendants[0].op_name) == "child_op"
+
+
+def test_calls_descendants_massive(client):
+    """Test that get_calls_descendants can handle a large number of descendants."""
+    # Create a parent call
+    parent_call = client.create_call("parent_op", {"x": 5})
+
+    # Create 10_000 child calls
+    child_calls = [
+        client.create_call("child_op", {"x": i}, parent_call) for i in range(10_000)
+    ]
+    for child in child_calls:
+        client.finish_call(child, i)
+    client.flush()
+
+    # Test getting all descendants
+    descendants = list(client.get_calls_descendants(parent_call))
+    assert len(descendants) == 10_000
