@@ -2566,7 +2566,7 @@ def test_calls_descendants_massive(client):
     child_calls = [
         client.create_call("child_op", {"x": i}, parent_call) for i in range(10_000)
     ]
-    for child in child_calls:
+    for child, i in enumerate(child_calls):
         client.finish_call(child, i)
     client.flush()
 
