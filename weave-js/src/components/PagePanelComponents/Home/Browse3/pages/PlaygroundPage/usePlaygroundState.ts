@@ -220,8 +220,8 @@ export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
   // Handles anthropic outputs
   // Anthropic has content and stop_reason as top-level fields
   if (
-    isAnthropicCompletionFormat(parsedTraceCall.output) &&
-    parsedTraceCall.output !== null
+    parsedTraceCall.output !== null &&
+    isAnthropicCompletionFormat(parsedTraceCall.output)
   ) {
     const {content, stop_reason, ...outputs} = parsedTraceCall.output as any;
     parsedTraceCall.output = {
