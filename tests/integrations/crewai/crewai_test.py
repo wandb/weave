@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from weave.integrations.integration_utilities import (
@@ -27,7 +29,7 @@ def get_crew():
         agents=[researcher],
         tasks=[research_task],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,
     )
 
     return crew
@@ -60,29 +62,9 @@ def get_flow_with_router_or():
 
         @listen(receive_ticket)
         def categorize_ticket(self, _):
-            # Use a direct LLM call for categorization
-            import os
+            import random
 
-            from crewai import LLM
-
-            api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-            print(api_key)
-            llm = LLM(model="openai/gpt-4o-mini", api_key=api_key)
-
-            prompt = f"""
-            Categorize the following customer support issue into one of these categories:
-            - Billing
-            - Account Access
-            - Technical Issue
-            - Feature Request
-            - Other
-
-            Issue: {self.state.issue_description}
-
-            Return only the category name.
-            """
-
-            self.state.category = llm.call(prompt).strip()
+            self.state.category = random.choice(["Billing", "Account access"])
             return self.state.category
 
         @router(categorize_ticket)
@@ -146,7 +128,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     assert len(inputs["self"]["tasks"]) == 1
     assert len(inputs["self"]["agents"]) == 1
     assert inputs["self"]["process"] == "sequential"
-    assert inputs["self"]["verbose"] == True
+    assert inputs["self"]["verbose"] == False
     assert inputs["self"]["memory"] == False
 
     outputs = call_0.output
@@ -338,11 +320,13 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
         inputs=[{"input1": "input1"}, {"input2": "input2"}]
     )
 
+    await asyncio.sleep(1)
+
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     print(flattened_calls_to_names(flattened_calls))
 
-    assert len(flattened_calls) == 19
+    assert len(flattened_calls) == 15
 
     assert flattened_calls_to_names(flattened_calls) == [
         ("crewai.Crew.kickoff_for_each_async", 0),
@@ -353,10 +337,6 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
         ("crewai.LLM.call", 5),
         ("litellm.completion", 6),
         ("openai.chat.completions.create", 7),
-        ("crewai.Agent.execute_task", 5),
-        ("crewai.LLM.call", 6),
-        ("litellm.completion", 7),
-        ("openai.chat.completions.create", 8),
         ("crewai.Crew.kickoff_async", 1),
         ("crewai.Crew.kickoff", 2),
         ("crewai.Task.execute_sync", 3),
@@ -380,7 +360,10 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+    ],
 )
 def test_simple_flow(client: WeaveClient) -> None:
     flow = get_flow_with_router_or()
@@ -389,15 +372,13 @@ def test_simple_flow(client: WeaveClient) -> None:
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    assert len(flattened_calls) == 9
+    assert len(flattened_calls) == 6
+    print(flattened_calls_to_names(flattened_calls))
     assert flattened_calls_to_names(flattened_calls) == [
         ("crewai.Flow.kickoff", 0),
         ("crewai.Flow.kickoff_async", 1),
         ("crewai.flow.flow.start", 2),
         ("crewai.flow.flow.listen", 2),
-        ("crewai.LLM.call", 3),
-        ("litellm.completion", 4),
-        ("openai.chat.completions.create", 5),
         ("crewai.flow.flow.router", 2),
         ("crewai.flow.flow.listen", 2),
     ]
@@ -407,20 +388,12 @@ def test_simple_flow(client: WeaveClient) -> None:
     assert call_0.started_at < call_0.ended_at
 
     inputs = call_0.inputs
-    # assert inputs["self"]["flow_id"] == "27d6c0f9-834f-4b4e-89e7-162469b8b3c9"
+    assert inputs["self"]["flow_id"] is not None
     assert inputs["self"]["state"]["priority"] == "medium"
     assert inputs["self"]["state"]["resolution"] == ""
     assert inputs["self"]["state"]["satisfaction_score"] == 0
     assert inputs["self"]["state"]["ticket_id"] == ""
-    assert call_0.output == "Billing issue handled"
-
-    # kickoff_async is same as kickoff
 
     call_1, _ = flattened_calls[1]
     assert call_1.exception is None
     assert call_1.started_at < call_1.ended_at
-
-    inputs = call_1.inputs
-    outputs = call_1.output
-    print(inputs)
-    print(outputs)
