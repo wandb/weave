@@ -52,6 +52,15 @@ const formatSmallTime = (then: moment.Moment): string | null => {
     }
   }
 
+  const years = now.diff(then, 'years');
+  if (years > 0) {
+    if (years === 1) {
+      return '1y';
+    } else if (years > 1) {
+      return `${years}y`;
+    }
+  }
+
   // Only use weeks when it's an exact multiple
   if (days % 7 === 0) {
     const weeks = days / 7;

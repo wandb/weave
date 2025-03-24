@@ -246,6 +246,46 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
     });
 
+    test('should parse "X units" format (without "ago")', () => {
+      // Current date is 2023-06-15 12:30:00
+      expect(
+        areDateTimesEqual(
+          parseDate('30 minutes'),
+          createDateTime(2023, 6, 15, 12, 0)
+        )
+      ).toBe(true);
+      expect(
+        areDateTimesEqual(
+          parseDate('2 hours'),
+          createDateTime(2023, 6, 15, 10, 30)
+        )
+      ).toBe(true);
+      expect(areDatesEqual(parseDate('1 day'), createDate(2023, 6, 14))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('3 days'), createDate(2023, 6, 12))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('1 week'), createDate(2023, 6, 8))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('2 weeks'), createDate(2023, 6, 1))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('1 month'), createDate(2023, 5, 15))).toBe(
+        true
+      );
+      expect(
+        areDatesEqual(parseDate('6 months'), createDate(2022, 12, 15))
+      ).toBe(true);
+      expect(areDatesEqual(parseDate('1 year'), createDate(2022, 6, 15))).toBe(
+        true
+      );
+      expect(areDatesEqual(parseDate('5 years'), createDate(2018, 6, 15))).toBe(
+        true
+      );
+    });
+
     test('should parse "in X units" format', () => {
       // Current date is 2023-06-15 12:30:00
       expect(
