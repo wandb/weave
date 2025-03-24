@@ -126,3 +126,86 @@ Running this Crew with an agent with access to internet produces better and more
 :::note
 The integration automatically patches all the tools available in the [`crewAI-tools`](https://github.com/crewAIInc/crewAI-tools) repository. 
 :::
+
+## Getting Started with Flow
+
+```python
+import weave
+# Initialize Weave with your project name
+# highlight-next-line
+weave.init("crewai_demo")
+
+from crewai.flow.flow import Flow, listen, router, start
+from litellm import completion
+
+
+class CustomerFeedbackFlow(Flow):
+    model = "gpt-4o-mini"
+
+    @start()
+    def fetch_feedback(self):
+        print("Fetching customer feedback")
+        # In a real-world scenario, this could be replaced by an API call.
+        # For this example, we simulate customer feedback.
+        feedback = (
+            "I had a terrible experience with the product. "
+            "It broke after one use and customer service was unhelpful."
+        )
+        self.state["feedback"] = feedback
+        return feedback
+
+    @router(fetch_feedback)
+    def analyze_feedback(self, feedback):
+        # Use the language model to analyze sentiment
+        prompt = (
+            f"Analyze the sentiment of this customer feedback and "
+            "return only 'positive' or 'negative':\n\n"
+            f"Feedback: {feedback}"
+        )
+        response = completion(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        sentiment = response["choices"][0]["message"]["content"].strip().lower()
+        # If the response is ambiguous, default to negative
+        if sentiment not in ["positive", "negative"]:
+            sentiment = "negative"
+        return sentiment
+
+    @listen("positive")
+    def handle_positive_feedback(self):
+        # Generate a thank you message for positive feedback
+        prompt = "Generate a thank you message for a customer who provided positive feedback."
+        response = completion(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        thank_you_message = response["choices"][0]["message"]["content"].strip()
+        self.state["response"] = thank_you_message
+        return thank_you_message
+
+    @listen("negative")
+    def handle_negative_feedback(self):
+        # Generate an apology message with a promise to improve service for negative feedback
+        prompt = (
+            "Generate an apology message to a customer who provided negative feedback and offer assistance or a solution."
+        )
+        response = completion(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        apology_message = response["choices"][0]["message"]["content"].strip()
+        self.state["response"] = apology_message
+        return apology_message
+
+# Instantiate and kickoff the flow
+flow = CustomerFeedbackFlow()
+result = flow.kickoff()
+print(result)
+```
+
+[![flow.png](imgs/crewai/flow.png)](https://wandb.ai/ayut/crewai_demo/weave/traces?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fayut%2Fcrewai_demo%2Fop%2Fcrewai.Flow.kickoff%3A*%22%5D%7D&peekPath=%2Fayut%2Fcrewai_demo%2Fcalls%2F0195c7e3-7a63-7283-bef4-9e0eb2f0eab1&cols=%7B%22wb_run_id%22%3Afalse%2C%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
+
+:::note
+The integration automatically patches the `Flow.kickoff` entry point and all the available decorators -- `@start`, `@listen`, `@router`, `@or_` and `@and_`.
+:::
