@@ -286,8 +286,19 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             </Box>
 
             <Box>
-              <Typography sx={{...sharedTypographyStyle, fontWeight: '600'}}>
-                API key (secret name)
+              <Typography sx={{...sharedTypographyStyle, fontWeight: '600', display: 'flex', alignItems: 'center', gap: 0.5}}>
+                API key
+                <Tooltip
+                  trigger={
+                    <Icon
+                      name="key-admin"
+                      width={16}
+                      height={16}
+                      color="text-muted"
+                    />
+                  }
+                  content="Sourced from team secrets"
+                />
               </Typography>
               <Typography
                 sx={{
@@ -295,7 +306,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                   color: 'text.secondary',
                   fontSize: '0.875rem',
                 }}>
-                API keys can be set in your
+                API keys can be added in your
                 <Link
                   href={`/${projectId.split('/')[0]}/settings`}
                   target="_blank"
@@ -308,7 +319,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     ml: 0.5,
                     textDecoration: 'none',
                   }}>
-                  team's secrets in settings →
+                  team's secrets →
                 </Link>
               </Typography>
               <Typography
@@ -321,7 +332,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 Note: Secrets are only available to team admins.
               </Typography>
               <TextField
-                placeholder="WANDB_KEY_NAME..."
+                placeholder="WANDB_SECRET_NAME..."
                 value={apiKey}
                 onChange={value => setApiKey(value)}
               />
