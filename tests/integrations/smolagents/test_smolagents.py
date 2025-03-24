@@ -130,7 +130,7 @@ def test_tool_calling_agent_weather(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_code_agent_ddgsearch(client):
-    from smolagents import DuckDuckGoSearchTool, OpenAIServerModel, CodeAgent
+    from smolagents import CodeAgent, DuckDuckGoSearchTool, OpenAIServerModel
 
     model = OpenAIServerModel(model_id="gpt-4o")
     agent = CodeAgent(tools=[DuckDuckGoSearchTool()], model=model)
@@ -153,7 +153,7 @@ def test_code_agent_ddgsearch(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_code_agent_weather(client):
-    from smolagents import OpenAIServerModel, CodeAgent, tool
+    from smolagents import CodeAgent, OpenAIServerModel, tool
 
     model = OpenAIServerModel(model_id="gpt-4o")
 
