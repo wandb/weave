@@ -86,7 +86,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     if (isEmpty) {
       lastProcessedInputRef.current = null;
     }
-  }, [editor.children]);
+  }, [editor]);
 
   const [showSuggestions, setShowSuggestions] = useState(
     props.expr?.nodeType === 'void'
