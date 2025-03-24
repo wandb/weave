@@ -290,18 +290,18 @@ def startswith(self, prefix):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def endswith(self, suffix):
-    if isinstance(suffix, str):
-        return ArrowWeaveList(
-            pc.ends_with(self._arrow_data, suffix), types.Boolean(), self._artifact
-        )
-    return ArrowWeaveList(
-        pa.array(
-            s.as_py().endswith(p.as_py())
-            for s, p in zip(self._arrow_data, suffix._arrow_data)
-        ),
-        types.Boolean(),
-        self._artifact,
-    )
+    def _ends_with(arrow_data):
+        if isinstance(suffix, str):
+            return pc.ends_with(arrow_data, suffix)
+        else:
+            return pa.array(
+                s.as_py().endswith(p.as_py())
+                if s.as_py() is not None and p.as_py() is not None
+                else None
+                for s, p in zip(self._arrow_data, suffix._arrow_data)
+            )
+
+    return util.handle_dictionary_array(self, _ends_with, types.Boolean())
 
 
 @arrow_op(
