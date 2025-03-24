@@ -41,7 +41,9 @@ OverflowBin.displayName = 'S.OverflowBin';
 
 export const CallOverview: React.FC<{
   call: CallSchema;
-}> = ({call}) => {
+  showFeedback?: boolean;
+  onToggleFeedback?: () => void;
+}> = ({call, showFeedback, onToggleFeedback}) => {
   const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
@@ -57,7 +59,12 @@ export const CallOverview: React.FC<{
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
         <div>
-          <Reactions weaveRef={refCall} forceVisible={true} />
+          <Reactions 
+            weaveRef={refCall} 
+            forceVisible={true}
+            showFeedback={showFeedback}
+            onToggleFeedback={onToggleFeedback} 
+          />
         </div>
         <OverflowBin>
           <OverflowMenu

@@ -42,6 +42,8 @@ type ReactionsLoadedProps = {
   readonly: boolean;
   forceVisible: boolean;
   twWrapperStyles: React.CSSProperties;
+  showFeedback?: boolean;
+  onToggleFeedback?: () => void;
 };
 
 export const ReactionsLoaded = ({
@@ -53,6 +55,8 @@ export const ReactionsLoaded = ({
   readonly,
   forceVisible,
   twWrapperStyles,
+  showFeedback,
+  onToggleFeedback,
 }: ReactionsLoadedProps) => {
   const [isMouseOver, setIsMouseOver] = useState(false);
   const groupedByType = _.groupBy(reactions, r => r.feedback_type);
@@ -247,6 +251,20 @@ export const ReactionsLoaded = ({
                   {noteLabel}
                 </Button>
               </StyledTooltip>
+            )}
+            {onToggleFeedback && (
+              <WeaveTooltip
+                content={`${showFeedback ? 'Hide' : 'Show'} feedback sidebar`}
+                trigger={
+                  <Button
+                    icon="marker"
+                    variant="ghost"
+                    size="small"
+                    active={showFeedback ?? false}
+                    onClick={onToggleFeedback}
+                  />
+                }
+              />
             )}
             <Popover
               id={idNotes}

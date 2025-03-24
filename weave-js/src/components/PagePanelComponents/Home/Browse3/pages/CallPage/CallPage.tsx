@@ -323,14 +323,6 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
               active={!hideTraceTreeActual}
               onClick={onToggleTraceTree}
             />
-            <Button
-              icon="marker"
-              tooltip={`${showFeedbackActual ? 'Hide' : 'Show'} feedback`}
-              variant="ghost"
-              active={showFeedbackActual ?? false}
-              onClick={onToggleFeedbackExpand}
-              className="ml-4"
-            />
           </Box>
         </Box>
       }
@@ -348,7 +340,13 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
           </div>
         </Tailwind>
       }
-      headerContent={<CallOverview call={focusedCall} />}
+      headerContent={
+        <CallOverview 
+          call={focusedCall} 
+          showFeedback={showFeedbackActual}
+          onToggleFeedback={onToggleFeedbackExpand} 
+        />
+      }
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>

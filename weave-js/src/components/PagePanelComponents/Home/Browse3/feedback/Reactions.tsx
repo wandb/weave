@@ -19,6 +19,10 @@ type ReactionsProps = {
   forceVisible?: boolean;
 
   twWrapperStyles?: React.CSSProperties;
+  
+  // Controls for the feedback sidebar
+  showFeedback?: boolean;
+  onToggleFeedback?: () => void;
 };
 
 const SORT_BY: SortBy[] = [{field: 'created_at', direction: 'asc'}];
@@ -28,6 +32,8 @@ export const Reactions = ({
   readonly = false,
   forceVisible,
   twWrapperStyles = {},
+  showFeedback,
+  onToggleFeedback,
 }: ReactionsProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
@@ -110,6 +116,8 @@ export const Reactions = ({
       readonly={isReadonly}
       forceVisible={forceVisible ?? false}
       twWrapperStyles={twWrapperStyles}
+      showFeedback={showFeedback}
+      onToggleFeedback={onToggleFeedback}
     />
   );
 };
