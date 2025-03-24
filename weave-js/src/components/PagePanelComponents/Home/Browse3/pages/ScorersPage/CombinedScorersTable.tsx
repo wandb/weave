@@ -1,37 +1,42 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {useWFHooks} from '../wfReactInterface/context';
 import {
   GridColDef,
   GridColumnGroupingModel,
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import {Checkbox} from '@wandb/weave/components/Checkbox';
+import {Icon, IconNames} from '@wandb/weave/components/Icon';
+import {UserLink} from '@wandb/weave/components/UserLink';
+import _ from 'lodash';
+import React, {useEffect, useMemo, useState} from 'react';
+
+import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Pill} from '../../../../../Tag';
+import {Timestamp} from '../../../../../Timestamp';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
-import {CustomLink, ObjectVersionLink, objectVersionText} from '../common/Links';
+import {
+  CustomLink,
+  ObjectVersionLink,
+  objectVersionText,
+} from '../common/Links';
 import {
   buildDynamicColumns,
   prepareFlattenedDataForTable,
 } from '../common/tabularListViews/columnBuilder';
-import {Checkbox} from '@wandb/weave/components/Checkbox';
-import {UserLink} from '@wandb/weave/components/UserLink';
-import {Timestamp} from '../../../../../Timestamp';
 import {useURLSearchParamsDict} from '../util';
-import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {
-  isTableRef,
-  makeRefExpandedPayload,
-} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
 } from '../wfReactInterface/constants';
-import _ from 'lodash';
-import {Pill} from '../../../../../Tag';
+import {useWFHooks} from '../wfReactInterface/context';
+import {
+  isTableRef,
+  makeRefExpandedPayload,
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {TEAL_600} from '../../../../../../common/css/color.styles';
-import {LoadingDots} from '../../../../../LoadingDots';
-import {Icon, IconNames} from '@wandb/weave/components/Icon';
 
 // Custom table component specifically for scorers with a custom category column
 const ScorerObjectVersionsTable: React.FC<{
@@ -47,7 +52,7 @@ const ScorerObjectVersionsTable: React.FC<{
 }> = props => {
   const {selectedVersions, setSelectedVersions} = props;
   const showPropsAsColumns = !props.hidePropsAsColumns;
-  
+
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
     const flat = prepareFlattenedDataForTable(vals);
@@ -116,7 +121,7 @@ const ScorerObjectVersionsTable: React.FC<{
             },
           ]
         : [];
-    
+
     const cols: GridColDef[] = [
       ...checkboxColumnArr,
 
@@ -211,14 +216,14 @@ const ScorerObjectVersionsTable: React.FC<{
           // Custom rendering based on scorer type
           if (category === 'AnnotationSpec') {
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <Icon name={IconNames.UsersTeam} size="sm" />
                 <span>Human Annotation</span>
               </div>
             );
           } else if (category === 'Scorer') {
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <Icon name={IconNames.CodeAlt} size="sm" />
                 <span>Programmatic Scorer</span>
               </div>
@@ -387,4 +392,4 @@ export const CombinedScorersTable: React.FC<{
       objectTitle="Scorer"
     />
   );
-}; 
+};

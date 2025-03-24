@@ -3,13 +3,13 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {CombinedScorersTable} from './CombinedScorersTable';
 import {
   HUMAN_ANNOTATION_VALUE,
   NewScorerDrawer,
   ScorerType,
   scorerTypeRecord,
 } from './NewScorerDrawer';
-import {CombinedScorersTable} from './CombinedScorersTable';
 
 export const ScorersPage: React.FC<{
   entity: string;
@@ -27,8 +27,8 @@ export const ScorersPage: React.FC<{
         tabs={[
           {
             label: 'All Scorers',
-            content: <CombinedScorersTable entity={entity} project={project} />
-          }
+            content: <CombinedScorersTable entity={entity} project={project} />,
+          },
         ]}
         hideTabsIfSingle
         headerExtra={

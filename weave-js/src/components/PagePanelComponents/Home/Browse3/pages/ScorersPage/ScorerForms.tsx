@@ -20,10 +20,14 @@ export const ProgrammaticScorerForm: FC<ScorerFormProps<any>> = ({
         borderRadius: '8px',
       }}>
       <Box mb={1}>
-        This form will allow you to create a <span style={{fontWeight: 'semibold'}}>Human Annotation</span> scorer which can be used in the trace interface.
+        This form will allow you to create a{' '}
+        <span style={{fontWeight: 'semibold'}}>Human Annotation</span> scorer
+        which can be used in the trace interface.
       </Box>
       <Box>
-        If you would like to create a <span style={{fontWeight: 'semibold'}}>Programmatic Scorer</span>, please use Python and refer to the{' '}
+        If you would like to create a{' '}
+        <span style={{fontWeight: 'semibold'}}>Programmatic Scorer</span>,
+        please use Python and refer to the{' '}
         <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
           scorer documentation
         </Link>{' '}
