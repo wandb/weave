@@ -232,7 +232,7 @@ def validate_blog_content(result: TaskOutput) -> Tuple[bool, Any]:
     try:
         # Check word count
         word_count = len(result.split())
-        print("word_count", word_count)
+
         if word_count > 200:
             return (False, {
                 "error": "Blog content exceeds 200 words",
