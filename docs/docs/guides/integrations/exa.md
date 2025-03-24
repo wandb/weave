@@ -9,30 +9,18 @@ It's important to store traces of search API calls in a central database, both d
 Weave will automatically capture traces for [exa-py](https://github.com/exaai/exa-py). You can use the library as usual, start by calling `weave.init()`:
 
 ```python
-import weave
-weave.init("web_research")
-
-# then use exa library as usual
 import os
 from exa_py import Exa
-from dotenv import load_dotenv
-from weave.integrations.exa import get_exa_patcher
+import weave
 
-# Load environment variables
-load_dotenv()
+weave.init("web_research")
 
 # Initialize Exa
 exa = Exa(os.getenv('EXA_API_KEY'))
 
-# Enable Weave tracking for Exa
-patcher = get_exa_patcher()
-patcher.patch()
-
 # Make your Exa query
-result = exa.search_and_contents(
+result = exa.search(
     "Latest developments in quantum computing",
-    type="auto",
-    text=True,
 )
 
 print(result)
@@ -45,13 +33,9 @@ Weave will now track and log all API calls made through the Exa library, includi
 Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](/guides/tracking/ops) that calls into Exa and Weave will track the inputs, outputs, and costs for you:
 
 ```python
-@weave.op()
+@weave.op
 def research_topic(query: str, result_type: str = "auto") -> dict:
     "Search for information on a specific topic"
-    
-    # Ensure the patcher is active
-    patcher = get_exa_patcher()
-    patcher.patch()
     
     # Initialize Exa
     exa = Exa(os.getenv('EXA_API_KEY'))
@@ -59,7 +43,6 @@ def research_topic(query: str, result_type: str = "auto") -> dict:
     # Perform the search
     results = exa.search_and_contents(
         query,
-        type=result_type,
         text=True,
     )
     
@@ -78,24 +61,18 @@ Organizing experimentation is difficult when there are many moving pieces. By us
 In the example below, you can experiment with different search configurations. Every time you change one of these, you'll get a new _version_ of `ResearchAssistant`.
 
 ```python
+import os
 import weave
 from exa_py import Exa
-from weave.integrations.exa import get_exa_patcher
 
 weave.init("web_research_project")
 
 class ResearchAssistant(weave.Model):
-    result_type: str
-    highlight_results: bool
     max_results: int
 
-    @weave.op()
+    @weave.op
     def predict(self, query: str) -> dict:
         "Search for information on a specific topic"
-        
-        # Ensure the patcher is active
-        patcher = get_exa_patcher()
-        patcher.patch()
         
         # Initialize Exa
         exa = Exa(os.getenv('EXA_API_KEY'))
@@ -103,18 +80,15 @@ class ResearchAssistant(weave.Model):
         # Perform the search
         results = exa.search_and_contents(
             query,
-            type=self.result_type,
             text=True,
+            type="auto",
             num_results=self.max_results,
-            highlight=self.highlight_results
         )
         
         return results
 
 # Create and use a research model
 research_model = ResearchAssistant(
-    result_type="auto",
-    highlight_results=True,
     max_results=5
 )
 
