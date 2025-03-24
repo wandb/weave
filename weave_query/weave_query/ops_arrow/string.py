@@ -304,7 +304,7 @@ def endswith(self, suffix):
                 s.as_py().endswith(p.as_py())
                 if s.as_py() is not None and p.as_py() is not None
                 else None
-                for s, p in zip(self._arrow_data, suffix._arrow_data)
+                for s, p in zip(arrow_data, suffix._arrow_data)
             )
 
     return util.handle_dictionary_array(self, _ends_with, types.Boolean())
