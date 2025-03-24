@@ -38,16 +38,18 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 from typing_extensions import TypeGuard
 
 # Not locking down the return type for inline encoding but
 # it would be expected to be something like a str or dict.
 InlineSave = Callable[[Any], Any]
-# Second parameter should really be MemTraceFilesArtifact
-# but we are avoiding a circular import.
-FileSave = Callable[[Any, Any, str], None]
+# This is avoiding a circular import.
+if TYPE_CHECKING:
+    from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+
+FileSave = Callable[[Any, "MemTraceFilesArtifact", str], None]
 Save = Union[InlineSave, FileSave]
 
 

@@ -56,7 +56,7 @@ The entrypoint for custom object serialization is `weave/trace/serialization/cus
 
 #### Custom Object Serialization Flow
 
-This diagram shows the flow for file-based custom objects. Inline objects are similar but simpler.
+This diagram shows the flow for file-based custom objects.
 
 ```mermaid
 flowchart TD
@@ -69,6 +69,28 @@ flowchart TD
 
         MemArtifact -->|Read from files| Deserializer["Registered Serializer (load method)"]
         Deserializer --> DecodeCustomObj["decode_custom_files_obj()"]
+    end
+
+    DecodeCustomObj --> FromJson["from_json()"]
+    FromJson --> ReconstructedObj["Reconstructed Custom Object"]
+
+    RegisterSerializer["register_serializer()"] -.->|Registers| Serializer
+    RegisterSerializer -.->|Registers| Deserializer
+```
+
+The flow for inline custom objects is similar:
+
+```mermaid
+flowchart TD
+    CustomObj["Custom Object (datetime.datetime, rich.markdown.Markdown, etc.)"] --> ToJson["to_json()"]
+    ToJson --> EncodeCustomObj["encode_custom_obj()"]
+
+    subgraph CustomSerialization["Custom Object Serialization Process"]
+        EncodeCustomObj --> Serializer["Registered Serializer (save method)"]
+        Serializer --> Inline["Write to an inline value representation, e.g. str/dict"]
+
+        Inline --> Deserializer["Registered Serializer (load method)"]
+        Deserializer --> DecodeCustomObj["decode_custom_inline_obj()"]
     end
 
     DecodeCustomObj --> FromJson["from_json()"]

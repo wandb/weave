@@ -412,7 +412,10 @@ def _get_code_deps(
                     import_code.append(import_line)
 
         else:
-            # _name will work for typing_extensions.NotRequired in 3.9
+            # Code saving for Ops using TypedDict and NotRequired was failing on Python 3.9
+            # because NotRequired on 3.9 requires using typing_extensions and the implementation
+            # doesn't have a __name__ attribute. We now check for _name as a fallback.
+            # This came up in the context of persisting an inline custom object deserializer.
             var_value_name = getattr(
                 var_value, "__name__", getattr(var_value, "_name", None)
             )
