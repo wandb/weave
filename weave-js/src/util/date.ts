@@ -119,6 +119,39 @@ export const parseDate = (dateStr: string): Date | null => {
 
   const units = 'minute|hour|day|week|month|year|second';
 
+  // Handle "X minutes/hours/days/weeks/months/years" (assume in the past)
+  const simpleUnitsPattern = new RegExp(`^(\\d+)\\s+(${units})s?$`, 'i');
+  const simpleUnitsMatch = lowerStr.match(simpleUnitsPattern);
+  if (simpleUnitsMatch) {
+    const amount = parseInt(simpleUnitsMatch[1], 10);
+    const unit = simpleUnitsMatch[2].toLowerCase();
+    const result = new Date(now);
+
+    switch (unit) {
+      case 'minute':
+        result.setMinutes(result.getMinutes() - amount);
+        return result;
+      case 'hour':
+        result.setHours(result.getHours() - amount);
+        return result;
+      case 'day':
+        result.setDate(result.getDate() - amount);
+        return result;
+      case 'week':
+        result.setDate(result.getDate() - amount * 7);
+        return result;
+      case 'month':
+        result.setMonth(result.getMonth() - amount);
+        return result;
+      case 'year':
+        result.setFullYear(result.getFullYear() - amount);
+        return result;
+      case 'second':
+        result.setSeconds(result.getSeconds() - amount);
+        return result;
+    }
+  }
+
   // Handle "X minutes/hours/days/weeks/months/years ago"
   const agoPattern = new RegExp(`^(\\d+)\\s+(${units})s?\\s+ago$`, 'i');
   const agoMatch = lowerStr.match(agoPattern);
