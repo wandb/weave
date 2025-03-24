@@ -319,6 +319,7 @@ type Entity implements Node {
     collectionTypes: [ArtifactCollectionType!]
   ): ArtifactCollectionConnection
   secrets: [Secret!]!
+  members: [Member!]!
 }
 
 type EntityConnection {
@@ -737,4 +738,10 @@ interface Error {
 enum ErrorSeverity {
   WARN
   ERROR
+}
+
+type Member {
+  role: String
+  username: String
+  id: String
 }

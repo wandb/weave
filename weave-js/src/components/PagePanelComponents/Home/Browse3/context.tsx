@@ -391,7 +391,7 @@ export const browse3ContextGen = (
       return `${projectRoot(
         entityName,
         projectName
-      )}/calls?${searchParams.toString()}`;
+      )}/traces?${searchParams.toString()}`;
     },
     objectVersionsUIUrl: (
       entityName: string,

@@ -169,6 +169,13 @@ def openai_accumulator(
             if chunk_choice.logprobs:
                 choice["logprobs"] = chunk_choice.logprobs
 
+            # See https://github.com/openai/openai-python/issues/1677
+            # Per the OpenAI SDK, delta is not Optional. However, the AzureOpenAI service
+            # will return a None delta under some conditions, including when you have enabled
+            # custom content filtering settings with the Asynchronous_filter streaming setting.
+            if chunk_choice.delta is None:
+                continue
+
             # message
             if chunk_choice.delta.content:
                 if choice["delta"]["content"] is None:

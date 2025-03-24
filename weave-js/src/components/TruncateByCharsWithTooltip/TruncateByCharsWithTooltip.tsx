@@ -22,6 +22,18 @@ export type TruncateByCharsWithTooltipProps = {
 };
 
 /**
+ * Helper type for components that use TruncateByCharsWithTooltip.
+ * Allows you to easily create a type that contains both truncation
+ * props and inner component props.
+ */
+export type TruncateByCharsProps = Partial<
+  Pick<
+    TruncateByCharsWithTooltipProps,
+    'maxChars' | 'truncatedPart' | 'Wrapper'
+  >
+>;
+
+/*
  * A higher order component that truncates text to the specified max chars.
  * Supports start, middle, or end truncation. If text is truncated, tooltip
  * with full text will appear when element is hovered.
