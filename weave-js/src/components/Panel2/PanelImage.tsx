@@ -79,7 +79,13 @@ const PanelImageConfig: FC<PanelImageProps> = ({
   updateConfig,
   input,
 }) => {
-  const classLabels = useClassLabels(input);
+  const weave = useWeaveContext();
+
+  const exemplarsNode = useMemo(() => {
+    return replaceInputVariables(input, weave.client.opStore);
+  }, [input, weave.client.opStore]);
+
+  const classLabels = useClassLabels(exemplarsNode as Node<typeof inputType>);
 
   const {classSets, controls} = Controls.useImageControls(
     input.type,
@@ -96,12 +102,6 @@ const PanelImageConfig: FC<PanelImageProps> = ({
       };
     }
   }, [config, controls]);
-
-  const weave = useWeaveContext();
-
-  const exemplarsNode = useMemo(() => {
-    return replaceInputVariables(input, weave.client.opStore);
-  }, [input, weave.client.opStore]);
 
   const exemplars = CGReact.useNodeValue(exemplarsNode).result;
   const boxes = useMemo(() => {
@@ -209,6 +209,7 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
     loadedFrom: imageArtifact,
     width: image?.width,
     height: image?.height,
+    caption: image?.caption,
   };
 
   if (tileLayout === 'MASKS_NEXT_TO_IMAGE') {

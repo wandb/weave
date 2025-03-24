@@ -62,6 +62,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Model: 'model',
   Dataset: 'table',
   Evaluation: 'baseline-alt',
+  EvaluationResults: 'baseline-alt',
   Leaderboard: 'benchmark-square',
   Scorer: 'type-number-alt',
   ActionSpec: 'rocket-launch',

@@ -146,9 +146,7 @@ def in_(self, other):
     output_type=ARROW_WEAVE_LIST_INT_TYPE,
 )
 def arrowweavelist_len(self):
-    return ArrowWeaveList(
-        pc.binary_length(self._arrow_data), types.Int(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.binary_length, types.Int())
 
 
 @arrow_op(
@@ -213,7 +211,10 @@ def split(self, pattern):
             # If we have a dictionary array, we need to split the dictionary and
             # then re-encode it as a dictionary array.
             return ArrowWeaveList(
-                pc.split_pattern(self._arrow_data.dictionary, pattern),
+                pa.DictionaryArray.from_arrays(
+                    self._arrow_data.indices,
+                    pc.split_pattern(self._arrow_data.dictionary, pattern),
+                ),
                 types.optional(types.List(types.String())),
                 self._artifact,
             )
@@ -309,9 +310,7 @@ def endswith(self, suffix):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalpha(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alpha(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_alpha, types.Boolean())
 
 
 @arrow_op(
@@ -320,9 +319,7 @@ def isalpha(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isnumeric(self):
-    return ArrowWeaveList(
-        pc.ascii_is_decimal(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_decimal, types.Boolean())
 
 
 @arrow_op(
@@ -331,9 +328,7 @@ def isnumeric(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalnum(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alnum(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_alnum, types.Boolean())
 
 
 @arrow_op(
@@ -342,9 +337,7 @@ def isalnum(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def lower(self):
-    return ArrowWeaveList(
-        pc.ascii_lower(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_lower, types.String())
 
 
 @arrow_op(
@@ -353,9 +346,7 @@ def lower(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def upper(self):
-    return ArrowWeaveList(
-        pc.ascii_upper(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_upper, types.String())
 
 
 @arrow_op(
@@ -368,10 +359,8 @@ def upper(self):
     output_type=self_type_output_type_fn,
 )
 def slice(self, begin, end):
-    return ArrowWeaveList(
-        pc.utf8_slice_codeunits(self._arrow_data, begin, end),
-        types.String(),
-        self._artifact,
+    return util.handle_dictionary_array(
+        self, lambda arr: pc.utf8_slice_codeunits(arr, begin, end), types.String()
     )
 
 
@@ -385,10 +374,10 @@ def slice(self, begin, end):
     output_type=self_type_output_type_fn,
 )
 def replace(self, pattern, replacement):
-    return ArrowWeaveList(
-        pc.replace_substring(self._arrow_data, pattern, replacement),
+    return util.handle_dictionary_array(
+        self,
+        lambda arr: pc.replace_substring(arr, pattern, replacement),
         types.String(),
-        self._artifact,
     )
 
 
@@ -398,9 +387,7 @@ def replace(self, pattern, replacement):
     output_type=self_type_output_type_fn,
 )
 def strip(self):
-    return ArrowWeaveList(
-        pc.utf8_trim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_trim_whitespace, types.String())
 
 
 @arrow_op(
@@ -409,9 +396,7 @@ def strip(self):
     output_type=self_type_output_type_fn,
 )
 def lstrip(self):
-    return ArrowWeaveList(
-        pc.utf8_ltrim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_ltrim_whitespace, types.String())
 
 
 @arrow_op(
@@ -420,9 +405,7 @@ def lstrip(self):
     output_type=self_type_output_type_fn,
 )
 def rstrip(self):
-    return ArrowWeaveList(
-        pc.utf8_rtrim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_rtrim_whitespace, types.String())
 
 
 @arrow_op(

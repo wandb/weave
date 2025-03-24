@@ -242,3 +242,10 @@ def make_memorable_name() -> str:
     adj = random.choice(adjectives)
     noun = random.choice(nouns)
     return f"{adj}-{noun}"
+
+
+def short_str(obj: Any, limit: int = 25) -> str:
+    str_val = str(obj)
+    if len(str_val) > limit:
+        return str_val[:limit] + "..."
+    return str_val

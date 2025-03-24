@@ -46,7 +46,7 @@ import {useDatasetEditContext} from './DatasetEditorContext';
 const ADDED_ROW_ID_PREFIX = 'new-';
 
 // Dataset object schema as it is stored in the database.
-interface DatasetObjectVal {
+export interface DatasetObjectVal {
   _type: 'Dataset';
   name: string | null;
   description: string | null;
@@ -60,6 +60,8 @@ export interface EditableDatasetViewProps {
   isEditing?: boolean;
   hideRemoveForAddedRows?: boolean;
   showAddRowButton?: boolean;
+  hideIdColumn?: boolean;
+  disableNewRowHighlight?: boolean;
 }
 
 interface OrderedRow {
@@ -72,6 +74,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   isEditing = false,
   hideRemoveForAddedRows = false,
   showAddRowButton = true,
+  hideIdColumn = false,
+  disableNewRowHighlight = false,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -91,11 +95,11 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
 
   const {
     editedRows,
-    getEditedFields,
     deletedRows,
     setDeletedRows,
     setAddedRows,
     addedRows,
+    isFieldEdited,
   } = useDatasetEditContext();
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
@@ -297,15 +301,29 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return [...displayedAddedRows, ...rows];
   }, [rows, addedRows, numAddedRows, paginationModel, isEditing]);
 
+  const initialFieldsSet = useMemo(
+    () => new Set(initialFields),
+    [initialFields]
+  );
+
   const preserveFieldOrder = useCallback(
     (row: OrderedRow): OrderedRow => {
       const orderedRow: OrderedRow = {___weave: row.___weave};
+      // First add all fields that are in initialFields in the correct order
       initialFields.forEach(field => {
         orderedRow[field] = row[field] !== undefined ? row[field] : '';
       });
+
+      // Then add any additional fields that weren't in initialFields
+      Object.keys(row).forEach(field => {
+        if (field !== '___weave' && !initialFieldsSet.has(field)) {
+          orderedRow[field] = row[field];
+        }
+      });
+
       return orderedRow;
     },
-    [initialFields]
+    [initialFields, initialFieldsSet]
   );
 
   const columns = useMemo(() => {
@@ -320,8 +338,12 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       setInitialFields(Array.from(allFields));
     }
 
-    const baseColumns: GridColDef[] = [
-      {
+    // Create an array to hold all base columns
+    const baseColumns: GridColDef[] = [];
+
+    // Add ID column only if not hidden
+    if (!hideIdColumn) {
+      baseColumns.push({
         field: '_row_click',
         headerName: 'id',
         sortable: false,
@@ -354,7 +376,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                   params.row.___weave?.index
                 )
                   ? CELL_COLORS.DELETED
-                  : params.row.___weave?.isNew
+                  : params.row.___weave?.isNew && !disableNewRowHighlight
                   ? CELL_COLORS.NEW
                   : CELL_COLORS.TRANSPARENT,
               }}>
@@ -364,31 +386,32 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             </Box>
           );
         },
-      },
-      ...(isEditing
-        ? [
-            {
-              field: 'controls',
-              headerName: '',
-              width: columnWidths.controls ?? 48,
-              sortable: false,
-              filterable: false,
-              editable: false,
-              renderCell: (params: GridRenderCellParams) => (
-                <ControlCell
-                  params={params}
-                  deleteRow={deleteRow}
-                  deleteAddedRow={deleteAddedRow}
-                  restoreRow={restoreRow}
-                  isDeleted={deletedRows.includes(params.row.___weave?.index)}
-                  isNew={params.row.___weave?.isNew}
-                  hideRemoveForAddedRows={hideRemoveForAddedRows}
-                />
-              ),
-            },
-          ]
-        : []),
-    ];
+      });
+    }
+
+    // Add control column if editing is enabled, regardless of hideIdColumn setting
+    if (isEditing) {
+      baseColumns.push({
+        field: 'controls',
+        headerName: '',
+        width: columnWidths.controls ?? 48,
+        sortable: false,
+        filterable: false,
+        editable: false,
+        renderCell: (params: GridRenderCellParams) => (
+          <ControlCell
+            params={params}
+            deleteRow={deleteRow}
+            deleteAddedRow={deleteAddedRow}
+            restoreRow={restoreRow}
+            isDeleted={deletedRows.includes(params.row.___weave?.index)}
+            isNew={params.row.___weave?.isNew}
+            hideRemoveForAddedRows={hideRemoveForAddedRows}
+            disableNewRowHighlight={disableNewRowHighlight}
+          />
+        ),
+      });
+    }
 
     const fieldColumns: GridColDef[] = Array.from(allFields).map(field => ({
       field: field as string,
@@ -414,20 +437,21 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         }
         const rowIndex = params.row.___weave?.index;
 
-        const editedFields =
-          rowIndex != null && !params.row.___weave?.isNew
-            ? getEditedFields(rowIndex)
-            : {};
         return (
           <CellViewingRenderer
             {...params}
-            isEdited={editedFields[field as string] !== undefined}
+            isEdited={
+              rowIndex != null && !params.row.___weave?.isNew
+                ? isFieldEdited(rowIndex, field as string)
+                : false
+            }
             isDeleted={deletedRows.includes(params.row.___weave?.index)}
             isNew={params.row.___weave?.isNew}
             serverValue={get(
               loadedRows[rowIndex - offset]?.val ?? {},
               field as string
             )}
+            disableNewRowHighlight={disableNewRowHighlight}
           />
         );
       },
@@ -450,7 +474,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return [...baseColumns, ...fieldColumns];
   }, [
     combinedRows,
-    getEditedFields,
     deleteRow,
     restoreRow,
     deletedRows,
@@ -463,6 +486,9 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     columnWidths,
     preserveFieldOrder,
     hideRemoveForAddedRows,
+    isFieldEdited,
+    hideIdColumn,
+    disableNewRowHighlight,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {

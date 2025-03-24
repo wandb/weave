@@ -44,6 +44,7 @@ interface CellViewingRendererProps {
   isNew?: boolean;
   isEditing?: boolean;
   serverValue?: any;
+  disableNewRowHighlight?: boolean;
 }
 
 export const CellViewingRenderer: React.FC<
@@ -58,9 +59,10 @@ export const CellViewingRenderer: React.FC<
   id,
   field,
   serverValue,
+  disableNewRowHighlight = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const {setEditedRows, setAddedRows} = useDatasetEditContext();
+  const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isEditable =
@@ -77,6 +79,7 @@ export const CellViewingRenderer: React.FC<
     event.stopPropagation();
     const existingRow = api.getRow(id);
     const updatedRow = {...existingRow};
+
     set(updatedRow, field, serverValue);
     api.updateRows([{id, ...updatedRow}]);
     api.setEditCellValue({id, field, value: serverValue});
@@ -85,6 +88,9 @@ export const CellViewingRenderer: React.FC<
       newMap.set(existingRow.___weave?.index, updatedRow);
       return newMap;
     });
+    if (existingRow.___weave?.index !== undefined) {
+      setFieldEdited(existingRow.___weave.index, field, false);
+    }
   };
 
   const getBackgroundColor = () => {
@@ -94,7 +100,7 @@ export const CellViewingRenderer: React.FC<
     if (isEdited) {
       return CELL_COLORS.EDITED;
     }
-    if (isNew) {
+    if (isNew && !disableNewRowHighlight) {
       return CELL_COLORS.NEW;
     }
     return CELL_COLORS.TRANSPARENT;
@@ -107,16 +113,22 @@ export const CellViewingRenderer: React.FC<
       const existingRow = api.getRow(id);
       const updatedRow = {...existingRow, [field]: !value};
       api.updateRows([{id, ...updatedRow}]);
+      const rowToUpdate = {...updatedRow};
+
       if (existingRow.___weave?.isNew) {
         setAddedRows(prev => {
           const newMap = new Map(prev);
-          newMap.set(existingRow.___weave?.id, updatedRow);
+          newMap.set(existingRow.___weave?.id, rowToUpdate);
           return newMap;
         });
       } else {
+        if (!rowToUpdate.___weave.editedFields) {
+          rowToUpdate.___weave.editedFields = new Set<string>();
+        }
+        rowToUpdate.___weave.editedFields.add(field);
         setEditedRows(prev => {
           const newMap = new Map(prev);
-          newMap.set(existingRow.___weave?.index, updatedRow);
+          newMap.set(existingRow.___weave?.index, rowToUpdate);
           return newMap;
         });
       }
@@ -189,10 +201,22 @@ export const CellViewingRenderer: React.FC<
             },
           },
         }}>
-        <div
-          onClick={e => e.stopPropagation()}
-          onDoubleClick={e => e.stopPropagation()}
-          style={{
+        <Box
+          onClick={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onDoubleClick={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onKeyDown={e => e.preventDefault()}
+          onFocus={e => e.target.blur()}
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          sx={{
             height: '100%',
             backgroundColor: getBackgroundColor(),
             opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,
@@ -203,7 +227,7 @@ export const CellViewingRenderer: React.FC<
             paddingLeft: '8px',
           }}>
           <CellValue value={value} noLink={true} />
-        </div>
+        </Box>
       </Tooltip>
     );
   }
@@ -299,9 +323,10 @@ const NumberEditor: React.FC<{
   api: any;
   id: string | number;
   field: string;
-}> = ({value, onClose, api, id, field}) => {
+  serverValue?: any;
+}> = ({value, onClose, api, id, field, serverValue}) => {
   const [inputValue, setInputValue] = useState(value.toString());
-  const {setEditedRows, setAddedRows} = useDatasetEditContext();
+  const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
 
   const handleValueUpdate = (newValue: string) => {
     setInputValue(newValue);
@@ -315,6 +340,8 @@ const NumberEditor: React.FC<{
     if (inputValue !== '') {
       const numValue = Number(inputValue);
       const existingRow = api.getRow(id);
+      const isValueChanged = numValue !== serverValue;
+
       if (existingRow.___weave?.isNew) {
         setAddedRows((prev: Map<string, DatasetRow>) => {
           const newMap = new Map(prev);
@@ -331,6 +358,9 @@ const NumberEditor: React.FC<{
           newMap.set(existingRow.___weave?.index, updatedRow);
           return newMap;
         });
+        if (isValueChanged && existingRow.___weave?.index !== undefined) {
+          setFieldEdited(existingRow.___weave.index, field, isValueChanged);
+        }
       }
     }
     onClose();
@@ -512,13 +542,13 @@ const StringEditor: React.FC<{
 
 export const CellEditingRenderer: React.FC<
   CellEditingRendererProps
-> = params => {
+> = props => {
   const {setEditedRows, setAddedRows} = useDatasetEditContext();
-  const {id, value, field, api, serverValue, preserveFieldOrder} = params;
+  const {id, value, field, api, serverValue, preserveFieldOrder} = props;
 
   // Convert edit params to render params
   const renderParams: GridRenderCellParams = {
-    ...params,
+    ...props,
     value,
   };
 
@@ -545,6 +575,7 @@ export const CellEditingRenderer: React.FC<
         api={api}
         id={id}
         field={field}
+        serverValue={serverValue}
       />
     );
   }
@@ -557,16 +588,38 @@ export const CellEditingRenderer: React.FC<
       onClose={() => {
         const existingRow = api.getRow(id);
         const updatedRow = updateRow(existingRow, value);
+
+        const isValueChanged = value !== serverValue;
+        const rowToUpdate = {...updatedRow};
+
         if (existingRow.___weave?.isNew) {
           setAddedRows(prev => {
             const newMap = new Map(prev);
-            newMap.set(existingRow.___weave?.id, updatedRow);
+            newMap.set(existingRow.___weave?.id, rowToUpdate);
             return newMap;
           });
         } else {
+          if (!rowToUpdate.___weave.editedFields) {
+            rowToUpdate.___weave.editedFields = new Set<string>();
+          }
+
+          if (isValueChanged) {
+            rowToUpdate.___weave.editedFields.add(field);
+          } else {
+            rowToUpdate.___weave.editedFields.delete(field);
+          }
+
           setEditedRows(prev => {
             const newMap = new Map(prev);
-            newMap.set(existingRow.___weave?.index, updatedRow);
+
+            // If we don't have any edited fields and it's not a new row,
+            // don't add it to the editedRows map
+            if (rowToUpdate.___weave.editedFields.size === 0) {
+              newMap.delete(existingRow.___weave?.index);
+            } else {
+              newMap.set(existingRow.___weave?.index, rowToUpdate);
+            }
+
             return newMap;
           });
         }
@@ -585,6 +638,7 @@ export interface ControlCellProps {
   isDeleted: boolean;
   isNew: boolean;
   hideRemoveForAddedRows?: boolean;
+  disableNewRowHighlight?: boolean;
 }
 
 export const ControlCell: React.FC<ControlCellProps> = ({
@@ -595,6 +649,7 @@ export const ControlCell: React.FC<ControlCellProps> = ({
   isDeleted,
   isNew,
   hideRemoveForAddedRows,
+  disableNewRowHighlight = false,
 }) => {
   const rowId = params.id as string;
   const rowIndex = params.row.___weave?.index;
@@ -609,7 +664,9 @@ export const ControlCell: React.FC<ControlCellProps> = ({
           justifyContent: 'center',
           height: '100%',
           width: '100%',
-          backgroundColor: CELL_COLORS.NEW,
+          backgroundColor: disableNewRowHighlight
+            ? CELL_COLORS.TRANSPARENT
+            : CELL_COLORS.NEW,
         }}
       />
     );
@@ -625,7 +682,7 @@ export const ControlCell: React.FC<ControlCellProps> = ({
         width: '100%',
         backgroundColor: isDeleted
           ? CELL_COLORS.DELETED
-          : isNew
+          : isNew && !disableNewRowHighlight
           ? CELL_COLORS.NEW
           : CELL_COLORS.TRANSPARENT,
         opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,

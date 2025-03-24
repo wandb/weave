@@ -2,6 +2,7 @@ import asyncio
 import logging
 import traceback
 from datetime import datetime
+from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
@@ -28,9 +29,8 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
-from weave.trace.errors import OpCallError
 from weave.trace.objectify import register_object
-from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
+from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
@@ -211,12 +211,14 @@ class Evaluation(Object):
         n_complete = 0
         dataset = self.dataset
         _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
+        num_rows = len(_rows) * self.trials
+
+        trial_rows = chain.from_iterable(repeat(_rows, self.trials))
         async for example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            print(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:

@@ -7,12 +7,13 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
+import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {
   CallData,
   extractSourceSchema,
   FieldMapping,
+  getNestedValue,
   inferSchema,
-  suggestMappings,
 } from './schemaUtils';
 
 export interface SchemaMappingStepProps {
@@ -21,7 +22,7 @@ export interface SchemaMappingStepProps {
   entity: string;
   project: string;
   onMappingChange: (mappings: FieldMapping[]) => void;
-  onDatasetObjectLoaded: (obj: any) => void;
+  onDatasetObjectLoaded: (obj: any, rowsData?: any[]) => void;
   fieldMappings?: FieldMapping[];
   datasetObject?: any;
 }
@@ -35,10 +36,10 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   project,
   onMappingChange,
   onDatasetObjectLoaded,
-  fieldMappings,
+  fieldMappings = [],
 }) => {
   const {useObjectVersion, useTableRowsQuery} = useWFHooks();
-  const prevDatasetRef = React.useRef<string | null>(null);
+  const {dispatch} = useDatasetDrawer();
 
   const sourceSchema = useMemo(() => {
     return selectedCalls.length > 0 ? extractSourceSchema(selectedCalls) : [];
@@ -60,10 +61,14 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   );
 
   useEffect(() => {
-    if (selectedDatasetObjectVersion.result?.val) {
+    if (selectedDataset && selectedDatasetObjectVersion.result?.val) {
       onDatasetObjectLoaded(selectedDatasetObjectVersion.result.val);
     }
-  }, [selectedDatasetObjectVersion.result, onDatasetObjectLoaded]);
+  }, [
+    selectedDataset,
+    selectedDatasetObjectVersion.result,
+    onDatasetObjectLoaded,
+  ]);
 
   const tableDigest = selectedDatasetObjectVersion.result?.val?.rows
     ?.split('/')
@@ -84,39 +89,35 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     return inferSchema(tableRowsQuery.result.rows.map(row => row.val));
   }, [tableRowsQuery.result]);
 
-  const currentDatasetKey =
-    selectedDataset?.objectId + selectedDataset?.versionHash;
-
+  // Update target schema in context
   useEffect(() => {
+    if (targetSchema.length > 0) {
+      dispatch({type: ACTION_TYPES.SET_TARGET_SCHEMA, payload: targetSchema});
+    }
+  }, [targetSchema, dispatch]);
+
+  // Pass rows data to parent when available
+  useEffect(() => {
+    // Only load rows data if we have a valid selected dataset
+    // This prevents loading data from a previously selected dataset when in create new mode
     if (
-      prevDatasetRef.current !== currentDatasetKey &&
+      selectedDataset &&
       tableRowsQuery.result &&
-      targetSchema.length > 0
+      tableRowsQuery.result.rows
     ) {
-      prevDatasetRef.current = currentDatasetKey;
-      const suggestedMappings = suggestMappings(sourceSchema, targetSchema, []);
-      onMappingChange(suggestedMappings);
+      if (selectedDatasetObjectVersion.result?.val) {
+        onDatasetObjectLoaded(
+          selectedDatasetObjectVersion.result.val,
+          tableRowsQuery.result.rows
+        );
+      }
     }
   }, [
-    currentDatasetKey,
     tableRowsQuery.result,
-    targetSchema,
-    sourceSchema,
-    onMappingChange,
+    selectedDatasetObjectVersion.result,
+    selectedDataset,
+    onDatasetObjectLoaded,
   ]);
-
-  const localFieldMappings = useMemo(() => {
-    if (!tableRowsQuery.result || !targetSchema.length) {
-      return fieldMappings || [];
-    }
-    return fieldMappings || [];
-  }, [fieldMappings, tableRowsQuery.result, targetSchema.length]);
-
-  useEffect(() => {
-    if (JSON.stringify(localFieldMappings) !== JSON.stringify(fieldMappings)) {
-      onMappingChange(localFieldMappings);
-    }
-  }, [localFieldMappings, fieldMappings, onMappingChange]);
 
   const handleMappingChange = useCallback(
     (targetField: string, sourceField: string | null) => {
@@ -135,23 +136,6 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   const fieldPreviews = useMemo(() => {
     const previews = new Map<string, Array<Record<string, any>>>();
-
-    const getNestedValue = (obj: any, path: string[]): any => {
-      let current = obj;
-      for (const part of path) {
-        if (current == null) {
-          return undefined;
-        }
-        if (typeof current === 'object' && '__val__' in current) {
-          current = current.__val__;
-        }
-        if (typeof current !== 'object') {
-          return current;
-        }
-        current = current[part];
-      }
-      return current;
-    };
 
     sourceSchema.forEach(field => {
       const fieldData = selectedCalls.map(call => {
@@ -192,7 +176,15 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
               maxWidth: '800px',
             },
           }}>
-          <div>{option.label}</div>
+          <div
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
+            }}>
+            {option.label}
+          </div>
         </DataPreviewTooltip>
       );
     },
@@ -201,9 +193,16 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   const renderTargetField = useCallback(
     (fieldName: string) => {
-      const previewData = tableRowsQuery.result?.rows.slice(0, 5).map(row => ({
-        [fieldName]: row.val[fieldName],
-      }));
+      const previewData = tableRowsQuery.result?.rows.slice(0, 5).map(row => {
+        // Handle nested paths by splitting on dots and traversing the object
+        const value = fieldName.includes('.')
+          ? getNestedValue(row.val, fieldName.split('.'))
+          : row.val[fieldName];
+
+        return {
+          [fieldName]: value,
+        };
+      });
 
       return (
         <DataPreviewTooltip
@@ -233,6 +232,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
               padding: '4px 8px',
               borderRadius: 1,
               transition: 'all 0.2s ease',
+              width: '100%',
               '&:hover': {
                 backgroundColor: 'rgba(0, 0, 0, 0.04)',
               },
@@ -243,6 +243,10 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                 fontWeight: 500,
                 color: 'text.primary',
                 fontSize: '14px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%',
               }}>
               {fieldName}
             </Typography>
@@ -260,7 +264,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   ) {
     return (
       <Stack spacing={1} sx={{mt: 2}}>
-        <Typography sx={{...typographyStyle, fontWeight: 600}}>
+        <Typography component="div" sx={{...typographyStyle, fontWeight: 600}}>
           Field Mapping
         </Typography>
         <Paper
@@ -281,7 +285,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   if (!selectedCalls.length || !tableRowsQuery.result?.rows?.length) {
     return (
       <Stack spacing={1} sx={{mt: 2}}>
-        <Typography sx={typographyStyle}>
+        <Typography component="div" sx={typographyStyle}>
           No data available to extract schema from.
         </Typography>
       </Stack>
@@ -291,7 +295,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   if (!sourceSchema.length || !targetSchema.length) {
     return (
       <Stack spacing={1} sx={{mt: 2}}>
-        <Typography sx={typographyStyle}>
+        <Typography component="div" sx={typographyStyle}>
           No schema could be extracted from the data.
         </Typography>
       </Stack>
@@ -300,10 +304,11 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   return (
     <Stack spacing={'8px'} sx={{mt: '24px'}}>
-      <Typography sx={{...typographyStyle, fontWeight: 600}}>
+      <Typography component="div" sx={{...typographyStyle, fontWeight: 600}}>
         Configure field mapping
       </Typography>
       <Typography
+        component="div"
         sx={{
           ...typographyStyle,
           color: 'text.secondary',
@@ -326,6 +331,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
             mb: 2,
           }}>
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
@@ -336,6 +342,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
           </Typography>
           <Box /> {/* Spacer for arrow */}
           <Typography
+            component="div"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
@@ -346,7 +353,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         </Box>
         <Stack spacing={2}>
           {targetSchema.map(targetField => {
-            const currentMapping = localFieldMappings.find(
+            const currentMapping = fieldMappings.find(
               m => m.targetField === targetField.name
             );
 

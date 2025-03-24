@@ -116,9 +116,17 @@ export const opArtifactMembershipFile = makeStandardOp({
     if (artifactMembership.artifact == null) {
       throw new Error('opArtifactMembershipFile missing artifact');
     }
+    const artifactCollection = artifactMembership.artifactCollection;
+    if (artifactCollection == null) {
+      throw new Error('opArtifactMembershipFile missing artifactCollection');
+    }
     try {
-      const result = await context.backend.getArtifactFileMetadata(
-        artifactMembership.artifact.id,
+      const result = await context.backend.getArtifactMembershipFileMetadata(
+        artifactMembership.id,
+        artifactCollection.project.entityName,
+        artifactCollection.project.name,
+        artifactCollection.name,
+        `v${artifactMembership.versionIndex}`,
         path
       );
       if (result == null) {

@@ -1,6 +1,6 @@
 from PIL import Image
 
-from weave.trace.custom_objs import decode_custom_obj, encode_custom_obj
+from weave.trace.serialization.custom_objs import decode_custom_obj, encode_custom_obj
 
 
 def test_decode_custom_obj_known_type(client):
