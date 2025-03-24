@@ -15,6 +15,7 @@ from weave_query.ops_arrow.string import (
     rstrip,
     slice,
     split,
+    startswith,
     strip,
     to_number,
     upper,
@@ -46,6 +47,64 @@ class TestLenOp:
         awl = ArrowWeaveList(dict_array, types.String())
         result = arrowweavelist_len.eager_call(awl)
         expected = [None, 0, 3, None]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestStartsWithOp:
+    def test_basic(self):
+        arrow_data = [
+            "hello world",
+            "hello there",
+            "",
+            None,
+        ]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = startswith.eager_call(awl, "hello")
+        expected = [True, True, False, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_awl_prefix(self):
+        arrow_data = ["hello world", "hello there", "goodbye", "", None, "bar"]
+        prefix = ArrowWeaveList(
+            pa.array(["hello", "goodbye", "goodbye", "", "foo", None]), types.String()
+        )
+        awl = ArrowWeaveList(pa.array(arrow_data), types.optional(types.String()))
+        result = startswith.eager_call(awl, prefix)
+        expected = [True, False, True, True, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_vectorized_data_arrow_data_ignored(self):
+        arrow_data = ["hello world", "hello there", "goodbye", "", None, "bar"]
+        prefix = ArrowWeaveList(
+            pa.array(["hello", "goodbye", "goodbye", "", "foo", None]), types.String()
+        )
+        awl = ArrowWeaveList(pa.array(arrow_data), types.optional(types.String()))
+        result = startswith.eager_call(awl, prefix)
+        expected = [True, False, True, True, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_vectorized_data_suffix_ignored(self):
+        arrow_data = ["hello world", "hello there", "goodbye", "", None, "bar"]
+        prefix = ArrowWeaveList(
+            pa.array(["hello", "goodbye", "goodbye", "", "foo", None]), types.String()
+        )
+        awl = ArrowWeaveList(pa.array(arrow_data), types.optional(types.String()))
+        result = startswith.eager_call(awl, prefix)
+        expected = [True, False, True, True, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = [
+            "hello world",
+            "hello there",
+            "goodbye",
+        ]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = startswith.eager_call(awl, "hello")
+        expected = [False, True, True, False]
         assert result._arrow_data.to_pylist() == expected
 
 

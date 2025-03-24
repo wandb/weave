@@ -267,18 +267,18 @@ def partition(self, sep):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def startswith(self, prefix):
-    if isinstance(prefix, str):
-        return ArrowWeaveList(
-            pc.starts_with(self._arrow_data, prefix), types.Boolean(), self._artifact
-        )
-    return ArrowWeaveList(
-        pa.array(
-            s.as_py().startswith(p.as_py())
-            for s, p in zip(self._arrow_data, prefix._arrow_data)
-        ),
-        types.Boolean(),
-        self._artifact,
-    )
+    def _startswith(arrow_data):
+        if isinstance(prefix, str):
+            return pc.starts_with(arrow_data, prefix)
+        else:
+            return pa.array(
+                s.as_py().startswith(p.as_py())
+                if s.as_py() is not None and p.as_py() is not None
+                else None
+                for s, p in zip(arrow_data, prefix._arrow_data)
+            )
+
+    return util.handle_dictionary_array(self, _startswith, types.Boolean())
 
 
 @arrow_op(
