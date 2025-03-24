@@ -165,10 +165,8 @@ def get_crewai_patcher(
     # CrewAI Tools
     tools_settings = {}
     with warnings.catch_warnings():
-        from pydantic import PydanticDeprecatedSince20
-
-        warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
-        warnings.simplefilter("ignore")
+        old_showwarning = warnings.showwarning
+        warnings.showwarning = lambda *args, **kwargs: None
         try:
             crewai_tools_module = importlib.import_module("crewai_tools")
             crewai_tools = dir(crewai_tools_module)
@@ -192,6 +190,9 @@ def get_crewai_patcher(
         except ImportError:
             # if crewai_tools is not installed, we don't want to raise an error
             pass
+        finally:
+            # Restore the original showwarning function
+            warnings.showwarning = old_showwarning
 
     crew_patchers = []
     for settings_name, method_name in crew_methods:
