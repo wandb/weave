@@ -1,6 +1,10 @@
-import {Box, Link,Typography} from '@mui/material';
+import {Box, Link, Typography} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {MOON_200,TEAL_500, TEAL_600} from '@wandb/weave/common/css/color.styles';
+import {
+  MOON_200,
+  TEAL_500,
+  TEAL_600,
+} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -232,7 +236,8 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 borderRadius: '8px',
                 marginBottom: '-8px',
               }}>
-              Custom providers are made for connecting to OpenAI compatible API endpoints. Please refer to the{' '}
+              Custom providers are made for connecting to OpenAI compatible API
+              endpoints. Please refer to the{' '}
               <Link
                 href="#"
                 target="_blank"
@@ -286,7 +291,14 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             </Box>
 
             <Box>
-              <Typography sx={{...sharedTypographyStyle, fontWeight: '600', display: 'flex', alignItems: 'center', gap: 0.5}}>
+              <Typography
+                sx={{
+                  ...sharedTypographyStyle,
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                }}>
                 API key
                 <Tooltip
                   trigger={
