@@ -59,11 +59,11 @@ export const CallOverview: React.FC<{
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
         <div>
-          <Reactions 
-            weaveRef={refCall} 
+          <Reactions
+            weaveRef={refCall}
             forceVisible={true}
             showFeedback={showFeedback}
-            onToggleFeedback={onToggleFeedback} 
+            onToggleFeedback={onToggleFeedback}
           />
         </div>
         <OverflowBin>

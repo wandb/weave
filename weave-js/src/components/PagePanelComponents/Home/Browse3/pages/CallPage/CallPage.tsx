@@ -343,10 +343,10 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         </Tailwind>
       }
       headerContent={
-        <CallOverview 
-          call={focusedCall} 
+        <CallOverview
+          call={focusedCall}
           showFeedback={showFeedbackActual}
-          onToggleFeedback={onToggleFeedbackExpand} 
+          onToggleFeedback={onToggleFeedbackExpand}
         />
       }
       isLeftSidebarOpen={!hideTraceTreeActual}

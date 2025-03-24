@@ -19,7 +19,7 @@ type ReactionsProps = {
   forceVisible?: boolean;
 
   twWrapperStyles?: React.CSSProperties;
-  
+
   // Controls for the feedback sidebar
   showFeedback?: boolean;
   onToggleFeedback?: () => void;

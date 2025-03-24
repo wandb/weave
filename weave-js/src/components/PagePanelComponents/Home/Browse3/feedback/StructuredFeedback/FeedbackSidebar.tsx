@@ -7,9 +7,7 @@ import {Loading} from '@wandb/weave/components/Loading';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
 import {NewScorerDrawer} from '../../pages/ScorersPage/NewScorerDrawer';
@@ -37,15 +35,11 @@ export const FeedbackSidebar = ({
   onReloadSpecs,
   onClose,
 }: FeedbackSidebarProps) => {
-  const history = useHistory();
-  const router = useWeaveflowRouteContext().baseRouter;
   const [isSaving, setIsSaving] = useState(false);
   const [isNewScorerDrawerOpen, setIsNewScorerDrawerOpen] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
-  const [reloadTrigger, setReloadTrigger] = useState(0);
-
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const {loading: orgNameLoading, orgName} = useOrgName({
     entityName: entity,
@@ -113,7 +107,7 @@ export const FeedbackSidebar = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="justify-between flex items-center w-full px-12 min-h-[32px]">
+      <div className="flex min-h-[32px] w-full items-center justify-between px-12">
         <div className="text-sm font-semibold">Annotations</div>
         {onClose && (
           <Button
@@ -157,7 +151,7 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="px-12 mt-12 items-center justify-center">
+        <div className="mt-12 items-center justify-center px-12">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
