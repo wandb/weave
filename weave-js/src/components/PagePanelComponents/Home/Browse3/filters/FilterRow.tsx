@@ -17,19 +17,25 @@ import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';
 
 type FilterRowProps = {
+  entity: string;
+  project: string;
   item: GridFilterItem;
   options: SelectFieldOption[];
   onAddFilter: (field: string) => void;
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
+  activeEditId?: FilterId | null;
 };
 
 export const FilterRow = ({
+  entity,
+  project,
   item,
   options,
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
+  activeEditId,
 }: FilterRowProps) => {
   const onSelectField = (field: string) => {
     if (item.id == null) {
@@ -81,10 +87,14 @@ export const FilterRow = ({
       <div className="flex items-center">
         {item.field && (
           <SelectValue
+            entity={entity}
+            project={project}
             field={item.field}
             operator={item.operator}
             value={item.value}
             onSetValue={onSetValue}
+            activeEditId={activeEditId}
+            itemId={item.id}
           />
         )}
       </div>
