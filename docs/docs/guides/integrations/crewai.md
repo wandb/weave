@@ -14,7 +14,13 @@ The integration supports both Crews and Flows.
 
 ## Getting Started with Crew
 
-To get started, simply call `weave.init()` at the beginning of your script. The argument in weave.init() is a project name where the traces will be logged.
+You need to install CrewAI ([more details](https://docs.crewai.com/installation)) and weave to run this example:
+
+```
+pip install crewai weave
+```
+
+Now we will create a CrewAI Crew and trace the execution using Weave. To get started, simply call `weave.init()` at the beginning of your script. The argument in weave.init() is a project name where the traces will be logged.
 
 ```python
 import weave
@@ -22,7 +28,7 @@ from crewai import Agent, Task, Crew, LLM, Process
 
 # Initialize Weave with your project name
 # highlight-next-line
-weave.init("crewai_demo")
+weave.init(project_name="crewai_demo")
 
 # Create an LLM with a temperature of 0 to ensure deterministic outputs
 llm = LLM(model="gpt-4o-mini", temperature=0)
@@ -80,3 +86,43 @@ Weave will track and log all calls made through the CrewAI library, including ag
 CrewAI provides several methods for better control over the kickoff process: `kickoff()`, `kickoff_for_each()`, `kickoff_async()`, and `kickoff_for_each_async()`. The integration supports logging traces from all these methods.
 :::
 
+## Track Tools
+
+CrewAI tools empower agents with capabilities ranging from web searching and data analysis to collaboration and delegating tasks among coworkers. The integration can trace them as well. 
+
+We will improve the quality of the generated report in the above example by giving it access to a tool that can search the internet and return the most relevant results.
+
+Let us first install the extra dependency.
+
+```
+pip install 'crewai[tools]'
+```
+
+In this example, we are using the `SerperDevTool` to enable our 'Research Analyst' agent to search relevant information on the internet. Learn more about this tool and API requirements [here](https://docs.crewai.com/tools/serperdevtool).
+
+```python
+# .... existing imports ....
+from crewai_tools import SerperDevTool
+
+# We provide the agent with the tool.
+researcher = Agent(
+    role='Research Analyst',
+    goal='Find and analyze the best investment opportunities',
+    backstory='Expert in financial analysis and market research',
+    llm=llm,
+    verbose=True,
+    allow_delegation=False,
+    # highlight-next-line
+    tools=[SerperDevTool()],
+)
+
+# .... existing code ....
+```
+
+Running this Crew with an agent with access to internet produces better and more relevant result. We automatically trace the tool usage as shown in the image below.
+
+[![crew_with_tool_trace.png](imgs/crewai/crew_with_tool.png)](https://wandb.ai/ayut/crewai_demo/weave/traces?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fayut%2Fcrewai_demo%2Fop%2Fcrewai.Crew.kickoff%3A*%22%5D%7D&peekPath=%2Fayut%2Fcrewai_demo%2Fcalls%2F0195c7c7-0213-7f42-b130-caa93a79316c%3FdescendentCallId%3D0195c7c7-0a16-7f11-8cfd-9dedf1d03b3b&cols=%7B%22wb_run_id%22%3Afalse%2C%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
+
+:::note
+The integration automatically patches all the tools available in the [`crewAI-tools`](https://github.com/crewAIInc/crewAI-tools) repository. 
+:::
