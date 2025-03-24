@@ -35,6 +35,83 @@ def get_crew():
     return crew
 
 
+def get_flow_with_router_or():
+    from crewai.flow.flow import Flow, listen, router, start, or_, and_
+    from pydantic import BaseModel
+
+    # Define structured state
+    class SupportTicketState(BaseModel):
+        ticket_id: str = ""
+        customer_name: str = ""
+        issue_description: str = ""
+        category: str = ""
+        priority: str = "medium"
+        resolution: str = ""
+        satisfaction_score: int = 0
+
+    class CustomerSupportFlow(Flow[SupportTicketState]):
+        @start()
+        def receive_ticket(self):
+            # In a real app, this might come from an API
+            self.state.ticket_id = "TKT-12345"
+            self.state.customer_name = "Alex Johnson"
+            self.state.issue_description = "Unable to access premium features after payment"
+            return "Ticket received"
+
+        @listen(receive_ticket)
+        def categorize_ticket(self, _):
+            # Use a direct LLM call for categorization
+            from crewai import LLM
+            import os
+            api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+            print(api_key)
+            llm = LLM(model="openai/gpt-4o-mini", api_key=api_key)
+
+            prompt = f"""
+            Categorize the following customer support issue into one of these categories:
+            - Billing
+            - Account Access
+            - Technical Issue
+            - Feature Request
+            - Other
+
+            Issue: {self.state.issue_description}
+
+            Return only the category name.
+            """
+
+            self.state.category = llm.call(prompt).strip()
+            return self.state.category
+
+        @router(categorize_ticket)
+        def route_by_category(self, category):
+            # Route to different handlers based on category
+            return category.lower().replace(" ", "_")
+
+        @listen("billing")
+        def handle_billing_issue(self):
+            # Handle billing-specific logic
+            self.state.priority = "high"
+            # More billing-specific processing...
+            return "Billing issue handled"
+
+        @listen("account_access")
+        def handle_access_issue(self):
+            # Handle access-specific logic
+            self.state.priority = "high"
+            # More access-specific processing...
+            return "Access issue handled"
+        
+        @listen(or_("billing", "account_access"))
+        def resolve_ticket(self, resolution_info):
+            # Final resolution step
+            self.state.resolution = f"Issue resolved: {resolution_info}"
+            return self.state.resolution
+
+    support_flow = CustomerSupportFlow()
+    return support_flow
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -213,18 +290,16 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
     # Rest is same as test_crewai_simple_crew
 
 
+@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
+async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
     crew = get_crew()
 
-    async def async_crew_execution():
-        result = await crew.kickoff_async()
-
-    result = asyncio.run(async_crew_execution())
+    result = await crew.kickoff_async()
 
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
@@ -248,20 +323,18 @@ def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
     # Rest is same as test_crewai_simple_crew
 
 
+@pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
+async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
     crew = get_crew()
 
-    async def async_crew_execution():
-        result = await crew.kickoff_for_each_async(
-            inputs=[{"input1": "input1"}, {"input2": "input2"}]
-        )
-
-    result = asyncio.run(async_crew_execution())
+    result = await crew.kickoff_for_each_async(
+        inputs=[{"input1": "input1"}, {"input2": "input2"}]
+    )
 
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
@@ -300,3 +373,44 @@ def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
 
     outputs = call_0.output
     assert len(outputs) == 2
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_simple_flow(client: WeaveClient) -> None:
+    flow = get_flow_with_router_or()
+    result = flow.kickoff()
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    
+    assert len(flattened_calls) == 9
+    assert flattened_calls_to_names(flattened_calls) == [('crewai.Flow.kickoff', 0), ('crewai.Flow.kickoff_async', 1), ('crewai.flow.flow.start', 2), ('crewai.flow.flow.listen', 2), ('crewai.LLM.call', 3), ('litellm.completion', 4), ('openai.chat.completions.create', 5), ('crewai.flow.flow.router', 2), ('crewai.flow.flow.listen', 2)]
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.exception is None
+    assert call_0.started_at < call_0.ended_at
+
+    inputs = call_0.inputs
+    # assert inputs["self"]["flow_id"] == "27d6c0f9-834f-4b4e-89e7-162469b8b3c9"
+    assert inputs["self"]["state"]["priority"] == "medium"
+    assert inputs["self"]["state"]["resolution"] == ""
+    assert inputs["self"]["state"]["satisfaction_score"] == 0
+    assert inputs["self"]["state"]["ticket_id"] == ""
+    assert call_0.output == "Billing issue handled"
+
+    # kickoff_async is same as kickoff
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.exception is None
+    assert call_1.started_at < call_1.ended_at
+
+    inputs = call_1.inputs
+    outputs = call_1.output
+    print(inputs)
+    print(outputs)
+    
+
