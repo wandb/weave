@@ -12,7 +12,10 @@ from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    require_weave_client,
+)
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -439,6 +442,8 @@ class WeaveTable(Traceable):
         if self.table_ref is None:
             return
 
+        wc = require_weave_client()
+
         page_index = 0
         page_size = 100
         while True:
@@ -474,6 +479,8 @@ class WeaveTable(Traceable):
                     logger.debug(msg)
                     self._prefetched_rows = None
 
+            # Process rows in parallel using the weave client's future executor
+            futures = []
             for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
@@ -487,9 +494,26 @@ class WeaveTable(Traceable):
                     if self._prefetched_rows is None
                     else self._prefetched_rows[page_index * page_size + i]
                 )
-                res = from_json(val, self.table_ref.project_id, self.server)
-                res = make_trace_obj(res, new_ref, self.server, self.root)
-                yield res
+
+                def process_row(val: Any, new_ref: RefWithExtra) -> Any:
+                    if not self.table_ref:
+                        # Should never happen, we need table_ref to remote_iter
+                        return None
+                    return make_trace_obj(
+                        from_json(val, self.table_ref.project_id, self.server),
+                        new_ref,
+                        self.server,
+                        self.root,
+                    )
+
+                future = wc.future_executor.defer(
+                    lambda v=val, r=new_ref: process_row(v, r)
+                )
+                futures.append(future)
+
+            # Yield results as they complete
+            for future in futures:
+                yield future.result()
 
             if len(response.rows) < page_size:
                 break
