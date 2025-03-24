@@ -12,6 +12,9 @@ import {useHistory} from 'react-router-dom';
 import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
+import {NewScorerDrawer} from '../../pages/ScorersPage/NewScorerDrawer';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -33,14 +36,28 @@ export const FeedbackSidebar = ({
   const history = useHistory();
   const router = useWeaveflowRouteContext().baseRouter;
   const [isSaving, setIsSaving] = useState(false);
+  const [isNewScorerDrawerOpen, setIsNewScorerDrawerOpen] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const {loading: orgNameLoading, orgName} = useOrgName({
     entityName: entity,
   });
+
+  const {useFeedback} = useWFHooks();
+  const query = useFeedback({
+    entity,
+    project,
+    weaveRef: callID,
+  });
+
+  const getTsClient = useGetTraceServerClientContext();
+  useEffect(() => {
+    return getTsClient().registerOnFeedbackListener(callID, query.refetch);
+  }, [callID, query.refetch, getTsClient]);
 
   const save = async () => {
     setIsSaving(true);
@@ -132,12 +149,22 @@ export const FeedbackSidebar = ({
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
-              onClick={() =>
-                history.push(router.scorersUIUrl(entity, project))
-              }>
-              View scorers
+              onClick={() => setIsNewScorerDrawerOpen(true)}
+              variant="primary"
+              icon="add-new">
+              Create scorer
             </Button>
           </div>
+          <NewScorerDrawer
+            entity={entity}
+            project={project}
+            open={isNewScorerDrawerOpen}
+            onClose={() => {
+              setIsNewScorerDrawerOpen(false);
+              query.refetch();
+            }}
+            initialScorerType="ANNOTATION"
+          />
         </div>
       )}
     </div>
