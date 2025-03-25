@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.serialization.serialize import dictify
 
-_smolagents_patcher: Optional[MultiPatcher] = None
+_smolagents_patcher: MultiPatcher | None = None
 
 
 def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -72,8 +72,8 @@ def get_multi_step_agent_patchers(
 
 
 def get_smolagents_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> Union[MultiPatcher, NoOpPatcher]:
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 
