@@ -11,18 +11,15 @@ _smolagents_patcher: Optional[MultiPatcher] = None
 
 def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     if "self" in inputs:
-        try:
-            dictified_self = dictify(inputs["self"])
-            # Make sure that the object type is rendered correctly in the Weave UI
-            if "__class__" not in dictified_self:
-                dictified_self["__class__"] = {
-                    "module": inputs["self"].__class__.__module__,
-                    "qualname": inputs["self"].__class__.__qualname__,
-                    "name": inputs["self"].__class__.__name__,
-                }
-            inputs["self"] = dictified_self
-        except Exception as e:
-            pass
+        dictified_self = dictify(inputs["self"])
+        # Make sure that the object type is rendered correctly in the Weave UI
+        if "__class__" not in dictified_self:
+            dictified_self["__class__"] = {
+                "module": inputs["self"].__class__.__module__,
+                "qualname": inputs["self"].__class__.__qualname__,
+                "name": inputs["self"].__class__.__name__,
+            }
+        inputs["self"] = dictified_self
     return inputs
 
 

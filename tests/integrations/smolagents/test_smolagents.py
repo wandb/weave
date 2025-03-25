@@ -16,7 +16,7 @@ def test_hf_api_model(client):
 
     engine = HfApiModel(
         model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
-        token=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"),
+        token=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"),
     )
     messages = [{"role": "user", "content": "What is the capital of France?"}]
     response = engine(messages, stop_sequences=["END"])
@@ -49,7 +49,7 @@ def test_openai_server_model(client):
 
     engine = OpenAIServerModel(
         model_id="gpt-4o-mini",
-        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY", "DUMMY_API_KEY"),
     )
     messages = [{"role": "user", "content": "What is the capital of France?"}]
     response = engine(messages, stop_sequences=["END"])
