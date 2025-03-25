@@ -3,8 +3,8 @@ import time
 import numpy as np
 import wandb
 
-import weave_query as weave
 import weave_query
+import weave_query as weave
 from weave_query.language_features.tagging import make_tag_getter_op
 from weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 from weave_query.ops_arrow.list_ops import filter
@@ -177,6 +177,7 @@ def test_join_table_with_images(fake_wandb):
                         "sha256": "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
                         "boxes": {},
                         "masks": {},
+                        "caption": None,
                     },
                 },
                 "1": {"name": "a", "score": 1.0},
@@ -196,6 +197,7 @@ def test_join_table_with_images(fake_wandb):
                         "sha256": "61cd2467cff9f0666c730c57d065cfe834765ba26514b46f91735c750676876a",
                         "boxes": {},
                         "masks": {},
+                        "caption": None,
                     },
                 },
                 "1": {"name": "b", "score": 2.0},
