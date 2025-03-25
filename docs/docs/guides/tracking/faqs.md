@@ -42,6 +42,44 @@ You can disable system information capture during Weave client initialization: `
 
 You can disable client information capture during Weave client initialization: `weave.init("entity/project", settings={"capture_client_info": False})`.
 
+## How do I render Python Datetime objects in the UI?
+
+Wrap your string with `weave.Markdown(...)` before saving. Weave uses the object type to determine rendering, and `weave.Markdown` maps to a known UI renderer.
+
+```python
+import weave
+
+my_md = weave.Markdown("## This will be rendered as Markdown in the UI")
+client.save(my_md, "example-md")
+```
+
+## How do I render Python datetime values in the Weave UI?
+
+Use Python’s `datetime.datetime` (with timezone info), and publish the object using `weave.publish(...)`. Weave recognizes this type and renders it as a timestamp.
+
+```python
+import weave
+import datetime
+
+# Use timezone-aware datetimes (recommended)
+now = datetime.datetime.now(datetime.timezone.utc)
+
+# Rendered as a formatted timestamp
+client = weave.init()
+ref = client.save(now, "timestamp-example")
+```
+
+## How do I render Markdown in the UI?
+
+Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI.
+
+```python
+import weave
+
+my_md = weave.Markdown("## This will render as Markdown in the UI")
+weave.publish(my_md, name="example-md")
+```
+
 ## Will Weave affect my function's execution speed?
 
 The overhead of Weave logging is typically negligible compared to making a call to an LLM.
