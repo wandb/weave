@@ -225,8 +225,7 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
 
 export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
   icon: 'forum-chat-bubble' as const,
-  heading: 'No LLM providers configured',
-  description: 'Configure an LLM provider to start using the playground.',
+  heading: 'Get started with the LLM playground',
   moreInformation: (
     <>
       Get started by configuring your `OPENAI_API_KEY` secret in your team's

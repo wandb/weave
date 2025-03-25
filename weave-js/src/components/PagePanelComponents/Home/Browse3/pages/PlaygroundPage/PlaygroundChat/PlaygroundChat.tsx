@@ -49,10 +49,10 @@ const EmptyWithSettingsButton: React.FC<{
           <Button
             variant="ghost"
             onClick={() => {
-              window.open(urlPrefixed(`/${entity}/${project}`), '_blank');
+              window.open(urlPrefixed(`/${entity}/${project}/overview`));
             }}
             size="medium">
-            View all providers
+            View providers
           </Button>
           <Button
             variant="primary"
