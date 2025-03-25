@@ -62,6 +62,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isTeamAdmin = !loadingUserInfo && userInfo?.roles[entity] === 'admin';
 
+
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
 

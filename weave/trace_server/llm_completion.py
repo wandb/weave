@@ -1,9 +1,15 @@
 from typing import Callable, Optional
 
+from pydantic import BaseModel
+
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
+)
+from weave.trace_server.interface.builtin_object_classes.provider import (
+    Provider,
+    ProviderModel,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
@@ -63,6 +69,14 @@ def lite_llm_completion(
             error_message = str(e)
             error_message = error_message.replace("litellm.", "")
             return tsi.CompletionsCreateRes(response={"error": error_message})
+    elif provider == "custom" and not base_url:
+        raise InvalidRequest(
+            "Invalid provider configuration: must provide base_url if provider is 'custom'"
+        )
+    elif base_url and provider != "custom":
+        raise InvalidRequest(
+            f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
+        )
 
     try:
         res = litellm.completion(
@@ -154,11 +168,19 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
     return azure_api_base, azure_api_version
 
 
+class CustomProviderInfo(BaseModel):
+    base_url: str
+    api_key: str
+    extra_headers: dict[str, str]
+    return_type: str
+    actual_model_name: str
+
+
 def get_custom_provider_info(
     project_id: str,
     model_name: str,
     obj_read_func: Callable,
-) -> tuple[str, str, dict[str, str], str, str]:
+) -> CustomProviderInfo:
     """
     Extract provider information from a custom provider model.
     Args:
@@ -167,7 +189,7 @@ def get_custom_provider_info(
         obj_read_func: Function to read objects from the database
         secret_fetcher: Secret fetcher to get API keys
     Returns:
-        Tuple containing:
+        CustomProviderInfo containing:
         - base_url: The base URL for the provider
         - api_key: The API key for the provider
         - extra_headers: Extra headers to send with the request
@@ -205,18 +227,18 @@ def get_custom_provider_info(
             metadata_only=False,
         )
         provider_obj_res = obj_read_func(provider_obj_req)
-        provider_obj = provider_obj_res.obj
 
-        if provider_obj.base_object_class != "Provider":
+        if provider_obj_res.obj.base_object_class != "Provider":
             raise InvalidRequest(
-                f"Object {provider_id} is not a Provider, it is a {provider_obj.base_object_class}"
+                f"Object {provider_id} is not a Provider, it is a {provider_obj_res.obj.base_object_class}"
             )
 
-        # Extract provider information
-        base_url = provider_obj.val.get("base_url")
-        secret_name = provider_obj.val.get("api_key_name")
-        extra_headers = provider_obj.val.get("extra_headers", {})
-        return_type = provider_obj.val.get("return_type", "openai")
+        provider_obj = Provider.model_validate(provider_obj_res.obj.val)
+
+        base_url = provider_obj.base_url
+        secret_name = provider_obj.api_key_name
+        extra_headers = provider_obj.extra_headers
+        return_type = provider_obj.return_type
 
     except Exception as e:
         raise InvalidRequest(f"Failed to fetch provider information: {str(e)}")
@@ -231,15 +253,18 @@ def get_custom_provider_info(
             metadata_only=False,
         )
         provider_model_obj_res = obj_read_func(provider_model_obj_req)
-        provider_model_obj = provider_model_obj_res.obj
 
-        if provider_model_obj.base_object_class != "ProviderModel":
+        if provider_model_obj_res.obj.base_object_class != "ProviderModel":
             raise InvalidRequest(
-                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj.base_object_class}"
+                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj_res.obj.base_object_class}"
             )
 
+        provider_model_obj = ProviderModel.model_validate(
+            provider_model_obj_res.obj.val
+        )
+
         # Use the provider model's name as the actual model name for the API call
-        actual_model_name = provider_model_obj.val.get("name")
+        actual_model_name = provider_model_obj.name
 
     except Exception as e:
         raise InvalidRequest(f"Failed to fetch provider_model information: {str(e)}")
@@ -256,4 +281,10 @@ def get_custom_provider_info(
             api_key_name=secret_name,
         )
 
-    return base_url, api_key, extra_headers, return_type, actual_model_name
+    return CustomProviderInfo(
+        base_url=base_url,
+        api_key=api_key,
+        extra_headers=extra_headers,
+        return_type=return_type,
+        actual_model_name=actual_model_name,
+    )

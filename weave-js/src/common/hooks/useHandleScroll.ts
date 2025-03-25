@@ -1,5 +1,7 @@
 import {useEffect, useState} from 'react';
 
+// This hook is copied from core
+// Its function is to determine if the navbar is within the viewport
 export function useHandleScroll(): {scrolled: boolean; scrollWidth: number} {
   const [scrolled, setScrolled] = useState(false);
   const [scrollWidth, setScrollWidth] = useState(0);

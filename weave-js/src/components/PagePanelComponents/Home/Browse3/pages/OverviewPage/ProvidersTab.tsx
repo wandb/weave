@@ -7,15 +7,15 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {useCallback, useMemo} from 'react';
+import React, {useState} from 'react';
 
 import {DeleteModal} from '../common/DeleteModal';
 import {Link} from '../common/Links';
 import {useConfiguredProviders} from '../PlaygroundPage/useConfiguredProviders';
-import {useWFHooks, WFDataModelAutoProvider} from '../wfReactInterface/context';
-import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {WFDataModelAutoProvider} from '../wfReactInterface/context';
 import {AddProviderDrawer} from './AddProviderDrawer';
 import {ProviderTable} from './ProviderTable';
+import {useCustomProviders} from './useCustomProviders';
 
 const ProviderStatus = ({isActive}: {isActive: boolean}) => {
   return (
@@ -84,19 +84,19 @@ const columns: GridColDef[] = [
 const customColumns: GridColDef[] = [
   {
     field: 'name',
-    headerName: 'NAME',
+    headerName: 'Name',
     flex: 0.25,
     minWidth: 200,
   },
   {
     field: 'models',
-    headerName: 'MODELS',
+    headerName: 'Models',
     flex: 0.25,
     minWidth: 200,
   },
   {
     field: 'lastUpdated',
-    headerName: 'LAST UPDATED',
+    headerName: 'Last updated',
     flex: 0.5,
     minWidth: 200,
     renderCell: (params: GridRenderCellParams) => (
@@ -127,12 +127,9 @@ export const ProvidersTabInner: React.FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const {objectDeleteAllVersions} = useObjectDeleteFunc();
-
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
-  const [editingProvider, setEditingProvider] = React.useState<any>(null);
-  const [deletingProvider, setDeletingProvider] = React.useState<any>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<any>(null);
+  const [deletingProvider, setDeletingProvider] = useState<any>(null);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isAdmin = !loadingUserInfo && userInfo?.roles[entityName] === 'admin';
 
@@ -150,163 +147,15 @@ export const ProvidersTabInner: React.FC<{
     })
   );
 
-  const {
-    result: customProvidersResult,
-    loading: customProvidersLoading,
-    refetch: refetchCustomProviders,
-  } = useBaseObjectInstances('Provider', {
-    project_id: `${entityName}/${projectName}`,
-    filter: {
-      latest_only: true,
-    },
-  });
-
-  const {
-    result: customProviderModelsResult,
-    loading: customProviderModelsLoading,
-    refetch: refetchCustomProviderModels,
-  } = useBaseObjectInstances('ProviderModel', {
-    project_id: `${entityName}/${projectName}`,
-    filter: {
-      latest_only: true,
-    },
-  });
-
-  const {
-    result: customModelsResult,
-    loading: customModelsLoading,
-    refetch: refetchCustomModels,
-  } = useBaseObjectInstances('LLMModel', {
-    project_id: `${entityName}/${projectName}`,
-    filter: {
-      latest_only: true,
-    },
-  });
-
-  const getModels = (providerModels: any[], llmModels: any[]) => {
-    const filteredLlmModels = llmModels.filter(llmModel =>
-      providerModels.some(
-        providerModel => providerModel.digest === llmModel.val.provider_model
-      )
-    );
-
-    const noLLLMModelProviderModels = providerModels.filter(
-      providerModel =>
-        !filteredLlmModels.some(
-          llmModel => llmModel.digest === providerModel.digest
-        )
-    );
-
-    return {
-      llmModels: filteredLlmModels,
-      modelCount: filteredLlmModels.length + noLLLMModelProviderModels.length,
-    };
-  };
-
-  const refetch = useCallback(() => {
-    refetchCustomProviders();
-    refetchCustomProviderModels();
-    refetchCustomModels();
-  }, [
-    refetchCustomModels,
-    refetchCustomProviderModels,
-    refetchCustomProviders,
-  ]);
-
-  const customProviders: any[] = useMemo(
-    () =>
-      customProvidersResult?.map(provider => {
-        const providerModels =
-          customProviderModelsResult?.filter(
-            model => model.val.provider === provider.digest
-          ) || [];
-
-        const {llmModels, modelCount} = getModels(
-          providerModels,
-          customModelsResult || []
-        );
-
-        return {
-          id: provider.digest,
-          name: provider.val.name,
-          baseUrl: provider.val.base_url,
-          apiKeyName: provider.val.api_key_name,
-          description: provider.val.description,
-          returnType: provider.val.return_type,
-          extraHeaders: Object.entries(provider.val.extra_headers || {}) || [],
-          lastUpdated: provider.created_at,
-          providerModels,
-          llmModels,
-          models: modelCount,
-          delete: () => {
-            setDeletingProvider({
-              name: provider.val.name,
-              deleteAction: async () => {
-                setDeletingProvider(null);
-                await objectDeleteAllVersions({
-                  entity: entityName,
-                  project: projectName,
-                  objectId: provider.val.name || '',
-                  weaveKind: 'object',
-                  scheme: 'weave',
-                  versionHash: '',
-                  path: '',
-                });
-
-                await Promise.all(
-                  providerModels.map(model =>
-                    objectDeleteAllVersions({
-                      entity: entityName,
-                      project: projectName,
-                      objectId: `${provider.val.name}-${model.val.name}`,
-                      weaveKind: 'object',
-                      scheme: 'weave',
-                      versionHash: '',
-                      path: '',
-                    })
-                  )
-                );
-
-                await Promise.all(
-                  llmModels.map(model =>
-                    objectDeleteAllVersions({
-                      entity: entityName,
-                      project: projectName,
-                      objectId: model.val.name,
-                      weaveKind: 'object',
-                      scheme: 'weave',
-                      versionHash: '',
-                      path: '',
-                    })
-                  )
-                );
-
-                refetch();
-              },
-            });
-          },
-          edit: () => {
-            setEditingProvider({
-              name: provider.val.name,
-              baseUrl: provider.val.base_url,
-              apiKey: provider.val.api_key_name,
-              models: providerModels.map(model => model.val.name),
-              headers: Object.entries(provider.val.extra_headers || {}),
-              maxTokens: providerModels.map(model => model.val.max_tokens),
-            });
-            setIsDrawerOpen(true);
-          },
-        };
-      }) || [],
-    [
-      customProvidersResult,
-      customProviderModelsResult,
-      customModelsResult,
+  // Use our custom hook for custom providers
+  const {customProviders, customProvidersLoading, refetch} = useCustomProviders(
+    {
       entityName,
       projectName,
-      objectDeleteAllVersions,
-      refetch,
-    ]
+      setEditingProvider,
+      setIsDrawerOpen,
+      setDeletingProvider,
+    }
   );
 
   return (
@@ -353,11 +202,7 @@ export const ProvidersTabInner: React.FC<{
               <ProviderTable
                 columns={customColumns}
                 providers={customProviders}
-                loading={
-                  customProvidersLoading ||
-                  customProviderModelsLoading ||
-                  customModelsLoading
-                }
+                loading={customProvidersLoading}
               />
             </div>
           </div>
@@ -368,7 +213,11 @@ export const ProvidersTabInner: React.FC<{
         projectId={`${entityName}/${projectName}`}
         onClose={() => setIsDrawerOpen(false)}
         refetch={refetch}
-        providers={customProviders.map(provider => provider.name)}
+        providers={
+          customProviders
+            .map(provider => provider.name)
+            .filter(Boolean) as string[]
+        }
         editingProvider={editingProvider}
       />
       <DeleteModal

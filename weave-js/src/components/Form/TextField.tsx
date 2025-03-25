@@ -93,7 +93,7 @@ export const TextField = ({
     <Tailwind style={{width: '100%'}}>
       <div
         className={classNames(
-          'relative rounded-sm',
+          'relative rounded-[5px]',
           textFieldSize === 'small'
             ? 'h-30'
             : textFieldSize === 'medium'
@@ -118,7 +118,7 @@ export const TextField = ({
             'pointer-events-none opacity-50': disabled,
           }
         )}>
-        <div className="absolute bottom-0 top-0 flex w-full items-center rounded-sm">
+        <div className="absolute bottom-0 top-0 flex w-full items-center rounded-[5px]">
           {prefix && (
             <div
               className={classNames(
@@ -130,7 +130,7 @@ export const TextField = ({
           )}
           <input
             className={classNames(
-              'h-full w-full flex-1 rounded-sm bg-inherit pr-8',
+              'h-full w-full flex-1 rounded-[5px] bg-inherit pr-8',
               'appearance-none border-none',
               'focus:outline-none',
               'placeholder-moon-500',

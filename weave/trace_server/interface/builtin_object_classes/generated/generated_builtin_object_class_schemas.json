@@ -331,6 +331,7 @@
       "title": "LlmJudgeActionConfig",
       "type": "object"
     },
+<<<<<<< HEAD
     "ModelMode": {
       "enum": [
         "completion",
@@ -423,6 +424,8 @@
       "title": "ModelParams",
       "type": "object"
     },
+=======
+>>>>>>> josiah/add-custom-providers-playground
     "Provider": {
       "properties": {
         "name": {
@@ -461,12 +464,23 @@
           "additionalProperties": {
             "type": "string"
           },
+<<<<<<< HEAD
           "default": {},
+=======
+>>>>>>> josiah/add-custom-providers-playground
           "title": "Extra Headers",
           "type": "object"
         },
         "return_type": {
+<<<<<<< HEAD
           "$ref": "#/$defs/ReturnType",
+=======
+          "allOf": [
+            {
+              "$ref": "#/$defs/ProviderReturnType"
+            }
+          ],
+>>>>>>> josiah/add-custom-providers-playground
           "default": "openai"
         }
       },
@@ -510,10 +524,13 @@
         "max_tokens": {
           "title": "Max Tokens",
           "type": "integer"
+<<<<<<< HEAD
         },
         "mode": {
           "$ref": "#/$defs/ModelMode",
           "default": "chat"
+=======
+>>>>>>> josiah/add-custom-providers-playground
         }
       },
       "required": [
@@ -523,11 +540,20 @@
       "title": "ProviderModel",
       "type": "object"
     },
+<<<<<<< HEAD
     "ReturnType": {
       "enum": [
         "openai"
       ],
       "title": "ReturnType",
+=======
+    "ProviderReturnType": {
+      "const": "openai",
+      "enum": [
+        "openai"
+      ],
+      "title": "ProviderReturnType",
+>>>>>>> josiah/add-custom-providers-playground
       "type": "string"
     },
     "TestOnlyExample": {
@@ -646,9 +672,12 @@
     "Provider": {
       "$ref": "#/$defs/Provider"
     },
+<<<<<<< HEAD
     "LLMModel": {
       "$ref": "#/$defs/LLMModel"
     },
+=======
+>>>>>>> josiah/add-custom-providers-playground
     "ProviderModel": {
       "$ref": "#/$defs/ProviderModel"
     }
@@ -660,7 +689,10 @@
     "ActionSpec",
     "AnnotationSpec",
     "Provider",
+<<<<<<< HEAD
     "LLMModel",
+=======
+>>>>>>> josiah/add-custom-providers-playground
     "ProviderModel"
   ],
   "title": "CompositeBaseObject",

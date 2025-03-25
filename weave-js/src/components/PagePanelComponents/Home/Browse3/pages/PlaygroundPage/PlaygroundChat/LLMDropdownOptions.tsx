@@ -43,6 +43,7 @@ export const DisabledProviderTooltip: React.FC<{
   return (
     <Tooltip
       trigger={children}
+      aria-label="Provider configuration status"
       content={
         <Box
           sx={{
@@ -59,6 +60,7 @@ export const DisabledProviderTooltip: React.FC<{
               <Link
                 to={`/${entity}/settings`}
                 target="_blank"
+                aria-label="Go to team settings to configure missing secrets"
                 rel="noopener noreferrer"
                 style={{
                   color: TEAL_500,

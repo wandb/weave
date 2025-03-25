@@ -116,6 +116,7 @@ export {
   IconLayoutHorizontal,
   IconLayoutTabs,
   IconLayoutVertical,
+  IconLightboard,
   IconLightbulbInfo,
   IconLinearScale,
   IconLinePlotAlt2,

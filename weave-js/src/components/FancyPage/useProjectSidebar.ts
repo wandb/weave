@@ -60,16 +60,21 @@ export const useProjectSidebar = (
       ? []
       : [
           {
-            type: 'label' as const,
-            label: 'Models',
-            isShown: isShowAll,
-          },
-          {
             type: 'button' as const,
             name: 'Overview',
             slug: 'overview',
             isShown: true,
             iconName: IconNames.Info,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerOverview',
+            isShown: isShowAll,
+          },
+          {
+            type: 'label' as const,
+            label: 'Models',
+            isShown: isShowAll,
           },
           {
             type: 'button' as const,
