@@ -2,15 +2,20 @@ import {ApolloProvider} from '@apollo/client';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React from 'react';
+import {Timestamp} from '@wandb/weave/components/Timestamp';
+import React, {useState} from 'react';
 
+import {DeleteModal} from '../common/DeleteModal';
 import {Link} from '../common/Links';
 import {useConfiguredProviders} from '../PlaygroundPage/useConfiguredProviders';
 import {WFDataModelAutoProvider} from '../wfReactInterface/context';
+import {AddProviderDrawer} from './AddProviderDrawer';
 import {ProviderTable} from './ProviderTable';
+import {useCustomProviders} from './useCustomProviders';
 
 const ProviderStatus = ({isActive}: {isActive: boolean}) => {
   return (
@@ -49,7 +54,17 @@ const columns: GridColDef[] = [
     minWidth: 200,
     renderCell: (params: GridRenderCellParams) => (
       <div className="flex h-full items-center justify-between">
-        <span className="text-moon-500">{params.value || 'None'}</span>
+        <span
+          className="text-moon-500"
+          style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            display: 'inline-block',
+          }}>
+          {params.value || 'None'}
+        </span>
         {params.row.isAdmin && !params.row.status && (
           <Link
             to={`/${params.row.entityName}/settings`}
@@ -66,9 +81,55 @@ const columns: GridColDef[] = [
   },
 ];
 
+const customColumns: GridColDef[] = [
+  {
+    field: 'name',
+    headerName: 'Name',
+    flex: 0.25,
+    minWidth: 200,
+  },
+  {
+    field: 'models',
+    headerName: 'Models',
+    flex: 0.25,
+    minWidth: 200,
+  },
+  {
+    field: 'lastUpdated',
+    headerName: 'Last updated',
+    flex: 0.5,
+    minWidth: 200,
+    renderCell: (params: GridRenderCellParams) => (
+      <div className="flex h-full items-center justify-between">
+        <Timestamp value={params.value} format="relative" />
+        <div className="flex h-full items-center justify-end">
+          <Button
+            variant="ghost"
+            icon="pencil-edit"
+            onClick={() => {
+              params.row.edit();
+            }}
+          />
+          <Button
+            variant="ghost"
+            icon="delete"
+            onClick={() => {
+              params.row.delete();
+            }}
+          />
+        </div>
+      </div>
+    ),
+  },
+];
+
 export const ProvidersTabInner: React.FC<{
   entityName: string;
-}> = ({entityName}) => {
+  projectName: string;
+}> = ({entityName, projectName}) => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<any>(null);
+  const [deletingProvider, setDeletingProvider] = useState<any>(null);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isAdmin = !loadingUserInfo && userInfo?.roles[entityName] === 'admin';
 
@@ -84,6 +145,17 @@ export const ProvidersTabInner: React.FC<{
       isAdmin,
       entityName,
     })
+  );
+
+  // Use our custom hook for custom providers
+  const {customProviders, customProvidersLoading, refetch} = useCustomProviders(
+    {
+      entityName,
+      projectName,
+      setEditingProvider,
+      setIsDrawerOpen,
+      setDeletingProvider,
+    }
   );
 
   return (
@@ -109,8 +181,55 @@ export const ProvidersTabInner: React.FC<{
               />
             </div>
           </div>
+
+          <div>
+            <div>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="mb-2 text-xl font-bold">Custom providers</h2>
+                  <p className="text-moon-500">
+                    Custom providers and models are configured at the project
+                    level.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  icon="add-new"
+                  onClick={() => setIsDrawerOpen(true)}>
+                  Add a provider
+                </Button>
+              </div>
+              <ProviderTable
+                columns={customColumns}
+                providers={customProviders}
+                loading={customProvidersLoading}
+              />
+            </div>
+          </div>
         </div>
       </div>
+      <AddProviderDrawer
+        isOpen={isDrawerOpen}
+        projectId={`${entityName}/${projectName}`}
+        onClose={() => setIsDrawerOpen(false)}
+        refetch={refetch}
+        providers={
+          customProviders
+            .map(provider => provider.name)
+            .filter(Boolean) as string[]
+        }
+        editingProvider={editingProvider}
+      />
+      <DeleteModal
+        open={deletingProvider != null}
+        onClose={() => setDeletingProvider(null)}
+        deleteTitleStr={`custom provider "${deletingProvider?.name}"?`}
+        deleteBodyStrs={[
+          'This action cannot be undone.',
+          'All custom models and provider models will also be deleted.',
+        ]}
+        onDelete={deletingProvider?.deleteAction}
+      />
     </Tailwind>
   );
 };
@@ -124,7 +243,7 @@ export const ProvidersTab: React.FC<{
       <WFDataModelAutoProvider
         entityName={entityName}
         projectName={projectName}>
-        <ProvidersTabInner entityName={entityName} />
+        <ProvidersTabInner entityName={entityName} projectName={projectName} />
       </WFDataModelAutoProvider>
     </ApolloProvider>
   );
