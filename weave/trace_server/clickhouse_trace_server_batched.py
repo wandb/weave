@@ -579,40 +579,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 }
             )
 
-        # find all descendants of requested root calls
-        query = """
-        WITH RECURSIVE descendants AS (
-            -- Base case: get the root calls
-            SELECT id, parent_id
-            FROM call_parts
-            WHERE project_id = {project_id:String}
-                AND id IN {call_ids:Array(String)}
-                AND deleted_at IS NULL
-
-            UNION ALL
-
-            -- Recursive case: get children of descendants
-            SELECT c.id, c.parent_id
-            FROM call_parts c
-            INNER JOIN descendants d ON c.parent_id = d.id
-            WHERE c.project_id = {project_id:String}
-                AND c.deleted_at IS NULL
+        all_descendants = self._get_call_descendant_ids(
+            project_id=req.project_id,
+            call_ids=req.call_ids,
+            include_root=True,
         )
-        SELECT DISTINCT id FROM descendants
-        LIMIT 100000
-        SETTINGS allow_experimental_analyzer=1
-        """
-
-        # Execute recursive query to get all descendant IDs
-        result = self.ch_client.query(
-            query,
-            parameters={
-                "project_id": req.project_id,
-                "call_ids": req.call_ids,
-            },
-        )
-        all_descendants = [row[0] for row in result.result_rows]
-
         deleted_at = datetime.datetime.now()
         insertables = [
             CallDeleteCHInsertable(
