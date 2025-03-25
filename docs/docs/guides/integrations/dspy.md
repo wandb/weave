@@ -84,3 +84,5 @@ class DraftArticle(dspy.Module):
 draft_article = DraftArticle()
 article = draft_article(topic="World Cup 2002")
 ```
+
+[![](imgs/dspy/dspy_custom_module.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
