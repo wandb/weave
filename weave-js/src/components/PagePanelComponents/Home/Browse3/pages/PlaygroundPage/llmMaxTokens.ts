@@ -1,3 +1,5 @@
+import levenshtein from 'js-levenshtein';
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
@@ -543,4 +545,41 @@ export const LLM_PROVIDER_LABELS: Record<
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
   deepseek: 'DeepSeek',
+};
+
+// Example usage:
+// findMaxTokensByModelName('gpt-4') // returns 4096
+// findMaxTokensByModelName('gpt-4-turbo') // returns 4096
+// findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
+// findMaxTokensByModelName('completely-unknown-model') // returns 4096
+export const findMaxTokensByModelName = (modelName: string): number => {
+  // Default to a reasonable max_tokens value if no close match is found
+  const DEFAULT_MAX_TOKENS = 4096;
+
+  // If the model name is an exact match, return its max_tokens
+  if (modelName in LLM_MAX_TOKENS) {
+    return LLM_MAX_TOKENS[modelName as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Find the closest match using Levenshtein distance
+  let closestMatch = '';
+  let minDistance = Infinity;
+
+  Object.keys(LLM_MAX_TOKENS).forEach(key => {
+    const distance = levenshtein(modelName.toLowerCase(), key.toLowerCase());
+
+    // Update closest match if this distance is smaller
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestMatch = key;
+    }
+  });
+
+  // If we found a reasonably close match (distance less than half the length of the model name)
+  if (minDistance < modelName.length / 2) {
+    return LLM_MAX_TOKENS[closestMatch as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Return default if no close match found
+  return DEFAULT_MAX_TOKENS;
 };
