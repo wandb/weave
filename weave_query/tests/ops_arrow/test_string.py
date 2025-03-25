@@ -287,7 +287,6 @@ class TestConcatenateStrings:
         expected = [None, None, None]
         assert result.to_pylist_notags() == expected
 
-    # @pytest.mark.xfail(reason="Dictionary array concatenation is not supported yet")
     def test_dictionary_array(self):
         arrow_data = ["hello", "world", None]
         dict_array = pa.DictionaryArray.from_arrays(
