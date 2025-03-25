@@ -52,7 +52,7 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const weave = useWeaveContext();
 
   const {tableState, autoTable} = useAutomatedTableState(
-    input,
+    inputNode,
     (config as any).tableState,
     weave
   );
@@ -632,7 +632,7 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const weave = useWeaveContext();
 
   const {tableState, autoTable} = useAutomatedTableState(
-    input,
+    inputNode,
     (config as any).tableState,
     weave
   );
