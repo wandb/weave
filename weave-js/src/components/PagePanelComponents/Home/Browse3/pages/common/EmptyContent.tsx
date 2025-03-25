@@ -229,8 +229,14 @@ export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
   description: 'Configure an LLM provider to start using the playground.',
   moreInformation: (
     <>
-        Get started by configuring your `OPENAI_API_KEY` secret in your team's secrets.<br />
-        You can find your OpenAI API key in your <TargetBlank href="https://platform.openai.com/api-keys">OpenAI dashboard</TargetBlank>.
+      Get started by configuring your `OPENAI_API_KEY` secret in your team's
+      secrets.
+      <br />
+      You can find your OpenAI API key in your{' '}
+      <TargetBlank href="https://platform.openai.com/api-keys">
+        OpenAI dashboard
+      </TargetBlank>
+      .
     </>
   ),
 };

@@ -1,8 +1,9 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_500, MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, MOON_500, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import getConfig from '@wandb/weave/config';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -26,6 +27,7 @@ const EmptyWithSettingsButton: React.FC<{
   onSettingsClick: () => void;
   entity: string;
 }> = ({emptyProps, onSettingsClick, entity}) => {
+  const {urlPrefixed} = getConfig();
   return (
     <Box
       sx={{
@@ -45,7 +47,7 @@ const EmptyWithSettingsButton: React.FC<{
         <Button
           variant="primary"
           onClick={() => {
-            window.open(`https://wandb.ai/${entity}/settings`, '_blank');
+            window.open(urlPrefixed(`/${entity}/settings`), '_blank');
             onSettingsClick();
           }}
           icon="key-admin"
