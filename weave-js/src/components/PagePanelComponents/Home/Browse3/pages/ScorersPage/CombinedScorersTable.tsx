@@ -13,6 +13,8 @@ import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_SCORERS} from '../common/EmptyContent';
 import {basicField} from '../common/DataTable';
 import {
   CustomLink,
@@ -374,16 +376,20 @@ export const CombinedScorersTable: React.FC<{
   );
 
   if (objectVersions.loading) {
-    return <div>Loading...</div>;
+    return <LoadingDots />;
   }
 
   if (objectVersions.error) {
     return <div>Error loading scorers</div>;
   }
 
+  if (!objectVersions.result || objectVersions.result.length === 0) {
+    return <Empty {...EMPTY_PROPS_SCORERS} />;
+  }
+
   return (
     <ScorerObjectVersionsTable
-      objectVersions={objectVersions.result ?? []}
+      objectVersions={objectVersions.result}
       objectTitle="Scorer"
     />
   );
