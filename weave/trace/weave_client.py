@@ -9,7 +9,7 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
@@ -87,6 +87,7 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsDescendantsReq,
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
@@ -356,6 +357,39 @@ def _make_calls_iterator(
     )
 
 
+def _make_calls_descendants_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    call_ids: list[str],
+    depth: int | None = None,
+    limit_override: int | None = None,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+) -> CallsIter:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        return list(
+            server.calls_descendants(
+                CallsDescendantsReq(
+                    project_id=project_id,
+                    call_ids=call_ids,
+                    depth=depth,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+
+    def transform_func(call: CallSchema) -> WeaveObject:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        limit=limit_override,
+        page_size=page_size,
+    )
+
+
 def _add_scored_by_to_calls_query(
     scored_by: list[str] | str | None, query: Query | None
 ) -> Query | None:
@@ -616,6 +650,38 @@ class Call:
             page_size=page_size,
         )
 
+    def descendants(
+        self,
+        depth: int | None = None,
+        limit: int | None = None,
+        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+    ) -> CallsIter:
+        """
+        Get the descendants of the call.
+
+        Args:
+            depth: The depth of the descendants to get.
+                example: depth=2 will get all grandchildren of the call.
+            limit: The maximum number of descendants to get.
+            page_size: The page size of the descendants to get.
+        """
+        client = weave_client_context.require_weave_client()
+
+        call_id = self.id
+        if not call_id:
+            raise ValueError(
+                "Can't get descendants of call without ID, was `weave.init` called?"
+            )
+
+        return _make_calls_descendants_iterator(
+            client.server,
+            self.project_id,
+            [call_id],
+            depth=depth,
+            limit_override=limit,
+            page_size=page_size,
+        )
+
     def delete(self) -> bool:
         """Delete the call."""
         client = weave_client_context.require_weave_client()
@@ -808,6 +874,7 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+CallId = str
 
 
 class WeaveClient:
@@ -1324,6 +1391,59 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_calls_descendants(
+        self,
+        calls: Call | WeaveObject | CallId | Iterable[Call | WeaveObject | CallId],
+        depth: int | None = None,
+        limit: int | None = None,
+    ) -> Iterable[Call | WeaveObject]:
+        """Get all descendant calls of given list of calls or call IDs.
+
+        Args:
+            calls: A single call/object/id or iterable of them
+            depth: Maximum depth of descendants to fetch
+            limit: Maximum number of descendants to fetch
+
+        Returns:
+            An iterable of descendant calls
+        """
+        # Convert input to a list of items we can process
+        if isinstance(calls, (Call, WeaveObject, CallId)):
+            items_to_process = [calls]
+        elif isinstance(calls, Iterable):
+            items_to_process = list(calls)
+        else:
+            raise TypeError(
+                f"Invalid call, CallId, or Iterable: {calls}, expected Call, CallId (str), or Iterable[Call | CallId]"
+            )
+
+        call_ids: list[str] = []
+        for item in items_to_process:
+            if isinstance(item, (Call, WeaveObject)):
+                if item.id is None:
+                    raise ValueError(
+                        f"Call has no ID: {item}, expected Call with an ID"
+                    )
+                call_ids.append(item.id)
+            elif isinstance(item, CallId):
+                call_ids.append(item)
+            else:
+                raise TypeError(
+                    f"Invalid call or call ID: {item}, expected Call or CallId (str)"
+                )
+
+        res = self.server.calls_descendants(
+            CallsDescendantsReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
+                depth=depth,
+                limit=limit,
+            )
+        )
+        for server_call in res:
+            yield make_client_call(self.entity, self.project, server_call, self.server)
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:

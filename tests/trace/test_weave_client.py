@@ -20,6 +20,7 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
@@ -36,6 +37,7 @@ from weave.trace.serialization.serializer import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -2389,3 +2391,184 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
     # Verify they all have the same op_name
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
+
+
+def test_calls_descendants_basic(client):
+    """Test basic functionality of calls_descendants including depth limits and multiple children."""
+    # Create parent call
+    parent_call = client.create_call("parent_op", {"x": 5})
+
+    # Create two child calls with different op names
+    child1 = client.create_call("child_op1", {"x": 5}, parent_call)
+    child2 = client.create_call("child_op2", {"x": 5}, parent_call)
+
+    # Create grandchild for child1
+    grandchild = client.create_call("grandchild_op", {"x": 5}, child1)
+
+    # Finish all calls
+    client.finish_call(grandchild, 10)
+    client.finish_call(child1, 10)
+    client.finish_call(child2, 15)
+    client.finish_call(parent_call, 25)
+
+    client.flush()
+
+    # Test getting immediate children only (depth=1)
+    immediate_children = list(client.get_calls_descendants(parent_call, depth=1))
+    assert len(immediate_children) == 2
+    child_op_names = {op_name_from_ref(child.op_name) for child in immediate_children}
+    assert child_op_names == {"child_op1", "child_op2"}
+
+    # Test getting all descendants (depth=2)
+    all_descendants = list(client.get_calls_descendants(parent_call, depth=2))
+    assert len(all_descendants) == 3
+    descendant_op_names = {op_name_from_ref(child.op_name) for child in all_descendants}
+    assert descendant_op_names == {"child_op1", "child_op2", "grandchild_op"}
+
+    # Test getting children for multiple parents
+    parent_call2 = client.create_call("parent_op", {"x": 10})
+    child3 = client.create_call("child_op1", {"x": 10}, parent_call2)
+    client.finish_call(child3, 20)
+    client.finish_call(parent_call2, 20)
+    client.flush()
+
+    multi_parent_children = list(
+        client.get_calls_descendants([parent_call, parent_call2], depth=1)
+    )
+    assert len(multi_parent_children) == 3  # child1, child2, child3
+
+
+def test_get_calls_descendants_input_types(client):
+    """Test that get_calls_descendants accepts different types of input for the calls parameter."""
+    # Create a call with a child
+    parent_call = client.create_call("parent_op", {"x": 5})
+    child_call = client.create_call("child_op", {"x": 5}, parent_call)
+    client.finish_call(child_call, 10)
+    client.finish_call(parent_call, 10)
+    client.flush()
+
+    # Test with a single Call object
+    descendants1 = list(client.get_calls_descendants(parent_call))
+    assert len(descendants1) == 1
+    assert op_name_from_ref(descendants1[0].op_name) == "child_op"
+
+    # Test with a single call ID string
+    descendants2 = list(client.get_calls_descendants(parent_call.id))
+    assert len(descendants2) == 1
+    assert op_name_from_ref(descendants2[0].op_name) == "child_op"
+
+    # Test with a list of Call objects
+    descendants3 = list(client.get_calls_descendants([parent_call]))
+    assert len(descendants3) == 1
+    assert op_name_from_ref(descendants3[0].op_name) == "child_op"
+
+    # Test with a list of call ID strings
+    descendants4 = list(client.get_calls_descendants([parent_call.id]))
+    assert len(descendants4) == 1
+    assert op_name_from_ref(descendants4[0].op_name) == "child_op"
+
+    # Test with a mixed list of Call objects and call ID strings, duplicate ids
+    descendants5 = list(client.get_calls_descendants([parent_call, parent_call.id]))
+    assert len(descendants5) == 1
+    assert all(op_name_from_ref(d.op_name) == "child_op" for d in descendants5)
+
+    # Test with invalid input type
+    with pytest.raises(TypeError, match="Invalid call, CallId, or Iterable"):
+        list(client.get_calls_descendants(123))  # type: ignore
+
+
+def test_calls_descendants_edge_cases(client):
+    """Test edge cases for calls_descendants including deleted calls and leaf nodes."""
+    # Test leaf node (no children)
+    leaf_call = client.create_call("leaf_op", {"x": 5})
+    client.finish_call(leaf_call, 15)
+    client.flush()
+
+    leaf_children = list(client.get_calls_descendants(leaf_call, depth=1))
+    assert len(leaf_children) == 0
+
+    # Test deleted parent
+    parent_call = client.create_call("parent_op", {"x": 5})
+    child_call = client.create_call("child_op", {"x": 5}, parent_call)
+    client.finish_call(child_call, 10)
+    client.finish_call(parent_call, 10)
+    client.flush()
+
+    # Delete parent and verify no children are returned
+    client.delete_calls(call_ids=[parent_call.id])
+    deleted_parent_children = list(client.get_calls_descendants(parent_call.id))
+    assert len(deleted_parent_children) == 0
+
+    # Test deleted child
+    parent_call2 = client.create_call("parent_op", {"x": 10})
+    child_call2 = client.create_call("child_op", {"x": 10}, parent_call2)
+    client.finish_call(child_call2, 20)
+    client.finish_call(parent_call2, 20)
+    client.flush()
+
+    all_children = list(client.get_calls_descendants(parent_call2.id))
+    assert len(all_children) == 1
+
+    # Delete child and verify it's no longer returned
+    client.delete_calls(call_ids=[all_children[0].id])
+    remaining_children = list(client.get_calls_descendants(parent_call2.id))
+    assert len(remaining_children) == 0
+
+    # Test invalid parameters
+    with pytest.raises(ValueError, match="Depth must be a positive integer"):
+        list(client.get_calls_descendants(parent_call2.id, depth=-1))
+
+    with pytest.raises(ValueError, match="Limit must be a positive integer"):
+        list(client.get_calls_descendants(parent_call2.id, limit=-1))
+
+    with pytest.raises(
+        RequestTooLarge, match="Cannot get more than 100000 children at once"
+    ):
+        list(client.get_calls_descendants(parent_call2.id, limit=100_001))
+
+
+def test_calls_descendants_class_method(client):
+    """Test the descendants() method on Call objects."""
+    # Create a call hierarchy
+    parent_call = client.create_call("parent_op", {"x": 5})
+    child_call = client.create_call("child_op", {"x": 5}, parent_call)
+    grandchild_call = client.create_call("grandchild_op", {"x": 5}, child_call)
+
+    # Finish all calls
+    client.finish_call(grandchild_call, 15)
+    client.finish_call(child_call, 10)
+    client.finish_call(parent_call, 10)
+    client.flush()
+
+    # Test getting all descendants
+    descendants = list(parent_call.descendants())
+    assert len(descendants) == 2
+    descendant_op_names = {op_name_from_ref(d.op_name) for d in descendants}
+    assert descendant_op_names == {"child_op", "grandchild_op"}
+
+    # Test getting descendants with depth
+    depth1_descendants = list(parent_call.descendants(depth=1))
+    assert len(depth1_descendants) == 1
+    assert op_name_from_ref(depth1_descendants[0].op_name) == "child_op"
+
+    # Test getting descendants with limit
+    limited_descendants = list(parent_call.descendants(limit=1))
+    assert len(limited_descendants) == 1
+    assert op_name_from_ref(limited_descendants[0].op_name) == "child_op"
+
+
+def test_calls_descendants_massive(client):
+    """Test that get_calls_descendants can handle a large number of descendants."""
+    # Create a parent call
+    parent_call = client.create_call("parent_op", {"x": 5})
+
+    # Create 10_000 child calls
+    for batch in range(10_000 // 500):
+        for i in range(500):
+            call = client.create_call("child_op", {"x": i}, parent_call)
+            client.finish_call(call)
+        client.flush()
+
+    # Test getting all descendants
+    descendants = list(client.get_calls_descendants(parent_call))
+    assert len(descendants) == 10_000

@@ -19,6 +19,7 @@ from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
+    RequestTooLarge,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -590,9 +591,108 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 query=req.query,
             )
         ).calls
-        return tsi.CallsQueryStatsRes(
-            count=len(calls),
+        return tsi.CallsQueryStatsRes(count=len(calls))
+
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
+        """Get descendant calls for given call IDs."""
+        if req.depth is not None and req.depth < 0:
+            raise ValueError("Depth must be a positive integer")
+
+        limit = req.limit or 100_000
+        if limit > 100_000:
+            raise RequestTooLarge(
+                f"Cannot get more than 100000 children at once (requested: {req.limit})."
+            )
+        elif limit < 0:
+            raise ValueError("Limit must be a positive integer")
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        # Get all child calls recursively
+        cursor.execute(
+            """
+            WITH RECURSIVE call_tree AS (
+                -- Base case: get immediate children
+                SELECT
+                    c.id,
+                    c.project_id,
+                    c.trace_id,
+                    c.parent_id,
+                    c.op_name,
+                    c.started_at,
+                    c.ended_at,
+                    c.inputs,
+                    c.output,
+                    c.attributes,
+                    c.summary,
+                    c.exception,
+                    c.wb_user_id,
+                    c.wb_run_id,
+                    c.deleted_at,
+                    c.display_name,
+                    1 as depth
+                FROM calls c
+                WHERE c.parent_id IN ({})
+                    AND c.deleted_at IS NULL
+                    AND c.project_id = ?
+
+                UNION ALL
+
+                -- Recursive case: get children of children
+                SELECT
+                    c.id,
+                    c.project_id,
+                    c.trace_id,
+                    c.parent_id,
+                    c.op_name,
+                    c.started_at,
+                    c.ended_at,
+                    c.inputs,
+                    c.output,
+                    c.attributes,
+                    c.summary,
+                    c.exception,
+                    c.wb_user_id,
+                    c.wb_run_id,
+                    c.deleted_at,
+                    c.display_name,
+                    ct.depth + 1 as depth
+                FROM calls c
+                JOIN call_tree ct ON c.parent_id = ct.id
+                WHERE c.project_id = ?
+                    AND c.deleted_at IS NULL
+                    AND (? IS NULL OR ct.depth < ?)
+            )
+            SELECT * FROM call_tree
+            ORDER BY started_at ASC
+            LIMIT ?
+            """.format(",".join("?" * len(req.call_ids))),
+            req.call_ids
+            + [req.project_id, req.project_id, req.depth, req.depth, limit],
         )
+
+        rows = cursor.fetchall()
+
+        for row in rows:
+            yield tsi.CallSchema(
+                id=row[0],
+                project_id=row[1],
+                trace_id=row[2],
+                parent_id=row[3],
+                op_name=row[4],
+                started_at=row[5],
+                ended_at=row[6],
+                inputs=json.loads(row[7]) if row[7] else {},
+                output=json.loads(row[8]) if row[8] else {},
+                attributes=json.loads(row[9]) if row[9] else None,
+                summary=json.loads(row[10]) if row[10] else None,
+                exception=row[11],
+                wb_user_id=row[12],
+                wb_run_id=row[13],
+                deleted_at=row[14],
+                display_name=row[15],
+            )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)

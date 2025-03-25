@@ -106,7 +106,7 @@ class CallSchema(BaseModel):
     # Exception is present if the call failed
     exception: Optional[str] = None
 
-    # Outputs
+    # Output
     output: Optional[Any] = None
 
     # Summary: a summary of the call
@@ -163,7 +163,7 @@ class EndedCallSchemaForInsert(BaseModel):
     # Exception is present if the call failed
     exception: Optional[str] = None
 
-    # Outputs
+    # Output
     output: Optional[Any] = None
 
     # Summary: a summary of the call
@@ -251,6 +251,41 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
+class CallsDescendantsReq(BaseModel):
+    project_id: str
+    call_ids: list[str] = Field(
+        description="List of call IDs to get descendants for",
+        examples=[["0193e107-8fcf-7630-b576-977cc3062e2e"]],
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        description="The maximum number of descendants to return. The default, None, is all descendants.",
+        examples=[100],
+    )
+    columns: Optional[list[str]] = Field(
+        default=None,
+        description="List of columns to select, defaults to all columns",
+        examples=[
+            [
+                "id",
+                "op_name",
+                "attributes",
+                "inputs",
+                "output",
+                "summary",
+            ]
+        ],
+    )
+    depth: Optional[int] = Field(
+        default=None,
+        description="The depth of the descendants to return. The default, None, is all descendants. Depth 2 would stop at grandchildren",
+        examples=[1],
+    )
+
+    # wb_user_id is automatically populated by the server
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
     messages: list = []
@@ -309,7 +344,7 @@ class CallsFilter(BaseModel):
 
 class SortBy(BaseModel):
     # Field should be a key of `CallSchema`. For dictionary fields
-    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # (`attributes`, `inputs`, `output`, `summary`), the field can be
     # dot-separated.
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
@@ -915,6 +950,7 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
+    def calls_descendants(self, req: CallsDescendantsReq) -> Iterator[CallSchema]: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
