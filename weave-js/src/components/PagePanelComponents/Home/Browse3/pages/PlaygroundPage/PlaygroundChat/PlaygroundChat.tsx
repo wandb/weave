@@ -26,7 +26,8 @@ const EmptyWithSettingsButton: React.FC<{
   emptyProps: typeof EMPTY_PROPS_NO_LLM_PROVIDERS;
   onSettingsClick: () => void;
   entity: string;
-}> = ({emptyProps, onSettingsClick, entity}) => {
+  project: string;
+}> = ({emptyProps, onSettingsClick, entity, project}) => {
   const {urlPrefixed} = getConfig();
   return (
     <Box
@@ -44,16 +45,26 @@ const EmptyWithSettingsButton: React.FC<{
           alignItems: 'center',
           gap: '8px',
         }}>
-        <Button
-          variant="primary"
-          onClick={() => {
-            window.open(urlPrefixed(`/${entity}/settings`), '_blank');
-            onSettingsClick();
-          }}
-          icon="key-admin"
-          size="medium">
-          Configure LLM key
-        </Button>
+        <Box sx={{display: 'flex', gap: '8px'}}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              window.open(urlPrefixed(`/${entity}/${project}`), '_blank');
+            }}
+            size="medium">
+            View all providers
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              window.open(urlPrefixed(`/${entity}/settings`), '_blank');
+              onSettingsClick();
+            }}
+            icon="key-admin"
+            size="medium">
+            Configure LLM secret
+          </Button>
+        </Box>
         <Tailwind>
           <div className="text-sm" style={{color: MOON_500}}>
             Note: You must be a team admin to edit your secrets.
@@ -127,13 +138,75 @@ export const PlaygroundChat = ({
           width: '100%',
           height: '100%',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          overflow: 'hidden',
         }}>
-        <EmptyWithSettingsButton
-          emptyProps={EMPTY_PROPS_NO_LLM_PROVIDERS}
-          onSettingsClick={() => setSettingsTab(0)}
-          entity={entity}
+        <Box
+          sx={{
+            width: '100%',
+            height: '100%',
+            maxHeight: 'calc(100% - 130px)',
+            display: 'flex',
+            position: 'relative',
+          }}>
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+            }}>
+            <Box
+              sx={{
+                backgroundColor: 'white',
+                borderBottom: `1px solid ${MOON_200}`,
+                position: 'absolute',
+                top: '0',
+                width: '100%',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                zIndex: 10,
+              }}>
+              <PlaygroundChatTopBar
+                idx={0}
+                settingsTab={settingsTab}
+                setSettingsTab={setSettingsTab}
+                setPlaygroundStateField={setPlaygroundStateField}
+                setPlaygroundStates={setPlaygroundStates}
+                playgroundStates={playgroundStates}
+                entity={entity}
+                project={project}
+              />
+            </Box>
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingTop: '48px',
+              }}>
+              <EmptyWithSettingsButton
+                emptyProps={EMPTY_PROPS_NO_LLM_PROVIDERS}
+                onSettingsClick={() => setSettingsTab(0)}
+                entity={entity}
+                project={project}
+              />
+            </Box>
+          </Box>
+        </Box>
+        <PlaygroundChatInput
+          chatText={chatText}
+          setChatText={setChatText}
+          isLoading={isAnyLoading}
+          onSend={handleSend}
+          onAdd={handleAddMessage}
+          settingsTab={settingsTab}
         />
       </Box>
     );
