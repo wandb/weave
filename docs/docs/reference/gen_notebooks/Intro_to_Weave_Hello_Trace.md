@@ -22,7 +22,7 @@ You can use Weave to:
 
 Weave traces let you automatically capture the inputs, outputs, and internal structure of your Python functions—especially useful when working with LLMs. By decorating a function with `@weave.op`, Weave records a rich trace of how your function runs, including any nested operations or external API calls. This makes it easy to debug, understand, and visualize how your code is interacting with language models, all from within your notebook.
 
-To get started, complete the prerequisites. Then, define a Weave model with a predict method, create a labeled dataset and scoring function, and run an evaluation using weave.Evaluation.evaluate().
+To get started, complete the prerequisites. Then, define a function with the `@weave.op` decorator to track LLM calls, run it on an example input, and Weave will automatically capture and visualize the trace.
 
 ## 🔑 Prerequisites
 
