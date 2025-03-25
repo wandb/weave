@@ -136,7 +136,11 @@ export const CallDetails: FC<{
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
-            value={{entity: call.entity, project: call.project}}>
+            value={{
+              entity: call.entity,
+              project: call.project,
+              mode: 'object_viewer',
+            }}>
             <ObjectViewerSection title="Inputs" data={inputs} />
           </CustomWeaveTypeProjectContext.Provider>
         </Box>
@@ -158,7 +162,11 @@ export const CallDetails: FC<{
             </div>
           ) : (
             <CustomWeaveTypeProjectContext.Provider
-              value={{entity: call.entity, project: call.project}}>
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
               <ObjectViewerSection title="Output" data={output} isExpanded />
             </CustomWeaveTypeProjectContext.Provider>
           )}

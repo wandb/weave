@@ -189,6 +189,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
             "guides/integrations/instructor",
+            "guides/integrations/crewai",
           ],
         },
       ],
