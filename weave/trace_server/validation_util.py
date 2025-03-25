@@ -16,7 +16,7 @@ def require_otel_trace_id(s: str) -> str:
 
     # 16 Bytes is a hex string of len 32
     if len(s) != 32:
-        raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be 8 bytes")
+        raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be 16 bytes")
     return s
 
 
