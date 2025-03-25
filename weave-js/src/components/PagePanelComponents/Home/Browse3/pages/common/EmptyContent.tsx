@@ -226,18 +226,19 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
 export const EMPTY_PROPS_SCORERS: EmptyProps = {
   icon: 'type-number-alt' as const,
   heading: 'No scorers yet',
-  description: 'Create programmatic scorers in Python or human annotations in the UI.',
+  description:
+    'Create programmatic scorers in Python or human annotations in the UI.',
   moreInformation: (
     <>
       Learn about{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
         programmatic scorers
-      </TargetBlank>
-      {' '}or{' '}
+      </TargetBlank>{' '}
+      or{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
         human annotations
-      </TargetBlank>
-      {' '}to get started.
+      </TargetBlank>{' '}
+      to get started.
     </>
   ),
 };

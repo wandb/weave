@@ -13,9 +13,9 @@ import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {basicField} from '../common/DataTable';
 import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_SCORERS} from '../common/EmptyContent';
-import {basicField} from '../common/DataTable';
 import {
   CustomLink,
   ObjectVersionLink,
