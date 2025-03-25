@@ -99,6 +99,6 @@ class BedrockGuardrailScorer(weave.Scorer):
                 passed=False,
                 metadata={
                     "error": f"Error applying Bedrock guardrail: {str(e)}",
-                    "reason": f"Error applying Bedrock guardrail: {str(e)}"
+                    "reason": f"Error applying Bedrock guardrail: {str(e)}",
                 },
             )
