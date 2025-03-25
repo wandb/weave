@@ -209,6 +209,8 @@ export const ProvidersTabInner: React.FC<{
         </div>
       </div>
       <AddProviderDrawer
+        entityName={entityName}
+        projectName={projectName}
         isOpen={isDrawerOpen}
         projectId={`${entityName}/${projectName}`}
         onClose={() => setIsDrawerOpen(false)}

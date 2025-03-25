@@ -11,6 +11,7 @@ import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
 import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
+import {useWFHooks} from '../wfReactInterface/context';
 import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {
   ApiKeyInput,
@@ -22,6 +23,8 @@ import {
 } from './AddProviderDrawerFormComponents';
 
 interface AddProviderDrawerProps {
+  entityName: string;
+  projectName: string;
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
@@ -38,6 +41,8 @@ interface AddProviderDrawerProps {
 }
 
 export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
+  entityName,
+  projectName,
   projectId,
   isOpen,
   onClose,
@@ -48,6 +53,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
   const {scrollWidth} = useHandleScroll();
   const createProvider = useCreateBuiltinObjectInstance('Provider');
   const createProviderModel = useCreateBuiltinObjectInstance('ProviderModel');
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectDeleteAllVersions} = useObjectDeleteFunc();
+
   const [drawerWidth, setDrawerWidth] = useState(480);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -121,6 +129,31 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       });
     }
 
+    // Delete models that are no longer in the form
+    const deletedModels = (editingProvider?.models || []).filter(
+      model => !modelName.includes(model)
+    );
+    try {
+      await Promise.all([
+        ...deletedModels.map(model =>
+          objectDeleteAllVersions({
+            entity: entityName,
+            project: projectName,
+            objectId: `${editingProvider?.name || ''}-${model || ''}`,
+            weaveKind: 'object',
+            scheme: 'weave',
+            versionHash: '',
+            path: '',
+          })
+        ),
+      ]);
+    } catch (error) {
+      console.error(error);
+      toast(`Failed to delete provider models: ${error}`, {
+        type: 'error',
+      });
+    }
+
     try {
       if (result?.digest) {
         await Promise.all(
@@ -137,8 +170,8 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                     maxTokens[index] || findMaxTokensByModelName(model),
                 },
                 project_id: projectId,
-                // Object ID is the provider name + '/' + model name
-                object_id: name + '/' + model,
+                // Object ID is the provider name + '-' + model name
+                object_id: name + '-' + model,
               },
             });
           })

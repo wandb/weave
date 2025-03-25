@@ -209,6 +209,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
       />
 
       <AddProviderDrawer
+        entityName={entity}
+        projectName={project}
         isOpen={isAddProviderDrawerOpen}
         onClose={handleCloseDrawer}
         refetch={refetch}
