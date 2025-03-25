@@ -13,14 +13,14 @@ def project_id_validator(s: str) -> str:
 def call_id_validator(s: str) -> str:
     try:
         return validation_util.require_otel_span_id(s)
-    except:
+    except validation_util.CHValidationError:
         return validation_util.require_uuid(s)
 
 
 def trace_id_validator(s: str) -> str:
     try:
         return validation_util.require_otel_trace_id(s)
-    except:
+    except validation_util.CHValidationError:
         return validation_util.require_uuid(s)
 
 
