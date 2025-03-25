@@ -137,6 +137,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           gap: '4px',
           backgroundColor: 'transparent',
+          marginLeft: '8px',
         }}>
         <Button
           tooltip={'Clear chat'}

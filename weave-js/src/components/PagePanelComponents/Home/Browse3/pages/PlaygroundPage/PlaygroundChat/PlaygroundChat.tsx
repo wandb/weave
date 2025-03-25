@@ -101,7 +101,7 @@ export const PlaygroundChat = ({
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
-                minWidth: '600px',
+                minWidth: '620px',
               }}>
               {state.loading && (
                 <Box
@@ -154,7 +154,7 @@ export const PlaygroundChat = ({
                   flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto mt-[32px] h-full min-w-[300px] max-w-[800px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
