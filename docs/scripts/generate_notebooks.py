@@ -1,7 +1,8 @@
+import argparse
 import os
 import re
 import tempfile
-import argparse
+
 import nbformat
 from nbconvert import MarkdownExporter
 
@@ -97,7 +98,9 @@ def export_all_notebooks_in_primary_dir():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert Python notebooks to Markdown docs.")
+    parser = argparse.ArgumentParser(
+        description="Convert Python notebooks to Markdown docs."
+    )
     parser.add_argument(
         "notebook_path",
         nargs="?",
@@ -118,10 +121,10 @@ def main():
     else:
         export_all_notebooks_in_primary_dir()
         export_notebook(
-            "./intro_notebook.ipynb", "./docs/reference/gen_notebooks/01-intro_notebook.md"
+            "./intro_notebook.ipynb",
+            "./docs/reference/gen_notebooks/01-intro_notebook.md",
         )
         print("All notebooks exported.")
-
 
 
 if __name__ == "__main__":
