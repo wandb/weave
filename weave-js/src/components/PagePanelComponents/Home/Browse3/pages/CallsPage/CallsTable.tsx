@@ -570,6 +570,12 @@ export const CallsTable: FC<{
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  // Clear selections when switching table types
+  useEffect(() => {
+    clearSelectedCalls();
+  }, [isEvaluateTable, clearSelectedCalls]);
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -801,7 +807,14 @@ export const CallsTable: FC<{
               />
               <div className="text-sm">
                 {selectedCalls.length}{' '}
-                {isEvaluateTable ? 'evaluations' : 'traces'} selected:
+                {isEvaluateTable
+                  ? selectedCalls.length === 1
+                    ? 'evaluation'
+                    : 'evaluations'
+                  : selectedCalls.length === 1
+                  ? 'trace'
+                  : 'traces'}{' '}
+                selected:
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
