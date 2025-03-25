@@ -1,152 +1,382 @@
-import os
+from typing import Literal
 
+import dspy
 import pytest
 
-from weave.integrations.integration_utilities import (
-    flatten_calls,
-    flattened_calls_to_names,
-)
+from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
+
+SAMPLE_EVAL_DATASET = [
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+A machine is set up in such a way that it will short circuit if both the black wire and the red wire touch the battery at the same time. The machine will not short circuit if just one of these wires touches the battery. The black wire is designated as the one that is supposed to touch the battery, while the red wire is supposed to remain in some other part of the machine. One day, the black wire and the red wire both end up touching the battery at the same time. There is a short circuit. Did the black wire cause the short circuit?
+Options:
+- Yes
+- No""",
+            "answer": "No",
+        }
+    ).with_inputs("question"),
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+Long ago, when John was only 17 years old, he got a job working for a large manufacturing company. He started out working on an assembly line for minimum wage, but after a few years at the company, he was given a choice between two line manager positions. He could stay in the woodwork division, which is where he was currently working. Or he could move to the plastics division. John was unsure what to do because he liked working in the woodwork division, but he also thought it might be worth trying something different. He finally decided to switch to the plastics division and try something new. For the last 30 years, John has worked as a production line supervisor in the plastics division. After the first year there, the plastics division was moved to a different building with more space. Unfortunately, through the many years he worked there, John was exposed to asbestos, a highly carcinogenic substance. Most of the plastics division was quite safe, but the small part in which John worked was exposed to asbestos fibers. And now, although John has never smoked a cigarette in his life and otherwise lives a healthy lifestyle, he has a highly progressed and incurable case of lung cancer at the age of 50. John had seen three cancer specialists, all of whom confirmed the worst: that, except for pain, John's cancer was untreatable and he was absolutely certain to die from it very soon (the doctors estimated no more than 2 months). Yesterday, while John was in the hospital for a routine medical appointment, a new nurse accidentally administered the wrong medication to him. John was allergic to the drug and he immediately went into shock and experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate him but he died minutes after the medication was administered. Did John's job cause his premature death?
+Options:
+- Yes
+- No""",
+            "answer": "No",
+        }
+    ).with_inputs("question"),
+    dspy.Example(
+        {
+            "question": """How would a typical person answer each of the following questions about causation?
+Long ago, when John was only 17 years old, he got a job working for a large manufacturing company. He started out working on an assembly line for minimum wage, but after a few years at the company, he was given a choice between two line manager positions. He could stay in the woodwork division, which is where he was currently working. Or he could move to the plastics division. John was unsure what to do because he liked working in the woodwork division, but he also thought it might be worth trying something different. He finally decided to switch to the plastics division and try something new. For the last 30 years, John has worked as a production line supervisor in the plastics division. After the first year there, the plastics division was moved to a different building with more space. Unfortunately, through the many years he worked there, John was exposed to asbestos, a highly carcinogenic substance. Most of the plastics division was quite safe, but the small part in which John worked was exposed to asbestos fibers. And now, although John has never smoked a cigarette in his life and otherwise lives a healthy lifestyle, he has a highly progressed and incurable case of lung cancer at the age of 50. John had seen three cancer specialists, all of whom confirmed the worst: that, except for pain, John's cancer was untreatable and he was absolutely certain to die from it very soon (the doctors estimated no more than 2 months). Yesterday, while John was in the hospital for a routine medical appointment, a new nurse accidentally administered the wrong medication to him. John was allergic to the drug and he immediately went into shock and experienced cardiac arrest (a heart attack). Doctors attempted to resuscitate him but he died minutes after the medication was administered. Did misadministration of medication cause John's premature death?
+Options:
+- Yes
+- No""",
+            "answer": "Yes",
+        }
+    ).with_inputs("question"),
+]
+
+
+def accuracy_metric(answer, model_output, trace=None):
+    predicted_answer = model_output["answer"].lower()
+    return answer["answer"].lower() == predicted_answer
 
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_language_models(client: WeaveClient) -> None:
-    import dspy
+    lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+    result = lm("Say this is a test! Don't say anything else.", temperature=0.7)
+    assert len(result) == 1
+    assert result[0].lower() == "this is a test!"
 
-    os.environ["DSP_CACHEBOOL"] = "False"
+    calls = list(client.calls())
+    assert len(calls) == 3
 
-    gpt3_turbo = dspy.OpenAI(
-        model="gpt-3.5-turbo-1106",
-        max_tokens=300,
-        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
-    )
-    dspy.configure(lm=gpt3_turbo)
-    prediction = gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
-    expected_prediction = "Hello! How can I assist you today?"
-    assert prediction == [expected_prediction]
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 4
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+    output = call.output
+    assert output[0].lower() == "this is a test!"
 
-    assert flattened_calls_to_names(flattened_calls) == [
-        ("dspy.OpenAI", 0),
-        ("dspy.OpenAI.request", 1),
-        ("dspy.OpenAI.basic_request", 2),
-        ("openai.chat.completions.create", 3),
-    ]
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+    output = call.output
+    assert output["choices"][0]["message"]["content"].lower() == "this is a test!"
 
-    call_1, _ = flattened_calls[0]
-    assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = call_1.output
-    assert output_1[0] == expected_prediction
-
-    call_2, _ = flattened_calls[1]
-    assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = call_2.output
-    assert output_2["choices"][0]["finish_reason"] == "stop"
-    assert output_2["choices"][0]["message"]["content"] == expected_prediction
-    assert output_2["choices"][0]["message"]["role"] == "assistant"
-    assert output_2["model"] == "gpt-3.5-turbo-1106"
-    assert output_2["usage"]["completion_tokens"] == 9
-    assert output_2["usage"]["prompt_tokens"] == 21
-    assert output_2["usage"]["total_tokens"] == 30
-
-    call_3, _ = flattened_calls[2]
-    assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = call_3.output
-    assert output_3["choices"][0]["finish_reason"] == "stop"
-    assert output_3["choices"][0]["message"]["content"] == expected_prediction
-    assert output_3["choices"][0]["message"]["role"] == "assistant"
-    assert output_3["model"] == "gpt-3.5-turbo-1106"
-    assert output_3["usage"]["completion_tokens"] == 9
-    assert output_3["usage"]["prompt_tokens"] == 21
-    assert output_3["usage"]["total_tokens"] == 30
-    assert output_2["id"] == output_3["id"]
-    assert output_2["created"] == output_3["created"]
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_dspy_inline_signatures(client: WeaveClient) -> None:
-    import dspy
+def test_dspy_predict_module(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    qa = dspy.Predict("question: str -> response: str")
+    response = qa(question="who is the creator of git?")
+    assert "Linus Torvalds" in response.response
 
-    os.environ["DSP_CACHEBOOL"] = "False"
+    calls = list(client.calls())
+    assert len(calls) == 5
 
-    turbo = dspy.OpenAI(
-        model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Predict"
+    output = call.output
+    assert "Linus Torvalds" in output["response"]
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChatAdapter"
+    output = call.output
+    assert "Linus Torvalds" in output[0]["response"]
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_cot(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    math = dspy.ChainOfThought("question -> answer: float")
+    response = math(
+        question="Two dice are tossed. What is the probability that the sum equals two?"
     )
-    dspy.settings.configure(lm=turbo)
-    classify = dspy.Predict("sentence -> sentiment")
-    prediction = classify(
-        sentence="it's a charming and often affecting journey."
-    ).sentiment
-    expected_prediction = "Positive"
-    assert prediction == expected_prediction
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 6
+    assert response.answer > 0.027
 
-    assert flattened_calls_to_names(flattened_calls) == [
-        ("dspy.Predict", 0),
-        ("dspy.Predict.forward", 1),
-        ("dspy.OpenAI", 2),
-        ("dspy.OpenAI.request", 3),
-        ("dspy.OpenAI.basic_request", 4),
-        ("openai.chat.completions.create", 5),
-    ]
+    calls = list(client.calls())
+    assert len(calls) == 6
 
-    call_1, _ = flattened_calls[0]
-    assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = call_1.output
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChainOfThought"
+    output = call.output
+    assert output["answer"] > 0.027
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Predict"
+    output = call.output
+    assert output["answer"] > 0.027
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChatAdapter"
+    output = call.output
+    assert output[0]["answer"] > 0.027
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_custom_module(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+
+    class Classify(dspy.Signature):
+        """Classify sentiment of a given sentence."""
+
+        sentence: str = dspy.InputField()
+        sentiment: Literal["positive", "negative", "neutral"] = dspy.OutputField()
+        confidence: float = dspy.OutputField()
+
+    classify = dspy.Predict(Classify)
+    response = classify(
+        sentence="This book was super fun to read, though not the last chapter."
+    )
+    assert response.sentiment == "positive"
+    assert response.confidence > 0.5
+
+    calls = list(client.calls())
+    assert len(calls) == 5
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Predict"
+    output = call.output
+    assert output["sentiment"] == "positive"
+    assert output["confidence"] > 0.5
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.ChatAdapter"
+    output = call.output
+    assert output[0]["sentiment"] == "positive"
+    assert output[0]["confidence"] > 0.5
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_evaluate(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    evaluate = dspy.Evaluate(devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric)
+    accuracy = evaluate(module)
+    assert accuracy > 50
+
+    calls = list(client.calls())
+    assert len(calls) == 22
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.Evaluate"
+    output = call.output
+    assert output > 50
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    optimizer = dspy.LabeledFewShot()
+    optimized_module = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET)
     assert (
-        output_1
-        == """Prediction(
-    sentiment='Positive'
-)"""
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
     )
-    call_2, _ = flattened_calls[1]
-    assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = call_2.output
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LabeledFewShot.compile"
+    output = call.output
+    assert len(output["predict"]["demos"]) > 0
     assert (
-        output_2
-        == """Prediction(
-    sentiment='Positive'
-)"""
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
     )
 
-    call_3, _ = flattened_calls[2]
-    assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = call_3.output
-    assert output_3[0] == expected_prediction
 
-    call_4, _ = flattened_calls[3]
-    assert call_4.exception is None and call_4.ended_at is not None
-    output_4 = call_4.output
-    assert output_4["choices"][0]["finish_reason"] == "stop"
-    assert output_4["choices"][0]["message"]["content"] == expected_prediction
-    assert output_4["choices"][0]["message"]["role"] == "assistant"
-    assert output_4["model"] == "gpt-3.5-turbo-0125"
-    assert output_4["usage"]["completion_tokens"] == 1
-    assert output_4["usage"]["prompt_tokens"] == 53
-    assert output_4["usage"]["total_tokens"] == 54
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    optimizer = dspy.BootstrapFewShot(metric=accuracy_metric)
+    optimized_module = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET)
+    assert (
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
+    )
 
-    call_5, _ = flattened_calls[4]
-    assert call_5.exception is None and call_5.ended_at is not None
-    output_5 = call_5.output
-    assert output_5["choices"][0]["finish_reason"] == "stop"
-    assert output_5["choices"][0]["message"]["content"] == expected_prediction
-    assert output_5["choices"][0]["message"]["role"] == "assistant"
-    assert output_5["model"] == "gpt-3.5-turbo-0125"
-    assert output_5["usage"]["completion_tokens"] == 1
-    assert output_5["usage"]["prompt_tokens"] == 53
-    assert output_5["usage"]["total_tokens"] == 54
-    assert output_5["id"] == output_4["id"]
-    assert output_5["created"] == output_4["created"]
+    calls = list(client.calls())
+    assert len(calls) == 20
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.BootstrapFewShot.compile"
+    output = call.output
+    assert len(output["predict"]["demos"]) > 0
+    assert (
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
+    )
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
+    client: WeaveClient,
+) -> None:
+    dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
+    module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+    optimizer = dspy.BootstrapFewShotWithRandomSearch(
+        metric=accuracy_metric,
+        num_candidate_programs=1,
+        stop_at_score=100,
+        num_threads=1,
+    )
+    optimized_module = optimizer.compile(
+        module, trainset=SAMPLE_EVAL_DATASET, valset=SAMPLE_EVAL_DATASET
+    )
+    assert (
+        optimized_module.predict.signature.instructions
+        == "Given the fields `question`, produce the fields `answer`, `explanation`."
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 23
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "dspy.BootstrapFewShotWithRandomSearch.compile"
+    )
+    output = call.output
+    assert (
+        output["predict"]["signature"]["instructions"]
+        == optimized_module.predict.signature.instructions
+    )
