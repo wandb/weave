@@ -673,10 +673,38 @@ export const CallsTable: FC<{
           call?.traceCall?.id != null &&
           selectedCalls.includes(call.traceCall.id)
       )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
+      .map(call => {
+        // Create a deep copy of the trace call to avoid modifying the original
+        const traceCall = {...call.traceCall!};
+
+        // Add costs data if available
+        if (call.traceCall?.summary?.weave?.costs) {
+          if (!traceCall.summary) {
+            traceCall.summary = {};
+          }
+          if (!traceCall.summary.weave) {
+            traceCall.summary.weave = {};
+          }
+          traceCall.summary.weave.costs = call.traceCall.summary.weave.costs;
+        }
+
+        // Add feedback data if available
+        if (call.traceCall?.summary?.weave?.feedback) {
+          if (!traceCall.summary) {
+            traceCall.summary = {};
+          }
+          if (!traceCall.summary.weave) {
+            traceCall.summary.weave = {};
+          }
+          traceCall.summary.weave.feedback =
+            call.traceCall.summary.weave.feedback;
+        }
+
+        return {
+          digest: traceCall.id,
+          val: traceCall,
+        };
+      });
   }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu

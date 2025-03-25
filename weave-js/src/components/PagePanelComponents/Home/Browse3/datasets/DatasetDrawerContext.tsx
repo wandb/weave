@@ -4,6 +4,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useReducer,
 } from 'react';
 
@@ -16,10 +17,12 @@ import {FieldConfig} from './NewDatasetSchemaStep';
 import {
   CallData,
   createProcessedRowsMap,
+  extractSourceSchema,
   FieldMapping,
   filterRowsForNewDataset,
   inferSchema,
   mapCallsToDatasetRows,
+  SchemaField,
   suggestFieldMappings,
 } from './schemaUtils';
 
@@ -47,6 +50,14 @@ export const ACTION_TYPES = {
   SET_USER_MODIFIED_MAPPINGS: 'SET_ADDED_ROWS_DIRTY',
 } as const;
 
+export interface DatasetRow {
+  [key: string]: any;
+  ___weave: {
+    id: string;
+    isNew: boolean;
+  };
+}
+
 // Define the state interface
 export interface DatasetDrawerState {
   // Step management
@@ -62,8 +73,8 @@ export interface DatasetDrawerState {
   // Schema and field configuration
   fieldMappings: FieldMapping[];
   fieldConfigs: FieldConfig[];
-  sourceSchema: any[];
-  targetSchema: any[];
+  sourceSchema: SchemaField[];
+  targetSchema: SchemaField[];
 
   // Flag to indicate mappings have been modified and rows need reprocessing
   addedRowsDirty: boolean;
@@ -79,13 +90,14 @@ export interface DatasetDrawerState {
   isFullscreen: boolean;
   isCreating: boolean;
   error: string | null;
+  rows: DatasetRow[];
 }
 
 // Define action types using the constants
 export type DatasetDrawerAction =
   | {
       type: typeof ACTION_TYPES.SET_CURRENT_STEP;
-      payload: {step: number; setAddedRows?: (rows: Map<string, any>) => void};
+      payload: {step: number};
     }
   | {type: typeof ACTION_TYPES.SET_DATASETS; payload: ObjectVersionSchema[]}
   | {
@@ -97,8 +109,8 @@ export type DatasetDrawerAction =
   | {type: typeof ACTION_TYPES.SET_FIELD_MAPPINGS; payload: FieldMapping[]}
   | {type: typeof ACTION_TYPES.SET_FIELD_CONFIGS; payload: FieldConfig[]}
   | {type: typeof ACTION_TYPES.SET_DATASET_OBJECT; payload: any}
-  | {type: typeof ACTION_TYPES.SET_SOURCE_SCHEMA; payload: any[]}
-  | {type: typeof ACTION_TYPES.SET_TARGET_SCHEMA; payload: any[]}
+  | {type: typeof ACTION_TYPES.SET_SOURCE_SCHEMA; payload: SchemaField[]}
+  | {type: typeof ACTION_TYPES.SET_TARGET_SCHEMA; payload: SchemaField[]}
   | {type: typeof ACTION_TYPES.SET_DRAWER_WIDTH; payload: number}
   | {type: typeof ACTION_TYPES.SET_IS_FULLSCREEN; payload: boolean}
   | {type: typeof ACTION_TYPES.SET_IS_CREATING; payload: boolean}
@@ -129,6 +141,7 @@ const initialState: DatasetDrawerState = {
   isFullscreen: false,
   isCreating: false,
   error: null,
+  rows: [],
 };
 
 /**
@@ -136,13 +149,11 @@ const initialState: DatasetDrawerState = {
  *
  * @param state - Current state of the dataset drawer
  * @param currentCalls - Array of call data to process
- * @param setAddedRows - Callback to update rows in the editor
  * @returns Object containing processed rows map and success status
  */
 function processRowsForStep2(
   state: DatasetDrawerState,
-  currentCalls: any[],
-  setAddedRows?: (rows: Map<string, any>) => void
+  currentCalls: any[]
 ): {processedRows: Map<string, any>; success: boolean} {
   try {
     const callsToProcess = (currentCalls as CallData[]) || [];
@@ -170,20 +181,23 @@ function processRowsForStep2(
     // Apply filtering for new datasets
     if (isNewDataset) {
       const targetFields = new Set(fieldMappings.map(m => m.targetField));
-      mappedRows = filterRowsForNewDataset(mappedRows, targetFields);
+      mappedRows = filterRowsForNewDataset(
+        mappedRows as Array<{
+          ___weave: {id: string; isNew: boolean};
+          [key: string]: any;
+        }>,
+        targetFields
+      );
     }
 
     // Process rows with schema-based filtering
-    const processedRowsMap = createProcessedRowsMap(mappedRows, datasetObject);
-
-    // If setAddedRows is provided, use it to update the editor directly
-    if (setAddedRows) {
-      try {
-        setAddedRows(processedRowsMap);
-      } catch (error) {
-        console.error('Error setting added rows:', error);
-      }
-    }
+    const processedRowsMap = createProcessedRowsMap(
+      mappedRows as Array<{
+        ___weave: {id: string; isNew: boolean};
+        [key: string]: any;
+      }>,
+      datasetObject
+    );
 
     return {processedRows: processedRowsMap, success: true};
   } catch (error) {
@@ -208,73 +222,6 @@ function handleTransitionToStep1(
   };
 }
 
-/**
- * Handles state transitions when changing steps in the dataset drawer workflow.
- *
- * This function manages the complex logic of transitioning between different steps
- * in the dataset creation/editing process, particularly focusing on:
- * - Processing rows when moving from mapping (step 1) to editing (step 2)
- * - Applying appropriate filtering based on dataset type (new vs existing)
- * - Updating the editor with processed rows when necessary
- *
- * @param state - Current state of the dataset drawer
- * @param newStep - The step number to transition to
- * @param currentStep - The current step number
- * @param setAddedRows - Optional callback to update rows in the editor
- * @param currentCalls - Array of call data to process
- * @returns Updated state after the step transition
- */
-function handleStepTransition(
-  state: DatasetDrawerState,
-  newStep: number,
-  currentStep: number,
-  setAddedRows?: (rows: Map<string, any>) => void,
-  currentCalls?: any[]
-): DatasetDrawerState {
-  // Going from step 1 to step 2 (mapping to editing)
-  if (currentStep === 1 && newStep === 2) {
-    const shouldProcessRows = state.addedRowsDirty && currentCalls;
-
-    if (shouldProcessRows) {
-      const {processedRows, success} = processRowsForStep2(
-        state,
-        currentCalls,
-        setAddedRows
-      );
-
-      if (success) {
-        return {
-          ...state,
-          currentStep: newStep,
-          addedRowsDirty: false, // Reset dirty flag after processing
-          processedRows,
-        };
-      } else {
-        return {
-          ...state,
-          currentStep: newStep,
-          addedRowsDirty: false, // Reset dirty flag
-        };
-      }
-    }
-
-    // If mappings weren't modified, just change the step
-    return {
-      ...state,
-      currentStep: newStep,
-      addedRowsDirty: false, // Reset dirty flag
-    };
-  }
-
-  // Going from step 2 back to step 1 (editing to mapping)
-  if (currentStep === 2 && newStep === 1) {
-    return handleTransitionToStep1(state);
-  }
-
-  // Default case: just update the step
-  return {...state, currentStep: newStep};
-}
-
 // Reducer function with additional parameters
 function datasetDrawerReducer(
   state: DatasetDrawerState,
@@ -286,16 +233,23 @@ function datasetDrawerReducer(
       // Extract parameters from the action payload
       const newStep = action.payload.step;
       const currentStep = state.currentStep;
-      const setAddedRows = action.payload.setAddedRows;
 
-      // Use the helper function to handle the step transition
-      return handleStepTransition(
-        state,
-        newStep,
-        currentStep,
-        setAddedRows,
-        currentCalls
-      );
+      // Going from step 1 to step 2 (mapping to editing)
+      if (currentStep === 1 && newStep === 2) {
+        return {
+          ...state,
+          currentStep: newStep,
+          // Don't reset addedRowsDirty here - we'll handle that in the component's useEffect
+        };
+      }
+
+      // Going from step 2 back to step 1 (editing to mapping)
+      if (currentStep === 2 && newStep === 1) {
+        return handleTransitionToStep1(state);
+      }
+
+      // Default case: just update the step
+      return {...state, currentStep: newStep};
     }
 
     case ACTION_TYPES.SET_DATASETS:
@@ -355,8 +309,20 @@ function datasetDrawerReducer(
     case ACTION_TYPES.SET_DATASET_OBJECT:
       return {...state, datasetObject: action.payload};
 
-    case ACTION_TYPES.SET_SOURCE_SCHEMA:
-      return {...state, sourceSchema: action.payload};
+    case ACTION_TYPES.SET_SOURCE_SCHEMA: {
+      const newRows = currentCalls?.map(call => ({
+        ___weave: {
+          id: call.digest,
+          isNew: true,
+        },
+      })) as DatasetRow[];
+
+      return {
+        ...state,
+        sourceSchema: action.payload,
+        rows: newRows,
+      };
+    }
 
     case ACTION_TYPES.SET_TARGET_SCHEMA: {
       // When the target schema is set (after dataset selection), suggest field mappings
@@ -424,7 +390,7 @@ interface DatasetDrawerContextType {
   handleDatasetSelect: (dataset: ObjectVersionSchema | null) => void;
   handleMappingChange: (mappings: FieldMapping[]) => void;
   handleDatasetObjectLoaded: (datasetObj: any, rowsData?: any[]) => void;
-  setSourceSchema: (schema: any[]) => void;
+  setSourceSchema: (schema: SchemaField[]) => void;
   resetDrawerState: () => void;
   handleNext: () => void;
   handleBack: () => void;
@@ -502,14 +468,27 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
   const [state, dispatch] = useReducer(wrappedReducer, initialState);
 
   // Memoized action dispatchers
-  const setCurrentStep = useCallback(
-    (step: number) =>
-      dispatch({
-        type: ACTION_TYPES.SET_CURRENT_STEP,
-        payload: {step, setAddedRows: step === 2 ? setAddedRows : undefined},
-      }),
-    [setAddedRows]
-  );
+  const setCurrentStep = useCallback((step: number) => {
+    dispatch({
+      type: ACTION_TYPES.SET_CURRENT_STEP,
+      payload: {step},
+    });
+  }, []);
+
+  // Handle setting rows for the editor when step changes to 2
+  useEffect(() => {
+    // Only run this effect when transitioning to step 2
+    if (state.currentStep === 2 && state.addedRowsDirty) {
+      const result = processRowsForStep2(state, selectedCalls);
+      if (result.success && setAddedRows) {
+        setAddedRows(result.processedRows);
+        dispatch({
+          type: ACTION_TYPES.SET_USER_MODIFIED_MAPPINGS,
+          payload: false,
+        });
+      }
+    }
+  }, [state.currentStep, state.addedRowsDirty, selectedCalls, setAddedRows]);
 
   const handleDatasetSelect = useCallback(
     (dataset: ObjectVersionSchema | null) => {
@@ -528,7 +507,7 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
     dispatch({type: ACTION_TYPES.SET_USER_MODIFIED_MAPPINGS, payload: true});
   }, []);
 
-  const setSourceSchema = useCallback((schema: any[]) => {
+  const setSourceSchema = useCallback((schema: SchemaField[]) => {
     dispatch({type: ACTION_TYPES.SET_SOURCE_SCHEMA, payload: schema});
   }, []);
 
@@ -589,7 +568,10 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
           [key: string]: any;
         }> = [];
         try {
-          mappedRows = mapCallsToDatasetRows(calls, mappings);
+          mappedRows = mapCallsToDatasetRows(calls, mappings) as Array<{
+            ___weave: {id: string; isNew: boolean};
+            [key: string]: any;
+          }>;
         } catch (error) {
           console.error('Error in mapCallsToDatasetRows:', error);
           return [];
@@ -738,6 +720,30 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
     isNextDisabled,
     editorContext,
   };
+
+  useEffect(() => {
+    if (selectedCalls.length > 0) {
+      const extractedSchema = extractSourceSchema(selectedCalls);
+      dispatch({
+        type: ACTION_TYPES.SET_SOURCE_SCHEMA,
+        payload: extractedSchema,
+      });
+    }
+  }, [selectedCalls, dispatch]);
+
+  useEffect(() => {
+    if (state.sourceSchema.length > 0 && state.fieldConfigs.length === 0) {
+      const initialConfigs = state.sourceSchema.map(field => ({
+        sourceField: field.name,
+        targetField: field.name.replace(/^(inputs\.|output\.)/, ''),
+        included: true,
+      }));
+      dispatch({
+        type: ACTION_TYPES.SET_FIELD_CONFIGS,
+        payload: initialConfigs,
+      });
+    }
+  }, [state.sourceSchema, state.fieldConfigs.length, dispatch]);
 
   return (
     <DatasetDrawerContext.Provider value={contextValue}>

@@ -4,6 +4,7 @@ import React from 'react';
 import {TEAL_600} from '../../../../../common/css/globals.styles';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
 import {CellValue} from '../../Browse2/CellValue';
+import {FeedbackCellRenderer} from './CellRenderers';
 
 interface DataPreviewTooltipProps {
   rows?: Array<Record<string, any>>;
@@ -62,7 +63,18 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
   const hasMoreColumns = allColumns.length > maxColumns;
   const hasMoreRows = rows.length > maxRows;
 
-  // Helper to render cell content with special handling for missing values
+  const isFeedbackField = (fieldName: string, value: any) => {
+    return (
+      fieldName === 'summary.weave.feedback' ||
+      (typeof value === 'object' &&
+        value !== null &&
+        Object.keys(value).some(key =>
+          key.match(/^wandb\.(reaction|note)\.\d+$/)
+        ))
+    );
+  };
+
+  // Helper to render cell content with special handling for missing values and feedback
   const renderCellContent = (row: Record<string, any>, column: string) => {
     const value = row[column];
     if (value === undefined || value === null) {
@@ -82,6 +94,18 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
         </Typography>
       );
     }
+
+    if (isFeedbackField(column, value)) {
+      return (
+        <Box
+          onClick={e => e.stopPropagation()}
+          onMouseEnter={e => e.stopPropagation()}
+          onMouseLeave={e => e.stopPropagation()}>
+          <FeedbackCellRenderer value={value} />
+        </Box>
+      );
+    }
+
     return (
       <Box
         onClick={e => e.stopPropagation()}

@@ -40,6 +40,7 @@ import {
   CellViewingRenderer,
   ControlCell,
   DELETED_CELL_STYLES,
+  FeedbackCellRenderer,
 } from './CellRenderers';
 import {useDatasetEditContext} from './DatasetEditorContext';
 
@@ -413,63 +414,125 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       });
     }
 
-    const fieldColumns: GridColDef[] = Array.from(allFields).map(field => ({
-      field: field as string,
-      headerName: field as string,
-      width: columnWidths[field as string] ?? undefined,
-      flex: columnWidths[field as string] ? undefined : 1,
-      minWidth: 100,
-      editable: isEditing,
-      sortable: true,
-      filterable: false,
-      renderCell: (params: GridRenderCellParams) => {
-        if (!isEditing) {
-          return (
-            <div
-              style={{
-                marginLeft: '8px',
-                height: '100%',
-                alignContent: 'center',
-              }}>
-              <CellValue value={params.value} />
-            </div>
-          );
-        }
-        const rowIndex = params.row.___weave?.index;
+    const fieldColumns: GridColDef[] = Array.from(allFields).map(field => {
+      // Check if this is a feedback field by looking at the first row's value for this field
+      const isFeedbackField = combinedRows.some(row => {
+        const value = row[field as keyof typeof row];
+        return (
+          (typeof value === 'object' &&
+            value !== null &&
+            Object.keys(value).some(key =>
+              key.match(/^wandb\.(reaction|note)\.\d+$/)
+            )) ||
+          field === 'summary.weave.feedback' ||
+          (field as string).endsWith('feedback')
+        );
+      });
 
-        return (
-          <CellViewingRenderer
-            {...params}
-            isEdited={
-              rowIndex != null && !params.row.___weave?.isNew
-                ? isFieldEdited(rowIndex, field as string)
-                : false
+      return {
+        field: field as string,
+        headerName: field as string,
+        width:
+          columnWidths[field as string] ?? (isFeedbackField ? 300 : undefined),
+        flex: columnWidths[field as string] ? undefined : 1,
+        minWidth: isFeedbackField ? 300 : 100,
+        editable: isEditing,
+        sortable: true,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams) => {
+          // Check if this is a feedback field
+          const isFeedbackField =
+            (typeof params.value === 'object' &&
+              params.value !== null &&
+              Object.keys(params.value).some(key =>
+                key.match(/^wandb\.(reaction|note)\.\d+$/)
+              )) ||
+            field === 'summary.weave.feedback' ||
+            (field as string).endsWith('feedback');
+
+          if (isFeedbackField) {
+            if (!isEditing) {
+              return (
+                <Box
+                  sx={{
+                    height: '100%',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  <FeedbackCellRenderer value={params.value} />
+                </Box>
+              );
             }
-            isDeleted={deletedRows.includes(params.row.___weave?.index)}
-            isNew={params.row.___weave?.isNew}
-            serverValue={get(
-              loadedRows[rowIndex - offset]?.val ?? {},
-              field as string
-            )}
-            disableNewRowHighlight={disableNewRowHighlight}
-          />
-        );
-      },
-      renderEditCell: (params: GridRenderEditCellParams) => {
-        const rowIndex = params.row.___weave?.index;
-        const serverValue =
-          rowIndex != null && !params.row.___weave?.isNew
-            ? get(loadedRows[rowIndex - offset]?.val ?? {}, params.field)
-            : '';
-        return (
-          <CellEditingRenderer
-            {...params}
-            serverValue={serverValue}
-            preserveFieldOrder={preserveFieldOrder}
-          />
-        );
-      },
-    }));
+
+            const rowIndex = params.row.___weave?.index;
+            return (
+              <CellViewingRenderer
+                {...params}
+                isEdited={
+                  rowIndex != null && !params.row.___weave?.isNew
+                    ? isFieldEdited(rowIndex, field as string)
+                    : false
+                }
+                isDeleted={deletedRows.includes(params.row.___weave?.index)}
+                isNew={params.row.___weave?.isNew}
+                serverValue={get(
+                  loadedRows[rowIndex - offset]?.val ?? {},
+                  field as string
+                )}
+                disableNewRowHighlight={disableNewRowHighlight}
+              />
+            );
+          }
+
+          if (!isEditing) {
+            return (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  height: '100%',
+                  alignContent: 'center',
+                }}>
+                <CellValue value={params.value} />
+              </div>
+            );
+          }
+          const rowIndex = params.row.___weave?.index;
+
+          return (
+            <CellViewingRenderer
+              {...params}
+              isEdited={
+                rowIndex != null && !params.row.___weave?.isNew
+                  ? isFieldEdited(rowIndex, field as string)
+                  : false
+              }
+              isDeleted={deletedRows.includes(params.row.___weave?.index)}
+              isNew={params.row.___weave?.isNew}
+              serverValue={get(
+                loadedRows[rowIndex - offset]?.val ?? {},
+                field as string
+              )}
+              disableNewRowHighlight={disableNewRowHighlight}
+            />
+          );
+        },
+        renderEditCell: (params: GridRenderEditCellParams) => {
+          const rowIndex = params.row.___weave?.index;
+          const serverValue =
+            rowIndex != null && !params.row.___weave?.isNew
+              ? get(loadedRows[rowIndex - offset]?.val ?? {}, params.field)
+              : '';
+          return (
+            <CellEditingRenderer
+              {...params}
+              serverValue={serverValue}
+              preserveFieldOrder={preserveFieldOrder}
+            />
+          );
+        },
+      };
+    });
 
     return [...baseColumns, ...fieldColumns];
   }, [

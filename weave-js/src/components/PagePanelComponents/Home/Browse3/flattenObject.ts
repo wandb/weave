@@ -7,11 +7,28 @@ export const flattenObjectPreservingWeaveTypes = (obj: {
   [key: string]: any;
 }) => {
   return flattenObject(obj, '', {}, (key, value) => {
-    return (
-      typeof value !== 'object' ||
-      value == null ||
-      value._type !== 'CustomWeaveType'
-    );
+    // If the object is a Weave type, keep it intact
+    if (
+      typeof value === 'object' &&
+      value != null &&
+      value._type === 'CustomWeaveType'
+    ) {
+      return false;
+    }
+
+    // If this is a feedback object (has wandb.reaction.* or wandb.note.* keys), keep it intact
+    if (typeof value === 'object' && value != null) {
+      // Check if this object has feedback keys (wandb.reaction.* or wandb.note.*)
+      const hasFeedbackKeys = Object.keys(value).some(k =>
+        k.match(/^wandb\.(reaction|note)\.\d+$/)
+      );
+
+      if (hasFeedbackKeys) {
+        return false; // Don't flatten this object
+      }
+    }
+
+    return true;
   });
 };
 
