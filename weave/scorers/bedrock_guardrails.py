@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, PrivateAttr
 
@@ -26,10 +26,9 @@ class BedrockGuardrailScorer(weave.Scorer):
     guardrail_version: str = Field(
         default="DRAFT", description="The version of the guardrail to use."
     )
-    source: str = Field(
+    source: Literal["INPUT", "OUTPUT"] = Field(
         default="OUTPUT",
         description="The source of the content to evaluate, either 'INPUT' or 'OUTPUT'.",
-        choices=["INPUT", "OUTPUT"],
     )
     bedrock_runtime_kwargs: dict[str, Any] = Field(
         default_factory=dict,
@@ -80,12 +79,7 @@ class BedrockGuardrailScorer(weave.Scorer):
             # Check if the guardrail intervened
             passed = response.get("action") != "GUARDRAIL_INTERVENED"
 
-            # Get the assessments
-            assessments = (
-                response.get("assessments", [{}])[0]
-                if response.get("assessments")
-                else {}
-            )
+            assessments = response.get("assessments", [{}])[0]
 
             # Get the modified output if available
             modified_output = None
@@ -104,7 +98,6 @@ class BedrockGuardrailScorer(weave.Scorer):
             return WeaveScorerResult(
                 passed=False,
                 metadata={
-                    "reason": f"Error applying Bedrock guardrail: {str(e)}",
-                    "error": str(e),
+                    "error": f"Error applying Bedrock guardrail: {str(e)}",
                 },
             )

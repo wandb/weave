@@ -210,7 +210,9 @@ def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> di
     return orig(self, operation_name, api_params)
 
 
-def mock_apply_guardrail_make_api_call(self, operation_name: str, api_params: dict) -> dict:
+def mock_apply_guardrail_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
     if operation_name == "ApplyGuardrail":
         # Check if we should return the intervention response based on the content
         content = api_params.get("content", [])
