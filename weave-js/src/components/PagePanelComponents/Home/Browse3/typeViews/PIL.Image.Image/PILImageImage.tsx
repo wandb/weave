@@ -247,6 +247,7 @@ const PILImageImageLoaded = ({
           buttonNext: () => null,
         }}
         carousel={{finite: true}}
+        zoom={{maxZoomPixelRatio: 5}}
       />
     </>
   );
