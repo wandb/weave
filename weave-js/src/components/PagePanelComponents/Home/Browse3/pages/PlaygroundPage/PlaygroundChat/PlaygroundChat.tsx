@@ -1,23 +1,23 @@
-import { Box, CircularProgress, Divider } from '@mui/material';
-import { MOON_200, MOON_500, WHITE } from '@wandb/weave/common/css/color.styles';
-import { hexToRGB } from '@wandb/weave/common/css/utils';
-import { TargetBlank } from '@wandb/weave/common/util/links';
-import { Button } from '@wandb/weave/components/Button';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
+import {Box, CircularProgress, Divider} from '@mui/material';
+import {MOON_200, MOON_500, WHITE} from '@wandb/weave/common/css/color.styles';
+import {hexToRGB} from '@wandb/weave/common/css/utils';
+import {TargetBlank} from '@wandb/weave/common/util/links';
+import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import getConfig from '@wandb/weave/config';
-import React, { Dispatch, SetStateAction, useMemo, useState } from 'react';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
-import { CallChat } from '../../CallPage/CallChat';
-import { Empty } from '../../common/Empty';
-import { EMPTY_PROPS_NO_LLM_PROVIDERS } from '../../common/EmptyContent';
-import { TraceCallSchema } from '../../wfReactInterface/traceServerClientTypes';
-import { PlaygroundContext } from '../PlaygroundContext';
-import { PlaygroundMessageRole, PlaygroundState } from '../types';
-import { useConfiguredProviders } from '../useConfiguredProviders';
-import { PlaygroundCallStats } from './PlaygroundCallStats';
-import { PlaygroundChatInput } from './PlaygroundChatInput';
-import { PlaygroundChatTopBar } from './PlaygroundChatTopBar';
-import { useChatCompletionFunctions } from './useChatCompletionFunctions';
+import {CallChat} from '../../CallPage/CallChat';
+import {Empty} from '../../common/Empty';
+import {EMPTY_PROPS_NO_LLM_PROVIDERS} from '../../common/EmptyContent';
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
+import {PlaygroundContext} from '../PlaygroundContext';
+import {PlaygroundMessageRole, PlaygroundState} from '../types';
+import {useConfiguredProviders} from '../useConfiguredProviders';
+import {PlaygroundCallStats} from './PlaygroundCallStats';
+import {PlaygroundChatInput} from './PlaygroundChatInput';
+import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
+import {useChatCompletionFunctions} from './useChatCompletionFunctions';
 import {
   SetPlaygroundStateFieldFunctionType,
   useChatFunctions,
@@ -28,8 +28,8 @@ const EmptyWithSettingsButton: React.FC<{
   onSettingsClick: () => void;
   entity: string;
   project: string;
-}> = ({ emptyProps, onSettingsClick, entity, project }) => {
-  const { urlPrefixed } = getConfig();
+}> = ({emptyProps, onSettingsClick, entity, project}) => {
+  const {urlPrefixed} = getConfig();
   return (
     <Box
       sx={{
@@ -46,7 +46,7 @@ const EmptyWithSettingsButton: React.FC<{
           alignItems: 'center',
           gap: '8px',
         }}>
-        <Box sx={{ display: 'flex', gap: '8px' }}>
+        <Box sx={{display: 'flex', gap: '8px'}}>
           <Button
             variant="secondary"
             onClick={() => {
@@ -67,13 +67,17 @@ const EmptyWithSettingsButton: React.FC<{
           </Button>
         </Box>
         <Tailwind>
-          <div className="text-sm text-center mt-[16px] max-w-[400px]" style={{ color: MOON_500 }}>
+          <div
+            className="mt-[16px] max-w-[400px] text-center text-sm"
+            style={{color: MOON_500}}>
             Example setup:
             <br />
             Find your OpenAI API key in your{' '}
             <TargetBlank href="https://platform.openai.com/api-keys">
               OpenAI dashboard
-            </TargetBlank>. <br /> Use <code className="text-sm mx-1.5">OPENAI_API_KEY</code> as your team's secret.
+            </TargetBlank>
+            . <br /> Use <code className="mx-1.5 text-sm">OPENAI_API_KEY</code>{' '}
+            as your team's secret.
           </div>
         </Tailwind>
       </Box>
@@ -101,10 +105,10 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const { result: configuredProviders, loading: configuredProvidersLoading } =
+  const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entity);
 
-  const { handleRetry, handleSend } = useChatCompletionFunctions(
+  const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setPlaygroundStateField,
     playgroundStates,
@@ -113,12 +117,12 @@ export const PlaygroundChat = ({
     setChatText
   );
 
-  const { deleteMessage, editMessage, deleteChoice, editChoice, addMessage } =
+  const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
   const handleAddMessage = (role: PlaygroundMessageRole, text: string) => {
     for (let i = 0; i < playgroundStates.length; i++) {
-      addMessage(i, { role, content: text });
+      addMessage(i, {role, content: text});
     }
     setChatText('');
   };
@@ -134,7 +138,7 @@ export const PlaygroundChat = ({
     if (configuredProvidersLoading) {
       return true;
     } // Don't show empty state while loading
-    return Object.values(configuredProviders).some(({ status }) => status);
+    return Object.values(configuredProviders).some(({status}) => status);
   }, [configuredProviders, configuredProvidersLoading]);
 
   if (!hasConfiguredProviders) {
