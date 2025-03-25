@@ -13,6 +13,7 @@ type PlaygroundChatInputProps = {
   onSend: (role: PlaygroundMessageRole, chatText: string) => void;
   onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
   settingsTab: number | null;
+  hasConfiguredProviders?: boolean;
 };
 
 const isMac = () => {
@@ -32,6 +33,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   onSend,
   onAdd,
   settingsTab,
+  hasConfiguredProviders = true,
 }) => {
   const [addMessageRole, setAddMessageRole] =
     useState<PlaygroundMessageRole>('user');
@@ -92,10 +94,11 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           onChange={e => setChatText(e.target.value)}
           value={chatText}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message here..."
+          placeholder={hasConfiguredProviders ? "Type your message here..." : "Configure a provider to start chatting..."}
           autoGrow
           maxHeight={160}
           reset={shouldReset}
+          disabled={!hasConfiguredProviders}
         />
         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
           <Box sx={{display: 'flex', gap: '8px'}}>
@@ -140,7 +143,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               variant="secondary"
               size="medium"
               startIcon="add-new"
-              disabled={isLoading || chatText.trim() === ''}
+              disabled={isLoading || chatText.trim() === '' || !hasConfiguredProviders}
               onClick={() => handleAdd(addMessageRole, chatText)}>
               Add
             </Button>
@@ -148,7 +151,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             <Button
               size="medium"
               onClick={() => handleSend(addMessageRole)}
-              disabled={isLoading || chatText.trim() === ''}
+              disabled={isLoading || chatText.trim() === '' || !hasConfiguredProviders}
               startIcon={isLoading ? 'loading' : undefined}>
               {isLoading ? 'Sending...' : 'Send'}
             </Button>

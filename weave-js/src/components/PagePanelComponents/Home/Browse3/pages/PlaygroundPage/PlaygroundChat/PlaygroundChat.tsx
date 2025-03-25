@@ -213,6 +213,7 @@ export const PlaygroundChat = ({
           onSend={handleSend}
           onAdd={handleAddMessage}
           settingsTab={settingsTab}
+          hasConfiguredProviders={hasConfiguredProviders}
         />
       </Box>
     );
@@ -377,6 +378,7 @@ export const PlaygroundChat = ({
         onSend={handleSend}
         onAdd={handleAddMessage}
         settingsTab={settingsTab}
+        hasConfiguredProviders={hasConfiguredProviders}
       />
     </Box>
   );
