@@ -2557,18 +2557,23 @@ def test_calls_descendants_class_method(client):
     assert op_name_from_ref(limited_descendants[0].op_name) == "child_op"
 
 
-def test_calls_descendants_massive(client):
+def test_calls_descendants_massive(client, monkeypatch):
     """Test that get_calls_descendants can handle a large number of descendants."""
+    from weave.trace_server import clickhouse_trace_server_batched
+
+    monkeypatch.setattr(
+        clickhouse_trace_server_batched, "DESCENDANT_IDS_BATCH_SIZE", 100
+    )
+
     # Create a parent call
     parent_call = client.create_call("parent_op", {"x": 5})
 
     # Create 10_000 child calls
-    for batch in range(10_000 // 500):
-        for i in range(500):
-            call = client.create_call("child_op", {"x": i}, parent_call)
-            client.finish_call(call)
-        client.flush()
+    for i in range(500):
+        call = client.create_call("child_op", {"x": i}, parent_call)
+        client.finish_call(call)
+    client.flush()
 
     # Test getting all descendants
     descendants = list(client.get_calls_descendants(parent_call))
-    assert len(descendants) == 10_000
+    assert len(descendants) == 500
