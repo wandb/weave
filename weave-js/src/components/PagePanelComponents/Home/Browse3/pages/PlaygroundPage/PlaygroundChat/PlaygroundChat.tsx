@@ -50,7 +50,9 @@ const EmptyWithSettingsButton: React.FC<{
           <Button
             variant="secondary"
             onClick={() => {
-              window.open(urlPrefixed(`/${entity}/${project}/overview/providers`));
+              window.open(
+                urlPrefixed(`/${entity}/${project}/overview/providers`)
+              );
             }}
             size="medium">
             View project providers
