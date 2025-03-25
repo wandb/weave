@@ -43,12 +43,12 @@ self_type_output_type_fn = lambda input_types: input_types["self"]
 
 def _concatenate_strings(
     left: ArrowWeaveList[str],
-    right: typing.Optional[typing.Union[str, ArrowWeaveList[str]]],
-) -> ArrowWeaveList[str]:
+    right: typing.Union[str, ArrowWeaveList[str], None],
+) -> ArrowWeaveList[typing.Optional[str]]:
     if right is None:
         return ArrowWeaveList(
             pa.nulls(len(left._arrow_data), type=left._arrow_data.type),
-            types.optional(types.String()),
+            types.NoneType(),
             left._artifact,
         )
 
