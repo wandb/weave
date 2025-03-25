@@ -14,9 +14,12 @@ export type ImageUrl = {
 };
 
 export type InternalMessage = {
-  type: 'text' | 'image_url';
+  type: 'text' | 'image_url' | 'tool_result' | 'tool_use';
   text?: string;
   image_url?: ImageUrl;
+  input?: Record<string, any>;
+  content?: string;
+  name?: string;
 };
 
 export type MessagePart = string | Placeholder | InternalMessage;
