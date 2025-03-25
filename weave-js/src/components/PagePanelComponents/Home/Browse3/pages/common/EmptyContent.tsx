@@ -24,10 +24,7 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
       .
       <Box sx={{mt: 2}}>
         <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/examples/quickstart.ipynb">
-          <Button
-            variant="secondary"
-            icon="logo-colab"
-          >
+          <Button variant="secondary" icon="logo-colab">
             Get started with Colab
           </Button>
         </TargetBlank>
@@ -53,10 +50,7 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
       .
       <Box sx={{mt: 2}}>
         <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/examples/evaluation.ipynb">
-          <Button
-            variant="secondary"
-            icon="logo-colab"
-          >
+          <Button variant="secondary" icon="logo-colab">
             Get started with Colab
           </Button>
         </TargetBlank>
