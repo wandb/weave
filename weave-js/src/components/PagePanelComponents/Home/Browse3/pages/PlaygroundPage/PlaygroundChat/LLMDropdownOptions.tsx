@@ -1,6 +1,7 @@
 import {Box} from '@mui/material';
 import {
   MOON_100,
+  MOON_200,
   MOON_800,
   MOON_900,
   OBLIVION,
@@ -42,7 +43,6 @@ export const DisabledProviderTooltip: React.FC<{
   return (
     <Tooltip
       trigger={children}
-      aria-label="Provider configuration status"
       content={
         <Box
           sx={{
@@ -60,7 +60,6 @@ export const DisabledProviderTooltip: React.FC<{
                 to={`/${entity}/settings`}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Go to team settings to configure missing secrets"
                 style={{
                   color: TEAL_500,
                   textDecoration: 'none',
@@ -203,6 +202,17 @@ const SubMenuOption = ({
     [children, isDisabled, isHovered, llms, onChange, position, props]
   );
 
+  if (props.data.value === 'divider') {
+    return (
+      <Box
+        sx={{
+          borderBottom: `1px solid ${MOON_200}`,
+          mb: 1,
+        }}
+      />
+    );
+  }
+
   return isDisabled ? (
     <DisabledProviderTooltip entity={entity} isAdmin={isAdmin}>
       {optionContent}
@@ -294,4 +304,26 @@ export const CustomOption = ({
       {children}
     </SubMenuOption>
   );
+};
+
+export const dividerOption: ProviderOption = {
+  label: '',
+  value: 'divider',
+  llms: [],
+};
+
+export const addProviderOption: ProviderOption = {
+  label: (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+      }}>
+      <Icon name="add-new" />
+      Add AI provider
+    </Box>
+  ),
+  value: 'add-provider',
+  llms: [],
 };

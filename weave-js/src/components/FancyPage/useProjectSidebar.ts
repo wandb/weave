@@ -76,6 +76,7 @@ export const useProjectSidebar = (
             label: 'Models',
             isShown: isShowAll,
           },
+
           {
             type: 'button' as const,
             name: 'Workspace',
