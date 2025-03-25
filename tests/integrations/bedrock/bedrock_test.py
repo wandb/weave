@@ -191,7 +191,7 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
 orig = botocore.client.BaseClient._make_api_call
 
 
-def mock_converse_make_api_call(self, operation_name, kwarg):
+def mock_converse_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "Converse":
         return MOCK_CONVERSE_RESPONSE
     elif operation_name == "ConverseStream":
@@ -201,25 +201,25 @@ def mock_converse_make_api_call(self, operation_name, kwarg):
                 yield from MOCK_STREAM_EVENTS
 
         return {"stream": MockStream()}
-    return orig(self, operation_name, kwarg)
+    return orig(self, operation_name, api_params)
 
 
-def mock_invoke_make_api_call(self, operation_name, kwarg):
+def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "InvokeModel":
         return MOCK_INVOKE_RESPONSE
-    return orig(self, operation_name, kwarg)
+    return orig(self, operation_name, api_params)
 
 
-def mock_apply_guardrail_make_api_call(self, operation_name, kwarg):
+def mock_apply_guardrail_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "ApplyGuardrail":
         # Check if we should return the intervention response based on the content
-        content = kwarg.get("content", [])
+        content = api_params.get("content", [])
         if content and isinstance(content, list) and len(content) > 0:
             text_content = content[0].get("text", {}).get("text", "")
             if "specific investment" in text_content.lower():
                 return MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE
         return MOCK_APPLY_GUARDRAIL_RESPONSE
-    return orig(self, operation_name, kwarg)
+    return orig(self, operation_name, api_params)
 
 
 @pytest.mark.skip_clickhouse_client
