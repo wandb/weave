@@ -179,19 +179,19 @@ async def generate_with_monitoring(prompt: str) -> str:
 
 ## AWS Bedrock Guardrails
 
-The `BedrockGuardrailScorer` leverages AWS Bedrock's guardrail functionality to detect and filter content based on configured policies. It utilised the `apply_guardrail` API to apply the guardrail to the content.
+The `BedrockGuardrailScorer` uses AWS Bedrock's guardrail feature to detect and filter content based on configured policies. It calls the `apply_guardrail` API to apply the guardrail to the content.
 
-
-This scorer requires:
+To use the `BedrockGuardrailScorer`, you need the following:
 - An AWS account with Bedrock access
+- An AWS account with access to Bedrock
 - A configured guardrail in the AWS Bedrock console
-- The `boto3` Python package installed
+- The `boto3` Python package
 
-We actually create the bedrock client for you, so you don't need to create your own. If you need to specify a region pass the `bedrock_runtime_kwargs` parameter to the scorer.
+:::tip
+You don't need to create your own Bedrock client—Weave creates it for you.  To specify a region, pass the `bedrock_runtime_kwargs` parameter to the scorer.
+:::
 
-
-Note: You can find more information about how to create a guardrail in the [this notebook](https://github.com/aws-samples/amazon-bedrock-samples/blob/main/responsible_ai/bedrock-guardrails/guardrails-api.ipynb) from Bedrock.
-
+For more details on creating a guardrail, see the [Bedrock guardrails notebook](https://github.com/aws-samples/amazon-bedrock-samples/blob/main/responsible_ai/bedrock-guardrails/guardrails-api.ipynb).
 ```python
 import weave
 import boto3
@@ -202,15 +202,15 @@ weave.init("my_app")
 
 # Create a guardrail scorer
 guardrail_scorer = BedrockGuardrailScorer(
-    guardrail_id="your-guardrail-id",  # Replace with your guardrail ID
-    guardrail_version="DRAFT",         # Or use a specific version
-    source="INPUT",                   # Can be "INPUT" or "OUTPUT"
+    guardrail_id="your-guardrail-id",  # Replace "your-guardrail-id" with your guardrail ID
+    guardrail_version="DRAFT",          # Use guardrail_version to use a specific guardrail version
+    source="INPUT",                             # Can be "INPUT" or "OUTPUT"
     bedrock_runtime_kwargs={"region_name": "us-east-1"}  # AWS region
 )
 
 @weave.op
 def generate_text(prompt: str) -> str:
-    # Your text generation logic here
+    # Add your text generation logic here
     return "Generated text..."
 
 # Use the guardrail as a safety check
