@@ -26,6 +26,8 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Compare LLMs](#compare-llms)
 - [Adjust the number of trials](#adjust-the-number-of-trials)
 - [Add a custom provider](#add-a-custom-provider)
+- [Edit a custom provider](#edit-a-custom-provider)
+- [Remove a custom provider](#remove-a-custom-provider)
 
 ## Prerequisites
 
@@ -264,4 +266,28 @@ To add a custom provider to the Playground, do the following:
    - _Max tokens_ (optional): For each model, you can specify the max tokens that the model can generate in a response.
 
 4. Once you've entered your provider information, click **Add provider**.
-5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI. Now, you can test the custom provider model(s) using standard Playground features.
+5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI. 
+
+Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
+
+## Edit a custom provider
+
+To edit information for a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overiew**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the edit button (the pencil icon).
+5. In the pop-up modal, edit the  provider information.
+6. Click **Save**.
+
+## Remove a custom provider
+
+To remove a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overiew**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the delete button (the trashcan icon).
+5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
+6. Click **Delete**.
