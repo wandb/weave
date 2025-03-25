@@ -35,6 +35,19 @@ def wf_file_storage_uri() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_URI")
 
 
+def wf_file_storage_project_allow_list() -> Optional[list[str]]:
+    """The project allowed list."""
+    allow_list = os.environ.get("WF_FILE_STORAGE_PROJECT_ALLOW_LIST")
+    if allow_list is None:
+        return None
+    try:
+        return allow_list.split(",")
+    except Exception:
+        raise ValueError(
+            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}"
+        )
+
+
 def wf_storage_bucket_aws_access_key_id() -> Optional[str]:
     """The AWS access key ID."""
     return os.environ.get("WF_FILE_STORAGE_AWS_ACCESS_KEY_ID")
