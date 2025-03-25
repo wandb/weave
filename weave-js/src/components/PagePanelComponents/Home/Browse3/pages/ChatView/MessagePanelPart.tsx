@@ -43,22 +43,37 @@ export const MessagePanelPart = ({
     );
   }
   if (value.type === 'tool_use' && 'name' in value) {
-    return <div>
-      <div><span className="font-bold">Tool name:</span>&nbsp;{value.name}</div>
-      { 'input' in value && <><div><span className="font-bold">Tool inputs:</span></div>
+    return (
       <div>
-        {Object.keys(value.input as object).map((key) =>
-          <div key={key} className='ml-16'>
-            <span className="font-bold">{key}:</span>&nbsp;{(value.input as {[key: string]: any})[key]}
-          </div>
+        <div>
+          <span className="font-bold">Tool name:</span>&nbsp;{value.name}
+        </div>
+        {'input' in value && (
+          <>
+            <div>
+              <span className="font-bold">Tool inputs:</span>
+            </div>
+            <div>
+              {Object.keys(value.input as object).map(key => (
+                <div key={key} className="ml-16">
+                  <span className="font-bold">{key}:</span>&nbsp;
+                  {(value.input as {[key: string]: any})[key]}
+                </div>
+              ))}
+            </div>
+          </>
         )}
-      </div></>}
-    </div>;
+      </div>
+    );
   }
   if (value.type === 'tool_result' && 'content' in value) {
     try {
-      const jsonContent = JSON.stringify(JSON.parse(value.content as string), null, 2);
-      return <CodeEditor language="json" value={jsonContent} readOnly/>;
+      const jsonContent = JSON.stringify(
+        JSON.parse(value.content as string),
+        null,
+        2
+      );
+      return <CodeEditor language="json" value={jsonContent} readOnly />;
     } catch (error) {
       return <span className="whitespace-break-spaces">{value.content}</span>;
     }
