@@ -75,6 +75,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -820,6 +821,10 @@ class WeaveClient:
     # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
     future_executor_fastlane: FutureExecutor | None
 
+    # Cache of files sent to the server to avoid sending the same file
+    # multiple times.
+    send_file_cache: WeaveClientSendFileCache
+
     """
     A client for interacting with the Weave trace server.
 
@@ -857,6 +862,7 @@ class WeaveClient:
         self._server_is_flushable = False
         if isinstance(self.server, RemoteHTTPTraceServer):
             self._server_is_flushable = self.server.should_batch
+        self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
 
@@ -1325,6 +1331,22 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_calls(self, call_ids: list[str]) -> None:
+        """Delete calls by their IDs.
+
+        Deleting a call will also delete all of its children.
+
+        Args:
+            call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
+        """
+        self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
             )
         )
 
@@ -1972,10 +1994,18 @@ class WeaveClient:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        cached_res = self.send_file_cache.get(req)
+        if cached_res:
+            return cached_res
+
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
+            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+        else:
+            res = self.future_executor.defer(self.server.file_create, req)
+
+        self.send_file_cache.put(req, res)
+        return res
 
     @property
     def num_outstanding_jobs(self) -> int:
@@ -1994,10 +2024,12 @@ class WeaveClient:
 
         # Add call batch uploads if available
         if self._server_is_flushable:
-            total += self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            total += server.call_processor.num_outstanding_jobs
         return total
 
-    def flush(
+    def finish(
         self,
         use_progress_bar: bool = True,
         callback: Callable[[FlushStatus], None] | None = None,
@@ -2027,6 +2059,10 @@ class WeaveClient:
             self._flush_with_callback(callback=callback)
         else:
             self._flush()
+
+    def flush(self) -> None:
+        """Flushes background asynchronous tasks, safe to call multiple times."""
+        self._flush()
 
     def _flush_with_callback(
         self,
@@ -2117,7 +2153,16 @@ class WeaveClient:
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
         if self._server_is_flushable:
-            self.server.call_processor.stop_accepting_new_work_and_flush_queue()  # type: ignore
+            # We don't want to do an instance check here because it could
+            # be susceptible to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable.
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+            # Restart call processor processing thread after flushing
+            server.call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2135,7 +2180,9 @@ class WeaveClient:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
         if self._server_is_flushable:
-            call_processor_jobs = self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            call_processor_jobs = server.call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,

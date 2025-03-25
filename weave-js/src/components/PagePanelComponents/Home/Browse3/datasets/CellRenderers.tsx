@@ -44,6 +44,7 @@ interface CellViewingRendererProps {
   isNew?: boolean;
   isEditing?: boolean;
   serverValue?: any;
+  disableNewRowHighlight?: boolean;
 }
 
 export const CellViewingRenderer: React.FC<
@@ -58,6 +59,7 @@ export const CellViewingRenderer: React.FC<
   id,
   field,
   serverValue,
+  disableNewRowHighlight = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
@@ -98,7 +100,7 @@ export const CellViewingRenderer: React.FC<
     if (isEdited) {
       return CELL_COLORS.EDITED;
     }
-    if (isNew) {
+    if (isNew && !disableNewRowHighlight) {
       return CELL_COLORS.NEW;
     }
     return CELL_COLORS.TRANSPARENT;
@@ -636,6 +638,7 @@ export interface ControlCellProps {
   isDeleted: boolean;
   isNew: boolean;
   hideRemoveForAddedRows?: boolean;
+  disableNewRowHighlight?: boolean;
 }
 
 export const ControlCell: React.FC<ControlCellProps> = ({
@@ -646,6 +649,7 @@ export const ControlCell: React.FC<ControlCellProps> = ({
   isDeleted,
   isNew,
   hideRemoveForAddedRows,
+  disableNewRowHighlight = false,
 }) => {
   const rowId = params.id as string;
   const rowIndex = params.row.___weave?.index;
@@ -660,7 +664,9 @@ export const ControlCell: React.FC<ControlCellProps> = ({
           justifyContent: 'center',
           height: '100%',
           width: '100%',
-          backgroundColor: CELL_COLORS.NEW,
+          backgroundColor: disableNewRowHighlight
+            ? CELL_COLORS.TRANSPARENT
+            : CELL_COLORS.NEW,
         }}
       />
     );
@@ -676,7 +682,7 @@ export const ControlCell: React.FC<ControlCellProps> = ({
         width: '100%',
         backgroundColor: isDeleted
           ? CELL_COLORS.DELETED
-          : isNew
+          : isNew && !disableNewRowHighlight
           ? CELL_COLORS.NEW
           : CELL_COLORS.TRANSPARENT,
         opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,
