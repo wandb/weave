@@ -1,6 +1,8 @@
+import {Box} from '@mui/material';
 import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {Button} from '../../../../../Button';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
@@ -20,6 +22,16 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         following our quickstart guide
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/examples/quickstart.ipynb">
+          <Button
+            variant="secondary"
+            icon="logo-colab"
+          >
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };
@@ -39,6 +51,16 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
         set up an evaluation pipeline
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/examples/evaluation.ipynb">
+          <Button
+            variant="secondary"
+            icon="logo-colab"
+          >
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };
