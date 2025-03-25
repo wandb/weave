@@ -19,11 +19,20 @@ export const ProgrammaticScorerForm: FC<ScorerFormProps<any>> = ({
         padding: '16px',
         borderRadius: '8px',
       }}>
-      Programmatic scorers must be written in Python. Please refer to the{' '}
-      <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
-        scorer documentation
-      </Link>{' '}
-      for more information.
+      <Box mb={1}>
+        This form will allow you to create a{' '}
+        <span style={{fontWeight: 'semibold'}}>Human Annotation</span> scorer
+        which can be used in the trace interface.
+      </Box>
+      <Box>
+        If you would like to create a{' '}
+        <span style={{fontWeight: 'semibold'}}>Programmatic Scorer</span>,
+        please use Python and refer to the{' '}
+        <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+          scorer documentation
+        </Link>{' '}
+        for more information.
+      </Box>
     </Box>
   );
 };

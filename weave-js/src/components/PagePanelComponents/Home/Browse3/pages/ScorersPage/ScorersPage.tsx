@@ -3,21 +3,15 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
-import {AnnotationsTab} from './AnnotationsTab';
-import {ProgrammaticScorersTab} from './CoreScorersTab';
-import {
-  HUMAN_ANNOTATION_VALUE,
-  NewScorerDrawer,
-  ScorerType,
-  scorerTypeRecord,
-} from './NewScorerDrawer';
+import {CombinedScorersTable} from './CombinedScorersTable';
+import {NewScorerDrawer, ScorerType, scorerTypeRecord} from './NewScorerDrawer';
 
 export const ScorersPage: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<ScorerType>(
+  const [selectedScorerType] = useState<ScorerType>(
     scorerTypeRecord.ANNOTATION.value
   );
 
@@ -27,40 +21,26 @@ export const ScorersPage: React.FC<{
         title="Scorers"
         tabs={[
           {
-            label: scorerTypeRecord.ANNOTATION.label + 's',
-            icon: scorerTypeRecord.ANNOTATION.icon,
-            content: <AnnotationsTab entity={entity} project={project} />,
-          },
-          {
-            label: scorerTypeRecord.PROGRAMMATIC.label + 's',
-            icon: scorerTypeRecord.PROGRAMMATIC.icon,
-            content: (
-              <ProgrammaticScorersTab entity={entity} project={project} />
-            ),
+            label: 'All Scorers',
+            content: <CombinedScorersTable entity={entity} project={project} />,
           },
         ]}
+        hideTabsIfSingle
         headerExtra={
           <Button
             icon={IconNames.AddNew}
             onClick={() => setIsModalOpen(true)}
-            variant="secondary">
-            Create scorer
+            variant="ghost">
+            New scorer
           </Button>
         }
         headerContent={undefined}
-        onTabSelectedCallback={tab =>
-          setSelectedTab(
-            // Hacky that we have to do the `"s"` thing, but it works
-            Object.values(scorerTypeRecord).find(t => t.label + 's' === tab)
-              ?.value ?? HUMAN_ANNOTATION_VALUE
-          )
-        }
       />
       <NewScorerDrawer
         entity={entity}
         project={project}
         open={isModalOpen}
-        initialScorerType={selectedTab}
+        initialScorerType={selectedScorerType}
         onClose={() => setIsModalOpen(false)}
       />
     </>
