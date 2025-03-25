@@ -1,13 +1,17 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
+import {MOON_500, MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
+import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
+import {Empty} from '../../common/Empty';
+import {EMPTY_PROPS_NO_LLM_PROVIDERS} from '../../common/EmptyContent';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
+import {useConfiguredProviders} from '../useConfiguredProviders';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -16,6 +20,47 @@ import {
   SetPlaygroundStateFieldFunctionType,
   useChatFunctions,
 } from './useChatFunctions';
+
+const EmptyWithSettingsButton: React.FC<{
+  emptyProps: typeof EMPTY_PROPS_NO_LLM_PROVIDERS;
+  onSettingsClick: () => void;
+  entity: string;
+}> = ({emptyProps, onSettingsClick, entity}) => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '24px',
+      }}>
+      <Empty {...emptyProps} />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            window.open(`https://wandb.ai/${entity}/settings`, '_blank');
+            onSettingsClick();
+          }}
+          icon="key-admin"
+          size="medium">
+          Configure LLM key
+        </Button>
+        <Tailwind>
+          <div className="text-sm" style={{color: MOON_500}}>
+            Note: You must be a team admin to edit your secrets.
+          </div>
+        </Tailwind>
+      </Box>
+    </Box>
+  );
+};
 
 export type PlaygroundChatProps = {
   entity: string;
@@ -37,6 +82,8 @@ export const PlaygroundChat = ({
   settingsTab,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
+  const {result: configuredProviders, loading: configuredProvidersLoading} =
+    useConfiguredProviders(entity);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -62,6 +109,31 @@ export const PlaygroundChat = ({
     () => playgroundStates.some(state => state.loading),
     [playgroundStates]
   );
+
+  // Check if there are any configured providers
+  const hasConfiguredProviders = useMemo(() => {
+    if (configuredProvidersLoading) return true; // Don't show empty state while loading
+    return Object.values(configuredProviders).some(({status}) => status);
+  }, [configuredProviders, configuredProvidersLoading]);
+
+  if (!hasConfiguredProviders) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <EmptyWithSettingsButton
+          emptyProps={EMPTY_PROPS_NO_LLM_PROVIDERS}
+          onSettingsClick={() => setSettingsTab(0)}
+          entity={entity}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box
