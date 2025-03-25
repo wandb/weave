@@ -807,9 +807,14 @@ export const CallsTable: FC<{
               />
               <div className="text-sm">
                 {selectedCalls.length}{' '}
-                {isEvaluateTable 
-                  ? selectedCalls.length === 1 ? 'evaluation' : 'evaluations'
-                  : selectedCalls.length === 1 ? 'trace' : 'traces'} selected:
+                {isEvaluateTable
+                  ? selectedCalls.length === 1
+                    ? 'evaluation'
+                    : 'evaluations'
+                  : selectedCalls.length === 1
+                  ? 'trace'
+                  : 'traces'}{' '}
+                selected:
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
