@@ -70,8 +70,11 @@ def _concatenate_strings(
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    result = util.equal(self._arrow_data, other)
-    return ArrowWeaveList(result, types.Boolean(), self._artifact)
+    return util.handle_dictionary_array(
+        self,
+        lambda arr: util.equal(arr, other),
+        types.Boolean(),
+    )
 
 
 @arrow_op(
@@ -82,8 +85,11 @@ def __eq__(self, other):
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    result = util.not_equal(self._arrow_data, other)
-    return ArrowWeaveList(result, types.Boolean(), self._artifact)
+    return util.handle_dictionary_array(
+        self,
+        lambda arr: util.not_equal(arr, other),
+        types.Boolean(),
+    )
 
 
 @arrow_op(

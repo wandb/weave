@@ -4,6 +4,8 @@ import pytest
 from weave_query import weave_types as types
 from weave_query.arrow.list_ import ArrowWeaveList
 from weave_query.ops_arrow.string import (
+    __eq__,
+    __ne__,
     _concatenate_strings,
     append,
     arrowweavelist_len,
@@ -26,6 +28,78 @@ from weave_query.ops_arrow.string import (
     to_number,
     upper,
 )
+
+
+class TestEqualOp:
+    def test_other_is_string(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = __eq__.eager_call(awl, "hello")
+        expected = [True, False, False]
+        assert result.to_pylist_notags() == expected
+
+    def test_other_is_awl(self):
+        arrow_data = ["hello", "world", None, None, "foo"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(
+            pa.array(["hello", "world", None, "foo", None]), types.String()
+        )
+        result = __eq__.eager_call(awl, other)
+        expected = [True, True, True, False, False]
+        assert result.to_pylist_notags() == expected
+
+    def test_other_is_awl_of_different_length_raises_exception(self):
+        arrow_data = ["hello", "world", "foo", "bar"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(pa.array(["hello", "world"]), types.String())
+        with pytest.raises(pa.lib.ArrowInvalid):
+            __eq__.eager_call(awl, other)
+
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = __eq__.eager_call(awl, "hello")
+        expected = [False, False, True, False]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestNotEqualOp:
+    def test_other_is_string(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = __ne__.eager_call(awl, "hello")
+        expected = [False, True, True]
+        assert result.to_pylist_notags() == expected
+
+    def test_other_is_awl(self):
+        arrow_data = ["hello", "earth", None, None, "foo"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(
+            pa.array(["hello", "world", None, "foo", None]), types.String()
+        )
+        result = __ne__.eager_call(awl, other)
+        expected = [False, True, False, True, True]
+        assert result.to_pylist_notags() == expected
+
+    def test_other_is_awl_of_different_length_raises_exception(self):
+        arrow_data = ["hello", "world", "foo", "bar"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(pa.array(["hello", "world"]), types.String())
+        with pytest.raises(pa.lib.ArrowInvalid):
+            __ne__.eager_call(awl, other)
+
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = __ne__.eager_call(awl, "hello")
+        expected = [True, True, False, True]
+        assert result._arrow_data.to_pylist() == expected
 
 
 class TestLenOp:
@@ -134,11 +208,11 @@ class TestConcatenateStrings:
         other = ArrowWeaveList(
             pa.array([" there", " earth", " moon", "foo"]), types.String()
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(pa.lib.ArrowInvalid):
             # right is longer than left
             _concatenate_strings(awl, other)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(pa.lib.ArrowInvalid):
             # left is longer than right
             _concatenate_strings(other, awl)
 
