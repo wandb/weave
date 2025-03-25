@@ -227,15 +227,16 @@ def get_custom_provider_info(
             metadata_only=False,
         )
         provider_obj_res = obj_read_func(provider_obj_req)
-        provider_obj = Provider.model_validate(provider_obj_res.obj)
 
-        if provider_obj.base_object_class != "Provider":
+        if provider_obj_res.obj.base_object_class != "Provider":
             raise InvalidRequest(
-                f"Object {provider_id} is not a Provider, it is a {provider_obj.base_object_class}"
+                f"Object {provider_id} is not a Provider, it is a {provider_obj_res.obj.base_object_class}"
             )
 
+        provider_obj = Provider.model_validate(provider_obj_res.obj.val)
+
         base_url = provider_obj.base_url
-        api_key = provider_obj.api_key_name
+        secret_name = provider_obj.api_key_name
         extra_headers = provider_obj.extra_headers
         return_type = provider_obj.return_type
 
@@ -252,12 +253,15 @@ def get_custom_provider_info(
             metadata_only=False,
         )
         provider_model_obj_res = obj_read_func(provider_model_obj_req)
-        provider_model_obj = ProviderModel.model_validate(provider_model_obj_res.obj)
 
-        if provider_model_obj.base_object_class != "ProviderModel":
+        if provider_model_obj_res.obj.base_object_class != "ProviderModel":
             raise InvalidRequest(
-                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj.base_object_class}"
+                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj_res.obj.base_object_class}"
             )
+
+        provider_model_obj = ProviderModel.model_validate(
+            provider_model_obj_res.obj.val
+        )
 
         # Use the provider model's name as the actual model name for the API call
         actual_model_name = provider_model_obj.name

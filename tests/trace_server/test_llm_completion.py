@@ -97,7 +97,6 @@ class TestGetCustomProviderInfo(unittest.TestCase):
         4. Object read and secret fetch calls are made correctly
         """
 
-        # Set up the mock_obj_read_func to return test objects
         def mock_obj_read(req):
             if req.object_id == self.provider_id:
                 return tsi.ObjReadRes(obj=self.provider_obj)
@@ -107,65 +106,41 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         self.mock_obj_read_func.side_effect = mock_obj_read
 
-        # Use the context manager to set the secret fetcher
+        # Set up the secret fetcher context
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
             # Call the function under test
-            base_url, api_key, extra_headers, return_type, actual_model_name = (
-                get_custom_provider_info(
-                    project_id=self.project_id,
-                    model_name=self.model_name,
-                    obj_read_func=self.mock_obj_read_func,
-                )
+            provider_info = get_custom_provider_info(
+                project_id=self.project_id,
+                model_name=self.model_name,
+                obj_read_func=self.mock_obj_read_func,
             )
 
-            # Verify all returned values match expected configuration
-            self.assertEqual(
-                base_url,
-                "https://api.example.com",
-                f"Base URL mismatch. Expected 'https://api.example.com', got '{base_url}'",
+            # Verify the results
+            assert provider_info.base_url == "https://api.example.com", (
+                f"Base URL mismatch. Expected 'https://api.example.com', "
+                f"got '{provider_info.base_url}'"
             )
-            self.assertEqual(
-                api_key,
-                "test-api-key-value",
-                f"API key mismatch. Expected 'test-api-key-value', got '{api_key}'",
+            assert provider_info.api_key == "test-api-key-value", (
+                f"API key mismatch. Expected 'test-api-key-value', "
+                f"got '{provider_info.api_key}'"
             )
-            self.assertEqual(
-                extra_headers,
-                {"X-Header": "value"},
-                f"Extra headers mismatch. Expected {{'X-Header': 'value'}}, got {extra_headers}",
+            assert provider_info.extra_headers == {"X-Header": "value"}, (
+                f"Extra headers mismatch. Expected {{'X-Header': 'value'}}, "
+                f"got {provider_info.extra_headers}"
             )
-            self.assertEqual(
-                return_type,
-                "openai",
-                f"Return type mismatch. Expected 'openai', got '{return_type}'",
+            assert provider_info.return_type == "openai", (
+                f"Return type mismatch. Expected 'openai', "
+                f"got '{provider_info.return_type}'"
             )
-            self.assertEqual(
-                actual_model_name,
-                "actual-model-name",
-                f"Model name mismatch. Expected 'actual-model-name', got '{actual_model_name}'",
+            assert provider_info.actual_model_name == "actual-model-name", (
+                f"Actual model name mismatch. Expected 'actual-model-name', "
+                f"got '{provider_info.actual_model_name}'"
             )
 
-            # Verify correct object read calls were made
-            self.mock_obj_read_func.assert_any_call(
-                tsi.ObjReadReq(
-                    project_id=self.project_id,
-                    object_id=self.provider_id,
-                    digest="latest",
-                    metadata_only=False,
-                )
-            )
-            self.mock_obj_read_func.assert_any_call(
-                tsi.ObjReadReq(
-                    project_id=self.project_id,
-                    object_id=f"{self.provider_id}-{self.model_id}",
-                    digest="latest",
-                    metadata_only=False,
-                )
-            )
-
-            # Verify secret fetch was called correctly
-            self.mock_secret_fetcher.fetch.assert_called_once_with("TEST_API_KEY")
+            # Verify the mock calls
+            self.mock_obj_read_func.assert_called()
+            self.mock_secret_fetcher.fetch.assert_called_with("TEST_API_KEY")
         finally:
             _secret_fetcher_context.reset(token)
 

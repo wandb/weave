@@ -41,7 +41,8 @@ export const FilterTagItem = ({
   item,
   onRemoveFilter,
   isEditing = false,
-}: FilterTagItemProps) => {
+  onClick,
+}: FilterTagItemProps & {onClick?: () => void}) => {
   const field = getFieldLabel(item.field);
   const operator = getOperatorLabel(item.operator);
   let label: any = `${field} ${operator}`;
@@ -82,6 +83,7 @@ export const FilterTagItem = ({
         </>
       }
       isEditing={isEditing}
+      onClick={onClick}
       removeAction={
         disableRemove ? (
           <></>
