@@ -1,5 +1,5 @@
 import {Box, Typography} from '@material-ui/core';
-import {MOON_200, MOON_300} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, MOON_300, MOON_600} from '@wandb/weave/common/css/color.styles';
 import {Link} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
 import {IconName, IconNames} from '@wandb/weave/components/Icon';
@@ -169,16 +169,16 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
           <Box
             style={{
               backgroundColor: MOON_200,
+              color: MOON_600,
               padding: '16px',
               borderRadius: '8px',
             }}>
             <Box mb={1}>
-              This form will allow you to create a{' '}
-              <span style={{fontWeight: '600'}}>Human Annotation</span> scorer
-              which can be used in the trace interface.
+              <span style={{fontWeight: '600'}}>Human Annotation</span> scorers
+              can be used in the trace interface.
             </Box>
             <Box>
-              If you would like to create a{' '}
+              To create a{' '}
               <span style={{fontWeight: '600'}}>Programmatic Scorer</span>,
               please use Python and refer to the{' '}
               <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
