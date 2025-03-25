@@ -83,15 +83,6 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
-export const LlmModelSchema = z.object({
-  default_params: ModelParamsSchema.optional(),
-  description: z.union([z.null(), z.string()]).optional(),
-  name: z.union([z.null(), z.string()]).optional(),
-  prompt: z.union([z.null(), z.string()]).optional(),
-  provider_model: z.string(),
-});
-export type LlmModel = z.infer<typeof LlmModelSchema>;
-
 export const TestOnlyExampleSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
   name: z.union([z.null(), z.string()]).optional(),
