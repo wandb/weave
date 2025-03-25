@@ -36,16 +36,27 @@ def wf_file_storage_uri() -> Optional[str]:
 
 
 def wf_file_storage_project_allow_list() -> Optional[list[str]]:
-    """The project allowed list."""
+    """Get the list of project IDs allowed to use file storage.
+
+    Returns:
+        Optional[list[str]]: A list of project IDs that are allowed to use file storage.
+            Returns None if no allow list is configured.
+
+    Raises:
+        ValueError: If the allow list environment variable is set but contains invalid data.
+            The value must be a comma-separated list of non-empty project IDs.
+    """
     allow_list = os.environ.get("WF_FILE_STORAGE_PROJECT_ALLOW_LIST")
     if allow_list is None:
         return None
     try:
-        return allow_list.split(",")
-    except Exception:
+        project_ids = [pid.strip() for pid in allow_list.split(",") if pid.strip()]
+    except Exception as e:
         raise ValueError(
-            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}"
+            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {str(e)}"
         )
+
+    return project_ids
 
 
 def wf_storage_bucket_aws_access_key_id() -> Optional[str]:

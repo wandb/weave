@@ -1335,21 +1335,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         Get the base storage URI for a project.
 
-        Currently this is quite simple as it uses the default storage bucket
-        for the entire client (most typically configured via environment variable).
+        Args:
+            project_id: The ID of the project requesting file storage access.
 
-        However, in the near future, this might be something that is driven by
-        the project or a context variable. Leaving this method here for clarity
-        and future extensibility.
+        Returns:
+            Optional[FileStorageURI]: The base storage URI if the project has access,
+                None otherwise.
+
+        Raises:
+            ValueError: If the configured storage URI is invalid.
         """
         file_storage_uri_str = wf_env.wf_file_storage_uri()
         if not file_storage_uri_str:
             return None
+
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
             return None
+
         if project_id not in project_allow_list:
             return None
+
         res = FileStorageURI.parse_uri_str(file_storage_uri_str)
         if res.has_path():
             raise ValueError(
