@@ -878,6 +878,7 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionHash: obj.digest,
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
+    userId: obj.wb_user_id,
   };
 };
 
