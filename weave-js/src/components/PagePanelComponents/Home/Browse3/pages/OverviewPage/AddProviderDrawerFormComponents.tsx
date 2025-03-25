@@ -119,93 +119,6 @@ export const HeadersInput: React.FC<{
   );
 };
 
-// Model component
-export const ModelInput: React.FC<{
-  model: string;
-  maxToken: number;
-  providerName: string;
-  index: number;
-  onModelChange: (value: string, index: number) => void;
-  onMaxTokensChange: (value: number, index: number) => void;
-  onDelete: (index: number) => void;
-  modelNames: string[];
-}> = ({
-  model,
-  maxToken,
-  providerName,
-  index,
-  onModelChange,
-  onMaxTokensChange,
-  onDelete,
-  modelNames,
-}) => {
-  return (
-    <Box>
-      <Box
-        sx={{
-          mt: index > 0 ? 2 : 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          width: '100%',
-        }}>
-        <Box sx={{width: '75%'}}>
-          <TextField
-            placeholder="Enter model name..."
-            value={model}
-            onChange={value => {
-              const newValue = value.replace(/\s/g, '');
-              onModelChange(newValue, index);
-            }}
-            errorState={
-              providerName.length + model.length > 127 ||
-              modelNames.some((m, i) => i !== index && m === model)
-            }
-          />
-        </Box>
-        <Box sx={{width: '25%'}}>
-          <TextField
-            placeholder="Max tokens..."
-            type="number"
-            value={String(maxToken || '')}
-            onChange={value => {
-              const newValue = value.replace(/[^0-9]/g, '');
-              const numericValue = newValue ? parseInt(newValue, 10) : 0;
-              onMaxTokensChange(numericValue, index);
-            }}
-          />
-        </Box>
-        <Button variant="ghost" icon="delete" onClick={() => onDelete(index)} />
-      </Box>
-      {/* Error messages */}
-      {providerName.length + model.length > 127 && (
-        <Typography
-          variant="caption"
-          color="error"
-          sx={{
-            ...sharedTypographyStyle,
-            mt: 0.5,
-            display: 'block',
-          }}>
-          {'<Provider>/<Model> cannot be more than 128 characters'}
-        </Typography>
-      )}
-      {modelNames.some((m, i) => i !== index && m === model) && (
-        <Typography
-          variant="caption"
-          color="error"
-          sx={{
-            ...sharedTypographyStyle,
-            mt: 0.5,
-            display: 'block',
-          }}>
-          Model name must be unique
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
 // Provider name component
 export const ProviderNameInput: React.FC<{
   name: string;
@@ -223,7 +136,7 @@ export const ProviderNameInput: React.FC<{
       <TextField
         placeholder="Enter provider name..."
         value={name}
-        onChange={value => onNameChange(value)}
+        onChange={value => onNameChange(value.replace(/\s/g, '_'))}
         errorState={!nameIsUnique || !nameNoSpaces || name.length > 128}
       />
       {!nameIsUnique && (
@@ -312,7 +225,7 @@ export const ApiKeyInput: React.FC<{
       <TextField
         placeholder="WANDB_SECRET_NAME..."
         value={apiKey}
-        onChange={value => onApiKeyChange(value)}
+        onChange={value => onApiKeyChange(value.replace(/\s/g, '_'))}
       />
     </Box>
   );
@@ -340,7 +253,7 @@ export const BaseUrlInput: React.FC<{
       <TextField
         placeholder="Enter base URL..."
         value={baseUrl}
-        onChange={value => onBaseUrlChange(value)}
+        onChange={value => onBaseUrlChange(value.replace(/\s/g, ''))}
       />
     </Box>
   );
@@ -410,6 +323,93 @@ export const ModelsSection: React.FC<{
           modelNames={modelNames}
         />
       ))}
+    </Box>
+  );
+};
+
+// Model component
+export const ModelInput: React.FC<{
+  model: string;
+  maxToken: number;
+  providerName: string;
+  index: number;
+  onModelChange: (value: string, index: number) => void;
+  onMaxTokensChange: (value: number, index: number) => void;
+  onDelete: (index: number) => void;
+  modelNames: string[];
+}> = ({
+  model,
+  maxToken,
+  providerName,
+  index,
+  onModelChange,
+  onMaxTokensChange,
+  onDelete,
+  modelNames,
+}) => {
+  return (
+    <Box>
+      <Box
+        sx={{
+          mt: index > 0 ? 2 : 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          width: '100%',
+        }}>
+        <Box sx={{width: '75%'}}>
+          <TextField
+            placeholder="Enter model name..."
+            value={model}
+            onChange={value => {
+              const newValue = value.replace(/\s/g, '');
+              onModelChange(newValue, index);
+            }}
+            errorState={
+              providerName.length + model.length > 127 ||
+              modelNames.some((m, i) => i !== index && m === model)
+            }
+          />
+        </Box>
+        <Box sx={{width: '25%'}}>
+          <TextField
+            placeholder="Max tokens..."
+            type="number"
+            value={String(maxToken || '')}
+            onChange={value => {
+              const newValue = value.replace(/[^0-9]/g, '');
+              const numericValue = newValue ? parseInt(newValue, 10) : 0;
+              onMaxTokensChange(numericValue, index);
+            }}
+          />
+        </Box>
+        <Button variant="ghost" icon="delete" onClick={() => onDelete(index)} />
+      </Box>
+      {/* Error messages */}
+      {providerName.length + model.length > 127 && (
+        <Typography
+          variant="caption"
+          color="error"
+          sx={{
+            ...sharedTypographyStyle,
+            mt: 0.5,
+            display: 'block',
+          }}>
+          {'<Provider>/<Model> cannot be more than 128 characters'}
+        </Typography>
+      )}
+      {modelNames.some((m, i) => i !== index && m === model) && (
+        <Typography
+          variant="caption"
+          color="error"
+          sx={{
+            ...sharedTypographyStyle,
+            mt: 0.5,
+            display: 'block',
+          }}>
+          Model name must be unique
+        </Typography>
+      )}
     </Box>
   );
 };

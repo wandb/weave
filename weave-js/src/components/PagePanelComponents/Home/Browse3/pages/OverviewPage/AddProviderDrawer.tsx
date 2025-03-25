@@ -11,6 +11,7 @@ import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
 import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
+import {useWFHooks} from '../wfReactInterface/context';
 import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {
   ApiKeyInput,
@@ -22,6 +23,8 @@ import {
 } from './AddProviderDrawerFormComponents';
 
 interface AddProviderDrawerProps {
+  entityName: string;
+  projectName: string;
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
@@ -38,6 +41,8 @@ interface AddProviderDrawerProps {
 }
 
 export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
+  entityName,
+  projectName,
   projectId,
   isOpen,
   onClose,
@@ -48,6 +53,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
   const {scrollWidth} = useHandleScroll();
   const createProvider = useCreateBuiltinObjectInstance('Provider');
   const createProviderModel = useCreateBuiltinObjectInstance('ProviderModel');
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectDeleteAllVersions} = useObjectDeleteFunc();
+
   const [drawerWidth, setDrawerWidth] = useState(480);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -94,9 +102,11 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     try {
       result = await createProvider({
         obj: {
+          project_id: projectId,
+          object_id: name,
           val: {
             name,
-            base_url: baseUrl.replace(/\/+$/, ''),
+            base_url: baseUrl,
             api_key_name: apiKey,
             extra_headers:
               headers
@@ -106,10 +116,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                   return acc;
                 }, {} as Record<string, string>) || {},
           },
-          project_id: projectId,
-          object_id: name,
         },
       });
+
       toast(`Provider ${name} ${editingProvider ? 'updated' : 'created'}`, {
         type: 'success',
       });
@@ -120,32 +129,53 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       });
     }
 
+    // Delete models that are no longer in the form
+    const deletedModels = (editingProvider?.models || []).filter(
+      model => !modelName.includes(model)
+    );
     try {
-      let modelDigests: string[] = [];
+      await Promise.all([
+        ...deletedModels.map(model =>
+          objectDeleteAllVersions({
+            entity: entityName,
+            project: projectName,
+            objectId: `${editingProvider?.name || ''}-${model || ''}`,
+            weaveKind: 'object',
+            scheme: 'weave',
+            versionHash: '',
+            path: '',
+          })
+        ),
+      ]);
+    } catch (error) {
+      console.error(error);
+      toast(`Failed to delete provider models: ${error}`, {
+        type: 'error',
+      });
+    }
+
+    try {
       if (result?.digest) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        modelDigests = (
-          await Promise.all(
-            modelName.map(async (model, index) => {
-              if (model === '') {
-                return '';
-              }
-              const modelResult = await createProviderModel({
-                obj: {
-                  val: {
-                    name: model,
-                    provider: result.digest,
-                    max_tokens:
-                      maxTokens[index] || findMaxTokensByModelName(model),
-                  },
-                  project_id: projectId,
-                  object_id: name + '-' + model,
+        await Promise.all(
+          modelName.map(async (model, index) => {
+            if (model === '') {
+              return '';
+            }
+            return await createProviderModel({
+              obj: {
+                val: {
+                  name: model,
+                  provider: result.digest,
+                  max_tokens:
+                    maxTokens[index] || findMaxTokensByModelName(model),
                 },
-              });
-              return modelResult.digest;
-            })
-          )
-        ).filter((digest: string) => digest !== '');
+                project_id: projectId,
+                // Object ID is the provider name + '-' + model name
+                object_id: name + '-' + model,
+              },
+            });
+          })
+        );
       }
 
       refetch();
@@ -179,6 +209,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     <ResizableDrawer
       open={isOpen}
       onClose={handleClose}
+      // if the navbar is visible, we need to offset the drawer by the height of the navbar
       marginTop={Math.min(60 - scrollWidth, 60)}
       defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
       setWidth={width => !isFullscreen && setDrawerWidth(width)}
@@ -206,7 +237,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
             overflowX: 'hidden',
           }}>
           <Box sx={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
-            <CustomProviderInfo />
+            <CustomProviderInfoBanner />
 
             <ProviderNameInput
               name={name}
@@ -239,11 +270,9 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
                 );
               }}
               onMaxTokensChange={(value, idx) => {
-                setMaxTokens(prev => {
-                  const newTokens = [...prev];
-                  newTokens[idx] = value;
-                  return newTokens;
-                });
+                setMaxTokens(prev =>
+                  prev.map((m, i) => (i === idx ? value : m))
+                );
               }}
               onDeleteModel={idx => {
                 setModelName(prev => prev.filter((_, i) => i !== idx));
@@ -290,7 +319,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
   );
 };
 
-const CustomProviderInfo = () => (
+const CustomProviderInfoBanner = () => (
   <Box
     style={{
       backgroundColor: MOON_200,
@@ -299,7 +328,7 @@ const CustomProviderInfo = () => (
       marginBottom: '-8px',
     }}>
     Custom providers are made for connecting to OpenAI compatible API endpoints.
-    Please refer to the{' '}
+    Please refer to the {/* TODO: Add link to custom provider documentation */}
     <Link
       href="#"
       target="_blank"
