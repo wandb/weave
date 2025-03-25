@@ -1560,3 +1560,110 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         """,
         {"pb_0": "my_model", "pb_1": "project"},
     )
+
+def test_calls_query_with_ref_resolution() -> None:
+    """Test reference resolution in calls queries."""
+    cq = CallsQuery(project_id="test_project")
+    
+    # Test basic reference resolution
+    cq.add_field("inputs.model.message.text")
+    cq.set_expand_columns(["inputs.model.message.text"])
+    
+    # Add a filter on the resolved reference
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.model.message.text"},
+                    {"$literal": "Hello, world!"},
+                ]
+            }
+        )
+    )
+    
+    # Add ordering by the resolved reference
+    cq.add_order("inputs.model.message.text", "asc")
+    
+    # Set a limit to test with pagination
+    cq.set_limit(10)
+    
+    # Expected SQL should include:
+    # 1. A CTE for reference resolution
+    # 2. Joins to connect resolved references
+    # 3. Proper filtering and ordering on resolved values
+    exp_query = """
+    WITH resolved_0 AS (
+        WITH RECURSIVE resolved_refs AS (
+            -- Base case: Get initial refs
+            SELECT 
+                calls_merged.id as call_id,
+                calls_merged.project_id,
+                calls_merged.input_refs as refs,
+                CAST('' AS String) as path,
+                CAST('' AS String) as resolved_value
+            FROM calls_merged
+            WHERE calls_merged.project_id = {project_id: String}
+            
+            UNION ALL
+            
+            -- Recursive case: Resolve refs and look for more refs
+            SELECT 
+                r.call_id,
+                r.project_id,
+                o.val_dump as refs,
+                r.path || '.' || k as path,
+                CASE 
+                    WHEN JSONType(o.val_dump, k) = 'String' 
+                    AND startsWith(o.val_dump[k], 'weave:///') 
+                    THEN o.val_dump[k]
+                    ELSE o.val_dump[k]
+                END as resolved_value
+            FROM resolved_refs r
+            CROSS JOIN LATERAL (
+                SELECT key as k, value as v
+                FROM JSONEachRow(r.refs)
+            ) j
+            LEFT JOIN LATERAL (
+                SELECT val_dump
+                FROM object_versions
+                WHERE project_id = r.project_id
+                AND object_id = extractRefId(r.refs[k])
+                AND is_latest = 1
+            ) o
+            WHERE r.path != {path: String}
+        )
+        SELECT call_id, resolved_value
+        FROM resolved_refs
+        WHERE path = {path: String}
+    )
+    WITH filtered_calls AS (
+        SELECT id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {project_id: String}
+            AND calls_merged.deleted_at IS NULL
+            AND calls_merged.started_at IS NOT NULL
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        ORDER BY resolved_0.resolved_value ASC
+        LIMIT 10
+    )
+    SELECT any(JSON_VALUE(inputs_dump, {path: String})) AS inputs.model.message.text
+    FROM calls_merged
+    LEFT JOIN resolved_0
+    ON resolved_0.call_id = calls_merged.id
+    WHERE calls_merged.project_id = {project_id: String}
+        AND calls_merged.deleted_at IS NULL
+        AND calls_merged.started_at IS NOT NULL
+        AND calls_merged.id IN filtered_calls
+    GROUP BY (calls_merged.project_id, calls_merged.id)
+    HAVING JSON_VALUE(inputs_dump, {path: String}) = {literal: String}
+    ORDER BY resolved_0.resolved_value ASC
+    LIMIT 10
+    """
+    
+    exp_params = {
+        "project_id": "test_project",
+        "path": "$.model.message.text",
+        "literal": "Hello, world!",
+    }
+    
+    assert_sql(cq, exp_query, exp_params)

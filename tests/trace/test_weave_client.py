@@ -5,6 +5,7 @@ import platform
 import sys
 import time
 import uuid
+from typing import Optional
 
 import pydantic
 import pytest
@@ -2389,3 +2390,74 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
     # Verify they all have the same op_name
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
+
+def test_calls_query_expand_columns_recursive_refs(client):
+    """Test that expand_columns with recursive_refs works with get_calls."""
+    import uuid
+
+    # Use a unique test ID to identify these calls
+    test_id = str(uuid.uuid4())
+
+    # Create a nested object structure
+    class NestedObject(weave.Object):
+        value: str
+        nested: Optional["NestedObject"] = None
+
+    # Create three nested objects
+    obj_c = NestedObject(value="FFFF")
+    obj_b = NestedObject(value="GGGG", nested=obj_c)
+
+    # Create a call that uses these objects
+    @weave.op()
+    def process_nested(obj: NestedObject) -> str:
+        return f"{obj.value} -> {obj.nested.value if obj.nested else 'None'}"
+
+    # Make 3 calls with our nested object
+    obj_a = NestedObject(value="AAAA", nested=obj_b)
+    process_nested(obj_a)
+    obj_a = NestedObject(value="BBBB", nested=obj_b)
+    process_nested(obj_a)
+    obj_a = NestedObject(value="CCCC", nested=obj_b)
+    process_nested(obj_a)
+
+    # Now query the calls with expand_columns to resolve the refs
+    calls = client.get_calls(
+        expand_columns=["inputs.obj.nested.value", "inputs.obj.value"],
+        sort_by=[
+            tsi.SortBy(field="inputs.obj.nested.value", direction="asc"),
+        ]
+    )
+
+    # Verify we got the call back
+    assert len(calls) == 3
+    call = calls[0]
+
+    # Verify the refs were resolved correctly
+    print(call.inputs)
+    assert call.inputs["obj"]["value"] == "A"
+    assert call.inputs["obj"]["nested"]["value"] == "B"
+
+    # Create another call with a different nested structure
+    obj_x = NestedObject(value="X")
+    obj_y = NestedObject(value="Y", nested=obj_x)
+    result2 = process_nested(obj_y)
+
+    # Query again with the same expand_columns
+    calls = client.get_calls(
+        expand_columns=["inputs.obj.nested.value", "inputs.obj.value"],
+        sort_by=[
+            tsi.SortBy(field="inputs.obj.nested.value", direction="asc"),
+            tsi.SortBy(field="inputs.obj.value", direction="desc")
+        ]
+    )
+
+    # Verify we got both calls back
+    assert len(calls) == 4
+
+    # Verify the ordering worked correctly
+    # First call should be obj_y (Y -> X) since X comes before B alphabetically
+    assert calls[0].inputs["obj"]["value"] == "Y"
+    assert calls[0].inputs["obj"]["nested"]["value"] == "X"
+    # Second call should be obj_a (A -> B)
+    assert calls[1].inputs["obj"]["value"] == "A"
+    assert calls[1].inputs["obj"]["nested"]["value"] == "B"

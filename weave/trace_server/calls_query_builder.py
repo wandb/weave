@@ -237,6 +237,85 @@ class QueryBuilderDynamicField(QueryBuilderField):
         return f"{super().as_sql(pb, table_alias)} AS {self.field}"
 
 
+class CallsMergedRefField(CallsMergedDynamicField):
+    """Field class for handling reference resolution in nested JSON fields."""
+    
+    def __init__(self, field: str, path: list[str], project_id: str):
+        super().__init__(field=field, agg_fn="any")
+        self.path = path
+        self.project_id = project_id
+        
+    def as_sql(self, pb: ParamBuilder, table_alias: str, cast: Optional[tsi_query.CastTo] = None) -> str:
+        # Get the base field value
+        base_field = super().as_sql(pb, table_alias)
+        
+        # If we're in a reference resolution CTE, use the resolved value
+        if table_alias.startswith("resolved_"):
+            return f"{table_alias}.resolved_value"
+            
+        # Otherwise, use the base field
+        return base_field
+        
+    def _create_ref_resolution_cte(self, pb: ParamBuilder, table_alias: str) -> str:
+        """Creates a recursive CTE to resolve references."""
+        
+        # Base case: Get initial refs from input_refs/output_refs
+        base_query = f"""
+        WITH RECURSIVE resolved_refs AS (
+            -- Base case: Get initial refs
+            SELECT 
+                {table_alias}.id as call_id,
+                {table_alias}.project_id,
+                {table_alias}.input_refs as refs,
+                CAST('' AS String) as path,
+                CAST('' AS String) as resolved_value
+            FROM {table_alias}
+            WHERE {table_alias}.project_id = {_param_slot(pb.add_param(self.project_id), 'String')}
+            
+            UNION ALL
+            
+            -- Recursive case: Resolve refs and look for more refs
+            SELECT 
+                r.call_id,
+                r.project_id,
+                o.val_dump as refs,
+                r.path || '.' || k as path,
+                CASE 
+                    WHEN JSONType(o.val_dump, k) = 'String' 
+                    AND startsWith(o.val_dump[k], 'weave:///') 
+                    THEN o.val_dump[k]
+                    ELSE o.val_dump[k]
+                END as resolved_value
+            FROM resolved_refs r
+            CROSS JOIN LATERAL (
+                SELECT key as k, value as v
+                FROM JSONEachRow(r.refs)
+            ) j
+            LEFT JOIN LATERAL (
+                SELECT val_dump
+                FROM object_versions
+                WHERE project_id = r.project_id
+                AND object_id = extractRefId(r.refs[k])
+                AND is_latest = 1
+            ) o
+            WHERE r.path != {_param_slot(pb.add_param('.'.join(self.path)), 'String')}
+        )
+        SELECT call_id, resolved_value
+        FROM resolved_refs
+        WHERE path = {_param_slot(pb.add_param('.'.join(self.path)), 'String')}
+        """
+        return base_query
+
+def extractRefId(ref: str) -> str:
+    """Extracts the object ID from a reference string."""
+    if not ref.startswith("weave:///"):
+        return ref
+    parts = ref.split("/")
+    if len(parts) >= 5:
+        return parts[4]
+    return ref
+
+
 def json_dump_field_as_sql(
     pb: ParamBuilder,
     table_alias: str,
@@ -371,9 +450,10 @@ class CallsQuery(BaseModel):
     limit: Optional[int] = None
     offset: Optional[int] = None
     include_costs: bool = False
+    expand_columns: list[str] = Field(default_factory=list)
 
     def add_field(self, field: str) -> "CallsQuery":
-        name = get_field_by_name(field)
+        name = get_field_by_name(field, self.project_id)
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
@@ -400,7 +480,7 @@ class CallsQuery(BaseModel):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
-            OrderField(field=get_field_by_name(field), direction=direction)
+            OrderField(field=get_field_by_name(field, self.project_id), direction=direction)
         )
         return self
 
@@ -420,6 +500,11 @@ class CallsQuery(BaseModel):
         self.offset = offset
         return self
 
+    def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
+        """Set the columns that should have their references expanded."""
+        self.expand_columns = expand_columns
+        return self
+
     def clone(self) -> "CallsQuery":
         return CallsQuery(
             project_id=self.project_id,
@@ -429,6 +514,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            expand_columns=self.expand_columns.copy(),
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -505,7 +591,6 @@ class CallsQuery(BaseModel):
         LIMIT {LIMIT}                           -- optional
         OFFSET {OFFSET}                         -- optional
         ```
-
         """
         if not self.select_fields:
             raise ValueError("Missing select columns")
@@ -598,7 +683,17 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        raw_sql = f"""
+        # Handle reference resolution
+        if self.expand_columns:
+            # Add a CTE for reference resolution
+            ref_cte = self._create_ref_resolution_cte(pb, table_alias)
+            raw_sql = f"""
+            WITH {ref_cte}
+            """
+        else:
+            raw_sql = ""
+
+        raw_sql += f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         """
 
@@ -615,13 +710,37 @@ class CallsQuery(BaseModel):
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
-
         else:
             raw_sql += f"""
             {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
             """
 
         return _safely_format_sql(raw_sql)
+
+    def _create_ref_resolution_cte(self, pb: ParamBuilder, table_alias: str) -> str:
+        """Creates a CTE for reference resolution."""
+        # Create a CTE that joins with resolved_refs for each expand_columns path
+        cte_parts = []
+        for i, path in enumerate(self.expand_columns):
+            field_parts = path.split(".")
+            start_part = field_parts[0]
+            dumped_start_part = start_part + "_dump"
+            
+            if dumped_start_part in ALLOWED_CALL_FIELDS:
+                field = ALLOWED_CALL_FIELDS[dumped_start_part]
+                if isinstance(field, CallsMergedDynamicField):
+                    ref_field = CallsMergedRefField(
+                        field=dumped_start_part,
+                        path=field_parts[1:],
+                        project_id=self.project_id
+                    )
+                    cte_parts.append(f"""
+                    resolved_{i} AS (
+                        {ref_field._create_ref_resolution_cte(pb, table_alias)}
+                    )
+                    """)
+        
+        return ",\n".join(cte_parts)
 
     def _as_sql_base_format(
         self,
@@ -699,10 +818,29 @@ class CallsQuery(BaseModel):
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
+        # Handle reference resolution joins
+        ref_joins_sql = ""
+        if self.expand_columns:
+            ref_joins = []
+            for i, path in enumerate(self.expand_columns):
+                field_parts = path.split(".")
+                start_part = field_parts[0]
+                dumped_start_part = start_part + "_dump"
+                
+                if dumped_start_part in ALLOWED_CALL_FIELDS:
+                    field = ALLOWED_CALL_FIELDS[dumped_start_part]
+                    if isinstance(field, CallsMergedDynamicField):
+                        ref_joins.append(f"""
+                        LEFT JOIN resolved_{i}
+                        ON resolved_{i}.call_id = calls_merged.id
+                        """)
+            ref_joins_sql = "\n".join(ref_joins)
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
+        {ref_joins_sql}
         WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
@@ -743,22 +881,29 @@ START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 
 
-def get_field_by_name(name: str) -> CallsMergedField:
+def get_field_by_name(name: str, project_id: Optional[str] = None) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
-            return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
+            return CallsMergedFeedbackPayloadField.from_path(name[len("feedback."):])
         elif name.startswith("summary.weave."):
-            # Handle summary.weave.* fields
-            summary_field = name[len("summary.weave.") :]
+            summary_field = name[len("summary.weave."):]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
             field_parts = name.split(".")
             start_part = field_parts[0]
             dumped_start_part = start_part + "_dump"
+            
             if dumped_start_part in ALLOWED_CALL_FIELDS:
                 field = ALLOWED_CALL_FIELDS[dumped_start_part]
                 if isinstance(field, CallsMergedDynamicField):
                     if len(field_parts) > 1:
+                        # Check if this is a reference path
+                        if project_id and any(part.startswith("ref:") for part in field_parts[1:]):
+                            return CallsMergedRefField(
+                                field=dumped_start_part,
+                                path=field_parts[1:],
+                                project_id=project_id
+                            )
                         return field.with_path(field_parts[1:])
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
