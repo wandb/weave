@@ -1,8 +1,35 @@
-import React from 'react';
+import React, {useState} from 'react';
+import {Box} from '@mui/material';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {Button} from '../../../../../Button';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
+import {NewScorerDrawer} from '../ScorersPage/NewScorerDrawer';
+
+const NewScorerButton: React.FC<{entity: string; project: string}> = ({
+  entity,
+  project,
+}) => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}>
+        New scorer
+      </Button>
+      <NewScorerDrawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        entity={entity}
+        project={project}
+      />
+    </>
+  );
+};
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
@@ -225,10 +252,10 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
 
 export const EMPTY_PROPS_SCORERS: EmptyProps = {
   icon: 'type-number-alt' as const,
-  heading: 'No scorers yet',
+  heading: 'Create your first scorer',
   description:
     'Create programmatic scorers in Python or human annotations in the UI.',
-  moreInformation: (
+  moreInformation: ({entity, project}: {entity: string; project: string}) => (
     <>
       Learn about{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
@@ -239,6 +266,9 @@ export const EMPTY_PROPS_SCORERS: EmptyProps = {
         human annotations
       </TargetBlank>{' '}
       to get started.
+      <Box sx={{mt: 2}}>
+        <NewScorerButton entity={entity} project={project} />
+      </Box>
     </>
   ),
 };

@@ -17,6 +17,8 @@ export type EmptyProps = {
   description: string;
   moreInformation: React.ReactNode;
   size?: EmptySize;
+  entity?: string;
+  project?: string;
 };
 
 const Container = styled.div`
@@ -92,16 +94,22 @@ export const Empty = ({
   description,
   moreInformation,
   size = 'medium',
+  entity,
+  project,
 }: EmptyProps) => {
   return (
     <Container>
       <Content>
         <Circle size={size}>
-          <CircleIcon size={size} name={icon} />
+          <CircleIcon name={icon} size={size} />
         </Circle>
         <Heading size={size}>{heading}</Heading>
         <Description size={size}>{description}</Description>
-        <MoreInformation size={size}>{moreInformation}</MoreInformation>
+        <MoreInformation size={size}>
+          {typeof moreInformation === 'function'
+            ? moreInformation({entity, project})
+            : moreInformation}
+        </MoreInformation>
       </Content>
     </Container>
   );
