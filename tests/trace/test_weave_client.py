@@ -2516,15 +2516,15 @@ def test_calls_descendants_edge_cases(client):
 
     # Test invalid parameters
     with pytest.raises(ValueError, match="Depth must be a positive integer"):
-        list(client.get_calls_descendants(parent_call2.id, depth=-1))
+        client.get_calls_descendants(parent_call2.id, depth=-1)
 
     with pytest.raises(ValueError, match="Limit must be a positive integer"):
-        list(client.get_calls_descendants(parent_call2.id, limit=-1))
+        client.get_calls_descendants(parent_call2.id, limit=-1)
 
     with pytest.raises(
         RequestTooLarge, match="Cannot get more than 100000 children at once"
     ):
-        list(client.get_calls_descendants(parent_call2.id, limit=100_001))
+        client.get_calls_descendants(parent_call2.id, limit=100_001)
 
 
 def test_calls_descendants_class_method(client):
