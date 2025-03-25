@@ -2,7 +2,7 @@
 
 > **The LLM Playground is currently in preview.**
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure.
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
 ## Features
 
@@ -25,6 +25,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Add a new message](#add-a-new-message)
 - [Compare LLMs](#compare-llms)
 - [Adjust the number of trials](#adjust-the-number-of-trials)
+- [Add a custom provider](#add-a-custom-provider)
 
 ## Prerequisites
 
@@ -241,3 +242,26 @@ Playground allows you to generate multiple outputs for the same input by setting
 
 1. In the Playground UI, open the settings sidebar if it is not already open.
 2. Adjust the **Number of trials**.
+
+## Add a custom provider
+
+In addition to the [supported providers](#select-an-llm), you can use the Playground to test OpenAI compatible API endpoints for custom models. Examples include:
+
+- Older versions of supported model providers
+- Local models
+
+To add a custom provider to the Playground, do the following:
+
+1. In the upper left corner of the Playground UI, click the **Select a model** dropdown.
+2. Select **+ Add AI provider**.
+3. In the pop-up modal, enter the  provider information:
+
+   - _Provider name_: For example, `openai` or `ollama`.
+   - _API key_: For example, an OpenAI API key.
+   - _Base URL_: For example, `https://api.openai.com/v1/` or `https://e452-2600-1700-45f0-3e10-2d3f-796b-d6f2-8ba7.ngrok-free.app`.
+   - _Headers_ (optional): You can add multiple header keys and values.
+   - _Models_: You can add multiple models for one provider. For example, `deepseek-r1` and `qwq`.
+   - _Max tokens_ (optional): For each model, you can specify the max tokens that the model can generate in a response.
+
+4. Once you've entered your provider information, click **Add provider**.
+5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI. Now, you can test the custom provider model(s) using standard Playground features.
