@@ -303,7 +303,7 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
         assert final_response is not None
 
     # Now verify that a trace was captured.
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 1, "Expected exactly one trace call for the stream test"
     call = calls[0]
 
