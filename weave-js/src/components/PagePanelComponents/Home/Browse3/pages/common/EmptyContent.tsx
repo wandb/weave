@@ -142,9 +142,9 @@ export const EMPTY_PROPS_MODEL: EmptyProps = {
 
 export const EMPTY_PROPS_DATASETS: EmptyProps = {
   icon: 'table' as const,
-  heading: 'No datasets yet',
+  heading: 'Create your first dataset',
   description:
-    'You can use datasets to collect difficult examples to use in evaluations.',
+    'Use datasets to collect difficult examples to use within evaluations of your app.',
   moreInformation: (
     <>
       Learn{' '}
