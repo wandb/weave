@@ -2563,12 +2563,11 @@ def test_calls_descendants_massive(client):
     parent_call = client.create_call("parent_op", {"x": 5})
 
     # Create 10_000 child calls
-    child_calls = [
-        client.create_call("child_op", {"x": i}, parent_call) for i in range(10_000)
-    ]
-    for child in child_calls:
-        client.finish_call(child)
-    client.flush()
+    for batch in range(10_000 // 500):
+        for i in range(500):
+            call = client.create_call("child_op", {"x": i}, parent_call)
+            client.finish_call(call)
+        client.flush()
 
     # Test getting all descendants
     descendants = list(client.get_calls_descendants(parent_call))
