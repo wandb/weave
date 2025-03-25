@@ -114,7 +114,9 @@ export const PlaygroundChat = ({
 
   // Check if there are any configured providers
   const hasConfiguredProviders = useMemo(() => {
-    if (configuredProvidersLoading) return true; // Don't show empty state while loading
+    if (configuredProvidersLoading) {
+      return true;
+    } // Don't show empty state while loading
     return Object.values(configuredProviders).some(({status}) => status);
   }, [configuredProviders, configuredProvidersLoading]);
 
