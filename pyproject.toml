@@ -60,6 +60,8 @@ trace_server = [
   "azure-storage-blob>=12.24.0",
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
+  # LLM Support
+  "litellm>=1.36.1",
 ]
 trace_server_tests = [
   # BYOB - S3
@@ -69,6 +71,7 @@ docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
+crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
@@ -256,7 +259,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.39-dev0"
+current_version = "0.51.40-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
