@@ -19,10 +19,8 @@ PY313_INCOMPATIBLE_SHARDS = [
     "crewai",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
+    "crewai", "smolagents"
 ]
-PY309_INCOMPATIBLE_SHARDS = ["smolagents"]
-
 
 @nox.session
 def lint(session):
