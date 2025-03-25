@@ -26,6 +26,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
+import {CellValueBoolean} from '../../../Browse2/CellValueBoolean';
 import {CellValueRun} from '../../../Browse2/CellValueRun';
 import {CellValueString} from '../../../Browse2/CellValueString';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
@@ -401,7 +402,7 @@ function buildCallsTableColumns(
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
             if (typeof params.value === 'boolean') {
-              return <div>{params.value ? 'true' : 'false'}</div>;
+              return <CellValueBoolean value={params.value} />;
             }
             if (typeof params.value === 'string') {
               return <CellValueString value={params.value} />;
