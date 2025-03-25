@@ -25,6 +25,7 @@ classify(sentence="it's a charming and often affecting journey.")
 
 [![dspy_trace.png](imgs/dspy/dspy_trace.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
 
+Weave logs all LM calls in your DSPy program, providing details about inputs, outputs, and metadata.
 
 ## Track your own DSPy Modules and Signatures
 
@@ -86,3 +87,30 @@ article = draft_article(topic="World Cup 2002")
 ```
 
 [![](imgs/dspy/dspy_custom_module.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
+
+
+## Optimization and Evaluation of your DSPy Program
+
+Weave also automatically captures traces for DSPy optimizers and Evaluation calls which you can use to improve and evaulate your DSPy program's performance on a development set.
+
+
+```python
+import os
+import dspy
+import weave
+
+os.environ["OPENAI_API_KEY"] = "<YOUR-OPENAI-API-KEY>"
+weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")
+
+def accuracy_metric(answer, model_output, trace=None):
+    predicted_answer = model_output["answer"].lower()
+    return answer["answer"].lower() == predicted_answer
+
+module = dspy.ChainOfThought("question -> answer: str, explanation: str")
+optimizer = dspy.BootstrapFewShot(metric=accuracy_metric)
+optimized_module = optimizer.compile(
+    module, trainset=SAMPLE_EVAL_DATASET, valset=SAMPLE_EVAL_DATASET
+)
+```
+
+[![](docs/docs/guides/integrations/imgs/dspy/dspy_optimizer.png)]()
