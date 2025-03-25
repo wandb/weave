@@ -4,6 +4,7 @@ import pytest
 from weave_query import weave_types as types
 from weave_query.arrow.list_ import ArrowWeaveList
 from weave_query.ops_arrow.string import (
+    __contains__,
     __eq__,
     __ne__,
     _concatenate_strings,
@@ -99,6 +100,69 @@ class TestNotEqualOp:
         awl = ArrowWeaveList(dict_array, types.String())
         result = __ne__.eager_call(awl, "hello")
         expected = [True, True, False, True]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestContainsOp:
+    def test_other_is_scalar(self):
+        arrow_data = ["foobar", "foo", "bar", None, ""]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = __contains__.eager_call(awl, "foo")
+        expected = [True, True, False, None, False]
+        assert result.to_pylist_notags() == expected
+
+        result = __contains__.eager_call(awl, None)
+        expected = [None, None, None, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_other_is_awl(self):
+        arrow_data = ["foobar", "foo", "bar", "", "bar", None, "baz", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other_arrow_data = ["foo", "foo", "baz", "", "", None, None, "baz"]
+        other = ArrowWeaveList(pa.array(other_arrow_data), types.String())
+        result = __contains__.eager_call(awl, other)
+        expected = [True, True, False, True, True, None, None, None]
+        assert result.to_pylist_notags() == expected
+
+    def test_awl_of_different_lengths_ignores_longer_items(self):
+        arrow_data = ["hello", "world", "bar"]
+        other_arrow_data = ["hello", "world", "baz", "foo"]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(pa.array(other_arrow_data), types.String())
+        result = __contains__.eager_call(awl, other)
+        expected = [True, True, False]
+        assert result.to_pylist_notags() == expected
+
+        result = __contains__.eager_call(other, awl)
+        expected = [True, True, False]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array_where_other_is_scalar(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = __contains__.eager_call(awl, "hello")
+        expected = [None, False, True, None]
+        assert result._arrow_data.to_pylist() == expected
+
+        result = __contains__.eager_call(awl, None)
+        expected = [None, None, None, None]
+        assert result._arrow_data.to_pylist() == expected
+
+    def test_dictionary_array_where_other_is_awl(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+
+        other_arrow_data = ["hello", "baz", None]
+        other = ArrowWeaveList(pa.array(other_arrow_data), types.String())
+
+        result = __contains__.eager_call(awl, other)
+        expected = [None, False, True, None]
         assert result._arrow_data.to_pylist() == expected
 
 

@@ -95,20 +95,25 @@ def __ne__(self, other):
 @arrow_op(
     name="ArrowWeaveListString-contains",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    output_type=ArrowWeaveListType(types.optional(types.Boolean())),
 )
 def __contains__(self, other):
-    if isinstance(other, ArrowWeaveList):
-        return ArrowWeaveList(
-            pa.array(
+    def _contains(arrow_data):
+        if isinstance(other, ArrowWeaveList):
+            return pa.array(
                 other_item.as_py() in my_item.as_py()
-                for my_item, other_item in zip(self._arrow_data, other._arrow_data)
-            ),
-            None,
-            self._artifact,
-        )
-    return ArrowWeaveList(
-        pc.match_substring(self._arrow_data, other), types.Boolean(), self._artifact
+                if my_item.as_py() is not None and other_item.as_py() is not None
+                else None
+                for my_item, other_item in zip(arrow_data, other._arrow_data)
+            )
+
+        if other is None:
+            return pa.array([None] * len(arrow_data))
+
+        return pc.match_substring(arrow_data, other)
+
+    return util.handle_dictionary_array(
+        self, _contains, types.optional(types.Boolean())
     )
 
 
