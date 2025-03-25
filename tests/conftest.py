@@ -126,6 +126,11 @@ class ThrowingServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
+        raise DummyTestException("FAILURE - calls_descendants, req:", req)
+
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise DummyTestException("FAILURE - op_create, req:", req)
@@ -373,6 +378,12 @@ class TestOnlyUserInjectingExternalTraceServer(
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.wb_user_id = self._user_id
         return super().call_update(req)
+
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
+        req.wb_user_id = self._user_id
+        return super().calls_descendants(req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         req.wb_user_id = self._user_id
