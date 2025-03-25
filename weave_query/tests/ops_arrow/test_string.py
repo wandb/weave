@@ -1,8 +1,11 @@
 import pyarrow as pa
+import pytest
 
 from weave_query import weave_types as types
 from weave_query.arrow.list_ import ArrowWeaveList
 from weave_query.ops_arrow.string import (
+    _concatenate_strings,
+    append,
     arrowweavelist_len,
     endswith,
     isalnum,
@@ -12,11 +15,13 @@ from weave_query.ops_arrow.string import (
     lower,
     lstrip,
     partition,
+    prepend,
     replace,
     rstrip,
     slice,
     split,
     startswith,
+    string_add,
     strip,
     to_number,
     upper,
@@ -105,6 +110,112 @@ class TestPartitionOp:
             list("goodbye".partition(" ")),
         ]
         assert result.to_pylist_notags() == expected
+
+
+class TestConcatenateStrings:
+    def test_concatenate_with_string(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = _concatenate_strings(awl, " test")
+        expected = ["hello test", "world test", None]
+        assert result.to_pylist_notags() == expected
+
+    def test_concatenate_with_awl(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(pa.array([" there", " earth", " moon"]), types.String())
+        result = _concatenate_strings(awl, other)
+        expected = ["hello there", "world earth", None]
+        assert result.to_pylist_notags() == expected
+
+    def test_concatenate_with_awl_different_lengths_raises_exception(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        other = ArrowWeaveList(
+            pa.array([" there", " earth", " moon", "foo"]), types.String()
+        )
+        with pytest.raises(ValueError):
+            # right is longer than left
+            _concatenate_strings(awl, other)
+
+        with pytest.raises(ValueError):
+            # left is longer than right
+            _concatenate_strings(other, awl)
+
+    def test_concatenate_with_none(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = _concatenate_strings(awl, None)
+        expected = [None, None, None]
+        assert result.to_pylist_notags() == expected
+
+    # @pytest.mark.xfail(reason="Dictionary array concatenation is not supported yet")
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = _concatenate_strings(awl, " test")
+        expected = [None, "world test", "hello test", None]
+        assert result.to_pylist_notags() == expected
+
+
+class TestStringAddOp:
+    def test_basic(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = string_add.eager_call(awl, " test")
+        expected = ["hello test", "world test", None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = string_add.eager_call(awl, " test")
+        expected = [None, "world test", "hello test", None]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestAppendOp:
+    def test_basic(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = append.eager_call(awl, " test")
+        expected = ["hello test", "world test", None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = append.eager_call(awl, " test")
+        expected = [None, "world test", "hello test", None]
+        assert result._arrow_data.to_pylist() == expected
+
+
+class TestPrependOp:
+    def test_basic(self):
+        arrow_data = ["hello", "world", None]
+        awl = ArrowWeaveList(pa.array(arrow_data), types.String())
+        result = prepend.eager_call(awl, "test ")
+        expected = ["test hello", "test world", None]
+        assert result.to_pylist_notags() == expected
+
+    def test_dictionary_array(self):
+        arrow_data = ["hello", "world", None]
+        dict_array = pa.DictionaryArray.from_arrays(
+            indices=pa.array([2, 1, 0, 2]), dictionary=pa.array(arrow_data)
+        )
+        awl = ArrowWeaveList(dict_array, types.String())
+        result = prepend.eager_call(awl, "test ")
+        expected = [None, "test world", "test hello", None]
+        assert result._arrow_data.to_pylist() == expected
 
 
 class TestStartsWithOp:

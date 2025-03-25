@@ -42,21 +42,23 @@ self_type_output_type_fn = lambda input_types: input_types["self"]
 
 
 def _concatenate_strings(
-    left: ArrowWeaveList[str], right: typing.Union[str, ArrowWeaveList[str]]
+    left: ArrowWeaveList[str],
+    right: typing.Optional[typing.Union[str, ArrowWeaveList[str]]],
 ) -> ArrowWeaveList[str]:
-    a = left._arrow_data
-    if right == None:
+    if right is None:
         return ArrowWeaveList(
-            pa.nulls(len(a), type=a.type),
-            types.NoneType(),
+            pa.nulls(len(left._arrow_data), type=left._arrow_data.type),
+            types.optional(types.String()),
             left._artifact,
         )
+
     if isinstance(right, ArrowWeaveList):
         right = right._arrow_data
-    return ArrowWeaveList(
-        pc.binary_join_element_wise(left._arrow_data, right, ""),
+
+    return util.handle_dictionary_array(
+        left,
+        lambda arr: pc.binary_join_element_wise(arr, right, ""),
         types.String(),
-        left._artifact,
     )
 
 
@@ -190,11 +192,31 @@ def append(self, other):
     output_type=self_type_output_type_fn,
 )
 def prepend(self, other):
-    if isinstance(other, str):
-        other = ArrowWeaveList(
-            pa.array([other] * len(self._arrow_data)), types.String(), self._artifact
+    if isinstance(self._arrow_data, pa.DictionaryArray):
+        if isinstance(other, str):
+            other = ArrowWeaveList(
+                pa.array([other] * len(self._arrow_data.dictionary)),
+                types.String(),
+                self._artifact,
+            )
+
+        return ArrowWeaveList(
+            pa.DictionaryArray.from_arrays(
+                self._arrow_data.indices,
+                _concatenate_strings(other, self._arrow_data.dictionary)._arrow_data,
+            ),
+            types.String(),
+            self._artifact,
         )
-    return _concatenate_strings(other, self)
+    else:
+        if isinstance(other, str):
+            other = ArrowWeaveList(
+                pa.array([other] * len(self._arrow_data)),
+                types.String(),
+                self._artifact,
+            )
+
+        return _concatenate_strings(other, self)
 
 
 @arrow_op(
