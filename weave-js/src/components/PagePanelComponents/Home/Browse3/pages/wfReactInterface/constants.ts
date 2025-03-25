@@ -32,5 +32,4 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'EvaluationResults',
   'Provider',
   'ProviderModel',
-  'LLMModel',
 ] as const;
