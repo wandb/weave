@@ -115,6 +115,7 @@ export const IconNames = {
   LayoutHorizontal: 'layout-horizontal',
   LayoutTabs: 'layout-tabs',
   LayoutVertical: 'layout-vertical',
+  Lightboard: 'lightboard',
   LightbulbInfo: 'lightbulb-info',
   LinePlotAlt2: 'line-plot-alt2',
   LinearScale: 'linear-scale',
