@@ -184,7 +184,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
         {numeral(file.size).format('0.0b')}
       </Table.Cell>
       <Table.Cell className="file-download-cell">
-      {isDownloadable && (
+        {isDownloadable && (
           <a
             href={file.url}
             download={fileName}
