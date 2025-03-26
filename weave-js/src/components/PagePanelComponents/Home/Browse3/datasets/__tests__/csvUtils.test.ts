@@ -124,6 +124,28 @@ describe('parseCSV', () => {
     ]);
   });
 
+  test('automatically detects different delimiters', async () => {
+    // Test with tab delimiter
+    const tabCsv = 'name\tage\nJohn\t25\nJane\t30';
+    const tabFile = createCSVFile(tabCsv);
+    const tabResult = await parseCSV(tabFile);
+    expect(tabResult.data).toEqual([
+      {name: 'John', age: 25},
+      {name: 'Jane', age: 30},
+    ]);
+    expect(tabResult.meta.delimiter).toBe('\t');
+
+    // Test with semicolon delimiter
+    const semicolonCsv = 'name;age\nJohn;25\nJane;30';
+    const semicolonFile = createCSVFile(semicolonCsv);
+    const semicolonResult = await parseCSV(semicolonFile);
+    expect(semicolonResult.data).toEqual([
+      {name: 'John', age: 25},
+      {name: 'Jane', age: 30},
+    ]);
+    expect(semicolonResult.meta.delimiter).toBe(';');
+  });
+
   test('handles empty CSV', async () => {
     const csv = 'col1,col2\n';
     const file = createCSVFile(csv);
