@@ -236,6 +236,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._call_batch = []
             self._flush_immediately = True
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        with self.call_batch():
+            res = []
+            for item in req.batch:
+                if item.mode == "start":
+                    res.append(self.call_start(item.req))
+                elif item.mode == "end":
+                    res.append(self.call_end(item.req))
+                else:
+                    raise ValueError("Invalid mode")
+        return tsi.CallCreateBatchRes(res=res)
+
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         # Converts the user-provided call details into a clickhouse schema.
