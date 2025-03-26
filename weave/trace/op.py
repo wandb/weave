@@ -89,6 +89,7 @@ logger = logging.getLogger(__name__)
 CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
+UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
 
 
 class DisplayNameFuncError(ValueError): ...
@@ -300,6 +301,7 @@ def _should_skip_tracing(op: Op) -> bool:
     if settings.should_disable_weave():
         return True
     if weave_client_context.get_weave_client() is None:
+        log_once(logger.warn, UNINITIALIZED_MSG)
         return True
     if not op._tracing_enabled:
         return True
