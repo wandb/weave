@@ -1,9 +1,9 @@
 interactions:
 - request:
-    body: '{"messages": [{"role": "system", "content": "\n                As a genius
-      expert, your task is to understand the content and provide\n                the
-      parsed objects in json that match the following json_schema:\n\n\n                {\n  \"$defs\":
-      {\n    \"Person\": {\n      \"properties\": {\n        \"person_name\": {\n          \"title\":
+    body: '{"messages":[{"role":"system","content":"\n        As a genius expert,
+      your task is to understand the content and provide\n        the parsed objects
+      in json that match the following json_schema:\n\n\n        {\n  \"$defs\": {\n    \"Person\":
+      {\n      \"properties\": {\n        \"person_name\": {\n          \"title\":
       \"Person Name\",\n          \"type\": \"string\"\n        },\n        \"age\":
       {\n          \"title\": \"Age\",\n          \"type\": \"integer\"\n        }\n      },\n      \"required\":
       [\n        \"person_name\",\n        \"age\"\n      ],\n      \"title\": \"Person\",\n      \"type\":
@@ -11,12 +11,10 @@ interactions:
       tasks\",\n  \"properties\": {\n    \"tasks\": {\n      \"description\": \"Correctly
       segmented list of `Person` tasks\",\n      \"items\": {\n        \"$ref\": \"#/$defs/Person\"\n      },\n      \"title\":
       \"Tasks\",\n      \"type\": \"array\"\n    }\n  },\n  \"title\": \"IterablePerson\",\n  \"type\":
-      \"object\"\n}\n\n                Make sure to return an instance of the JSON,
-      not the schema itself\n"}, {"role": "user", "content": "Consider this data:
-      Jason is 10 and John is 30.                             Correctly segment it
-      into entities                            Make sure the JSON is correct"}], "model":
-      "gpt-3.5-turbo-1106", "response_format": {"type": "json_object"}, "stream":
-      false, "temperature": 0.1}'
+      \"object\"\n}\n\n        Make sure to return an instance of the JSON, not the
+      schema itself\n"},{"role":"user","content":"Consider this data: Jason is 10
+      and John is 30.                             Correctly segment it into entities                            Make
+      sure the JSON is correct"}],"model":"gpt-3.5-turbo-1106","response_format":{"type":"json_object"},"stream":false,"temperature":0.1}'
     headers:
       accept:
       - application/json
@@ -25,45 +23,48 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '1438'
+      - '1389'
       content-type:
       - application/json
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.47.1
+      - OpenAI/Python 1.68.2
       x-stainless-arch:
-      - x64
+      - arm64
       x-stainless-async:
       - 'false'
       x-stainless-lang:
       - python
       x-stainless-os:
-      - Linux
+      - MacOS
       x-stainless-package-version:
-      - 1.47.1
+      - 1.68.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.12.1
+      - 3.9.21
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFHBitswEL37K4Y5O4uVNPE2ty00h7TQQw57WC9Gdsa2GllSpQl0Cf73
-        RXYSb6GFXjTovXlPTzOXBADVEbeAdSe57p1ePD11y/3+B+++/XJfvp92B/PcHrpDK7/uKodpVNjq
-        J9V8Uz3UtneaWFkz0bUnyRRdRb7MhVhm+XokenskHWWt48XqYb3gs6/sQohsc1V2VtUUcAsvCQDA
-        ZTxjRnOk37iFLL0hPYUgW8LtvQkAvdURQRmCCiwNYzqTtTVMZox9KQxAgSzDKRTxtXgHuEwlUo58
-        sKY0sqfYUOBeBmsKTOcW2Y6UyCZoSP/DxHZ/9VjdPGJ5LczwMben5hxknJs5a33Fh/sgtG2dt1W4
-        8ne8UUaFrvQUg8dPB7YOR3ZIAF7HgZ//mCE6b3vHJdsTmWi4zMXkh/OOZ/ZTfiXZstQzvhKP/1KV
-        R2KpdPiwNpwSKtPODtk95vhPDG+BqS8bZVryzqtpi40r6VFU688NbTaYDMk7AAAA//8DAN7elovP
-        AgAA
+        H4sIAAAAAAAAAwAAAP//jJPBjpswEIbvPIU1Z7KChSTd3LaHalWpUqseS4SMGcBZY1v2UO02yrtX
+        hiSw21TaCxbzzfye+QeOEWMga9gxEB0n0Vu1+vzl+0vyUPHD4ya//zE8PT657uefw2v/LW0TiEOF
+        qQ4o6FJ1J0xvFZI0esLCIScMquk2z5I0z7b5CHpTowplraVVdrde0eAqs0rTZHOu7IwU6GHHfkWM
+        MXYcn6FHXeML7FgSXyI9es9bhN01iTFwRoUIcO+lJ64J4hkKown12Pax0IwVQNw/+yLcFt4ZO05H
+        QBadN7rUvMeQUMBX7o0uIJ5TeDuiNJlCp/gDIqa7qZFdNMKxL/Rp2bfDZvA8+KYHpRaAa22IB99H
+        x/Zncrp6pExrnan8u1JopJa+Kx2GmYIfnoyFkZ4ixvbjLoY39oJ1prdUknnG8br7bTrpwbz+meaf
+        zpAMcTXHs/QhvqFX1khcKr/YJgguOqzn0nn1fKilWYBoMfW/3dzSniaXuv2I/AyEQEtYl9ZhLcXb
+        iec0h+Hv+F/a1eWxYfDofkuBJUl0YRM1NnxQ03cL/tUT9mUjdYvOOjl9vI0txWZTrdd5wgVEp+gv
+        AAAA//8DAFFq6lrGAwAA
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 8c7c35c96f843ce2-BOM
+      - 9268c57e5b4266e9-DFW
       Connection:
       - keep-alive
       Content-Encoding:
@@ -71,14 +72,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 23 Sep 2024 17:21:16 GMT
+      - Wed, 26 Mar 2025 18:39:35 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=1EoBqMH6z5i5b9Dnsbku.cMXcPzgMO0opMqW1IeTQPk-1727112076-1.0.1.1-SGQPbiqW8tBjH2NOggqNwct59sR9pUOoEa4tpeNywqxF9H4MGWFxBGAEvt7GLcaWmRQC4UnXtJcBuyZmKimtvg;
-        path=/; expires=Mon, 23-Sep-24 17:51:16 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=Djb4R1GU6FPT80Lw2I2mQoWCcCGeUZHNUgoV7suw4sc-1743014375-1.0.1.1-5Mppz4mi7xeUgB4ndLE9jtQWQhfsCOTS0UGSitRU4TkeLR2yIvUgvOWOl8YZSBp9NicKgJtyHnT2zawpE8L7DHM9P5b7ltGUfzZ7NSLH4Mk;
+        path=/; expires=Wed, 26-Mar-25 19:09:35 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=ZAtLa9awh4NjsL.T6gVANVbrCu667uXx5Bq6weu7cpY-1727112076529-0.0.1.1-604800000;
+      - _cfuvid=Jh_GuN1RcoVH8mcl_HcovbjkdCsfQttGEz0kS7zpwOw-1743014375631-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -86,14 +87,18 @@ interactions:
       - nosniff
       access-control-expose-headers:
       - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '477'
+      - '1358'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
-      - max-age=15552000; includeSubDomains; preload
+      - max-age=31536000; includeSubDomains; preload
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
@@ -101,13 +106,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '9999'
       x-ratelimit-remaining-tokens:
-      - '49999699'
+      - '49999723'
       x-ratelimit-reset-requests:
       - 6ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_eb5cee6c7643db21b83cf890466e34e4
+      - req_b60fb72d3b8218cac2e1511d4a040dfa
     status:
       code: 200
       message: OK

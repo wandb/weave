@@ -71,6 +71,34 @@ def test_instructor_openai(
     assert "John" in output_arguments["person_name"]
     assert output_arguments["age"] == 20
 
+def test_instructor_openai_with_completion(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    import instructor
+    from openai import OpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(OpenAI(api_key=api_key))
+    person = lm_client.chat.completions.create_with_completion(
+        model="gpt-3.5-turbo",
+        response_model=Person,
+        messages=[{"role": "user", "content": "My name is John and I am 20 years old"}],
+    )
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    output = call.output
+    output_arguments = json.loads(
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    )
+    assert "person_name" in output_arguments
+    assert "age" in output_arguments
+    assert "John" in output_arguments["person_name"]
+    assert output_arguments["age"] == 20
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
