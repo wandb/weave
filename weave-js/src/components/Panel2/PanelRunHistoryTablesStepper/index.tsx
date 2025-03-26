@@ -15,6 +15,8 @@ import {
   opFileTable,
   opFilter,
   opIndex,
+  opIsNone,
+  opNot,
   opNumberEqual,
   opPick,
   opRunHistory,
@@ -149,8 +151,21 @@ const PanelRunHistoryTablesStepper: React.FC<
     props.config?.tableHistoryKey
   );
 
+  // runs.history.concat.filter((row) => !row[<table-history-key>].isNone)
+  const filteredRunsHistoryNode = opFilter({
+    arr: runsHistoryNode,
+    filterFn: constFunction({row: runsHistoryNode.type}, ({row}) =>
+      opNot({
+        bool: opIsNone({
+          val: opPick({obj: row, key: constString(tableHistoryKey)}),
+        }),
+      })
+    ),
+  });
+
+  // runs.history.concat.filter((row) => !row[<table-history-key>].isNone)["_step"]
   const stepsNode = opPick({
-    obj: runsHistoryNode,
+    obj: filteredRunsHistoryNode,
     key: constString('_step'),
   });
   const {result: stepsNodeResult, loading: stepsNodeLoading} =
