@@ -4,9 +4,7 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
-from pydantic import BaseModel, validate_call
-from typing_extensions import Self
-from weave_server_sdk import DefaultHttpxClient, WeaveTrace
+from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size
@@ -88,6 +86,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
+    @with_retry
+    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of data to the server with retry logic.
+
+        This method is separated from _flush_calls to avoid recursive retries.
+        """
+        r = requests.post(
+            self.trace_server_url + "/call/upsert_batch",
+            data=encoded_data,  # type: ignore
+            auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
+        )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
+        r.raise_for_status()
+
     def _flush_calls(
         self,
         batch: list[Union[StartBatchItem, EndBatchItem]],
@@ -131,8 +147,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
 
         try:
-            self.stainless_client.calls.upsert_batch(batch=batch)
-        except Exception as e:
+            self._send_batch_to_server(encoded_data)
+        except Exception:
             # Add items back to the queue for later processing
             logger.warning(
                 f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
@@ -209,11 +225,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def server_info(self) -> ServerInfoRes:
-        return self.stainless_client.services.server_info()
-
-    @validate_call
-    def health_check(self) -> dict[str, str]:
-        return self.stainless_client.services.health_check()
+        r = requests.get(
+            self.trace_server_url + "/server_info",
+            # timeout=DEFAULT_TIMEOUT,
+        )
+        r.raise_for_status()
+        return ServerInfoRes.model_validate(r.json())
 
     # Call API
     def call_start(
@@ -237,11 +254,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
-
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._generic_request(
-            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
         )
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
@@ -268,29 +280,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # This previously called the deprecated /calls/query endpoint.
         return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    @validate_call
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        stream = self.stainless_client.calls.stream_query(
-            project_id=req.project_id,
-            filter=req.filter,
-            limit=req.limit,
-            offset=req.offset,
-            sort_by=req.sort_by,
-            query=req.query,
-            include_costs=req.include_costs,
-            include_feedback=req.include_feedback,
-            columns=req.columns,
-            expand_columns=req.expand_columns,
-        )
-        for x in stream:
-            yield tsi.CallSchema.model_validate(x)
-
-    @validate_call
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        return self.stainless_client.calls.query_stats(
-            project_id=req.project_id,
-            filter=req.filter,
-            query=req.query,
+    def calls_query_stream(
+        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
+    ) -> Iterator[tsi.CallSchema]:
+        return self._generic_stream_request(
+            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
 
     def calls_query_stats(
@@ -455,7 +449,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
-    @validate_call
+    @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
@@ -467,13 +461,20 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
-    @validate_call
+    @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        # TODO: This returns the wrong type?
-        res = self.stainless_client.files.content(
-            digest=req.digest, project_id=req.project_id
+        r = requests.post(
+            self.trace_server_url + "/files/content",
+            json={"project_id": req.project_id, "digest": req.digest},
+            auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
         )
-        return tsi.FileContentReadRes(content=res.content)
+        r.raise_for_status()
+        # TODO: Should stream to disk rather than to memory
+        bytes = io.BytesIO()
+        bytes.writelines(r.iter_content())
+        bytes.seek(0)
+        return tsi.FileContentReadRes(content=bytes.read())
 
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
