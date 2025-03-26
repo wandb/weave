@@ -86,9 +86,12 @@ def test_instructor_openai_with_completion(
     )
 
     calls = list(client.calls())
-    assert len(calls) == 1
+    assert len(calls) == 2
 
     call = calls[0]
+    assert op_name_from_ref(call.op_name) == "Instructor.create_with_completion"
+
+    call = calls[1]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
