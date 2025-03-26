@@ -151,7 +151,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
   const newPath = path?.concat([fileName]) ?? [fileName];
   const iconName = iconFromFileName(fileName);
   // const iconName = fileInfo.iconName;
-  const isDownloadable = config?.isDownloadable;
+  const isDownloadable = config ? config?.isDownloadable : true;
 
   return (
     <Table.Row
@@ -160,7 +160,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
           if (file.ref.startsWith('http://')) {
             window.open(file.ref);
           }
-        } else {
+        } else if (isDownloadable) {
           setFilePath(newPath);
         }
       }}>
