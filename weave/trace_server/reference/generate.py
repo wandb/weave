@@ -314,14 +314,26 @@ def generate_routes(
         )
         return service.trace_server_interface.file_create(req)
 
-    @router.post("/file/content", tags=[FILES_TAG_NAME])
+    @router.post(
+        "/file/content",
+        tags=[FILES_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "content": {"application/octet-stream": {}},
+                "description": "Binary file content stream",
+            }
+        },
+    )
     @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
     def file_content(
         req: tsi.FileContentReadReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),
     ) -> StreamingResponse:
         res = service.trace_server_interface.file_content_read(req)
-        return StreamingResponse(iter([res.content]))
+        return StreamingResponse(
+            iter([res.content]), media_type="application/octet-stream"
+        )
 
     # @router.post("/op/create", tags=[OPS_TAG_NAME])
     # def op_create(
