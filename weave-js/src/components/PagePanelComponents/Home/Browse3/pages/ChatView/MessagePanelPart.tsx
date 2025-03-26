@@ -4,7 +4,8 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {MessagePart} from './types';
+import {ToolCalls} from './ToolCalls';
+import {MessagePart, ToolCall} from './types';
 
 type MessagePanelPartProps = {value: MessagePart; isStructuredOutput?: boolean};
 
@@ -42,12 +43,28 @@ export const MessagePanelPart = ({
       </div>
     );
   }
-  if ('name' in value) {
-    return (
-      <span>
-        <b>{value.name}</b>
-      </span>
-    );
+  if (value.type === 'tool_use' && 'name' in value && 'id' in value) {
+    const toolCall: ToolCall = {
+      id: value.id || '',
+      type: value.type,
+      function: {
+        name: value.name || '',
+        arguments: JSON.stringify(value.input) || '',
+      },
+    };
+    return <ToolCalls toolCalls={[toolCall]} />;
+  }
+  if (value.type === 'tool_result' && 'content' in value) {
+    try {
+      const jsonContent = JSON.stringify(
+        JSON.parse(value.content as string),
+        null,
+        2
+      );
+      return <CodeEditor language="json" value={jsonContent} readOnly />;
+    } catch (error) {
+      return <span className="whitespace-break-spaces">{value.content}</span>;
+    }
   }
   return null;
 };

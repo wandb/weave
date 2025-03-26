@@ -14,9 +14,13 @@ export type ImageUrl = {
 };
 
 export type InternalMessage = {
-  type: 'text' | 'image_url';
+  type: 'text' | 'image_url' | 'tool_result' | 'tool_use';
   text?: string;
   image_url?: ImageUrl;
+  input?: Record<string, any>;
+  content?: string;
+  name?: string;
+  id?: string;
 };
 
 export type MessagePart = string | Placeholder | InternalMessage;
@@ -111,5 +115,6 @@ export type Chat = {
   // When the chat is created from a call, this will be the request.
   // When the chat is created from an empty playground, this will be null.
   request: ChatRequest | null;
-  result: ChatCompletion | null;
+  // ChatCompletion is for OpenAI responses, Message is for Anthropic responses
+  result: ChatCompletion | Message | null;
 };
