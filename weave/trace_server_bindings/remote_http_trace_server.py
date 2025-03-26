@@ -49,7 +49,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
         username: str,
-        password: str,
+        password: str | None,
         trace_server_url: str,
         should_batch: bool = False,
         *,
@@ -83,7 +83,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(
-        cls, entity_name: str, api_key: str, should_batch: bool = False
+        cls, entity_name: str, api_key: str | None = None, should_batch: bool = False
     ) -> Self:
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
@@ -388,7 +388,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     @validate_call
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         return self.stainless_client.files.create(
-            file=req.file,
+            file=(req.name, req.content),
             project_id=req.project_id,
         )
 
