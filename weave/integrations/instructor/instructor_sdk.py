@@ -66,7 +66,7 @@ def get_instructor_patcher(
                 lambda: importlib.import_module("instructor.client"),
                 "AsyncInstructor.create_partial",
                 instructor_wrapper_partial(async_create_partial_settings),
-            )
+            ),
         ]
     )
 

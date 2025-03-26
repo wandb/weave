@@ -71,6 +71,7 @@ def test_instructor_openai(
     assert "John" in output_arguments["person_name"]
     assert output_arguments["age"] == 20
 
+
 def test_instructor_openai_with_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
@@ -103,6 +104,7 @@ def test_instructor_openai_with_completion(
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
     assert output_arguments["age"] == 20
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
