@@ -1350,7 +1350,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if project_allow_list is None:
             return None
 
-        if project_id not in project_allow_list:
+        universally_enabled = (
+            len(project_allow_list) == 1 and project_allow_list[0] == "*"
+        )
+
+        if not universally_enabled and project_id not in project_allow_list:
             return None
 
         res = FileStorageURI.parse_uri_str(file_storage_uri_str)
