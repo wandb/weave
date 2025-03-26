@@ -103,7 +103,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_google_generativeai_patcher(settings.google_generativeai).attempt_patch()
     get_google_genai_patcher(settings.google_genai_sdk).attempt_patch()
     get_crewai_patcher(settings.crewai).attempt_patch()
-    get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
