@@ -66,55 +66,53 @@ function dataWithUniqueColors(
   // see: Note here https://vega.github.io/vega-lite/docs/scale.html#example-setting-color-range-based-on-a-field
   // vega-lite color encoding does not work well with multiple lines having the same color
   // only need to do this for vega chart wandb/line/v0, which only supports single table data
-  const processedData = React.useMemo(() => {
-    if (!dataIsSingle(data) || panelConfig?.panelDefId !== 'wandb/line/v0') {
-      return data;
-    }
-    if (!Array.isArray(data)) {
-      return data;
-    }
+  if (!dataIsSingle(data) || panelConfig?.panelDefId !== 'wandb/line/v0') {
+    return data;
+  }
+  if (!Array.isArray(data)) {
+    return data;
+  }
 
-    // map of rgb color to set of names that have that color
-    const colorMap = new Map<string, Set<string>>();
-    // map of name to color
-    const nameToColorMap = new Map<string, string>();
-    const result: SingleTableDataType = new Array(data.length);
+  // map of rgb color to set of names that have that color
+  const colorMap = new Map<string, Set<string>>();
+  // map of name to color
+  const nameToColorMap = new Map<string, string>();
+  const result: SingleTableDataType = new Array(data.length);
 
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
 
-      if (!row.name || !row.color) {
-        result[i] = row;
-        continue;
-      }
-
-      // Check if we already calculated this name's color
-      const existingColor = nameToColorMap.get(row.name);
-      if (existingColor) {
-        result[i] = {...row, color: existingColor};
-        continue;
-      }
-
-      const baseColor = row.color;
-
-      if (!colorMap.has(baseColor)) {
-        colorMap.set(baseColor, new Set([row.name]));
-        nameToColorMap.set(row.name, baseColor);
-        result[i] = row;
-      } else {
-        const namesWithColor = colorMap.get(baseColor)!;
-        namesWithColor.add(row.name);
-        const alpha = 100 - (namesWithColor.size - 1);
-        const newColor = baseColor
-          .replace('rgb', 'rgba')
-          .replace(')', `,${alpha / 100})`);
-        nameToColorMap.set(row.name, newColor);
-        result[i] = {...row, color: newColor};
-      }
+    if (!row.name || !row.color) {
+      result[i] = row;
+      continue;
     }
 
-    return result;
-  }, [data]);
+    // Check if we already calculated this name's color
+    const existingColor = nameToColorMap.get(row.name);
+    if (existingColor) {
+      result[i] = {...row, color: existingColor};
+      continue;
+    }
+
+    const baseColor = row.color;
+
+    if (!colorMap.has(baseColor)) {
+      colorMap.set(baseColor, new Set([row.name]));
+      nameToColorMap.set(row.name, baseColor);
+      result[i] = row;
+    } else {
+      const namesWithColor = colorMap.get(baseColor)!;
+      namesWithColor.add(row.name);
+      const alpha = 100 - (namesWithColor.size - 1);
+      const newColor = baseColor
+        .replace('rgb', 'rgba')
+        .replace(')', `,${alpha / 100})`);
+      nameToColorMap.set(row.name, newColor);
+      result[i] = {...row, color: newColor};
+    }
+  }
+
+  return result;
 }
 
 export type SingleTableDataType = QueryResult.Row[];
@@ -238,7 +236,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
   }, [dimensions, vegaView]);
 
   const processedData = useMemo(
-    () => dataWithUniqueColors(data, props.panelConfig),
+    () => dataWithUniqueColors(data, panelConfig),
     [data, panelConfig]
   );
 
@@ -265,7 +263,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
       });
       return processedData.filter(row => row.name === viewedRun);
     }
-  }, [data, viewedRun, showRunSelector, vegaView]);
+  }, [processedData, viewedRun, showRunSelector, vegaView]);
 
   const onSliderChange = React.useCallback(
     (value: number) => {
