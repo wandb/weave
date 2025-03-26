@@ -331,10 +331,21 @@ After ngrok starts, it will display a public URL, such as `https://xxxx-xxxx.ngr
 The following diagram illustrates the data flow between your local environment, the ngrok proxy, and the W&B cloud services:
 
 ```mermaid
-flowchart TD
+flowchart LR
+    %% Style definitions
+    classDef clientMachine fill:#FFD95CCC,stroke:#454B52,stroke-width:2px
+    classDef proxy fill:#00CDDBCC,stroke:#454B52,stroke-width:2px
+    classDef wandbCloud fill:#DE72FFCC,stroke:#454B52,stroke-width:2px
+    classDef publicCloud fill:#FFCBADCC,stroke:#454B52,stroke-width:2px
+
+    %% Subgraphs
     subgraph Client_Machine
         browser[Browser]
         llm_local[Local LLM Provider]
+    end
+
+    subgraph Proxy
+        ngrok[Ngrok Proxy]
     end
 
     subgraph WandB_Cloud
@@ -345,18 +356,26 @@ flowchart TD
         llm_cloud[Public LLM Provider]
     end
 
-    subgraph Proxy
-        ngrok[ngrok proxy]
-    end
+    %% Apply styles to subgraphs
+    class Client_Machine clientMachine
+    class Proxy proxy
+    class WandB_Cloud wandbCloud
+    class Public_Cloud publicCloud
 
     %% Current Data Flow
-    browser --> trace_server
-    trace_server -->|if LLM is public| llm_cloud
-    trace_server -->|if LLM is local| ngrok --> llm_local
-    llm_cloud --> trace_server
-    llm_local --> ngrok --> trace_server
-    trace_server --> browser
+    browser -->|Sends chat request| trace_server
+    trace_server -->|Uses Public LLM| llm_cloud
+    trace_server -->|Uses Local LLM| ngrok
+    ngrok -->|Forwards to| llm_local
+    llm_cloud -->|Returns response| trace_server
+    llm_local -->|Returns response| ngrok
+    ngrok -->|Forwards to| trace_server
+    trace_server -->|Returns response| browser
 
     %% Future Possible Connection
-    browser -.->|future| llm_local
+    browser -.->|Future: Call local LLM directly| llm_local
+
+    %% Link styles
+    linkStyle default stroke:#454B52,stroke-width:2px
+    linkStyle 8 stroke:#454B52,stroke-width:2px,stroke-dasharray:5
 ```
