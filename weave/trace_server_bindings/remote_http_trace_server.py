@@ -255,6 +255,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
+        
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return self._generic_request(
+            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
+        )
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
