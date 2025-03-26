@@ -281,6 +281,7 @@ To add a custom provider to the Playground, do the following:
 
 :::important
 Because of CORS restrictions, you can't call localhost or 127.0.0.1 URLs directly from the Playground. If you're running a local model server (such as Ollama), use a tunneling service like ngrok to expose it securely. For details, see [Using ngrok with Ollama](https://github.com/wandb/weave/pull/3978/files#using-ngrok-with-ollama).
+:::
 
 Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
 

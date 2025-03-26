@@ -328,9 +328,9 @@ const CustomProviderInfoBanner = () => (
       marginBottom: '-8px',
     }}>
     Custom providers are made for connecting to OpenAI compatible API endpoints.
-    Please refer to the {/* TODO: Add link to custom provider documentation */}
+    Please refer to the{' '}
     <Link
-      href="#"
+      href="https://weave-docs.wandb.ai/guides/tools/playground/#add-a-custom-provider"
       target="_blank"
       rel="noopener noreferrer"
       sx={{
