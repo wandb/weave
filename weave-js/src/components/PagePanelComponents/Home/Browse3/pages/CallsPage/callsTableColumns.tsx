@@ -26,9 +26,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
-import {CellValueBoolean} from '../../../Browse2/CellValueBoolean';
 import {CellValueRun} from '../../../Browse2/CellValueRun';
-import {CellValueString} from '../../../Browse2/CellValueString';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   convertFeedbackFieldToBackendFilter,
@@ -394,6 +392,8 @@ function buildCallsTableColumns(
           field: convertFeedbackFieldToBackendFilter(c),
           headerName: parsed ? parsed.displayName : `${c}`,
           width: 150,
+          minWidth: 150,
+          flex: 1,
           renderHeader: () => {
             return <div>{parsed ? parsed.userDefinedType : c}</div>;
           },
@@ -401,13 +401,7 @@ function buildCallsTableColumns(
             return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            if (typeof params.value === 'boolean') {
-              return <CellValueBoolean value={params.value} />;
-            }
-            if (typeof params.value === 'string') {
-              return <CellValueString value={params.value} />;
-            }
-            return <div>{params.value}</div>;
+            return <CellValue value={params.value} />;
           },
         };
       });
