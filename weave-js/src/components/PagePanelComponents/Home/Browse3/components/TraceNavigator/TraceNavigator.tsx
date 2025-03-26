@@ -161,7 +161,7 @@ export const TraceNavigatorInner: FC<
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
-        <h2 className="truncate text-sm font-semibold">Trace view</h2>
+        <h2 className="truncate text-sm font-semibold">Trace</h2>
         <div className="flex items-center gap-3">
           {traceViews.map(view => {
             const isDisabled = !!(

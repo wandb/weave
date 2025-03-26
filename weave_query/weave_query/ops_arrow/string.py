@@ -146,9 +146,7 @@ def in_(self, other):
     output_type=ARROW_WEAVE_LIST_INT_TYPE,
 )
 def arrowweavelist_len(self):
-    return ArrowWeaveList(
-        pc.binary_length(self._arrow_data), types.Int(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.binary_length, types.Int())
 
 
 @arrow_op(
@@ -208,29 +206,19 @@ def prepend(self, other):
     output_type=ARROW_WEAVE_LIST_LIST_OF_STR_TYPE,
 )
 def split(self, pattern):
-    if isinstance(pattern, str):
-        if isinstance(self._arrow_data, pa.DictionaryArray):
-            # If we have a dictionary array, we need to split the dictionary and
-            # then re-encode it as a dictionary array.
-            return ArrowWeaveList(
-                pa.DictionaryArray.from_arrays(
-                    self._arrow_data.indices, pc.split_pattern(self._arrow_data.dictionary, pattern)
-                ),
-                types.optional(types.List(types.String())),
-                self._artifact,
+    def _split(arrow_data):
+        if isinstance(pattern, str):
+            return pc.split_pattern(arrow_data, pattern)
+        else:
+            return pa.array(
+                item.as_py().split(p.as_py())
+                if item.as_py() is not None and p.as_py() is not None
+                else None
+                for item, p in zip(arrow_data, pattern._arrow_data)
             )
-        return ArrowWeaveList(
-            pc.split_pattern(self._arrow_data, pattern),
-            types.optional(types.List(types.String())),
-            self._artifact,
-        )
-    return ArrowWeaveList(
-        pa.array(
-            self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
-            for i in range(len(self._arrow_data))
-        ),
-        types.optional(types.List(types.String())),
-        self._artifact,
+
+    return util.handle_dictionary_array(
+        self, _split, types.optional(types.List(types.String()))
     )
 
 
@@ -243,17 +231,34 @@ def split(self, pattern):
     output_type=ARROW_WEAVE_LIST_LIST_OF_STR_TYPE,
 )
 def partition(self, sep):
-    def data_iterator():
-        for i in range(len(self._arrow_data)):
-            item = self._arrow_data[i].as_py()
-            separator = sep if isinstance(sep, str) else sep._arrow_data[i].as_py()
-            if not (item is None or separator is None):
-                yield item.partition(separator)
-            else:
-                yield None
+    if sep is None:
+        return ArrowWeaveList(
+            pa.array([None] * len(self._arrow_data)),
+            types.optional(types.List(types.String())),
+            self._artifact,
+        )
+
+    if isinstance(sep, str):
+        return ArrowWeaveList(
+            pa.array(
+                [
+                    item.as_py().partition(sep) if item.as_py() is not None else None
+                    for item in self._arrow_data
+                ]
+            ),
+            types.optional(types.List(types.String())),
+            self._artifact,
+        )
 
     return ArrowWeaveList(
-        pa.array(data_iterator()),
+        pa.array(
+            [
+                item.as_py().partition(s.as_py())
+                if item.as_py() is not None and s.as_py() is not None
+                else None
+                for item, s in zip(self._arrow_data, sep._arrow_data)
+            ]
+        ),
         types.optional(types.List(types.String())),
         self._artifact,
     )
@@ -268,18 +273,18 @@ def partition(self, sep):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def startswith(self, prefix):
-    if isinstance(prefix, str):
-        return ArrowWeaveList(
-            pc.starts_with(self._arrow_data, prefix), types.Boolean(), self._artifact
-        )
-    return ArrowWeaveList(
-        pa.array(
-            s.as_py().startswith(p.as_py())
-            for s, p in zip(self._arrow_data, prefix._arrow_data)
-        ),
-        types.Boolean(),
-        self._artifact,
-    )
+    def _startswith(arrow_data):
+        if isinstance(prefix, str):
+            return pc.starts_with(arrow_data, prefix)
+        else:
+            return pa.array(
+                s.as_py().startswith(p.as_py())
+                if s.as_py() is not None and p.as_py() is not None
+                else None
+                for s, p in zip(arrow_data, prefix._arrow_data)
+            )
+
+    return util.handle_dictionary_array(self, _startswith, types.Boolean())
 
 
 @arrow_op(
@@ -291,18 +296,18 @@ def startswith(self, prefix):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def endswith(self, suffix):
-    if isinstance(suffix, str):
-        return ArrowWeaveList(
-            pc.ends_with(self._arrow_data, suffix), types.Boolean(), self._artifact
-        )
-    return ArrowWeaveList(
-        pa.array(
-            s.as_py().endswith(p.as_py())
-            for s, p in zip(self._arrow_data, suffix._arrow_data)
-        ),
-        types.Boolean(),
-        self._artifact,
-    )
+    def _ends_with(arrow_data):
+        if isinstance(suffix, str):
+            return pc.ends_with(arrow_data, suffix)
+        else:
+            return pa.array(
+                s.as_py().endswith(p.as_py())
+                if s.as_py() is not None and p.as_py() is not None
+                else None
+                for s, p in zip(arrow_data, suffix._arrow_data)
+            )
+
+    return util.handle_dictionary_array(self, _ends_with, types.Boolean())
 
 
 @arrow_op(
@@ -311,9 +316,7 @@ def endswith(self, suffix):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalpha(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alpha(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_alpha, types.Boolean())
 
 
 @arrow_op(
@@ -322,9 +325,7 @@ def isalpha(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isnumeric(self):
-    return ArrowWeaveList(
-        pc.ascii_is_decimal(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_decimal, types.Boolean())
 
 
 @arrow_op(
@@ -333,9 +334,7 @@ def isnumeric(self):
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def isalnum(self):
-    return ArrowWeaveList(
-        pc.ascii_is_alnum(self._arrow_data), types.Boolean(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_is_alnum, types.Boolean())
 
 
 @arrow_op(
@@ -344,9 +343,7 @@ def isalnum(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def lower(self):
-    return ArrowWeaveList(
-        pc.ascii_lower(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_lower, types.String())
 
 
 @arrow_op(
@@ -355,9 +352,7 @@ def lower(self):
     output_type=ArrowWeaveListType(types.String()),
 )
 def upper(self):
-    return ArrowWeaveList(
-        pc.ascii_upper(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.ascii_upper, types.String())
 
 
 @arrow_op(
@@ -370,10 +365,8 @@ def upper(self):
     output_type=self_type_output_type_fn,
 )
 def slice(self, begin, end):
-    return ArrowWeaveList(
-        pc.utf8_slice_codeunits(self._arrow_data, begin, end),
-        types.String(),
-        self._artifact,
+    return util.handle_dictionary_array(
+        self, lambda arr: pc.utf8_slice_codeunits(arr, begin, end), types.String()
     )
 
 
@@ -387,10 +380,10 @@ def slice(self, begin, end):
     output_type=self_type_output_type_fn,
 )
 def replace(self, pattern, replacement):
-    return ArrowWeaveList(
-        pc.replace_substring(self._arrow_data, pattern, replacement),
+    return util.handle_dictionary_array(
+        self,
+        lambda arr: pc.replace_substring(arr, pattern, replacement),
         types.String(),
-        self._artifact,
     )
 
 
@@ -400,9 +393,7 @@ def replace(self, pattern, replacement):
     output_type=self_type_output_type_fn,
 )
 def strip(self):
-    return ArrowWeaveList(
-        pc.utf8_trim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_trim_whitespace, types.String())
 
 
 @arrow_op(
@@ -411,9 +402,7 @@ def strip(self):
     output_type=self_type_output_type_fn,
 )
 def lstrip(self):
-    return ArrowWeaveList(
-        pc.utf8_ltrim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_ltrim_whitespace, types.String())
 
 
 @arrow_op(
@@ -422,9 +411,7 @@ def lstrip(self):
     output_type=self_type_output_type_fn,
 )
 def rstrip(self):
-    return ArrowWeaveList(
-        pc.utf8_rtrim_whitespace(self._arrow_data), types.String(), self._artifact
-    )
+    return util.handle_dictionary_array(self, pc.utf8_rtrim_whitespace, types.String())
 
 
 @arrow_op(
@@ -438,27 +425,33 @@ def rstrip(self):
 def join_to_str(arr, sep):
     if isinstance(sep, ArrowWeaveList):
         sep = sep._arrow_data
-    # match Weave0 - join nulls to empty string
-    filled_arr = pa.ListArray.from_arrays(
-        offsets_starting_at_zero(arr._arrow_data),
-        arr._arrow_data.flatten().fill_null(""),
-    )
-    return ArrowWeaveList(
-        pc.binary_join(filled_arr, sep), types.String(), arr._artifact
-    )
+
+    def _join_to_str(arrow_data):
+        # match Weave0 - join nulls to empty string
+        filled_arr = pa.ListArray.from_arrays(
+            offsets_starting_at_zero(arrow_data),
+            arrow_data.flatten().fill_null(""),
+        )
+        return pc.binary_join(filled_arr, sep)
+
+    return util.handle_dictionary_array(arr, _join_to_str, types.String())
 
 
 @arrow_op(
     name="ArrowWeaveListString-toNumber",
     input_type={"self": ArrowWeaveListType(types.String())},
-    output_type=ArrowWeaveListType(types.Number()),
+    output_type=ArrowWeaveListType(types.optional(types.Number())),
 )
 def to_number(self):
-    arrow_data = self._arrow_data
-    is_not_numeric = pc.invert(pc.utf8_is_numeric(arrow_data))
+    def _to_number(arrow_data):
+        is_not_numeric = pc.invert(pc.utf8_is_numeric(arrow_data))
 
-    # need to use kleene logic here for masking
-    mask = pc.and_kleene(is_not_numeric, pa.nulls(len(self)).cast(pa.bool_()))
+        # need to use kleene logic here for masking
+        mask = pc.and_kleene(is_not_numeric, pa.nulls(len(arrow_data)).cast(pa.bool_()))
 
-    new_data = pc.replace_with_mask(arrow_data, mask, arrow_data).cast(pa.float64())
-    return ArrowWeaveList(new_data, types.optional(types.Number()), self._artifact)
+        new_data = pc.replace_with_mask(arrow_data, mask, arrow_data).cast(pa.float64())
+        return new_data
+
+    return util.handle_dictionary_array(
+        self, _to_number, types.optional(types.Number())
+    )
