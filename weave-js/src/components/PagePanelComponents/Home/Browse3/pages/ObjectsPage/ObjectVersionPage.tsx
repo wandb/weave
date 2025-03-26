@@ -68,6 +68,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   ActionSpec: 'rocket-launch',
   AnnotationSpec: 'forum-chat-bubble',
   SavedView: 'view-glasses',
+  Provider: 'model',
+  ProviderModel: 'model',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
