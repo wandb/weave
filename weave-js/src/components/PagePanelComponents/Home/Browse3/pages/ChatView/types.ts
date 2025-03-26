@@ -109,7 +109,6 @@ export type ChatCompletion = {
   usage: Usage;
 };
 
-
 export type Chat = {
   // TODO: Maybe optional information linking back to Call?
   isStructuredOutput: boolean;

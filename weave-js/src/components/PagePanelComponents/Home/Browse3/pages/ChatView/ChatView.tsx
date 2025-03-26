@@ -3,7 +3,7 @@ import React, {useEffect, useMemo, useRef} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {ChoicesView} from './ChoicesView';
 import {MessageList} from './MessageList';
-import { MessagePanel } from './MessagePanel';
+import {MessagePanel} from './MessagePanel';
 import {Chat} from './types';
 
 type ChatViewProps = {
@@ -16,12 +16,13 @@ export const ChatView = ({chat}: ChatViewProps) => {
   const chatResult = useDeepMemo(chat.result);
 
   const scrollLastMessage = useMemo(
-    () => !(
-      outputRef.current &&
-      chatResult &&
-      'choices' in chatResult
-      && chatResult.choices
-    ),
+    () =>
+      !(
+        outputRef.current &&
+        chatResult &&
+        'choices' in chatResult &&
+        chatResult.choices
+      ),
     [chatResult]
   );
 
@@ -43,36 +44,42 @@ export const ChatView = ({chat}: ChatViewProps) => {
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
       />
-      {chatResult && 'content' in chatResult && chatResult.content && chatResult.content.length > 0 && (
-        <>
-          <span className="mb-[8px] text-sm font-semibold text-moon-800">
-            Response
-          </span>
-          <div ref={outputRef}>
-            <MessagePanel
-              index={0}
-              message={chatResult}
-              isStructuredOutput={chat.isStructuredOutput}
-              isNested={false}
-              choiceIndex={0}
-              messageHeader={null}
-            />
-          </div>
+      {chatResult &&
+        'content' in chatResult &&
+        chatResult.content &&
+        chatResult.content.length > 0 && (
+          <>
+            <span className="mb-[8px] text-sm font-semibold text-moon-800">
+              Response
+            </span>
+            <div ref={outputRef}>
+              <MessagePanel
+                index={0}
+                message={chatResult}
+                isStructuredOutput={chat.isStructuredOutput}
+                isNested={false}
+                choiceIndex={0}
+                messageHeader={null}
+              />
+            </div>
           </>
-      )}
-      {chatResult && 'choices' in chatResult && chatResult.choices && chatResult.choices.length > 0 && (
-        <>
-          <span className="mb-[8px] text-sm font-semibold text-moon-800">
-            Response
-          </span>
-          <div ref={outputRef}>
-            <ChoicesView
-              isStructuredOutput={chat.isStructuredOutput}
-              choices={chatResult.choices}
-            />
-          </div>
-        </>
-      )}
+        )}
+      {chatResult &&
+        'choices' in chatResult &&
+        chatResult.choices &&
+        chatResult.choices.length > 0 && (
+          <>
+            <span className="mb-[8px] text-sm font-semibold text-moon-800">
+              Response
+            </span>
+            <div ref={outputRef}>
+              <ChoicesView
+                isStructuredOutput={chat.isStructuredOutput}
+                choices={chatResult.choices}
+              />
+            </div>
+          </>
+        )}
     </div>
   );
 };
