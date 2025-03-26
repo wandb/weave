@@ -95,9 +95,12 @@ export const useChatCompletionFunctions = (
           // Make the API request
           const response = await makeCompletionRequest(idx, updatedStates);
 
-          await handleErrorsAndUpdate(response, idx);
+          const success = await handleErrorsAndUpdate(response, idx);
+          if (!success) {
+            setPlaygroundStateField(idx, 'loading', false);
+          }
 
-          return {idx, success: true};
+          return {idx, success};
         } catch (error) {
           console.error(`Error processing completion for chat ${idx}:`, error);
           // Make sure to clear loading state on error
@@ -148,7 +151,10 @@ export const useChatCompletionFunctions = (
       const response = await makeCompletionRequest(callIndex, updatedStates);
 
       // Handle any errors or global updates
-      await handleErrorsAndUpdate(response, callIndex);
+      const success = await handleErrorsAndUpdate(response, callIndex);
+      if (!success) {
+        setPlaygroundStateField(callIndex, 'loading', false);
+      }
     } catch (error) {
       console.error('Error processing completion:', error);
       // Clear loading state in case of outer error
@@ -193,13 +199,13 @@ const handleMissingLLMApiKey = (responses: any, entity: string): boolean => {
 };
 
 const handleErrorResponse = (
-  response: CompletionsCreateRes | null | {error: string}
+  response: CompletionsCreateRes | null | {response: {error: string}}
 ): boolean => {
   if (!response) {
     return true;
   }
-  if (response && 'error' in response) {
-    toast(response?.error, {
+  if (response && 'error' in response.response) {
+    toast(response.response?.error, {
       type: 'error',
     });
     return true;

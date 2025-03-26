@@ -1,15 +1,22 @@
 import {Box} from '@mui/material';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Select} from '@wandb/weave/components/Form/Select';
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 
+import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
+import {useBaseObjectInstances} from '../../wfReactInterface/objectClassQuery';
 import {
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
   LLMMaxTokensKey,
 } from '../llmMaxTokens';
 import {useConfiguredProviders} from '../useConfiguredProviders';
-import {CustomOption, ProviderOption} from './LLMDropdownOptions';
+import {
+  addProviderOption,
+  CustomOption,
+  dividerOption,
+  ProviderOption,
+} from './LLMDropdownOptions';
 
 interface LLMDropdownProps {
   value: LLMMaxTokensKey;
@@ -24,8 +31,33 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   entity,
   project,
 }) => {
+  const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entity);
+
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+    refetch: refetchCustomProviders,
+  } = useBaseObjectInstances('Provider', {
+    project_id: `${entity}/${project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+    refetch: refetchCustomProviderModels,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: `${entity}/${project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const customLoading = customProvidersLoading || customProviderModelsLoading;
 
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isTeamAdmin = !loadingUserInfo && userInfo?.roles[entity] === 'admin';
@@ -65,8 +97,53 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     });
   }
 
+  // Add custom providers
+  if (!customLoading) {
+    customProvidersResult?.forEach(provider => {
+      const providerName = provider.val.name || '';
+      const currentProviderModels =
+        customProviderModelsResult?.filter(
+          obj => obj.val.provider === provider.digest
+        ) || [];
+
+      const shortenedProviderLabel =
+        providerName.length > 20
+          ? providerName.slice(0, 2) + '...' + providerName.slice(-4)
+          : providerName;
+
+      const llmOptions = currentProviderModels.map(model => ({
+        label: shortenedProviderLabel + '/' + model.val.name,
+        value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
+        max_tokens: model.val.max_tokens,
+      }));
+
+      if (llmOptions.length > 0) {
+        options.push({
+          label: providerName,
+          value: providerName,
+          llms: llmOptions,
+        });
+      }
+    });
+  }
+
   // Combine enabled and disabled options
-  const allOptions = [...options, ...disabledOptions];
+  // Add a divider option before the add provider option
+  const allOptions = [
+    ...options,
+    ...disabledOptions,
+    dividerOption,
+    addProviderOption,
+  ];
+
+  const refetch = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+  }, [refetchCustomProviders, refetchCustomProviderModels]);
+
+  const handleCloseDrawer = () => {
+    setIsAddProviderDrawerOpen(false);
+  };
 
   return (
     <Box sx={{width: '300px'}}>
@@ -90,6 +167,13 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           // When you click a provider, select the first LLM
           if (option && 'value' in option) {
             const selectedOption = option as ProviderOption;
+
+            // Check if the "Add AI provider" option was selected
+            if (selectedOption.value === 'add-provider') {
+              setIsAddProviderDrawerOpen(true);
+              return;
+            }
+
             if (selectedOption.llms.length > 0) {
               const llm = selectedOption.llms[0];
               onChange(llm.value, llm.max_tokens);
@@ -122,6 +206,16 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             )
           );
         }}
+      />
+
+      <AddProviderDrawer
+        entityName={entity}
+        projectName={project}
+        isOpen={isAddProviderDrawerOpen}
+        onClose={handleCloseDrawer}
+        refetch={refetch}
+        projectId={`${entity}/${project}`}
+        providers={customProvidersResult?.map(p => p.val.name || '') || []}
       />
     </Box>
   );
