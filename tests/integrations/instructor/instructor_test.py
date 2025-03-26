@@ -89,6 +89,7 @@ def test_instructor_openai_with_completion(
     assert len(calls) == 2
 
     call = calls[0]
+    assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "Instructor.create_with_completion"
 
     call = calls[1]
