@@ -4,6 +4,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {ChoicesView} from './ChoicesView';
 import {MessageList} from './MessageList';
 import {Chat} from './types';
+import { MessagePanel } from './MessagePanel';
 
 type ChatViewProps = {
   chat: Chat;
@@ -15,12 +16,22 @@ export const ChatView = ({chat}: ChatViewProps) => {
   const chatResult = useDeepMemo(chat.result);
 
   const scrollLastMessage = useMemo(
-    () => !(outputRef.current && chatResult && chatResult.choices),
+    () => !(
+      outputRef.current &&
+      chatResult &&
+      'choices' in chatResult
+      && chatResult.choices
+    ),
     [chatResult]
   );
 
   useEffect(() => {
-    if (outputRef.current && chatResult && chatResult.choices) {
+    if (
+      outputRef.current &&
+      chatResult &&
+      'choices' in chatResult &&
+      chatResult.choices
+    ) {
       outputRef.current.scrollIntoView();
     }
   }, [chatResult]);
@@ -32,7 +43,24 @@ export const ChatView = ({chat}: ChatViewProps) => {
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
       />
-      {chatResult?.choices && chatResult.choices.length > 0 && (
+      {chatResult && 'content' in chatResult && chatResult.content && chatResult.content.length > 0 && (
+        <>
+          <span className="mb-[8px] text-sm font-semibold text-moon-800">
+            Response
+          </span>
+          <div ref={outputRef}>
+            <MessagePanel
+              index={0}
+              message={chatResult}
+              isStructuredOutput={chat.isStructuredOutput}
+              isNested={false}
+              choiceIndex={0}
+              messageHeader={null}
+            />
+          </div>
+          </>
+      )}
+      {chatResult && 'choices' in chatResult && chatResult.choices && chatResult.choices.length > 0 && (
         <>
           <span className="mb-[8px] text-sm font-semibold text-moon-800">
             Response

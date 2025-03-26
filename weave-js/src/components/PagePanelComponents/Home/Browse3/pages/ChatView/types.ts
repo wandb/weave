@@ -20,6 +20,7 @@ export type InternalMessage = {
   input?: Record<string, any>;
   content?: string;
   name?: string;
+  id?: string;
 };
 
 export type MessagePart = string | Placeholder | InternalMessage;
@@ -108,11 +109,13 @@ export type ChatCompletion = {
   usage: Usage;
 };
 
+
 export type Chat = {
   // TODO: Maybe optional information linking back to Call?
   isStructuredOutput: boolean;
   // When the chat is created from a call, this will be the request.
   // When the chat is created from an empty playground, this will be null.
   request: ChatRequest | null;
-  result: ChatCompletion | null;
+  // ChatCompletion is for OpenAI responses, Message is for Anthropic responses
+  result: ChatCompletion | Message | null;
 };

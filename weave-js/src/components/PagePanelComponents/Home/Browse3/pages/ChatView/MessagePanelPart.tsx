@@ -4,7 +4,8 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {MessagePart} from './types';
+import {MessagePart, ToolCall} from './types';
+import {ToolCalls} from './ToolCalls';
 
 type MessagePanelPartProps = {value: MessagePart; isStructuredOutput?: boolean};
 
@@ -42,29 +43,16 @@ export const MessagePanelPart = ({
       </div>
     );
   }
-  if (value.type === 'tool_use' && 'name' in value) {
-    return (
-      <div>
-        <div>
-          <span className="font-bold">Tool name:</span>&nbsp;{value.name}
-        </div>
-        {'input' in value && (
-          <>
-            <div>
-              <span className="font-bold">Tool inputs:</span>
-            </div>
-            <div>
-              {Object.keys(value.input as object).map(key => (
-                <div key={key} className="ml-16">
-                  <span className="font-bold">{key}:</span>&nbsp;
-                  {(value.input as {[key: string]: any})[key]}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    );
+  if (value.type === 'tool_use' && 'name' in value && 'id' in value) {
+    const toolCall: ToolCall = {
+      id: value.id || '',
+      type: value.type,
+      function: {
+        name: value.name || '',
+        arguments: JSON.stringify(value.input) || '',
+      },
+    };
+    return <ToolCalls toolCalls={[toolCall]} />;
   }
   if (value.type === 'tool_result' && 'content' in value) {
     try {
