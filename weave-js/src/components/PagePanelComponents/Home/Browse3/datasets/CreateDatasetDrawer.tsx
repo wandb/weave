@@ -18,6 +18,7 @@ import {
 } from './CreateDatasetDrawerContext';
 import {validateDatasetName} from './datasetNameValidation';
 import {EditableDatasetView} from './EditableDatasetView';
+import {SUPPORTED_FILE_EXTENSIONS} from './fileFormats';
 
 // Define typography style with Source Sans Pro font
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
@@ -54,7 +55,7 @@ const CreateDatasetDrawerContent: React.FC<{
   const {
     state,
     dispatch,
-    parseCSVFile,
+    parseFile,
     handleCloseDrawer,
     handlePublishDataset,
     clearDataset,
@@ -84,10 +85,10 @@ const CreateDatasetDrawerContent: React.FC<{
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (file) {
-        await parseCSVFile(file);
+        await parseFile(file);
       }
     },
-    [parseCSVFile]
+    [parseFile]
   );
 
   const handleUploadClick = useCallback(() => {
@@ -126,14 +127,17 @@ const CreateDatasetDrawerContent: React.FC<{
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         const file = files[0];
-        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-          await parseCSVFile(file);
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        if (SUPPORTED_FILE_EXTENSIONS.includes(fileExtension as any)) {
+          await parseFile(file);
         } else {
-          toast.error('Please upload a CSV file');
+          toast.error(
+            `Please upload a ${SUPPORTED_FILE_EXTENSIONS.join(', ')} file`
+          );
         }
       }
     },
-    [parseCSVFile]
+    [parseFile]
   );
 
   const handleToggleFullscreen = useCallback(() => {
@@ -309,7 +313,7 @@ const CreateDatasetDrawerContent: React.FC<{
                       fontWeight: 600,
                     }}
                     gutterBottom>
-                    {isDragging ? 'Drop CSV file here' : 'Upload your CSV file'}
+                    {isDragging ? 'Drop file here' : 'Upload your data file'}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -317,22 +321,25 @@ const CreateDatasetDrawerContent: React.FC<{
                     color="textSecondary"
                     align="center"
                     gutterBottom>
-                    Drag and drop your CSV file here, or click below to browse.
+                    Drag and drop your {SUPPORTED_FILE_EXTENSIONS.join(', ')}{' '}
+                    file here, or click below to browse.
                     <br />
                     Your file will be converted to a dataset that you can edit
                     before saving.
                   </Typography>
                   <Box sx={{mt: 2}}>
                     <input
-                      accept=".csv"
-                      id="csv-upload"
+                      accept={SUPPORTED_FILE_EXTENSIONS.map(
+                        ext => `.${ext}`
+                      ).join(',')}
+                      id="data-upload"
                       type="file"
                       style={{display: 'none'}}
                       onChange={handleFileChange}
                       ref={fileInputRef}
                     />
                     <Button onClick={handleUploadClick} variant="secondary">
-                      Browse for CSV file
+                      Browse for file
                     </Button>
                   </Box>
                   {isDragging && (
