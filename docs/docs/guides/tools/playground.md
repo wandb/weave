@@ -295,25 +295,14 @@ To remove a [previously created custom provider](#add-a-custom-provider), do the
 5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
 6. Click **Delete**.
 
-### Using ngrok with Ollama
+### Use ngrok with Ollama
 
-If you're running Ollama locally and want to test it in the Playground, you can use ngrok to create a temporary public URL that bypasses CORS restrictions. Here's how:
+To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions. 
 
-1. Install ngrok using Homebrew:
+To set it up, do the following:
 
-   ```bash
-   brew install ngrok
-   ```
-
+1. [Install ngrok](https://ngrok.com/docs/getting-started/#step-1-install) for your operating system.
 2. Start your Ollama model:
 
    ```bash
    ollama run <model>
-   ```
-
-3. In a separate terminal, create an ngrok tunnel with the proper CORS headers:
-   ```bash
-   ngrok http 11434 --response-header-add "Access-Control-Allow-Origin: *" --host-header rewrite
-   ```
-
-Once ngrok is running, it will provide you with a public URL (like `https://xxxx-xxxx.ngrok-free.app`). Use this as the Base URL when adding Ollama as a custom provider in the Playground.
