@@ -36,6 +36,8 @@ type PanelExportRef = {
   onDownloadPDF: (name: string) => Promise<void>;
 };
 
+const UNIQUE_COLOR_PANEL_IDS = ['wandb/line/v0'];
+
 transforms.rasterize = Rasterize as any;
 
 const INCOMPLETE_QUERY_MESSAGE =
@@ -66,10 +68,14 @@ function dataWithUniqueColors(
   // see: Note here https://vega.github.io/vega-lite/docs/scale.html#example-setting-color-range-based-on-a-field
   // vega-lite color encoding does not work well with multiple lines having the same color
   // only need to do this for vega chart wandb/line/v0, which only supports single table data
-  if (!dataIsSingle(data) || panelConfig?.panelDefId !== 'wandb/line/v0') {
+  if (!dataIsSingle(data)) {
     return data;
   }
   if (!Array.isArray(data)) {
+    return data;
+  }
+
+  if (!UNIQUE_COLOR_PANEL_IDS.includes(panelConfig?.panelDefId ?? '')) {
     return data;
   }
 
@@ -79,18 +85,13 @@ function dataWithUniqueColors(
   const nameToColorMap = new Map<string, string>();
   const result: SingleTableDataType = new Array(data.length);
 
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-
+  // First loop - fill nameToColorMap
+  for (const row of data) {
     if (!row.name || !row.color) {
-      result[i] = row;
       continue;
     }
 
-    // Check if we already calculated this name's color
-    const existingColor = nameToColorMap.get(row.name);
-    if (existingColor) {
-      result[i] = {...row, color: existingColor};
+    if (nameToColorMap.has(row.name)) {
       continue;
     }
 
@@ -99,7 +100,6 @@ function dataWithUniqueColors(
     if (!colorMap.has(baseColor)) {
       colorMap.set(baseColor, new Set([row.name]));
       nameToColorMap.set(row.name, baseColor);
-      result[i] = row;
     } else {
       const namesWithColor = colorMap.get(baseColor)!;
       namesWithColor.add(row.name);
@@ -108,8 +108,17 @@ function dataWithUniqueColors(
         .replace('rgb', 'rgba')
         .replace(')', `,${alpha / 100})`);
       nameToColorMap.set(row.name, newColor);
-      result[i] = {...row, color: newColor};
     }
+  }
+
+  // Second loop - update data with colors
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row.name || !row.color) {
+      result[i] = row;
+      continue;
+    }
+    result[i] = {...row, color: nameToColorMap.get(row.name)!};
   }
 
   return result;
