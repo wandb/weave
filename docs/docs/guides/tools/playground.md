@@ -28,6 +28,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Add a custom provider](#add-a-custom-provider)
 - [Edit a custom provider](#edit-a-custom-provider)
 - [Remove a custom provider](#remove-a-custom-provider)
+- [Using ngrok with Ollama](#using-ngrok-with-ollama)
 
 ## Prerequisites
 
@@ -49,6 +50,10 @@ Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazo
   - `AZURE_API_KEY`
   - `AZURE_API_BASE`
   - `AZURE_API_VERSION`
+- X.AI:
+  - `XAI_API_KEY`
+- Deepseek
+  - `DEEPSEEK_API_KEY`
 
 ### Access the Playground
 
@@ -73,6 +78,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - [Groq](#groq)
 - [OpenAI](#openai)
 - [X.AI](#xai)
+- [Deepseek](#deepseek)
 
 ### [Amazon Bedrock](../integrations/bedrock.md)
 
@@ -186,6 +192,11 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - xai/grok-2
 - xai/grok-2-latest
 
+### Deepseek
+
+- deepseek/deepseek-reasoner
+- deepseek/deepseek-chat
+
 ## Adjust LLM parameters
 
 You can experiment with different parameter values for your selected model. To adjust parameters, do the following:
@@ -297,7 +308,7 @@ To remove a [previously created custom provider](#add-a-custom-provider), do the
 
 ### Use ngrok with Ollama
 
-To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions. 
+To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions.
 
 To set it up, do the following:
 
@@ -306,3 +317,12 @@ To set it up, do the following:
 
    ```bash
    ollama run <model>
+   ```
+
+3. In a separate terminal, create an ngrok tunnel with the required CORS headers:
+
+   ```bash
+   ngrok http 11434 --response-header-add "Access-Control-Allow-Origin: *" --host-header rewrite
+   ```
+
+After ngrok starts, it will display a public URL, such as `https://xxxx-xxxx.ngrok-free.app`. Use this URL as the base URL when you add Ollama as a custom provider in the Playground.
