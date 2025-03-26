@@ -49,6 +49,11 @@ def get_instructor_patcher(
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("instructor.client"),
+                "Instructor.create_with_completion",
+                instructor_wrapper_partial(create_completion_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("instructor.client"),
                 "AsyncInstructor.create",
                 instructor_wrapper_async(async_create_settings),
             ),
@@ -61,12 +66,7 @@ def get_instructor_patcher(
                 lambda: importlib.import_module("instructor.client"),
                 "AsyncInstructor.create_partial",
                 instructor_wrapper_partial(async_create_partial_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("instructor.client"),
-                "AsyncInstructor.create_with_completion",
-                instructor_wrapper_partial(create_settings),
-            ),
+            )
         ]
     )
 
