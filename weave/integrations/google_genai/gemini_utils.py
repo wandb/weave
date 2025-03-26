@@ -10,6 +10,11 @@ from weave.trace.weave_client import Call
 if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse
 
+SKIP_TRACING_FUNCTIONS = [
+    "google.genai.models.Models.count_tokens",
+    "google.genai.models.AsyncModels.count_tokens",
+]
+
 
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """
@@ -107,7 +112,7 @@ def google_genai_gemini_wrapper_sync(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
-        if not op.name.endswith("count_tokens"):
+        if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(
             op,
@@ -134,7 +139,7 @@ def google_genai_gemini_wrapper_async(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        if not op.name.endswith("count_tokens"):
+        if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(
             op,
