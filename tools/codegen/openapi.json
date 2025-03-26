@@ -22,8 +22,23 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/health": {
@@ -47,8 +62,23 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/call/start": {
@@ -89,7 +119,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/call/end": {
@@ -130,7 +165,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/call/upsert_batch": {
@@ -171,7 +211,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/calls/delete": {
@@ -212,7 +257,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/call/update": {
@@ -253,7 +303,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/call/read": {
@@ -294,7 +349,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/calls/query_stats": {
@@ -335,7 +395,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/calls/stream_query": {
@@ -345,6 +410,11 @@
         ],
         "summary": "Calls Query Stream",
         "operationId": "calls_query_stream_calls_stream_query_post",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
         "parameters": [
           {
             "name": "accept",
@@ -432,7 +502,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/obj/read": {
@@ -473,7 +548,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/objs/query": {
@@ -514,7 +594,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/obj/delete": {
@@ -555,7 +640,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/table/create": {
@@ -596,7 +686,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/table/update": {
@@ -637,7 +732,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/table/query": {
@@ -678,13 +778,23 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/table/query_stream": {
       "post": {
         "summary": "Table Query Stream",
         "operationId": "table_query_stream_table_query_stream_post",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
         "parameters": [
           {
             "name": "accept",
@@ -772,7 +882,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/refs/read_batch": {
@@ -813,7 +928,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/file/create": {
@@ -854,7 +974,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/file/content": {
@@ -876,11 +1001,9 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Binary file content stream",
             "content": {
-              "application/json": {
-                "schema": {}
-              }
+              "application/octet-stream": {}
             }
           },
           "422": {
@@ -893,7 +1016,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/cost/create": {
@@ -934,7 +1062,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/cost/query": {
@@ -975,7 +1108,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/cost/purge": {
@@ -1016,7 +1154,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/feedback/create": {
@@ -1058,7 +1201,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/feedback/query": {
@@ -1100,7 +1248,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/feedback/purge": {
@@ -1142,7 +1295,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     },
     "/feedback/replace": {
@@ -1183,7 +1341,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
       }
     }
   },
@@ -4762,6 +4925,12 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBasic": {
+        "type": "http",
+        "scheme": "basic"
       }
     }
   }

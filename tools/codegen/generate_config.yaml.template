@@ -13,7 +13,7 @@
 # Path to the Python package repository (required)
 # This is used both as the output directory for generated Python code
 # and as the repository path for updating pyproject.toml
-repo_path: /path/to/your/local/python/repo
+python_output: /path/to/your/local/python/repo
 
 # Path to the Node package repository (optional)
 # Comment out or remove if not needed
