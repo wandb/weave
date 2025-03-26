@@ -1,16 +1,15 @@
-import json
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union, cast
+from typing import Union, cast
 
 from pydantic import BaseModel, validate_call
+from typing_extensions import Self
+from weave_server_sdk import WeaveTrace
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size
-from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -49,6 +48,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     # My current batching is not safe in notebooks, disable it for now
     def __init__(
         self,
+        username: str,
+        password: str,
         trace_server_url: str,
         should_batch: bool = False,
         *,
@@ -63,8 +64,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
             )
-        self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
+
+        self.stainless_client = WeaveTrace(
+            username=username,
+            password=password,
+            base_url=self.trace_server_url,
+        )
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -76,13 +82,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
+    def from_env(
+        cls, entity_name: str, api_key: str, should_batch: bool = False
+    ) -> Self:
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
-        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
-
-    def set_auth(self, auth: tuple[str, str]) -> None:
-        self._auth = auth
+        return cls(entity_name, api_key, weave_trace_server_url(), should_batch)
 
     def _flush_calls(
         self,
@@ -93,7 +98,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         """Process a batch of calls, splitting if necessary and sending to the server.
 
         This method handles the logic of splitting batches that are too large,
-        but delegates the actual server communication (with retries) to _send_batch_to_server.
+        but delegates the actual server communication (with retries) to upsert_batch.
         """
         # Call processor must be defined for this method
         assert self.call_processor is not None
@@ -145,69 +150,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 logger.debug(f"Requeueing batch with {ids=}")
             self.call_processor.enqueue(batch)
 
-<<<<<<< HEAD
-    @with_retry
-    def _generic_request_executor(
-        self,
-        url: str,
-        req: BaseModel,
-        stream: bool = False,
-    ) -> requests.Response:
-        r = requests.post(
-            self.trace_server_url + url,
-            # `by_alias` is required since we have Mongo-style properties in the
-            # query models that are aliased to conform to start with `$`. Without
-            # this, the model_dump will use the internal property names which are
-            # not valid for the `model_validate` step.
-            data=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=self._auth,
-            stream=stream,
-            # timeout=DEFAULT_TIMEOUT,
-        )
-        if r.status_code == 500:
-            reason_val = r.text
-            try:
-                reason_val = json.dumps(json.loads(reason_val), indent=2)
-            except json.JSONDecodeError:
-                reason_val = f"Reason: {reason_val}"
-            raise requests.HTTPError(
-                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
-                response=r,
-            )
-        r.raise_for_status()
-
-        return r
-
-    def _generic_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> BaseModel:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req)
-        return res_model.model_validate(r.json())
-
-    def _generic_stream_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> Iterator[BaseModel]:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield res_model.model_validate_json(line)
-
-    @with_retry
-=======
     @validate_call
->>>>>>> cb2220243 (test)
     def server_info(self) -> ServerInfoRes:
         return self.stainless_client.services.server_info()
 
@@ -216,9 +159,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self.stainless_client.services.health_check()
 
     # Call API
-    def call_start(
-        self, req: Union[tsi.CallStartReq, dict[str, Any]]
-    ) -> tsi.CallStartRes:
+    @validate_call
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         if self.should_batch:
             assert self.call_processor is not None
 
@@ -235,16 +177,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
+        return self.stainless_client.calls.start(start=req.start)
 
+    @validate_call
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._generic_request(
-            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
-        )
+        return self.stainless_client.calls.upsert_batch(batch=req.batch)
 
-    def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
+    @validate_call
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         if self.should_batch:
             assert self.call_processor is not None
 
@@ -255,16 +195,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = req
             self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
             return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+        return self.stainless_client.calls.end(end=req.end)
 
-    def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
-        return self._generic_request(
-            "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
+    @validate_call
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        return self.stainless_client.calls.read(
+            id=req.id, project_id=req.project_id, include_costs=req.include_costs
         )
 
-    def calls_query(
-        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
-    ) -> tsi.CallsQueryRes:
+    @validate_call
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         # This previously called the deprecated /calls/query endpoint.
         return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
@@ -293,67 +233,55 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             query=req.query,
         )
 
-    def calls_query_stats(
-        self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
-    ) -> tsi.CallsQueryStatsRes:
-        return self._generic_request(
-            "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
+    @validate_call
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        return self.stainless_client.calls.delete(
+            call_ids=req.call_ids, project_id=req.project_id, wb_user_id=req.wb_user_id
         )
 
-    def calls_delete(
-        self, req: Union[tsi.CallsDeleteReq, dict[str, Any]]
-    ) -> tsi.CallsDeleteRes:
-        return self._generic_request(
-            "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
+    @validate_call
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        return self.stainless_client.calls.update(
+            call_id=req.call_id,
+            project_id=req.project_id,
+            display_name=req.display_name,
+            wb_user_id=req.wb_user_id,
         )
-
-    def call_update(
-        self, req: Union[tsi.CallUpdateReq, dict[str, Any]]
-    ) -> tsi.CallUpdateRes:
-        return self._generic_request(
-            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
-        )
-
-    # Op API
-
-    def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
-        return self._generic_request(
-            "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
-        )
-
-    def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
-        return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
-
-    def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
-        return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
     # Obj API
 
-    def obj_create(
-        self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
-    ) -> tsi.ObjCreateRes:
-        return self._generic_request(
-            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
+    @validate_call
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        return self.stainless_client.objects.create(obj=req.obj)
+
+    @validate_call
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        return self.stainless_client.objects.read(
+            digest=req.digest,
+            object_id=req.object_id,
+            project_id=req.project_id,
+            metadata_only=req.metadata_only,
         )
 
-    def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
-        return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
-
-    def objs_query(
-        self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
-    ) -> tsi.ObjQueryRes:
-        return self._generic_request(
-            "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
+    @validate_call
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        return self.stainless_client.objects.query(
+            project_id=req.project_id,
+            filter=req.filter,
+            limit=req.limit,
+            offset=req.offset,
+            query=req.query,
+            sort_by=req.sort_by,
         )
 
+    @validate_call
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        return self._generic_request(
-            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
+        return self.stainless_client.objects.delete(
+            object_id=req.object_id, project_id=req.project_id, digests=req.digests
         )
 
-    def table_create(
-        self, req: Union[tsi.TableCreateReq, dict[str, Any]]
-    ) -> tsi.TableCreateRes:
+    @validate_call
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table creation can be decomposed into a series of
         updates. This is useful when the table creation size is too big to be sent in
@@ -388,10 +316,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 digest=update_res.digest, row_digests=update_res.updated_row_digests
             )
         else:
-            return self._generic_request(
-                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-            )
+            return self.stainless_client.tables.create(table=req.table)
 
+    @validate_call
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table updates can be decomposed into a series of
@@ -423,17 +350,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
-            return self._generic_request(
-                "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
+            return self.stainless_client.tables.update(
+                base_digest=req.base_digest,
+                project_id=req.project_id,
+                updates=req.updates,
             )
 
-    def table_query(
-        self, req: Union[tsi.TableQueryReq, dict[str, Any]]
-    ) -> tsi.TableQueryRes:
-        return self._generic_request(
-            "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
+    @validate_call
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        return self.stainless_client.tables.query(
+            digest=req.digest,
+            project_id=req.project_id,
+            filter=req.filter,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
+    @validate_call
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
@@ -441,31 +375,22 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         res = self.table_query(req)
         yield from res.rows
 
-    def table_query_stats(
-        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
-    ) -> tsi.TableQueryStatsRes:
-        return self._generic_request(
-            "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
-        )
-
-    def refs_read_batch(
-        self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
-    ) -> tsi.RefsReadBatchRes:
-        return self._generic_request(
-            "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
+    @validate_call
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        return self.stainless_client.tables.query_stats(
+            digest=req.digest, project_id=req.project_id
         )
 
     @validate_call
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        return self.stainless_client.refs.read_batch(refs=req.refs)
+
+    @validate_call
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
-            self.trace_server_url + "/files/create",
-            auth=self._auth,
-            data={"project_id": req.project_id},
-            files={"file": (req.name, req.content)},
-            # timeout=DEFAULT_TIMEOUT,
+        return self.stainless_client.files.create(
+            file=req.file,
+            project_id=req.project_id,
         )
-        r.raise_for_status()
-        return tsi.FileCreateRes.model_validate(r.json())
 
     @validate_call
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
@@ -475,36 +400,57 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
         return tsi.FileContentReadRes(content=res.content)
 
-    def feedback_create(
-        self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
-    ) -> tsi.FeedbackCreateRes:
-        return self._generic_request(
-            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+    @validate_call
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        return self.stainless_client.feedback.create(
+            feedback_type=req.feedback_type,
+            payload=req.payload,
+            project_id=req.project_id,
+            weave_ref=req.weave_ref,
+            annotation_ref=req.annotation_ref,
+            call_ref=req.call_ref,
+            creator=req.creator,
+            runnable_ref=req.runnable_ref,
+            trigger_ref=req.trigger_ref,
+            wb_user_id=req.wb_user_id,
         )
 
-    def feedback_query(
-        self, req: Union[tsi.FeedbackQueryReq, dict[str, Any]]
-    ) -> tsi.FeedbackQueryRes:
-        return self._generic_request(
-            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
+    @validate_call
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        return self.stainless_client.feedback.query(
+            project_id=req.project_id,
+            fields=req.fields,
+            limit=req.limit,
+            offset=req.offset,
+            query=req.query,
+            sort_by=req.sort_by,
         )
 
-    def feedback_purge(
-        self, req: Union[tsi.FeedbackPurgeReq, dict[str, Any]]
-    ) -> tsi.FeedbackPurgeRes:
-        return self._generic_request(
-            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+    @validate_call
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        return self.stainless_client.feedback.purge(
+            project_id=req.project_id, query=req.query
         )
 
-    def feedback_replace(
-        self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
-    ) -> tsi.FeedbackReplaceRes:
-        return self._generic_request(
-            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+    @validate_call
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        return self.stainless_client.feedback.replace(
+            feedback=req.feedback,
+            feedback_type=req.feedback_type,
+            payload=req.payload,
+            project_id=req.project_id,
+            weave_ref=req.weave_ref,
+            annotation_ref=req.annotation_ref,
+            call_ref=req.call_ref,
+            creator=req.creator,
+            runnable_ref=req.runnable_ref,
+            trigger_ref=req.trigger_ref,
+            wb_user_id=req.wb_user_id,
         )
 
+    @validate_call
     def actions_execute_batch(
-        self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
+        self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         return tsi.ActionsExecuteBatchRes()
         # return self.stainless_client.actions.execute_batch(
@@ -515,27 +461,31 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # )
 
     # Cost API
-    def cost_query(
-        self, req: Union[tsi.CostQueryReq, dict[str, Any]]
-    ) -> tsi.CostQueryRes:
-        return self._generic_request(
-            "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
+    @validate_call
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        return self.stainless_client.costs.query(
+            project_id=req.project_id,
+            fields=req.fields,
+            limit=req.limit,
+            offset=req.offset,
+            query=req.query,
+            sort_by=req.sort_by,
         )
 
-    def cost_create(
-        self, req: Union[tsi.CostCreateReq, dict[str, Any]]
-    ) -> tsi.CostCreateRes:
-        return self._generic_request(
-            "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
+    @validate_call
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        return self.stainless_client.costs.create(
+            costs=req.costs, project_id=req.project_id, wb_user_id=req.wb_user_id
         )
 
-    def cost_purge(
-        self, req: Union[tsi.CostPurgeReq, dict[str, Any]]
-    ) -> tsi.CostPurgeRes:
-        return self._generic_request(
-            "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
+    @validate_call
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        return self.stainless_client.costs.purge(
+            project_id=req.project_id,
+            query=req.query,
         )
 
+    @validate_call
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:

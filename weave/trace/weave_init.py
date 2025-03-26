@@ -190,7 +190,7 @@ def init_weave_disabled() -> InitializedClient:
 
 def init_weave_get_server(
     entity_name: str,
-    api_key: str | None = None,
+    api_key: str,
     should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
     return remote_http_trace_server.RemoteHTTPTraceServer.from_env(
