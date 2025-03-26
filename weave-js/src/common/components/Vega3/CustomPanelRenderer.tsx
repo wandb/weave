@@ -58,6 +58,65 @@ function specHasWandbData(spec: VisualizationSpec) {
   return false;
 }
 
+function dataWithUniqueColors(
+  data: CustomPanelRendererDataType,
+  panelConfig: VegaPanel2Config | undefined
+): CustomPanelRendererDataType {
+  // HACK: ensure unique colors per name by adding and modifying the alpha channel for collisions
+  // see: Note here https://vega.github.io/vega-lite/docs/scale.html#example-setting-color-range-based-on-a-field
+  // vega-lite color encoding does not work well with multiple lines having the same color
+  // only need to do this for vega chart wandb/line/v0, which only supports single table data
+  const processedData = React.useMemo(() => {
+    if (!dataIsSingle(data) || panelConfig?.panelDefId !== 'wandb/line/v0') {
+      return data;
+    }
+    if (!Array.isArray(data)) {
+      return data;
+    }
+
+    // map of rgb color to set of names that have that color
+    const colorMap = new Map<string, Set<string>>();
+    // map of name to color
+    const nameToColorMap = new Map<string, string>();
+    const result: SingleTableDataType = new Array(data.length);
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+
+      if (!row.name || !row.color) {
+        result[i] = row;
+        continue;
+      }
+
+      // Check if we already calculated this name's color
+      const existingColor = nameToColorMap.get(row.name);
+      if (existingColor) {
+        result[i] = {...row, color: existingColor};
+        continue;
+      }
+
+      const baseColor = row.color;
+
+      if (!colorMap.has(baseColor)) {
+        colorMap.set(baseColor, new Set([row.name]));
+        nameToColorMap.set(row.name, baseColor);
+        result[i] = row;
+      } else {
+        const namesWithColor = colorMap.get(baseColor)!;
+        namesWithColor.add(row.name);
+        const alpha = 100 - (namesWithColor.size - 1);
+        const newColor = baseColor
+          .replace('rgb', 'rgba')
+          .replace(')', `,${alpha / 100})`);
+        nameToColorMap.set(row.name, newColor);
+        result[i] = {...row, color: newColor};
+      }
+    }
+
+    return result;
+  }, [data]);
+}
+
 export type SingleTableDataType = QueryResult.Row[];
 export type MultiTableDataType = {[tableName: string]: SingleTableDataType};
 export type CustomPanelRendererDataType =
@@ -178,10 +237,15 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
     }
   }, [dimensions, vegaView]);
 
+  const processedData = useMemo(
+    () => dataWithUniqueColors(data, props.panelConfig),
+    [data, panelConfig]
+  );
+
   const vegaData = React.useMemo(() => {
-    if (dataIsMulti(data)) {
-      vegaView?.setState({data});
-      return data;
+    if (dataIsMulti(processedData)) {
+      vegaView?.setState({data: processedData});
+      return processedData;
     } else if (
       // viewed run change just changes the filtered data
       // because it does not require a new query
@@ -189,17 +253,17 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
       !showRunSelector ||
       (viewedRun && viewedRun === VIEW_ALL_RUNS)
     ) {
-      vegaView?.setState({data: {wandb: data}});
-      return data;
+      vegaView?.setState({data: {wandb: processedData}});
+      return processedData;
     } else {
       // hack to refresh the data in case vega doesnt do it.
       vegaView?.setState({data: {wandb: []}});
       vegaView?.setState({
         data: {
-          wandb: data.filter(row => row.name === viewedRun),
+          wandb: processedData.filter(row => row.name === viewedRun),
         },
       });
-      return data.filter(row => row.name === viewedRun);
+      return processedData.filter(row => row.name === viewedRun);
     }
   }, [data, viewedRun, showRunSelector, vegaView]);
 
