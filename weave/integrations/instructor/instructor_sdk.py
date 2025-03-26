@@ -50,7 +50,7 @@ def get_instructor_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("instructor.client"),
                 "Instructor.create_with_completion",
-                instructor_wrapper_partial(create_completion_settings),
+                instructor_wrapper_sync(create_completion_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("instructor.client"),
