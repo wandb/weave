@@ -115,9 +115,7 @@ export const isInternalMessage = (part: any): boolean => {
     if (!hasStringProp(part, 'tool_use_id')) {
       return false;
     }
-    if (!hasStringProp(part, 'content')) {
-      return false;
-    }
+
     return true;
   }
 
