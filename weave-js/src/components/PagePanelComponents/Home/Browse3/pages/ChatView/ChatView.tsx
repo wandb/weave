@@ -3,8 +3,8 @@ import React, {useEffect, useMemo, useRef} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {ChoicesView} from './ChoicesView';
 import {MessageList} from './MessageList';
-import {Chat} from './types';
 import { MessagePanel } from './MessagePanel';
+import {Chat} from './types';
 
 type ChatViewProps = {
   chat: Chat;

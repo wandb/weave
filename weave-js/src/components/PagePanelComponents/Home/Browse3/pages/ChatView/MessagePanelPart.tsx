@@ -4,8 +4,8 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {MessagePart, ToolCall} from './types';
 import {ToolCalls} from './ToolCalls';
+import {MessagePart, ToolCall} from './types';
 
 type MessagePanelPartProps = {value: MessagePart; isStructuredOutput?: boolean};
 
