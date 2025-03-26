@@ -28,6 +28,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Add a custom provider](#add-a-custom-provider)
 - [Edit a custom provider](#edit-a-custom-provider)
 - [Remove a custom provider](#remove-a-custom-provider)
+- [Using ngrok with Ollama](#using-ngrok-with-ollama)
 
 ## Prerequisites
 
@@ -49,6 +50,10 @@ Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazo
   - `AZURE_API_KEY`
   - `AZURE_API_BASE`
   - `AZURE_API_VERSION`
+- X.AI:
+  - `XAI_API_KEY`
+- Deepseek
+  - `DEEPSEEK_API_KEY`
 
 ### Access the Playground
 
@@ -73,6 +78,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - [Groq](#groq)
 - [OpenAI](#openai)
 - [X.AI](#xai)
+- [Deepseek](#deepseek)
 
 ### [Amazon Bedrock](../integrations/bedrock.md)
 
@@ -186,6 +192,11 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - xai/grok-2
 - xai/grok-2-latest
 
+### Deepseek
+
+- deepseek/deepseek-reasoner
+- deepseek/deepseek-chat
+
 ## Adjust LLM parameters
 
 You can experiment with different parameter values for your selected model. To adjust parameters, do the following:
@@ -256,17 +267,20 @@ To add a custom provider to the Playground, do the following:
 
 1. In the upper left corner of the Playground UI, click the **Select a model** dropdown.
 2. Select **+ Add AI provider**.
-3. In the pop-up modal, enter the  provider information:
+3. In the pop-up modal, enter the provider information:
 
    - _Provider name_: For example, `openai` or `ollama`.
    - _API key_: For example, an OpenAI API key.
-   - _Base URL_: For example, `https://api.openai.com/v1/` or `https://e452-2600-1700-45f0-3e10-2d3f-796b-d6f2-8ba7.ngrok-free.app`.
+   - _Base URL_: For example, `https://api.openai.com/v1/` or a ngrok URL `https://e452-2600-1700-45f0-3e10-2d3f-796b-d6f2-8ba7.ngrok-free.app`.
    - _Headers_ (optional): You can add multiple header keys and values.
    - _Models_: You can add multiple models for one provider. For example, `deepseek-r1` and `qwq`.
    - _Max tokens_ (optional): For each model, you can specify the max tokens that the model can generate in a response.
 
 4. Once you've entered your provider information, click **Add provider**.
-5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI. 
+5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI.
+
+:::important
+Because of CORS restrictions, you can't call localhost or 127.0.0.1 URLs directly from the Playground. If you're running a local model server (such as Ollama), use a tunneling service like ngrok to expose it securely. For details, see [Using ngrok with Ollama](https://github.com/wandb/weave/pull/3978/files#using-ngrok-with-ollama).
 
 Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
 
@@ -278,7 +292,7 @@ To edit information for a [previously created custom provider](#add-a-custom-pro
 2. From the top navigation menu, select **AI Providers**.
 3. In the **Custom providers** table, find the custom provider you want to update.
 4. In the **Last Updated** column of the entry for your custom provider, click the edit button (the pencil icon).
-5. In the pop-up modal, edit the  provider information.
+5. In the pop-up modal, edit the provider information.
 6. Click **Save**.
 
 ## Remove a custom provider
@@ -291,3 +305,24 @@ To remove a [previously created custom provider](#add-a-custom-provider), do the
 4. In the **Last Updated** column of the entry for your custom provider, click the delete button (the trashcan icon).
 5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
 6. Click **Delete**.
+
+### Use ngrok with Ollama
+
+To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions.
+
+To set it up, do the following:
+
+1. [Install ngrok](https://ngrok.com/docs/getting-started/#step-1-install) for your operating system.
+2. Start your Ollama model:
+
+   ```bash
+   ollama run <model>
+   ```
+
+3. In a separate terminal, create an ngrok tunnel with the required CORS headers:
+
+   ```bash
+   ngrok http 11434 --response-header-add "Access-Control-Allow-Origin: *" --host-header rewrite
+   ```
+
+After ngrok starts, it will display a public URL, such as `https://xxxx-xxxx.ngrok-free.app`. Use this URL as the base URL when you add Ollama as a custom provider in the Playground.
