@@ -1560,3 +1560,170 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         """,
         {"pb_0": "my_model", "pb_1": "project"},
     )
+
+
+def test_datetime_optimization_simple() -> None:
+    """Test basic datetime optimization with a single timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+        AND calls_merged.id >= '018df74e-99a0-7000-8000-000000000000'
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) > {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": 1709251200, "pb_1": "project"},
+    )
+
+
+def test_datetime_optimization_not_operation() -> None:
+    """Test datetime optimization with a NOT operation."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.NotOperation.model_validate(
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field with reversed comparison
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+        AND calls_merged.id < '018df750-6e60-7000-8000-000000000000'
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((
+            (NOT ((any(calls_merged.started_at) > {pb_0:UInt64}))))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": 1709251200, "pb_1": "project"},
+    )
+
+
+def test_datetime_optimization_multiple_conditions() -> None:
+    """Test datetime optimization with multiple timestamp conditions."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$getField": "ended_at"},
+                            {"$literal": 1709337600},  # 2024-03-02 00:00:00 UTC
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    # The optimization should add conditions for both timestamps
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+        AND calls_merged.id >= '018df74e-99a0-7000-8000-000000000000'
+        AND calls_merged.id >= '018dfc74-f5a0-7000-8000-000000000000'
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) > {pb_0:UInt64}))
+            AND ((any(calls_merged.ended_at) > {pb_1:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": 1709251200, "pb_1": 1709337600, "pb_2": "project"},
+    )
+
+
+def test_datetime_optimization_invalid_field() -> None:
+    """Test that datetime optimization is not applied for non-timestamp fields."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "wb_user_id"},
+                    {"$literal": 1709251200},
+                ]
+            }
+        )
+    )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": "2025-03-01 00:00:00 UTC"},
+                ]
+            }
+        )
+    )
+
+    # The optimization should not be applied since wb_user_id is not a timestamp field
+    # and '2025-03-01 00:00:00 UTC' isn't a timestamp
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.wb_user_id) > {pb_0:UInt64}))
+            AND ((any(calls_merged.started_at) > {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
+    )
