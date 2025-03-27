@@ -165,12 +165,12 @@ export const buildPanelRunsWithStepper = (
         safeUpdateConfig({steps: newSteps});
       }
 
-      const currentStep = config?.currentStep ?? -1;
+      const configCurrentStep = config?.currentStep ?? -1;
       const shouldUpdateCurrentStep =
         hasStepsChanged ||
-        currentStep === undefined ||
-        currentStep < 0 ||
-        !newSteps.includes(currentStep);
+        configCurrentStep === undefined ||
+        configCurrentStep < 0 ||
+        !newSteps.includes(configCurrentStep);
 
       if (shouldUpdateCurrentStep) {
         safeUpdateConfig({currentStep: newSteps[0]});
