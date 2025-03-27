@@ -32,7 +32,11 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
 class TestRemoteHTTPTraceServer(unittest.TestCase):
     def setUp(self):
         self.trace_server_url = "http://example.com"
-        self.server = RemoteHTTPTraceServer(self.trace_server_url)
+        self.server = RemoteHTTPTraceServer(
+            username="testuser",
+            password="testpassword",
+            trace_server_url=self.trace_server_url
+        )
 
     def test_ok(self):
         call_id = generate_id()

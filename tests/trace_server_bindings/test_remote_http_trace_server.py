@@ -64,7 +64,12 @@ def success_response():
 
 @pytest.fixture
 def server(request):
-    _server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    _server = RemoteHTTPTraceServer(
+        username="testuser",
+        password="testpassword",
+        trace_server_url="http://example.com",
+        should_batch=True
+    )
 
     if request.param == "normal":
         _server._send_batch_to_server = MagicMock()
@@ -271,7 +276,12 @@ def test_non_uniform_batch_items(server):
 @patch("weave.trace_server.requests.post")
 def test_timeout_retry_mechanism(mock_post, success_response):
     """Test that timeouts trigger the retry mechanism."""
-    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer(
+        username="testuser",
+        password="testpassword",
+        trace_server_url="http://example.com",
+        should_batch=True
+    )
 
     # Mock server to raise errors twice, then succeed
     mock_post.side_effect = [
@@ -321,7 +331,12 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     ]
 
     # Create a new server since the old one has shutdown its batch processor
-    server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
+    server = RemoteHTTPTraceServer(
+        username="testuser",
+        password="testpassword",
+        trace_server_url="http://example.com",
+        should_batch=False
+    )
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
         stop=tenacity.stop_after_attempt(2),
