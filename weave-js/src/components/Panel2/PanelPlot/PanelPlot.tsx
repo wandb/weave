@@ -23,7 +23,7 @@ import * as TableType from '../PanelTable/tableType';
 import {getColumnVariables, useAutomatedTableState} from '../PanelTable/util';
 import {useConfig} from './config';
 import {ConfigDimComponent} from './ConfigDimComponent';
-import {PanelPlot2ContextWrapper, PanelPlot2Inner} from './PanelPlot2Inner';
+import {PanelPlot2ContextWrapper} from './PanelPlot2Inner';
 import * as PlotState from './plotState';
 import {isValidConfig} from './plotState';
 import {ScaleConfigOption} from './ScaleConfigOption';
