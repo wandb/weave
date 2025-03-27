@@ -8,6 +8,7 @@ interface ResizableDrawerProps
   title?: React.ReactNode;
   headerContent?: React.ReactNode;
   setWidth?: (width: number) => void;
+  marginTop?: number;
 }
 
 export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
@@ -17,6 +18,7 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
   headerContent,
   onClose,
   setWidth: externalSetWidth,
+  marginTop = 60,
   ...drawerProps
 }) => {
   const [internalWidth, setInternalWidth] = useState(defaultWidth);
@@ -95,13 +97,13 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
       onClose={onClose}
       sx={{
         '& .MuiDrawer-paper': {
-          mt: '60px',
+          mt: `${marginTop}px`,
           width: `${internalWidth}px`,
           position: 'fixed',
           maxWidth: `${maxAllowedWidth}px`,
           minWidth: '500px',
-          maxHeight: 'calc(100vh - 60px)',
-          height: 'calc(100vh - 60px)',
+          maxHeight: `calc(100vh - ${marginTop}px)`,
+          height: `calc(100vh - ${marginTop}px)`,
         },
       }}>
       <Box
