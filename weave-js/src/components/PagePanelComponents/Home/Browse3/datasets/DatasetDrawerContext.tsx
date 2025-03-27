@@ -17,7 +17,6 @@ import {
   CallData,
   createProcessedRowsMap,
   FieldMapping,
-  filterRowsForNewDataset,
   inferSchema,
   mapCallsToDatasetRows,
   suggestFieldMappings,
@@ -107,7 +106,13 @@ export type DatasetDrawerAction =
   | {type: typeof ACTION_TYPES.RESET_EDIT_STATE; payload?: undefined}
   | {type: typeof ACTION_TYPES.RESET_DRAWER_STATE; payload?: undefined}
   | {type: typeof ACTION_TYPES.SET_PROCESSED_ROWS; payload: Map<string, any>}
-  | {type: typeof ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR; payload?: undefined}
+  | {
+      type: typeof ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR;
+      payload?: {
+        selectedCalls: CallData[];
+        setAddedRows?: (rows: Map<string, any>) => void;
+      };
+    }
   | {type: typeof ACTION_TYPES.SET_USER_MODIFIED_MAPPINGS; payload: boolean};
 
 // Initial state
@@ -130,67 +135,6 @@ const initialState: DatasetDrawerState = {
   isCreating: false,
   error: null,
 };
-
-/**
- * Processes rows for the editor when transitioning from step 1 to step 2.
- *
- * @param state - Current state of the dataset drawer
- * @param currentCalls - Array of call data to process
- * @param setAddedRows - Callback to update rows in the editor
- * @returns Object containing processed rows map and success status
- */
-function processRowsForStep2(
-  state: DatasetDrawerState,
-  currentCalls: any[],
-  setAddedRows?: (rows: Map<string, any>) => void
-): {processedRows: Map<string, any>; success: boolean} {
-  try {
-    const callsToProcess = (currentCalls as CallData[]) || [];
-    const isNewDataset = state.selectedDataset === null;
-    const {fieldMappings = [], datasetObject} = state;
-
-    if (
-      !Array.isArray(callsToProcess) ||
-      !Array.isArray(fieldMappings) ||
-      callsToProcess.length === 0 ||
-      fieldMappings.length === 0
-    ) {
-      return {processedRows: new Map(), success: false};
-    }
-
-    // Process the rows using existing logic
-    let mappedRows = [];
-    try {
-      mappedRows = mapCallsToDatasetRows(callsToProcess, fieldMappings);
-    } catch (error) {
-      console.error('Error mapping calls to rows:', error);
-      return {processedRows: new Map(), success: false};
-    }
-
-    // Apply filtering for new datasets
-    if (isNewDataset) {
-      const targetFields = new Set(fieldMappings.map(m => m.targetField));
-      mappedRows = filterRowsForNewDataset(mappedRows, targetFields);
-    }
-
-    // Process rows with schema-based filtering
-    const processedRowsMap = createProcessedRowsMap(mappedRows, datasetObject);
-
-    // If setAddedRows is provided, use it to update the editor directly
-    if (setAddedRows) {
-      try {
-        setAddedRows(processedRowsMap);
-      } catch (error) {
-        console.error('Error setting added rows:', error);
-      }
-    }
-
-    return {processedRows: processedRowsMap, success: true};
-  } catch (error) {
-    console.error('Error processing rows during step transition:', error);
-    return {processedRows: new Map(), success: false};
-  }
-}
 
 /**
  * Handles the transition from step 2 (editing) back to step 1 (mapping).
@@ -221,52 +165,26 @@ function handleTransitionToStep1(
  * @param newStep - The step number to transition to
  * @param currentStep - The current step number
  * @param setAddedRows - Optional callback to update rows in the editor
- * @param currentCalls - Array of call data to process
  * @returns Updated state after the step transition
  */
 function handleStepTransition(
   state: DatasetDrawerState,
   newStep: number,
   currentStep: number,
-  setAddedRows?: (rows: Map<string, any>) => void,
-  currentCalls?: any[]
+  setAddedRows?: (rows: Map<string, any>) => void
 ): DatasetDrawerState {
-  // Going from step 1 to step 2 (mapping to editing)
+  // Handle step transition from 1 to 2 specifically
   if (currentStep === 1 && newStep === 2) {
-    const shouldProcessRows = state.addedRowsDirty && currentCalls;
-
-    if (shouldProcessRows) {
-      const {processedRows, success} = processRowsForStep2(
-        state,
-        currentCalls,
-        setAddedRows
-      );
-
-      if (success) {
-        return {
-          ...state,
-          currentStep: newStep,
-          addedRowsDirty: false, // Reset dirty flag after processing
-          processedRows,
-        };
-      } else {
-        return {
-          ...state,
-          currentStep: newStep,
-          addedRowsDirty: false, // Reset dirty flag
-        };
-      }
-    }
-
-    // If mappings weren't modified, just change the step
+    // The main processing is now done in the AddToDatasetDrawer component
+    // Return the updated state with the new current step
     return {
       ...state,
       currentStep: newStep,
-      addedRowsDirty: false, // Reset dirty flag
+      addedRowsDirty: false, // Reset the dirty flag when moving to step 2
     };
   }
 
-  // Going from step 2 back to step 1 (editing to mapping)
+  // Handle step transition from 2 to 1
   if (currentStep === 2 && newStep === 1) {
     return handleTransitionToStep1(state);
   }
@@ -275,11 +193,10 @@ function handleStepTransition(
   return {...state, currentStep: newStep};
 }
 
-// Reducer function with additional parameters
+// Reducer function without additional parameters
 function datasetDrawerReducer(
   state: DatasetDrawerState,
-  action: DatasetDrawerAction,
-  currentCalls?: any[] // Add parameter to access the calls when needed
+  action: DatasetDrawerAction
 ): DatasetDrawerState {
   switch (action.type) {
     case ACTION_TYPES.SET_CURRENT_STEP: {
@@ -289,13 +206,7 @@ function datasetDrawerReducer(
       const setAddedRows = action.payload.setAddedRows;
 
       // Use the helper function to handle the step transition
-      return handleStepTransition(
-        state,
-        newStep,
-        currentStep,
-        setAddedRows,
-        currentCalls
-      );
+      return handleStepTransition(state, newStep, currentStep, setAddedRows);
     }
 
     case ACTION_TYPES.SET_DATASETS:
@@ -393,9 +304,60 @@ function datasetDrawerReducer(
       return {...state, processedRows: action.payload};
 
     case ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR: {
-      // This action no longer needs to process rows immediately
-      // since processing now happens during step transition
-      return state;
+      if (
+        !action.payload?.selectedCalls ||
+        action.payload.selectedCalls.length === 0
+      ) {
+        return state;
+      }
+
+      const {selectedCalls, setAddedRows} = action.payload;
+      const isNewDataset = state.selectedDataset === null;
+
+      try {
+        // Map calls to dataset rows
+        let mappedRows = mapCallsToDatasetRows(
+          selectedCalls,
+          state.fieldMappings
+        );
+
+        // Apply filtering for new datasets
+        if (isNewDataset) {
+          const targetFields = new Set(
+            state.fieldMappings.map(m => m.targetField)
+          );
+          mappedRows = mappedRows.map(row => {
+            const {___weave, ...rest} = row;
+            const filteredData = Object.fromEntries(
+              Object.entries(rest).filter(([key]) => targetFields.has(key))
+            );
+            return {
+              ___weave,
+              ...filteredData,
+            };
+          });
+        }
+
+        // Process rows with schema-based filtering
+        const processedRowsMap = createProcessedRowsMap(
+          mappedRows,
+          state.datasetObject
+        );
+
+        // Update the editor with the processed rows
+        if (setAddedRows) {
+          setAddedRows(processedRowsMap);
+        }
+
+        return {
+          ...state,
+          processedRows: processedRowsMap,
+          addedRowsDirty: false,
+        };
+      } catch (error) {
+        console.error('Error processing rows for editor:', error);
+        return state;
+      }
     }
 
     case ACTION_TYPES.RESET_EDIT_STATE:
@@ -428,7 +390,7 @@ interface DatasetDrawerContextType {
   resetDrawerState: () => void;
   handleNext: () => void;
   handleBack: () => void;
-  processRowsForEditor: () => void;
+  processRowsForEditor: (selectedCalls: CallData[]) => void;
   resetEditState: () => void;
 
   // Row computation
@@ -452,7 +414,7 @@ const DatasetDrawerContext = createContext<
 // Provider component
 interface DatasetDrawerProviderProps {
   children: ReactNode;
-  selectedCalls: any[];
+  selectedCallIds: string[];
   onClose: () => void;
   entity: string;
   project: string;
@@ -461,7 +423,7 @@ interface DatasetDrawerProviderProps {
 // Wrapper component that provides both contexts
 export const DatasetDrawerProvider: React.FC<DatasetDrawerProviderProps> = ({
   children,
-  selectedCalls,
+  selectedCallIds,
   onClose,
   entity,
   project,
@@ -469,7 +431,7 @@ export const DatasetDrawerProvider: React.FC<DatasetDrawerProviderProps> = ({
   return (
     <DatasetEditProvider>
       <DatasetDrawerProviderInner
-        selectedCalls={selectedCalls}
+        selectedCallIds={selectedCallIds}
         onClose={onClose}
         entity={entity}
         project={project}>
@@ -482,7 +444,7 @@ export const DatasetDrawerProvider: React.FC<DatasetDrawerProviderProps> = ({
 // Inner provider that has access to the editor context
 const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
   children,
-  selectedCalls,
+  selectedCallIds,
   onClose,
   entity,
   project,
@@ -491,12 +453,12 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
   const editorContext = useDatasetEditContext();
   const {setAddedRows, resetEditState: resetEditorState} = editorContext;
 
-  // Custom reducer that passes additional parameters
+  // Custom reducer that passes additional parameters - we no longer need to pass selectedCalls
   const wrappedReducer = useCallback(
     (drawerState: DatasetDrawerState, action: DatasetDrawerAction) => {
-      return datasetDrawerReducer(drawerState, action, selectedCalls);
+      return datasetDrawerReducer(drawerState, action);
     },
-    [selectedCalls]
+    []
   );
 
   const [state, dispatch] = useReducer(wrappedReducer, initialState);
@@ -703,9 +665,18 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
   }, [state.currentStep, setCurrentStep]);
 
   // Add processing rows for editor
-  const processRowsForEditor = useCallback(() => {
-    dispatch({type: ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR});
-  }, []);
+  const processRowsForEditor = useCallback(
+    (selectedCalls: CallData[]) => {
+      dispatch({
+        type: ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR,
+        payload: {
+          selectedCalls,
+          setAddedRows,
+        },
+      });
+    },
+    [dispatch, setAddedRows]
+  );
 
   // Add reset edit state - now uses both contexts
   const resetEditState = useCallback(() => {

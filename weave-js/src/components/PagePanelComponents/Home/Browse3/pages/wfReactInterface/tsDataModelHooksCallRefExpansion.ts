@@ -20,7 +20,10 @@ export const EXPANDED_REF_REF_KEY = '__ref__';
 export const EXPANDED_REF_VAL_KEY = '__val__';
 export const useClientSideCallRefExpansion = (
   calls: Loadable<CallSchema[]>,
-  expandedRefColumns?: Set<string>
+  expandedRefColumns?: Set<string>,
+  options?: {
+    recursiveUnwrap?: boolean;
+  }
 ) => {
   const getTsClient = useGetTraceServerClientContext();
   const [expandedCalls, setExpandedCalls] = useState<
@@ -47,7 +50,8 @@ export const useClientSideCallRefExpansion = (
     doExpansionIteration(
       callResultStart.map(c => c.traceCall!),
       expandedRefColumns ?? new Set<string>(),
-      getTsClient()
+      getTsClient(),
+      options?.recursiveUnwrap ?? false
     ).then(innerExpandedCalls => {
       if (calls.result === callResultStart && mounted) {
         setExpandedCalls(innerExpandedCalls);
@@ -58,7 +62,14 @@ export const useClientSideCallRefExpansion = (
     return () => {
       mounted = false;
     };
-  }, [calls, calls.loading, calls.result, expandedRefColumns, getTsClient]);
+  }, [
+    calls,
+    calls.loading,
+    calls.result,
+    expandedRefColumns,
+    getTsClient,
+    options?.recursiveUnwrap,
+  ]);
 
   return useMemo(() => {
     return {
@@ -71,15 +82,68 @@ export const useClientSideCallRefExpansion = (
 const doExpansionIteration = async (
   traceCalls: traceServerClientTypes.TraceCallSchema[],
   expandedRefColumns: Set<string>,
-  client: traceServerClient.TraceServerClient
+  client: traceServerClient.TraceServerClient,
+  recursiveUnwrap: boolean = false,
+  iterationCount: number = 0,
+  maxIterations: number = 10
 ): Promise<traceServerClientTypes.TraceCallSchema[]> => {
+  // Safety check to prevent infinite recursion
+  if (iterationCount >= maxIterations) {
+    return traceCalls;
+  }
+
   const refsNeeded = new Set<string>();
-  const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
-  traceCalls.forEach(call => {
-    expandedRefColumnsList.forEach(col => {
-      const colParts = col.split('.');
-      let value: any = call;
-      for (const part of colParts) {
+
+  if (recursiveUnwrap) {
+    // Recursively find all references in specified columns/paths
+    const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+
+    traceCalls.forEach(call => {
+      expandedRefColumnsList.forEach(column => {
+        // Get the value at the specified column path
+        const parts = column.split('.');
+        let value: any = call;
+
+        // Navigate to the column
+        for (const part of parts) {
+          if (value == null || typeof value !== 'object') {
+            value = undefined;
+            break;
+          }
+          // Use bracket notation with any type to bypass TypeScript's index signature check
+          value = value[part as keyof typeof value];
+        }
+
+        // If we found a value at this path, recursively find all refs in it
+        if (value !== undefined) {
+          findAllRefsRecursively(value, refsNeeded);
+        }
+      });
+    });
+  } else {
+    // Original implementation: only look at specified columns
+    const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+    traceCalls.forEach(call => {
+      expandedRefColumnsList.forEach(col => {
+        const colParts = col.split('.');
+        let value: any = call;
+        for (const part of colParts) {
+          while (
+            typeof value === 'object' &&
+            value != null &&
+            EXPANDED_REF_VAL_KEY in value
+          ) {
+            value = value[EXPANDED_REF_VAL_KEY];
+          }
+          if (value == null) {
+            break;
+          }
+          if (typeof value !== 'object' || !(part in value)) {
+            value = null;
+            break;
+          }
+          value = value[part];
+        }
         while (
           typeof value === 'object' &&
           value != null &&
@@ -87,27 +151,12 @@ const doExpansionIteration = async (
         ) {
           value = value[EXPANDED_REF_VAL_KEY];
         }
-        if (value == null) {
-          break;
+        if (isExpandableRef(value)) {
+          refsNeeded.add(value);
         }
-        if (typeof value !== 'object' || !(part in value)) {
-          value = null;
-          break;
-        }
-        value = value[part];
-      }
-      while (
-        typeof value === 'object' &&
-        value != null &&
-        EXPANDED_REF_VAL_KEY in value
-      ) {
-        value = value[EXPANDED_REF_VAL_KEY];
-      }
-      if (isExpandableRef(value)) {
-        refsNeeded.add(value);
-      }
+      });
     });
-  });
+  }
 
   const refsNeededArray = Array.from(refsNeeded);
 
@@ -115,54 +164,268 @@ const doExpansionIteration = async (
     return traceCalls;
   }
 
-  const refsData = await directFetchRefsData(refsNeededArray, client);
-  const refsDataMap = new Map<string, any>();
-  refsNeededArray.forEach((ref, i) => {
-    refsDataMap.set(ref, refsData[i]);
-  });
-
-  const expandedTraceCalls = traceCalls.map(call => {
-    call = _.cloneDeep(call);
-    expandedRefColumnsList.forEach(col => {
-      const colParts = col.split('.');
-      let value: any = call;
-      const path: string[] = [];
-      for (const part of colParts) {
-        while (
-          typeof value === 'object' &&
-          value != null &&
-          EXPANDED_REF_VAL_KEY in value
-        ) {
-          value = value[EXPANDED_REF_VAL_KEY];
-          path.push(EXPANDED_REF_VAL_KEY);
-        }
-        if (value == null) {
-          break;
-        }
-        if (typeof value !== 'object' || !(part in value)) {
-          value = null;
-          break;
-        }
-        value = value[part];
-        path.push(part);
-      }
-      while (
-        typeof value === 'object' &&
-        value != null &&
-        EXPANDED_REF_VAL_KEY in value
-      ) {
-        value = value[EXPANDED_REF_VAL_KEY];
-        path.push(EXPANDED_REF_VAL_KEY);
-      }
-      if (isWeaveRef(value) && refsDataMap.has(value)) {
-        const refObj = refsDataMap.get(value);
-        _.set(call, path, makeRefExpandedPayload(value, refObj));
-      }
+  try {
+    const refsData = await directFetchRefsData(refsNeededArray, client);
+    const refsDataMap = new Map<string, any>();
+    refsNeededArray.forEach((ref, i) => {
+      refsDataMap.set(ref, refsData[i]);
     });
-    return call;
-  });
 
-  return doExpansionIteration(expandedTraceCalls, expandedRefColumns, client);
+    const expandedTraceCalls = traceCalls.map(call => {
+      call = _.cloneDeep(call);
+
+      if (recursiveUnwrap) {
+        // Recursively replace all references, but only in specified paths
+        const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+
+        expandedRefColumnsList.forEach(column => {
+          // Navigate to the column path
+          const parts = column.split('.');
+          let target: any = call;
+          let parent: any = null;
+
+          // Find the parent object that contains the target field
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (target == null || typeof target !== 'object') {
+              target = undefined;
+              break;
+            }
+
+            if (i === parts.length - 1) {
+              parent = target;
+            }
+
+            target = target[part as keyof typeof target];
+          }
+
+          // If we found the path, recursively replace refs in it
+          if (target !== undefined && parent !== null) {
+            // Replace refs in the target value
+            replaceAllRefsRecursively(target, refsDataMap);
+          }
+        });
+      } else {
+        // Original implementation: only replace refs in specified columns
+        const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+        expandedRefColumnsList.forEach(col => {
+          const colParts = col.split('.');
+          let value: any = call;
+          const path: string[] = [];
+          for (const part of colParts) {
+            while (
+              typeof value === 'object' &&
+              value != null &&
+              EXPANDED_REF_VAL_KEY in value
+            ) {
+              value = value[EXPANDED_REF_VAL_KEY];
+              path.push(EXPANDED_REF_VAL_KEY);
+            }
+            if (value == null) {
+              break;
+            }
+            if (typeof value !== 'object' || !(part in value)) {
+              value = null;
+              break;
+            }
+            value = value[part];
+            path.push(part);
+          }
+          while (
+            typeof value === 'object' &&
+            value != null &&
+            EXPANDED_REF_VAL_KEY in value
+          ) {
+            value = value[EXPANDED_REF_VAL_KEY];
+            path.push(EXPANDED_REF_VAL_KEY);
+          }
+          if (isWeaveRef(value) && refsDataMap.has(value)) {
+            const refObj = refsDataMap.get(value);
+            _.set(call, path, makeRefExpandedPayload(value, refObj));
+          }
+        });
+      }
+
+      return call;
+    });
+
+    return doExpansionIteration(
+      expandedTraceCalls,
+      expandedRefColumns,
+      client,
+      recursiveUnwrap,
+      iterationCount + 1,
+      maxIterations
+    );
+  } catch (error) {
+    // Return the calls as they are if an error occurs
+    return traceCalls;
+  }
+};
+
+/**
+ * Recursively finds all expandable references in an object
+ * @param obj The object to search
+ * @param refsNeeded Set to collect found references
+ * @param visited Set of objects already visited to prevent circular reference issues
+ * @param depth Current recursion depth
+ * @param maxDepth Maximum recursion depth to prevent stack overflow
+ */
+const findAllRefsRecursively = (
+  obj: any,
+  refsNeeded: Set<string>,
+  visited: Set<any> = new Set(),
+  depth: number = 0,
+  maxDepth: number = 50
+): void => {
+  // Prevent excessive recursion
+  if (depth > maxDepth) {
+    return;
+  }
+
+  // Base case: null or primitive value
+  if (!obj || typeof obj !== 'object') {
+    if (isExpandableRef(obj)) {
+      refsNeeded.add(obj);
+    }
+    return;
+  }
+
+  // Prevent circular references
+  if (visited.has(obj)) {
+    return;
+  }
+  visited.add(obj);
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      findAllRefsRecursively(item, refsNeeded, visited, depth + 1, maxDepth);
+    }
+    return;
+  }
+
+  // Handle objects
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      // If we find a value that's already a reference with a __val__
+      if (
+        key === EXPANDED_REF_REF_KEY &&
+        EXPANDED_REF_VAL_KEY in obj &&
+        isExpandableRef(obj[EXPANDED_REF_REF_KEY])
+      ) {
+        // Make sure the ref is added
+        refsNeeded.add(obj[EXPANDED_REF_REF_KEY]);
+        // Continue recursively with the __val__ part
+        findAllRefsRecursively(
+          obj[EXPANDED_REF_VAL_KEY],
+          refsNeeded,
+          visited,
+          depth + 1,
+          maxDepth
+        );
+      } else {
+        // Regular property
+        const value = obj[key];
+        if (isExpandableRef(value)) {
+          refsNeeded.add(value);
+        } else if (typeof value === 'object' && value !== null) {
+          findAllRefsRecursively(
+            value,
+            refsNeeded,
+            visited,
+            depth + 1,
+            maxDepth
+          );
+        }
+      }
+    }
+  }
+};
+
+/**
+ * Recursively replaces all references in an object with their expanded values
+ * @param obj The object to process
+ * @param refsDataMap Map of reference URIs to their resolved values
+ * @param visited Set of objects already visited to prevent circular reference issues
+ * @param depth Current recursion depth
+ * @param maxDepth Maximum recursion depth to prevent stack overflow
+ */
+const replaceAllRefsRecursively = (
+  obj: any,
+  refsDataMap: Map<string, any>,
+  visited: Set<any> = new Set(),
+  depth: number = 0,
+  maxDepth: number = 50
+): void => {
+  // Prevent excessive recursion
+  if (depth > maxDepth) {
+    return;
+  }
+
+  // Base case: null or primitive value
+  if (!obj || typeof obj !== 'object') {
+    return;
+  }
+
+  // Prevent circular references
+  if (visited.has(obj)) {
+    return;
+  }
+  visited.add(obj);
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const item = obj[i];
+
+      if (isExpandableRef(item) && refsDataMap.has(item)) {
+        // Replace the string reference with an expanded reference object
+        obj[i] = makeRefExpandedPayload(item, refsDataMap.get(item));
+      } else if (typeof item === 'object' && item !== null) {
+        replaceAllRefsRecursively(
+          item,
+          refsDataMap,
+          visited,
+          depth + 1,
+          maxDepth
+        );
+      }
+    }
+    return;
+  }
+
+  // Handle objects
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+
+      // If this is already an expanded reference, recurse into its __val__ part
+      if (key === EXPANDED_REF_REF_KEY && EXPANDED_REF_VAL_KEY in obj) {
+        replaceAllRefsRecursively(
+          obj[EXPANDED_REF_VAL_KEY],
+          refsDataMap,
+          visited,
+          depth + 1,
+          maxDepth
+        );
+      }
+      // Handle string references
+      else if (isExpandableRef(value) && refsDataMap.has(value)) {
+        obj[key] = makeRefExpandedPayload(value, refsDataMap.get(value));
+      }
+      // Recurse into nested objects
+      else if (typeof value === 'object' && value !== null) {
+        replaceAllRefsRecursively(
+          value,
+          refsDataMap,
+          visited,
+          depth + 1,
+          maxDepth
+        );
+      }
+    }
+  }
 };
 
 export type ExpandedRefWithValue<T = any> = {
