@@ -54,7 +54,7 @@ dependencies = [
   #    weave_server_sdk==0.0.1
 
   # TODO: Uncomment when ready to commit to the new bindings.
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@d73db02635ef874c9511b3905c7b4a2de544bd3a",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@80aafaeede36a50a412432340a14619b238c7bfe",
 ]
 
 [project.optional-dependencies]
