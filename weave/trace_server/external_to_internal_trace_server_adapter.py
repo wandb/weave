@@ -107,6 +107,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_start, req)
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return self._ref_apply(self._internal_trace_server.call_start_batch, req)
+
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return self._ref_apply(self._internal_trace_server.call_end, req)
