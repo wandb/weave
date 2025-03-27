@@ -54,10 +54,11 @@ export const MessagePanelPart = ({
     };
     return <ToolCalls toolCalls={[toolCall]} />;
   }
-  console.log('value', value);
+
   if (value.type === 'tool_result' && 'content' in value) {
+    // value.content can be a string or an array of content blocks
     const contentArray = Array.isArray(value.content) ? value.content : [value.content];
-    return contentArray.map((content) => {
+    return <>{contentArray.map((content) => {
       const stringContent = _.isObject(content) && "text" in content ? content.text : content;
       try {
         const jsonContent = JSON.stringify(
@@ -69,7 +70,7 @@ export const MessagePanelPart = ({
       } catch (error) {
         return <span className="whitespace-break-spaces">{stringContent}</span>;
       }
-    });
+    })}</>;
   }
   return null;
 };
