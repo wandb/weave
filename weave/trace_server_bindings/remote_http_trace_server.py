@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import cast
+from typing import Union, cast
 
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
@@ -32,7 +32,7 @@ class EndBatchItem(BaseModel):
     req: tsi.CallEndReq
 
 
-BatchItem = StartBatchItem | EndBatchItem
+BatchItem = Union[StartBatchItem, EndBatchItem]
 
 
 class Batch(BaseModel):
