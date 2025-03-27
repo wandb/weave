@@ -45,9 +45,9 @@ import {weavePythonPanelSpecs} from './PanelRegistryWeavePython';
 // converters
 import {Spec as RowSpec} from './PanelRow';
 import {Spec as RunColorSpec} from './PanelRunColor';
-import {Spec as PanelRunHistoryTablesStepperSpec} from './PanelRunHistoryTablesStepper';
 import {Spec as RunOverviewSpec} from './PanelRunOverview';
 import {Spec as PanelRunsTableSpec} from './PanelRunsTable';
+import {Spec as PanelRunHistoryTablesStepperSpec} from './PanelRunsWithStepper/HistoryTables';
 import {Spec as SavedModelSpec} from './PanelSavedModel';
 import {Spec as StringSpec} from './PanelString';
 import {Spec as StringCompare} from './PanelStringCompare';
