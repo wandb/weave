@@ -26,6 +26,7 @@ Outstanding Optimizations/Work:
 
 """
 
+import datetime
 import logging
 import re
 from typing import Callable, Literal, Optional, cast
@@ -47,6 +48,9 @@ from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+
+# Buffer time for datetime optimization to ensure we don't miss records
+DATETIME_OPTIMIZATION_BUFFER = datetime.timedelta(minutes=1)
 
 logger = logging.getLogger(__name__)
 
@@ -656,6 +660,11 @@ class CallsQuery(BaseModel):
             pb, table_alias, self.query_conditions
         )
 
+        # Add datetime optimization based on UUIDv7 timestamp
+        datetime_optimization_sql = _create_datetime_optimization_sql(
+            self.query_conditions, pb, table_alias
+        )
+
         order_by_sql = ""
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
@@ -707,6 +716,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {datetime_optimization_sql}
         {call_parts_predicate_filters_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
@@ -1265,6 +1275,87 @@ def _create_like_optimized_in_condition(
         like_conditions.append(like_condition)
 
     return "(" + " OR ".join(like_conditions) + ")"
+
+
+def _create_datetime_optimization_sql(
+    conditions: list[Condition],
+    pb: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Creates SQL for datetime optimization using UUIDv7 timestamp filtering.
+
+    This optimization takes advantage of the fact that UUIDv7 includes a timestamp
+    in the first 48 bits. For date range filters, we can create a pre-filter
+    condition that checks if the ID falls within the expected UUIDv7 range
+    for the given date range.
+
+    We include a buffer time (DATETIME_OPTIMIZATION_BUFFER) to ensure we don't
+    miss records due to slight timing differences.
+    """
+    datetime_conditions: list[str] = []
+
+    for condition in conditions:
+        # Track if this is a NOT operation and get the actual operand
+        is_not = isinstance(condition.operand, tsi_query.NotOperation)
+        operand = condition.operand.not_[0] if is_not else condition.operand
+
+        # Only handle GtOperation
+        if not isinstance(operand, tsi_query.GtOperation):
+            continue
+
+        # Check if this is a date comparison
+        if not isinstance(operand.gt_[0], tsi_query.GetFieldOperator):
+            continue
+
+        field = operand.gt_[0].get_field_
+        if field not in ("started_at", "ended_at"):
+            continue
+
+        # Get the timestamp value
+        if not isinstance(operand.gt_[1], tsi_query.LiteralOperation):
+            continue
+
+        if not isinstance(operand.gt_[1].literal_, int):
+            continue
+
+        timestamp = datetime.datetime.fromtimestamp(operand.gt_[1].literal_)
+
+        # Time buffer to be more inclusive
+        if not is_not:
+            timestamp = timestamp - DATETIME_OPTIMIZATION_BUFFER
+        else:
+            timestamp = timestamp + DATETIME_OPTIMIZATION_BUFFER
+
+        # Create UUIDv7-like string for the timestamp
+        # UUIDv7 format: timestamp (48 bits) | version (4 bits) | variant (2 bits) | random (74 bits)
+        # Format: 8-4-4-4-12 hex digits
+        timestamp_ms = int(timestamp.timestamp() * 1000)
+        # First 8 hex digits (32 bits) of timestamp
+        time_high = f"{timestamp_ms >> 32:08x}"
+        # Next 4 hex digits (16 bits) of timestamp
+        time_low = f"{(timestamp_ms & 0xFFFF0000) >> 16:04x}"
+        # Version (7) and next 2 bits of timestamp
+        version = "7"
+        time_mid = f"{(timestamp_ms & 0x0000F000) >> 12:01x}"
+        # Variant (1) and remaining bits of timestamp
+        variant = "8"
+        time_low = f"{(timestamp_ms & 0x00000FFF):03x}"
+
+        # Construct UUID string in format: 8-4-4-4-12
+        uuid_prefix = (
+            f"{time_high}-{time_low}{version}{time_mid}-{variant}000-0000-000000000000"
+        )
+
+        # Determine the comparison operator based on whether this is a NOT operation
+        comparison_op = "<" if is_not else ">="
+
+        # Add the condition
+        datetime_conditions.append(f"{table_alias}.id {comparison_op} '{uuid_prefix}'")
+
+    if not datetime_conditions:
+        return ""
+
+    return "AND " + " AND ".join(datetime_conditions)
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
