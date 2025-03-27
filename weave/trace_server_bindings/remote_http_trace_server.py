@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Union, cast
+from typing import cast
 
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
@@ -32,8 +32,11 @@ class EndBatchItem(BaseModel):
     req: tsi.CallEndReq
 
 
+BatchItem = StartBatchItem | EndBatchItem
+
+
 class Batch(BaseModel):
-    batch: list[Union[StartBatchItem, EndBatchItem]]
+    batch: list[BatchItem]
 
 
 class ServerInfoRes(BaseModel):
@@ -93,7 +96,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[BatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:

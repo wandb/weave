@@ -35,7 +35,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         self.server = RemoteHTTPTraceServer(
             username="testuser",
             password="testpassword",
-            trace_server_url=self.trace_server_url
+            trace_server_url=self.trace_server_url,
         )
 
     def test_ok(self):

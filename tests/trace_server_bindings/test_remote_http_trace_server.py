@@ -68,7 +68,7 @@ def server(request):
         username="testuser",
         password="testpassword",
         trace_server_url="http://example.com",
-        should_batch=True
+        should_batch=True,
     )
 
     if request.param == "normal":
@@ -280,7 +280,7 @@ def test_timeout_retry_mechanism(mock_post, success_response):
         username="testuser",
         password="testpassword",
         trace_server_url="http://example.com",
-        should_batch=True
+        should_batch=True,
     )
 
     # Mock server to raise errors twice, then succeed
@@ -335,7 +335,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
         username="testuser",
         password="testpassword",
         trace_server_url="http://example.com",
-        should_batch=False
+        should_batch=False,
     )
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),

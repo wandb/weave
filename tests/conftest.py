@@ -581,7 +581,7 @@ def create_client(
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url="http://testing",
             username="testuser",
-            password="testpassword"
+            password="testpassword",
         )
         server = remote_server
     elif weave_server_flag == ("prod"):
