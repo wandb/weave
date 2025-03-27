@@ -53,8 +53,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     # My current batching is not safe in notebooks, disable it for now
     def __init__(
         self,
-        username: str,
-        password: str | None,
+        api_key: str,
         trace_server_url: str,
         should_batch: bool = False,
         *,
@@ -72,8 +71,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
         self.stainless_client = WeaveTrace(
-            username=username,
-            password=password,
+            api_key=api_key,
             base_url=self.trace_server_url,
         )
 
@@ -87,12 +85,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @classmethod
-    def from_env(
-        cls, entity_name: str, api_key: str | None = None, should_batch: bool = False
-    ) -> Self:
+    def from_env(cls, api_key: str, should_batch: bool = False) -> Self:
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
-        return cls(entity_name, api_key, weave_trace_server_url(), should_batch)
+        return cls(
+            api_key=api_key,
+            trace_server_url=weave_trace_server_url(),
+            should_batch=should_batch,
+        )
 
     def _flush_calls(
         self,

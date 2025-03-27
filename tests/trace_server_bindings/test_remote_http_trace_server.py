@@ -65,9 +65,8 @@ def success_response():
 @pytest.fixture
 def server(request):
     _server = RemoteHTTPTraceServer(
-        username="testuser",
-        password="testpassword",
         trace_server_url="http://example.com",
+        api_key="test123",
         should_batch=True,
     )
 
@@ -277,9 +276,8 @@ def test_non_uniform_batch_items(server):
 def test_timeout_retry_mechanism(mock_post, success_response):
     """Test that timeouts trigger the retry mechanism."""
     server = RemoteHTTPTraceServer(
-        username="testuser",
-        password="testpassword",
         trace_server_url="http://example.com",
+        api_key="test123",
         should_batch=True,
     )
 
@@ -332,9 +330,8 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
 
     # Create a new server since the old one has shutdown its batch processor
     server = RemoteHTTPTraceServer(
-        username="testuser",
-        password="testpassword",
         trace_server_url="http://example.com",
+        api_key="test123",
         should_batch=False,
     )
     fast_retry = tenacity.retry(

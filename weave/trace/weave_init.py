@@ -109,7 +109,12 @@ def init_weave(
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
 
-    remote_server = init_weave_get_server(entity_name, api_key)
+    if api_key is None:
+        raise WeaveWandbAuthenticationException(
+            "No API key found. Please set `WANDB_API_KEY` or run `wandb login` to continue."
+        )
+
+    remote_server = init_weave_get_server(api_key=api_key)
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -179,9 +184,9 @@ def init_weave_disabled() -> InitializedClient:
         _current_inited_client.reset()
 
     client = weave_client.WeaveClient(
-        "DISABLED",
-        "DISABLED",
-        init_weave_get_server("DISABLED", "DISABLED", should_batch=False),
+        entity="DISABLED",
+        project="DISABLED",
+        server=init_weave_get_server(api_key="DISABLED", should_batch=False),
         ensure_project_exists=False,
     )
 
@@ -189,12 +194,10 @@ def init_weave_disabled() -> InitializedClient:
 
 
 def init_weave_get_server(
-    entity_name: str,
-    api_key: str | None = None,
+    api_key: str,
     should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
     return remote_http_trace_server.RemoteHTTPTraceServer.from_env(
-        entity_name=entity_name,
         api_key=api_key,
         should_batch=should_batch,
     )

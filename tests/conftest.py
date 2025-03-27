@@ -580,8 +580,7 @@ def create_client(
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url="http://testing",
-            username="testuser",
-            password="testpassword",
+            api_key="test123",
         )
         server = remote_server
     elif weave_server_flag == ("prod"):
@@ -725,8 +724,7 @@ def network_proxy_client(client):
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url="http://testing",
-            username="testuser",
-            password="testpassword",
+            api_key="test123",
         )
 
         # Replace the stainless client's HTTP client with our adapter
