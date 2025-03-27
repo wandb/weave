@@ -181,8 +181,8 @@ export const TimestampSmall = ({
   /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
-  const valueMoment = valueToMoment(value);
-  const {long, small} = formatTimestampInternal(valueMoment);
+  const localValueMoment = moment(value);
+  const {long, small} = formatTimestampInternal(localValueMoment);
   if (!small) {
     // default to regular timestamp, which expects utc
     return <Timestamp value={value} dropTimeWhenDefault />;
