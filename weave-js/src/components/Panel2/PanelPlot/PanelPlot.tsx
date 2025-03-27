@@ -23,7 +23,7 @@ import * as TableType from '../PanelTable/tableType';
 import {getColumnVariables, useAutomatedTableState} from '../PanelTable/util';
 import {useConfig} from './config';
 import {ConfigDimComponent} from './ConfigDimComponent';
-import {PanelPlot2Inner} from './PanelPlot2Inner';
+import {PanelPlot2ContextWrapper, PanelPlot2Inner} from './PanelPlot2Inner';
 import * as PlotState from './plotState';
 import {isValidConfig} from './plotState';
 import {ScaleConfigOption} from './ScaleConfigOption';
@@ -47,33 +47,37 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = <Panel2Loader />;
 
-  const {config} = useConfig(inputNode, newProps.config);
-
-  const weave = useWeaveContext();
-
-  const {tableState, autoTable} = useAutomatedTableState(
-    inputNode,
-    (config as any).tableState,
-    weave
-  );
-
-  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
-    return getColumnVariables(
-      (config as any).tableState ?? tableState ?? autoTable
-    );
-  }, [config, tableState, autoTable]);
-
   if (typedInputNodeUse.loading) {
     return loaderComp;
   } else if (typedInputNodeUse.result.nodeType === 'void') {
     return <></>;
   } else {
-    return (
-      <PanelContextProvider newVars={columnVariables}>
-        <PanelPlotConfigInner {...newProps} />
-      </PanelContextProvider>
-    );
+    return <PanelPlotConfigContextWrapper {...newProps} />;
   }
+};
+
+const PanelPlotConfigContextWrapper: React.FC<PanelPlotProps> = props => {
+  const {input} = props;
+  const {config} = useConfig(input, props.config);
+  const weave = useWeaveContext();
+
+  const {tableState, autoTable} = useAutomatedTableState(
+    input,
+    (config as any)?.tableState,
+    weave
+  );
+
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(
+      (props.config as any)?.tableState ?? tableState ?? autoTable
+    );
+  }, [props.config, tableState, autoTable]);
+
+  return (
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelPlotConfigInner {...props} />
+    </PanelContextProvider>
+  );
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
@@ -627,22 +631,6 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = useLoader();
 
-  const {config} = useConfig(inputNode, props.config);
-
-  const weave = useWeaveContext();
-
-  const {tableState, autoTable} = useAutomatedTableState(
-    inputNode,
-    (config as any).tableState,
-    weave
-  );
-
-  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
-    return getColumnVariables(
-      (config as any).tableState ?? tableState ?? autoTable
-    );
-  }, [config, tableState, autoTable]);
-
   if (typedInputNodeUse.loading) {
     return <div style={{height: '100%', width: '100%'}}>{loaderComp}</div>;
   } else if (typedInputNodeUse.result.nodeType === 'void') {
@@ -650,9 +638,7 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   } else {
     return (
       <div style={{height: '100%', width: '100%'}}>
-        <PanelContextProvider newVars={columnVariables}>
-          <PanelPlot2Inner {...newProps} />
-        </PanelContextProvider>
+        <PanelPlot2ContextWrapper {...newProps} />
       </div>
     );
   }
