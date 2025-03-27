@@ -1,0 +1,36 @@
+# =============================================
+# GENERATE_CONFIG.YAML TEMPLATE
+# =============================================
+# To use this template:
+# 1. Copy this file to generate_config.yaml
+# 2. Update the paths below with your local settings
+# 3. The generate_config.yaml file will be ignored by git
+# =============================================
+
+# ==============
+# CONFIGURE ONCE
+# ==============
+# Path to the Python package repository (required)
+# This is used both as the output directory for generated Python code
+# and as the repository path for updating pyproject.toml
+python_output: /path/to/your/local/python/repo
+
+# Path to the Node package repository (optional)
+# Comment out or remove if not needed
+# node_output: /path/to/your/local/node/repo
+
+# Path to the TypeScript package repository (optional)
+# Comment out or remove if not needed
+# typescript_output: /path/to/your/local/typescript/repo
+
+# ==========================
+# PROBABLY SHOULD NOT CHANGE
+# ==========================
+# OpenAPI spec output location (required)
+openapi_output: tools/codegen/openapi.json
+
+# Package name for pyproject.toml updates (required)
+package_name: weave_server_sdk
+
+# Whether to use release version instead of git SHA (optional, defaults to false)
+release: false
