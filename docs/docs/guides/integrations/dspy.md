@@ -113,4 +113,4 @@ optimized_module = optimizer.compile(
 )
 ```
 
-[![](imgs/dspy/dspy_optimizer.png)]()
+[![](imgs/dspy/dspy_optimizer.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
