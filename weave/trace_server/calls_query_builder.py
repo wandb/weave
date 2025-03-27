@@ -26,9 +26,9 @@ Outstanding Optimizations/Work:
 
 """
 
-import datetime
 import logging
 import re
+import uuid
 from typing import Callable, Literal, Optional, cast
 
 import sqlparse
@@ -50,7 +50,7 @@ from weave.trace_server.trace_server_interface_util import (
 )
 
 # Buffer time for datetime optimization to ensure we don't miss records
-DATETIME_OPTIMIZATION_BUFFER = datetime.timedelta(minutes=1)
+DATETIME_OPTIMIZATION_BUFFER = 1000 * 60 * 1  # 1 minute
 
 logger = logging.getLogger(__name__)
 
@@ -1277,6 +1277,34 @@ def _create_like_optimized_in_condition(
     return "(" + " OR ".join(like_conditions) + ")"
 
 
+def _uuidv7_from_timestamp_zeroed(ms_since_epoch: int) -> str:
+    if not (0 <= ms_since_epoch < 2**48):
+        raise ValueError("Timestamp must be a 48-bit integer (ms since epoch).")
+
+    # Split the 48-bit timestamp
+    time_low = (ms_since_epoch >> 16) & 0xFFFFFFFF  # First 32 bits
+    time_mid = ms_since_epoch & 0xFFFF  # Next 16 bits
+
+    # Set version (7) in high 4 bits, rest zero
+    time_hi_and_version = 0x7 << 12  # Version 7 + 12 zero bits
+
+    # Set variant bits (10xx....) and rest zero
+    clock_seq_hi_and_reserved = 0x80  # 10xx xxxx
+    clock_seq_low = 0x00
+    node = 0x000000000000  # 48 bits of zero
+
+    # Create UUID from fields
+    uuid_fields = (
+        time_low,
+        time_mid,
+        time_hi_and_version,
+        clock_seq_hi_and_reserved,
+        clock_seq_low,
+        node,
+    )
+    return str(uuid.UUID(fields=uuid_fields))
+
+
 def _create_datetime_optimization_sql(
     conditions: list[Condition],
     pb: ParamBuilder,
@@ -1318,10 +1346,7 @@ def _create_datetime_optimization_sql(
         if not isinstance(operand.gt_[1].literal_, int):
             continue
 
-        # Convert Unix timestamp to UTC datetime
-        timestamp = datetime.datetime.fromtimestamp(
-            operand.gt_[1].literal_, tz=datetime.timezone.utc
-        )
+        timestamp = operand.gt_[1].literal_ * 1000
 
         # Time buffer to be more inclusive
         if not is_not:
@@ -1329,29 +1354,13 @@ def _create_datetime_optimization_sql(
         else:
             timestamp = timestamp + DATETIME_OPTIMIZATION_BUFFER
 
-        # Create UUIDv7-like string for the timestamp
-        # UUIDv7 format: timestamp (48 bits) | version (4 bits) | variant (2 bits) | random (74 bits)
-        # Format: 8-4-4-4-12 hex digits
-        timestamp_ms = int(timestamp.timestamp() * 1000)
-
-        # UUIDv7 timestamp bits (48 bits total)
-        # First 32 bits (8 hex digits)
-        time_high = f"{timestamp_ms >> 16:08x}"
-        # Next 16 bits (4 hex digits)
-        time_mid = f"{(timestamp_ms & 0xFFFF):04x}"
-
-        # Version (7) and variant (1) bits
-        version = "7"
-        variant = "8"
-
-        # Construct UUID string in format: 8-4-4-4-12
-        uuid_prefix = f"{time_high}-{time_mid}{version}-{variant}000-0000-000000000000"
+        fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
 
         # Determine the comparison operator based on whether this is a NOT operation
         comparison_op = "<" if is_not else ">="
 
         # Add the condition
-        datetime_conditions.append(f"{table_alias}.id {comparison_op} '{uuid_prefix}'")
+        datetime_conditions.append(f"{table_alias}.id {comparison_op} '{fake_uuid}'")
 
     if not datetime_conditions:
         return ""
