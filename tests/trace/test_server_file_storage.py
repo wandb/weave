@@ -83,6 +83,7 @@ class TestS3Storage:
                 "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
                 "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
                 "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
             },
         ):
             yield
@@ -168,6 +169,7 @@ class TestGCSStorage:
                 }"""
                 ).decode(),
                 "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
+                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
             },
         ):
             yield
@@ -221,6 +223,7 @@ class TestAzureStorage:
                 "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": AZURITE_B64_KEY,
                 "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": AZURITE_URL,
                 "WF_FILE_STORAGE_URI": f"az://{AZURITE_ACCOUNT}/{TEST_BUCKET}",
+                "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
             },
         ):
             yield
