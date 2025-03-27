@@ -244,6 +244,7 @@ jobs:
             "groq",
             "huggingface",
             "google_ai_studio",
+            "google_genai",
             "instructor",
             "langchain",
             "litellm",

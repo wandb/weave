@@ -13,6 +13,7 @@ import {
   useDatasetEditContext,
 } from './DatasetEditorContext';
 import {DatasetObjectVal} from './EditableDatasetView';
+import {parseJSON, parseJSONL} from './jsonUtils';
 
 // Action type constants
 export const CREATE_DATASET_ACTIONS = {
@@ -94,7 +95,7 @@ function createDatasetReducer(
 interface CreateDatasetContextType {
   state: CreateDatasetState;
   dispatch: Dispatch<CreateDatasetAction>;
-  parseCSVFile: (file: File) => Promise<void>;
+  parseFile: (file: File) => Promise<void>;
   handleCloseDrawer: () => void;
   handlePublishDataset: () => void;
   clearDataset: () => void;
@@ -128,7 +129,7 @@ const CreateDatasetProviderInner: React.FC<{
   const [state, dispatch] = useReducer(createDatasetReducer, initialState);
   const editorContext = useDatasetEditContext();
 
-  const parseCSVFile = useCallback(
+  const parseFile = useCallback(
     async (file: File) => {
       dispatch({type: CREATE_DATASET_ACTIONS.SET_IS_LOADING, payload: true});
       dispatch({type: CREATE_DATASET_ACTIONS.SET_ERROR, payload: null});
@@ -144,7 +145,27 @@ const CreateDatasetProviderInner: React.FC<{
           });
         }
 
-        const result = await parseCSV(file);
+        let result;
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+        switch (fileExtension) {
+          case 'csv':
+            result = await parseCSV(file);
+            break;
+          case 'tsv':
+            result = await parseCSV(file, '\t');
+            break;
+          case 'json':
+            result = await parseJSON(file);
+            break;
+          case 'jsonl':
+            result = await parseJSONL(file);
+            break;
+          default:
+            throw new Error(
+              'Unsupported file type. Please upload a CSV, TSV, JSON, or JSONL file.'
+            );
+        }
 
         if (result.errors.length > 0) {
           const errorMessage = result.errors
@@ -152,13 +173,12 @@ const CreateDatasetProviderInner: React.FC<{
             .join('\n');
           dispatch({
             type: CREATE_DATASET_ACTIONS.SET_ERROR,
-            payload: `CSV parsing errors:\n${errorMessage}`,
+            payload: `File parsing errors:\n${errorMessage}`,
           });
           return;
         }
 
         // Transform the data into the format expected by EditableDatasetView
-        // The data has already been cast to the appropriate types by parseCSV
         const transformedRows = result.data.map((row, index) => ({
           ...row,
           ___weave: {
@@ -195,7 +215,7 @@ const CreateDatasetProviderInner: React.FC<{
         dispatch({
           type: CREATE_DATASET_ACTIONS.SET_ERROR,
           payload:
-            error instanceof Error ? error.message : 'Failed to parse CSV file',
+            error instanceof Error ? error.message : 'Failed to parse file',
         });
       } finally {
         dispatch({type: CREATE_DATASET_ACTIONS.SET_IS_LOADING, payload: false});
@@ -245,7 +265,7 @@ const CreateDatasetProviderInner: React.FC<{
       value={{
         state,
         dispatch,
-        parseCSVFile,
+        parseFile,
         handleCloseDrawer,
         handlePublishDataset,
         clearDataset,

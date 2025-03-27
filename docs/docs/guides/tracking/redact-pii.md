@@ -1,4 +1,4 @@
-# Redact PII from Traces
+# Redacting PII
 
 :::important
 This feature is only accessible via the Python SDK.

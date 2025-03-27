@@ -27,11 +27,12 @@ type PanelPreviewDirProps = Panel2.PanelProps<typeof inputType>;
 interface DirViewProps {
   dir: DirMetadata;
   path: string[];
+  config: any;
   setFilePath(path: string[]): void;
 }
 
 const DirView: React.FC<DirViewProps> = props => {
-  const {dir, path, setFilePath} = props;
+  const {dir, path, config, setFilePath} = props;
   // TODO: make this use config?
   const [displayOffset, setDisplayOffset] = useState(0);
 
@@ -72,6 +73,7 @@ const DirView: React.FC<DirViewProps> = props => {
                     fileName={dirOrFile}
                     file={file}
                     path={path}
+                    config={config}
                     setFilePath={setFilePath}
                   />
                 );
@@ -140,14 +142,16 @@ interface SubfileRowProps {
   file: FileMetadata;
   fileName: string;
   path?: string[];
+  config: any;
   setFilePath(path: string[]): void;
 }
 
 const SubfileRow: React.FC<SubfileRowProps> = props => {
-  const {file, fileName, path, setFilePath} = props;
+  const {file, fileName, path, config, setFilePath} = props;
   const newPath = path?.concat([fileName]) ?? [fileName];
   const iconName = iconFromFileName(fileName);
   // const iconName = fileInfo.iconName;
+  const isDownloadable = config ? config?.isDownloadable : true;
 
   return (
     <Table.Row
@@ -156,7 +160,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
           if (file.ref.startsWith('http://')) {
             window.open(file.ref);
           }
-        } else {
+        } else if (isDownloadable) {
           setFilePath(newPath);
         }
       }}>
@@ -180,12 +184,14 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
         {numeral(file.size).format('0.0b')}
       </Table.Cell>
       <Table.Cell className="file-download-cell">
-        <a
-          href={file.url}
-          download={fileName}
-          onClick={e => e.stopPropagation()}>
-          <LegacyWBIcon name="download" />
-        </a>
+        {isDownloadable && (
+          <a
+            href={file.url}
+            download={fileName}
+            onClick={e => e.stopPropagation()}>
+            <LegacyWBIcon name="download" />
+          </a>
+        )}
       </Table.Cell>
     </Table.Row>
   );
@@ -242,6 +248,7 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
     <DirView
       dir={dir}
       path={props.context?.path!}
+      config={props.config}
       setFilePath={path => {
         if (props.updateInput != null) {
           props.updateInput(
