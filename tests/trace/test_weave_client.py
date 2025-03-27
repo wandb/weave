@@ -1408,7 +1408,7 @@ def test_table_partitioning(network_proxy_client):
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
-        + NUM_ROWS / 2  # updates - 2 per batch
+        + NUM_ROWS // 2  # updates - 2 per batch
     )
 
 
