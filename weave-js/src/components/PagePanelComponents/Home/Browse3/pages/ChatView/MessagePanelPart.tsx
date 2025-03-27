@@ -1,5 +1,6 @@
 import 'prismjs/components/prism-markup-templating';
 
+import _ from 'lodash';
 import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
@@ -54,17 +55,32 @@ export const MessagePanelPart = ({
     };
     return <ToolCalls toolCalls={[toolCall]} />;
   }
+
   if (value.type === 'tool_result' && 'content' in value) {
-    try {
-      const jsonContent = JSON.stringify(
-        JSON.parse(value.content as string),
-        null,
-        2
-      );
-      return <CodeEditor language="json" value={jsonContent} readOnly />;
-    } catch (error) {
-      return <span className="whitespace-break-spaces">{value.content}</span>;
-    }
+    // value.content can be a string or an array of content blocks
+    const contentArray = Array.isArray(value.content)
+      ? value.content
+      : [value.content];
+    return (
+      <>
+        {contentArray.map(content => {
+          const stringContent =
+            _.isObject(content) && 'text' in content ? content.text : content;
+          try {
+            const jsonContent = JSON.stringify(
+              JSON.parse(stringContent as string),
+              null,
+              2
+            );
+            return <CodeEditor language="json" value={jsonContent} readOnly />;
+          } catch (error) {
+            return (
+              <span className="whitespace-break-spaces">{stringContent}</span>
+            );
+          }
+        })}
+      </>
+    );
   }
   return null;
 };
