@@ -1318,7 +1318,10 @@ def _create_datetime_optimization_sql(
         if not isinstance(operand.gt_[1].literal_, int):
             continue
 
-        timestamp = datetime.datetime.fromtimestamp(operand.gt_[1].literal_)
+        # Convert Unix timestamp to UTC datetime
+        timestamp = datetime.datetime.fromtimestamp(
+            operand.gt_[1].literal_, tz=datetime.timezone.utc
+        )
 
         # Time buffer to be more inclusive
         if not is_not:
@@ -1330,21 +1333,19 @@ def _create_datetime_optimization_sql(
         # UUIDv7 format: timestamp (48 bits) | version (4 bits) | variant (2 bits) | random (74 bits)
         # Format: 8-4-4-4-12 hex digits
         timestamp_ms = int(timestamp.timestamp() * 1000)
-        # First 8 hex digits (32 bits) of timestamp
-        time_high = f"{timestamp_ms >> 32:08x}"
-        # Next 4 hex digits (16 bits) of timestamp
-        time_low = f"{(timestamp_ms & 0xFFFF0000) >> 16:04x}"
-        # Version (7) and next 2 bits of timestamp
+
+        # UUIDv7 timestamp bits (48 bits total)
+        # First 32 bits (8 hex digits)
+        time_high = f"{timestamp_ms >> 16:08x}"
+        # Next 16 bits (4 hex digits)
+        time_mid = f"{(timestamp_ms & 0xFFFF):04x}"
+
+        # Version (7) and variant (1) bits
         version = "7"
-        time_mid = f"{(timestamp_ms & 0x0000F000) >> 12:01x}"
-        # Variant (1) and remaining bits of timestamp
         variant = "8"
-        time_low = f"{(timestamp_ms & 0x00000FFF):03x}"
 
         # Construct UUID string in format: 8-4-4-4-12
-        uuid_prefix = (
-            f"{time_high}-{time_low}{version}{time_mid}-{variant}000-0000-000000000000"
-        )
+        uuid_prefix = f"{time_high}-{time_mid}{version}-{variant}000-0000-000000000000"
 
         # Determine the comparison operator based on whether this is a NOT operation
         comparison_op = "<" if is_not else ">="
