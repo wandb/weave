@@ -174,7 +174,9 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
           ) : (
             <LegacyWBIcon className="file-browser-icon" name={iconName} />
           )}
-          <span className="file-browser-file-name" style={!isDownloadable ? { color: 'inherit' } : undefined}>
+          <span
+            className="file-browser-file-name"
+            style={!isDownloadable ? {color: 'inherit'} : undefined}>
             {fileName.split('/').pop()}
           </span>
         </div>
