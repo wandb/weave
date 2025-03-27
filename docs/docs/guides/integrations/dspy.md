@@ -113,4 +113,4 @@ optimized_module = optimizer.compile(
 )
 ```
 
-[![](docs/docs/guides/integrations/imgs/dspy/dspy_optimizer.png)]()
+[![](imgs/dspy/dspy_optimizer.png)]()
