@@ -72,6 +72,11 @@ def test_instructor_openai(
     assert output_arguments["age"] == 20
 
 
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
 def test_instructor_openai_with_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
