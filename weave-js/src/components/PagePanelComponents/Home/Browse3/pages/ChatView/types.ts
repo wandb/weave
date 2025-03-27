@@ -18,7 +18,7 @@ export type InternalMessage = {
   text?: string;
   image_url?: ImageUrl;
   input?: Record<string, any>;
-  content?: string;
+  content?: string | Record<string, any>[];
   name?: string;
   id?: string;
 };
