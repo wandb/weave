@@ -158,7 +158,7 @@ describe('DatasetDrawerContext', () => {
   test('provides initial state', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -178,7 +178,7 @@ describe('DatasetDrawerContext', () => {
   test('updates state when selecting a dataset', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -203,7 +203,7 @@ describe('DatasetDrawerContext', () => {
   test('updates field mappings', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -225,7 +225,7 @@ describe('DatasetDrawerContext', () => {
   test('navigates between steps', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -244,7 +244,7 @@ describe('DatasetDrawerContext', () => {
   test('resets state', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -270,7 +270,7 @@ describe('DatasetDrawerContext', () => {
   test('handles create new mode correctly', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -294,7 +294,7 @@ describe('DatasetDrawerContext', () => {
   test('suggests field mappings based on schema similarity', () => {
     render(
       <DatasetDrawerProvider
-        selectedCalls={[]}
+        selectedCallIds={[]}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">
@@ -341,18 +341,9 @@ describe('DatasetDrawerContext', () => {
   });
 
   test('does not reprocess rows when navigating between steps unless mappings are modified', () => {
-    // Create mock calls data
-    const mockCalls = [
-      {
-        id: 'call1',
-        inputs: {text: 'Sample input'},
-        output: 'Sample output',
-      },
-    ];
-
     render(
       <DatasetDrawerProvider
-        selectedCalls={mockCalls}
+        selectedCallIds={['1234', '5678']}
         onClose={() => {}}
         entity="test-entity"
         project="test-project">

@@ -662,23 +662,6 @@ export const CallsTable: FC<{
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
 
-  // Replace the state and effect with a single memo
-  const selectedCallObjects = useMemo(() => {
-    if (!callsResult) {
-      return [];
-    }
-    return callsResult
-      .filter(
-        call =>
-          call?.traceCall?.id != null &&
-          selectedCalls.includes(call.traceCall.id)
-      )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
-  }, [callsResult, selectedCalls]);
-
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
     ? (newModel: GridColumnVisibilityModel) => {
@@ -837,7 +820,7 @@ export const CallsTable: FC<{
                       project={project}
                       open={addToDatasetModalOpen}
                       onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCalls={selectedCallObjects}
+                      selectedCallIds={selectedCalls}
                     />
                   </div>
                   <div className="flex-none">
