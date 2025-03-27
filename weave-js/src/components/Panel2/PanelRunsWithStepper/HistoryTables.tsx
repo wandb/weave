@@ -7,9 +7,9 @@ import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {TableSpec} from '../PanelTable/PanelTable';
 import {
+  buildPanelRunsWithStepper,
   getCurrentTableHistoryKey,
   getTableKeysFromRunsHistoryPropertyType,
-  PanelRunsWithStepper,
   PanelRunsWithStepperConfigType,
   PanelRunsWithStepperProps,
 } from './base';
@@ -58,7 +58,7 @@ const PanelRunsWithStepperConfig: React.FC<
 export const Spec: Panel2.PanelSpec<PanelRunsWithStepperConfigType> = {
   id: 'run-history-tables-stepper',
   displayName: 'Run History Tables Stepper',
-  Component: PanelRunsWithStepper(TableSpec),
+  Component: buildPanelRunsWithStepper(TableSpec),
   ConfigComponent: PanelRunsWithStepperConfig,
   inputType: LIST_RUNS_TYPE,
   outputType: () => ({

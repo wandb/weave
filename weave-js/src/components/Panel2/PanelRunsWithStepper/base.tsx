@@ -92,9 +92,9 @@ export const getCurrentTableHistoryKey = (
   return '';
 };
 
-export const PanelRunsWithStepper: (
+export const buildPanelRunsWithStepper = (
   spec: Panel2.PanelSpec
-) => React.FC<PanelRunsWithStepperProps> = spec => {
+): React.FC<PanelRunsWithStepperProps> => {
   const PanelRunsWithStepperInner: React.FC<
     PanelRunsWithStepperProps
   > = props => {
