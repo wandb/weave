@@ -1,5 +1,5 @@
 import importlib
-from typing import Union
+from typing import Callable, Union
 
 from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_wrapper_async,
@@ -10,7 +10,23 @@ from weave.integrations.google_genai.imagen_utils import (
     google_genai_imagen_wrapper_sync,
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.autopatch import IntegrationSettings
+from weave.trace.autopatch import IntegrationSettings, OpSettings
+
+
+def get_google_genai_symbol_patcher(
+    base_symbol: str, attribute_name: str, wrapper: Callable, settings: OpSettings
+) -> SymbolPatcher:
+    display_name = base_symbol + "." + attribute_name
+    display_name = (
+        display_name.replace(".__call__", "")
+        if attribute_name.endswith(".__call__")
+        else display_name
+    )
+    return SymbolPatcher(
+        lambda: importlib.import_module(base_symbol),
+        attribute_name,
+        wrapper(settings.model_copy(update={"name": settings.name or display_name})),
+    )
 
 
 def get_google_genai_patcher(
@@ -24,95 +40,67 @@ def get_google_genai_patcher(
 
     base = settings.op_settings
 
-    generate_content_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.Models.generate_content"}
-    )
-    count_tokens_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.Models.count_tokens"}
-    )
-    generate_content_async_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.AsyncModels.generate_content"}
-    )
-    count_tokens_async_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.AsyncModels.count_tokens"}
-    )
-    chat_settings = base.model_copy(
-        update={"name": base.name or "google.genai.chats.Chat.send_message"}
-    )
-    chat_async_settings = base.model_copy(
-        update={"name": base.name or "google.genai.chats.AsyncChat.send_message"}
-    )
-    generate_content_stream_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.models.Models.generate_content_stream"
-        }
-    )
-    generate_content_stream_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "google.genai.models.AsyncModels.generate_content_stream"
-        }
-    )
-    generate_images_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.Models.generate_images"}
-    )
-    generate_images_async_settings = base.model_copy(
-        update={"name": base.name or "google.genai.models.AsyncModels.generate_images"}
-    )
-
     _google_genai_patcher = MultiPatcher(
         [
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "Models.generate_content",
-                google_genai_gemini_wrapper_sync(generate_content_settings),
+                google_genai_gemini_wrapper_sync,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "AsyncModels.generate_content",
-                google_genai_gemini_wrapper_async(generate_content_async_settings),
+                google_genai_gemini_wrapper_async,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "Models.count_tokens",
-                google_genai_gemini_wrapper_sync(count_tokens_settings),
+                google_genai_gemini_wrapper_sync,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "AsyncModels.count_tokens",
-                google_genai_gemini_wrapper_async(count_tokens_async_settings),
+                google_genai_gemini_wrapper_async,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.chats"),
+            get_google_genai_symbol_patcher(
+                "google.genai.chats",
                 "Chat.send_message",
-                google_genai_gemini_wrapper_sync(chat_settings),
+                google_genai_gemini_wrapper_sync,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.chats"),
+            get_google_genai_symbol_patcher(
+                "google.genai.chats",
                 "AsyncChat.send_message",
-                google_genai_gemini_wrapper_async(chat_async_settings),
+                google_genai_gemini_wrapper_async,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "Models.generate_content_stream",
-                google_genai_gemini_wrapper_sync(generate_content_stream_settings),
+                google_genai_gemini_wrapper_sync,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "AsyncModels.generate_content_stream",
-                google_genai_gemini_wrapper_async(
-                    generate_content_stream_async_settings
-                ),
+                google_genai_gemini_wrapper_async,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "Models.generate_images",
-                google_genai_imagen_wrapper_sync(generate_images_settings),
+                google_genai_imagen_wrapper_sync,
+                base,
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("google.genai.models"),
+            get_google_genai_symbol_patcher(
+                "google.genai.models",
                 "AsyncModels.generate_images",
-                google_genai_imagen_wrapper_async(generate_images_async_settings),
+                google_genai_imagen_wrapper_async,
+                base,
             ),
         ]
     )
