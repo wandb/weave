@@ -7,6 +7,7 @@ import {
   constString,
   isAssignableTo,
   isUnion,
+  isVoidNode,
   listObjectType,
   maybe,
   NodeOrVoidNode,
@@ -26,7 +27,7 @@ import {
   Union,
   voidNode,
 } from '@wandb/weave/core';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect} from 'react';
 
 import {LIST_RUNS_TYPE} from '../../../common/types/run';
 import {useNodeValue, useNodeWithServerType} from '../../../react';
@@ -37,6 +38,8 @@ import {TableSpec} from '../PanelTable/PanelTable';
 
 type PanelRunsHistoryTablesConfigType = {
   tableHistoryKey: string;
+  currentStep: number;
+  steps: number[];
 };
 
 type PanelRunHistoryTablesStepperProps = Panel2.PanelProps<
@@ -135,9 +138,20 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
 const PanelRunHistoryTablesStepper: React.FC<
   PanelRunHistoryTablesStepperProps
 > = props => {
-  const [currentStep, setCurrentStep] = useState<number>(-1);
-  const [steps, setSteps] = useState<number[]>([]);
-  const {input} = props;
+  const {input, updateConfig, config} = props;
+
+  const safeUpdateConfig = React.useCallback(
+    (updates: Partial<PanelRunsHistoryTablesConfigType>) => {
+      const needsUpdate = Object.entries(updates).some(
+        ([key, value]) => (config as any)?.[key] !== value
+      );
+
+      if (needsUpdate) {
+        updateConfig(updates);
+      }
+    },
+    [config, updateConfig]
+  );
 
   const runsHistoryNode = opConcat({
     arr: opRunHistory({run: input as any}),
@@ -172,18 +186,32 @@ const PanelRunHistoryTablesStepper: React.FC<
     useNodeValue(stepsNode);
 
   useEffect(() => {
-    if (stepsNodeLoading) {
+    if (stepsNodeLoading || stepsNodeResult == null) {
       return;
     }
 
-    if (stepsNodeResult != null) {
-      const newSteps: number[] = [...new Set<number>(stepsNodeResult)].sort(
-        (a, b) => a - b
-      );
-      setSteps(newSteps);
-      setCurrentStep(newSteps[0]);
+    const newSteps: number[] = [...new Set<number>(stepsNodeResult)].sort(
+      (a, b) => a - b
+    );
+
+    const currentConfigSteps = config?.steps || [];
+
+    const hasStepsChanged =
+      currentConfigSteps.length !== newSteps.length ||
+      !currentConfigSteps.every((step, i) => step === newSteps[i]);
+
+    if (hasStepsChanged) {
+      safeUpdateConfig({steps: newSteps});
+
+      const currentStep = config?.currentStep ?? -1;
+      const shouldUpdateCurrentStep =
+        currentStep < 0 || !newSteps.includes(currentStep);
+
+      if (shouldUpdateCurrentStep) {
+        safeUpdateConfig({currentStep: newSteps[0]});
+      }
     }
-  }, [stepsNodeResult, stepsNodeLoading]);
+  }, [stepsNodeResult, stepsNodeLoading, config, safeUpdateConfig]);
 
   const exampleRow = opIndex({
     arr: runsHistoryNode,
@@ -191,6 +219,7 @@ const PanelRunHistoryTablesStepper: React.FC<
   });
   const exampleRowRefined = useNodeWithServerType(exampleRow);
   let defaultNode: NodeOrVoidNode = voidNode();
+  const currentStep = config?.currentStep ?? -1;
   if (currentStep != null && currentStep >= 0 && tableHistoryKey) {
     // This performs the following weave expression:
     // runs.history.concat.filter((row) => row._step == <current-step>)[<table-history-key>].concat
@@ -218,7 +247,7 @@ const PanelRunHistoryTablesStepper: React.FC<
 
   return (
     <>
-      {defaultNode != null && (
+      {defaultNode != null && !isVoidNode(defaultNode) && (
         <div
           style={{
             display: 'flex',
@@ -240,7 +269,7 @@ const PanelRunHistoryTablesStepper: React.FC<
             updateContext={props.updateContext}
             updateInput={props.updateInput}
           />
-          {steps.length > 0 && (
+          {(config?.steps?.length || 0) > 0 && (
             <div
               style={{
                 padding: '8px',
@@ -253,15 +282,17 @@ const PanelRunHistoryTablesStepper: React.FC<
               }}>
               Step:{' '}
               <SliderInput
-                min={steps[0]}
-                max={steps[steps.length - 1]}
-                minLabel={steps[0].toString()}
-                maxLabel={steps[steps.length - 1].toString()}
+                min={config!.steps![0]}
+                max={config!.steps![config!.steps!.length - 1]}
+                minLabel={config!.steps![0].toString()}
+                maxLabel={config!.steps![config!.steps!.length - 1].toString()}
                 hasInput={true}
-                value={currentStep}
+                value={config!.currentStep!}
                 step={1}
-                ticks={steps}
-                onChange={setCurrentStep}
+                ticks={config!.steps}
+                onChange={val => {
+                  safeUpdateConfig({currentStep: val});
+                }}
               />
             </div>
           )}
