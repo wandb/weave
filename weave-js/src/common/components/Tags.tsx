@@ -49,7 +49,7 @@ function colorIndexToName(showColor: boolean, index?: number): string {
     case TagType.ALIAS:
       return 'tag-sienna-light';
     case TagType.PROTECTED_ALIAS:
-      return 'tag-purple';
+      return 'tag-sienna-light';
     default:
       return 'tag-lightGray';
   }
@@ -77,6 +77,7 @@ export const Tag: React.FC<TagProps> = React.memo(
     // the database color index. This can be modified in the future if the design decision changes
     // based on user feedback
     const colorName = colorIndexToName(showColor, nounToTagType(noun));
+    const isProtectedAlias = nounToTagType(noun) === TagType.PROTECTED_ALIAS;
     return (
       <Label
         style={{marginLeft: '2px', maxWidth: '220px'}}
@@ -87,7 +88,7 @@ export const Tag: React.FC<TagProps> = React.memo(
         }
         key={tag.name}
         onClick={onClick}>
-        <S.Icon
+        <S.StyledIcon
           name={noun === 'tag' ? 'tag-latest' : 'email-at'}
           size={size}
           $pos="left"
@@ -100,8 +101,15 @@ export const Tag: React.FC<TagProps> = React.memo(
               })
             : tag.name}
         </SingleLineText>
+        {isProtectedAlias && (
+          <S.ProtectedAliasIcon
+            name="key-admin-private"
+            size={size}
+            $pos="right"
+          />
+        )}
         {canDelete && onDelete && (
-          <S.Icon
+          <S.StyledIcon
             className="delete-tag"
             name="close-latest"
             size={size}
