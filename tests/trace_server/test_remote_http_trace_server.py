@@ -31,9 +31,8 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
 
 class TestRemoteHTTPTraceServer(unittest.TestCase):
     def setUp(self):
-        self.trace_server_url = "http://example.com"
         self.server = RemoteHTTPTraceServer(
-            trace_server_url=self.trace_server_url,
+            trace_server_url="http://example.com",
             api_key="test123",
         )
 

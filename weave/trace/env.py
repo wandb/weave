@@ -96,7 +96,3 @@ def weave_wandb_api_key() -> str | None:
             "There are different credentials in the netrc file and the environment. Using the environment value."
         )
     return env_api_key or netrc_api_key
-
-
-def weave_wandb_entity_name() -> str | None:
-    return os.getenv("WANDB_ENTITY")
