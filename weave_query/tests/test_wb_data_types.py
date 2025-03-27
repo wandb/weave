@@ -6,23 +6,18 @@ import numpy as np
 import pytest
 import wandb
 from bokeh.plotting import figure
-from wandb import Artifact
 from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
-import weave_query as weave
 import weave_query
-from weave_query import artifact_fs
+import weave_query as weave
 from weave_query import weave_types as types
-from weave_query.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 from weave_query.ops_domain.wbmedia import ImageArtifactFileRefType
 from weave_query.ops_primitives import file
 from weave_query.wandb_client_api import wandb_gql_query
 from weave_query.wandb_util import weave0_type_json_to_weave1_type
-
-from tests.fixture_fakewandb import FakeApi
 
 
 class RandomClass:
@@ -258,6 +253,10 @@ def make_wb_image(use_middle=False, use_pixels=False):
 
 
 def make_table():
+    image_with_caption = wandb.Image(
+        make_wb_image(False, False),
+        caption="This is a caption",
+    )
     return wandb.Table(
         columns=["label", "image"],
         data=[
@@ -265,6 +264,7 @@ def make_table():
             ["b", make_wb_image(False, True)],
             ["c", make_wb_image(True, False)],
             ["d", make_wb_image(True, True)],
+            ["e", image_with_caption],
         ],
     )
 
@@ -323,6 +323,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -377,6 +378,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -431,6 +433,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -485,6 +488,21 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
+            },
+        },
+        {
+            "label": "e",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {"box_set_1": None, "box_set_2": None},  # not copied
+                "masks": {"mask_set_1": None},  # not copied
+                "caption": "This is a caption",
             },
         },
     ]
@@ -536,8 +554,8 @@ def test_annotated_images_in_tables(fake_wandb):
 
 def test_annotated_legacy_images_in_tables(fake_wandb):
     # Mocking this property makes the payload look like the legacy version.
-    from wandb.sdk.data_types.image import _ImageFileType
     from wandb.sdk.data_types._dtypes import InvalidType
+    from wandb.sdk.data_types.image import _ImageFileType
 
     def dummy_params(self):
         return {}

@@ -1,8 +1,34 @@
-import React from 'react';
+import {Box} from '@mui/material';
+import React, {useState} from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {Button} from '../../../../../Button';
+import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
+
+const NewDatasetButton: React.FC = () => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}>
+        New dataset
+      </Button>
+      <CreateDatasetDrawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSaveDataset={() => {
+          setIsDrawerOpen(false);
+          // Refresh the page or update the list as needed
+        }}
+      />
+    </>
+  );
+};
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
@@ -116,9 +142,9 @@ export const EMPTY_PROPS_MODEL: EmptyProps = {
 
 export const EMPTY_PROPS_DATASETS: EmptyProps = {
   icon: 'table' as const,
-  heading: 'No datasets yet',
+  heading: 'Create your first dataset',
   description:
-    'You can use datasets to collect difficult examples to use within evaluations of your app.',
+    'Use datasets to collect difficult examples to use within evaluations of your app.',
   moreInformation: (
     <>
       Learn{' '}
@@ -130,6 +156,9 @@ export const EMPTY_PROPS_DATASETS: EmptyProps = {
         use datasets within an evaluation pipeline
       </TargetBlank>{' '}
       .
+      <Box sx={{mt: 2}}>
+        <NewDatasetButton />
+      </Box>
     </>
   ),
 };
@@ -221,4 +250,11 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
       .
     </>
   ),
+};
+
+export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'Get started with the LLM playground',
+  description: 'Configure an LLM provider to start using the playground',
+  moreInformation: <></>,
 };

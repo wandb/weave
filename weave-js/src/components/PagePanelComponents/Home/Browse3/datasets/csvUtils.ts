@@ -227,7 +227,10 @@ export const castDataWithColumnTypes = (
   });
 };
 
-export const parseCSV = async (file: File): Promise<ParseResult> => {
+export const parseCSV = async (
+  file: File,
+  delimiter: string = 'auto'
+): Promise<ParseResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -239,6 +242,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
         header: true,
         skipEmptyLines: true,
         encoding: 'UTF-8',
+        delimiter: delimiter === 'auto' ? undefined : delimiter,
         complete: (results: PapaParseResult<any>) => {
           const columns = analyzeColumns(results.data);
 
@@ -259,16 +263,15 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
               encoding: 'UTF-8',
             },
           };
+
           resolve(parseResult);
         },
         error: (error: Error) => {
-          reject(new Error(`Failed to parse CSV: ${error.message}`));
+          reject(error);
         },
       });
     };
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
 };

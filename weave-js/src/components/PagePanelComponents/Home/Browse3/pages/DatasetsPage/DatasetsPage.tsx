@@ -253,7 +253,7 @@ const DatasetsPageHeaderExtra: React.FC<{
             variant="ghost"
             onClick={onCreateDataset}
             tooltip="Create a new dataset">
-            New Dataset
+            New dataset
           </Button>
         )}
         {compareButton}
