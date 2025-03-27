@@ -32,7 +32,7 @@ const NewDatasetButton: React.FC = () => {
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
-  heading: 'No traces yet',
+  heading: 'Create your first trace',
   description:
     'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
   moreInformation: (
@@ -46,13 +46,20 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         following our quickstart guide
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };
 
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
-  heading: 'No evaluations yet',
+  heading: 'Create your first evaluation',
   description: 'Use evaluations to track the performance of your application.',
   moreInformation: (
     <>
@@ -65,6 +72,13 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
         set up an evaluation pipeline
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };

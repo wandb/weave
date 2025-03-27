@@ -196,7 +196,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
-        file_storage_uri_str: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -209,7 +208,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._file_storage_uri_str = file_storage_uri_str
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -222,7 +220,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
-            file_storage_uri_str=wf_env.wf_file_storage_uri(),
         )
 
     @contextmanager
@@ -1272,7 +1269,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri()
+        base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
 
         if base_file_storage_uri is not None:
             self._file_create_bucket(req, digest, base_file_storage_uri)
@@ -1349,7 +1346,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-    def _get_base_file_storage_uri(self) -> Optional[FileStorageURI]:
+    def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
         """
         Get the base storage URI for a project.
 
@@ -1360,12 +1357,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         the project or a context variable. Leaving this method here for clarity
         and future extensibility.
         """
-        if not self._file_storage_uri_str:
+        file_storage_uri_str = wf_env.wf_file_storage_uri()
+        if not file_storage_uri_str:
             return None
-        res = FileStorageURI.parse_uri_str(self._file_storage_uri_str)
+
+        project_allow_list = wf_env.wf_file_storage_project_allow_list()
+        if project_allow_list is None:
+            return None
+
+        universally_enabled = (
+            len(project_allow_list) == 1 and project_allow_list[0] == "*"
+        )
+
+        if not universally_enabled and project_id not in project_allow_list:
+            return None
+
+        res = FileStorageURI.parse_uri_str(file_storage_uri_str)
         if res.has_path():
             raise ValueError(
-                f"Supplied file storage uri contains path components: {self._file_storage_uri_str}"
+                f"Supplied file storage uri contains path components: {file_storage_uri_str}"
             )
         return res
 
