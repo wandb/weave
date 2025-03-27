@@ -284,6 +284,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ),
                 limit=1,
                 include_costs=req.include_costs,
+                include_storage_size=req.include_storage_size,
+                include_rolled_up_storage_size=req.include_rolled_up_storage_size,
             )
         )
         try:
@@ -323,7 +325,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
-            project_id=req.project_id, include_costs=req.include_costs or False
+            project_id=req.project_id,
+            include_costs=req.include_costs or False,
+            include_storage_size=req.include_storage_size or False,
+            include_rolled_up_storage_size=req.include_rolled_up_storage_size or False,
         )
         columns = all_call_select_columns
         if req.columns:
@@ -345,6 +350,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
+
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_rolled_up_storage_size:
+            columns.append("total_size_bytes")
+
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -2144,6 +2156,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
         display_name=display_name,
+        storage_size_bytes=ch_call.storage_size_bytes,
+        total_size_bytes=ch_call.total_size_bytes,
     )
 
 
@@ -2176,6 +2190,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
+        "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
+        "total_size_bytes": ch_call_dict.get("total_size_bytes"),
     }
 
 

@@ -87,6 +87,21 @@ class CallsMergedAggField(CallsMergedField):
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
+class AggFieldWithTableOverrides(CallsMergedAggField):
+    # This is useful if you know the field must come from a predetemined table alias.
+
+    table_name: str
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        return super().as_sql(pb, self.table_name, cast, use_agg_fn)
+
+
 class CallsMergedDynamicField(CallsMergedAggField):
     extra_path: Optional[list[str]] = None
 
@@ -201,6 +216,37 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         raise NotImplementedError(
             "Feedback fields cannot be selected directly, yet - implement me!"
         )
+
+
+class AggregatedDataSizeField(CallsMergedField):
+    def __init__(self, field: str = "total_size_bytes"):
+        super().__init__(field=field)
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # This field is not supposed to be called yet. For now, we just take the parent class's
+        # implementation. Consider re-implementation for future use.
+        return super().as_sql(pb, table_alias, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        # It doesn't make sense for a non-root call to have a rolled up storage size,
+        # even if a value could be computed.
+        conditional_field = f"""
+        CASE
+            WHEN any({table_alias}.parent_id) IS NULL
+            THEN any(rolled_up_cms.total_size_bytes)
+            ELSE NULL
+        END
+        """
+
+        return f"{conditional_field} AS {self.field}"
 
 
 class QueryBuilderDynamicField(QueryBuilderField):
@@ -371,6 +417,8 @@ class CallsQuery(BaseModel):
     limit: Optional[int] = None
     offset: Optional[int] = None
     include_costs: bool = False
+    include_storage_size: bool = False
+    include_rolled_up_storage_size: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
@@ -569,7 +617,11 @@ class CallsQuery(BaseModel):
 
         # If so, build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
-        outer_query = CallsQuery(project_id=self.project_id)
+        outer_query = CallsQuery(
+            project_id=self.project_id,
+            include_storage_size=self.include_storage_size,
+            include_rolled_up_storage_size=self.include_rolled_up_storage_size,
+        )
 
         # Select Fields:
         filter_query.add_field("id")
@@ -699,10 +751,34 @@ class CallsQuery(BaseModel):
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
+        storage_size_sql = ""
+        if self.include_storage_size:
+            storage_size_sql = """
+            LEFT JOIN (SELECT
+                id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
+            FROM calls_merged_stats
+            GROUP BY id) as storage_size_tbl
+            on calls_merged.id = storage_size_tbl.id
+            """
+
+        rolled_up_storage_size_sql = ""
+        if self.include_rolled_up_storage_size:
+            rolled_up_storage_size_sql = """
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_size_bytes
+            FROM calls_merged_stats
+            GROUP BY trace_id) as rolled_up_cms
+            on calls_merged.trace_id = rolled_up_cms.trace_id
+            """
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
+        {storage_size_sql}
+        {rolled_up_storage_size_sql}
         WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
@@ -737,6 +813,10 @@ ALLOWED_CALL_FIELDS = {
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
+    "storage_size_bytes": AggFieldWithTableOverrides(
+        field="storage_size_bytes", agg_fn="any", table_name="storage_size_tbl"
+    ),
+    "total_size_bytes": AggregatedDataSizeField(),
 }
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
