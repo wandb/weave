@@ -129,6 +129,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -225,6 +226,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             use_async_insert=use_async_insert,
         )
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        traces_data = [ResourceSpans.from_proto(span) for span in req.traces.resource_spans]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend([
+                        { 'mode': 'start', 'req': tsi.CallStartReq(start=start_call) },
+                        { 'mode': 'end', 'req': tsi.CallEndReq(end=end_call) }
+                    ])
+        res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        print(res)
+        return tsi.OtelExportRes()
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
@@ -250,6 +267,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        print('in call_start')
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults

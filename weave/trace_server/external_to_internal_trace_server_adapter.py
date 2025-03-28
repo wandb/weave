@@ -99,6 +99,14 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # if req.wb_run_id is not None:
+        #     req.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.otel_export, req)
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
