@@ -29,7 +29,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 import uuid
-from typing import Callable, Literal, Optional, cast
+from typing import Literal, Optional, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
@@ -120,6 +120,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
 
     def is_heavy(self) -> bool:
         return True
+
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
     feedback_type: str
