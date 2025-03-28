@@ -76,6 +76,7 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
+  userId?: string;
 };
 
 export type OpVersionFilter = {

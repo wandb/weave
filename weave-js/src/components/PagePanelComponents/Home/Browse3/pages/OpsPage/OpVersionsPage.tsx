@@ -159,8 +159,8 @@ export const FilterableOpVersionsTable: React.FC<{
         ]
       : []),
 
-    basicField('createdAtMs', 'Created', {
-      width: 100,
+    basicField('createdAtMs', 'Last updated', {
+      width: 130,
       renderCell: cellParams => {
         const createdAtMs = cellParams.value;
         return <Timestamp value={createdAtMs / 1000} format="relative" />;

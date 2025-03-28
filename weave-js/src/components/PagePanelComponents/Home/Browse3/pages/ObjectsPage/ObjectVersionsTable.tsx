@@ -285,8 +285,8 @@ export const ObjectVersionsTable: React.FC<{
 
     if (!props.hideCreatedAtColumn) {
       cols.push(
-        basicField('createdAtMs', 'Created', {
-          width: 100,
+        basicField('createdAtMs', 'Last updated', {
+          width: 130,
           valueGetter: (unused: any, row: any) => {
             return row.obj.createdAtMs;
           },

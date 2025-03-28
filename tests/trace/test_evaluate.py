@@ -425,3 +425,65 @@ def test_evaluate_table_lazy_iter(client):
     # so the first count can be different.
     count = counts_split_by_table_query[0]
     assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
+
+
+def test_evaluate_table_order(client):
+    """
+    Test that evaluation results maintain the original order of the dataset
+    when using a published dataset with images.
+    """
+    import random
+
+    from PIL import Image
+
+    def make_image(i):
+        return Image.new(
+            "RGB",
+            (1024, 1024),
+            (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+        )
+
+    # Create a dataset with ordered values
+    dataset_rows = [
+        {"input": i, "target": i, "image": make_image(i)} for i in range(100)
+    ]
+    dataset = Dataset(rows=dataset_rows)
+    ref = weave.publish(dataset)
+    dataset = ref.get()
+
+    @weave.op()
+    async def model_predict(input) -> int:
+        return input
+
+    @weave.op()
+    def score_simple(input, output, target):
+        return input == output == target
+
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score_simple],
+    )
+
+    # Get all prediction and score calls to verify order
+    result = asyncio.run(evaluation.evaluate(model_predict))
+
+    # Verify the overall results
+    assert result["output"] == {"mean": 49.5}  # Average of 0-99
+    assert result["score_simple"] == {"true_count": 100, "true_fraction": 1.0}
+
+    # Get all prediction calls and verify order
+    predict_and_score_calls = list(evaluation.predict_and_score.calls())
+    assert len(predict_and_score_calls) == 100
+
+    # Extract inputs and outputs to verify order
+    inputs = [c.inputs["example"]["input"] for c in predict_and_score_calls]
+    outputs = [c.output["output"] for c in predict_and_score_calls]
+
+    # Verify inputs and outputs are in order 0-99
+    assert inputs == list(range(100))
+    assert outputs == list(range(100))
+
+    # Verify scores are all True and in order
+    scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
+    assert all(scores)
+    assert len(scores) == 100
