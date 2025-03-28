@@ -329,16 +329,3 @@ export const formatDateOnly = (
   }
   return moment(date).local().format(format);
 };
-
-/**
- * Converts a UTC time string to a local time string
- *
- * @param utcTime The UTC time string to convert
- * @returns A local time string in the format 'YYYY-MM-DD HH:mm:ss'
- */
-export const utcToLocalTimeString = (utcTime: string): string => {
-  return moment
-    .utc(utcTime, 'YYYY-MM-DDTHH:mm:ss')
-    .local()
-    .format('YYYY-MM-DD HH:mm:ss');
-};

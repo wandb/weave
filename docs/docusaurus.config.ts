@@ -1,7 +1,7 @@
 import type * as Preset from "@docusaurus/preset-classic";
-import type {Config} from "@docusaurus/types";
+import type { Config } from "@docusaurus/types";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
-import {themes as prismThemes} from "prism-react-renderer";
+import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "W&B Weave",
@@ -28,6 +28,10 @@ const config: Config = {
   i18n: {
     defaultLocale: "en",
     locales: ["en"],
+  },
+
+  markdown: {
+    mermaid: true,
   },
 
   presets: [
@@ -120,6 +124,7 @@ const config: Config = {
       },
     ],
     "docusaurus-theme-openapi-docs",
+    "@docusaurus/theme-mermaid",
   ],
   themeConfig: {
     // Replace with your project's social card
@@ -223,7 +228,7 @@ const config: Config = {
         {
           className: "theme-code-block-highlighted-line",
           line: "highlight-next-line",
-          block: {start: "highlight-start", end: "highlight-end"},
+          block: { start: "highlight-start", end: "highlight-end" },
         },
       ],
     },
