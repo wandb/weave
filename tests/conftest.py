@@ -570,7 +570,9 @@ def create_client(
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+        )
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
