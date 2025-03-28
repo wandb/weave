@@ -182,7 +182,7 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+    "max_memory_usage": 32 * 1024 * 1024 * 1024,  # 32 GiB
 }
 
 
