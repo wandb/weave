@@ -181,6 +181,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_size_bytes": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -227,6 +229,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_size_bytes": None,
     }
 
 
@@ -3471,3 +3475,118 @@ def test_call_stream_query_heavy_query_batch(client):
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
+
+
+def test_calls_query_with_storage_size(client):
+    """Test querying calls with storage size information"""
+    if not client_is_sqlite(client):
+        # due to limitations on how calls_merged_stats is calculated,
+        # the test is not run for ClickHouse clients
+        pytest.skip("Skipping test for non-sqlite clients")
+
+    @weave.op
+    def test_op(x: dict):
+        return x
+
+    # Create a call with some data
+    result = test_op(
+        {"data": "x" * 1000}
+    )  # Create some data to ensure storage size > 0
+
+    # Query with storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client), include_storage_size=True
+            )
+        )
+    )
+    assert len(calls) == 1
+    call = calls[0]
+
+    # Verify storage size is present and reasonable
+    assert call.storage_size_bytes > 0
+
+
+def test_calls_query_with_rolled_up_storage_size(client):
+    """Test querying calls with rolled up storage size"""
+    if not client_is_sqlite(client):
+        # due to limitations on how calls_merged_stats is calculated,
+        # the test is not run for ClickHouse clients
+        pytest.skip("Skipping test for non-sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # Query with rolled up storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_rolled_up_storage_size=True,
+            )
+        )
+    )
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify storage size fields
+    assert parent_call.storage_size_bytes is None
+    assert parent_call.total_size_bytes > 0  # Parent should have total size
+    assert child_call.storage_size_bytes is None
+    assert child_call.total_size_bytes is None  # Child should not have total size
+
+
+def test_calls_query_with_both_storage_sizes(client):
+    """Test querying calls with rolled up storage size"""
+    if not client_is_sqlite(client):
+        # due to limitations on how calls_merged_stats is calculated,
+        # the test is not run for ClickHouse clients
+        pytest.skip("Skipping test for non-sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # Query with rolled up storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_storage_size=True,
+                include_rolled_up_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify storage size fields
+    assert parent_call.storage_size_bytes > 0
+    assert (
+        parent_call.total_size_bytes > parent_call.storage_size_bytes
+    )  # Parent should have total size
+    assert child_call.storage_size_bytes > 0
+    assert child_call.total_size_bytes is None  # Child should not have total size
