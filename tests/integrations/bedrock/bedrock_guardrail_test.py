@@ -104,14 +104,14 @@ class TestBedrockGuardrailScorer:
         scorer = BedrockGuardrailScorer(
             guardrail_id="test-guardrail-id",
             guardrail_version="DRAFT",
-            source="OUTPUT",
+            source="OUTPUT", # where to apply the guardrail
             bedrock_runtime_kwargs={"region_name": "us-east-1"},
         )
         # Replace the real client with our mock
         scorer._bedrock_runtime = mock_bedrock_client
         return scorer
 
-    def test_format_content(self, scorer):
+    def bedrock_guardrail_test_format_content(self, scorer):
         """Test the format_content method."""
         output = "This is a test output"
         formatted = scorer.format_content(output)
@@ -120,7 +120,7 @@ class TestBedrockGuardrailScorer:
         assert len(formatted["content"]) == 1
         assert formatted["content"][0]["text"]["text"] == output
 
-    def test_score_allow(self, scorer, mock_bedrock_client):
+    def bedrock_guardrail_test_score_allow(self, scorer, mock_bedrock_client):
         """Test scoring content that passes the guardrail."""
         # Configure the mock to return the ALLOW response
         mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
@@ -162,7 +162,7 @@ class TestBedrockGuardrailScorer:
             == "How should I think about retirement planning in general?"
         )
 
-    def test_score_intervene(self, scorer, mock_bedrock_client):
+    def bedrock_guardrail_test_score_intervene(self, scorer, mock_bedrock_client):
         """Test scoring content that triggers guardrail intervention."""
         # Configure the mock to return the INTERVENE response
         mock_bedrock_client.apply_guardrail.return_value = (
@@ -197,7 +197,7 @@ class TestBedrockGuardrailScorer:
         # Verify the client was called with the correct parameters
         mock_bedrock_client.apply_guardrail.assert_called_once()
 
-    def test_score_error_handling(self, scorer, mock_bedrock_client):
+    def bedrock_guardrail_test_score_error_handling(self, scorer, mock_bedrock_client):
         """Test error handling in the score method."""
         # Configure the mock to raise an exception
         mock_bedrock_client.apply_guardrail.side_effect = Exception("Test error")
@@ -213,7 +213,7 @@ class TestBedrockGuardrailScorer:
         assert "error" in result.metadata
         assert "Test error" in result.metadata["error"]
 
-    def test_client_initialization_error(self):
+    def bedrock_guardrail_test_client_initialization_error(self):
         """Test handling of client initialization errors."""
         with patch("boto3.client") as mock_boto3_client:
             mock_boto3_client.side_effect = Exception("Failed to initialize client")
@@ -228,7 +228,7 @@ class TestBedrockGuardrailScorer:
 
             assert "Failed to initialize Bedrock runtime client" in str(excinfo.value)
 
-    def test_missing_boto3(self):
+    def bedrock_guardrail_test_missing_boto3(self):
         """Test handling of missing boto3 dependency."""
         with patch.dict("sys.modules", {"boto3": None}):
             with pytest.raises(ImportError) as excinfo:
@@ -241,7 +241,7 @@ class TestBedrockGuardrailScorer:
 
             assert "boto3 is not installed" in str(excinfo.value)
 
-    def test_uninitialized_client(self):
+    def bedrock_guardrail_test_uninitialized_client(self):
         """Test handling of uninitialized client."""
         scorer = BedrockGuardrailScorer(
             guardrail_id="test-guardrail-id",
@@ -258,7 +258,7 @@ class TestBedrockGuardrailScorer:
 
         assert "Bedrock runtime client is not initialized" in str(excinfo.value)
 
-    def test_different_source_parameter(self, mock_bedrock_client):
+    def bedrock_guardrail_test_different_source_parameter(self, mock_bedrock_client):
         """Test using a different source parameter."""
         scorer = BedrockGuardrailScorer(
             guardrail_id="test-guardrail-id",
@@ -278,7 +278,7 @@ class TestBedrockGuardrailScorer:
         call_args = mock_bedrock_client.apply_guardrail.call_args[1]
         assert call_args["source"] == "INPUT"
 
-    def test_different_guardrail_version(self, mock_bedrock_client):
+    def bedrock_guardrail_test_different_guardrail_version(self, mock_bedrock_client):
         """Test using a different guardrail version."""
         scorer = BedrockGuardrailScorer(
             guardrail_id="test-guardrail-id",
@@ -293,8 +293,3 @@ class TestBedrockGuardrailScorer:
         scorer.score("Test content")
         call_args = mock_bedrock_client.apply_guardrail.call_args[1]
         assert call_args["guardrailVersion"] == "2"
-
-
-if __name__ == "__main__":
-    # This allows running the tests directly with pytest
-    pytest.main(["-xvs", __file__])
