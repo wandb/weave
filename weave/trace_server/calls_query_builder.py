@@ -1249,7 +1249,11 @@ def _create_datetime_optimization_sql(
         else:
             timestamp = timestamp + DATETIME_OPTIMIZATION_BUFFER
 
-        fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
+        try:
+            fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
+        except ValueError:
+            # If the timestamp is broken, skip optimizing that condition
+            continue
 
         # Determine the comparison operator based on whether this is a NOT operation
         comparison_op = "<" if is_not else ">="
