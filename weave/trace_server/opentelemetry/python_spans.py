@@ -9,14 +9,14 @@ from uuid_extensions import uuid7
 from weave.trace_server import trace_server_interface as tsi
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, List, Tuple, Union, NewType, Optional, Mapping
+from typing import Any, List, Tuple, Union, NewType, Optional, Mapping, Dict
 from typing_extensions import assert_never
 from collections.abc import Sequence, Iterable, Iterator
 from pathlib import Path
 import datetime
 from binascii import hexlify
 from .attributes import to_json_serializable
-from .attributes import transform_key_values
+from .attributes import unflatten_key_values
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue, KeyValue, InstrumentationScope
 )
@@ -154,7 +154,7 @@ def _decode_value(any_value: AnyValue) -> Any:
 @dataclass
 class Attributes():
 
-    _attributes: dict[str, Any] = field(default_factory=dict)
+    _attributes: Union[Dict[str, Any], List[Any]] = field(default_factory=dict)
 
     def __getitem__(self, item):
         return self._attributes.__getitem__(item)
@@ -167,7 +167,7 @@ class Attributes():
 
     @classmethod
     def from_proto(cls, key_values: Iterable[KeyValue]) -> 'Attributes':
-        return cls(transform_key_values(key_values))
+        return cls(unflatten_key_values(key_values))
 
     def get_attribute_value(self, key: str, separator: str = ".") -> Any:
         keys = key.split(separator)
@@ -250,7 +250,6 @@ class Span:
         # how do we injest it
         # how do we query it
         attributes = to_json_serializable(self.attributes._attributes)
-        inputs = self.attributes.get_attribute_value('input')
         inputs = attributes.pop('input') if attributes.get('input') else {}
         outputs = attributes.pop('output') if attributes.get('output') else {}
 
