@@ -3,7 +3,7 @@ from itertools import combinations
 from langfair.auto import AutoEval
 from langfair.generator import CounterfactualGenerator
 from langfair.metrics.counterfactual import CounterfactualMetrics
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
@@ -55,22 +55,19 @@ class CounterfactualScorer(LLMScorer):
         description="Count for prompts with protected words",
     )
 
-    autoeval: AutoEval = Field(
-        default=AutoEval(prompts=[" "]),
-        description="AutoEval class object",
-    )
-
     cf_generator_object: CounterfactualGenerator = Field(
         default=CounterfactualGenerator(),
         description="CounterfactualGenrator class object",
     )
 
-    cf_metric_object: CounterfactualMetrics = Field(
-        default=CounterfactualMetrics(metrics=[metric_name],
-            neutralize_tokens=neutralize_tokens,
-            ),
-        description="CounterfactualMetrics class object",
-    )
+    _cf_metric_object: CounterfactualMetrics = PrivateAttr()
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._cf_metric_object = CounterfactualMetrics(
+            metrics=self.metric_name,
+            neutralize_tokens=self.neutralize_tokens,
+        )
 
     @weave.op
     async def score(
@@ -114,14 +111,14 @@ class CounterfactualScorer(LLMScorer):
             threshold
         ) -> bool:
         for group in scores:
-            if self.metric_name in ["Cosine", "Rougel", "Bleu"]:
-                if scores[group] < threshold:
+            score = list(scores[group].values())[0]
+            if self.metric_name[0] in ["Cosine", "Rougel", "Bleu"]:
+                if score < threshold:
                     return False
             else:
-                if scores[group] > threshold:
+                if score > threshold:
                     return False
         return True
-
 
     def _check_ftu_(self, query):
         # Parse prompts for protected attribute words
@@ -147,11 +144,9 @@ class CounterfactualScorer(LLMScorer):
                     attribute=attribute,
                 )
 
-                # generate counterfactual responses
                 counterfactual_responses[attribute] = {}
                 for group in groups:
                     prompt_key = group + "_prompt"
-                    # print(group, prompt_key, prompts_dict)
                     responses = await self._acompletion(
                         messages=[{"role": "user", "content": prompts_dict[prompt_key][0]}],
                         model=self.model_id,
@@ -173,18 +168,9 @@ class CounterfactualScorer(LLMScorer):
                 ):
                     group1_response = counterfactual_responses[attribute][group1 + "_response"]
                     group2_response = counterfactual_responses[attribute][group2 + "_response"]
-                    successful_response_index = self.autoeval._get_success_indices(
-                        group1_response=[group1_response],
-                        group2_response=[group2_response],
-                    )
-                    print(successful_response_index)
-                    cf_group_results = self.cf_metric_object.evaluate(
-                        texts1=[
-                            group1_response[i] for i in successful_response_index
-                        ],
-                        texts2=[
-                            group2_response[i] for i in successful_response_index
-                        ],
+                    cf_group_results = self._cf_metric_object.evaluate(
+                        texts1=[group1_response],
+                        texts2=[group2_response],
                         attribute=attribute,
                         return_data=True,
                     )
@@ -192,3 +178,4 @@ class CounterfactualScorer(LLMScorer):
                         cf_group_results["metrics"]
                     )
         return counterfactual_data
+
