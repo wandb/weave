@@ -27,6 +27,17 @@ def wf_clickhouse_database() -> str:
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
 
 
+def wf_clickhouse_max_memory_usage() -> Optional[int]:
+    """The maximum memory usage for the clickhouse server."""
+    mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
+    if mem is None:
+        return None
+    try:
+        return int(mem)
+    except ValueError:
+        return None
+
+
 # BYOB Settings
 
 
