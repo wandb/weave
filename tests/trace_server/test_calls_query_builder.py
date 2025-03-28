@@ -1584,8 +1584,8 @@ def test_datetime_optimization_simple() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_1:String}
-        AND calls_merged.id >= '018df74e-99a0-7000-8000-000000000000'
+        WHERE calls_merged.project_id = {pb_2:String}
+        AND calls_merged.id >= {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:UInt64}))
@@ -1593,7 +1593,11 @@ def test_datetime_optimization_simple() -> None:
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": 1709251200, "pb_1": "project"},
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+        },
     )
 
 
@@ -1623,8 +1627,8 @@ def test_datetime_optimization_not_operation() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_1:String}
-        AND calls_merged.id < '018df750-6e60-7000-8000-000000000000'
+        WHERE calls_merged.project_id = {pb_2:String}
+        AND calls_merged.id < {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
             (NOT ((any(calls_merged.started_at) > {pb_0:UInt64}))))
@@ -1632,7 +1636,11 @@ def test_datetime_optimization_not_operation() -> None:
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": 1709251200, "pb_1": "project"},
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "018df750-6e60-7000-8000-000000000000",
+        },
     )
 
 
@@ -1645,15 +1653,35 @@ def test_datetime_optimization_multiple_conditions() -> None:
             {
                 "$and": [
                     {
-                        "$gt": [
-                            {"$getField": "started_at"},
-                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        "$and": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709337600},  # 2024-03-02 00:00:00 UTC
+                                ]
+                            },
                         ]
                     },
                     {
-                        "$gt": [
-                            {"$getField": "ended_at"},
-                            {"$literal": 1709337600},  # 2024-03-02 00:00:00 UTC
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$getField": "ended_at"},
+                                    {"$literal": 1709251200},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "ended_at"},
+                                    {"$literal": 1709337600},  #
+                                ]
+                            },
                         ]
                     },
                 ]
@@ -1668,18 +1696,23 @@ def test_datetime_optimization_multiple_conditions() -> None:
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_2:String}
-        AND calls_merged.id >= '018df74e-99a0-7000-8000-000000000000'
-        AND calls_merged.id >= '018dfc74-f5a0-7000-8000-000000000000'
+        WHERE calls_merged.project_id = {pb_4:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:UInt64}))
-            AND ((any(calls_merged.ended_at) > {pb_1:UInt64}))
+            AND ((any(calls_merged.started_at) > {pb_1:UInt64}))
+            AND (((any(calls_merged.ended_at) > {pb_0:UInt64}) OR (any(calls_merged.ended_at) > {pb_1:UInt64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": 1709251200, "pb_1": 1709337600, "pb_2": "project"},
+        {
+            "pb_0": 1709251200,
+            "pb_1": 1709337600,
+            "pb_4": "project",
+            "pb_2": "018df74e-99a0-7000-8000-000000000000",
+            "pb_3": "018dfc74-f5a0-7000-8000-000000000000",
+        },
     )
 
 

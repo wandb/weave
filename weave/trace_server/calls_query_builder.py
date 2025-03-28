@@ -1327,6 +1327,11 @@ def _create_datetime_optimization_sql(
         is_not = isinstance(condition.operand, tsi_query.NotOperation)
         operand = condition.operand.not_[0] if is_not else condition.operand
 
+        is_or = isinstance(operand, tsi_query.OrOperation)
+        # identified an OR, completely eject from optimization
+        if is_or:
+            return ""
+
         # Only handle GtOperation
         if not isinstance(operand, tsi_query.GtOperation):
             continue
@@ -1360,7 +1365,10 @@ def _create_datetime_optimization_sql(
         comparison_op = "<" if is_not else ">="
 
         # Add the condition
-        datetime_conditions.append(f"{table_alias}.id {comparison_op} '{fake_uuid}'")
+        param_name = pb.add_param(fake_uuid)
+        datetime_conditions.append(
+            f"{table_alias}.id {comparison_op} {_param_slot(param_name, 'String')}"
+        )
 
     if not datetime_conditions:
         return ""
