@@ -3,11 +3,14 @@ import contextlib
 import logging
 import os
 import subprocess
+import tempfile
 import time
 import typing
 import urllib
+import uuid
 from collections.abc import Iterator
 
+import clickhouse_connect
 import pytest
 import requests
 from fastapi import FastAPI
@@ -16,6 +19,7 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
@@ -30,6 +34,194 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+
+# Custom ClickHouse server for parallel testing
+class TestClickHouseTraceServer(clickhouse_trace_server_batched.ClickHouseTraceServer):
+    """Custom ClickHouse server that allows changing the database names for parallel testing."""
+
+    def __init__(self, *args, **kwargs):
+        self.db_management_name = "db_management"  # Default value
+        self.default_db_name = kwargs.get(
+            "database", "default"
+        )  # Get from constructor or use default
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def from_env(cls, use_async_insert: bool = False) -> "TestClickHouseTraceServer":
+        # Create the instance with standard env values
+        instance = cls(
+            host=ts_env.wf_clickhouse_host(),
+            port=ts_env.wf_clickhouse_port(),
+            user=ts_env.wf_clickhouse_user(),
+            password=ts_env.wf_clickhouse_pass(),
+            database="default",  # Start with the standard default database
+            use_async_insert=use_async_insert,
+            file_storage_uri_str=ts_env.wf_file_storage_uri(),
+        )
+        return instance
+
+    def _mint_client(self) -> "clickhouse_connect.driver.client.Client":
+        """Create a client that is safe to use before databases exist."""
+        client = clickhouse_connect.get_client(
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
+            database="default",  # Always start with the standard default database
+            secure=self._port == 8443,
+        )
+        return client
+
+    def setup_for_testing(self):
+        """Set up databases for testing safely."""
+        # Use a client with the default database
+        client = self._mint_client()
+
+        # Drop the databases if they exist
+        client.command(f"DROP DATABASE IF EXISTS {self.db_management_name}")
+        client.command(f"DROP DATABASE IF EXISTS {self.default_db_name}")
+
+        # Create the databases
+        client.command(f"CREATE DATABASE {self.db_management_name}")
+        client.command(f"CREATE DATABASE {self.default_db_name}")
+
+        # Run migrations
+        self._run_migrations()
+
+        # Now set the client's database to our custom one
+        self.ch_client.database = self.default_db_name
+
+    def _run_migrations(self):
+        """Override to use our custom database names."""
+        logger = logging.getLogger("weave.trace_server.clickhouse_trace_server_batched")
+        logger.info(
+            f"Running migrations for {self.default_db_name} with management db {self.db_management_name}"
+        )
+
+        # Create a migrator with the default client
+        migrator = (
+            clickhouse_trace_server_batched.wf_migrator.ClickHouseTraceServerMigrator(
+                self._mint_client()
+            )
+        )
+
+        # Initialize the management database for this specific instance
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.db_management_name}.migrations
+            (
+                db_name String,
+                curr_version UInt64,
+                partially_applied_version UInt64 NULL
+            )
+            ENGINE = MergeTree()
+            ORDER BY (db_name)
+        """
+        self.ch_client.command(create_table_sql)
+
+        # Apply migrations to our custom database
+        migrator.apply_migrations(self.default_db_name)
+
+    def _insert(self, table, data, column_names, settings=None):
+        """Override to prepend the database name to the table."""
+        # Only prepend if the table doesn't already include a database name
+        if "." not in table:
+            table = f"{self.default_db_name}.{table}"
+        return super()._insert(table, data, column_names, settings)
+
+    def _query(self, query, parameters, column_formats=None):
+        """Replace any references to the default database with our custom database."""
+        # Simple string replacement for database references
+        query = query.replace(" default.", f" {self.default_db_name}.")
+        query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
+        query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
+        query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        # Also handle db_management references
+        query = query.replace("db_management.", f"{self.db_management_name}.")
+
+        # Handle tables without explicit database prefix - add all table names that appear in queries
+        tables_to_prefix = [
+            "tables",
+            "call_parts",
+            "object_versions",
+            "files",
+            "feedback",
+            "llm_token_prices",
+            "table_rows",
+            "migrations",
+        ]
+
+        for table in tables_to_prefix:
+            # Being careful with the patterns to avoid false positives
+            query = query.replace(f" {table} ", f" {self.default_db_name}.{table} ")
+            query = query.replace(
+                f"FROM {table}\n", f"FROM {self.default_db_name}.{table}\n"
+            )
+            query = query.replace(
+                f"FROM {table} ", f"FROM {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"INTO {table} ", f"INTO {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"JOIN {table} ", f"JOIN {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"UPDATE {table} ", f"UPDATE {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"DELETE FROM {table} ", f"DELETE FROM {self.default_db_name}.{table} "
+            )
+
+        return super()._query(query, parameters, column_formats)
+
+    def _query_stream(self, query, parameters, column_formats=None, settings=None):
+        """Replace any references to the default database with our custom database."""
+        # Simple string replacement for database references
+        query = query.replace(" default.", f" {self.default_db_name}.")
+        query = query.replace("FROM default.", f"FROM {self.default_db_name}.")
+        query = query.replace("INTO default.", f"INTO {self.default_db_name}.")
+        query = query.replace("JOIN default.", f"JOIN {self.default_db_name}.")
+
+        # Also handle db_management references
+        query = query.replace("db_management.", f"{self.db_management_name}.")
+
+        # Handle tables without explicit database prefix - add all table names that appear in queries
+        tables_to_prefix = [
+            "tables",
+            "call_parts",
+            "object_versions",
+            "files",
+            "feedback",
+            "llm_token_prices",
+            "table_rows",
+            "migrations",
+        ]
+
+        for table in tables_to_prefix:
+            # Being careful with the patterns to avoid false positives
+            query = query.replace(f" {table} ", f" {self.default_db_name}.{table} ")
+            query = query.replace(
+                f"FROM {table}\n", f"FROM {self.default_db_name}.{table}\n"
+            )
+            query = query.replace(
+                f"FROM {table} ", f"FROM {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"INTO {table} ", f"INTO {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"JOIN {table} ", f"JOIN {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"UPDATE {table} ", f"UPDATE {self.default_db_name}.{table} "
+            )
+            query = query.replace(
+                f"DELETE FROM {table} ", f"DELETE FROM {self.default_db_name}.{table} "
+            )
+
+        return super()._query_stream(query, parameters, column_formats, settings)
 
 
 @pytest.fixture(autouse=True)
@@ -205,12 +397,8 @@ def clickhouse_server():
 
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
-    )
-    clickhouse_trace_server._run_migrations()
+    clickhouse_trace_server = TestClickHouseTraceServer.from_env(use_async_insert=False)
+    clickhouse_trace_server.setup_for_testing()
     yield clickhouse_trace_server
 
 
@@ -558,23 +746,64 @@ def create_client(
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+    db_path = None
+
+    # Get worker id for parallel test execution, used by both SQLite and ClickHouse
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
+    worker_suffix = f"_{worker_id}_{uuid.uuid4().hex[:8]}" if worker_id else ""
+
     if weave_server_flag == "sqlite":
-        sqlite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
+        if worker_id:
+            temp_dir = tempfile.gettempdir()
+            # Create a unique file-based database for each worker
+            db_path = f"{temp_dir}/weave_test{worker_suffix}.db"
+        else:
+            # Use in-memory database for single process
+            db_path = "file::memory:?cache=shared"
+
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(db_path)
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
         server = TestOnlyUserInjectingExternalTraceServer(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
-        ch_server._run_migrations()
+        # Create unique database names for parallel workers
+        db_management_name = f"db_management{worker_suffix}"
+        default_db_name = f"default{worker_suffix}"
+
+        # Create a customized ClickHouse server with unique database names
+        ch_server = TestClickHouseTraceServer.from_env()
+
+        # Set the custom database names
+        ch_server.db_management_name = db_management_name
+        ch_server.default_db_name = default_db_name
+
+        # Set up all databases and migrations safely
+        ch_server.setup_for_testing()
+
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
         )
+
+        # Register finalizer to clean up the ClickHouse databases
+        def cleanup_clickhouse():
+            try:
+                # Use a new client to drop databases
+                client = clickhouse_connect.get_client(
+                    host=ts_env.wf_clickhouse_host(),
+                    port=ts_env.wf_clickhouse_port(),
+                    user=ts_env.wf_clickhouse_user(),
+                    password=ts_env.wf_clickhouse_pass(),
+                    database="default",
+                )
+                client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
+                client.command(f"DROP DATABASE IF EXISTS {default_db_name}")
+                client.close()
+            except Exception:
+                pass
+
+        request.addfinalizer(cleanup_clickhouse)
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
@@ -594,6 +823,18 @@ def create_client(
         autopatch.autopatch(autopatch_settings)
         if global_attributes is not None:
             weave.trace.api._global_attributes = global_attributes
+
+        # Register finalizer to remove the temp SQLite file if we created one
+        if db_path and db_path.startswith(tempfile.gettempdir()):
+
+            def cleanup_db():
+                try:
+                    if os.path.exists(db_path):
+                        os.unlink(db_path)
+                except Exception:
+                    pass
+
+            request.addfinalizer(cleanup_db)
 
     return inited_client
 
@@ -687,3 +928,10 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True, scope="function")
+def clear_call_context(request):
+    """Ensure call context is empty at the start and end of each test."""
+    with set_call_stack([]):
+        yield
