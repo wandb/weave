@@ -1,10 +1,12 @@
-import {Box, Tooltip} from '@mui/material';
+import {Box, Tooltip, Typography} from '@mui/material';
 import {
   GridRenderCellParams,
   GridRenderEditCellParams,
 } from '@mui/x-data-grid-pro';
+import {MOON_600} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import set from 'lodash/set';
 import React, {useCallback, useState} from 'react';
 
@@ -47,6 +49,421 @@ interface CellViewingRendererProps {
   disableNewRowHighlight?: boolean;
 }
 
+interface FeedbackItem {
+  id: string;
+  feedback_type: string;
+  created_at: string;
+  creator: string | null;
+  wb_user_id: string;
+  payload: Record<string, any>;
+}
+
+export const FeedbackCellRenderer: React.FC<{
+  value: FeedbackItem[] | any;
+}> = ({value}) => {
+  // Convert different feedback formats to a consistent format for display
+  const normalizeFeedback = (feedbackData: any): FeedbackItem[] => {
+    if (!feedbackData) return [];
+
+    // If it's a plain object with feedback items as keys (the most common W&B format)
+    if (typeof feedbackData === 'object' && !Array.isArray(feedbackData)) {
+      // Check each key to see if it contains feedback (wandb.reaction, wandb.note, etc.)
+      const feedbackItems: FeedbackItem[] = [];
+
+      Object.entries(feedbackData).forEach(([key, value]) => {
+        // If the value is an object and has a feedback_type field, it's likely a feedback item
+        if (typeof value === 'object' && value && 'feedback_type' in value) {
+          feedbackItems.push(value as FeedbackItem);
+        }
+        // Handle the keys like wandb.reaction.1, wandb.note.1
+        else if (key.match(/^wandb\.(reaction|note)\.\d+$/)) {
+          // For these keys, create a FeedbackItem with the full original key as the feedback_type
+          feedbackItems.push({
+            id: key,
+            feedback_type: key, // Use the full key as the feedback_type to preserve numbering
+            created_at: new Date().toISOString(),
+            creator: null,
+            wb_user_id: '',
+            payload: value as Record<string, any>,
+          });
+        }
+      });
+
+      return feedbackItems;
+    }
+
+    // Handle array of feedback items (less common)
+    if (Array.isArray(feedbackData) && feedbackData.length > 0) {
+      return feedbackData;
+    }
+
+    return [];
+  };
+
+  const normalizedFeedback = normalizeFeedback(value);
+
+  if (!normalizedFeedback.length) {
+    return <Box sx={{p: '4px 8px', color: 'text.secondary'}}>No feedback</Box>;
+  }
+
+  // Count different types of feedback
+  const counts: Record<string, number> = {
+    reaction: 0,
+    note: 0,
+    other: 0,
+  };
+
+  normalizedFeedback.forEach(item => {
+    if (
+      item.feedback_type === 'wandb.reaction' ||
+      item.feedback_type.startsWith('wandb.reaction.')
+    ) {
+      counts.reaction += 1;
+    } else if (
+      item.feedback_type === 'wandb.note' ||
+      item.feedback_type.startsWith('wandb.note.')
+    ) {
+      counts.note += 1;
+    } else {
+      counts.other += 1;
+    }
+  });
+
+  // Group feedback by type for better organization in tooltip
+  const reactions = normalizedFeedback.filter(
+    item =>
+      item.feedback_type === 'wandb.reaction' ||
+      item.feedback_type.startsWith('wandb.reaction.')
+  );
+  const notes = normalizedFeedback.filter(
+    item =>
+      item.feedback_type === 'wandb.note' ||
+      item.feedback_type.startsWith('wandb.note.')
+  );
+  const others = normalizedFeedback.filter(
+    item =>
+      !(
+        item.feedback_type === 'wandb.reaction' ||
+        item.feedback_type.startsWith('wandb.reaction.')
+      ) &&
+      !(
+        item.feedback_type === 'wandb.note' ||
+        item.feedback_type.startsWith('wandb.note.')
+      )
+  );
+
+  // Generate tooltip content
+  const tooltipContent = (
+    <Box
+      sx={{
+        p: 1,
+        minWidth: 300,
+        maxHeight: 400,
+        overflow: 'auto',
+      }}>
+      {reactions.length > 0 && (
+        <Box sx={{mb: 2}}>
+          <Typography variant="subtitle2" sx={{fontWeight: 600, mb: 1}}>
+            Reactions ({reactions.length})
+          </Typography>
+          {reactions.map((item, index) => (
+            <Box
+              key={`reaction-${item.id || index}`}
+              sx={{
+                mb: 1,
+                p: 1,
+                borderRadius: 1,
+                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                '&:last-child': {mb: 0},
+              }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
+                  mb: 0.5,
+                }}>
+                <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5}}>
+                  {item.wb_user_id && (
+                    <UserLink userId={item.wb_user_id} includeName />
+                  )}
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{color: 'text.secondary', flexShrink: 0}}>
+                  {new Date(item.created_at).toLocaleString()}
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  bgcolor: 'background.paper',
+                  p: 1,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}>
+                <Typography variant="body2">
+                  {item.payload.emoji || item.payload.alias || 'Reaction'}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {notes.length > 0 && (
+        <Box sx={{mb: 2}}>
+          <Typography variant="subtitle2" sx={{fontWeight: 600, mb: 1}}>
+            Notes ({notes.length})
+          </Typography>
+          {notes.map((item, index) => (
+            <Box
+              key={`note-${item.id || index}`}
+              sx={{
+                mb: 1,
+                p: 1,
+                borderRadius: 1,
+                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                '&:last-child': {mb: 0},
+              }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
+                  mb: 0.5,
+                }}>
+                <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5}}>
+                  {item.wb_user_id && (
+                    <UserLink userId={item.wb_user_id} includeName />
+                  )}
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{color: 'text.secondary', flexShrink: 0}}>
+                  {new Date(item.created_at).toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  bgcolor: 'background.paper',
+                  p: 1,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}>
+                {item.payload.note || JSON.stringify(item.payload, null, 2)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {others.length > 0 && (
+        <Box>
+          <Typography variant="subtitle2" sx={{fontWeight: 600, mb: 1}}>
+            Other Feedback ({others.length})
+          </Typography>
+          {others.map((item, index) => (
+            <Box
+              key={`other-${item.id || index}`}
+              sx={{
+                mb: 1,
+                p: 1,
+                borderRadius: 1,
+                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                '&:last-child': {mb: 0},
+              }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
+                  mb: 0.5,
+                }}>
+                <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5}}>
+                  <Typography variant="subtitle2" sx={{fontWeight: 600}}>
+                    {item.feedback_type}
+                  </Typography>
+                  {item.wb_user_id && (
+                    <Typography
+                      variant="caption"
+                      sx={{color: 'text.secondary', ml: 1}}>
+                      · <UserLink userId={item.wb_user_id} includeName />
+                    </Typography>
+                  )}
+                </Box>
+                {item.creator && (
+                  <Typography
+                    variant="caption"
+                    sx={{color: 'text.secondary', flexShrink: 0}}>
+                    {new Date(item.created_at).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}>
+                {typeof item.payload === 'string'
+                  ? item.payload
+                  : JSON.stringify(item.payload, null, 2)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+
+  // Create compact display
+  const summary = (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        height: '100%',
+        pl: 1,
+        flexWrap: 'nowrap',
+      }}>
+      {normalizedFeedback.length === 0 ? (
+        <Typography variant="caption" sx={{color: 'text.secondary'}}>
+          No feedback
+        </Typography>
+      ) : (
+        <>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              ml: 1,
+              color: MOON_600,
+              fontFamily: '"Source Sans Pro"',
+            }}>
+            Feedback
+          </Typography>
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'nowrap',
+            }}>
+            {counts.reaction > 0 && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: 'rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px',
+                  px: 0.5,
+                  py: 0.25,
+                }}>
+                <Icon name="add-reaction" width={12} height={12} />
+                <Typography variant="caption" sx={{ml: 0.5, fontWeight: 600}}>
+                  {counts.reaction}
+                </Typography>
+              </Box>
+            )}
+
+            {counts.note > 0 && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: 'rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px',
+                  px: 0.5,
+                  py: 0.25,
+                }}>
+                <Icon name="forum-chat-bubble" width={12} height={12} />
+                <Typography variant="caption" sx={{ml: 0.5, fontWeight: 600}}>
+                  {counts.note}
+                </Typography>
+              </Box>
+            )}
+
+            {counts.other > 0 && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: 'rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px',
+                  px: 0.5,
+                  py: 0.25,
+                }}>
+                <Typography variant="caption" sx={{fontWeight: 600}}>
+                  +{counts.other}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+
+  return (
+    <Tooltip
+      title={tooltipContent}
+      placement="right-start"
+      arrow
+      enterDelay={300}
+      leaveDelay={300}
+      PopperProps={{
+        popperOptions: {
+          modifiers: [
+            {
+              name: 'preventOverflow',
+              options: {
+                boundary: window,
+                altAxis: true,
+                padding: 16,
+              },
+            },
+            {
+              name: 'flip',
+              options: {
+                altBoundary: true,
+                fallbackPlacements: ['left-start', 'bottom', 'top'],
+              },
+            },
+          ],
+        },
+        sx: {
+          '& .MuiTooltip-tooltip': {
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
+            border: '1px solid',
+            borderColor: 'divider',
+            p: 0,
+            maxHeight: '80vh', // Limit height to 80% of viewport
+            overflowY: 'auto',
+          },
+        },
+      }}>
+      {summary}
+    </Tooltip>
+  );
+};
+
 export const CellViewingRenderer: React.FC<
   GridRenderCellParams & CellViewingRendererProps
 > = ({
@@ -63,6 +480,39 @@ export const CellViewingRenderer: React.FC<
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
+
+  // Special handling for feedback field
+  const isFeedbackField =
+    field === 'summary.weave.feedback' ||
+    (typeof value === 'object' &&
+      value !== null &&
+      Object.keys(value).some(key =>
+        key.match(/^wandb\.(reaction|note)\.\d+$/)
+      ));
+
+  if (isFeedbackField) {
+    const backgroundColor = isDeleted
+      ? CELL_COLORS.DELETED
+      : isEdited
+      ? CELL_COLORS.EDITED
+      : isNew && !disableNewRowHighlight
+      ? CELL_COLORS.NEW
+      : CELL_COLORS.TRANSPARENT;
+
+    return (
+      <Box
+        sx={{
+          height: '100%',
+          backgroundColor,
+          opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,
+          textDecoration: isDeleted
+            ? DELETED_CELL_STYLES.textDecoration
+            : 'none',
+        }}>
+        <FeedbackCellRenderer value={value} />
+      </Box>
+    );
+  }
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isEditable =
