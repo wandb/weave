@@ -11,7 +11,7 @@ import sys
 import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
-from functools import lru_cache
+from functools import lru_cache, partial, wraps
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -40,6 +40,7 @@ from weave.trace.interface_query_builder import (
     literal_expr,
 )
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.log import log
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -723,6 +724,36 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+        )
+
+    @wraps(log)
+    def log(self, *args: Any, **kwargs: Any) -> Call:
+        return partial(log, parent_call=self)(*args, **kwargs)
+
+    def add_feedback(self, *, payload: dict, feedback_type: str = "custom") -> None:
+        wc = weave_client_context.require_weave_client()
+
+        freq = FeedbackCreateReq(
+            project_id=wc._project_id(),
+            weave_ref=self.ref.uri(),
+            feedback_type=feedback_type,
+            payload=payload,
+        )
+        wc._send_feedback_create(freq)
+
+    def finish(
+        self,
+        # ended_at: datetime | None = None,
+        output: Any | None = None,
+        exception: BaseException | None = None,
+        # summary: str | None = None
+    ) -> None:
+        wc = weave_client_context.require_weave_client()
+        return wc.finish_call(
+            self,
+            output=output,
+            #    summary=summary,
+            exception=exception,
         )
 
 
@@ -1683,6 +1714,13 @@ class WeaveClient:
         response = self.server.feedback_create(freq)
 
         return response.id
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _send_feedback_create(self, freq: FeedbackCreateReq) -> Future[str]:
+        def send_feedback_create() -> str:
+            return self.server.feedback_create(freq)
+
+        return self.future_executor.defer(send_feedback_create)
 
     ################# Object Saving ##################
     # `_save_object` is the top level entry point for saving data to the weave server.
