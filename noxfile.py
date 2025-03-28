@@ -16,7 +16,9 @@ PY313_INCOMPATIBLE_SHARDS = [
     "google_ai_studio",
     "bedrock",
     "scorers",
+    "crewai",
 ]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai"]
 
 
 @nox.session
@@ -40,8 +42,10 @@ def lint(session):
         "anthropic",
         "cerebras",
         "cohere",
+        "crewai",
         "dspy",
         "google_ai_studio",
+        "google_genai",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
@@ -64,6 +68,9 @@ def tests(session, shard):
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
+    if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
+
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
 
@@ -79,6 +86,9 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
+    if shard in ["google_ai_studio", "google_genai"]:
+        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
+
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 

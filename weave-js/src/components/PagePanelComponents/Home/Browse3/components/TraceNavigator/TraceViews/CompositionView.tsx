@@ -36,9 +36,20 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   border: 1px solid
     ${props => (props.$isSelected ? Colors.TEAL_500 : Colors.MOON_200)};
   border-radius: 4px;
-  background: ${props => (props.$isSelected ? Colors.MOON_100 : Colors.WHITE)};
+  background: ${props =>
+    props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE};
   transition: all 0.1s ease-in-out;
   flex: 1 1 100px;
+
+  &:hover {
+    ${props =>
+      !props.$isSelected &&
+      `
+      background: ${Colors.MOON_100};
+      box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      border-color: ${Colors.MOON_300};
+    `}
+  }
 `;
 NodeContainer.displayName = 'NodeContainer';
 
@@ -46,7 +57,7 @@ const NodeHeader = styled.button`
   width: 100%;
   padding: 8px 12px;
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 8px;
   border: none;
   background: none;
@@ -54,10 +65,6 @@ const NodeHeader = styled.button`
   cursor: pointer;
   min-height: 32px;
   user-select: none;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.02);
-  }
 `;
 NodeHeader.displayName = 'NodeHeader';
 
@@ -95,7 +102,7 @@ const RecursionBlock = styled.div`
   padding: 8px 12px;
   border: 1px dashed ${Colors.TEAL_500};
   border-radius: 4px;
-  background: ${Colors.MOON_100};
+  background: ${Colors.WHITE};
   color: ${Colors.TEAL_500};
   font-size: 14px;
   display: flex;
@@ -189,29 +196,29 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   return (
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <div className="flex min-w-0 flex-col">
-            <div className="flex items-center truncate text-sm font-medium">
-              {node.opName}
-            </div>
-            <div className="truncate text-[11px] text-moon-500">
-              {stats.finishedCallCount} finished
-              {stats.unfinishedCallCount > 0 &&
-                ` • ${stats.unfinishedCallCount} running`}
-              {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
-              {stats.finishedCallCount > 0 &&
-                ` • ${formatDuration(avgDuration)} avg`}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex w-full items-center ">
+            <div className="truncate text-sm font-medium">{node.opName}</div>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-moon-500">
+            <span>{stats.finishedCallCount} finished</span>
+            {stats.unfinishedCallCount > 0 && (
+              <span>• {stats.unfinishedCallCount} running</span>
+            )}
+            {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
+            {stats.finishedCallCount > 0 && (
+              <span>• {formatDuration(avgDuration)} avg</span>
+            )}
+            <div className="ml-auto whitespace-nowrap text-[11px] text-moon-500">
+              {stats.finishedCallCount > 0
+                ? stats.minDuration === stats.maxDuration
+                  ? formatDuration(stats.minDuration)
+                  : `${formatDuration(stats.minDuration)} - ${formatDuration(
+                      stats.maxDuration
+                    )}`
+                : 'Running...'}
             </div>
           </div>
-        </div>
-        <div className="whitespace-nowrap text-[11px] text-moon-500">
-          {stats.finishedCallCount > 0
-            ? stats.minDuration === stats.maxDuration
-              ? formatDuration(stats.minDuration)
-              : `${formatDuration(stats.minDuration)} - ${formatDuration(
-                  stats.maxDuration
-                )}`
-            : 'Running...'}
         </div>
       </NodeHeader>
 

@@ -231,18 +231,19 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "trace_server",
             "anthropic",
             "bedrock",
             "cerebras",
             "cohere",
+            # "crewai",
             "dspy",
             "groq",
             "huggingface",
             "google_ai_studio",
+            "google_genai",
             "instructor",
             "langchain",
             "litellm",

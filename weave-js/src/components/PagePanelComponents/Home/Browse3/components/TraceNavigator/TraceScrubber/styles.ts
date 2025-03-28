@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 export const Container = styled.div<{$isCollapsed?: boolean}>`
   border-top: 1px solid ${Colors.MOON_200};
-  margin-bottom: ${props => (props.$isCollapsed ? '-108px' : '0px')};
+  margin-bottom: ${props => (props.$isCollapsed ? '-105px' : '0px')};
   padding: 8px 16px;
   transition: padding 0.2s ease;
   background: ${Colors.WHITE};

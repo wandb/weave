@@ -68,6 +68,8 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   ActionSpec: 'rocket-launch',
   AnnotationSpec: 'forum-chat-bubble',
   SavedView: 'view-glasses',
+  Provider: 'model',
+  ProviderModel: 'model',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -278,14 +280,14 @@ const ObjectVersionPageInner: React.FC<{
               <p>{objectVersionIndex}</p>
             </div>
             <div className="block">
-              <p className="text-moon-500">Created</p>
+              <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
               </p>
             </div>
             {objectVersion.userId && (
               <div className="block">
-                <p className="text-moon-500">Created by</p>
+                <p className="text-moon-500">Last updated by</p>
                 <UserLink userId={objectVersion.userId} includeName />
               </div>
             )}

@@ -544,7 +544,7 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '/',
     PATTERN_PROJECT,
     '/call/',
-    '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
+    '([0-9a-fA-F-]+)', // Match any ID with or without dashes to support OTEL style ID strings
     '/?', // Ref extra portion is optional
     PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string

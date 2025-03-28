@@ -6,6 +6,9 @@ export type ActionType = z.infer<typeof ActionTypeSchema>;
 export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
 export type Model = z.infer<typeof ModelSchema>;
 
+export const ProviderReturnTypeSchema = z.enum(['openai']);
+export type ProviderReturnType = z.infer<typeof ProviderReturnTypeSchema>;
+
 export const ConfigSchema = z.object({
   action_type: ActionTypeSchema.optional(),
   model: ModelSchema.optional(),
@@ -31,6 +34,24 @@ export const LeaderboardColumnSchema = z.object({
   summary_metric_path: z.string(),
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
+
+export const ProviderSchema = z.object({
+  api_key_name: z.string(),
+  base_url: z.string(),
+  description: z.union([z.null(), z.string()]).optional(),
+  extra_headers: z.record(z.string(), z.string()).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+  return_type: ProviderReturnTypeSchema.optional(),
+});
+export type Provider = z.infer<typeof ProviderSchema>;
+
+export const ProviderModelSchema = z.object({
+  description: z.union([z.null(), z.string()]).optional(),
+  max_tokens: z.number(),
+  name: z.union([z.null(), z.string()]).optional(),
+  provider: z.string(),
+});
+export type ProviderModel = z.infer<typeof ProviderModelSchema>;
 
 export const TestOnlyNestedBaseModelSchema = z.object({
   a: z.number(),
@@ -75,6 +96,8 @@ export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
+  Provider: ProviderSchema,
+  ProviderModel: ProviderModelSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
