@@ -1348,10 +1348,10 @@ def _create_datetime_optimization_sql(
         if not isinstance(operand.gt_[1], tsi_query.LiteralOperation):
             continue
 
-        if not isinstance(operand.gt_[1].literal_, int):
+        if not isinstance(operand.gt_[1].literal_, (int, float)):
             continue
 
-        timestamp = operand.gt_[1].literal_ * 1000
+        timestamp = int(operand.gt_[1].literal_) * 1000
 
         # Time buffer to be more inclusive
         if not is_not:
@@ -1359,7 +1359,11 @@ def _create_datetime_optimization_sql(
         else:
             timestamp = timestamp + DATETIME_OPTIMIZATION_BUFFER
 
-        fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
+        try:
+            fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
+        except ValueError:
+            # If the timestamp is broken, skip optimizing that condition
+            continue
 
         # Determine the comparison operator based on whether this is a NOT operation
         comparison_op = "<" if is_not else ">="
