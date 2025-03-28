@@ -1,7 +1,7 @@
 import io
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Optional, Union, cast
 
 from pydantic import BaseModel
@@ -216,6 +216,20 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
     ) -> Iterator[BaseModel]:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield res_model.model_validate_json(line)
+
+    async def _generic_stream_request_async(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
+    ) -> AsyncIterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req, stream=True)
@@ -549,6 +563,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req,
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
+        )
+
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        return self._generic_request(
+            "/execute/method", req, tsi.CallMethodReq, tsi.CallMethodRes
+        )
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        return self._generic_request(
+            "/execute/score_call", req, tsi.ScoreCallReq, tsi.ScoreCallRes
+        )
+
+    async def evaluate_stream(
+        self, req: Union[tsi.EvaluateReq, dict[str, Any]]
+    ) -> AsyncIterator[tsi.EvaluateStepRes]:
+        # I doubt this will work.
+        return self._generic_stream_request_async(
+            "/evaluation/evaluate", req, tsi.EvaluateReq, tsi.EvaluateStepRes
         )
 
 
