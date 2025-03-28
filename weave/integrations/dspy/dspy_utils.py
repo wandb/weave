@@ -58,6 +58,8 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
+        if dictified_inputs_self["__class__"]["module"] == "__main__":
+            dictified_inputs_self["__class__"]["module"] = ""
 
         # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], Predict) or isinstance(inputs["self"], Adapter):

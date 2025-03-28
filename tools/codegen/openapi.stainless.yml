@@ -1,0 +1,220 @@
+# yaml-language-server: $schema=https://app.stainlessapi.com/config-internal.schema.json
+
+organization:
+  # Name of your organization or company, used to determine the name of the client
+  # and headings.
+  name: Weave Trace
+  docs: https://weave-docs.wandb.ai
+  contact: support@wandb.ai
+
+# `targets` define the output targets and their customization options, such as
+# whether to emit the Node SDK and what it's package name should be.
+targets:
+  node:
+    package_name: weave-server-sdk-old
+    production_repo: null
+    publish:
+      npm: false
+    skip: false
+  python:
+    package_name: weave_server_sdk
+    project_name: weave_server_sdk
+    production_repo: null
+    publish:
+      pypi: false
+    skip: false
+    options:
+      use_uv: true
+      use_new_recursive_imports: true
+  typescript:
+    package_name: weave-server-sdk
+    publish:
+      npm: false
+
+# `client_settings` define settings for the API client, such as extra constructor
+# arguments (used for authentication), retry behavior, idempotency, etc.
+client_settings:
+  opts:
+    username:
+      type: string
+      description: Username for HTTP Basic authentication
+      nullable: false
+      read_env: USERNAME
+      auth:
+        security_scheme: HTTPBasic
+        role: username
+    password:
+      type: string
+      description: Password for HTTP Basic authentication
+      nullable: false
+      read_env: PASSWORD
+      auth:
+        security_scheme: HTTPBasic
+        role: password
+
+security:
+  - HTTPBasic: []
+
+# `environments` are a map of the name of the environment (e.g. "sandbox",
+# "production") to the corresponding url to use.
+environments:
+  production: https://trace.wandb.ai
+
+# `pagination` defines [pagination schemes] which provides a template to match
+# endpoints and generate next-page and auto-pagination helpers in the SDKs.
+pagination: []
+
+# `resources` define the structure and organziation for your API, such as how
+# methods and models are grouped together and accessed. See the [configuration
+# guide] for more information.
+#
+# [configuration guide]:
+#   https://app.stainlessapi.com/docs/guides/configure#resources
+resources:
+  $shared:
+    models:
+      literal_operation: LiteralOperation
+      get_field_operator: GetFieldOperator
+      and_operation: AndOperation
+      or_operation: OrOperation
+      not_operation: NotOperation
+      eq_operation: EqOperation
+      gt_operation: GtOperation
+      gte_operation: GteOperation
+      in_operation: InOperation
+      operation: Operation
+      expr: Expr
+      contains_operation: ContainsOperation
+      convert_operation: ConvertOperation
+      contains_spec: ContainsSpec
+      convert_spec: ConvertSpec
+
+  services:
+    # Configure the methods defined in this resource. Each key in the object is the
+    # name of the method and the value is either an endpoint (for example, `get /foo`)
+    # or an object with more detail.
+    #
+    # [reference]: https://app.stainlessapi.com/docs/reference/config#method
+    # Configure the models--named types--defined in the resource. Each key in the
+    # object is the name of the model and the value is either the name of a schema in
+    # `#/components/schemas` or an object with more detail.
+    #
+    # [reference]: https://app.stainlessapi.com/docs/reference/config#model
+    models:
+      serverInfoRes: ServerInfoRes
+    methods:
+      health_check: get /health
+      server_info: get /server_info
+
+  calls:
+    methods:
+      start: post /call/start
+      end: post /call/end
+      upsert_batch: post /call/upsert_batch
+      delete: post /calls/delete
+      update: post /call/update
+      read: post /call/read
+      query_stats: post /calls/query_stats
+      stream_query:
+        endpoint: post /calls/stream_query
+        skip_test_reason: "prism"
+
+  objects:
+    methods:
+      create: post /obj/create
+      read: post /obj/read
+      query: post /objs/query
+      delete: post /obj/delete
+
+  tables:
+    methods:
+      create: post /table/create
+      update: post /table/update
+      query: post /table/query
+      # query_stream: post /table/query_stream
+      query_stats: post /table/query_stats
+
+  refs:
+    methods:
+      read_batch: post /refs/read_batch
+
+  files:
+    methods:
+      create: post /file/create
+      content: post /file/content
+
+  costs:
+    methods:
+      create: post /cost/create
+      query: post /cost/query
+      purge: post /cost/purge
+
+  feedback:
+    methods:
+      create: post /feedback/create
+      query: post /feedback/query
+      purge: post /feedback/purge
+      replace: post /feedback/replace
+
+settings:
+  license: Apache-2.0
+
+# `readme` is used to configure the code snippets that will be rendered in the
+# README.md of various SDKs. In particular, you can change the `headline`
+# snippet's endpoint and the arguments to call it with.
+readme:
+  example_requests:
+    default:
+      type: request
+      endpoint: post /obj/create
+      params: &ref_0 {}
+    headline:
+      type: request
+      endpoint: post /obj/create
+
+      params: *ref_0
+
+openapi:
+  code_samples: x-codeSamples
+  transformations:
+    - command: extractToRefs
+      reason: improve schema types
+      args:
+        ref:
+          target: "$.components.schemas.ConvertSpec.properties.input"
+          name: "#/components/schemas/Operation"
+    - command: extractToRefs
+      reason: improve schema types
+      args:
+        ref:
+          target: "$.components.schemas.Query.properties.$expr"
+          name: "#/components/schemas/Expr"
+    - command: mergeObject
+      reason: improve schema types
+      args:
+        target:
+          - "$.components.schemas.ContainsSpec.properties.substr"
+        object:
+          $ref: "#/components/schemas/Operation"
+
+    - command: mergeObject
+      reason: improve schema types
+      args:
+        target:
+          - "$.components.schemas.GteOperation.properties.$gte"
+          - "$.components.schemas.GtOperation.properties.$gt"
+          - "$.components.schemas.InOperation.properties.$in"
+          - "$.components.schemas.NotOperation.properties.$not"
+          - "$.components.schemas.EqOperation.properties.$eq"
+          - "$.components.schemas.AndOperation.properties.$and"
+          - "$.components.schemas.OrOperation.properties.$or"
+        object:
+          items:
+            $ref: "#/components/schemas/Operation"
+          prefixItems: null
+
+    - command: renameKey
+      reason: jsonl requires the correct mime-time
+      args:
+        target: "$.paths./calls/stream_query.post.responses.200.content.application/json"
+        to: "application/jsonl"
