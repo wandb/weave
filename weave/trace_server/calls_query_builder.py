@@ -28,7 +28,8 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from typing import Literal, Optional, cast
+import uuid
+from typing import Callable, Literal, Optional, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
@@ -47,6 +48,9 @@ from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+
+# Buffer time for datetime optimization to ensure we don't miss records
+DATETIME_OPTIMIZATION_BUFFER = 1000 * 60 * 1  # 1 minute
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +120,6 @@ class CallsMergedDynamicField(CallsMergedAggField):
 
     def is_heavy(self) -> bool:
         return True
-
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
     feedback_type: str
@@ -622,6 +625,11 @@ class CallsQuery(BaseModel):
             pb, table_alias, self.query_conditions
         )
 
+        # Add datetime optimization based on UUIDv7 timestamp
+        datetime_optimization_sql = _create_datetime_optimization_sql(
+            self.query_conditions, pb, table_alias
+        )
+
         order_by_sql = ""
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
@@ -673,6 +681,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {datetime_optimization_sql}
         {call_parts_predicate_filters_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
@@ -1067,6 +1076,7 @@ def _create_like_optimized_eq_condition(
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
         return None
+
     # Return if right-side isn't a string literal
     if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
         operation.eq_[1].literal_, str
@@ -1075,10 +1085,16 @@ def _create_like_optimized_eq_condition(
 
     field = get_field_by_name(operation.eq_[0].get_field_).field
     literal_value = operation.eq_[1].literal_
+
     if not literal_value:
         # Empty string is not a valid value for LIKE optimization
         return None
-    like_pattern = f'%"{literal_value}"%'
+
+    # Boolean literals are not wrapped in quotes in JSON payloads
+    if literal_value in ("true", "false"):
+        like_pattern = f"%{literal_value}%"
+    else:
+        like_pattern = f'%"{literal_value}"%'
 
     return _create_like_condition(field, like_pattern, pb, table_alias)
 
@@ -1148,6 +1164,105 @@ def _create_like_optimized_in_condition(
         like_conditions.append(like_condition)
 
     return "(" + " OR ".join(like_conditions) + ")"
+
+
+def _uuidv7_from_timestamp_zeroed(ms_since_epoch: int) -> str:
+    if not (0 <= ms_since_epoch < 2**48):
+        raise ValueError("Timestamp must be a 48-bit integer (ms since epoch).")
+
+    # Split the 48-bit timestamp
+    time_low = (ms_since_epoch >> 16) & 0xFFFFFFFF  # First 32 bits
+    time_mid = ms_since_epoch & 0xFFFF  # Next 16 bits
+
+    # Set version (7) in high 4 bits, rest zero
+    time_hi_and_version = 0x7 << 12  # Version 7 + 12 zero bits
+
+    # Set variant bits (10xx....) and rest zero
+    clock_seq_hi_and_reserved = 0x80  # 10xx xxxx
+    clock_seq_low = 0x00
+    node = 0x000000000000  # 48 bits of zero
+
+    # Create UUID from fields
+    uuid_fields = (
+        time_low,
+        time_mid,
+        time_hi_and_version,
+        clock_seq_hi_and_reserved,
+        clock_seq_low,
+        node,
+    )
+    return str(uuid.UUID(fields=uuid_fields))
+
+
+def _create_datetime_optimization_sql(
+    conditions: list[Condition],
+    pb: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Creates SQL for datetime optimization using UUIDv7 timestamp filtering.
+
+    This optimization takes advantage of the fact that UUIDv7 includes a timestamp
+    in the first 48 bits. For date range filters, we can create a pre-filter
+    condition that checks if the ID falls within the expected UUIDv7 range
+    for the given date range.
+
+    We include a buffer time (DATETIME_OPTIMIZATION_BUFFER) to ensure we don't
+    miss records due to slight timing differences.
+    """
+    datetime_conditions: list[str] = []
+
+    for condition in conditions:
+        # Track if this is a NOT operation and get the actual operand
+        is_not = isinstance(condition.operand, tsi_query.NotOperation)
+        operand = condition.operand.not_[0] if is_not else condition.operand
+
+        is_or = isinstance(operand, tsi_query.OrOperation)
+        # identified an OR, completely eject from optimization
+        if is_or:
+            return ""
+
+        # Only handle GtOperation
+        if not isinstance(operand, tsi_query.GtOperation):
+            continue
+
+        # Check if this is a date comparison
+        if not isinstance(operand.gt_[0], tsi_query.GetFieldOperator):
+            continue
+
+        field = operand.gt_[0].get_field_
+        if field not in ("started_at", "ended_at"):
+            continue
+
+        # Get the timestamp value
+        if not isinstance(operand.gt_[1], tsi_query.LiteralOperation):
+            continue
+
+        if not isinstance(operand.gt_[1].literal_, int):
+            continue
+
+        timestamp = operand.gt_[1].literal_ * 1000
+
+        # Time buffer to be more inclusive
+        if not is_not:
+            timestamp = timestamp - DATETIME_OPTIMIZATION_BUFFER
+        else:
+            timestamp = timestamp + DATETIME_OPTIMIZATION_BUFFER
+
+        fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
+
+        # Determine the comparison operator based on whether this is a NOT operation
+        comparison_op = "<" if is_not else ">="
+
+        # Add the condition
+        param_name = pb.add_param(fake_uuid)
+        datetime_conditions.append(
+            f"{table_alias}.id {comparison_op} {_param_slot(param_name, 'String')}"
+        )
+
+    if not datetime_conditions:
+        return ""
+
+    return "AND " + " AND ".join(datetime_conditions)
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
