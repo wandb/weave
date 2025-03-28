@@ -105,7 +105,7 @@ export const Tag: React.FC<TagProps> = React.memo(
           <S.ProtectedAliasIcon
             name="key-admin-private"
             size={size}
-            $pos="right"
+            $pos={canDelete && onDelete ? 'middle' : 'right'}
           />
         )}
         {canDelete && onDelete && (

@@ -37,9 +37,15 @@ export const ProtectedAliasIcon = styled(Icon)<{
   $cursor?: string;
 }>`
   ${props => IconVariants[props.size]};
-  margin: 2px 2px 2px 2px;
+  margin: 4px 4px 4px 4px;
   ${props =>
-    props.$pos === 'left' ? `margin-left: -4px;` : `margin-right: -4px;`}
+    props.$pos === 'left'
+      ? `margin-left: -4px;`
+      : props.$pos === 'right'
+      ? `margin-right: -4px;`
+      : 'margin-right: 0px;'}
   opacity: ${props => props.$opacity};
   ${props => (props.$cursor ? `cursor: ${props.$cursor};` : '')}
+  width: 16px;
+  height: 16px;
 `;
