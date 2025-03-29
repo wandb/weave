@@ -7,11 +7,12 @@ import {Loading} from '@wandb/weave/components/Loading';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
+import {NewScorerDrawer} from '../../pages/ScorersPage/NewScorerDrawer';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -21,6 +22,8 @@ type FeedbackSidebarProps = {
   callID: string;
   entity: string;
   project: string;
+  onReloadSpecs?: () => void;
+  onClose?: () => void;
 };
 
 export const FeedbackSidebar = ({
@@ -29,18 +32,30 @@ export const FeedbackSidebar = ({
   callID,
   entity,
   project,
+  onReloadSpecs,
+  onClose,
 }: FeedbackSidebarProps) => {
-  const history = useHistory();
-  const router = useWeaveflowRouteContext().baseRouter;
   const [isSaving, setIsSaving] = useState(false);
+  const [isNewScorerDrawerOpen, setIsNewScorerDrawerOpen] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
-
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const {loading: orgNameLoading, orgName} = useOrgName({
     entityName: entity,
   });
+
+  const {useFeedback} = useWFHooks();
+  const query = useFeedback({
+    entity,
+    project,
+    weaveRef: callID,
+  });
+
+  const getTsClient = useGetTraceServerClientContext();
+  useEffect(() => {
+    return getTsClient().registerOnFeedbackListener(callID, query.refetch);
+  }, [callID, query.refetch, getTsClient]);
 
   const save = async () => {
     setIsSaving(true);
@@ -92,9 +107,17 @@ export const FeedbackSidebar = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="justify-left flex w-full p-12">
-        <div className="text-lg font-semibold">Feedback</div>
-        <div className="flex-grow" />
+      <div className="flex min-h-[32px] w-full items-center justify-between px-12">
+        <div className="text-sm font-semibold">Annotations</div>
+        {onClose && (
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="small"
+            icon="close"
+            aria-label="Close feedback sidebar"
+          />
+        )}
       </div>
       <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
@@ -128,16 +151,27 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mr-10 mt-12 items-center justify-center">
+        <div className="mt-12 items-center justify-center px-12">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
-              onClick={() =>
-                history.push(router.scorersUIUrl(entity, project))
-              }>
-              View scorers
+              onClick={() => setIsNewScorerDrawerOpen(true)}
+              variant="primary"
+              icon="add-new">
+              Create scorer
             </Button>
           </div>
+          <NewScorerDrawer
+            entity={entity}
+            project={project}
+            open={isNewScorerDrawerOpen}
+            onClose={() => {
+              setIsNewScorerDrawerOpen(false);
+              query.refetch();
+              onReloadSpecs?.();
+            }}
+            initialScorerType="ANNOTATION"
+          />
         </div>
       )}
     </div>
@@ -172,7 +206,7 @@ const HumanAnnotationInputs = ({
   return (
     <div>
       {humanAnnotationSpecs?.map((field, index) => (
-        <div key={field.ref} className="px-16">
+        <div key={field.ref} className="px-8">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
             <div className="bg-gray-50 font-italic text-sm text-moon-700 ">
