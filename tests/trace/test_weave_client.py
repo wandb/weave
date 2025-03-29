@@ -21,6 +21,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
+from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -2389,3 +2390,30 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
     # Verify they all have the same op_name
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
+
+
+async def test_tracing_enabled_context(client):
+    """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
+    from weave.trace.weave_client import Call
+
+    @weave.op()
+    def test_op():
+        return "test"
+
+    # Test create_call with tracing enabled
+    call = await client.create_call(test_op, {})
+    assert isinstance(call, Call)
+    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert len(list(client.get_calls())) == 1  # Verify only one call was created
+
+    # Test create_call with tracing disabled
+    with tracing_disabled():
+        call = client.create_call(test_op, {})
+        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
+        assert (
+            len(list(client.get_calls())) == 1
+        )  # Verify no additional calls were created
+
+    # Test finish_call with tracing disabled
+    with tracing_disabled():
+        client.finish_call(call)  # Should not raise any error
