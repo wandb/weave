@@ -33,6 +33,7 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 | `WEAVE_MAX_CALLS_QUEUE_SIZE` | `int` | `100000` | Sets the maximum size of the calls queue.  Defaults to 100_000.  Setting a value of 0 means the queue can grow unbounded. |
 | `WEAVE_RETRY_MAX_ATTEMPTS` | `int` | `3` | Sets the maximum number of retry attempts for failed requests. |
 | `WEAVE_RETRY_MAX_INTERVAL` | `float` | `300.0` | Sets the maximum interval between retry attempts in seconds. |
+| `WANDB_BASE_URL` | `string` | `None` | Sets the Weave host URL. Equivalent to entering the host URL when prompted by `wandb.login()`. You can specify `WANDB_BASE_URL` and `WANDB_API_KEY` before using `weave.init()` to automatically log into and authenticate to Weave. |
 
 :::note
 All boolean environment variables accept the following values (case-insensitive):
