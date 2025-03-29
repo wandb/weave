@@ -31,13 +31,13 @@ def set_current_output(output: Any) -> Iterator[None]:
         current_output.reset(token)
 
 
-class ScoreLogger(BaseModel):
+class BetaScoreLogger(BaseModel):
     prediction_id: ID
     score: float
     metadata: dict | None
 
 
-class PredictionLogger(BaseModel):
+class BetaPredictionLogger(BaseModel):
     model_id: ID
     inputs: dict
     output: Any
@@ -48,7 +48,7 @@ class PredictionLogger(BaseModel):
 
     async def log_score(
         self, scorer_name: str, score: float, metadata: dict | None = None
-    ) -> ScoreLogger:
+    ) -> BetaScoreLogger:
         @weave.op(name=scorer_name)
         def scorer(model_output: Any, **inputs: Any) -> float:
             return score
@@ -59,10 +59,10 @@ class PredictionLogger(BaseModel):
         ):
             await self.hack_reference_to_predict_and_score.apply_scorer(scorer)
 
-        return ScoreLogger(prediction_id="123", score=score, metadata=metadata)
+        return BetaScoreLogger(prediction_id="123", score=score, metadata=metadata)
 
 
-class EvaluationLogger(BaseModel):
+class BetaEvaluationLogger(BaseModel):
     model_id: ID = ""
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -74,17 +74,19 @@ class EvaluationLogger(BaseModel):
         )
     )
 
-    def log_prediction(self, inputs: dict, output: Any) -> PredictionLogger:
+    def log_prediction(self, inputs: dict, output: Any) -> BetaPredictionLogger:
         if not self._eval_started:
             self._eval_started = True
 
-            # --- Setup the model with predict method ---
+            # The following section is a "hacky" way to create Model and Evaluation
+            # objects that "look right" to our object saving system.
+
+            # --- Setup the model object ---
             @weave.op
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
 
-            # Hacks: Put custom predict and predict_and_score methods back on the model
             self._pseudo_model.__dict__["predict"] = MethodType(
                 predict, self._pseudo_model
             )
@@ -104,10 +106,8 @@ class EvaluationLogger(BaseModel):
 
             @weave.op
             def summarize(self: Evaluation) -> dict:
-                # Placeholder - will be replaced in log_summary
                 return {}
 
-            # Attach methods to evaluation
             self._pseudo_evaluation.__dict__["evaluate"] = MethodType(
                 evaluate, self._pseudo_evaluation
             )
@@ -140,7 +140,7 @@ class EvaluationLogger(BaseModel):
         # Get the model output from the call result
         model_output = predict_and_score_call.output.get("model_output")
 
-        return PredictionLogger(
+        return BetaPredictionLogger(
             model_id="123",
             inputs=inputs,
             output=model_output,
