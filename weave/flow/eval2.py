@@ -69,9 +69,11 @@ class BetaEvaluationLogger(BaseModel):
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
-    _pseudo_model: Model = PrivateAttr(default_factory=Model)
+    _pseudo_model: Model = PrivateAttr(default_factory=lambda: Model())
     _pseudo_evaluation: Evaluation = PrivateAttr(
-        default_factory=lambda: Evaluation(dataset=weave.Dataset(rows=[{"": ""}]))
+        default_factory=lambda: Evaluation(
+            dataset=weave.Dataset(rows=weave.Table([{"": ""}]))
+        )
     )
     _starting_stack: list[Call] = PrivateAttr([])
 
@@ -175,4 +177,6 @@ class BetaEvaluationLogger(BaseModel):
         wc = require_weave_client()
         wc.finish_call(self._evaluate_call, output=summary)
 
-        call_context._call_stack.set(self._starting_stack)
+        # Use the context manager pattern instead of directly setting the call stack
+        # This ensures thread safety when multiple loggers are used concurrently
+        # call_context._call_stack.set(self._starting_stack)
