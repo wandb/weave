@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 import weave
-from weave.flow.eval import Evaluation
+from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -121,11 +121,12 @@ class EvaluationLogger(BaseModel):
             # Create the evaluation call
             wc = require_weave_client()
             self._evaluate_call = wc.create_call(
-                op=evaluate,
+                op=self._pseudo_evaluation.evaluate,
                 inputs={
                     "self": self._pseudo_evaluation,
                     "model": self._pseudo_model,
                 },
+                display_name=default_evaluation_display_name,
             )
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
@@ -153,12 +154,12 @@ class EvaluationLogger(BaseModel):
         self._logged_summary = True
 
         # Replace the summarize method with real implementation
-        @weave.op
-        def real_summarize(self: Evaluation) -> dict:
+        @weave.op(name="Evaluation.summarize")
+        def summarize(self: Evaluation) -> dict:
             return summary
 
         self._pseudo_evaluation.__dict__["summarize"] = MethodType(
-            real_summarize, self._pseudo_evaluation
+            summarize, self._pseudo_evaluation
         )
 
         # Call the summarize method with the proper context
