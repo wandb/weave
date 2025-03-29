@@ -17,7 +17,9 @@ ID = str
 
 NOT_DEFINED = "Not defined for custom scoring"
 
-# Context variable to store the current output safely between threads
+# Context variable to store the current output safely between threads.  This also
+# ensures that only 1 version of the predict method is saved because the code
+# contents are always the same.
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
 
 
@@ -69,10 +71,9 @@ class BetaEvaluationLogger(BaseModel):
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_model: Model = PrivateAttr(default_factory=Model)
     _pseudo_evaluation: Evaluation = PrivateAttr(
-        default_factory=lambda: Evaluation(
-            dataset=weave.Dataset(rows=[{"THIS_IS_A_DUMMY": "IGNORE"}])
-        )
+        default_factory=lambda: Evaluation(dataset=weave.Dataset(rows=[{"": ""}]))
     )
+    _starting_stack: list[Call] = PrivateAttr([])
 
     def log_prediction(self, inputs: dict, output: Any) -> BetaPredictionLogger:
         if not self._eval_started:
@@ -97,7 +98,7 @@ class BetaEvaluationLogger(BaseModel):
 
             @weave.op
             def predict_and_score(self: Evaluation, model: Model, inputs: dict) -> dict:
-                model_output = model.predict(inputs)
+                model_output = model.get_infer_method()(inputs)
                 return {
                     "model_output": model_output,
                     "scores": NOT_DEFINED,
@@ -108,25 +109,27 @@ class BetaEvaluationLogger(BaseModel):
             def summarize(self: Evaluation) -> dict:
                 return {}
 
-            self._pseudo_evaluation.__dict__["evaluate"] = MethodType(
-                evaluate, self._pseudo_evaluation
+            self._pseudo_evaluation.__dict__.update(
+                {
+                    "evaluate": MethodType(evaluate, self._pseudo_evaluation),
+                    "predict_and_score": MethodType(
+                        predict_and_score, self._pseudo_evaluation
+                    ),
+                    "summarize": MethodType(summarize, self._pseudo_evaluation),
+                }
             )
-            self._pseudo_evaluation.__dict__["predict_and_score"] = MethodType(
-                predict_and_score, self._pseudo_evaluation
-            )
-            self._pseudo_evaluation.__dict__["summarize"] = MethodType(
-                summarize, self._pseudo_evaluation
-            )
+
+            self._starting_stack = call_context.get_call_stack()
 
             # Create the evaluation call
             wc = require_weave_client()
             self._evaluate_call = wc.create_call(
+                display_name=default_evaluation_display_name,
                 op=self._pseudo_evaluation.evaluate,
                 inputs={
                     "self": self._pseudo_evaluation,
                     "model": self._pseudo_model,
                 },
-                display_name=default_evaluation_display_name,
             )
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
@@ -140,6 +143,7 @@ class BetaEvaluationLogger(BaseModel):
         # Get the model output from the call result
         model_output = predict_and_score_call.output.get("model_output")
 
+        assert self._evaluate_call is not None
         return BetaPredictionLogger(
             model_id="123",
             inputs=inputs,
@@ -170,3 +174,5 @@ class BetaEvaluationLogger(BaseModel):
         # Finish the evaluation call
         wc = require_weave_client()
         wc.finish_call(self._evaluate_call, output=summary)
+
+        call_context._call_stack.set(self._starting_stack)
