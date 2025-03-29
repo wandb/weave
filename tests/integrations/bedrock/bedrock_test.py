@@ -385,17 +385,11 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
 def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -> None:
     from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
 
-    # Initialize the scorer
-    guardrail_id = "test-guardrail-id"
-    guardrail_version = "DRAFT"
-    source = "OUTPUT"
-    bedrock_kwargs = {"region_name": "us-east-1"}
-
     scorer = BedrockGuardrailScorer(
-        guardrail_id=guardrail_id,
-        guardrail_version=guardrail_version,
-        source=source,
-        bedrock_runtime_kwargs=bedrock_kwargs,
+        guardrail_id="test-guardrail-id",
+        guardrail_version="DRAFT", 
+        source="OUTPUT",
+        bedrock_runtime_kwargs={"region_name": "us-east-1"},
     )
 
     # Test with content that should pass the guardrail
