@@ -22,7 +22,7 @@ def test_hf_api_model(client):
     response = engine(messages, stop_sequences=["END"])
     assert "paris" in response.content.lower()
 
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 2
 
     call = calls[0]
@@ -55,7 +55,7 @@ def test_openai_server_model(client):
     response = engine(messages, stop_sequences=["END"])
     assert "paris" in response.content.lower()
 
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 2
 
     call = calls[0]
@@ -83,7 +83,7 @@ def test_tool_calling_agent_ddgsearch(client):
         "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
     )
 
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 11
 
     call = calls[0]
@@ -116,7 +116,7 @@ def test_tool_calling_agent_weather(client):
     answer = agent.run("What is the weather in Tokyo?")
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 11
 
     call = calls[0]
@@ -138,7 +138,7 @@ def test_code_agent_ddgsearch(client):
         "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
     )
 
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 10
 
     call = calls[0]
@@ -171,7 +171,7 @@ def test_code_agent_weather(client):
     answer = agent.run("What is the weather in Tokyo?")
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
-    calls = list(client.calls())
+    calls = client.calls()
     assert len(calls) == 10
 
     call = calls[0]
