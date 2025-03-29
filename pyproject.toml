@@ -71,6 +71,11 @@ trace_server = [
   "google-cloud-storage>=2.7.0",
   # LLM Support
   "litellm>=1.36.1",
+  # OTEL Tracing Support
+  "opentelemetry-sdk",
+  "opentelemetry-proto>=1.12.0",
+  "opentelemetry-semantic-conventions",
+  "openinference-semantic-conventions>=0.1.12",
 ]
 trace_server_tests = [
   # BYOB - S3
