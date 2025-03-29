@@ -30,7 +30,6 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 - [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
 - And more!
 
-
 ### Guardrails vs. Monitors: When to Use Each
 
 While scorers power both guardrails and monitors, they serve different purposes:
@@ -177,6 +176,60 @@ async def generate_with_monitoring(prompt: str) -> str:
     
     return result
 ```
+
+## AWS Bedrock Guardrails
+
+The `BedrockGuardrailScorer` uses AWS Bedrock's guardrail feature to detect and filter content based on configured policies. It calls the `apply_guardrail` API to apply the guardrail to the content.
+
+To use the `BedrockGuardrailScorer`, you need the following:
+- An AWS account with Bedrock access
+- An AWS account with access to Bedrock
+- A configured guardrail in the AWS Bedrock console
+- The `boto3` Python package
+
+:::tip
+You don't need to create your own Bedrock client—Weave creates it for you.  To specify a region, pass the `bedrock_runtime_kwargs` parameter to the scorer.
+:::
+
+For more details on creating a guardrail, see the [Bedrock guardrails notebook](https://github.com/aws-samples/amazon-bedrock-samples/blob/main/responsible_ai/bedrock-guardrails/guardrails-api.ipynb).
+```python
+import weave
+import boto3
+from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
+
+# Initialize Weave
+weave.init("my_app")
+
+# Create a guardrail scorer
+guardrail_scorer = BedrockGuardrailScorer(
+    guardrail_id="your-guardrail-id",  # Replace "your-guardrail-id" with your guardrail ID
+    guardrail_version="DRAFT",          # Use guardrail_version to use a specific guardrail version
+    source="INPUT",                             # Can be "INPUT" or "OUTPUT"
+    bedrock_runtime_kwargs={"region_name": "us-east-1"}  # AWS region
+)
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    # Add your text generation logic here
+    return "Generated text..."
+
+# Use the guardrail as a safety check
+async def generate_safe_text(prompt: str) -> str:
+    result, call = generate_text.call(prompt)
+    
+    # Apply the guardrail
+    score = await call.apply_scorer(guardrail_scorer)
+    
+    # Check if the content passed the guardrail
+    if not score.result.passed:
+        # Use the modified output if available
+        if score.result.metadata.get("modified_output"):
+            return score.result.metadata["modified_output"]
+        return "I cannot generate that content due to content policy restrictions."
+    
+    return result
+```
+
 
 ## Implementation Details
 
