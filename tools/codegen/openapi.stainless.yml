@@ -37,17 +37,18 @@ client_settings:
   opts:
     username:
       type: string
-      description: Username for HTTP Basic authentication
+      description: Weights & Biases Username
       nullable: false
-      read_env: USERNAME
+      default: user
+      read_env: WANDB_USERNAME
       auth:
         security_scheme: HTTPBasic
         role: username
-    password:
+    api_key:
       type: string
-      description: Password for HTTP Basic authentication
+      description: Weights & Biases API Key
       nullable: false
-      read_env: PASSWORD
+      read_env: WANDB_API_KEY
       auth:
         security_scheme: HTTPBasic
         role: password
