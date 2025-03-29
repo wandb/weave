@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -62,9 +62,6 @@ class PredictionLogger(BaseModel):
         return ScoreLogger(prediction_id="123", score=score, metadata=metadata)
 
 
-stub_dataset = weave.Dataset(rows=[{"THIS_IS_A_DUMMY": "IGNORE"}])
-
-
 class EvaluationLogger(BaseModel):
     model_id: ID = ""
     _eval_started: bool = PrivateAttr(False)
@@ -72,14 +69,16 @@ class EvaluationLogger(BaseModel):
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_model: Model = PrivateAttr(default_factory=Model)
     _pseudo_evaluation: Evaluation = PrivateAttr(
-        default_factory=lambda: Evaluation(dataset=[{"": None}])
+        default_factory=lambda: Evaluation(
+            dataset=weave.Dataset(rows=[{"THIS_IS_A_DUMMY": "IGNORE"}])
+        )
     )
 
     def log_prediction(self, inputs: dict, output: Any) -> PredictionLogger:
-        eval_self = self
         if not self._eval_started:
             self._eval_started = True
 
+            # --- Setup the model with predict method ---
             @weave.op
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
@@ -90,78 +89,55 @@ class EvaluationLogger(BaseModel):
                 predict, self._pseudo_model
             )
 
+            # --- Setup the evaluation object ---
             @weave.op(name="Evaluation.evaluate")
             def evaluate(self: Evaluation, model: Model) -> None: ...
 
-            self._pseudo_evaluation.__dict__["evaluate"] = MethodType(
-                evaluate, self._pseudo_evaluation
-            )
-
             @weave.op
             def predict_and_score(self: Evaluation, model: Model, inputs: dict) -> dict:
-                assert eval_self._pseudo_model is not None
-                res = eval_self._pseudo_model.predict(inputs)
+                model_output = model.predict(inputs)
                 return {
-                    "model_output": res,
+                    "model_output": model_output,
                     "scores": NOT_DEFINED,
                     "model_latency": NOT_DEFINED,
                 }
 
+            @weave.op
+            def summarize(self: Evaluation) -> dict:
+                # Placeholder - will be replaced in log_summary
+                return {}
+
+            # Attach methods to evaluation
+            self._pseudo_evaluation.__dict__["evaluate"] = MethodType(
+                evaluate, self._pseudo_evaluation
+            )
             self._pseudo_evaluation.__dict__["predict_and_score"] = MethodType(
                 predict_and_score, self._pseudo_evaluation
             )
-
-            # Create a placeholder summarize method
-            @weave.op
-            def summarize(self: Evaluation) -> dict:
-                # This is just a placeholder - the real implementation
-                # will be set in log_summary
-                return {}
-
-            # Attach the placeholder to the evaluation object
             self._pseudo_evaluation.__dict__["summarize"] = MethodType(
                 summarize, self._pseudo_evaluation
             )
 
-            # Define a summarize factory that will be used later in log_summary
-            def summarize_factory(summary_value: dict) -> Callable:
-                @weave.op
-                def new_summarize(self: Evaluation) -> dict:
-                    return summary_value
-
-                return new_summarize
-
-            self._pseudo_evaluation.__dict__["summarize_factory"] = summarize_factory
-
-            # _, evaluate_call = evaluate.call(
-            #     self._pseudo_evaluation, self._pseudo_model
-            # )
+            # Create the evaluation call
             wc = require_weave_client()
-            evaluate_call = wc.create_call(
+            self._evaluate_call = wc.create_call(
                 op=evaluate,
                 inputs={
                     "self": self._pseudo_evaluation,
                     "model": self._pseudo_model,
                 },
             )
+            assert self._evaluate_call is not None
+            call_context.push_call(self._evaluate_call)
 
-            self._evaluate_call = evaluate_call
-            # hack: put the evaluate call back on the stack
-            call_context.push_call(evaluate_call)
-
-        # Use a context manager to set the current output in a thread-safe way
+        # Make the prediction call
         with set_current_output(output):
-            assert self._pseudo_evaluation is not None
             _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
                 self._pseudo_evaluation, self._pseudo_model, inputs
             )
 
-        # Extract the model_output directly from the call output
-        model_output = (
-            predict_and_score_call.output.get("model_output")
-            if predict_and_score_call.output
-            else None
-        )
+        # Get the model output from the call result
+        model_output = predict_and_score_call.output.get("model_output")
 
         return PredictionLogger(
             model_id="123",
@@ -172,28 +148,24 @@ class EvaluationLogger(BaseModel):
         )
 
     def log_summary(self, summary: dict) -> None:
-        # basically materialize everything here
-        # create Dataset object
-        # create Evaluation object
-        # write the summary records
         if self._logged_summary:
             return
-
         self._logged_summary = True
-        assert self._evaluate_call is not None
-        assert self._pseudo_evaluation is not None
 
-        # Get the new summarize implementation with the real summary value
-        new_summarize = self._pseudo_evaluation.summarize_factory(summary)
+        # Replace the summarize method with real implementation
+        @weave.op
+        def real_summarize(self: Evaluation) -> dict:
+            return summary
 
-        # Replace the placeholder with the real implementation
         self._pseudo_evaluation.__dict__["summarize"] = MethodType(
-            new_summarize, self._pseudo_evaluation
+            real_summarize, self._pseudo_evaluation
         )
 
-        # Call it within the proper context
+        # Call the summarize method with the proper context
+        assert self._evaluate_call is not None
         with call_context.set_call_stack([self._evaluate_call]):
             self._pseudo_evaluation.summarize()
 
+        # Finish the evaluation call
         wc = require_weave_client()
         wc.finish_call(self._evaluate_call, output=summary)
