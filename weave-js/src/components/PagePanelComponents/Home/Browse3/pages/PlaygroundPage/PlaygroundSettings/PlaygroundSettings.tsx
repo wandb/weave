@@ -39,7 +39,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         flexShrink: 0,
       }}>
       <Tabs.Root value={settingsTab.toString()}>
-        <Tabs.List>
+        <Tabs.List className="hide-scrollbar overflow-x-auto py-2">
           {playgroundStates.map((state, idx) => (
             <Tabs.Trigger
               key={idx}
