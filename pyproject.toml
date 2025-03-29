@@ -83,6 +83,7 @@ cohere = ["cohere>=5.9.1,<5.9.3"]
 crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=2.6.3", "litellm<=1.61.6"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
+google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
