@@ -104,7 +104,7 @@ class TestBedrockGuardrailScorer:
         scorer = BedrockGuardrailScorer(
             guardrail_id="test-guardrail-id",
             guardrail_version="DRAFT",
-            source="OUTPUT", # where to apply the guardrail
+            source="OUTPUT",  # where to apply the guardrail
             bedrock_runtime_kwargs={"region_name": "us-east-1"},
         )
         # Replace the real client with our mock

@@ -387,7 +387,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
 
     scorer = BedrockGuardrailScorer(
         guardrail_id="test-guardrail-id",
-        guardrail_version="DRAFT", 
+        guardrail_version="DRAFT",
         source="OUTPUT",
         bedrock_runtime_kwargs={"region_name": "us-east-1"},
     )
