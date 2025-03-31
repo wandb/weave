@@ -1,13 +1,14 @@
+import {TriggerGenerator, WBPopupTrigger} from '@wandb/ui';
+import {WBPopupDirection} from '@wandb/ui';
 import React from 'react';
 
 import {
+  OptionRenderer,
   WBMenu,
   WBMenuOnSelectHandler,
   WBMenuOption,
   WBMenuTheme,
 } from '../../common/components/WBMenu';
-import {WBPopupDirection} from '../WBPopup';
-import {TriggerGenerator, WBPopupTrigger} from '../WBPopupTrigger';
 
 export interface WBPopupMenuTriggerProps {
   options: WBMenuOption[];
@@ -18,6 +19,7 @@ export interface WBPopupMenuTriggerProps {
   theme?: WBMenuTheme;
   children: TriggerGenerator;
   onSelect?: WBMenuOnSelectHandler;
+  optionRenderer?: OptionRenderer;
 }
 
 export const WBPopupMenuTrigger: React.FC<WBPopupMenuTriggerProps> = props => {
@@ -39,6 +41,7 @@ export const WBPopupMenuTrigger: React.FC<WBPopupMenuTriggerProps> = props => {
           onEsc={close}
           backgroundColor={props.menuBackgroundColor}
           theme={props.theme}
+          optionRenderer={props.optionRenderer}
         />
       )}>
       {props.children}

@@ -34,15 +34,14 @@ export const Item = styled.div<{
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   word-break: break-word;
   background: ${props =>
     props.hovered ? getHighlightForTheme(props.theme.main) : 'none'};
 `;
 
 export const ItemIcon: typeof WBIcon = styled(WBIcon)`
-  margin-right: 8px;
-  margin-left: 0;
+  margin-left: 8px;
   font-size: 16px;
   width: 16px;
   flex-shrink: 0;

@@ -1,4 +1,6 @@
 import {CSSProperties} from '@material-ui/core/styles/withStyles';
+import {WBMenuOption} from '@wandb/ui';
+import {OptionRenderer} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
@@ -18,23 +20,16 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {TableState} from '@wandb/weave/index';
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
-import {WBMenuOption} from '../../../common/components/WbMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
+import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {Button} from '../../Button';
 import {Tooltip} from '../../Tooltip';
-import {WBPopupMenuTrigger} from '../../WBPopupMenuTrigger';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';
@@ -58,7 +53,7 @@ const makeMenuItemDivider = (value: string) => {
         style={{
           marginRight: 12,
           marginLeft: 12,
-          borderBottom: '1px solid #888',
+          borderBottom: '1px solid #d3d3d3',
         }}
       />
     ),
@@ -73,7 +68,7 @@ const makeSortingMenuItems = (
   const colSortState = tableState.sort.find(
     sort => sort.columnId === colId
   )?.dir;
-  const menuItems: WBMenuOption[] = [makeMenuItemDivider('sort-div')];
+  const menuItems: WBMenuOption[] = [];
   if (colSortState !== 'asc') {
     menuItems.push({
       value: 'sort-asc',
@@ -352,6 +347,16 @@ export const ColumnHeader: React.FC<{
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
+    menuItems.push(makeMenuItemDivider('expression-div'));
+    menuItems.push({
+      value: 'pin',
+      name: isPinned ? 'Unpin column' : 'Pin column',
+      icon: 'pin',
+      onSelect: () => {
+        recordEvent('PIN_COLUMN');
+        setColumnPinState(!isPinned);
+      },
+    });
     if (
       !isGroupCol &&
       !isGroupCountColumn &&
@@ -413,7 +418,7 @@ export const ColumnHeader: React.FC<{
       menuItems = menuItems.concat([
         {
           value: 'insert-right',
-          name: 'Insert column to right',
+          name: 'Insert 1 right',
           icon: 'next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
@@ -428,7 +433,7 @@ export const ColumnHeader: React.FC<{
         },
         {
           value: 'insert-left',
-          name: 'Insert column to left',
+          name: 'Insert 1 left',
           icon: 'previous',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
@@ -441,17 +446,6 @@ export const ColumnHeader: React.FC<{
             updateTableState(newTableState);
           },
         },
-        makeMenuItemDivider('pin-div'),
-        {
-          value: 'pin',
-          name: isPinned ? 'Unpin column' : 'Pin column',
-          icon: 'pin',
-          onSelect: () => {
-            recordEvent('PIN_COLUMN');
-            setColumnPinState(!isPinned);
-          },
-        },
-        makeMenuItemDivider('remove-div'),
         {
           value: 'remove',
           name: 'Remove column',
@@ -489,7 +483,7 @@ export const ColumnHeader: React.FC<{
         },
         {
           value: 'remove-all-right',
-          name: 'Remove columns to the right',
+          name: 'Remove to the right',
           icon: 'next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
@@ -503,7 +497,7 @@ export const ColumnHeader: React.FC<{
         },
         {
           value: 'remove-all-left',
-          name: 'Remove columns to the left',
+          name: 'Remove to the left',
           icon: 'previous',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
@@ -570,7 +564,8 @@ export const ColumnHeader: React.FC<{
       ? {zIndex: 1, flexDirection: 'row-reverse'}
       : {flexDirection: 'row'};
 
-  // Create a memoized handler for open state changes
+  // Used as a condition to change the background color of a column whose
+  // action menu is open
   const handleOpenChange = useCallback((open: boolean) => {
     setMenuOpen(open);
   }, []);
@@ -754,10 +749,10 @@ export const ColumnHeader: React.FC<{
           options={columnMenuItems}
           theme="light"
           menuBackgroundColor="white"
+          optionRenderer={ColumnMenuOptionRenderer}
           direction={
             columnFormat?.textAlign === 'right' ? 'bottom right' : 'bottom left'
-          }
-          menuWidth={200}>
+          }>
           {({anchorRef, setOpen, open}) => {
             // Update menuOpen state only when the open state changes
             if (menuOpen !== open) {
@@ -859,3 +854,22 @@ const PinnedIndicator: React.FC<{
     />
   );
 };
+
+const ColumnMenuOptionRenderer: OptionRenderer = ({
+  option,
+  hovered,
+  selected,
+}) => (
+  <Item
+    data-test={option['data-test']}
+    hovered={hovered}
+    style={{justifyContent: 'flex-start'}}>
+    <ItemIcon
+      style={{marginRight: '8px', marginLeft: 0}}
+      name={
+        option.icon ?? (selected && option.icon !== null ? 'check' : 'blank')
+      }
+    />
+    {option.name ?? option.value}
+  </Item>
+);
