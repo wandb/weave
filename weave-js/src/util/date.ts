@@ -246,13 +246,7 @@ export const parseDate = (dateStr: string): Date | null => {
   // Try parsing with moment for standard date formats
   const momentDate = moment(trimmedStr);
   if (momentDate.isValid()) {
-    // Check if the date is within a year from now
-    const oneYearFromNow = moment().add(1, 'year');
-    const oneYearAgo = moment().subtract(1, 'year');
-
-    if (momentDate.isBetween(oneYearAgo, oneYearFromNow, 'day', '[]')) {
-      return momentDate.toDate();
-    }
+    return momentDate.toDate();
   }
 
   // If all parsing attempts fail, return null
@@ -328,17 +322,4 @@ export const formatDateOnly = (
     return '';
   }
   return moment(date).local().format(format);
-};
-
-/**
- * Converts a UTC time string to a local time string
- *
- * @param utcTime The UTC time string to convert
- * @returns A local time string in the format 'YYYY-MM-DD HH:mm:ss'
- */
-export const utcToLocalTimeString = (utcTime: string): string => {
-  return moment
-    .utc(utcTime, 'YYYY-MM-DDTHH:mm:ss')
-    .local()
-    .format('YYYY-MM-DD HH:mm:ss');
 };

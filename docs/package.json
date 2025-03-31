@@ -19,6 +19,7 @@
     "@docusaurus/plugin-google-gtag": "^3.4.0",
     "@docusaurus/plugin-google-tag-manager": "^3.4.0",
     "@docusaurus/preset-classic": "^3.4.0",
+    "@docusaurus/theme-mermaid": "3.4.0",
     "@easyops-cn/docusaurus-search-local": "^0.44.4",
     "@laxels/docusaurus-plugin-segment": "^1.0.6",
     "@mdx-js/react": "^3.0.0",

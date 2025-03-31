@@ -16,12 +16,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
-import {
-  formatDate,
-  formatDateOnly,
-  parseDate,
-  utcToLocalTimeString,
-} from '../../../../../util/date';
+import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -56,7 +51,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   isActive,
 }) => {
   // We have to play this game because
-  const [inputValue, setInputValue] = useState(utcToLocalTimeString(value));
+  const [inputValue, setInputValue] = useState(value);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -77,9 +72,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     if (!value) {
       const defaultDate = parseDate('1mo');
       if (defaultDate) {
-        const utcDate = formatDate(defaultDate, 'YYYY-MM-DD HH:mm:ss', true);
-        onChange(utcDate);
-        setInputValue(utcToLocalTimeString(utcDate));
+        const localDate = formatDate(defaultDate);
+        onChange(localDate);
+        setInputValue(localDate);
       }
     }
     // Only run on first render
@@ -129,8 +124,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     (newInputValue: string, skipDebounce = false) => {
       const date = parseDate(newInputValue);
       if (date) {
-        const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
-        onChange(utcDate);
+        const formattedDate = formatDate(date);
+        setInputValue(formattedDate);
+        onChange(formattedDate);
         setIsInvalid(false);
       } else {
         setIsInvalid(true);
@@ -177,9 +173,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const handleDateChange = (date: Date | null) => {
     if (date) {
-      setInputValue(formatDate(date));
-      const utcDate = formatDate(date, 'YYYY-MM-DD HH:mm:ss', true);
-      onChange(utcDate);
+      const formattedDate = formatDate(date);
+      setInputValue(formattedDate);
+      onChange(formattedDate);
       setIsInvalid(false);
     }
   };
@@ -328,7 +324,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
           <DateTimePicker
             open={isCalendarOpen}
             onClose={() => setIsCalendarOpen(false)}
-            value={parseDate(inputValue) ?? null}
+            value={new Date(inputValue) ?? null}
             onChange={handleDateChange}
             onAccept={handleAccept}
             slotProps={{
