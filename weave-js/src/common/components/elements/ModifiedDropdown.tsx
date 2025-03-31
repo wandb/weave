@@ -505,14 +505,13 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </div>
       );
     };
-    // State used to control the open/close state of the dropdown icon
+    // State used to keep track of the open/close state of the dropdown icon
     const [isOpen, setIsOpen] = useState(passProps.open === true);
     const multipleDropdownStyle = {
       paddingTop: 8,
       paddingBottom: 8,
       paddingRight: 12,
       paddingLeft: 12,
-      display: 'flex',
     };
 
     return wrapWithDragDrop(
@@ -520,7 +519,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         {...passProps}
         style={{
           ...(multiple ? multipleDropdownStyle : {}),
-          display: 'flex', // for the text and the icon to be aligned properly
           ...style,
         }}
         options={displayOptions}
