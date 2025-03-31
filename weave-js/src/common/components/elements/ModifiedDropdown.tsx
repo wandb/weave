@@ -513,7 +513,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       paddingRight: 12,
       paddingLeft: 12,
       display: 'flex',
-      alignItems: 'center',
     };
 
     return wrapWithDragDrop(
@@ -521,6 +520,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         {...passProps}
         style={{
           ...(multiple ? multipleDropdownStyle : {}),
+          display: 'flex', // for the text and the icon to be aligned properly
           ...style,
         }}
         options={displayOptions}
@@ -565,8 +565,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         }}
         trigger={renderTrigger()}
         icon={
-          <div className="absolute right-12 top-8 cursor-pointer">
-            {isOpen ? <IconChevronUp /> : <IconChevronDown />}
+          <div className="absolute right-12 top-0 h-full cursor-pointer">
+            <div className="flex h-full items-center justify-center">
+              {isOpen ? <IconChevronUp /> : <IconChevronDown />}
+            </div>
           </div>
         }
       />
