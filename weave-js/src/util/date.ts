@@ -246,13 +246,7 @@ export const parseDate = (dateStr: string): Date | null => {
   // Try parsing with moment for standard date formats
   const momentDate = moment(trimmedStr);
   if (momentDate.isValid()) {
-    // Check if the date is within a year from now
-    const oneYearFromNow = moment().add(1, 'year');
-    const oneYearAgo = moment().subtract(1, 'year');
-
-    if (momentDate.isBetween(oneYearAgo, oneYearFromNow, 'day', '[]')) {
-      return momentDate.toDate();
-    }
+    return momentDate.toDate();
   }
 
   // If all parsing attempts fail, return null
