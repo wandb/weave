@@ -14,9 +14,14 @@ export const FilterControls = styled.div`
   position: absolute;
   z-index: 9;
   background: white;
-  border-bottom: 2px solid #bbb;
+  border-left: 0.5px solid #bbb;
+  border-right: 0.5px solid #bbb;
+  border-bottom: 0.5px solid #bbb;
   padding: 5px;
   top: 30px;
   display: flex;
   flex-direction: column;
+  &.simple-mode {
+    padding: 0;
+  }
 `;

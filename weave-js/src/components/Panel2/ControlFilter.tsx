@@ -5,6 +5,7 @@ import {
   NodeOrVoidNode,
   voidNode,
 } from '@wandb/weave/core';
+import {FilterExpressionBuilder} from '@wandb/weave/panel/WeaveExpressionBuilder/FilterBuilder';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Button} from 'semantic-ui-react';
 
@@ -65,6 +66,11 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
             setExpression={setFilterFunction}
             onMount={focusEditor}
             liveUpdate
+          />
+          <FilterExpressionBuilder
+            expr={filterFunction}
+            setExpression={setFilterFunction}
+            propsSetFilterFunction={propsSetFilterFunction}
           />
         </div>
         <div

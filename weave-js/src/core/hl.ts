@@ -820,7 +820,10 @@ export function availableOpsForChain(node: Node, opStore: OpStore): OpDef[] {
   });
 }
 
-export function pickSuggestions(objType: Type): string[] {
+export function pickSuggestions(
+  objType: Type,
+  returnTypes = false
+): string[] | Array<{key: string; type: Type}> {
   // Currently this returns all paths to leave, but its useful to
   // be able to fetch intermediate nodes as weTypes. TODO: fix
   objType = taggableStrip(objType);
@@ -838,14 +841,16 @@ export function pickSuggestions(objType: Type): string[] {
     objType = objType.value;
   }
   let keys: string[] = [];
+  let keysWithTypes: Array<{key: string; type: Type}> = [];
   if (isTypedDictLike(objType)) {
-    const allPaths = allObjPaths(objType).map(pt =>
+    const allPaths = allObjPaths(objType);
+    const escapedAllPaths = allPaths.map(pt =>
       pt.path.map(s => s.replace(new RegExp('\\.', 'g'), '\\.'))
     );
     // If we have nested paths that share the same tail key, included *. paths
     // in suggestions
     const sameLengthAndTailGroups = groupBy(
-      allPaths,
+      escapedAllPaths,
       path => `${path.length}-${path[path.length - 1]}`
     );
     keys = Object.values(sameLengthAndTailGroups)
@@ -860,8 +865,37 @@ export function pickSuggestions(objType: Type): string[] {
         return [starredPath].concat(paths);
       })
       .map(path => path.join('.'));
+
+    if (returnTypes) {
+      // For all the keys, find the matching path entry and create an object with key and type
+      keysWithTypes = keys.map(key => {
+        // If key has * in it, it's a starred path
+        if (key.includes('*')) {
+          const lastPart = key.split('.').pop() || '';
+          const matchingPath = allPaths.find(
+            pt => pt.path.length > 0 && pt.path[pt.path.length - 1] === lastPart
+          );
+          return {
+            key,
+            type: matchingPath?.type ?? 'any',
+          };
+        } else {
+          // For regular paths, find the exact match
+          const pathParts = key.split('.');
+          const matchingPath = allPaths.find(
+            pt =>
+              pt.path.length === pathParts.length &&
+              pt.path.join('.') === pathParts.join('.')
+          );
+          return {
+            key,
+            type: matchingPath?.type ?? 'any',
+          };
+        }
+      });
+    }
   }
-  return keys;
+  return returnTypes ? keysWithTypes : keys;
 }
 
 export function callOpValid(
