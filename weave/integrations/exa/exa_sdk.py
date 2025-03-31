@@ -41,9 +41,12 @@ def exa_on_finish(call: Call, output: Any, exception: BaseException | None) -> N
 
 
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    "I want to remove the 'kwargs' key from the inputs if it is empty (when kwargs = {})"
-    if "kwargs" in inputs and not inputs["kwargs"]:
-        del inputs["kwargs"]
+    """Unpack kwargs parameters into the top-level inputs dictionary for better tracing.
+    This ensures parameters like text, type, and num_results are properly displayed."""
+    if "kwargs" in inputs:
+        # Merge kwargs into the top-level inputs
+        kwargs = inputs.pop("kwargs")
+        inputs.update(kwargs)
     return inputs
 
 
