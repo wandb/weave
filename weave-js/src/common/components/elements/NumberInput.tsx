@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import React from 'react';
-import {Icon, Input} from 'semantic-ui-react';
+import {Input, SemanticICONS} from 'semantic-ui-react';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 
 import clamp from '../../util/clamp';
 
@@ -41,7 +42,7 @@ const NumberInput: React.FC<NumberInputProps> = props => {
 
   // Shifts value up or down based on strideLength and available ticks
   const shiftValue = React.useCallback(
-    (e: React.SyntheticEvent<HTMLInputElement>, direction: number) => {
+    (e: React.SyntheticEvent<HTMLDivElement>, direction: number) => {
       if (direction == null) {
         // Do nothing on non arrow keys
         return;
@@ -122,23 +123,33 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         }}
       />
       {props.stepper && (
-        <div className="number-input__stepper">
-          <Icon
-            onClick={(e: React.SyntheticEvent<HTMLInputElement>) =>
-              shiftValue(e, 1)
-            }
-            size="mini"
-            name="chevron up"
+        <div className="number-input__stepper flex flex-col justify-center p-2 pr-4">
+          <NumberInputArrow
+            onChange={e => shiftValue(e, 1)}
+            iconName="chevron-up"
           />
-          <Icon
-            onClick={(e: React.SyntheticEvent<HTMLInputElement>) =>
-              shiftValue(e, -1)
-            }
-            size="mini"
-            name="chevron down"
+          <NumberInputArrow
+            onChange={e => shiftValue(e, -1)}
+            iconName="chevron-down"
           />
         </div>
       )}
+    </div>
+  );
+};
+
+const NumberInputArrow = ({
+  onChange,
+  iconName,
+}: {
+  onChange: (e: React.SyntheticEvent<HTMLDivElement>) => void;
+  iconName: IconName;
+}) => {
+  return (
+    <div
+      className="flex h-full cursor-pointer flex-col items-center justify-center rounded-sm text-moon-600 hover:bg-moon-150"
+      onClick={onChange}>
+      <Icon width={10} height={10} name={iconName} />
     </div>
   );
 };
