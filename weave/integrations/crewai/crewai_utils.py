@@ -4,6 +4,10 @@ from typing import Any
 from weave.trace.serialization.serialize import dictify, stringify
 from weave.trace.weave_client import Call
 
+EXCLUDE_TASK_ATTRS = {
+    "agent": True
+}
+
 
 def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
     # Ensure obj is a pydantic BaseModel
@@ -57,14 +61,14 @@ def safe_serialize_crewai_task(obj: Any) -> dict[str, Any]:
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        attr_dict = obj.model_dump()
+        attr_dict = obj.model_dump(
+            exclude=EXCLUDE_TASK_ATTRS,
+            exclude_none=True,
+        )
 
     for attr, value in attr_dict.items():
-        if attr.startswith("_") or value is None or value == "":
+        if attr.startswith("_") or value == "":
             continue
-        # we don't want to serialize agent again. just knowing which agent is used is enough.
-        if attr == "agent" and isinstance(value, dict):
-            result[f"{attr}.role"] = value.get("role", "")
         else:
             result[attr] = stringify(value)
 
