@@ -1,0 +1,11 @@
+evaluation:
+  query_keywords: ["evaluation", "evaluate", "scoring", "score", "metrics"]
+  preferred_files: ["evaluation.md"]
+
+panels:
+  query_keywords: ["panel", "plot", "table", "image", "graph"]
+  preferred_files: ["panels.mdx"]
+
+rag:
+  query_keywords: ["rag", "retrieval", "context", "chunks"]
+  preferred_files: ["tutorial-rag.md"]
