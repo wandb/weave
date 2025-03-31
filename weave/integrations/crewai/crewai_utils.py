@@ -4,8 +4,10 @@ from typing import Any
 from weave.trace.serialization.serialize import dictify, stringify
 from weave.trace.weave_client import Call
 
-EXCLUDE_TASK_ATTRS = {
-    "agent": True
+EXCLUDE_TASK_ATTRS = {"agent": True}
+
+EXCLUDE_AGENT_ATTRS = {
+    "crew": True,
 }
 
 
@@ -30,13 +32,13 @@ def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        attr_dict = obj.model_dump()
+        attr_dict = obj.model_dump(
+            exclude=EXCLUDE_AGENT_ATTRS,
+            exclude_none=True,
+        )
 
     for attr, value in attr_dict.items():
-        if value is None or attr == "crew":
-            continue
-        else:
-            result[attr] = stringify(value)
+        result[attr] = stringify(value)
 
     return result
 
