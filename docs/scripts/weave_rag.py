@@ -20,11 +20,18 @@ with open(os.path.join(os.path.dirname(__file__), "llms.yaml"), "r") as f:
 
 def load_articles():
     articles = []
-    for fname in os.listdir(DOCS_DIR):
-        if fname.endswith((".md", ".mdx")):
-            with open(os.path.join(DOCS_DIR, fname), encoding="utf-8") as f:
-                articles.append({"text": f.read(), "source": fname})
+    for root, _, files in os.walk(DOCS_DIR):
+        for fname in files:
+            if fname.endswith((".md", ".mdx")):
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, DOCS_DIR)
+                with open(full_path, encoding="utf-8") as f:
+                    articles.append({
+                        "text": f.read(),
+                        "source": rel_path  # preserve subfolder structure
+                    })
     return articles
+
 
 
 def docs_to_embeddings(articles: list) -> list:
