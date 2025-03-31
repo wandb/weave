@@ -9,7 +9,7 @@ from binascii import hexlify
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue,
@@ -36,7 +36,12 @@ from typing_extensions import assert_never
 
 from weave.trace_server import trace_server_interface as tsi
 
-from .attributes import get_attribute, to_json_serializable, unflatten_key_values
+from .attributes import (
+    convert_numeric_keys_to_list,
+    get_attribute,
+    to_json_serializable,
+    unflatten_key_values,
+)
 
 
 class SpanKind(Enum):
@@ -90,6 +95,7 @@ class Status:
             return tsi.TraceStatus.ERROR
         # UNSET: This is not 'running' because if the trace was sent the call completed
         return None
+
 
 @dataclass
 class Event:
@@ -169,16 +175,16 @@ def _decode_value(any_value: AnyValue) -> Any:
 
 @dataclass
 class Attributes:
-    _attributes: Union[dict[str, Any], list[Any]] = field(default_factory=dict)
+    _attributes: dict[str, Any] = field(default_factory=dict)
 
-    def __getitem__(self, item):
-        return self._attributes.__getitem__(item)
+    def __getitem__(self, key: str) -> Any:
+        return self._attributes.__getitem__(key)
 
-    def __setitem__(self, item, value):
-        return self._attributes.__setitem__(item, value)
+    def __setitem__(self, key: str, value: Any) -> None:
+        return self._attributes.__setitem__(key, value)
 
-    def get(self, item, default=None):
-        return self._attributes.get(item, default)
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._attributes.get(key, default)
 
     def get_attribute_value(self, key: str) -> Any:
         return get_attribute(self._attributes, key)
@@ -258,7 +264,9 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        attributes = to_json_serializable(self.attributes._attributes)
+        attributes = to_json_serializable(
+            convert_numeric_keys_to_list(self.attributes._attributes)
+        )
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
@@ -272,11 +280,10 @@ class Span:
             wb_user_id=None,
             wb_run_id=None,
         )
-        summary_insert_map = tsi.SummaryInsertMap(
-            usage={},
-            status=self.status.to_weave_status(),
+        summary_insert_map = tsi.SummaryInsertMap(usage={})
+        exception_msg = (
+            self.status.message if self.status.code == StatusCode.ERROR else None
         )
-        exception_msg = self.status.message if self.status.code == StatusCode.ERROR else None
 
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
@@ -297,7 +304,7 @@ class ScopeSpans:
     spans: list[Span] = field(default_factory=list)
     schema_url: str = ""
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Span]:
         yield from self.spans
 
     @classmethod
@@ -318,7 +325,7 @@ class ResourceSpans:
     scope_spans: list[ScopeSpans] = field(default_factory=list)
     schema_url: str = ""
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ScopeSpans]:
         yield from self.scope_spans
 
     @classmethod
@@ -339,7 +346,7 @@ class TracesData:
 
     resource_spans: list[ResourceSpans] = field(default_factory=list)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ResourceSpans]:
         yield from self.resource_spans
 
     @classmethod

@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Optional, Protocol, Union
+from typing import Any, Literal, Optional, Protocol, TypeAlias, Union
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -228,9 +228,11 @@ class OtelExportReq(BaseModel):
     traces: ExportTraceServiceRequest
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+
 # Spec requires that the response be of type Export<signal>ServiceResponse
-# https://opentelemetry.io/docs/specs/otlp/ 
-OtelExportRes = ExportTraceServiceResponse
+# https://opentelemetry.io/docs/specs/otlp/
+OtelExportRes: TypeAlias = "ExportTraceServiceResponse"
+
 
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert

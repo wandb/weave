@@ -8,10 +8,10 @@ from uuid import UUID
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 # These are the attributes that should be filtered out, for now leave blank
-FILTERS = []
+FILTERS: tuple[str]
 
 # These vary based on the provider, will be set in followup PR
-JSON_ATTRIBUTES = []
+JSON_ATTRIBUTES: tuple[str]
 
 
 # JSON attributes loading for recursive key value parsing
@@ -149,7 +149,7 @@ def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
     current[parts[-1]] = value
 
 
-def _convert_numeric_keys_to_list(
+def convert_numeric_keys_to_list(
     obj: dict[str, Any],
 ) -> Union[dict[str, Any], list[Any]]:
     """
@@ -161,7 +161,7 @@ def _convert_numeric_keys_to_list(
     # Process all nested dictionaries first
     for key, value in obj.items():
         if isinstance(value, dict):
-            obj[key] = _convert_numeric_keys_to_list(value)
+            obj[key] = convert_numeric_keys_to_list(value)
 
     # Check if all keys are numeric strings and contiguous starting from 0
     try:
@@ -180,7 +180,7 @@ def _convert_numeric_keys_to_list(
 
 def expand_attributes(
     kv: Iterable[tuple[str, str]], json_attributes: list[str] = []
-) -> Union[dict[str, Any], list[Any]]:
+) -> dict[str, Any]:
     """
     Expand a flattened JSON attributes file into a nested Python dictionary.
 
@@ -194,7 +194,7 @@ def expand_attributes(
     # Read the JSON file
 
     # Create the result dictionary
-    result: Union[dict[str, Any], list[Any]] = {}
+    result_dict: dict[str, Any] = {}
 
     # Process each key-value pair
     for flat_key, value in kv:
@@ -211,12 +211,10 @@ def expand_attributes(
                 pass
 
         # Add the nested key to the result
-        _set_value_in_nested_dict(result, flat_key, value)
+        _set_value_in_nested_dict(result_dict, flat_key, value)
 
     # Convert dictionaries with numeric keys to lists
-    result = _convert_numeric_keys_to_list(result)
-
-    return result
+    return result_dict
 
 
 def flatten_attributes(
@@ -288,7 +286,7 @@ def flatten_attributes(
     return result
 
 
-def get_attribute(data: Union[dict[str, Any], list[Any]], key: str) -> Any:
+def get_attribute(data: dict[str, Any], key: str) -> Any:
     """
     Get the value of a nested attribute from either a nested or flattened dictionary.
 
@@ -309,7 +307,7 @@ def get_attribute(data: Union[dict[str, Any], list[Any]], key: str) -> Any:
 
 def unflatten_key_values(
     key_values: Iterable[KeyValue],
-) -> Union[dict[str, Any], list[Any]]:
+) -> dict[str, Any]:
     """
     Transform a list of KeyValue pairs into a nested dictionary structure.
 

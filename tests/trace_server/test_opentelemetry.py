@@ -28,11 +28,11 @@ from weave.trace_server.opentelemetry.attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
+from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
     StatusCode,
 )
-from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
 
@@ -43,7 +43,9 @@ def create_test_span():
     span.trace_id = uuid.uuid4().bytes
     span.span_id = uuid.uuid4().bytes[:8]
     span.start_time_unix_nano = int(datetime.now().timestamp() * 1_000_000_000)
-    span.end_time_unix_nano = span.start_time_unix_nano + 1_000_000_000  # 1 second later
+    span.end_time_unix_nano = (
+        span.start_time_unix_nano + 1_000_000_000
+    )  # 1 second later
     span.kind = 1
 
     # Add some attributes
@@ -116,11 +118,7 @@ def create_test_export_request(project_id="test_project"):
     request = ExportTraceServiceRequest()
     request.resource_spans.append(resource_spans)
 
-    return tsi.OtelExportReq(
-        project_id=project_id,
-        traces=request,
-        wb_user_id=None
-    )
+    return tsi.OtelExportReq(project_id=project_id, traces=request, wb_user_id=None)
 
 
 @pytest.fixture
@@ -135,28 +133,40 @@ def mock_clickhouse_trace_server():
         def mock_otel_export(req):
             # Mock the conversion of proto to python class and collection of calls
             calls = []
-            calls.extend([
-                {'mode': 'start', 'req': tsi.CallStartReq(start=tsi.StartedCallSchemaForInsert(
-                    project_id=req.project_id,
-                    id="test-span-id",
-                    op_name="test_span",
-                    trace_id="test-trace-id",
-                    parent_id=None,
-                    started_at=datetime.now(),
-                    attributes={},
-                    inputs={},
-                    wb_user_id=None,
-                    wb_run_id=None
-                ))},
-                {'mode': 'end', 'req': tsi.CallEndReq(end=tsi.EndedCallSchemaForInsert(
-                    project_id=req.project_id,
-                    id="test-span-id",
-                    ended_at=datetime.now(),
-                    exception=None,
-                    output={},
-                    summary=tsi.SummaryInsertMap(usage={})
-                ))}
-            ])
+            calls.extend(
+                [
+                    {
+                        "mode": "start",
+                        "req": tsi.CallStartReq(
+                            start=tsi.StartedCallSchemaForInsert(
+                                project_id=req.project_id,
+                                id="test-span-id",
+                                op_name="test_span",
+                                trace_id="test-trace-id",
+                                parent_id=None,
+                                started_at=datetime.now(),
+                                attributes={},
+                                inputs={},
+                                wb_user_id=None,
+                                wb_run_id=None,
+                            )
+                        ),
+                    },
+                    {
+                        "mode": "end",
+                        "req": tsi.CallEndReq(
+                            end=tsi.EndedCallSchemaForInsert(
+                                project_id=req.project_id,
+                                id="test-span-id",
+                                ended_at=datetime.now(),
+                                exception=None,
+                                output={},
+                                summary=tsi.SummaryInsertMap(usage={}),
+                            )
+                        ),
+                    },
+                ]
+            )
             server.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
             return tsi.OtelExportRes()
 
@@ -182,7 +192,7 @@ def mock_to_call(monkeypatch):
             attributes=attributes,
             inputs={},  # Use empty dict instead of None
             wb_user_id=None,
-            wb_run_id=None
+            wb_run_id=None,
         )
 
         summary_insert_map = tsi.SummaryInsertMap(usage={})
@@ -193,11 +203,11 @@ def mock_to_call(monkeypatch):
             ended_at=self.end_time,
             exception=None,
             output={},  # Use empty dict instead of None
-            summary=summary_insert_map
+            summary=summary_insert_map,
         )
         return (start_call, end_call)
 
-    monkeypatch.setattr(PySpan, 'to_call', patched_to_call)
+    monkeypatch.setattr(PySpan, "to_call", patched_to_call)
 
 
 class TestClickHouseTraceServerOtel:
@@ -242,7 +252,10 @@ class TestPythonSpans:
         # Verify attributes were correctly converted
         assert py_span.attributes.get_attribute_value("test.attribute") == "test_value"
         assert py_span.attributes.get_attribute_value("test.number") == 42
-        assert py_span.attributes.get_attribute_value("test.nested.value") == "nested_test_value"
+        assert (
+            py_span.attributes.get_attribute_value("test.nested.value")
+            == "nested_test_value"
+        )
         array_value = py_span.attributes.get_attribute_value("test.array")
         assert isinstance(array_value, list)
         assert len(array_value) == 2
@@ -284,9 +297,9 @@ class TestPythonSpans:
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
-        traces_data = PyTracesData.from_proto(TracesData(
-            resource_spans=export_req.traces.resource_spans
-        ))
+        traces_data = PyTracesData.from_proto(
+            TracesData(resource_spans=export_req.traces.resource_spans)
+        )
 
         assert len(traces_data.resource_spans) == 1
         resource_spans = traces_data.resource_spans[0]
@@ -317,10 +330,7 @@ class TestAttributes:
         assert to_json_serializable({"a": 1, "b": "two"}) == {"a": 1, "b": "two"}
 
         # Test nested structures
-        nested = {
-            "a": [1, 2, {"b": "c"}],
-            "d": {"e": [3, 4]}
-        }
+        nested = {"a": [1, 2, {"b": "c"}], "d": {"e": [3, 4]}}
         assert to_json_serializable(nested) == nested
 
         # Test datetime
@@ -344,33 +354,22 @@ class TestAttributes:
 
         # Verify the result
         assert result == {
-            "a": {
-                "b": {
-                    "c": "value1",
-                    "d": 42
-                },
-                "e": True
-            },
-            "f": ["item0", "item1"]
+            "a": {"b": {"c": "value1", "d": 42}, "e": True},
+            "f": ["item0", "item1"],
         }
 
     def test_get_attribute(self):
         """Test getting attributes from nested structures."""
-        nested = {
-            "a": {
-                "b": {
-                    "c": "value1"
-                }
-            },
-            "d": [1, 2, 3]
-        }
+        nested = {"a": {"b": {"c": "value1"}}, "d": [1, 2, 3]}
 
         assert get_attribute(nested, "a.b.c") == "value1"
         assert get_attribute(nested, "a.b") == {"c": "value1"}
         assert get_attribute(nested, "d") == [1, 2, 3]
 
         # Need to patch get_attribute function to correctly handle array indices
-        with patch("weave.trace_server.opentelemetry.attributes._get_value_from_nested_dict") as mock_get:
+        with patch(
+            "weave.trace_server.opentelemetry.attributes._get_value_from_nested_dict"
+        ) as mock_get:
             mock_get.return_value = 1
             assert get_attribute(nested, "d.0") == 1
             mock_get.assert_called_once_with(nested, "d.0")
@@ -384,33 +383,21 @@ class TestAttributes:
             ("a.b.d", 42),
             ("a.e", True),
             ("f.0", "item0"),
-            ("f.1", "item1")
+            ("f.1", "item1"),
         ]
 
         result = expand_attributes(flat_attrs)
 
         assert result == {
-            "a": {
-                "b": {
-                    "c": "value1",
-                    "d": 42
-                },
-                "e": True
-            },
-            "f": ["item0", "item1"]
+            "a": {"b": {"c": "value1", "d": 42}, "e": True},
+            "f": ["item0", "item1"],
         }
 
     def test_flatten_attributes(self):
         """Test flattening nested attributes into key-value pairs."""
         nested = {
-            "a": {
-                "b": {
-                    "c": "value1",
-                    "d": 42
-                },
-                "e": True
-            },
-            "f": ["item0", "item1"]
+            "a": {"b": {"c": "value1", "d": 42}, "e": True},
+            "f": ["item0", "item1"],
         }
 
         result = flatten_attributes(nested)
@@ -420,7 +407,7 @@ class TestAttributes:
             "a.b.d": 42,
             "a.e": True,
             "f.0": "item0",
-            "f.1": "item1"
+            "f.1": "item1",
         }
 
         assert result == expected
