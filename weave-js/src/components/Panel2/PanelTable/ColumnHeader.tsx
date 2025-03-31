@@ -1,5 +1,4 @@
 import {CSSProperties} from '@material-ui/core/styles/withStyles';
-import {WBMenuOption, WBPopupMenuTrigger} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
@@ -19,15 +18,23 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {TableState} from '@wandb/weave/index';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {WBMenuOption} from '../../../common/components/WbMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {Button} from '../../Button';
 import {Tooltip} from '../../Tooltip';
+import {WBPopupMenuTrigger} from '../../WBPopupMenuTrigger';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';
@@ -159,6 +166,7 @@ export const ColumnHeader: React.FC<{
   const {columnFormat} = useContext(WeaveFormatContext);
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [workingSelectFunction, setWorkingSelectFunction] =
     useState<EditingNode>(propsSelectFunction);
@@ -340,7 +348,7 @@ export const ColumnHeader: React.FC<{
     let menuItems: WBMenuOption[] = [];
     menuItems.push({
       value: 'settings',
-      name: 'Column settings',
+      name: 'Edit cell expression',
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
@@ -405,7 +413,7 @@ export const ColumnHeader: React.FC<{
       menuItems = menuItems.concat([
         {
           value: 'insert-right',
-          name: 'Insert 1 right',
+          name: 'Insert column to right',
           icon: 'next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
@@ -420,7 +428,7 @@ export const ColumnHeader: React.FC<{
         },
         {
           value: 'insert-left',
-          name: 'Insert 1 left',
+          name: 'Insert column to left',
           icon: 'previous',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
@@ -436,7 +444,7 @@ export const ColumnHeader: React.FC<{
         makeMenuItemDivider('pin-div'),
         {
           value: 'pin',
-          name: isPinned ? 'Unpin' : 'Pin',
+          name: isPinned ? 'Unpin column' : 'Pin column',
           icon: 'pin',
           onSelect: () => {
             recordEvent('PIN_COLUMN');
@@ -446,7 +454,7 @@ export const ColumnHeader: React.FC<{
         makeMenuItemDivider('remove-div'),
         {
           value: 'remove',
-          name: 'Remove',
+          name: 'Remove column',
           icon: 'delete',
           disabled: isUsedInFilter,
           onSelect: () => {
@@ -473,15 +481,15 @@ export const ColumnHeader: React.FC<{
               </Item>
             ) : (
               <Item data-test="remove-column" hovered={hovered}>
-                Remove
                 <ItemIcon name="delete" />
+                Remove column
               </Item>
             );
           },
         },
         {
           value: 'remove-all-right',
-          name: 'Remove all right',
+          name: 'Remove columns to the right',
           icon: 'next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
@@ -495,7 +503,7 @@ export const ColumnHeader: React.FC<{
         },
         {
           value: 'remove-all-left',
-          name: 'Remove all left',
+          name: 'Remove columns to the left',
           icon: 'previous',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
@@ -562,6 +570,11 @@ export const ColumnHeader: React.FC<{
       ? {zIndex: 1, flexDirection: 'row-reverse'}
       : {flexDirection: 'row'};
 
+  // Create a memoized handler for open state changes
+  const handleOpenChange = useCallback((open: boolean) => {
+    setMenuOpen(open);
+  }, []);
+
   return (
     <S.ColumnHeader
       data-test="column-header"
@@ -569,6 +582,7 @@ export const ColumnHeader: React.FC<{
         textAlign: columnFormat?.textAlign ?? 'center',
         flexDirection:
           columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
+        ...(menuOpen && {backgroundColor: 'rgba(0, 0, 0, 0.04)'}),
       }}>
       {simpleTable ? (
         workingColumnName !== '' ? (
@@ -736,47 +750,61 @@ export const ColumnHeader: React.FC<{
         />
       )}
       {!simpleTable && (
-        <WBPopupMenuTrigger options={columnMenuItems}>
-          {({anchorRef, setOpen, open}) => (
-            <S.ColumnActionContainer
-              className="column-controls"
-              style={columnActionContainerStyle}>
-              <S.ColumnAction>
-                {isPinned && (
-                  <PinnedIndicator unpin={() => setColumnPinState(false)} />
-                )}
-                {isGroupCol && (
-                  <S.ControlIcon
-                    name="group-runs"
-                    onClick={e => {
-                      recordEvent('REMOVE_COLUMN_GROUPING');
-                      doUngroup();
-                    }}
+        <WBPopupMenuTrigger
+          options={columnMenuItems}
+          theme="light"
+          menuBackgroundColor="white"
+          direction={
+            columnFormat?.textAlign === 'right' ? 'bottom right' : 'bottom left'
+          }
+          menuWidth={200}>
+          {({anchorRef, setOpen, open}) => {
+            // Update menuOpen state only when the open state changes
+            if (menuOpen !== open) {
+              handleOpenChange(open);
+            }
+
+            return (
+              <S.ColumnActionContainer
+                className="column-controls"
+                style={columnActionContainerStyle}>
+                <S.ColumnAction>
+                  {isPinned && (
+                    <PinnedIndicator unpin={() => setColumnPinState(false)} />
+                  )}
+                  {isGroupCol && (
+                    <S.ControlIcon
+                      name="group-runs"
+                      onClick={e => {
+                        recordEvent('REMOVE_COLUMN_GROUPING');
+                        doUngroup();
+                      }}
+                    />
+                  )}
+                </S.ColumnAction>
+                <S.ColumnAction>
+                  {colIsSorted && (
+                    <SortStateToggle
+                      {...{
+                        tableState,
+                        colId,
+                        updateTableState,
+                      }}
+                    />
+                  )}
+                </S.ColumnAction>
+                <S.ColumnAction>
+                  <S.EllipsisIcon
+                    ref={anchorRef}
+                    data-test="column-options"
+                    name="overflow"
+                    className="column-actions-trigger"
+                    onClick={() => setOpen(o => !o)}
                   />
-                )}
-              </S.ColumnAction>
-              <S.ColumnAction>
-                {colIsSorted && (
-                  <SortStateToggle
-                    {...{
-                      tableState,
-                      colId,
-                      updateTableState,
-                    }}
-                  />
-                )}
-              </S.ColumnAction>
-              <S.ColumnAction>
-                <S.EllipsisIcon
-                  ref={anchorRef}
-                  data-test="column-options"
-                  name="overflow"
-                  className="column-actions-trigger"
-                  onClick={() => setOpen(o => !o)}
-                />
-              </S.ColumnAction>
-            </S.ColumnActionContainer>
-          )}
+                </S.ColumnAction>
+              </S.ColumnActionContainer>
+            );
+          }}
         </WBPopupMenuTrigger>
       )}
     </S.ColumnHeader>

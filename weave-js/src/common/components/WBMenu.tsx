@@ -43,12 +43,12 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
     hovered={hovered}
     fontSize={fontSize}
     lineHeight={lineHeight}>
-    {getOptionDisplayName(option)}
     <S.ItemIcon
       name={
         option.icon ?? (selected && option.icon !== null ? 'check' : 'blank')
       }
     />
+    {getOptionDisplayName(option)}
   </S.Item>
 );
 
