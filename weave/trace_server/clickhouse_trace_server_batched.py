@@ -245,7 +245,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
                         ]
                     )
-        res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        # TODO: Actually populate the error fields if call_start_batch fails
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         return tsi.OtelExportRes()
 
     @contextmanager

@@ -1,13 +1,18 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Optional, Protocol, TypeAlias, Union
+from typing import Any, Literal, Optional, Protocol, Union
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
 )
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+)
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -231,7 +236,15 @@ class OtelExportReq(BaseModel):
 
 # Spec requires that the response be of type Export<signal>ServiceResponse
 # https://opentelemetry.io/docs/specs/otlp/
-OtelExportRes: TypeAlias = "ExportTraceServiceResponse"
+class OtelExportRes(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    _response: ExportTraceServiceResponse
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+        # Set the response type to ExportTraceServiceResponse
+        # TODO: Actually populate the error fields
+        self._response = ExportTraceServiceResponse()
 
 
 class CallStartReq(BaseModel):

@@ -1,34 +1,11 @@
 import json
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
 from typing import Any, Union
 from uuid import UUID
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-
-# These are the attributes that should be filtered out, for now leave blank
-FILTERS: tuple[str]
-
-# These vary based on the provider, will be set in followup PR
-JSON_ATTRIBUTES: tuple[str]
-
-
-# JSON attributes loading for recursive key value parsing
-def load_json_strings(
-    key_values: Iterable[tuple[str, Any]],
-) -> Iterator[tuple[str, Any]]:
-    for key, value in key_values:
-        if key.endswith(JSON_ATTRIBUTES):
-            try:
-                dict_value = json.loads(value)
-            except Exception:
-                yield key, value
-            else:
-                if dict_value:
-                    yield key, dict_value
-        else:
-            yield key, value
 
 
 def to_json_serializable(value: Any) -> Any:
@@ -336,6 +313,5 @@ def unflatten_key_values(
             }
         }
     """
-    it = filter(lambda kv: not any(kv.key.startswith(f) for f in FILTERS), key_values)
-    iterator = ((kv.key, resolve_pb_any_value(kv.value)) for kv in it)
+    iterator = ((kv.key, resolve_pb_any_value(kv.value)) for kv in key_values)
     return expand_attributes(iterator, json_attributes=[])

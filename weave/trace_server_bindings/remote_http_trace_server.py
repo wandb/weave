@@ -232,6 +232,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        # TODO: Add docs link
+        raise NotImplementedError(
+            "Sending otel traces directly is not yet supported. In order to learn more about OTEL "
+        )
+
     # Call API
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]

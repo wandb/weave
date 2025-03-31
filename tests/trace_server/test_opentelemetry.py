@@ -234,6 +234,49 @@ class TestClickHouseTraceServerOtel:
         assert len(batch_req.batch) == 2  # 1 start + 1 end
 
 
+@pytest.fixture
+def mock_sqlite_trace_server():
+    """Create a mocked SqliteTraceServer for testing OTEL export."""
+    from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+    with patch.object(SqliteTraceServer, "__init__", return_value=None):
+        server = SqliteTraceServer(":memory:")
+        server.call_start_batch = MagicMock()
+
+        # We keep the original otel_export method but mock call_start_batch
+        # This lets us test the conversion logic but mock the actual database operations
+
+        return server
+
+
+class TestSqliteTraceServerOtel:
+    def test_otel_export(self, mock_sqlite_trace_server):
+        """Test the otel_export method for SqliteTraceServer."""
+        from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+            ExportTraceServiceResponse,
+        )
+
+        export_req = create_test_export_request()
+
+        # Call the method under test
+        response = mock_sqlite_trace_server.otel_export(export_req)
+
+        # Verify the response is of the correct type
+        assert isinstance(response, ExportTraceServiceResponse)
+
+        # Verify call_start_batch was called with a batch request
+        mock_sqlite_trace_server.call_start_batch.assert_called_once()
+
+        # Get the batch request that was passed to call_start_batch
+        batch_req = mock_sqlite_trace_server.call_start_batch.call_args[0][0]
+
+        # Verify it's the expected type
+        assert isinstance(batch_req, tsi.CallCreateBatchReq)
+
+        # Verify the batch contains the expected number of calls (1 start + 1 end per span)
+        assert len(batch_req.batch) == 2
+
+
 class TestPythonSpans:
     def test_span_from_proto(self):
         """Test converting a protobuf Span to a Python Span."""

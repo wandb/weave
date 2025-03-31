@@ -1342,6 +1342,31 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
         return tsi.CompletionsCreateRes()
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+
+        traces_data = [
+            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
+        ]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
+        res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        # Return the empty ExportTraceServiceResponse as per the OTLP spec
+        return tsi.OtelExportRes()
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
