@@ -4,27 +4,40 @@ This module provides simple, human-readable Python classes that represent the
 trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
-from weave.trace_server import trace_server_interface as tsi
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, List, Tuple, Union, Optional, Dict
-from typing_extensions import assert_never
-from collections.abc import Iterable, Iterator
 import datetime
 from binascii import hexlify
-from .attributes import get_attribute, to_json_serializable
-from .attributes import unflatten_key_values
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Optional, Union
+
 from opentelemetry.proto.common.v1.common_pb2 import (
-    AnyValue, KeyValue, InstrumentationScope
+    AnyValue,
+    InstrumentationScope,
+    KeyValue,
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.trace.v1.trace_pb2 import (
-    TracesData as PbTracesData,
     ResourceSpans as PbResourceSpans,
+)
+from opentelemetry.proto.trace.v1.trace_pb2 import (
     ScopeSpans as PbScopeSpans,
+)
+from opentelemetry.proto.trace.v1.trace_pb2 import (
     Span as PbSpan,
+)
+from opentelemetry.proto.trace.v1.trace_pb2 import (
     Status as PbStatus,
 )
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    TracesData as PbTracesData,
+)
+from typing_extensions import assert_never
+
+from weave.trace_server import trace_server_interface as tsi
+
+from .attributes import get_attribute, to_json_serializable, unflatten_key_values
+
 
 class SpanKind(Enum):
     """Enum representing the span's kind."""
@@ -37,7 +50,7 @@ class SpanKind(Enum):
     CONSUMER = 5
 
     @classmethod
-    def from_proto(cls, proto_kind: int) -> 'SpanKind':
+    def from_proto(cls, proto_kind: int) -> "SpanKind":
         """Convert from protobuf enum value to SpanKind."""
         return cls(proto_kind)
 
@@ -50,9 +63,10 @@ class StatusCode(Enum):
     ERROR = 2
 
     @classmethod
-    def from_proto(cls, proto_code: int) -> 'StatusCode':
+    def from_proto(cls, proto_code: int) -> "StatusCode":
         """Convert from protobuf enum value to StatusCode."""
         return cls(proto_code)
+
 
 @dataclass
 class Status:
@@ -62,12 +76,12 @@ class Status:
     message: str = ""
 
     @classmethod
-    def from_proto(cls, proto_status: PbStatus) -> 'Status':
+    def from_proto(cls, proto_status: PbStatus) -> "Status":
         """Create a Status from a protobuf Status."""
         return cls(
-            code=StatusCode.from_proto(proto_status.code),
-            message=proto_status.message
+            code=StatusCode.from_proto(proto_status.code), message=proto_status.message
         )
+
 
 @dataclass
 class Event:
@@ -75,7 +89,7 @@ class Event:
 
     name: str
     timestamp: int  # nanoseconds since epoch
-    attributes: List[KeyValue] = field(default_factory=list)
+    attributes: list[KeyValue] = field(default_factory=list)
     dropped_attributes_count: int = 0
 
     @property
@@ -84,41 +98,45 @@ class Event:
         return datetime.datetime.fromtimestamp(self.timestamp / 1_000_000_000)
 
     @classmethod
-    def from_proto(cls, proto_event: PbSpan.Event) -> 'Event':
+    def from_proto(cls, proto_event: PbSpan.Event) -> "Event":
         """Create an Event from a protobuf Event."""
         return cls(
             name=proto_event.name,
             timestamp=proto_event.time_unix_nano,
             attributes=list(proto_event.attributes),
-            dropped_attributes_count=proto_event.dropped_attributes_count
+            dropped_attributes_count=proto_event.dropped_attributes_count,
         )
+
 
 @dataclass
 class Link:
     """Represents a link to another span."""
+
     trace_id: str
     span_id: str
     trace_state: str = ""
-    attributes: List[KeyValue] = field(default_factory=list)
+    attributes: list[KeyValue] = field(default_factory=list)
     dropped_attributes_count: int = 0
     flags: int = 0
 
     @classmethod
-    def from_proto(cls, proto_link: PbSpan.Link) -> 'Link':
+    def from_proto(cls, proto_link: PbSpan.Link) -> "Link":
         """Create a Link from a protobuf Link."""
         return cls(
-            trace_id=hexlify(proto_link.trace_id).decode('ascii'),
-            span_id=hexlify(proto_link.span_id).decode('ascii'),
+            trace_id=hexlify(proto_link.trace_id).decode("ascii"),
+            span_id=hexlify(proto_link.span_id).decode("ascii"),
             trace_state=proto_link.trace_state,
             attributes=list(proto_link.attributes),
             dropped_attributes_count=proto_link.dropped_attributes_count,
-            flags=proto_link.flags
+            flags=proto_link.flags,
         )
+
 
 def _decode_key_values(
     key_values: Iterable[KeyValue],
 ) -> Iterator[tuple[str, Any]]:
     return ((kv.key, _decode_value(kv.value)) for kv in key_values)
+
 
 def _decode_value(any_value: AnyValue) -> Any:
     which = any_value.WhichOneof("value")
@@ -140,10 +158,10 @@ def _decode_value(any_value: AnyValue) -> Any:
         return None
     assert_never(which)
 
-@dataclass
-class Attributes():
 
-    _attributes: Union[Dict[str, Any], List[Any]] = field(default_factory=dict)
+@dataclass
+class Attributes:
+    _attributes: Union[dict[str, Any], list[Any]] = field(default_factory=dict)
 
     def __getitem__(self, item):
         return self._attributes.__getitem__(item)
@@ -158,12 +176,14 @@ class Attributes():
         return get_attribute(self._attributes, key)
 
     @classmethod
-    def from_proto(cls, key_values: Iterable[KeyValue]) -> 'Attributes':
+    def from_proto(cls, key_values: Iterable[KeyValue]) -> "Attributes":
         return cls(unflatten_key_values(key_values))
+
 
 @dataclass
 class Span:
     """Represents a span in a trace."""
+
     name: str
     trace_id: str
     span_id: str
@@ -175,16 +195,18 @@ class Span:
     trace_state: str = ""
     flags: int = 0
     dropped_attributes_count: int = 0
-    events: List[Event] = field(default_factory=list)
+    events: list[Event] = field(default_factory=list)
     dropped_events_count: int = 0
-    links: List[Link] = field(default_factory=list)
+    links: list[Link] = field(default_factory=list)
     dropped_links_count: int = 0
     status: Status = field(default_factory=Status)
 
     @property
     def start_time(self) -> datetime.datetime:
         """Return the start time as a datetime object."""
-        return datetime.datetime.fromtimestamp(self.start_time_unix_nano / 1_000_000_000)
+        return datetime.datetime.fromtimestamp(
+            self.start_time_unix_nano / 1_000_000_000
+        )
 
     @property
     def end_time(self) -> datetime.datetime:
@@ -202,16 +224,18 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan) -> 'Span':
+    def from_proto(cls, proto_span: PbSpan) -> "Span":
         """Create a Span from a protobuf Span."""
         return cls(
             name=proto_span.name,
-            trace_id=hexlify(proto_span.trace_id).decode('ascii'),
-            span_id=hexlify(proto_span.span_id).decode('ascii'),
+            trace_id=hexlify(proto_span.trace_id).decode("ascii"),
+            span_id=hexlify(proto_span.span_id).decode("ascii"),
             start_time_unix_nano=proto_span.start_time_unix_nano,
             end_time_unix_nano=proto_span.end_time_unix_nano,
             kind=SpanKind.from_proto(proto_span.kind),
-            parent_id=hexlify(proto_span.parent_span_id).decode('ascii') if proto_span.parent_span_id else None,
+            parent_id=hexlify(proto_span.parent_span_id).decode("ascii")
+            if proto_span.parent_span_id
+            else None,
             trace_state=proto_span.trace_state,
             flags=proto_span.flags,
             attributes=Attributes.from_proto(proto_span.attributes),
@@ -223,20 +247,22 @@ class Span:
             status=Status.from_proto(proto_span.status),
         )
 
-    def to_call(self, project_id: str) -> Tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+    def to_call(
+        self, project_id: str
+    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         attributes = to_json_serializable(self.attributes._attributes)
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
-            id = self.span_id,
+            id=self.span_id,
             op_name=self.name,
-            trace_id = self.trace_id,
+            trace_id=self.trace_id,
             parent_id=self.parent_id,
             started_at=self.start_time,
             attributes=attributes,
             inputs={},
             wb_user_id=None,
-            wb_run_id=None
+            wb_run_id=None,
         )
         # TODO: (Followup) Get Exception from Output
 
@@ -244,54 +270,56 @@ class Span:
 
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
-            id = self.span_id,
+            id=self.span_id,
             ended_at=self.end_time,
-            exception = None,
+            exception=None,
             output={},
-            summary=summary_insert_map
+            summary=summary_insert_map,
         )
         return (start_call, end_call)
+
 
 @dataclass
 class ScopeSpans:
     """Represents a collection of spans from a specific instrumentation scope."""
 
     scope: InstrumentationScope
-    spans: List[Span] = field(default_factory=list)
+    spans: list[Span] = field(default_factory=list)
     schema_url: str = ""
 
     def __iter__(self):
-        for span in self.spans:
-            yield span
+        yield from self.spans
 
     @classmethod
-    def from_proto(cls, proto_scope_spans: PbScopeSpans) -> 'ScopeSpans':
+    def from_proto(cls, proto_scope_spans: PbScopeSpans) -> "ScopeSpans":
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
             spans=[Span.from_proto(s) for s in proto_scope_spans.spans],
-            schema_url=proto_scope_spans.schema_url
+            schema_url=proto_scope_spans.schema_url,
         )
+
 
 @dataclass
 class ResourceSpans:
     """Represents a collection of spans from a specific resource."""
 
     resource: Optional[Resource]
-    scope_spans: List[ScopeSpans] = field(default_factory=list)
+    scope_spans: list[ScopeSpans] = field(default_factory=list)
     schema_url: str = ""
 
     def __iter__(self):
-        for scope_span in self.scope_spans:
-            yield scope_span
+        yield from self.scope_spans
 
     @classmethod
-    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> 'ResourceSpans':
+    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> "ResourceSpans":
         """Create a ResourceSpans from a protobuf ResourceSpans."""
         return cls(
             resource=proto_resource_spans.resource,
-            scope_spans=[ScopeSpans.from_proto(s) for s in proto_resource_spans.scope_spans],
-            schema_url=proto_resource_spans.schema_url
+            scope_spans=[
+                ScopeSpans.from_proto(s) for s in proto_resource_spans.scope_spans
+            ],
+            schema_url=proto_resource_spans.schema_url,
         )
 
 
@@ -299,18 +327,16 @@ class ResourceSpans:
 class TracesData:
     """Top-level collection of trace data."""
 
-    resource_spans: List[ResourceSpans] = field(default_factory=list)
+    resource_spans: list[ResourceSpans] = field(default_factory=list)
 
     def __iter__(self):
-        for resouce_spans in self.resource_spans:
-            yield resouce_spans
+        yield from self.resource_spans
 
     @classmethod
-    def from_proto(cls, proto_traces_data: PbTracesData) -> 'TracesData':
+    def from_proto(cls, proto_traces_data: PbTracesData) -> "TracesData":
         """Create a TracesData from a protobuf TracesData."""
         return cls(
             resource_spans=[
                 ResourceSpans.from_proto(rs) for rs in proto_traces_data.resource_spans
             ]
         )
-

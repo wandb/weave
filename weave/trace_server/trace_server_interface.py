@@ -2,15 +2,17 @@ import datetime
 from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
-from typing_extensions import TypedDict
-from weave.trace_server.interface.query import Query
+
 from fastapi.responses import JSONResponse
 from google.protobuf.json_format import MessageToJson
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
 )
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from typing_extensions import TypedDict
+
+from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
@@ -221,17 +223,20 @@ class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
 
+
 class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
     traces: ExportTraceServiceRequest
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+
 class OtelExportRes(JSONResponse):
     def __init__(self, content: Optional[ExportTraceServiceResponse] = None) -> None:
         # TODO: We should actually implement partial success/success/failure
         content = content or ExportTraceServiceResponse()
         super().__init__(content=MessageToJson(content))
+
 
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
