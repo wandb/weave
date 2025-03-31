@@ -1,10 +1,8 @@
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Iterator, Iterable
+from typing import Any, Dict, List, Union, Iterator, Iterable
 from uuid import UUID
-from openinference.semconv import trace
-from openinference.semconv.trace import DocumentAttributes, SpanAttributes
 from opentelemetry.proto.common.v1.common_pb2 import (AnyValue, KeyValue)
 
 # These are the attributes that should be filtered out, for now leave blank
@@ -134,7 +132,7 @@ def _set_value_in_nested_dict(d: Dict[str, Any], key: str, value: Any) -> None:
 
     parts = key.split(".")
     current = d
-    for i, part in enumerate(parts[:-1]):
+    for _, part in enumerate(parts[:-1]):
         if part not in current:
             current[part] = {}
         current = current[part]
@@ -147,8 +145,6 @@ def _convert_numeric_keys_to_list(obj: Dict[str, Any]) -> Union[Dict[str, Any], 
     If all keys in a dictionary are numeric strings (0, 1, 2, ...), 
     convert it to a list. Recursively processes nested dictionaries.
     """
-    if not isinstance(obj, dict):
-        return obj
 
     # Process all nested dictionaries first
     for key, value in obj.items():

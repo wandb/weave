@@ -238,7 +238,7 @@ class Span:
             wb_user_id=None,
             wb_run_id=None
         )
-        # TODO: Get Exception from Output
+        # TODO: (Followup) Get Exception from Output
 
         summary_insert_map = tsi.SummaryInsertMap(usage={})
 
