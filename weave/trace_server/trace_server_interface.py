@@ -3,8 +3,6 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from fastapi.responses import JSONResponse
-from google.protobuf.json_format import MessageToJson
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
@@ -230,13 +228,9 @@ class OtelExportReq(BaseModel):
     traces: ExportTraceServiceRequest
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-
-class OtelExportRes(JSONResponse):
-    def __init__(self, content: Optional[ExportTraceServiceResponse] = None) -> None:
-        # TODO: We should actually implement partial success/success/failure
-        content = content or ExportTraceServiceResponse()
-        super().__init__(content=MessageToJson(content))
-
+# Spec requires that the response be of type Export<signal>ServiceResponse
+# https://opentelemetry.io/docs/specs/otlp/ 
+OtelExportRes = ExportTraceServiceResponse
 
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
