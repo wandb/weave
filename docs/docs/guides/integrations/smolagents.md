@@ -57,7 +57,7 @@ answer = agent.run(
 )
 ```
 
-![Weave logs each inference call, providing details about inputs, outputs, and metadata.](./imgs/huggingface/smolagents-trace.png)
+![Weave logs each inference call, providing details about inputs, outputs, and metadata.](./imgs/smolagents-trace.png)
 
 ## Tracing custom tools
 
@@ -88,4 +88,4 @@ agent = ToolCallingAgent(tools=[get_weather], model=model)
 answer = agent.run("What is the weather in Tokyo?")
 ```
 
-![Weave logs each custom tool call.](./imgs/huggingface/smolagents-custom-tool.png)
+![Weave logs each custom tool call.](./imgs/smolagents-custom-tool.png)
