@@ -2,8 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from weave.flow.monitor import Monitor
-from weave.trace.api import publish
 from weave.trace import weave_client
+from weave.trace.api import publish
 
 
 def test_init_pass():
