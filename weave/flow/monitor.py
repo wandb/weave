@@ -9,6 +9,7 @@ from weave.trace.api import publish
 from weave.trace.vals import WeaveObject
 from weave.trace.api import ObjectRef
 
+
 @register_object
 class Monitor(Object):
     """
@@ -47,6 +48,7 @@ class Monitor(Object):
     my_monitor.activate()
     ```
     """
+
     sampling_rate: float = Field(ge=0, le=1)
     scorers: list[ScorerLike]
     call_filter: dict
@@ -86,12 +88,12 @@ class Monitor(Object):
 
         if "query" not in call_filter:
             raise ValueError("call_filter must contain a query key")
-        
+
         return call_filter
-    
+
     def activate(self) -> ObjectRef:
         """Activates the monitor.
-        
+
         Returns:
             The ref to the monitor.
         """
@@ -101,7 +103,7 @@ class Monitor(Object):
 
     def deactivate(self) -> ObjectRef:
         """Deactivates the monitor.
-        
+
         Returns:
             The ref to the monitor.
         """
