@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 export default function WeaveRAGChat() {
   const [question, setQuestion] = useState("");
@@ -43,7 +44,7 @@ export default function WeaveRAGChat() {
         {answer && (
         <div style={{ background: "#f6f8fa", padding: "1rem", borderRadius: 8 }}>
             <strong>Answer:</strong>
-            <p>{answer.answer}</p>
+            <ReactMarkdown>{answer.answer}</ReactMarkdown>
             <small>
             <strong>Source:</strong> {answer.source}
             </small>

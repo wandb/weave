@@ -78,7 +78,7 @@ def get_source_bias(query: str, source: str) -> float:
     for topic, meta in META.items():
         if any(word in query.lower() for word in meta["query_keywords"]):
             if source in meta["preferred_files"]:
-                return 2.0
+                return 1.2
     return 1.0
 
 @weave.op()
