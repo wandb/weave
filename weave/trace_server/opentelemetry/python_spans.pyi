@@ -1,13 +1,13 @@
 """Type stub for the python_spans module."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Union, Tuple
 from weave.trace_server import trace_server_interface as tsi
 import datetime
 
 from opentelemetry.proto.common.v1.common_pb2 import (
-    AnyValue, KeyValue, InstrumentationScope
+   KeyValue, InstrumentationScope
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.trace.v1.trace_pb2 import (
@@ -103,7 +103,8 @@ class Span:
 
     @classmethod
     def from_proto(cls, proto_span: PbSpan) -> 'Span': ...
-    def to_call(cls, project_id: str) -> Tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]: ...
+
+    def to_call(self, project_id: str) -> Tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]: ...
 
 @dataclass
 class ScopeSpans:
