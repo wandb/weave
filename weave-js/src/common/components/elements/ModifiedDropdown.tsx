@@ -1,5 +1,6 @@
 import './ModifiedDropdown.less';
 
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import _ from 'lodash';
 import memoize from 'memoize-one';
@@ -21,7 +22,11 @@ import {
   StrictDropdownProps,
 } from 'semantic-ui-react';
 
-import {IconChevronDown, IconChevronUp} from '../../../components/Icon';
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconClose,
+} from '../../../components/Icon';
 import {
   DragDropProvider,
   DragDropState,
@@ -35,6 +40,7 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
+import {Button} from '../../../components';
 
 type LabelCoord = {
   top: number;
@@ -114,7 +120,6 @@ export interface ModifiedDropdownExtraProps {
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
-  useIcon?: boolean;
 }
 
 type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
@@ -140,6 +145,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       optionTransform,
       resultLimit = 100,
       resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
+      style,
       ...passProps
     } = props;
 
@@ -378,7 +384,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
 
       const dragDropLabelStyle = {
         userSelect: 'none',
-        padding: '.3125em .8125em',
         margin: 0,
         boxShadow: 'inset 0 0 0 1px rgb(34 36 38 / 15%)',
         fontSize: '1em',
@@ -391,22 +396,25 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           style={{
             ...(canReorder ? dragDropLabelStyle : {}),
             position: 'relative',
-            paddingRight: 32,
             maxWidth: '100%',
             verticalAlign: 'top',
             wordWrap: 'break-word',
+            backgroundColor: '#A9EDF27A', // TEAL_300 with 48% opacity
+            padding: 0,
           }}
           className="multi-group-label"
           data-test="modified-dropdown-label">
-          {item.text}
-          <Icon
-            style={{position: 'absolute', right: 13, top: 6}}
-            onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) =>
-              onRemove(e, defaultLabelProps)
-            }
-            name="delete"
-            data-test="modified-dropdown-label-delete"
-          />
+          <div className="flex items-center px-6 py-3 text-sm font-normal text-teal-600 hover:text-teal-500">
+            <div className="pr-4">{item.text}</div>
+            <div
+              onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) =>
+                onRemove(e, defaultLabelProps)
+              }
+              className="hover:cursor-pointer"
+              data-test="modified-dropdown-label-delete">
+              <IconClose width={14} height={14} />
+            </div>
+          </div>
         </Label>
       );
 
@@ -481,48 +489,61 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         </div>
       );
     };
+    // State used to control the open/close state of the dropdown icon
+    const [isOpen, setIsOpen] = useState(passProps.open === true);
     return wrapWithDragDrop(
-      <Dropdown
-        {...passProps}
-        options={displayOptions}
-        lazyLoad
-        selectOnNavigation={false}
-        searchQuery={searchQuery}
-        search={search !== false ? opts => opts : false}
-        renderLabel={renderLabel}
-        onSearchChange={(e, data) => {
-          props.onSearchChange?.(e, data);
-          if (!atItemLimit()) {
-            setSearchQuery(data.searchQuery);
-          }
-        }}
-        onChange={(e, {value: val}) => {
-          setSearchQuery('');
-          const valIsArray = Array.isArray(val);
-          const valCount = valIsArray ? val.length : 0;
+      <div className="w-full">
+        <Dropdown
+          {...passProps}
+          style={{
+            paddingTop: 8,
+            paddingBottom: 8,
+            paddingRight: 12,
+            paddingLeft: 12,
+            display: 'flex',
+            alignItems: 'center',
+            boxShadow: 'none',
 
-          // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
-          const valIsLimit = valIsArray
-            ? val.includes(ITEM_LIMIT_VALUE)
-            : val === ITEM_LIMIT_VALUE;
-
-          if (valCount < itemCount() || !atItemLimit()) {
-            if (onChange && !valIsLimit) {
-              onChange(e, {value: val});
+            ...style,
+          }}
+          options={displayOptions}
+          lazyLoad
+          selectOnNavigation={false}
+          searchQuery={searchQuery}
+          search={search !== false ? opts => opts : false}
+          renderLabel={renderLabel}
+          onSearchChange={(e, data) => {
+            props.onSearchChange?.(e, data);
+            if (!atItemLimit()) {
+              setSearchQuery(data.searchQuery);
             }
+          }}
+          onChange={(e, {value: val}) => {
+            setSearchQuery('');
+            const valIsArray = Array.isArray(val);
+            const valCount = valIsArray ? val.length : 0;
+
+            // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
+            const valIsLimit = valIsArray
+              ? val.includes(ITEM_LIMIT_VALUE)
+              : val === ITEM_LIMIT_VALUE;
+
+            if (valCount < itemCount() || !atItemLimit()) {
+              if (onChange && !valIsLimit) {
+                onChange(e, {value: val});
+              }
+            }
+          }}
+          onOpen={() => setIsOpen(true)}
+          onClose={() => setIsOpen(false)}
+          trigger={renderTrigger()}
+          icon={
+            <div className="absolute right-12">
+              {isOpen ? <IconChevronUp /> : <IconChevronDown />}
+            </div>
           }
-        }}
-        trigger={renderTrigger()}
-        icon={
-          passProps.useIcon ? (
-            passProps.open ? (
-              <IconChevronUp />
-            ) : (
-              <IconChevronDown />
-            )
-          ) : undefined
-        }
-      />
+        />
+      </div>
     );
   },
   makePropsAreEqual({
