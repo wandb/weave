@@ -3,7 +3,6 @@
 import datetime
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource
@@ -141,7 +140,7 @@ def create_span(
     start_time: int | datetime.datetime,
     end_time: int | datetime.datetime,
     kind: SpanKind = ...,
-    parent_span_id: Optional[str | bytes] = ...,
-    attributes: Optional[dict] = ...,
-    status: Optional[Status] = ...,
+    parent_span_id: str | bytes | None = ...,
+    attributes: dict | None = ...,
+    status: Status | None = ...,
 ) -> Span: ...

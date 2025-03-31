@@ -339,5 +339,5 @@ def unflatten_key_values(
         }
     """
     it = filter(lambda kv: not any(kv.key.startswith(f) for f in FILTERS), key_values)
-    iterator = map(lambda kv: (kv.key, resolve_pb_any_value(kv.value)), it)
+    iterator = ((kv.key, resolve_pb_any_value(kv.value)) for kv in it)
     return expand_attributes(iterator, json_attributes=[])
