@@ -293,8 +293,7 @@ def unflatten_key_values(
         separator: The character used to separate nested keys (default: '.')
 
     Returns:
-        A nested dictionary where keys are split by the separator and digit keys
-        are treated as array indices.
+        A nested dictionary where keys are split by the separator
 
     Example:
         Input: [("llm.token_count.completion", 123)]
@@ -306,10 +305,10 @@ def unflatten_key_values(
         ]
         Output: {
             "retrieval": {
-                "documents": [
-                    {"document": {"content": "A"}},
-                    {"document": {"content": "B"}}
-                ]
+                "documents": {
+                    "0": {"document": {"content": "A"}},
+                    "1": {"document": {"content": "B"}}
+                }
             }
         }
     """

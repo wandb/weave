@@ -27,6 +27,7 @@ from weave.trace_server.opentelemetry.attributes import (
     get_attribute,
     to_json_serializable,
     unflatten_key_values,
+    convert_numeric_keys_to_list
 )
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
@@ -252,9 +253,6 @@ def mock_sqlite_trace_server():
 class TestSqliteTraceServerOtel:
     def test_otel_export(self, mock_sqlite_trace_server):
         """Test the otel_export method for SqliteTraceServer."""
-        from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-            ExportTraceServiceResponse,
-        )
 
         export_req = create_test_export_request()
 
@@ -262,7 +260,7 @@ class TestSqliteTraceServerOtel:
         response = mock_sqlite_trace_server.otel_export(export_req)
 
         # Verify the response is of the correct type
-        assert isinstance(response, ExportTraceServiceResponse)
+        assert isinstance(response, tsi.OtelExportRes)
 
         # Verify call_start_batch was called with a batch request
         mock_sqlite_trace_server.call_start_batch.assert_called_once()
@@ -398,7 +396,7 @@ class TestAttributes:
         # Verify the result
         assert result == {
             "a": {"b": {"c": "value1", "d": 42}, "e": True},
-            "f": ["item0", "item1"],
+            "f": {"0": "item0", "1": "item1"},
         }
 
     def test_get_attribute(self):
@@ -430,6 +428,23 @@ class TestAttributes:
         ]
 
         result = expand_attributes(flat_attrs)
+
+        assert result == {
+            "a": {"b": {"c": "value1", "d": 42}, "e": True},
+            "f": {"0": "item0", "1": "item1"},
+        }
+
+    def test_expand_attributes_convert_numeric_to_list(self):
+        """Test expanding flattened attributes into nested structure."""
+        flat_attrs = [
+            ("a.b.c", "value1"),
+            ("a.b.d", 42),
+            ("a.e", True),
+            ("f.0", "item0"),
+            ("f.1", "item1"),
+        ]
+
+        result = convert_numeric_keys_to_list(expand_attributes(flat_attrs))
 
         assert result == {
             "a": {"b": {"c": "value1", "d": 42}, "e": True},
