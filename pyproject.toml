@@ -74,12 +74,6 @@ trace_server = [
   # OTEL Tracing Support
   "opentelemetry-sdk",
   "opentelemetry-proto>=1.12.0",
-  # Official conventions
-  "opentelemetry-semantic-conventions",
-  # Traceloop Extensions
-  "opentelemetry-semantic-conventions-ai",
-  # Arize Extensions
-  "openinference-semantic-conventions>=0.1.12",
 ]
 trace_server_tests = [
   # BYOB - S3
