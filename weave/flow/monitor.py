@@ -1,68 +1,56 @@
+from typing_extensions import Self
+
 from pydantic import Field, field_validator
 
 from weave.flow.obj import Object
 from weave.flow.casting import ScorerLike
 from weave.trace.objectify import register_object
-
-"""
-_MONGO_FILTER_SCHEMA = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "call_filter",
-    "type": "object",
-    "$defs": {
-        "literal": {
-            "type": ["number", "string", "boolean", "null"],
-            "description": "A literal value"
-        },
-        "binary_operator": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "$getField": {"type": "string"},
-                    "$literal": {"$ref": "#/$defs/literal"}
-                }
-            }
-        }
-    },
-    "properties": {
-        "op_names": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "query": {
-            "type": "object",
-            "properties": {
-                "$expr": {
-                    "type": "object",
-                    "properties": {
-                        "$gt": {"$ref": "#/$defs/binary_operator"},
-                        "$ge": {"$ref": "#/$defs/binary_operator"},
-                        "$lt": {"$ref": "#/$defs/binary_operator"},
-                        "$le": {"$ref": "#/$defs/binary_operator"},
-                        "$eq": {"$ref": "#/$defs/binary_operator"},
-                        "$ne": {"$ref": "#/$defs/binary_operator"},
-                    }
-                }
-            }
-        }
-    }
-}
-"""
-
+from weave.trace.api import publish
+from weave.trace.vals import WeaveObject
+from weave.trace.api import ObjectRef
 
 @register_object
 class Monitor(Object):
     """
     Sets up a monitor to score incoming calls automatically.
+
+    Examples:
+
+    ```python
+    import weave
+    from weave.scorers import ValidJSONScorer
+
+    json_scorer = ValidJSONScorer()
+
+    my_monitor = weave.Monitor(
+        name="my-monitor",
+        description="This is a test monitor",
+        sampling_rate=0.5,
+        call_filter={
+            "op_names": ["my_op"],
+            "query": {
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$getField": "started_at"
+                        },
+                        {
+                            "$literal": 1742540400
+                        }
+                    ]
+                }
+            }
+        },
+        scorers=[json_scorer],
+    )
+
+    my_monitor.activate()
+    ```
     """
     sampling_rate: float = Field(ge=0, le=1)
     scorers: list[ScorerLike]
-    call_filter: dict 
+    call_filter: dict
+    active: bool = False
 
     @field_validator("call_filter")
     @classmethod
@@ -100,3 +88,32 @@ class Monitor(Object):
             raise ValueError("call_filter must contain a query key")
         
         return call_filter
+    
+    def activate(self) -> ObjectRef:
+        """Activates the monitor.
+        
+        Returns:
+            The ref to the monitor.
+        """
+        self.active = True
+        self.ref = None
+        return publish(self)
+
+    def deactivate(self) -> ObjectRef:
+        """Deactivates the monitor.
+        
+        Returns:
+            The ref to the monitor.
+        """
+        self.active = False
+        self.ref = None
+        return publish(self)
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
