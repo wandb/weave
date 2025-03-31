@@ -57,8 +57,35 @@ answer = agent.run(
 )
 ```
 
+![Weave logs each inference call, providing details about inputs, outputs, and metadata.](./imgs/huggingface/smolagents-trace.png)
+
 ## Tracing custom tools
 
 You can declare custom tools for your agentic workflows either by decorating a function with `@tool` from `smolagents` or by inheriting from `smolagents.Tool` class.
 
 Weave automatically tracks custom tool calls for your `smolagents` workflows.
+
+```python
+from typing import Optional
+
+import weave
+from smolagents import OpenAIServerModel, ToolCallingAgent, tool
+
+weave.init(project_name="smolagents")
+
+@tool
+def get_weather(location: str, celsius: Optional[bool] = False) -> str:
+    """
+    Get weather in the next days at given location.
+    Args:
+        location: the location
+        celsius: whether to use Celsius for temperature
+    """
+    return f"The weather in {location} is sunny with temperatures around 7°C."
+
+model = OpenAIServerModel(model_id="gpt-4o")
+agent = ToolCallingAgent(tools=[get_weather], model=model)
+answer = agent.run("What is the weather in Tokyo?")
+```
+
+![Weave logs each custom tool call.](./imgs/huggingface/smolagents-custom-tool.png)
