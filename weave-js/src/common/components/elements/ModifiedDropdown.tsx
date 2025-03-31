@@ -551,11 +551,21 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             }
           }
         }}
-        onOpen={() => setIsOpen(true)}
-        onClose={() => setIsOpen(false)}
+        onOpen={(e, data) => {
+          props.onOpen?.(e, data);
+          setIsOpen(true);
+        }}
+        onClose={(e, data) => {
+          props.onClose?.(e, data);
+          setIsOpen(false);
+        }}
+        onBlur={(e, data) => {
+          props.onBlur?.(e, data);
+          setIsOpen(false);
+        }}
         trigger={renderTrigger()}
         icon={
-          <div className="absolute right-12 cursor-pointer">
+          <div className="absolute right-12 top-8 cursor-pointer">
             {isOpen ? <IconChevronUp /> : <IconChevronDown />}
           </div>
         }
