@@ -70,7 +70,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.crewai import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
-    from weave.integrations.exa import get_exa_patcher
+    from weave.integrations.exa.exa_sdk import get_exa_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_generativeai_patcher,
     )

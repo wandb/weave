@@ -9,26 +9,25 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
-    from typing import Optional
+    pass
 
 
 _exa_patcher: MultiPatcher | None = None
 
-def exa_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException]
-) -> None:
+
+def exa_on_finish(call: Call, output: Any, exception: BaseException | None) -> None:
     if getattr(output, "cost_dollars", None) and call.summary is not None:
         # Create a usage entry for Exa with the cost information
         exa_model_id = "exa"
-        
+
         # Get the cost as a float to ensure it's a numeric value
         cost_value = float(output.cost_dollars.total)
         print(f"The cost value is {cost_value}")
-        
+
         # Initialize the usage dictionary if it doesn't exist
         if "usage" not in call.summary:
             call.summary["usage"] = {}
-        
+
         # Add Exa usage entry
         # We use 1 token and set the token cost to match the actual cost from Exa
         call.summary["usage"][exa_model_id] = {
@@ -37,8 +36,9 @@ def exa_on_finish(
             "completion_tokens": 0,
             "total_tokens": 1,
             "prompt_token_cost": cost_value,  # This will be used directly by the token costs system
-            "completion_token_cost": 0.0
+            "completion_token_cost": 0.0,
         }
+
 
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     "I want to remove the 'kwargs' key from the inputs if it is empty (when kwargs = {})"
@@ -72,10 +72,16 @@ def get_exa_patcher(
 
     base = settings.op_settings
     search_settings = base.model_copy(
-        update={"name": base.name or "Exa.search", "postprocess_inputs": postprocess_inputs}
+        update={
+            "name": base.name or "Exa.search",
+            "postprocess_inputs": postprocess_inputs,
+        }
     )
     search_and_contents_settings = base.model_copy(
-        update={"name": base.name or "Exa.search_and_contents", "postprocess_inputs": postprocess_inputs}
+        update={
+            "name": base.name or "Exa.search_and_contents",
+            "postprocess_inputs": postprocess_inputs,
+        }
     )
 
     _exa_patcher = MultiPatcher(
