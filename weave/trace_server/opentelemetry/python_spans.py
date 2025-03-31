@@ -234,7 +234,7 @@ class Span:
             parent_id=self.parent_id,
             started_at=self.start_time,
             attributes=attributes,
-            inputs=None,
+            inputs={},
             wb_user_id=None,
             wb_run_id=None
         )
@@ -247,7 +247,7 @@ class Span:
             id = self.span_id,
             ended_at=self.end_time,
             exception = None,
-            output=None,
+            output={},
             summary=summary_insert_map
         )
         return (start_call, end_call)
