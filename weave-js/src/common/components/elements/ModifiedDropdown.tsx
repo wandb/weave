@@ -1,6 +1,5 @@
 import './ModifiedDropdown.less';
 
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import _ from 'lodash';
 import memoize from 'memoize-one';
@@ -40,7 +39,6 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
-import {Button} from '../../../components';
 
 type LabelCoord = {
   top: number;
@@ -389,6 +387,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         fontSize: '1em',
         cursor: 'move',
       };
+      const multipleSelectStyle = {
+        backgroundColor: '#A9EDF27A', // TEAL_300 with 48% opacity
+        padding: 0,
+      };
 
       const label = (
         <Label
@@ -397,24 +399,38 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             ...(canReorder ? dragDropLabelStyle : {}),
             position: 'relative',
             maxWidth: '100%',
+            paddingRight: 32,
             verticalAlign: 'top',
             wordWrap: 'break-word',
-            backgroundColor: '#A9EDF27A', // TEAL_300 with 48% opacity
-            padding: 0,
+            ...(multiple ? multipleSelectStyle : {}),
           }}
           className="multi-group-label"
           data-test="modified-dropdown-label">
-          <div className="flex items-center px-6 py-3 text-sm font-normal text-teal-600 hover:text-teal-500">
-            <div className="pr-4">{item.text}</div>
-            <div
-              onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) =>
-                onRemove(e, defaultLabelProps)
-              }
-              className="hover:cursor-pointer"
-              data-test="modified-dropdown-label-delete">
-              <IconClose width={14} height={14} />
+          {multiple ? (
+            <div className="flex items-center px-6 py-3 text-sm font-normal text-teal-600 hover:text-teal-500">
+              <div className="pr-4">{item.text}</div>
+              <div
+                onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) =>
+                  onRemove(e, defaultLabelProps)
+                }
+                className="hover:cursor-pointer"
+                data-test="modified-dropdown-label-delete">
+                <IconClose width={14} height={14} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {item.text}
+              <Icon
+                style={{position: 'absolute', right: 13, top: 6}}
+                onClick={(e: React.MouseEvent<HTMLElement, MouseEvent>) =>
+                  onRemove(e, defaultLabelProps)
+                }
+                name="delete"
+                data-test="modified-dropdown-label-delete"
+              />
+            </>
+          )}
         </Label>
       );
 
@@ -491,59 +507,59 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     };
     // State used to control the open/close state of the dropdown icon
     const [isOpen, setIsOpen] = useState(passProps.open === true);
+    const multipleDropdownStyle = {
+      paddingTop: 8,
+      paddingBottom: 8,
+      paddingRight: 12,
+      paddingLeft: 12,
+      display: 'flex',
+      alignItems: 'center',
+    };
+
     return wrapWithDragDrop(
-      <div className="w-full">
-        <Dropdown
-          {...passProps}
-          style={{
-            paddingTop: 8,
-            paddingBottom: 8,
-            paddingRight: 12,
-            paddingLeft: 12,
-            display: 'flex',
-            alignItems: 'center',
-            boxShadow: 'none',
-
-            ...style,
-          }}
-          options={displayOptions}
-          lazyLoad
-          selectOnNavigation={false}
-          searchQuery={searchQuery}
-          search={search !== false ? opts => opts : false}
-          renderLabel={renderLabel}
-          onSearchChange={(e, data) => {
-            props.onSearchChange?.(e, data);
-            if (!atItemLimit()) {
-              setSearchQuery(data.searchQuery);
-            }
-          }}
-          onChange={(e, {value: val}) => {
-            setSearchQuery('');
-            const valIsArray = Array.isArray(val);
-            const valCount = valIsArray ? val.length : 0;
-
-            // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
-            const valIsLimit = valIsArray
-              ? val.includes(ITEM_LIMIT_VALUE)
-              : val === ITEM_LIMIT_VALUE;
-
-            if (valCount < itemCount() || !atItemLimit()) {
-              if (onChange && !valIsLimit) {
-                onChange(e, {value: val});
-              }
-            }
-          }}
-          onOpen={() => setIsOpen(true)}
-          onClose={() => setIsOpen(false)}
-          trigger={renderTrigger()}
-          icon={
-            <div className="absolute right-12">
-              {isOpen ? <IconChevronUp /> : <IconChevronDown />}
-            </div>
+      <Dropdown
+        {...passProps}
+        style={{
+          ...(multiple ? multipleDropdownStyle : {}),
+          ...style,
+        }}
+        options={displayOptions}
+        lazyLoad
+        selectOnNavigation={false}
+        searchQuery={searchQuery}
+        search={search !== false ? opts => opts : false}
+        renderLabel={renderLabel}
+        onSearchChange={(e, data) => {
+          props.onSearchChange?.(e, data);
+          if (!atItemLimit()) {
+            setSearchQuery(data.searchQuery);
           }
-        />
-      </div>
+        }}
+        onChange={(e, {value: val}) => {
+          setSearchQuery('');
+          const valIsArray = Array.isArray(val);
+          const valCount = valIsArray ? val.length : 0;
+
+          // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
+          const valIsLimit = valIsArray
+            ? val.includes(ITEM_LIMIT_VALUE)
+            : val === ITEM_LIMIT_VALUE;
+
+          if (valCount < itemCount() || !atItemLimit()) {
+            if (onChange && !valIsLimit) {
+              onChange(e, {value: val});
+            }
+          }
+        }}
+        onOpen={() => setIsOpen(true)}
+        onClose={() => setIsOpen(false)}
+        trigger={renderTrigger()}
+        icon={
+          <div className="absolute right-12 cursor-pointer">
+            {isOpen ? <IconChevronUp /> : <IconChevronDown />}
+          </div>
+        }
+      />
     );
   },
   makePropsAreEqual({
