@@ -5,6 +5,7 @@ from weave.flow.monitor import Monitor
 from weave.trace.api import publish
 from weave.trace import weave_client
 
+
 def test_init_pass():
     monitor = Monitor(
         name="test_monitor",
@@ -16,6 +17,7 @@ def test_init_pass():
         },
     )
     assert monitor.sampling_rate == 0.5
+
 
 def test_out_of_range_sampling_rate():
     with pytest.raises(ValidationError):
@@ -29,8 +31,11 @@ def test_out_of_range_sampling_rate():
             },
         )
 
+
 def test_missing_op_names():
-    with pytest.raises(ValidationError, match="call_filter must contain an op_names key"):
+    with pytest.raises(
+        ValidationError, match="call_filter must contain an op_names key"
+    ):
         Monitor(
             name="test_monitor",
             sampling_rate=0.5,
@@ -39,6 +44,7 @@ def test_missing_op_names():
                 "query": {},
             },
         )
+
 
 def test_missing_query():
     with pytest.raises(ValidationError, match="call_filter must contain a query key"):
@@ -50,6 +56,7 @@ def test_missing_query():
                 "op_names": [],
             },
         )
+
 
 def test_publish(client: weave_client.WeaveClient):
     monitor = Monitor(
@@ -88,6 +95,7 @@ def test_publish(client: weave_client.WeaveClient):
         },
     }
 
+
 def test_activate(client: weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
@@ -99,7 +107,7 @@ def test_activate(client: weave_client.WeaveClient):
         },
     )
     publish(monitor)
-    
+
     activated_ref = monitor.activate()
     assert activated_ref.get().active == True
 

@@ -1,13 +1,11 @@
+from pydantic import Field, field_validator
 from typing_extensions import Self
 
-from pydantic import Field, field_validator
-
-from weave.flow.obj import Object
 from weave.flow.casting import ScorerLike
+from weave.flow.obj import Object
+from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
-from weave.trace.api import publish
 from weave.trace.vals import WeaveObject
-from weave.trace.api import ObjectRef
 
 
 @register_object
@@ -78,13 +76,13 @@ class Monitor(Object):
         }
         """
         if not isinstance(call_filter, dict):
-            raise ValueError("call_filter must be a dictionary")
+            raise ValueError("call_filter must be a dictionary")  # noqa: TRY004
 
         if "op_names" not in call_filter:
             raise ValueError("call_filter must contain an op_names key")
 
         if not isinstance(call_filter["op_names"], list):
-            raise ValueError("op_names must be a list")
+            raise ValueError("op_names must be a list")  # noqa: TRY004
 
         if "query" not in call_filter:
             raise ValueError("call_filter must contain a query key")
