@@ -225,12 +225,6 @@ class Span:
 
     def to_call(self, project_id: str) -> Tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         attributes = to_json_serializable(self.attributes._attributes)
-        inputs_raw = attributes.pop('input') if attributes.get('input') else {}
-        outputs_raw = attributes.pop('output') if attributes.get('output') else {}
-
-        input_values = inputs_raw.get('value') if inputs_raw.get('value') else {}
-        output_values = outputs_raw.get('value') if outputs_raw.get('value') else {}
-
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
@@ -240,7 +234,7 @@ class Span:
             parent_id=self.parent_id,
             started_at=self.start_time,
             attributes=attributes,
-            inputs=input_values,
+            inputs=None,
             wb_user_id=None,
             wb_run_id=None
         )
@@ -253,7 +247,7 @@ class Span:
             id = self.span_id,
             ended_at=self.end_time,
             exception = None,
-            output=output_values,
+            output=None,
             summary=summary_insert_map
         )
         return (start_call, end_call)
