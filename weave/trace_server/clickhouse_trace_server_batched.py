@@ -239,7 +239,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         { 'mode': 'end', 'req': tsi.CallEndReq(end=end_call) }
                     ])
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
-        print(res)
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -267,7 +266,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        print('in call_start')
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults

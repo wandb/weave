@@ -7,29 +7,13 @@ from openinference.semconv import trace
 from openinference.semconv.trace import DocumentAttributes, SpanAttributes
 from opentelemetry.proto.common.v1.common_pb2 import (AnyValue, KeyValue)
 
-DOCUMENT_METADATA = DocumentAttributes.DOCUMENT_METADATA
-LLM_PROMPT_TEMPLATE_VARIABLES = SpanAttributes.LLM_PROMPT_TEMPLATE_VARIABLES
-METADATA = SpanAttributes.METADATA
-TOOL_PARAMETERS = SpanAttributes.TOOL_PARAMETERS
-OUTPUT_MESSAGES = SpanAttributes.LLM_OUTPUT_MESSAGES
-INPUT_MESSAGES = SpanAttributes.LLM_INPUT_MESSAGES
+# These are the attributes that should be filtered out, for now leave blank
+FILTERS = []
 
-# Attributes interpreted as JSON strings during ingestion
-# Currently only maps openinference attributes
-# JSON_ATTRIBUTES = (
-#     DOCUMENT_METADATA,
-#     LLM_PROMPT_TEMPLATE_VARIABLES,
-#     METADATA,
-#     TOOL_PARAMETERS,
-#     OUTPUT_MESSAGES,
-#     INPUT_MESSAGES,
-# )
+# These vary based on the provider, will be set in followup PR
+JSON_ATTRIBUTES = []
 
-JSON_ATTRIBUTES = [
-    "input.value",
-    "output.value",
-]
-
+# JSON attributes loading for recursive key value parsing
 def load_json_strings(key_values: Iterable[tuple[str, Any]]) -> Iterator[tuple[str, Any]]:
     for key, value in key_values:
         if key.endswith(JSON_ATTRIBUTES):
@@ -42,6 +26,7 @@ def load_json_strings(key_values: Iterable[tuple[str, Any]]) -> Iterator[tuple[s
                     yield key, dict_value
         else:
             yield key, value
+
 def to_json_serializable(value: Any) -> Any:
     """
     Transform common data types into JSON-serializable values.
@@ -129,7 +114,13 @@ def _get_value_from_nested_dict(d: Dict[str, Any], key: str) -> Any:
     parts = key.split(".")
     current = d
     for part in parts:
-        if not isinstance(current, dict) or part not in current:
+        if isinstance(current, list):
+            try:
+                index = int(part)
+                current = current[index]
+            except (ValueError, IndexError):
+                return None
+        elif not isinstance(current, dict) or part not in current:
             return None
         current = current[part]
     return current
@@ -279,7 +270,7 @@ def flatten_attributes(data: Dict[str, Any], json_attributes: List[str] = []) ->
     return result
 
 
-def get_attribute(data: Dict[str, Any], key: str) -> Any:
+def get_attribute(data: Union[Dict[str, Any], List[Any]], key: str) -> Any:
     """
     Get the value of a nested attribute from either a nested or flattened dictionary.
 
@@ -327,22 +318,6 @@ def unflatten_key_values(key_values: Iterable[KeyValue]) -> Union[Dict[str, Any]
             }
         }
     """
-    iterator = map(lambda kv: (kv.key, resolve_pb_any_value(kv.value)), key_values)
-    return expand_attributes(iterator, json_attributes=JSON_ATTRIBUTES)
-
-# # Example usage
-# if __name__ == "__main__":
-#     # Example of expanding a flattened JSON file
-#     expanded = expand_attributes("example.json")
-#     print("Expanded attributes:")
-#     print(json.dumps(expanded, indent=2))
-#
-#     # Example of flattening a nested dictionary
-#     flattened = flatten_attributes(expanded)
-#     print("\nFlattened attributes:")
-#     print(json.dumps(flattened, indent=2))
-#
-#     # Example of getting values
-#     print("\nGetting values:")
-#     print(f"LLM provider: {get_attribute(expanded, 'llm.provider')}")
-#     print(f"Input value model: {get_attribute(expanded, 'input.value.model')}")
+    it = filter(lambda kv: not any(kv.key.startswith(f) for f in FILTERS), key_values)
+    iterator = map(lambda kv: (kv.key, resolve_pb_any_value(kv.value)), it)
+    return expand_attributes(iterator, json_attributes=[])

@@ -4,18 +4,15 @@ This module provides simple, human-readable Python classes that represent the
 trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
-from logging import exception
-from uuid_extensions import uuid7
 from weave.trace_server import trace_server_interface as tsi
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, List, Tuple, Union, NewType, Optional, Mapping, Dict
+from typing import Any, List, Tuple, Union, Optional, Dict
 from typing_extensions import assert_never
-from collections.abc import Sequence, Iterable, Iterator
-from pathlib import Path
+from collections.abc import Iterable, Iterator
 import datetime
 from binascii import hexlify
-from .attributes import to_json_serializable
+from .attributes import get_attribute, to_json_serializable
 from .attributes import unflatten_key_values
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue, KeyValue, InstrumentationScope
@@ -99,16 +96,8 @@ class Event:
 @dataclass
 class Link:
     """Represents a link to another span."""
-
-    # trace id
     trace_id: str
-
-    # call id
     span_id: str
-
-    # parent id:
-    # span_id of parent or none
-
     trace_state: str = ""
     attributes: List[KeyValue] = field(default_factory=list)
     dropped_attributes_count: int = 0
@@ -165,21 +154,12 @@ class Attributes():
     def get(self, item, default=None):
         return self._attributes.get(item, default)
 
+    def get_attribute_value(self, key: str) -> Any:
+        return get_attribute(self._attributes, key)
+
     @classmethod
     def from_proto(cls, key_values: Iterable[KeyValue]) -> 'Attributes':
         return cls(unflatten_key_values(key_values))
-
-    def get_attribute_value(self, key: str, separator: str = ".") -> Any:
-        keys = key.split(separator)
-        current = self._attributes.copy()
-        for k in keys:
-            if isinstance(current, dict):
-                current = current.get(k, None)
-            elif isinstance(current, list):
-                current = current[int(k)]
-            else:
-                return None
-        return current
 
 @dataclass
 class Span:
@@ -244,14 +224,12 @@ class Span:
         )
 
     def to_call(self, project_id: str) -> Tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        # what are the tradeoffs in table:
-        # this has to be extremely performant to ingest entire db
-        # mocking up a UI and exact dataflow
-        # how do we injest it
-        # how do we query it
         attributes = to_json_serializable(self.attributes._attributes)
-        inputs = attributes.pop('input') if attributes.get('input') else {}
-        outputs = attributes.pop('output') if attributes.get('output') else {}
+        inputs_raw = attributes.pop('input') if attributes.get('input') else {}
+        outputs_raw = attributes.pop('output') if attributes.get('output') else {}
+
+        input_values = inputs_raw.get('value') if inputs_raw.get('value') else {}
+        output_values = outputs_raw.get('value') if outputs_raw.get('value') else {}
 
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
@@ -262,7 +240,7 @@ class Span:
             parent_id=self.parent_id,
             started_at=self.start_time,
             attributes=attributes,
-            inputs=inputs,
+            inputs=input_values,
             wb_user_id=None,
             wb_run_id=None
         )
@@ -275,7 +253,7 @@ class Span:
             id = self.span_id,
             ended_at=self.end_time,
             exception = None,
-            output=outputs,
+            output=output_values,
             summary=summary_insert_map
         )
         return (start_call, end_call)
