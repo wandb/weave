@@ -1,0 +1,1 @@
+DROP VIEW IF EXISTS mv_call_parts_rollup;
