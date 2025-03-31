@@ -82,6 +82,14 @@ class Status:
             code=StatusCode.from_proto(proto_status.code), message=proto_status.message
         )
 
+    def to_weave_status(self) -> Optional[tsi.TraceStatus]:
+        """Convert from protobuf enum value to StatusCode."""
+        if self.code == StatusCode.OK:
+            return tsi.TraceStatus.SUCCESS
+        elif self.code == StatusCode.ERROR:
+            return tsi.TraceStatus.ERROR
+        # UNSET: This is not 'running' because if the trace was sent the call completed
+        return None
 
 @dataclass
 class Event:
@@ -264,15 +272,17 @@ class Span:
             wb_user_id=None,
             wb_run_id=None,
         )
-        # TODO: (Followup) Get Exception from Output
-
-        summary_insert_map = tsi.SummaryInsertMap(usage={})
+        summary_insert_map = tsi.SummaryInsertMap(
+            usage={},
+            status=self.status.to_weave_status(),
+        )
+        exception_msg = self.status.message if self.status.code == StatusCode.ERROR else None
 
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
             ended_at=self.end_time,
-            exception=None,
+            exception=exception_msg,
             output={},
             summary=summary_insert_map,
         )
