@@ -659,7 +659,6 @@ class CallsQuery(BaseModel):
         call_parts_predicate_filters_sql = (
             optimization_conditions.call_parts_predicate_filters_sql
         )
-        print(">>>>>>", call_parts_predicate_filters_sql)
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
