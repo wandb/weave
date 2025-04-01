@@ -80,6 +80,7 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageWriteError,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
@@ -1274,7 +1275,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
 
         if base_file_storage_uri is not None:
-            self._file_create_bucket(req, digest, base_file_storage_uri)
+            try:
+                self._file_create_bucket(req, digest, base_file_storage_uri)
+            except FileStorageWriteError as e:
+                self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
         return tsi.FileCreateRes(digest=digest)
