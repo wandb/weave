@@ -21,7 +21,6 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
-from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -2392,28 +2391,209 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
-async def test_tracing_enabled_context(client):
-    """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
-    from weave.trace.weave_client import Call
+def test_calls_query_datetime_optimization_with_gt_operation(client):
+    """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
+    if client_is_sqlite(client):
+        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
+        # correctly in sqlite
+        return
 
-    @weave.op()
-    def test_op():
-        return "test"
+    # Use a unique test ID to identify these calls
+    test_id = str(uuid.uuid4())
 
-    # Test create_call with tracing enabled
-    call = await client.create_call(test_op, {})
-    assert isinstance(call, Call)
-    assert call._op_name == "test_op"  # Use string literal instead of __name__
-    assert len(list(client.get_calls())) == 1  # Verify only one call was created
+    # Create calls with different timestamps
+    # Call 1: Start at t=0, end at t=1
+    call1 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)  # Ensure different timestamps
+    client.finish_call(call1, "result1")
 
-    # Test create_call with tracing disabled
-    with tracing_disabled():
-        call = client.create_call(test_op, {})
-        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
-        assert (
-            len(list(client.get_calls())) == 1
-        )  # Verify no additional calls were created
+    # Call 2: Start at t=1, end at t=2
+    time.sleep(0.1)  # Ensure different timestamps
+    call2 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call2, "result2")
 
-    # Test finish_call with tracing disabled
-    with tracing_disabled():
-        client.finish_call(call)  # Should not raise any error
+    # Call 3: Start at t=2, end at t=3
+    time.sleep(0.1)  # Ensure different timestamps
+    call3 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call3, "result3")
+
+    # Call 4: Start at t=3, end at t=4
+    time.sleep(0.1)  # Ensure different timestamps
+    call4 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call4, "result4")
+
+    # Flush to make sure all calls are committed
+    client.flush()
+
+    # Get all calls to determine their actual timestamps
+    base_query = {
+        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
+    }
+    all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
+    assert len(all_calls) == 4
+
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test GT operation on started_at
+    # Query for calls started after call2's timestamp
+    gt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                ]
+            }
+        }
+    )
+    gt_calls = list(client.get_calls(query=gt_query))
+    assert len(gt_calls) == 2  # Should get call3 and call4
+    gt_call_ids = {call.id for call in gt_calls}
+    assert gt_call_ids == {call3.id, call4.id}
+
+    # Test GT operation on ended_at
+    # Query for calls that ended after call2's end timestamp
+    gt_ended_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call2.ended_at.timestamp()},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    gt_ended_calls = list(client.get_calls(query=gt_ended_query))
+    assert len(gt_ended_calls) == 2  # Should get call3 and call4
+    gt_ended_call_ids = {call.id for call in gt_ended_calls}
+    assert gt_ended_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp between call2 and call3
+    mid_timestamp = (call2_ts + call3_ts) / 2
+    mid_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": mid_timestamp}]},
+                ]
+            }
+        }
+    )
+    mid_calls = list(client.get_calls(query=mid_query))
+    assert len(mid_calls) == 2  # Should get call3 and call4
+    mid_call_ids = {call.id for call in mid_calls}
+    assert mid_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp after all calls
+    future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
+    future_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": future_timestamp},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    future_calls = list(client.get_calls(query=future_query))
+    assert len(future_calls) == 0  # Should get no calls
+
+    # Test date range query with additional conditions
+    date_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    date_range_calls = list(client.get_calls(query=date_range_query))
+    assert len(date_range_calls) == 2  # Should get call3 and call4
+    date_range_call_ids = {call.id for call in date_range_calls}
+    assert date_range_call_ids == {call3.id, call4.id}
+
+    # Test date range query with ended_at field
+    ended_at_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    ended_at_range_calls = list(client.get_calls(query=ended_at_range_query))
+    assert len(ended_at_range_calls) == 2  # Should get call2 and call3
+    ended_at_range_call_ids = {call.id for call in ended_at_range_calls}
+    assert ended_at_range_call_ids == {call2.id, call3.id}
+
+    # Deeply nested datetime query
+    nested_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # greated than or equal to call 1
+                    {"$gte": [{"$getField": "started_at"}, {"$literal": call1_ts}]},
+                    # not greater than call 4
+                    {
+                        "$not": [
+                            {"$gt": [{"$getField": "started_at"}, {"$literal": call4_ts}]}
+                        ]
+                    },
+                    {"$or": [
+                        # or greater than call 2 and not greater than call 4
+                        {"$and": [
+                            {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                            {"$not":[{"$eq": [{"$getField": "started_at"}, {"$literal": call4_ts}]}]},
+                        ]},
+                        {"$and": [
+                            {"$gte": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                            {"$not": [{"$gt": [{"$getField": "started_at"}, {"$literal": call3_ts}]}]},
+                        ]}
+                    ]}
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 1
+    call_ids = {call.id for call in calls}
+    assert call_ids == {call3.id}

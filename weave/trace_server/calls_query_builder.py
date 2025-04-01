@@ -664,6 +664,8 @@ class CallsQuery(BaseModel):
             optimization_conditions.call_parts_predicate_filters_sql or ""
         )
 
+        print(">>>> id_datetime_sql:", id_datetime_sql)
+
         order_by_sql = ""
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
@@ -723,6 +725,8 @@ class CallsQuery(BaseModel):
         {limit_sql}
         {offset_sql}
         """
+
+        print("\n>>>> raw_sql:", raw_sql)
 
         return _safely_format_sql(raw_sql)
 
