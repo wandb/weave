@@ -44,7 +44,6 @@ class AutopatchSettings(BaseModel):
     google_generativeai: IntegrationSettings = Field(
         default_factory=IntegrationSettings
     )
-    google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     google_genai_sdk: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
     huggingface: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -106,7 +105,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_exa_patcher(settings.exa).attempt_patch()
     get_google_generativeai_patcher(settings.google_generativeai).attempt_patch()
     get_google_genai_patcher(settings.google_genai_sdk).attempt_patch()
-    get_google_generativeai_patcher(settings.google_ai_studio).attempt_patch()
     get_crewai_patcher(settings.crewai).attempt_patch()
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
