@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
@@ -22,12 +21,12 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.attributes import (
+    convert_numeric_keys_to_list,
     expand_attributes,
     flatten_attributes,
     get_attribute,
     to_json_serializable,
     unflatten_key_values,
-    convert_numeric_keys_to_list
 )
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
@@ -140,7 +139,8 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
         )
     )
     # Verify that the start and end calls were merged into a single call
-    assert(len(res.calls) == 1)
+    assert len(res.calls) == 1
+
 
 # @pytest.fixture
 # def mock_sqlite_trace_server():
