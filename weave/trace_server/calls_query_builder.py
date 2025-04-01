@@ -1061,18 +1061,27 @@ def _create_like_optimized_eq_condition(
     table_alias: str,
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for equality operations."""
-    # Check if the left side is a GetField operation on a JSON field
-    if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
+    # Check both sides for field and literal
+    field_operand = None
+    literal_operand = None
+
+    if isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
+        field_operand = operation.eq_[0]
+        literal_operand = operation.eq_[1]
+    elif isinstance(operation.eq_[1], tsi_query.GetFieldOperator):
+        field_operand = operation.eq_[1]
+        literal_operand = operation.eq_[0]
+    else:
         return None
 
-    # Return if right-side isn't a string literal
-    if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
-        operation.eq_[1].literal_, str
+    # Return if literal isn't a string
+    if not isinstance(literal_operand, tsi_query.LiteralOperation) or not isinstance(
+        literal_operand.literal_, str
     ):
         return None
 
-    field = get_field_by_name(operation.eq_[0].get_field_).field
-    literal_value = operation.eq_[1].literal_
+    field = get_field_by_name(field_operand.get_field_).field
+    literal_value = literal_operand.literal_
 
     if not literal_value:
         # Empty string is not a valid value for LIKE optimization
@@ -1187,7 +1196,21 @@ def process_query_to_optimization_sql(
         return OptimizationConditions(call_parts_predicate_filters_sql="")
 
     # Create a single AND operation from all conditions
-    and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
+    and_operation = tsi_query.AndOperation(
+        **{"$and": [c.operand for c in filterable_conditions]}
+    )
+
+    # Track conditions that need null checks to account for unmerged start/end call parts
+    null_check_conditions: set[str] = set()
+
+    def extract_field_from_operand(operand: tsi_query.Operand) -> Optional[str]:
+        """Extract the field name from an operand if it's a GetField operation."""
+        if isinstance(operand, tsi_query.GetFieldOperator):
+            field = get_field_by_name(operand.get_field_).field
+            if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
+                null_check_conditions.add(field)
+            return field
+        return None
 
     def process_operation(operation: tsi_query.Operation) -> Optional[str]:
         if isinstance(operation, tsi_query.OrOperation):
@@ -1219,19 +1242,29 @@ def process_query_to_optimization_sql(
             return f"NOT ({result})"
 
         elif isinstance(operation, tsi_query.EqOperation):
-            # Try to create a LIKE-optimized condition for equality
+            field1 = extract_field_from_operand(operation.eq_[0])
+            field2 = extract_field_from_operand(operation.eq_[1])
+            if field1 is None and field2 is None:
+                return None
+
             return _create_like_optimized_eq_condition(
                 operation, param_builder, table_alias
             )
 
         elif isinstance(operation, tsi_query.ContainsOperation):
-            # Try to create a LIKE-optimized condition for contains
+            field = extract_field_from_operand(operation.contains_.input)
+            if field is None:
+                return None
+
             return _create_like_optimized_contains_condition(
                 operation, param_builder, table_alias
             )
 
         elif isinstance(operation, tsi_query.InOperation):
-            # Try to create a LIKE-optimized condition for in
+            field = extract_field_from_operand(operation.in_[0])
+            if field is None:
+                return None
+
             return _create_like_optimized_in_condition(
                 operation, param_builder, table_alias
             )
@@ -1245,10 +1278,11 @@ def process_query_to_optimization_sql(
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            field = get_field_by_name(operand.get_field_).field
-            if not isinstance(field, CallsMergedDynamicField):
-                return None  # Only optimize dynamic fields
-            return field.as_sql(param_builder, table_alias, use_agg_fn=False)
+            field = get_field_by_name(operand.get_field_)
+            if field.is_heavy():
+                heavy_field = cast(CallsMergedDynamicField, field)
+                return heavy_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+            return field.as_sql(param_builder, table_alias)
         elif isinstance(operand, tsi_query.ConvertOperation):
             return process_operand(operand.convert_.input)
         elif isinstance(
@@ -1272,66 +1306,14 @@ def process_query_to_optimization_sql(
     if result is None:
         return OptimizationConditions(call_parts_predicate_filters_sql="")
 
-    # Add NULL allowances for start-only and end-only fields
-    start_only_null_conditions = []
-    end_only_null_conditions = []
-
-    def collect_field_types(operand: tsi_query.Operand) -> tuple[bool, bool]:
-        has_start_only = False
-        has_end_only = False
-        print('collect_field_types operand', operand)
-        if isinstance(operand, tsi_query.GetFieldOperator):
-            field = get_field_by_name(operand.get_field_).field
-            print('collect_field_types field', field)
-            if field in START_ONLY_CALL_FIELDS:
-                has_start_only = True
-            if field in END_ONLY_CALL_FIELDS:
-                has_end_only = True
-        elif isinstance(
-            operand,
-            (
-                tsi_query.AndOperation,
-                tsi_query.OrOperation,
-                tsi_query.NotOperation,
-            ),
-        ):
-            print('collect_field_types operand', operand)
-            for op in (
-                operand.and_
-                if isinstance(operand, tsi_query.AndOperation)
-                else operand.or_
-                if isinstance(operand, tsi_query.OrOperation)
-                else operand.not_
-            ):
-                start_only, end_only = collect_field_types(op)
-                has_start_only = has_start_only or start_only
-                has_end_only = has_end_only or end_only
-        return has_start_only, has_end_only
-
-    has_start_only, has_end_only = collect_field_types(and_operation)
-
-    if has_start_only:
-        start_only_null_conditions = [
-            f"{table_alias}.{field} IS NULL" for field in START_ONLY_CALL_FIELDS
+    result = "AND " + result
+    if null_check_conditions:
+        is_null_conditions = [
+            f"{table_alias}.{field} IS NULL" for field in sorted(null_check_conditions)
         ]
-    if has_end_only:
-        end_only_null_conditions = [
-            f"{table_alias}.{field} IS NULL" for field in END_ONLY_CALL_FIELDS
-        ]
+        result += " OR (" + " OR ".join(is_null_conditions) + ")"
 
-    print('start_only_null_conditions', start_only_null_conditions)
-    print('end_only_null_conditions', end_only_null_conditions)
-
-    # Combine all conditions
-    all_conditions = [result]
-    if start_only_null_conditions:
-        all_conditions.append("(" + " OR ".join(start_only_null_conditions) + ")")
-    if end_only_null_conditions:
-        all_conditions.append("(" + " OR ".join(end_only_null_conditions) + ")")
-
-    return OptimizationConditions(
-        call_parts_predicate_filters_sql="AND " + " AND ".join(all_conditions)
-    )
+    return OptimizationConditions(call_parts_predicate_filters_sql=result)
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
