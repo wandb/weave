@@ -7,15 +7,6 @@ from exa_py import Exa
 import weave
 from weave.integrations.exa.exa_sdk import get_exa_patcher
 
-
-@pytest.fixture()
-def patch_exa() -> Generator[None, None, None]:
-    patcher = get_exa_patcher()
-    patcher.attempt_patch()
-    yield
-    patcher.undo_patch()
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -23,7 +14,6 @@ def patch_exa() -> Generator[None, None, None]:
 )
 def test_search(
     client: weave.trace.weave_client.WeaveClient,
-    patch_exa: None,
 ) -> None:
     """Test that Exa.search API response is correctly logged in Weave."""
     api_key = os.environ.get("EXA_API_KEY", "DUMMY_API_KEY")
@@ -74,7 +64,6 @@ def test_search(
 )
 def test_search_and_contents(
     client: weave.trace.weave_client.WeaveClient,
-    patch_exa: None,
 ) -> None:
     """Test that Exa.search_and_contents API response is correctly logged in Weave."""
     api_key = os.environ.get("EXA_API_KEY", "DUMMY_API_KEY")
