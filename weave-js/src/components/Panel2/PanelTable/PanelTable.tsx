@@ -1200,6 +1200,7 @@ const PanelTableInner: React.FC<
       <Button
         variant="secondary"
         size="small"
+        data-test="table-filter-button"
         icon="filter-alt"
         onClick={() => {
           setFilterOpen(!filterOpen);
