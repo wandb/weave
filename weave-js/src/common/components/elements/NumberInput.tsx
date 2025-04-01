@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import React from 'react';
-import {Input, SemanticICONS} from 'semantic-ui-react';
+import {Input} from 'semantic-ui-react';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 
 import clamp from '../../util/clamp';
