@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 import weave
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
+from weave.flow.scorer import Scorer
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
@@ -51,15 +52,22 @@ class BetaPredictionLogger(BaseModel):
     async def log_score(
         self, scorer_name: str, score: float, metadata: dict | None = None
     ) -> BetaScoreLogger:
+        # Define the scorer class dynamically
+        cls_name = scorer_name.replace(".", "_")
+        DynamicScorer = type(cls_name, (Scorer,), {})
+        scorer_instance = DynamicScorer()
+
         @weave.op(name=scorer_name)
-        def scorer(model_output: Any, **inputs: Any) -> float:
-            return score
+        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> float:
+            return score  # TODO: can't use score here because it will cause version mismatch
+
+        scorer_instance.__dict__["score"] = MethodType(score_method, scorer_instance)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
             [self.hack_reference_to_evaluate, self.hack_reference_to_predict_and_score]
         ):
-            await self.hack_reference_to_predict_and_score.apply_scorer(scorer)
+            await self.hack_reference_to_predict_and_score.apply_scorer(scorer_instance)
 
         return BetaScoreLogger(prediction_id="123", score=score, metadata=metadata)
 
@@ -75,7 +83,7 @@ class BetaEvaluationLogger(BaseModel):
             dataset=weave.Dataset(rows=weave.Table([{"": ""}]))
         )
     )
-    _starting_stack: list[Call] = PrivateAttr([])
+    _starting_stack: list[Call] = PrivateAttr(default_factory=list)
 
     def log_prediction(self, inputs: dict, output: Any) -> BetaPredictionLogger:
         if not self._eval_started:
@@ -176,7 +184,3 @@ class BetaEvaluationLogger(BaseModel):
         # Finish the evaluation call
         wc = require_weave_client()
         wc.finish_call(self._evaluate_call, output=summary)
-
-        # Use the context manager pattern instead of directly setting the call stack
-        # This ensures thread safety when multiple loggers are used concurrently
-        # call_context._call_stack.set(self._starting_stack)
