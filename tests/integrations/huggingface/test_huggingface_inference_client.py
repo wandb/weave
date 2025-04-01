@@ -28,7 +28,6 @@ def test_huggingface_chat_completion(client):
 
     calls = list(client.calls())
     assert len(calls) == 1
-    print(calls)
 
     call = calls[0]
     assert call.started_at < call.ended_at
