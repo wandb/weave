@@ -1,12 +1,12 @@
 # Exa
 
-Weave automatically tracks and logs search calls made via the [Exa Python library](https://github.com/exaai/exa-py), allowing you to monitor costs and usage.
+Weave automatically tracks and logs search calls made via the [Exa Python library]( https://github.com/exa-labs/exa-py), allowing you to monitor costs and usage.
 
 ## Traces
 
 It's important to store traces of search API calls in a central database, both during development and in production. You'll use these traces for debugging, cost analysis, and to help improve your application.
 
-Weave will automatically capture traces for [exa-py](https://github.com/exaai/exa-py). You can use the library as usual, start by calling `weave.init()`:
+Weave will automatically capture traces for [exa-py]( https://github.com/exa-labs/exa-py). You can use the library as usual, start by calling `weave.init()`:
 
 ```python
 import os
