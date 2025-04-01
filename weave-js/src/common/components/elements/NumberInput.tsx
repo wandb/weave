@@ -153,6 +153,7 @@ const NumberInputArrow = ({
   return (
     <div
       className="flex h-full cursor-pointer flex-col items-center justify-center rounded-sm text-moon-600 hover:bg-moon-150"
+      data-test={`number-input-arrow-${iconName}`}
       onClick={onChange}>
       <Icon width={10} height={10} name={iconName} />
     </div>
