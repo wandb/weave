@@ -30,7 +30,7 @@ Weave will now track and log all API calls made through the Exa library, includi
 
 ## Wrapping with your own ops
 
-Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](/guides/tracking/ops) that calls into Exa and Weave will track the inputs, outputs, and costs for you:
+Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into Exa and Weave will track the inputs, outputs, and costs for you:
 
 ```python
 @weave.op
