@@ -41,7 +41,7 @@ export const CallsTableNoRowsOverlay: React.FC<
   setFilterModel,
 }) => {
   if (callsLoading) {
-    return <></>;
+    return null;
   }
 
   const isEmpty = callsResult.length === 0;

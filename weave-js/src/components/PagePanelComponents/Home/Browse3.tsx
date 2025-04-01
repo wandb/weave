@@ -824,14 +824,14 @@ const CallsPageBinding = () => {
   };
 
   // Only show the date filter if not evals and we haven't explicitly removed it
-  const defaultDateFilter =
+  const defaultFilter =
     isEvaluationsTab || hasRemovedDateFilter.current
       ? DEFAULT_FILTER_CALLS
       : DEFAULT_FILTER_CALLS_WITH_DATE;
 
   const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, defaultDateFilter),
-    [query.filters, defaultDateFilter]
+    () => getValidFilterModel(query.filters, defaultFilter),
+    [query.filters, defaultFilter]
   );
 
   const setFilterModel = (newModel: GridFilterModel) => {
