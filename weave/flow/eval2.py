@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -22,6 +22,7 @@ NOT_DEFINED = "Not defined for custom scoring"
 # ensures that only 1 version of the predict method is saved because the code
 # contents are always the same.
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
+current_score: ContextVar[float | None] = ContextVar("current_score", default=None)
 
 
 @contextmanager
@@ -32,6 +33,15 @@ def set_current_output(output: Any) -> Iterator[None]:
         yield
     finally:
         current_output.reset(token)
+
+
+@contextmanager
+def set_current_score(score: float) -> Iterator[None]:
+    token = current_score.set(score)
+    try:
+        yield
+    finally:
+        current_score.reset(token)
 
 
 class BetaScoreLogger(BaseModel):
@@ -59,7 +69,9 @@ class BetaPredictionLogger(BaseModel):
 
         @weave.op(name=scorer_name)
         def score_method(self: Scorer, *, output: Any, **inputs: Any) -> float:
-            return score  # TODO: can't use score here because it will cause version mismatch
+            # return score
+            # TODO: can't use score here because it will cause version mismatc
+            return cast(float, current_score.get())
 
         scorer_instance.__dict__["score"] = MethodType(score_method, scorer_instance)
 
