@@ -71,7 +71,7 @@ export const DraggableItem = SortableElement(
               />
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="start">
+              <DropdownMenu.Content align="start" style={{zIndex: 9999}}>
                 <DropdownMenu.Item
                   onClick={onMakeBaselinePropagated}
                   disabled={isBaseline}>

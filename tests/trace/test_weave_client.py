@@ -2575,20 +2575,59 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     # not greater than call 4
                     {
                         "$not": [
-                            {"$gt": [{"$getField": "started_at"}, {"$literal": call4_ts}]}
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
                         ]
                     },
-                    {"$or": [
-                        # or greater than call 2 and not greater than call 4
-                        {"$and": [
-                            {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
-                            {"$not":[{"$eq": [{"$getField": "started_at"}, {"$literal": call4_ts}]}]},
-                        ]},
-                        {"$and": [
-                            {"$gte": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
-                            {"$not": [{"$gt": [{"$getField": "started_at"}, {"$literal": call3_ts}]}]},
-                        ]}
-                    ]}
+                    {
+                        "$or": [
+                            # or greater than call 2 and not greater than call 4
+                            {
+                                "$and": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$eq": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call4_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {
+                                        "$gte": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$gt": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call3_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
                 ]
             }
         }
