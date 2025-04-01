@@ -60,7 +60,7 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {
   getDefaultOperatorForValue,
-  makeDefaultDateFilter,
+  make30DayDateFilter,
 } from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -132,7 +132,7 @@ export const DEFAULT_FILTER_CALLS: GridFilterModel = {
   logicOperator: GridLogicOperator.And,
 };
 export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
-  items: [makeDefaultDateFilter()],
+  items: [make30DayDateFilter()],
   logicOperator: GridLogicOperator.And,
 };
 export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
@@ -1019,6 +1019,8 @@ export const CallsTable: FC<{
         slots={{
           noRowsOverlay: () => (
             <CallsTableNoRowsOverlay
+              entity={entity}
+              project={project}
               callsLoading={callsLoading}
               callsResult={callsResult}
               isEvaluateTable={isEvaluateTable}

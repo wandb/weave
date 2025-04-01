@@ -414,17 +414,7 @@ export const makeDateFilter = (
 
 // Default time ranges for date filters in days
 const DEFAULT_DATE_RANGE_DAYS = 30;
-const EXTENDED_DATE_RANGE_DAYS = 90;
-const YEAR_LONG_DATE_RANGE_DAYS = 365;
 
-export const makeDefaultDateFilter = (): GridFilterItem => {
+export const make30DayDateFilter = (): GridFilterItem => {
   return makeDateFilter(DEFAULT_DATE_RANGE_DAYS);
-};
-
-export const make3MonthsLongDateFilter = (): GridFilterItem => {
-  return makeDateFilter(EXTENDED_DATE_RANGE_DAYS);
-};
-
-export const makeYearLongDateFilter = (): GridFilterItem => {
-  return makeDateFilter(YEAR_LONG_DATE_RANGE_DAYS);
 };

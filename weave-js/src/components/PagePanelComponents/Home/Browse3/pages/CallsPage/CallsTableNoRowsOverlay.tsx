@@ -3,20 +3,19 @@ import {GridFilterModel} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {
-  make3MonthsLongDateFilter,
-  makeDefaultDateFilter,
-  makeYearLongDateFilter,
-} from '../../filters/common';
+import {make30DayDateFilter, makeDateFilter} from '../../filters/common';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
+import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {filterHasCalledAfterDateFilter} from './CallsTable';
 
 type CallsTableNoRowsOverlayProps = {
+  entity: string;
+  project: string;
   callsLoading: boolean;
   callsResult: CallSchema[];
   isEvaluateTable: boolean;
@@ -32,6 +31,8 @@ type CallsTableNoRowsOverlayProps = {
 export const CallsTableNoRowsOverlay: React.FC<
   CallsTableNoRowsOverlayProps
 > = ({
+  entity,
+  project,
   callsLoading,
   callsResult,
   isEvaluateTable,
@@ -40,7 +41,8 @@ export const CallsTableNoRowsOverlay: React.FC<
   clearFilters,
   setFilterModel,
 }) => {
-  if (callsLoading) {
+  const {opLoading, opCreatedAt} = useCallsTableNoRowsOpLookup(entity, project);
+  if (callsLoading || opLoading) {
     return null;
   }
 
@@ -49,13 +51,13 @@ export const CallsTableNoRowsOverlay: React.FC<
     return null;
   }
 
+  const opExists = opCreatedAt != null;
+
   // Handle special empty states
   if (isEvaluateTable) {
     return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-  } else if (
-    effectiveFilter.traceRootsOnly &&
-    filterModelResolved.items.length === 0
-  ) {
+    // Show empty page if we have no ops, and thus haven't logged a real trace
+  } else if (effectiveFilter.traceRootsOnly && !opExists) {
     return <Empty {...EMPTY_PROPS_TRACES} />;
   }
 
@@ -64,6 +66,7 @@ export const CallsTableNoRowsOverlay: React.FC<
     return (
       <DateFilterEmptyState
         filterModelResolved={filterModelResolved}
+        opCreatedAt={opCreatedAt ?? null}
         clearFilters={clearFilters}
         setFilterModel={setFilterModel}
       />
@@ -75,12 +78,14 @@ export const CallsTableNoRowsOverlay: React.FC<
 
 type DateFilterEmptyStateProps = {
   filterModelResolved: GridFilterModel;
+  opCreatedAt: number | null;
   clearFilters?: () => void;
   setFilterModel?: (model: GridFilterModel) => void;
 };
 
 const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
   filterModelResolved,
+  opCreatedAt,
   clearFilters,
   setFilterModel,
 }) => {
@@ -92,32 +97,30 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
     const currentFilterModel = {...filterModelResolved};
     const items = [...currentFilterModel.items];
 
-    // Find existing date filter to determine what range to expand to next
-    const dateFilter = items.find(item => item.field === 'started_at');
     // Remove any existing started_at filters
     const filteredItems = items.filter(item => item.field !== 'started_at');
 
-    // Determine new date range based on current filter's date
+    // Determine new date range based on opCreatedAt
     let newDateFilter;
-    if (dateFilter?.value) {
-      const filterDate = new Date(dateFilter.value);
+    if (opCreatedAt) {
+      const filterDate = new Date(opCreatedAt);
       const now = new Date();
 
       const daysDifference = Math.round(
         (now.getTime() - filterDate.getTime()) / (24 * 60 * 60 * 1000)
       );
 
-      // If the filter is < 30 expand to 30
-      if (daysDifference < 30) {
-        newDateFilter = makeDefaultDateFilter();
-      }
-      // If the current filter is approximately 30 days, expand to 3 months
-      else if (daysDifference >= 25 && daysDifference <= 35) {
-        newDateFilter = make3MonthsLongDateFilter();
-      }
-      // If the current filter is approximately 3 months, expand to 1 year
-      else if (daysDifference >= 85 && daysDifference <= 95) {
-        newDateFilter = makeYearLongDateFilter();
+      // smallest suggested date range is 7 days
+      if (daysDifference < 7) {
+        newDateFilter = makeDateFilter(7);
+      } else if (daysDifference <= 30) {
+        newDateFilter = makeDateFilter(30);
+      } else if (daysDifference <= 90) {
+        newDateFilter = makeDateFilter(90);
+      } else if (daysDifference <= 180) {
+        newDateFilter = makeDateFilter(180);
+      } else if (daysDifference <= 365) {
+        newDateFilter = makeDateFilter(365);
       }
       // For any other case, don't add a datetime filter
       else {
@@ -129,7 +132,7 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
       }
     } else {
       // Impossible (block conditioned on hasDateFilter), but default to 3 months
-      newDateFilter = make3MonthsLongDateFilter();
+      newDateFilter = make30DayDateFilter();
     }
 
     // Add the new date filter
@@ -212,3 +215,21 @@ const ClearFiltersAction = ({
 const DocsLink = () => (
   <TargetBlank href="https://wandb.me/weave">the docs</TargetBlank>
 );
+
+const useCallsTableNoRowsOpLookup = (entity: string, project: string) => {
+  const {useOpVersions} = useWFHooks();
+  const {loading, result} = useOpVersions(
+    entity,
+    project,
+    {latestOnly: true},
+    1,
+    true,
+    [{field: 'created_at', direction: 'desc'}],
+    undefined
+  );
+  if (loading) {
+    return {opLoading: true, opCreatedAt: null};
+  }
+  const opCreatedAt = result?.[0]?.createdAtMs;
+  return {opLoading: false, opCreatedAt};
+};
