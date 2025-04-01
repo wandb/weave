@@ -3,15 +3,13 @@ interactions:
     body: null
     headers:
       user-agent:
-      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: POST
-    uri: https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
+    uri: https://router.huggingface.co/hf-inference/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions
   response:
     body:
-      string: '{"object":"chat.completion","id":"","created":1740032299,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"message":{"role":"assistant","content":"The
-        image showcases the iconic Statue of Liberty in New York City, prominently
-        featuring the statue''s copper-gold shimmer against the backdrop of the city''s
-        skyline."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":32,"total_tokens":76}}'
+      string: '{"object":"chat.completion","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        capital of France is Paris."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":8,"total_tokens":25}}'
     headers:
       Access-Control-Allow-Credentials:
       - 'true'
@@ -22,35 +20,39 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '491'
+      - '346'
       Content-Type:
       - application/json
       Date:
-      - Thu, 20 Feb 2025 06:28:09 GMT
+      - Tue, 01 Apr 2025 14:29:40 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       Via:
-      - 1.1 d5d581324f7c00665941b8e3d5683e78.cloudfront.net (CloudFront)
+      - 1.1 90b5eb2570c2a8ecfb2cf2f93e5818da.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - q8I5H8DGN_uNX5etGIub8borvqxQy_bHLgnwgz6_Qotb6KYkL-kwnw==
+      - BkKSkXrUy-sTaz9CMe-b5kaYjkzg-C5VlNEXR1Vo4XShl1WdgFf3cA==
       X-Amz-Cf-Pop:
-      - CCU50-P4
+      - HYD57-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
+      X-Robots-Tag:
+      - none
       cross-origin-opener-policy:
       - same-origin
       x-compute-time:
-      - '2.15392648'
+      - '0.17501681'
       x-compute-type:
       - cache
+      x-inference-id:
+      - Oe3Gc1rOS5nfKATp81w0z
       x-request-id:
-      - Root=1-67b6cb79-07ee545a1f6025792e9ac335
+      - Root=1-67ebf854-7f9944d607964fcf1fac3dd5
       x-sha:
-      - 9eb2daaa8597bf192a8b0e73f848f3a102794df5
+      - 5f0b02c75b57c5855da9ae460ce51323ea669d8a
     status:
       code: 200
       message: OK
