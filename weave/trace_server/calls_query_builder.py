@@ -656,9 +656,7 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        call_parts_opt_filters_sql = (
-            optimization_conditions.call_parts_predicate_filters_sql or ""
-        )
+        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -711,7 +709,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
-        {call_parts_opt_filters_sql}
+        {str_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -745,6 +743,10 @@ ALLOWED_CALL_FIELDS = {
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
+
+
+def _field_requires_null_check(field: str) -> bool:
+    return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -1092,7 +1094,10 @@ def _create_like_optimized_eq_condition(
     else:
         like_pattern = f'%"{literal_value}"%'
 
-    return _create_like_condition(field, like_pattern, pb, table_alias)
+    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+    if _field_requires_null_check(field):
+        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
+    return like_condition
 
 
 def _create_like_optimized_contains_condition(
@@ -1118,9 +1123,12 @@ def _create_like_optimized_contains_condition(
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
-    return _create_like_condition(
+    like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
+    if _field_requires_null_check(field):
+        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
+    return like_condition
 
 
 def _create_like_optimized_in_condition(
@@ -1157,11 +1165,14 @@ def _create_like_optimized_in_condition(
         like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
         like_conditions.append(like_condition)
 
-    return "(" + " OR ".join(like_conditions) + ")"
+    or_sql = "(" + " OR ".join(like_conditions) + ")"
+    if _field_requires_null_check(field):
+        return f"({or_sql} OR {table_alias}.{field} IS NULL)"
+    return or_sql
 
 
 class OptimizationConditions(BaseModel):
-    call_parts_predicate_filters_sql: Optional[str] = None
+    str_filter_opt_sql: Optional[str] = None
 
 
 def process_query_to_optimization_sql(
@@ -1194,23 +1205,10 @@ def process_query_to_optimization_sql(
     if not filterable_conditions:
         return OptimizationConditions()
 
-    # Track conditions that need null checks to account for unmerged start/end call parts
-    null_check_conditions: set[str] = set()
-
-    def extract_field_from_operand(operand: tsi_query.Operand) -> Optional[str]:
-        """Extract the field name from an operand if it's a GetField operation."""
-        if isinstance(operand, tsi_query.GetFieldOperator):
-            field = get_field_by_name(operand.get_field_).field
-            if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
-                null_check_conditions.add(field)
-            return field
-        return None
-
     def process_operation(
         operation: tsi_query.Operation,
     ) -> Optional[OptimizationConditions]:
         if isinstance(operation, tsi_query.OrOperation):
-            # Process each operand in the OR operation
             or_conditions = []
 
             for op in operation.or_:
@@ -1219,74 +1217,42 @@ def process_query_to_optimization_sql(
                     return None  # If any operand can't be optimized, the whole OR can't be optimized
                 or_conditions.append(result)
 
-            or_conditions_sql = "(" + " OR ".join(or_conditions) + ")"
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=or_conditions_sql
-            )
+            or_sql = "(" + " OR ".join(or_conditions) + ")"
+            return OptimizationConditions(str_filter_opt_sql=or_sql)
 
         elif isinstance(operation, tsi_query.AndOperation):
-            # Process each operand in the AND operation
             and_conditions = []
             for op in operation.and_:
                 result = process_operand(op)
                 if result is not None:
                     and_conditions.append(result)
-            and_conditions_sql = "(" + " AND ".join(and_conditions) + ")"
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=and_conditions_sql
-            )
+            and_sql = "(" + " AND ".join(and_conditions) + ")"
+            return OptimizationConditions(str_filter_opt_sql=and_sql)
 
         elif isinstance(operation, tsi_query.NotOperation):
-            # Process the NOT operand
             result = process_operand(operation.not_[0])
             if result is None:
                 return OptimizationConditions()
             not_condition = f"NOT ({result})"
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=not_condition
-            )
+            return OptimizationConditions(str_filter_opt_sql=not_condition)
 
         elif isinstance(operation, tsi_query.EqOperation):
-            field1 = extract_field_from_operand(operation.eq_[0])
-            field2 = extract_field_from_operand(operation.eq_[1])
-            if field1 is None and field2 is None:
-                return None
-
-            like_optimized_condition = _create_like_optimized_eq_condition(
+            eq_opt_sql = _create_like_optimized_eq_condition(
                 operation, param_builder, table_alias
             )
-
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=like_optimized_condition
-            )
+            return OptimizationConditions(str_filter_opt_sql=eq_opt_sql)
 
         elif isinstance(operation, tsi_query.ContainsOperation):
-            field = extract_field_from_operand(operation.contains_.input)
-            if field is None:
-                return None
-
-            like_optimized_contains_condition = (
-                _create_like_optimized_contains_condition(
-                    operation, param_builder, table_alias
-                )
-            )
-
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=like_optimized_contains_condition
-            )
-
-        elif isinstance(operation, tsi_query.InOperation):
-            field = extract_field_from_operand(operation.in_[0])
-            if field is None:
-                return None
-
-            like_optimized_in_condition = _create_like_optimized_in_condition(
+            contains_opt_sql = _create_like_optimized_contains_condition(
                 operation, param_builder, table_alias
             )
+            return OptimizationConditions(str_filter_opt_sql=contains_opt_sql)
 
-            return OptimizationConditions(
-                call_parts_predicate_filters_sql=like_optimized_in_condition
+        elif isinstance(operation, tsi_query.InOperation):
+            in_opt_sql = _create_like_optimized_in_condition(
+                operation, param_builder, table_alias
             )
+            return OptimizationConditions(str_filter_opt_sql=in_opt_sql)
 
         return None
 
@@ -1320,7 +1286,7 @@ def process_query_to_optimization_sql(
             processed = process_operation(operand)
             if processed is None:
                 return None
-            return processed.call_parts_predicate_filters_sql
+            return processed.str_filter_opt_sql
         return None
 
     # Create a single AND operation from all conditions
@@ -1332,19 +1298,10 @@ def process_query_to_optimization_sql(
     processed = process_operation(and_operation)
     if processed is None:
         return OptimizationConditions()
+    if processed.str_filter_opt_sql is None:
+        return OptimizationConditions()
 
-    if processed.call_parts_predicate_filters_sql:
-        processed.call_parts_predicate_filters_sql = (
-            "AND " + processed.call_parts_predicate_filters_sql
-        )
-        if null_check_conditions:
-            is_null_conditions = [
-                f"{table_alias}.{field} IS NULL"
-                for field in sorted(null_check_conditions)
-            ]
-            processed.call_parts_predicate_filters_sql += (
-                " OR (" + " OR ".join(is_null_conditions) + ")"
-            )
+    processed.str_filter_opt_sql = "AND " + processed.str_filter_opt_sql
 
     return processed
 
