@@ -17,7 +17,6 @@ import {
   GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
-  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridRowSelectionModel,
@@ -58,10 +57,7 @@ import {
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
-import {
-  getDefaultOperatorForValue,
-  make30DayDateFilter,
-} from '../../filters/common';
+import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -106,7 +102,7 @@ import {
   WFHighLevelCallFilter,
 } from './callsTableFilter';
 import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
-import {useCallsForQuery} from './callsTableQuery';
+import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
@@ -127,21 +123,14 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
-export const DEFAULT_FILTER_CALLS: GridFilterModel = {
-  items: [],
-  logicOperator: GridLogicOperator.And,
-};
-export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
-  items: [make30DayDateFilter()],
-  logicOperator: GridLogicOperator.And,
-};
+
 export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
   return filter.items.some(
     item => item.field === 'started_at' && item.operator === '(date): after'
   );
 };
 
-const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
 };

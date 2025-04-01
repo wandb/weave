@@ -60,12 +60,14 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_FILTER_CALLS,
-  DEFAULT_FILTER_CALLS_WITH_DATE,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
   filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
+import {
+  DEFAULT_FILTER_CALLS,
+  useMakeInitialDatetimeFilter,
+} from './Browse3/pages/CallsPage/callsTableQuery';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -786,8 +788,12 @@ const CallsPageBinding = () => {
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
 
-  // Track if the user has explicitly removed the date filter
-  const hasRemovedDateFilter = useRef(false);
+  const {initialDatetimeFilter} = useMakeInitialDatetimeFilter(
+    entity,
+    project,
+    initialFilter,
+    isEvaluationsTab
+  );
 
   const onFilterUpdate = useCallback(
     filter => {
@@ -823,11 +829,14 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  // Track if the user has explicitly removed the date filter
+  const hasRemovedDateFilter = useRef(false);
+
   // Only show the date filter if not evals and we haven't explicitly removed it
   const defaultFilter =
     isEvaluationsTab || hasRemovedDateFilter.current
       ? DEFAULT_FILTER_CALLS
-      : DEFAULT_FILTER_CALLS_WITH_DATE;
+      : initialDatetimeFilter;
 
   const filterModel = useMemo(
     () => getValidFilterModel(query.filters, defaultFilter),

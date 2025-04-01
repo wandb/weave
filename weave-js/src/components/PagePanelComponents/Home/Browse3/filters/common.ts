@@ -24,6 +24,7 @@ import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
 } from '../pages/wfReactInterface/constants';
+import {Query} from '../pages/wfReactInterface/traceServerClientInterface/query';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -387,6 +388,19 @@ export const upsertFilter = (
 export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
+};
+
+export const makeRawDateFilter = (
+  days: number,
+  field: string = 'started_at'
+): Query => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  return {
+    $expr: {
+      $gt: [{$getField: field}, {$literal: d.getTime() / 1000}],
+    },
+  };
 };
 
 /**

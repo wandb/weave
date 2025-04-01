@@ -1,12 +1,18 @@
 import {
   GridFilterModel,
+  GridLogicOperator,
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {isValuelessOperator} from '../../filters/common';
+import {
+  isValuelessOperator,
+  make30DayDateFilter,
+  makeDateFilter,
+  makeRawDateFilter,
+} from '../../filters/common';
 import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -16,6 +22,15 @@ import {
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+
+export const DEFAULT_FILTER_CALLS: GridFilterModel = {
+  items: [],
+  logicOperator: GridLogicOperator.And,
+};
+export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
+  items: [make30DayDateFilter()],
+  logicOperator: GridLogicOperator.And,
+};
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -260,4 +275,53 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
     };
     return c;
   });
+};
+
+export const useMakeInitialDatetimeFilter = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  skip: boolean
+) => {
+  // Fire off 2 stats queries, one for the # of calls in the last 7 days
+  // one for the  # of calls in the last 30 days.
+  // If the first query returns > 50 calls, set the default filter to 7 days
+  // Else if the second query returns > 50 calls, set to 30 days
+  // Else set a default filter to 6 months
+  const {useCallsStats} = useWFHooks();
+  const d30filter = useMemo(() => {
+    return makeRawDateFilter(30);
+  }, []);
+  const d7filter = useMemo(() => {
+    return makeRawDateFilter(7);
+  }, []);
+
+  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
+    skip,
+  });
+  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
+    skip,
+  });
+  const datetimeFilter = useMemo(() => {
+    if (callStats7Days.result && callStats7Days.result.count > 50) {
+      return {
+        items: [makeDateFilter(7)],
+        logicOperator: GridLogicOperator.And,
+      };
+    } else if (callStats30Days.result && callStats30Days.result.count > 50) {
+      return {
+        items: [makeDateFilter(30)],
+        logicOperator: GridLogicOperator.And,
+      };
+    }
+    return {
+      items: [makeDateFilter(180)],
+      logicOperator: GridLogicOperator.And,
+    };
+  }, [callStats7Days.result, callStats30Days.result]);
+
+  if (datetimeFilter != null) {
+    return {initialDatetimeFilter: datetimeFilter};
+  }
+  return {initialDatetimeFilter: DEFAULT_FILTER_CALLS_WITH_DATE};
 };
