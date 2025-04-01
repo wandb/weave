@@ -8,8 +8,6 @@ from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.weave_client import Call
 
-if TYPE_CHECKING:
-    pass
 
 
 _exa_patcher: MultiPatcher | None = None
@@ -22,7 +20,6 @@ def exa_on_finish(call: Call, output: Any, exception: BaseException | None) -> N
 
         # Get the cost as a float to ensure it's a numeric value
         cost_value = float(output.cost_dollars.total)
-        print(f"The cost value is {cost_value}")
 
         # Initialize the usage dictionary if it doesn't exist
         if "usage" not in call.summary:

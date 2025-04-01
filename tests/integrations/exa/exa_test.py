@@ -10,7 +10,7 @@ from weave.integrations.exa.exa_sdk import get_exa_patcher
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "api.exa.ai", "localhost"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_search(
     client: weave.trace.weave_client.WeaveClient,
@@ -23,7 +23,7 @@ def test_search(
     api_response = exa.search(query="Latest developments in AI safety", num_results=3)
 
     # Get the traced call
-    calls = list(client.calls())
+    calls = client.get_calls()
     assert len(calls) == 1
     call = calls[0]
 
@@ -37,13 +37,11 @@ def test_search(
 
     # Check that URLs exist and are properly formatted
     for result in output.results:
-        assert hasattr(result, "url")
         assert result.url is not None
         assert result.url.startswith("http")
 
     # Verify cost tracking works correctly
     if hasattr(api_response, "cost_dollars"):
-        assert hasattr(output, "cost_dollars")
         assert output.cost_dollars.total == api_response.cost_dollars.total
 
         # Check cost is in the summary
@@ -60,7 +58,7 @@ def test_search(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "api.exa.ai", "localhost"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_search_and_contents(
     client: weave.trace.weave_client.WeaveClient,
@@ -75,7 +73,7 @@ def test_search_and_contents(
     )
 
     # Get the traced call
-    calls = list(client.calls())
+    calls = client.get_calls()
     assert len(calls) == 1
     call = calls[0]
 
@@ -89,11 +87,9 @@ def test_search_and_contents(
 
     # Check that text content is present in the results
     for result in output.results:
-        assert hasattr(result, "url")
         assert result.url is not None
         assert result.url.startswith("http")
 
-        assert hasattr(result, "text")
         assert result.text is not None
         assert len(result.text) > 0
 
