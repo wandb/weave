@@ -234,9 +234,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         # TODO: Add docs link
-        raise NotImplementedError(
-            "Sending otel traces directly is not yet supported. In order to learn more about OTEL "
-        )
+        raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
     # Call API
     def call_start(
