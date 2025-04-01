@@ -7,14 +7,15 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
+from weave.trace.util import deprecated
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse
 
-_google_genai_patcher: MultiPatcher | None = None
+_google_generativeai_patcher: MultiPatcher | None = None
 
 
 def gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -100,7 +101,7 @@ def gemini_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         op = weave.op(fn, **op_kwargs)
         op._set_on_finish_handler(gemini_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: gemini_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)
@@ -125,7 +126,7 @@ def gemini_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         op._set_on_finish_handler(gemini_on_finish)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: gemini_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)
@@ -135,7 +136,8 @@ def gemini_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
-def get_google_genai_patcher(
+@deprecated(new_name="get_google_genai_patcher")
+def get_google_generativeai_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
     if settings is None:
@@ -144,9 +146,9 @@ def get_google_genai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _google_genai_patcher
-    if _google_genai_patcher is not None:
-        return _google_genai_patcher
+    global _google_generativeai_patcher
+    if _google_generativeai_patcher is not None:
+        return _google_generativeai_patcher
 
     base = settings.op_settings
 
@@ -170,7 +172,7 @@ def get_google_genai_patcher(
         }
     )
 
-    _google_genai_patcher = MultiPatcher(
+    _google_generativeai_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module(
@@ -203,4 +205,4 @@ def get_google_genai_patcher(
         ]
     )
 
-    return _google_genai_patcher
+    return _google_generativeai_patcher

@@ -86,7 +86,10 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
-from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.llm_completion import (
+    get_custom_provider_info,
+    lite_llm_completion,
+)
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
@@ -178,8 +181,10 @@ ObjRefListType = list[ri.InternalObjectRef]
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
+    or DEFAULT_MAX_MEMORY_USAGE
 }
 
 
@@ -193,7 +198,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
-        file_storage_uri_str: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -206,7 +210,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._file_storage_uri_str = file_storage_uri_str
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -219,7 +222,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
-            file_storage_uri_str=wf_env.wf_file_storage_uri(),
         )
 
     @contextmanager
@@ -232,6 +234,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._call_batch = []
             self._flush_immediately = True
+
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        with self.call_batch():
+            res = []
+            for item in req.batch:
+                if item.mode == "start":
+                    res.append(self.call_start(item.req))
+                elif item.mode == "end":
+                    res.append(self.call_end(item.req))
+                else:
+                    raise ValueError("Invalid mode")
+        return tsi.CallCreateBatchRes(res=res)
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -456,6 +470,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -463,7 +478,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # get all parents
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.calls_delete.count": str(
+                        len(req.call_ids)
+                    )
+                }
+            )
+
+        # get the requested calls to delete
         parents = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
@@ -471,26 +495,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
-                    # request minimal columns
                     columns=["id", "parent_id"],
                 )
             )
         )
+        parent_trace_ids = [p.trace_id for p in parents]
 
-        # get all calls with trace_ids matching parents
+        # get first 10k calls with trace_ids matching parents
         all_calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        trace_ids=[p.trace_id for p in parents],
-                    ),
-                    # request minimal columns
+                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
                     columns=["id", "parent_id"],
+                    limit=10_000,
                 )
             )
         )
-
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
             all_calls=all_calls,
@@ -1250,7 +1271,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri()
+        base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
 
         if base_file_storage_uri is not None:
             self._file_create_bucket(req, digest, base_file_storage_uri)
@@ -1327,7 +1348,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-    def _get_base_file_storage_uri(self) -> Optional[FileStorageURI]:
+    def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
         """
         Get the base storage URI for a project.
 
@@ -1338,12 +1359,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         the project or a context variable. Leaving this method here for clarity
         and future extensibility.
         """
-        if not self._file_storage_uri_str:
+        file_storage_uri_str = wf_env.wf_file_storage_uri()
+        if not file_storage_uri_str:
             return None
-        res = FileStorageURI.parse_uri_str(self._file_storage_uri_str)
+
+        project_allow_list = wf_env.wf_file_storage_project_allow_list()
+        if project_allow_list is None:
+            return None
+
+        universally_enabled = (
+            len(project_allow_list) == 1 and project_allow_list[0] == "*"
+        )
+
+        if not universally_enabled and project_id not in project_allow_list:
+            return None
+
+        res = FileStorageURI.parse_uri_str(file_storage_uri_str)
         if res.has_path():
             raise ValueError(
-                f"Supplied file storage uri contains path components: {self._file_storage_uri_str}"
+                f"Supplied file storage uri contains path components: {file_storage_uri_str}"
             )
         return res
 
@@ -1610,32 +1644,95 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # Required fields
         model_name = req.inputs.model
+        api_key = None
+        provider = None
+
+        # Custom model fields
+        base_url: Optional[str] = None
+        extra_headers: dict[str, str] = {}
+        return_type: Optional[str] = None
+
+        # For custom and standard models, we fetch the fields differently
+        #  1. Standard models: All of the information comes from the model_to_provider_info_map
+        #  2. Custom models: We fetch the provider object and provider model object
+
+        # First we try to see if the model name is a custom model
         model_info = self._model_to_provider_info_map.get(model_name)
-        if not model_info:
-            raise InvalidRequest(f"No model info found for model {model_name}")
-        secret_fetcher = _secret_fetcher_context.get()
-        if not secret_fetcher:
-            raise InvalidRequest(
-                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+
+        if model_info:
+            # Handle standard model case
+            # 1. We get the model info from the map
+            # 2. We fetch the API key, with the secret fetcher
+            # 3. We set the provider, to the litellm provider
+            # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
+
+            secret_name = model_info.get("api_key_name")
+            if not secret_name:
+                raise InvalidRequest(f"No secret name found for model {model_name}")
+
+            secret_fetcher = _secret_fetcher_context.get()
+            if not secret_fetcher:
+                raise InvalidRequest(
+                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
+                )
+
+            api_key = (
+                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
             )
-        secret_name = model_info.get("api_key_name")
-        if not secret_name:
-            raise InvalidRequest(f"No secret name found for model {model_name}")
-        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        provider = model_info.get("litellm_provider")
-        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
-            raise MissingLLMApiKeyError(
-                f"No API key {secret_name} found for model {model_name}",
-                api_key_name=secret_name,
+            provider = model_info.get("litellm_provider", "openai")
+
+            # We fetch bedrock credentials, in lite_llm_completion, later
+            if not api_key and provider != "bedrock" and provider != "bedrock_converse":
+                raise MissingLLMApiKeyError(
+                    f"No API key {secret_name} found for model {model_name}",
+                    api_key_name=secret_name,
+                )
+
+        else:
+            # If we don't have model info, we assume it is a custom model
+            # Handle custom provider case
+            # We fetch the provider object and provider model object
+            try:
+                custom_provider_info = get_custom_provider_info(
+                    project_id=req.project_id,
+                    model_name=model_name,
+                    obj_read_func=self.obj_read,
+                )
+
+                base_url = custom_provider_info.base_url
+                api_key = custom_provider_info.api_key
+                extra_headers = custom_provider_info.extra_headers
+                return_type = custom_provider_info.return_type
+                actual_model_name = custom_provider_info.actual_model_name
+
+            except Exception as e:
+                return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+            # Always use "custom" as the provider for litellm
+            provider = "custom"
+            # Update the model name for the API call
+            # If the model name is ollama, we need to add the ollama/ prefix
+            req.inputs.model = (
+                "ollama/" + actual_model_name
+                if "ollama" in model_name
+                else actual_model_name
             )
 
+        # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
+
+        # Make the API call
         res = lite_llm_completion(
-            api_key,
-            req.inputs,
-            provider,
+            api_key=api_key,
+            inputs=req.inputs,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
         )
+
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
@@ -1658,7 +1755,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             summary={},
         )
         if "usage" in res.response:
-            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+            end.summary["usage"] = {model_name: res.response["usage"]}
 
         if "error" in res.response:
             end.exception = res.response["error"]
@@ -1725,11 +1822,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
         if batch:
             settings = {}
             if self._use_async_insert:
                 settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
             self._insert(
                 "call_parts",
                 data=batch,
@@ -2177,10 +2285,22 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
+    if root_span := ddtrace.tracer.current_span():
+        root_span.set_tags(
+            {
+                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                    len(root_ids)
+                ),
+                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                    len(all_calls)
+                ),
+            }
+        )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:

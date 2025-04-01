@@ -203,6 +203,11 @@ export function getStackIdAndName<X, C, T extends Type>(
     ) {
       displayName = 'Run History Tables Stepper';
     } else if (
+      ourDisplayName === 'Run History Plots Stepper' &&
+      childDisplayName === 'Paginated Plots'
+    ) {
+      displayName = 'Run History Plots Stepper';
+    } else if (
       ourDisplayName === 'Combined Table' &&
       childDisplayName === 'Table'
     ) {

@@ -46,7 +46,17 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
+from weave.trace.op import (
+    Op,
+    as_op,
+    is_op,
+    is_placeholder_call,
+    is_tracing_setting_disabled,
+    maybe_unbind_method,
+    placeholder_call,
+    print_call_link,
+    should_skip_tracing_for_op,
+)
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -75,6 +85,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -725,6 +736,13 @@ class Call:
         )
 
 
+class NoOpCall(Call):
+    def __init__(self) -> None:
+        super().__init__(
+            _op_name="", trace_id="", project_id="", parent_id=None, inputs={}
+        )
+
+
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
@@ -820,6 +838,10 @@ class WeaveClient:
     # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
     future_executor_fastlane: FutureExecutor | None
 
+    # Cache of files sent to the server to avoid sending the same file
+    # multiple times.
+    send_file_cache: WeaveClientSendFileCache
+
     """
     A client for interacting with the Weave trace server.
 
@@ -857,6 +879,7 @@ class WeaveClient:
         self._server_is_flushable = False
         if isinstance(self.server, RemoteHTTPTraceServer):
             self._server_is_flushable = self.server.should_batch
+        self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
 
@@ -1082,6 +1105,11 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        if is_tracing_setting_disabled() or (
+            is_op(op) and should_skip_tracing_for_op(cast(Op, op))
+        ):
+            return placeholder_call()
+
         from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
@@ -1217,6 +1245,13 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        if (
+            is_tracing_setting_disabled()
+            or (op is not None and should_skip_tracing_for_op(op))
+            or is_placeholder_call(call)
+        ):
+            return None
+
         from weave.trace.api import _global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1325,6 +1360,22 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_calls(self, call_ids: list[str]) -> None:
+        """Delete calls by their IDs.
+
+        Deleting a call will also delete all of its children.
+
+        Args:
+            call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
+        """
+        self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
             )
         )
 
@@ -1972,10 +2023,18 @@ class WeaveClient:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        cached_res = self.send_file_cache.get(req)
+        if cached_res:
+            return cached_res
+
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
+            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+        else:
+            res = self.future_executor.defer(self.server.file_create, req)
+
+        self.send_file_cache.put(req, res)
+        return res
 
     @property
     def num_outstanding_jobs(self) -> int:

@@ -42,14 +42,21 @@ NOTE: Not all serialization is reversible, which can be surprising and frustrati
 
 ### 2. Custom Object Serialization (`custom_objs.py` and `serializer.py`)
 
-NOTE: Custom object serialization is WIP and subject to change!
+NOTE: Custom object serialization is WIP and subject to change! In particular, there are some asymmetries and other issues that we should fix:
+
+1. Encoding requires a WeaveClient while decoding requires a TraceServerInterface. Encoding is more complicated because of asynchronous file creation and caching in the client. A client object contains a reference to a TraceServerInterface so ideally we could use a WeaveClient object for both encoding and decoding.
+2. We are currently passing a project_id as a separate argument - a client has entity/project information internally so we shouldn't need to pass it separately.
+3. to_json and from_json should not need to know about inline vs. file-backed custom objects, the logic for things like file creation should be moved from `serializer.py` to `custom_objs.py` - this is complicated by #1 above. If we fix this we could expose a single `decode_custom_obj` method mirroring the single encode method.
 
 The entrypoint for custom object serialization is `weave/trace/serialization/custom_objs.py`. This file primarily contains:
 
-1. `encode_custom_obj()`, which encodes custom objects using registered serializers
-2. `decode_custom_obj()`, which decodes custom objects using the appropriate serializer
+1. `encode_custom_obj()`, which encodes custom objects using registered serializers (both inline and file-based)
+2. `decode_custom_inline_obj()`, which decodes custom inline objects using the appropriate serializer
+3. `decode_custom_files_obj()`, which decodes custom file-based objects using the appropriate serializer
 
 #### Custom Object Serialization Flow
+
+This diagram shows the flow for file-based custom objects.
 
 ```mermaid
 flowchart TD
@@ -61,7 +68,29 @@ flowchart TD
         Serializer -->|Write to files| MemArtifact["MemTraceFilesArtifact"]
 
         MemArtifact -->|Read from files| Deserializer["Registered Serializer (load method)"]
-        Deserializer --> DecodeCustomObj["decode_custom_obj()"]
+        Deserializer --> DecodeCustomObj["decode_custom_files_obj()"]
+    end
+
+    DecodeCustomObj --> FromJson["from_json()"]
+    FromJson --> ReconstructedObj["Reconstructed Custom Object"]
+
+    RegisterSerializer["register_serializer()"] -.->|Registers| Serializer
+    RegisterSerializer -.->|Registers| Deserializer
+```
+
+The flow for inline custom objects is similar:
+
+```mermaid
+flowchart TD
+    CustomObj["Custom Object (datetime.datetime, rich.markdown.Markdown, etc.)"] --> ToJson["to_json()"]
+    ToJson --> EncodeCustomObj["encode_custom_obj()"]
+
+    subgraph CustomSerialization["Custom Object Serialization Process"]
+        EncodeCustomObj --> Serializer["Registered Serializer (save method)"]
+        Serializer --> Inline["Write to an inline value representation, e.g. str/dict"]
+
+        Inline --> Deserializer["Registered Serializer (load method)"]
+        Deserializer --> DecodeCustomObj["decode_custom_inline_obj()"]
     end
 
     DecodeCustomObj --> FromJson["from_json()"]
@@ -78,16 +107,18 @@ Weave also ships with a set of first-class serializers for common types, defined
 - Images (`PIL.Image.Image`)
 - Audio (`wave.Wave_read`)
 - Op (`weave.Op`)
+- Datetime (`datetime.datetime`)
+- Markdown (`rich.markdown.Markdown`)
 
 These `KNOWN_TYPES` are implemented using `register_serializer`. Unlike other types, these will always be loaded using the SDK's current `load` function (instead of the one packaged with the object).
 
 #### File-based serialization
 
-Today, all custom object serialization is file-based via `MemTraceFilesArtifact`. Technicaly this supports many files per artifact, but in practice today we use just a single file (obj.py) for each artifact. Elements of this are hardcoded in both the SDK and App layers.
+Some custom object serialization is file-based via `MemTraceFilesArtifact`. Technically this supports many files per artifact, but in practice today we use just a single file (obj.py) for each artifact. Elements of this are hardcoded in both the SDK and App layers. File-based serialization is typically used for larger values, such as images.
 
 #### Inline serialization
 
-Notably, this system is missing the ability to register inline serializers for custom objects. For example, the user may have a simple type like a custom datetime. This is a known limitation and will be addressed in the future.
+Objects that have a small serialized representation, like a Python datetime object, can have that value stored "inline" with the other serialization information such as the class name and deserialization Op. This avoids needing to make a separate API request to retrieve the value.
 
 #### Other limitations
 

@@ -24,6 +24,13 @@ type TooltipProps = {
   /** Element to be rendered in-place where the popup is defined. */
   trigger: React.ReactNode;
 
+  /**
+   * Value for Tooltip.Trigger `asChild` prop. Defaults to true,
+   * but should be set to false if your trigger doesn't have an
+   * accessible role.
+   */
+  isTriggerAsChild?: boolean;
+
   /** If true, don't wrap the trigger with a span. */
   noTriggerWrap?: boolean;
 
@@ -62,6 +69,7 @@ const parsePosition = (position?: TooltipPosition): ParsedPosition => {
 
 export const Tooltip = ({
   trigger,
+  isTriggerAsChild = true,
   noTriggerWrap,
   content,
   side,
@@ -84,7 +92,7 @@ export const Tooltip = ({
   return (
     <Provider>
       <Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-        <Trigger asChild>{triggerChild}</Trigger>
+        <Trigger asChild={isTriggerAsChild}>{triggerChild}</Trigger>
         <Portal>
           <Content
             style={{

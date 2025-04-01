@@ -19,3 +19,5 @@ gha-creds-*.json
 *.log
 */file::memory:?cache=shared
 tests/weave_models/
+tools/codegen/generate_config.yaml
+.cursor
