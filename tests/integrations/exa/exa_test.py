@@ -1,11 +1,10 @@
 import os
-from collections.abc import Generator
 
 import pytest
 from exa_py import Exa
 
 import weave
-from weave.integrations.exa.exa_sdk import get_exa_patcher
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
