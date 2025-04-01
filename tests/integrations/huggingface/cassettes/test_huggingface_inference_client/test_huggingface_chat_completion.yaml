@@ -369,13 +369,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 01 Apr 2025 11:52:03 GMT
+      - Tue, 01 Apr 2025 14:29:34 GMT
       ETag:
       - W/"a377223ddc96fabaf7905fda409159d74165d81f634ab1c9e78e194ff84f508a"
       Expires:
-      - Tue, 01 Apr 2025 11:57:03 GMT
+      - Tue, 01 Apr 2025 14:34:34 GMT
       Source-Age:
-      - '62'
+      - '170'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -385,19 +385,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '1'
+      - '0'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - c38e2247dc8b61572f82877b2fc1a997f609bdd0
+      - dc3de605fa897bdc501c9fb2b3426369303661b4
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - 0A4F:6EE3D:62EF68:10598B5:67EB6C53
       X-Served-By:
-      - cache-ccu830034-CCU
+      - cache-ccu830027-CCU
       X-Timer:
-      - S1743508323.350875,VS0,VE1
+      - S1743517775.860931,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -413,7 +413,7 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - a4ec90f6-ee6e-421c-b133-756e0b6e7519
+      - 4d19aa26-44f2-4be8-bd81-f0ed9f7a8523
       user-agent:
       - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: GET
@@ -615,7 +615,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 01 Apr 2025 11:52:05 GMT
+      - Tue, 01 Apr 2025 14:29:37 GMT
       ETag:
       - W/"4c05-UVWupZolIf6/0yzFblDSHE/dRPI"
       Referrer-Policy:
@@ -623,9 +623,9 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 5ecd55f028d3424418cf823c48f98656.cloudfront.net (CloudFront)
+      - 1.1 99213fd5cb3468320e69c259200489b2.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - szyOv61_xV7VuO9CkVxUYPeNolfUqv10KQRv9tWIcYBNVh06wRLjYw==
+      - yzlS8zYL34YDPzTbW7d-jUStqP4pGwQflUgq212LLXHwPTO3AiRTlw==
       X-Amz-Cf-Pop:
       - BOM78-P10
       X-Cache:
@@ -633,7 +633,7 @@ interactions:
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-67ebd365-7a98a28c44b253ab636dd39c;a4ec90f6-ee6e-421c-b133-756e0b6e7519
+      - Root=1-67ebf851-3bd11f2c680474534d39796d;4d19aa26-44f2-4be8-bd81-f0ed9f7a8523
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -655,34 +655,36 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - ca3251b9-c9a4-49b1-a544-787501f23a36
+      - 4cc45082-6d47-4f52-8a51-de9596e3bb62
       user-agent:
       - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: POST
     uri: https://router.huggingface.co/hf-inference/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions
   response:
     body:
-      string: '{"object":"chat.completion","id":"","created":1743508326,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"message":{"role":"assistant","content":"The
+      string: '{"object":"chat.completion","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"message":{"role":"assistant","content":"The
         capital of France is Paris."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":8,"total_tokens":25}}'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
       Access-Control-Expose-Headers:
       - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '346'
       Content-Type:
       - application/json
       Date:
-      - Tue, 01 Apr 2025 11:52:06 GMT
+      - Tue, 01 Apr 2025 14:29:38 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
-      Transfer-Encoding:
-      - chunked
       Via:
-      - 1.1 a29f9f1ff42721dbcda7f3bae04962a0.cloudfront.net (CloudFront)
+      - 1.1 a3e3a116dc27da4ca749ff4c346e64c8.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - hXJQLWCZj0wGe0IT59nsV5qnbb0KZ_2Wvi3MiUQBkEKWqvV5Wp_QLg==
+      - aC_u7onP5FH3DfMxvB3IHc3fEYRfpUi9CzXLSBNVuhVNglrTDfRQqw==
       X-Amz-Cf-Pop:
-      - MAA51-P3
+      - HYD57-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
@@ -691,39 +693,20 @@ interactions:
       - none
       access-control-allow-credentials:
       - 'true'
-      access-control-allow-origin:
-      - '*'
       cross-origin-opener-policy:
       - same-origin
       vary:
-      - origin, access-control-request-method, access-control-request-headers, Origin,
-        Access-Control-Request-Method, Access-Control-Request-Headers
-      x-compute-characters:
-      - '146'
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       x-compute-time:
-      - '0.174929413'
+      - '0.17501681'
       x-compute-type:
-      - 2-a10-g
-      x-generated-tokens:
-      - '8'
+      - cache
       x-inference-id:
-      - 7Gtzm9JaQu3zBF16Vh8-Z
-      x-inference-time:
-      - '174'
-      x-prompt-tokens:
-      - '17'
-      x-queue-time:
-      - '0'
+      - CrVO2DeBKbCW6y1JUVJeg
       x-request-id:
-      - Root=1-67ebd366-7d43e59737cdb4ba607c1196;ca3251b9-c9a4-49b1-a544-787501f23a36
+      - Root=1-67ebf852-6cf8fe4811c1df2259c126f9;4cc45082-6d47-4f52-8a51-de9596e3bb62
       x-sha:
       - 5f0b02c75b57c5855da9ae460ce51323ea669d8a
-      x-time-per-token:
-      - '21'
-      x-total-time:
-      - '174'
-      x-validation-time:
-      - '0'
     status:
       code: 200
       message: OK
