@@ -1120,6 +1120,7 @@ def _create_like_optimized_contains_condition(
     if not substr_value:
         # Empty string is not a valid value for LIKE optimization
         return None
+
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
@@ -1216,6 +1217,8 @@ def process_query_to_optimization_sql(
                 if result is None:
                     return None  # If any operand can't be optimized, the whole OR can't be optimized
                 or_conditions.append(result)
+            if not or_conditions:
+                return None
 
             or_sql = "(" + " OR ".join(or_conditions) + ")"
             return OptimizationConditions(str_filter_opt_sql=or_sql)
@@ -1226,6 +1229,9 @@ def process_query_to_optimization_sql(
                 result = process_operand(op)
                 if result is not None:
                     and_conditions.append(result)
+            if not and_conditions:
+                return None
+
             and_sql = "(" + " AND ".join(and_conditions) + ")"
             return OptimizationConditions(str_filter_opt_sql=and_sql)
 
@@ -1298,7 +1304,7 @@ def process_query_to_optimization_sql(
     processed = process_operation(and_operation)
     if processed is None:
         return OptimizationConditions()
-    if processed.str_filter_opt_sql is None:
+    if not processed.str_filter_opt_sql:
         return OptimizationConditions()
 
     processed.str_filter_opt_sql = "AND " + processed.str_filter_opt_sql
