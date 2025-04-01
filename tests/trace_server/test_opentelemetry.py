@@ -21,7 +21,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.opentelemetry.attributes import (
     expand_attributes,
     flatten_attributes,
@@ -126,28 +125,22 @@ def create_test_export_request(project_id="test_project"):
 def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     """Test the otel_export method."""
     export_req = create_test_export_request()
-    export_req.project_id = client._project_id()
-    print(export_req)
+    project_id = client._project_id()
+    export_req.project_id = project_id
 
-    # Call the method under test
+    # Export the otel traces
     response = client.server.otel_export(export_req)
-    print(client.server.otel_export)
-    print(response)
-
     # Verify the response is of the correct type
     assert isinstance(response, tsi.OtelExportRes)
 
-    # Verify call_start_batch was called with a batch request
-    # client.server.call_start_batch
-
-    # for call in client.server.calls():
-    #     print(call)
-    # Verify it's the expected type
-    # assert isinstance(batch_req, tsi.CallCreateBatchReq)
-    #
-    # # Verify the batch contains the expected number of calls
-    # assert len(batch_req.batch) == 2  # 1 start + 1 end
-
+    # Query the calls
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+    # Verify that the start and end calls were merged into a single call
+    assert(len(res.calls) == 1)
 
 # @pytest.fixture
 # def mock_sqlite_trace_server():
