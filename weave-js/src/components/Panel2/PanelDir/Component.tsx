@@ -158,7 +158,6 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
       style={
         !isDownloadable
           ? {
-              backgroundColor: 'inherit',
               pointerEvents: 'none',
             }
           : undefined
