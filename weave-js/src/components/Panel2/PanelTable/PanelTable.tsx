@@ -1,5 +1,6 @@
 import 'react-base-table/lib/TableRow';
 
+import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useRunName} from '@wandb/weave/common/hooks/useRunName';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
@@ -1141,6 +1142,61 @@ const PanelTableInner: React.FC<
         margin: '8px',
       }}
       ref={actionBarRef}>
+      {props.config.tableSelection?.show && (
+        <Popup
+          hoverable
+          position="bottom left"
+          on="click"
+          basic
+          trigger={
+            <Button
+              variant="secondary"
+              size="small"
+              icon="table"
+              tooltip="Select table"
+              tooltipProps={{className: 'py-8 px-12'}}>
+              <>
+                Table:{' '}
+                <span
+                  style={{
+                    fontWeight: 'bold',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: 'inline-block',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'bottom',
+                  }}>
+                  {props.config.tableSelection?.currentSelection || 'Table'}
+                </span>
+              </>
+            </Button>
+          }
+          content={
+            <div>
+              Select table:
+              <ModifiedDropdown
+                style={{marginTop: '4px'}}
+                selection
+                scrolling
+                multiple={false}
+                value={props.config.tableSelection?.currentSelection}
+                data-test="table-selection"
+                closeOnBlur
+                closeOnChange
+                options={(props.config.tableSelection?.keys || []).map(key => ({
+                  text: key,
+                  key,
+                  value: key,
+                }))}
+                onChange={(e, {value}) => {
+                  props.config.tableSelection?.callback?.(value as string);
+                }}
+              />
+            </div>
+          }
+        />
+      )}
       <Button
         variant="secondary"
         size="small"
