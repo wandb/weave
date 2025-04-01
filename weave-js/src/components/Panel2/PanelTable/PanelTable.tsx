@@ -763,22 +763,6 @@ const PanelTableInner: React.FC<
           />
         );
       },
-      headerRenderer: ({headerIndex}) => {
-        return props.config.simpleTable ? null : (
-          <S.TableAction
-            data-test="table-filter-button"
-            highlight={isFiltered ?? false}
-            onClick={() => {
-              setFilterOpen(!filterOpen);
-            }}>
-            <S.TableIcon
-              name="filter"
-              // Pass undefined when false to avoid console warning.
-              highlight={isFiltered === false ? undefined : true}
-            />
-          </S.TableAction>
-        );
-      },
     });
     if (rowActions != null && rowActions.length > 0) {
       columns.unshift({
@@ -1113,6 +1097,64 @@ const PanelTableInner: React.FC<
     () => TableActions(weave, tableState.preFilterFunction, setFilterFunction),
     [weave, tableState.preFilterFunction, setFilterFunction]
   );
+
+  const [actionBarDimensions, setActionBarDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+  const actionBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (actionBarRef.current) {
+        const {width: actionBarWidth, height: actionBarHeight} =
+          actionBarRef.current.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(actionBarRef.current);
+        const marginTop = parseInt(computedStyle.marginTop, 10);
+        const marginBottom = parseInt(computedStyle.marginBottom, 10);
+
+        setActionBarDimensions({
+          width: Math.floor(actionBarWidth),
+          height: Math.floor(actionBarHeight) + marginTop + marginBottom,
+        });
+      }
+    };
+
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+
+    if (actionBarRef.current) {
+      resizeObserver.observe(actionBarRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const ActionBar = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        gap: '8px',
+        margin: '8px',
+      }}
+      ref={actionBarRef}>
+      <Button
+        variant="secondary"
+        size="small"
+        icon="filter-alt"
+        onClick={() => {
+          setFilterOpen(!filterOpen);
+        }}
+        tooltip="Filter"
+        tooltipProps={{className: 'py-8 px-12'}}>
+        Filter
+      </Button>
+    </div>
+  );
+
   const ConfiguredTable = (
     <BaseTable
       ignoreFunctionInColumnCompare={false}
@@ -1120,7 +1162,7 @@ const PanelTableInner: React.FC<
       onColumnResizeEnd={onColumnResizeEnd}
       fixed
       width={width}
-      height={height}
+      height={height - actionBarDimensions.height}
       columns={baseTableColumns}
       data={unpinnedData}
       frozenData={pinnedData}
@@ -1135,6 +1177,7 @@ const PanelTableInner: React.FC<
       footerHeight={footerHeight}
     />
   );
+
   return (
     <GrowToParent
       data-test-weave-id="table"
@@ -1190,7 +1233,10 @@ const PanelTableInner: React.FC<
         ConfiguredTable
       ) : (
         <WeaveActionContextProvider newActions={actions}>
-          {ConfiguredTable}
+          <div style={{display: 'flex', flexDirection: 'column'}}>
+            {ActionBar}
+            {ConfiguredTable}
+          </div>
         </WeaveActionContextProvider>
       )}
     </GrowToParent>
