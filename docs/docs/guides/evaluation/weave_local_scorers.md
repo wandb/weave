@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Local Scorers
+# Weave Local Scorers
 
 <a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/scorers_local_weave_scorers.ipynb">
 <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
@@ -299,6 +299,7 @@ While local scorers can be run on CPUs and GPUs, use GPUs for best performance.
 
     ### Usage notes
 
+    - To specify specific entity types, such as emails or phone numbers, pass a list of Presidio entities to the `selected_entities` parameter. Otherwise, Presidio will detect all entity types in its default entities list.
     - To detect specific entity types, such as emails or phone numbers, pass a list to the `selected_entities` parameter.
     - You can pass custom recognizers via the `custom_recognizers` parameter as a list of `presidio.EntityRecognizer` instances.
     - To handle non-English input, use the `language` parameter to specify the language.
