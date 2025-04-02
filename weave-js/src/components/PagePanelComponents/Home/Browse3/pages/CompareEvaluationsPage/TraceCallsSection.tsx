@@ -88,7 +88,11 @@ export const TraceCallsSection: React.FC<{
   }, [traceCalls]);
 
   // Column headers (evaluation IDs)
-  const evaluationIds = Object.keys(callsByParent);
+  const evaluationIds = useMemo(() => {
+    // Get evaluation IDs in the same order as they appear in the state
+    // Reverse the array to match the order in the rest of the UI
+    return Object.keys(state.summary.evaluationCalls).reverse();
+  }, [state.summary.evaluationCalls]);
 
   // Group inputs by example
   const inputGroups = Object.entries(callsGroupedByInput);
