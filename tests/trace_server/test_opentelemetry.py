@@ -29,7 +29,7 @@ from weave.trace_server.opentelemetry.attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
-from weave.trace_server.opentelemetry.python_spans import Span as PySpan
+from weave.trace_server.opentelemetry.python_spans import Attributes, Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
     StatusCode,
@@ -147,9 +147,25 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     decoded_trace = hexlify(export_span.trace_id).decode("ascii")
     decoded_span = hexlify(export_span.span_id).decode("ascii")
 
-    # TODO: Once postprocessing is added we should have tests for input, output and summary propogation
     assert call.id == decoded_span
     assert call.trace_id == decoded_trace
+
+    call_attributes = Attributes(_attributes=call.attributes)
+    for kv in export_span.attributes:
+        key = kv.key
+        value = kv.value
+        if value.HasField("string_value"):
+            assert call_attributes.get_attribute_value(key) == value.string_value
+        elif value.HasField("int_value"):
+            assert call_attributes.get_attribute_value(key) == value.int_value
+        elif value.HasField("double_value"):
+            assert call_attributes.get_attribute_value(key) == value.double_value
+        elif value.HasField("bool_value"):
+            assert call_attributes.get_attribute_value(key) == value.bool_value
+        elif value.HasField("array_value"):
+            # Handle array values
+            array_values = [v.string_value for v in value.array_value.values]
+            assert call_attributes.get_attribute_value(key) == array_values
 
     # Verify call deletion using client provided ID works
     client.server.calls_delete(
