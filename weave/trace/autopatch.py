@@ -86,9 +86,8 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     )
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral import get_mistral_patcher
-    from weave.integrations.mcp import get_mcp_server_patcher
-    from weave.integrations.mcp import get_mcp_client_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
@@ -141,9 +140,8 @@ def reset_autopatch() -> None:
     )
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral import get_mistral_patcher
-    from weave.integrations.mcp import get_mcp_server_patcher
-    from weave.integrations.mcp import get_mcp_client_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher

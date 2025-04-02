@@ -1,18 +1,17 @@
 print("I AM IN THE INTEGRATION")
-from typing import Callable, Any, Dict
 import importlib
-import weave
+from typing import Any, Callable
 
-from weave.integrations.patcher import Patcher
+import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.serialization.serialize import dictify
 
 _mcp_server_patcher: MultiPatcher | None = None
 
 
 def mcp_server_wrapper(settings: OpSettings) -> Callable:
     """Wrapper for MCP server methods."""
+
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
@@ -23,30 +22,31 @@ def mcp_server_wrapper(settings: OpSettings) -> Callable:
 
 def decorator_wrapper(settings: OpSettings) -> Callable:
     """Wrapper for MCP server decorators like tool, resource, prompt."""
+
     def outer_wrapper(decorator_fn: Callable) -> Callable:
-        def wrapped_decorator(*args, **kwargs):
+        def wrapped_decorator(*args: Any, **kwargs: Any) -> Callable:
             # Store the original decorator
             original_decorator = decorator_fn(*args, **kwargs)
-            
+
             # Create a new decorator that wraps the function with weave.op
             def new_decorator(fn: Callable) -> Callable:
                 # First apply the original decorator
                 decorated_fn = original_decorator(fn)
-                
+
                 # Then wrap with weave.op
                 op_kwargs = settings.model_dump()
                 return weave.op(decorated_fn, **op_kwargs)
 
             return new_decorator
-        
+
         return wrapped_decorator
-    
+
     return outer_wrapper
 
 
 def get_mcp_server_patcher(
-        settings: IntegrationSettings | None = None
-    ) -> MultiPatcher | NoOpPatcher:
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 
@@ -59,7 +59,7 @@ def get_mcp_server_patcher(
 
     base = settings.op_settings
     print("base", base)
-    
+
     # Settings for core methods
     call_tool_settings = base.model_copy(
         update={
@@ -67,28 +67,28 @@ def get_mcp_server_patcher(
             "call_display_name": base.call_display_name or "FastMCP.call_tool",
         }
     )
-    
+
     list_tools_settings = base.model_copy(
         update={
             "name": base.name or "mcp.server.fastmcp.FastMCP.list_tools",
             "call_display_name": base.call_display_name or "FastMCP.list_tools",
         }
     )
-    
+
     read_resource_settings = base.model_copy(
         update={
             "name": base.name or "mcp.server.fastmcp.FastMCP.read_resource",
             "call_display_name": base.call_display_name or "FastMCP.read_resource",
         }
     )
-    
+
     list_resources_settings = base.model_copy(
         update={
             "name": base.name or "mcp.server.fastmcp.FastMCP.list_resources",
             "call_display_name": base.call_display_name or "FastMCP.list_resources",
         }
     )
-    
+
     # Settings for decorator methods
     tool_decorator_settings = base.model_copy(
         update={
@@ -96,21 +96,21 @@ def get_mcp_server_patcher(
             "call_display_name": base.call_display_name or "FastMCP.tool",
         }
     )
-    
+
     resource_decorator_settings = base.model_copy(
         update={
             "name": base.name or "mcp.server.fastmcp.FastMCP.resource",
             "call_display_name": base.call_display_name or "FastMCP.resource",
         }
     )
-    
+
     prompt_decorator_settings = base.model_copy(
         update={
             "name": base.name or "mcp.server.fastmcp.FastMCP.prompt",
             "call_display_name": base.call_display_name or "FastMCP.prompt",
         }
     )
-    
+
     print("Creating patchers for MCP methods")
     # Create patchers for all methods we want to trace
     patchers = [
@@ -135,7 +135,6 @@ def get_mcp_server_patcher(
             "FastMCP.list_resources",
             mcp_server_wrapper(list_resources_settings),
         ),
-        
         # Decorator methods
         SymbolPatcher(
             lambda: importlib.import_module("mcp.server.fastmcp"),
