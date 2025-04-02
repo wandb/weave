@@ -2,10 +2,10 @@ import json
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 
-def find_child_defs(node: Dict[str, Any]) -> Set[str]:
+def find_child_defs(node: dict[str, Any]) -> set[str]:
     """Find all definition references in a node."""
     child_defs = set()
 
@@ -25,7 +25,7 @@ def find_child_defs(node: Dict[str, Any]) -> Set[str]:
     return child_defs
 
 
-def find_path_to_root(schema: Dict[str, Any], root_def: str) -> List[str]:
+def find_path_to_root(schema: dict[str, Any], root_def: str) -> list[str]:
     """
     Find a path from any descendant back to the root definition.
     Returns the path if found, empty list if no path exists.
@@ -53,7 +53,7 @@ def find_path_to_root(schema: Dict[str, Any], root_def: str) -> List[str]:
     return []
 
 
-def rewrite_circular_refs(schema: Dict[str, Any]) -> Dict[str, Any]:
+def rewrite_circular_refs(schema: dict[str, Any]) -> dict[str, Any]:
     """
     Rewrite circular references in the schema by iteratively finding and breaking cycles.
     For each cycle found, replaces the last reference back to root with 'any'.

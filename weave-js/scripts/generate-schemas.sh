@@ -9,7 +9,7 @@ OUTPUT_PATH="./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInte
 echo "Generating schemas..."
 
 # First resolve circular references in the schema
-python3 ../weave/scripts/resolve_schema_circular_refs.py "$SCHEMA_PATH"
+python3 ./resolve_schema_circular_refs.py "$SCHEMA_PATH"
 
 # Generate TypeScript-Zod types from schema
 yarn quicktype -s schema "$SCHEMA_PATH" -o "$OUTPUT_PATH" --lang typescript-zod
