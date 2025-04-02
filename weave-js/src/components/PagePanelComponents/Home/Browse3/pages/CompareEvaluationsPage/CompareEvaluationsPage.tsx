@@ -437,6 +437,228 @@ const TraceCallsSection: React.FC<{
           </Box>
         </Box>
 
+        {/* Add structured output comparison section */}
+        {(() => {
+          // Extract all possible numeric fields from all outputs
+          const allNumericFields: Set<string> = new Set();
+          const outputsByEvalId: Record<string, any> = {};
+
+          evaluationIds.forEach(evalId => {
+            const evalCall = currentExample[1].find(
+              c => c.evalId === evalId
+            )?.call;
+            const output = evalCall?.traceCall?.output;
+
+            // Store output for this evaluation
+            outputsByEvalId[evalId] = output;
+
+            // Extract model_output field if it exists
+            const modelOutput = output?.model_output || output;
+
+            if (typeof modelOutput === 'object' && modelOutput !== null) {
+              // Recursively find all numeric fields in the object
+              const findNumericFields = (obj: any, path: string = '') => {
+                if (typeof obj !== 'object' || obj === null) return;
+
+                Object.entries(obj).forEach(([key, value]) => {
+                  const currentPath = path ? `${path}.${key}` : key;
+
+                  if (typeof value === 'number') {
+                    allNumericFields.add(currentPath);
+                  } else if (
+                    Array.isArray(value) &&
+                    value.length > 0 &&
+                    typeof value[0] === 'number'
+                  ) {
+                    // Handle arrays of numbers (like dominant_color)
+                    allNumericFields.add(currentPath);
+                  } else if (
+                    typeof value === 'object' &&
+                    value !== null &&
+                    !Array.isArray(value)
+                  ) {
+                    findNumericFields(value, currentPath);
+                  }
+                });
+              };
+
+              findNumericFields(modelOutput);
+            }
+          });
+
+          // If no numeric fields found, don't render this section
+          if (allNumericFields.size === 0) return null;
+
+          // Function to get value by path
+          const getValueByPath = (
+            obj: any,
+            path: string
+          ): number | number[] | undefined => {
+            try {
+              const pathSegments = path.split('.');
+              let current = obj;
+
+              for (const segment of pathSegments) {
+                if (current?.[segment] === undefined) return undefined;
+                current = current[segment];
+              }
+
+              // Return the value if it's a number or array of numbers
+              if (typeof current === 'number') return current;
+              if (
+                Array.isArray(current) &&
+                current.length > 0 &&
+                current.every(item => typeof item === 'number')
+              ) {
+                return current;
+              }
+
+              return undefined;
+            } catch (e) {
+              return undefined;
+            }
+          };
+
+          // Convert Set to sorted Array
+          const numericFields = Array.from(allNumericFields).sort();
+
+          // Get baseline eval ID for comparison
+          const baselineEvalId = evaluationIds[0];
+
+          return (
+            <Box sx={{marginTop: '16px'}}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                  bgcolor: '#f5f5f5',
+                  fontWeight: 'bold',
+                }}>
+                <Box
+                  sx={{
+                    padding: '8px 16px',
+                    borderRight: '1px solid #e0e0e0',
+                    borderBottom: '1px solid #e0e0e0',
+                  }}>
+                  Output Metrics
+                </Box>
+                {evaluationIds.map(evalId => (
+                  <Box
+                    key={evalId}
+                    sx={{
+                      padding: '8px',
+                      textAlign: 'center',
+                      borderRight:
+                        evalId !== evaluationIds[evaluationIds.length - 1]
+                          ? '1px solid #e0e0e0'
+                          : 'none',
+                      borderBottom: '1px solid #e0e0e0',
+                    }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Box
+                        sx={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          bgcolor:
+                            evalId === evaluationIds[0] ? '#f06292' : '#42a5f5',
+                          marginRight: '8px',
+                        }}
+                      />
+                      model{' '}
+                      <Box
+                        component="span"
+                        sx={{fontSize: '0.9em', color: '#666'}}>
+                        {evalId.slice(-4)}
+                      </Box>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+
+              {/* Render rows for each numeric field */}
+              {numericFields.map((fieldPath, index) => {
+                // Get baseline value
+                const baselineValue = getValueByPath(
+                  outputsByEvalId[baselineEvalId]?.model_output ||
+                    outputsByEvalId[baselineEvalId],
+                  fieldPath
+                );
+
+                return (
+                  <Box
+                    key={fieldPath}
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                      bgcolor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
+                    }}>
+                    <Box
+                      sx={{
+                        padding: '8px 16px',
+                        fontWeight: 'bold',
+                        borderRight: '1px solid #e0e0e0',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                      {fieldPath}
+                    </Box>
+
+                    {evaluationIds.map(evalId => {
+                      const modelOutput =
+                        outputsByEvalId[evalId]?.model_output ||
+                        outputsByEvalId[evalId];
+                      const value = getValueByPath(modelOutput, fieldPath);
+
+                      return (
+                        <Box
+                          key={evalId}
+                          sx={{
+                            padding: '8px 16px',
+                            borderRight:
+                              evalId !== evaluationIds[evaluationIds.length - 1]
+                                ? '1px solid #e0e0e0'
+                                : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}>
+                          {value !== undefined ? (
+                            <>
+                              {Array.isArray(value)
+                                ? value
+                                    .map(v => (typeof v === 'number' ? v : ''))
+                                    .join(', ')
+                                : value.toFixed(6)}
+                              {/* Only show comparison pills for non-baseline elements and non-arrays */}
+                              {evalId !== baselineEvalId &&
+                                baselineValue !== undefined &&
+                                !Array.isArray(value) && (
+                                  <TraceCallComparisonPill
+                                    value={value}
+                                    baseline={baselineValue as number}
+                                    metricLowerIsBetter={false}
+                                  />
+                                )}
+                            </>
+                          ) : (
+                            '-'
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })}
+            </Box>
+          );
+        })()}
+
         {/* Metrics Section */}
         <Box sx={{marginTop: '8px'}}>
           <Box
