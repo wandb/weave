@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 
 import {
-  concreteTaggedValue,
+  concreteTaggedValue, DirMetadata, FileMetadata,
   filePathToType,
   getActualNamedTagFromValue,
   isFile,
@@ -99,7 +99,8 @@ export const opFileType = makeFileOp({
     forwardOp,
     context
   ) => {
-    const {artifact, path} = file;
+    console.log(file)
+    const {artifact, artifactMembership, path} = file;
     if (artifact == null) {
       // TODO: Add support for files stored on run without artifact
       return undefined;
@@ -107,10 +108,29 @@ export const opFileType = makeFileOp({
     try {
       // This errors if the sequence has been deleted (or a race case in which
       // the artifact is not created before the history step referencing it comes in)
-      const result = await context.backend.getArtifactFileMetadata(
-        artifact.id,
-        path
-      );
+
+      let result: DirMetadata | FileMetadata | null = null;
+      if (artifactMembership == null) {
+        console.log("membership is null")
+        result = await context.backend.getArtifactFileMetadata(
+            artifact.id,
+            path
+        );
+      } else {
+        console.log("using membership")
+        const artifactCollection = artifactMembership.artifactCollection;
+        if (artifactCollection == null || artifactCollection?.project == null) {
+          return undefined;
+        }
+        result = await context.backend.getArtifactMembershipFileMetadata(
+            artifactMembership.id,
+            artifactCollection.project.entityName,
+            artifactCollection.project.name,
+            artifactCollection.name,
+            `v${artifactMembership.versionIndex}`,
+            path
+        );
+      }
       let typeResult: Type = 'none';
       if (result != null) {
         if (result.type === 'dir') {
@@ -151,6 +171,7 @@ export const opFileDir = makeFileOp({
       // TODO: Add support for files stored on run without artifact
       return undefined;
     }
+    console.log("in file dir")
     try {
       // This errors if the sequence has been deleted (or a race case in which
       // the artifact is not created before the history step referencing it comes in)
@@ -221,6 +242,7 @@ export const opFileSize = makeFileOp({
       // TODO: Add support for files stored on run without artifact
       return undefined;
     }
+    console.log("in opFIleSize")
     try {
       // This errors if the sequence has been deleted (or a race case in which
       // the artifact is not created before the history step referencing it comes in)
@@ -265,6 +287,7 @@ export const opFileDigest = makeFileOp({
       // TODO: Add support for files stored on run without artifact
       return undefined;
     }
+    console.log("in opFIleDigest")
     try {
       // This errors if the sequence has been deleted (or a race case in which
       // the artifact is not created before the history step referencing it comes in)

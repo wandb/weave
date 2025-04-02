@@ -309,7 +309,7 @@ export type TypeToTSTypeInner<T> = T extends 'any'
   : T extends WBTraceTreeType
   ? WBTraceTree
   : T extends File
-  ? {artifact?: {id: string}; path: string}
+  ? {artifact?: {id: string}; path: string; artifactMembership?: {id: string; versionIndex: string; artifactCollection?: {id: string; name: string; project?: {id:string; name: string; entityName: string;}}}}
   : T extends Dir
   ? DirMetadata
   : T extends TimestampType

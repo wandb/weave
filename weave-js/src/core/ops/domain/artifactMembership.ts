@@ -132,11 +132,12 @@ export const opArtifactMembershipFile = makeStandardOp({
       if (result == null) {
         return null;
       }
-      return {artifact: artifactMembership.artifact, path};
+      return {artifact: artifactMembership.artifact, artifactMembership, path};
     } catch (e) {
       console.warn('Error loading artifact from membership', {
         err: e,
         artifact: artifactMembership.artifact,
+        artifactMembership,
         path,
       });
       return null;

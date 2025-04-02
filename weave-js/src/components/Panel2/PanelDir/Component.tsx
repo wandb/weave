@@ -242,6 +242,7 @@ function iconFromFileName(fileName: string): string {
 }
 
 const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
+  console.log("inside panel preview dir")
   const fileNode = props.input as any as Node;
   const dirNode = opDirAsW0Dict({dir: opFileDir({file: fileNode as any})});
   const dirValue = LLReact.useNodeValue(dirNode);
