@@ -326,6 +326,11 @@ export const useMakeInitialDatetimeFilter = (
       return cachedFilter as GridFilterModel;
     }
 
+    // Wait for both stats queries to return
+    if (callStats7Days.loading || callStats30Days.loading) {
+      return defaultDatetimeFilter;
+    }
+
     // If no cache or expired, compute new filter
     let newFilter = null;
     if (callStats7Days.result && callStats7Days.result.count >= 50) {
@@ -348,13 +353,7 @@ export const useMakeInitialDatetimeFilter = (
     }
 
     return newFilter;
-  }, [
-    callStats7Days.result,
-    callStats30Days.result,
-    defaultDatetimeFilter,
-    entity,
-    project,
-  ]);
+  }, [callStats7Days, callStats30Days, defaultDatetimeFilter, entity, project]);
 
   return {
     initialDatetimeFilter: datetimeFilter ?? defaultDatetimeFilter,
