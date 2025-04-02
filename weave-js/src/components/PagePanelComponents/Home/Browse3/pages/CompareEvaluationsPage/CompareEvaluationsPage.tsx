@@ -92,16 +92,13 @@ export const CompareEvaluationsPageContent: React.FC<
   const childCalls = useCalls(props.entity, props.project, {
     parentIds: props.evaluationCallIds,
   });
-  // console.log('childCalls', childCalls);
 
-  // Access specific input fields (for example, if each child has a "prompt" input)
-  const traceCalls = childCalls.result?.map(call => ({
-    callId: call.callId,
-    traceCall: call.traceCall,
-    // Extract other specific inputs as needed
-  }));
-
-  console.log('traceCalls', traceCalls);
+  const traceCalls = childCalls.result
+    ?.filter(call => call.traceCall?.op_name?.includes('predict_and_score'))
+    ?.map(call => ({
+      callId: call.callId,
+      traceCall: call.traceCall,
+    }));
 
   // --------------------------------------
 
