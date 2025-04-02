@@ -58,3 +58,17 @@ export const setCacheByKeyWithExpiry = <T>(cacheKey: string, data: T): void => {
     console.error('Error setting cached data:', e);
   }
 };
+
+/**
+ * Simple string hash function
+ * @param str - The string to hash
+ * @returns The hash of the string
+ */
+export const simpleHash = (str: string): string => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash * 31 + char) % 1000000007;
+  }
+  return Math.abs(hash).toString(36); // Convert to base36 for shorter string
+};

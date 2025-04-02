@@ -10,6 +10,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {
   getCachedByKeyWithExpiry,
   setCacheByKeyWithExpiry,
+  simpleHash,
 } from '../../browserCacheUtils';
 import {
   isValuelessOperator,
@@ -279,8 +280,14 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
 const CACHE_KEY_PREFIX = 'weave_datetime_filter_';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 
-const datetimeFilterCacheKey = (entity: string, project: string) => {
-  return `${CACHE_KEY_PREFIX}${entity}_${project}`;
+const datetimeFilterCacheKey = (
+  entity: string,
+  project: string,
+  filter: CallFilter
+) => {
+  // hash the filter
+  const filterHash = simpleHash(JSON.stringify(filter));
+  return `${CACHE_KEY_PREFIX}${entity}_${project}_${filterHash}`;
 };
 
 export const useMakeInitialDatetimeFilter = (
@@ -304,12 +311,16 @@ export const useMakeInitialDatetimeFilter = (
     return makeRawDateFilter(7);
   }, []);
 
+  const key = datetimeFilterCacheKey(entity, project, filter);
+  const cachedFilter = getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS);
+
   const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
-    skip,
+    skip: skip || cachedFilter != null,
   });
   const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
-    skip,
+    skip: skip || cachedFilter != null,
   });
+
   const defaultDatetimeFilter = useMemo(
     () => ({
       items: [makeDateFilter(7)],
@@ -318,14 +329,7 @@ export const useMakeInitialDatetimeFilter = (
     []
   );
 
-  const datetimeFilter = useMemo(() => {
-    // Try to get cached filter first
-    const key = datetimeFilterCacheKey(entity, project);
-    const cachedFilter = getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS);
-    if (cachedFilter) {
-      return cachedFilter as GridFilterModel;
-    }
-
+  const computedDatetimeFilter = useMemo(() => {
     // Wait for both stats queries to return
     if (callStats7Days.loading || callStats30Days.loading) {
       return defaultDatetimeFilter;
@@ -346,16 +350,20 @@ export const useMakeInitialDatetimeFilter = (
         logicOperator: GridLogicOperator.And,
       };
     }
-
     // Cache the new filter if we computed one
     if (newFilter) {
       setCacheByKeyWithExpiry(key, newFilter);
     }
-
     return newFilter;
-  }, [callStats7Days, callStats30Days, defaultDatetimeFilter, entity, project]);
+  }, [callStats7Days, callStats30Days, defaultDatetimeFilter, key]);
+
+  if (cachedFilter) {
+    return {
+      initialDatetimeFilter: cachedFilter as GridFilterModel,
+    };
+  }
 
   return {
-    initialDatetimeFilter: datetimeFilter ?? defaultDatetimeFilter,
+    initialDatetimeFilter: computedDatetimeFilter ?? defaultDatetimeFilter,
   };
 };
