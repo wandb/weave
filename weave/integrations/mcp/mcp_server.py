@@ -30,12 +30,23 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
 
             # Create a new decorator that wraps the function with weave.op
             def new_decorator(fn: Callable) -> Callable:
-                # First apply the original decorator
-                decorated_fn = original_decorator(fn)
+                weave_op_name = fn.__name__ or ""
+                base_name = settings.name or ""
 
-                # Then wrap with weave.op
-                op_kwargs = settings.model_dump()
-                return weave.op(decorated_fn, **op_kwargs)
+                display_name = (
+                    f"{base_name}.{weave_op_name}"
+                    if weave_op_name != ""
+                    else base_name
+                )
+
+                settings_copy = settings.model_copy(
+                    update={"call_display_name": display_name}
+                )
+
+                weave_wrapped = weave.op(fn, **settings_copy.model_dump())
+
+                # Then apply the original decorator
+                return original_decorator(weave_wrapped)
 
             return new_decorator
 
@@ -111,7 +122,6 @@ def get_mcp_server_patcher(
         }
     )
 
-    print("Creating patchers for MCP methods")
     # Create patchers for all methods we want to trace
     patchers = [
         # Core methods

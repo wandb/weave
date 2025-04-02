@@ -34,7 +34,6 @@ def get_mcp_client_patcher(
         return _mcp_client_patcher
 
     base = settings.op_settings
-    print("base client", base)
 
     # Settings for core client methods
     call_tool_settings = base.model_copy(
@@ -81,12 +80,12 @@ def get_mcp_client_patcher(
         }
     )
 
-    initialize_settings = base.model_copy(
-        update={
-            "name": base.name or "mcp.client.session.ClientSession.initialize",
-            "call_display_name": base.call_display_name or "ClientSession.initialize",
-        }
-    )
+    # initialize_settings = base.model_copy(
+    #     update={
+    #         "name": base.name or "mcp.client.session.ClientSession.initialize",
+    #         "call_display_name": base.call_display_name or "ClientSession.initialize",
+    #     }
+    # )
 
     print("Creating patchers for MCP client methods")
     # Create patchers for all methods we want to trace
@@ -122,11 +121,11 @@ def get_mcp_client_patcher(
             "ClientSession.get_prompt",
             mcp_client_wrapper(get_prompt_settings),
         ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.client.session"),
-            "ClientSession.initialize",
-            mcp_client_wrapper(initialize_settings),
-        ),
+        # SymbolPatcher(
+        #     lambda: importlib.import_module("mcp.client.session"),
+        #     "ClientSession.initialize",
+        #     mcp_client_wrapper(initialize_settings),
+        # ),
     ]
     print("client patchers", patchers)
 
