@@ -303,21 +303,23 @@ export const useMakeInitialDatetimeFilter = (
     skip,
   });
   const datetimeFilter = useMemo(() => {
-    if (callStats7Days.result && callStats7Days.result.count > 50) {
+    if (callStats7Days.result && callStats7Days.result.count >= 50) {
       return {
         items: [makeDateFilter(7)],
         logicOperator: GridLogicOperator.And,
       };
-    } else if (callStats30Days.result && callStats30Days.result.count > 50) {
+    } else if (callStats30Days.result && callStats30Days.result.count >= 50) {
       return {
         items: [makeDateFilter(30)],
         logicOperator: GridLogicOperator.And,
       };
+    } else if (callStats30Days.result && callStats30Days.result.count < 50) {
+      return {
+        items: [makeDateFilter(180)],
+        logicOperator: GridLogicOperator.And,
+      };
     }
-    return {
-      items: [makeDateFilter(180)],
-      logicOperator: GridLogicOperator.And,
-    };
+    return null;
   }, [callStats7Days.result, callStats30Days.result]);
 
   if (datetimeFilter != null) {

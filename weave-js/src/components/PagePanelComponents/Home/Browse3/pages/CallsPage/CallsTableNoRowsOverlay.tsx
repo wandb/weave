@@ -110,7 +110,8 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
         (now.getTime() - filterDate.getTime()) / (24 * 60 * 60 * 1000)
       );
 
-      // smallest suggested date range is 7 days
+      // buckets of time to create filters for, based on the most recent
+      // op created date.
       if (daysDifference < 7) {
         newDateFilter = makeDateFilter(7);
       } else if (daysDifference <= 30) {
