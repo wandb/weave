@@ -34,6 +34,7 @@ import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCom
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {useWFHooks} from '../wfReactInterface/context';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -84,6 +85,25 @@ export const CompareEvaluationsPageContent: React.FC<
   const [selectedInputDigest, setSelectedInputDigest] = React.useState<
     string | null
   >(null);
+
+  // --------------------------------------
+
+  const {useCalls} = useWFHooks();
+  const childCalls = useCalls(props.entity, props.project, {
+    parentIds: props.evaluationCallIds,
+  });
+  // console.log('childCalls', childCalls);
+
+  // Access specific input fields (for example, if each child has a "prompt" input)
+  const traceCalls = childCalls.result?.map(call => ({
+    callId: call.callId,
+    traceCall: call.traceCall,
+    // Extract other specific inputs as needed
+  }));
+
+  console.log('traceCalls', traceCalls);
+
+  // --------------------------------------
 
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
