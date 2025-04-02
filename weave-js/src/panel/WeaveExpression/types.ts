@@ -18,10 +18,6 @@ export interface WeaveExpressionProps {
   liveUpdate?: boolean;
   truncate?: boolean;
   frozen?: boolean;
-  customInput?: {
-    type: string;
-    children: Array<{text: string}>;
-  } | null;
 }
 
 export interface SuggestionProps {

@@ -9,11 +9,10 @@ import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import Sidebar from '../../Sidebar/Sidebar';
 import {themes} from '../Editor.styles';
-import {EmptyExpressionPanel} from '../EmptyExpressionPanel';
+import {EmptyExpressionPanel} from '../EmptyExpressionPanel/EmptyExpressionPanel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
-import {PanelShortcuts} from '../PanelShortcuts';
 import {ExpressionEditorActions} from './actions';
 import type {PanelExpressionProps} from './common';
 import {ConfigComponent} from './ConfigComponent';
@@ -59,30 +58,12 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
     [updateExp, weave]
   );
 
-  const [customEditorValueState, setCustomEdtiorValueState] = React.useState<{
-    type: string;
-    children: Array<{text: string}>;
-  } | null>(null);
-  const setEditorValue = (text: string) => {
-    setCustomEdtiorValueState({
-      type: 'paragraph',
-      children: [{text}],
-    });
-
-    // Clear the custom input after a short delay
-    // This allows the effect to run once and then enables user editing
-    setTimeout(() => {
-      setCustomEdtiorValueState(null);
-    }, 100);
-  };
-
   const {urlPrefixed} = getConfig();
 
   return (
     <ThemeProvider theme={themes.light}>
       <S.Main>
         <S.EditorBar style={{pointerEvents: isLoading ? 'none' : 'auto'}}>
-          <PanelShortcuts setEditorValue={setEditorValue} />
           {
             <div style={{width: '100%'}}>
               <Menu
@@ -116,7 +97,6 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                             }}
                             noBox
                             onMount={onMount}
-                            customInput={customEditorValueState}
                           />
                         </PanelContextProvider>
                       </div>
@@ -229,7 +209,11 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                     />
                   </WeaveActionContextProvider>
                 ) : (
-                  <EmptyExpressionPanel setEditorValue={setEditorValue} />
+                  <EmptyExpressionPanel
+                    updateExp={updateExp}
+                    inputNode={props.input}
+                    newVars={newVars}
+                  />
                 )}
               </>
             )}
