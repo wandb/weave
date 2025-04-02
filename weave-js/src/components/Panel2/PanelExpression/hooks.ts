@@ -621,6 +621,11 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
       if (r.key.startsWith('run-history-plots-stepper')) {
         return r.key === 'run-history-plots-stepper.row.plot';
       }
+
+      // Disable runs table conversion to generic tables stepper
+      if (r.key.includes('generic-tables-stepper')) {
+        return r.key !== 'runs-table.generic-tables-stepper';
+      }
       return true;
     });
     return results;
