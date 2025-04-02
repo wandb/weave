@@ -40,30 +40,294 @@ import {useWFHooks} from '../wfReactInterface/context';
 const TraceCallsSection: React.FC<{
   traceCalls: Array<{callId: string; traceCall: any}>;
 }> = ({traceCalls}) => {
+  // Group calls by their parent evaluation
+  const callsByParent = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+
+    traceCalls.forEach(call => {
+      const parentId = call.traceCall?.parent_id || 'unknown';
+      if (!grouped[parentId]) {
+        grouped[parentId] = [];
+      }
+      grouped[parentId].push(call);
+    });
+
+    return grouped;
+  }, [traceCalls]);
+
+  // Group calls by input pattern to show multiple examples
+  const callsGroupedByInput = useMemo(() => {
+    // Create a hash of the input to use as a grouping key
+    const hashInput = (input: any) => {
+      try {
+        return JSON.stringify(input);
+      } catch (e) {
+        return String(input);
+      }
+    };
+
+    const grouped: Record<string, Array<{evalId: string; call: any}>> = {};
+
+    Object.entries(callsByParent).forEach(([evalId, calls]) => {
+      calls.forEach(call => {
+        const inputs = call.traceCall?.inputs || {};
+        // Skip self and model inputs for grouping
+        const relevantInputs = {...inputs};
+        delete relevantInputs.self;
+        delete relevantInputs.model;
+
+        const inputHash = hashInput(relevantInputs);
+
+        if (!grouped[inputHash]) {
+          grouped[inputHash] = [];
+        }
+
+        grouped[inputHash].push({
+          evalId,
+          call,
+        });
+      });
+    });
+
+    return grouped;
+  }, [callsByParent]);
+
+  // Extract all unique inputs across all calls
+  const uniqueInputKeys = useMemo(() => {
+    const inputs = new Set<string>();
+    traceCalls.forEach(call => {
+      const callInputs = call.traceCall?.inputs || {};
+      Object.keys(callInputs).forEach(key => {
+        if (key !== 'self' && key !== 'model') {
+          inputs.add(key);
+        }
+      });
+    });
+    return Array.from(inputs);
+  }, [traceCalls]);
+
+  // Column headers (evaluation IDs)
+  const evaluationIds = Object.keys(callsByParent);
+
+  if (traceCalls.length === 0) {
+    return (
+      <Alert severity="info">
+        No trace calls found for the selected evaluations.
+      </Alert>
+    );
+  }
+
+  // Group inputs by example
+  const inputGroups = Object.entries(callsGroupedByInput);
+
   return (
-    <VerticalBox sx={{width: '100%', padding: STANDARD_PADDING}}>
-      <Box sx={{fontSize: '1.2em', fontWeight: 'bold', marginBottom: '12px'}}>
-        Trace Calls
-      </Box>
-      {traceCalls.map((call, index) => (
-        <Box
-          key={call.callId}
-          sx={{
-            border: '1px solid #e0e0e0',
-            borderRadius: '4px',
-            padding: '12px',
-            marginBottom: '8px',
-            bgcolor: '#f9f9f9',
-          }}>
-          <Box sx={{fontWeight: 'bold'}}>Call ID: {call.callId}</Box>
-          <Box sx={{marginTop: '8px'}}>
-            <pre style={{overflow: 'auto', maxHeight: '200px'}}>
-              {JSON.stringify(call.traceCall, null, 2)}
-            </pre>
+    <Box sx={{width: '100%', padding: STANDARD_PADDING}}>
+      {inputGroups.map(([inputHash, callGroup], groupIndex) => (
+        <Box key={inputHash} sx={{marginBottom: '32px'}}>
+          <Box
+            sx={{
+              fontSize: '1.2em',
+              fontWeight: 'bold',
+              marginBottom: '8px',
+              borderBottom: '1px solid #e0e0e0',
+              paddingBottom: '8px',
+            }}>
+            Example {groupIndex + 1} of {inputGroups.length}
+          </Box>
+
+          {/* Input section */}
+          <Box sx={{marginBottom: '24px'}}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                borderBottom: '1px solid #e0e0e0',
+                paddingBottom: '8px',
+                fontWeight: 'bold',
+              }}>
+              <Box sx={{padding: '8px'}}>Value</Box>
+              {evaluationIds.map(evalId => (
+                <Box key={evalId} sx={{padding: '8px', textAlign: 'center'}}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Box
+                      sx={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        bgcolor:
+                          evalId === evaluationIds[0] ? '#f06292' : '#42a5f5',
+                        marginRight: '8px',
+                      }}
+                    />
+                    model{' '}
+                    <Box
+                      component="span"
+                      sx={{fontSize: '0.9em', color: '#666'}}>
+                      {evalId.slice(-4)}
+                    </Box>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Input rows */}
+            {uniqueInputKeys.map((inputKey, index) => {
+              // Get a sample call from this input group
+              const sampleCall = callGroup[0]?.call;
+              const inputValue = sampleCall?.traceCall?.inputs?.[inputKey];
+
+              if (inputValue === undefined) return null;
+
+              return (
+                <Box
+                  key={inputKey}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                    borderBottom: '1px solid #f5f5f5',
+                    bgcolor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
+                  }}>
+                  <Box sx={{padding: '8px', fontWeight: 'bold'}}>
+                    {inputKey}
+                  </Box>
+                  {evaluationIds.map(evalId => {
+                    const evalCall = callGroup.find(
+                      c => c.evalId === evalId
+                    )?.call;
+                    const thisInputValue =
+                      evalCall?.traceCall?.inputs?.[inputKey];
+                    return (
+                      <Box
+                        key={evalId}
+                        sx={{
+                          padding: '8px',
+                          borderLeft: '1px solid #f5f5f5',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}>
+                        {thisInputValue !== undefined ? (
+                          <Box
+                            sx={{
+                              maxHeight: '100px',
+                              overflow: 'auto',
+                            }}>
+                            <pre
+                              style={{
+                                margin: 0,
+                                fontSize: '0.9em',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                              }}>
+                              {JSON.stringify(thisInputValue, null, 2)}
+                            </pre>
+                          </Box>
+                        ) : (
+                          '-'
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Model Outputs Section */}
+          <Box
+            sx={{
+              fontWeight: 'bold',
+              borderBottom: '1px solid #e0e0e0',
+              paddingBottom: '8px',
+              marginBottom: '8px',
+            }}>
+            Model Outputs
+          </Box>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+              borderBottom: '1px solid #f5f5f5',
+              bgcolor: '#ffffff',
+            }}>
+            <Box sx={{padding: '8px', fontWeight: 'bold'}}>output</Box>
+            {evaluationIds.map(evalId => {
+              const evalCall = callGroup.find(c => c.evalId === evalId)?.call;
+              const output = evalCall?.traceCall?.output;
+              return (
+                <Box
+                  key={evalId}
+                  sx={{
+                    padding: '8px',
+                    borderLeft: '1px solid #f5f5f5',
+                    maxHeight: '300px',
+                    overflow: 'auto',
+                  }}>
+                  {output !== undefined ? (
+                    typeof output === 'object' ? (
+                      <pre
+                        style={{
+                          margin: 0,
+                          fontSize: '0.9em',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}>
+                        {JSON.stringify(output, null, 2)}
+                      </pre>
+                    ) : (
+                      String(output)
+                    )
+                  ) : (
+                    '-'
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Metrics Section */}
+          <Box
+            sx={{
+              marginTop: '24px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid #e0e0e0',
+              paddingBottom: '8px',
+              marginBottom: '8px',
+            }}>
+            Metrics
+          </Box>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+              borderBottom: '1px solid #f5f5f5',
+              bgcolor: '#ffffff',
+            }}>
+            <Box sx={{padding: '8px', fontWeight: 'bold'}}>Model Latency</Box>
+            {evaluationIds.map(evalId => {
+              const evalCall = callGroup.find(c => c.evalId === evalId)?.call;
+              // Attempt to extract latency from the traceCall
+              const executionTime = evalCall?.traceCall?.execution_time;
+              return (
+                <Box
+                  key={evalId}
+                  sx={{padding: '8px', borderLeft: '1px solid #f5f5f5'}}>
+                  {executionTime !== undefined
+                    ? `${(executionTime * 1000).toFixed(3)}ms`
+                    : '-'}
+                </Box>
+              );
+            })}
           </Box>
         </Box>
       ))}
-    </VerticalBox>
+    </Box>
   );
 };
 
