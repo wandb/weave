@@ -1,6 +1,7 @@
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import _ from 'lodash';
 import React from 'react';
-import {Icon, Input} from 'semantic-ui-react';
+import {Input} from 'semantic-ui-react';
 
 import clamp from '../../util/clamp';
 
@@ -38,10 +39,11 @@ const NumberInput: React.FC<NumberInputProps> = props => {
   });
 
   const {onChange, ticks, strideLength, min, max} = props;
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   // Shifts value up or down based on strideLength and available ticks
   const shiftValue = React.useCallback(
-    (e: React.SyntheticEvent<HTMLInputElement>, direction: number) => {
+    (direction: number) => {
       if (direction == null) {
         // Do nothing on non arrow keys
         return;
@@ -69,8 +71,9 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         newValue = clamp(newValue, {min, max});
       }
 
-      const t = e.currentTarget;
-      t.value = newValue.toString();
+      if (inputRef.current) {
+        inputRef.current.value = newValue.toString();
+      }
       setStringValue(newValue.toString());
       onChange(newValue);
     },
@@ -80,6 +83,9 @@ const NumberInput: React.FC<NumberInputProps> = props => {
   return (
     <div className="number-input__container" style={props.containerStyle}>
       <Input
+        input={{
+          ref: inputRef,
+        }}
         aria-label={props.label}
         className={`number-input__input ${props.className || ''}`}
         disabled={props.disabled}
@@ -99,7 +105,7 @@ const NumberInput: React.FC<NumberInputProps> = props => {
             e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : null;
 
           if (direction != null) {
-            shiftValue(e, direction);
+            shiftValue(direction);
             e.preventDefault();
           }
         }}
@@ -122,23 +128,34 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         }}
       />
       {props.stepper && (
-        <div className="number-input__stepper">
-          <Icon
-            onClick={(e: React.SyntheticEvent<HTMLInputElement>) =>
-              shiftValue(e, 1)
-            }
-            size="mini"
-            name="chevron up"
+        <div className="number-input__stepper flex flex-col justify-center p-2 pr-4">
+          <NumberInputArrow
+            onChange={() => shiftValue(1)}
+            iconName="chevron-up"
           />
-          <Icon
-            onClick={(e: React.SyntheticEvent<HTMLInputElement>) =>
-              shiftValue(e, -1)
-            }
-            size="mini"
-            name="chevron down"
+          <NumberInputArrow
+            onChange={() => shiftValue(-1)}
+            iconName="chevron-down"
           />
         </div>
       )}
+    </div>
+  );
+};
+
+const NumberInputArrow = ({
+  onChange,
+  iconName,
+}: {
+  onChange: () => void;
+  iconName: IconName;
+}) => {
+  return (
+    <div
+      className="flex h-full cursor-pointer flex-col items-center justify-center rounded-sm text-moon-600 hover:bg-moon-150"
+      data-test={`number-input-arrow-${iconName}`}
+      onClick={onChange}>
+      <Icon width={10} height={10} name={iconName} />
     </div>
   );
 };
