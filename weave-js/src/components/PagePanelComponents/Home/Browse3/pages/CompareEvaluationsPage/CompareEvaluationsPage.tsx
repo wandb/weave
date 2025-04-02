@@ -35,11 +35,19 @@ import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilte
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 import {useWFHooks} from '../wfReactInterface/context';
+import {
+  CustomWeaveTypeDispatcher,
+  CustomWeaveTypePayload,
+} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {CustomWeaveTypePayload as CustomWeaveTypePayloadImport} from '../../typeViews/customWeaveType.types';
+import {consoleLog} from '@wandb/weave/util';
 
 // Add a new component for displaying trace calls
 const TraceCallsSection: React.FC<{
   traceCalls: Array<{callId: string; traceCall: any}>;
-}> = ({traceCalls}) => {
+  entity?: string;
+  project?: string;
+}> = ({traceCalls, entity, project}) => {
   // Pagination state - must be at the top level of the component
   const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
 
@@ -348,15 +356,40 @@ const TraceCallsSection: React.FC<{
                             maxHeight: '100px',
                           }}>
                           {typeof subValue === 'object' && subValue !== null ? (
-                            <pre
-                              style={{
-                                margin: 0,
-                                fontSize: '0.9em',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                              }}>
-                              {JSON.stringify(subValue, null, 2)}
-                            </pre>
+                            // Check if this is a PIL image type that we should render
+                            subValue &&
+                            typeof subValue === 'object' &&
+                            '_type' in subValue &&
+                            subValue._type === 'CustomWeaveType' &&
+                            'weave_type' in subValue &&
+                            subValue.weave_type &&
+                            typeof subValue.weave_type === 'object' &&
+                            'type' in subValue.weave_type &&
+                            (subValue.weave_type.type === 'PIL.Image.Image' ||
+                              subValue.weave_type.type ===
+                                'PIL.JpegImagePlugin.JpegImageFile' ||
+                              subValue.weave_type.type ===
+                                'PIL.PngImagePlugin.PngImageFile') ? (
+                              <CustomWeaveTypeProjectContext.Provider
+                                value={{
+                                  entity: entity || '',
+                                  project: project || '',
+                                }}>
+                                <CustomWeaveTypeDispatcher
+                                  data={subValue as CustomWeaveTypePayload}
+                                />
+                              </CustomWeaveTypeProjectContext.Provider>
+                            ) : (
+                              <pre
+                                style={{
+                                  margin: 0,
+                                  fontSize: '0.9em',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                }}>
+                                {JSON.stringify(subValue, null, 2)}
+                              </pre>
+                            )
                           ) : Array.isArray(subValue) ? (
                             <pre
                               style={{
@@ -422,117 +455,7 @@ const TraceCallsSection: React.FC<{
           })}
         </Box>
 
-        {/* Model Outputs section */}
-        <Box sx={{marginTop: '8px'}}>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-              bgcolor: '#f5f5f5',
-              fontWeight: 'bold',
-            }}>
-            <Box
-              sx={{
-                padding: '8px 16px',
-                borderRight: '1px solid #e0e0e0',
-                borderBottom: '1px solid #e0e0e0',
-              }}>
-              Model Outputs
-            </Box>
-            {evaluationIds.map(evalId => (
-              <Box
-                key={evalId}
-                sx={{
-                  padding: '8px',
-                  textAlign: 'center',
-                  borderRight:
-                    evalId !== evaluationIds[evaluationIds.length - 1]
-                      ? '1px solid #e0e0e0'
-                      : 'none',
-                  borderBottom: '1px solid #e0e0e0',
-                }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Box
-                    sx={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      bgcolor:
-                        evalId === evaluationIds[0] ? '#f06292' : '#42a5f5',
-                      marginRight: '8px',
-                    }}
-                  />
-                  model{' '}
-                  <Box component="span" sx={{fontSize: '0.9em', color: '#666'}}>
-                    {evalId.slice(-4)}
-                  </Box>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-
-          {/* Output row */}
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-              bgcolor: '#ffffff',
-            }}>
-            <Box
-              sx={{
-                padding: '8px 16px',
-                fontWeight: 'bold',
-                borderRight: '1px solid #e0e0e0',
-              }}>
-              output
-            </Box>
-
-            {evaluationIds.map((evalId, evalIndex) => {
-              const evalCall = currentExample[1].find(
-                c => c.evalId === evalId
-              )?.call;
-              const output = evalCall?.traceCall?.output;
-              return (
-                <Box
-                  key={evalId}
-                  sx={{
-                    padding: '8px 16px',
-                    borderRight:
-                      evalId !== evaluationIds[evaluationIds.length - 1]
-                        ? '1px solid #e0e0e0'
-                        : 'none',
-                    maxHeight: '300px',
-                    overflow: 'auto',
-                  }}>
-                  {output !== undefined ? (
-                    typeof output === 'object' ? (
-                      <pre
-                        style={{
-                          margin: 0,
-                          fontSize: '0.9em',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                        }}>
-                        {JSON.stringify(output, null, 2)}
-                      </pre>
-                    ) : (
-                      String(output)
-                    )
-                  ) : (
-                    '-'
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-        </Box>
-
-        {/* Add structured output comparison section */}
+        {/* Output Metrics section */}
         {(() => {
           // Extract all possible numeric fields from all outputs
           const allNumericFields: Set<string> = new Set();
@@ -635,7 +558,7 @@ const TraceCallsSection: React.FC<{
                     borderRight: '1px solid #e0e0e0',
                     borderBottom: '1px solid #e0e0e0',
                   }}>
-                  Output Metrics
+                  Model Output Metrics
                 </Box>
                 {evaluationIds.map(evalId => (
                   <Box
@@ -649,6 +572,7 @@ const TraceCallsSection: React.FC<{
                           : 'none',
                       borderBottom: '1px solid #e0e0e0',
                     }}>
+                    {console.log('Model evaluation ID:', evalId)}
                     <Box
                       sx={{
                         display: 'flex',
@@ -1186,6 +1110,9 @@ const ResultExplorer: React.FC<{
   height: number;
   traceCalls?: Array<{callId: string; traceCall: any}>;
 }> = ({state, height, traceCalls}) => {
+  // Get entity and project from context
+  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
+
   return (
     <VerticalBox
       sx={{
@@ -1217,7 +1144,11 @@ const ResultExplorer: React.FC<{
           overflow: 'auto',
         }}>
         {traceCalls && traceCalls.length > 0 ? (
-          <TraceCallsSection traceCalls={traceCalls} />
+          <TraceCallsSection
+            traceCalls={traceCalls}
+            entity={projectContext?.entity}
+            project={projectContext?.project}
+          />
         ) : (
           <ExampleCompareSection state={state} />
         )}
