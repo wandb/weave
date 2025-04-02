@@ -136,6 +136,67 @@ const TraceCallsSection: React.FC<{
   );
   const currentExample = inputGroups[safeCurrentIndex];
 
+  // Add the ComparisonPill component
+  const TraceCallComparisonPill: React.FC<{
+    value: number | undefined;
+    baseline: number | undefined;
+    metricUnit?: string;
+    metricLowerIsBetter?: boolean;
+  }> = ({value, baseline, metricUnit = '', metricLowerIsBetter = false}) => {
+    if (value === undefined || baseline === undefined) {
+      return null;
+    }
+
+    const diff = value - baseline;
+    const diffFixed = Number.isInteger(diff)
+      ? diff.toLocaleString()
+      : diff.toFixed(4); // Use 4 decimal places for precision
+
+    const showPill = diff !== 0;
+    if (!showPill) {
+      return null;
+    }
+
+    // Determine color based on whether higher or lower is better
+    let pillColor = 'moon';
+    if (diff > 0) {
+      pillColor = metricLowerIsBetter ? 'red' : 'green';
+    } else if (diff < 0) {
+      pillColor = metricLowerIsBetter ? 'green' : 'red';
+    }
+
+    // Create the pill label with sign
+    const pillLabel = `${diff > 0 ? '+' : ''}${diffFixed}${metricUnit}`;
+
+    return (
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '50px',
+          padding: '2px 8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          bgcolor:
+            pillColor === 'green'
+              ? 'rgba(0, 200, 83, 0.2)'
+              : pillColor === 'red'
+              ? 'rgba(244, 67, 54, 0.2)'
+              : 'rgba(160, 174, 192, 0.2)',
+          color:
+            pillColor === 'green'
+              ? '#00c853'
+              : pillColor === 'red'
+              ? '#f44336'
+              : '#718096',
+          marginLeft: '8px',
+        }}>
+        {pillLabel}
+      </Box>
+    );
+  };
+
   return (
     <VerticalBox
       sx={{
@@ -336,7 +397,7 @@ const TraceCallsSection: React.FC<{
               output
             </Box>
 
-            {evaluationIds.map(evalId => {
+            {evaluationIds.map((evalId, evalIndex) => {
               const evalCall = currentExample[1].find(
                 c => c.evalId === evalId
               )?.call;
@@ -426,11 +487,25 @@ const TraceCallsSection: React.FC<{
               Model Latency
             </Box>
 
-            {evaluationIds.map(evalId => {
+            {evaluationIds.map((evalId, evalIndex) => {
               const evalCall = currentExample[1].find(
                 c => c.evalId === evalId
               )?.call;
               const executionTime = evalCall?.traceCall?.execution_time;
+
+              // Use the first evaluation as baseline for comparison
+              const baselineEvalId = evaluationIds[0];
+              const baselineCall = currentExample[1].find(
+                c => c.evalId === baselineEvalId
+              )?.call;
+              const baselineTime = baselineCall?.traceCall?.execution_time;
+
+              // Convert to ms for display
+              const timeInMs =
+                executionTime !== undefined ? executionTime * 1000 : undefined;
+              const baselineTimeInMs =
+                baselineTime !== undefined ? baselineTime * 1000 : undefined;
+
               return (
                 <Box
                   key={evalId}
@@ -440,10 +515,99 @@ const TraceCallsSection: React.FC<{
                       evalId !== evaluationIds[evaluationIds.length - 1]
                         ? '1px solid #e0e0e0'
                         : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
                   }}>
-                  {executionTime !== undefined
-                    ? `${(executionTime * 1000).toFixed(3)}ms`
-                    : '-'}
+                  {timeInMs !== undefined ? (
+                    <>
+                      {`${timeInMs.toFixed(3)}ms`}
+                      {/* Only show comparison pills for non-baseline elements */}
+                      {evalId !== baselineEvalId && (
+                        <TraceCallComparisonPill
+                          value={timeInMs}
+                          baseline={baselineTimeInMs}
+                          metricUnit="ms"
+                          metricLowerIsBetter={true}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    '-'
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Add additional metrics here, like Total Tokens */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+              bgcolor: '#f8f8f8',
+            }}>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                borderRight: '1px solid #e0e0e0',
+              }}>
+              Total Tokens
+            </Box>
+
+            {evaluationIds.map((evalId, evalIndex) => {
+              const evalCall = currentExample[1].find(
+                c => c.evalId === evalId
+              )?.call;
+              // Extract tokens info from output if available
+              const output = evalCall?.traceCall?.output;
+              const tokens =
+                typeof output === 'object' && output !== null
+                  ? output.total_tokens || output.tokens || output.token_count
+                  : undefined;
+
+              // Use the first evaluation as baseline
+              const baselineEvalId = evaluationIds[0];
+              const baselineCall = currentExample[1].find(
+                c => c.evalId === baselineEvalId
+              )?.call;
+              const baselineOutput = baselineCall?.traceCall?.output;
+              const baselineTokens =
+                typeof baselineOutput === 'object' && baselineOutput !== null
+                  ? baselineOutput.total_tokens ||
+                    baselineOutput.tokens ||
+                    baselineOutput.token_count
+                  : undefined;
+
+              return (
+                <Box
+                  key={evalId}
+                  sx={{
+                    padding: '8px 16px',
+                    borderRight:
+                      evalId !== evaluationIds[evaluationIds.length - 1]
+                        ? '1px solid #e0e0e0'
+                        : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  {tokens !== undefined ? (
+                    <>
+                      {tokens}
+                      {/* Only show comparison pills for non-baseline elements */}
+                      {evalId !== baselineEvalId &&
+                        typeof tokens === 'number' &&
+                        typeof baselineTokens === 'number' && (
+                          <TraceCallComparisonPill
+                            value={tokens}
+                            baseline={baselineTokens}
+                            metricLowerIsBetter={true}
+                          />
+                        )}
+                    </>
+                  ) : (
+                    '-'
+                  )}
                 </Box>
               );
             })}
