@@ -238,7 +238,7 @@ jobs:
             "bedrock",
             "cerebras",
             "cohere",
-            # "crewai",
+            "crewai",
             "dspy",
             "groq",
             "huggingface",

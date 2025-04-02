@@ -80,6 +80,7 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageWriteError,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
@@ -1274,7 +1275,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
 
         if base_file_storage_uri is not None:
-            self._file_create_bucket(req, digest, base_file_storage_uri)
+            try:
+                self._file_create_bucket(req, digest, base_file_storage_uri)
+            except FileStorageWriteError as e:
+                self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
         return tsi.FileCreateRes(digest=digest)
@@ -1912,24 +1916,35 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         summary = None
         parameters = _process_parameters(parameters)
-        with self.ch_client.query_rows_stream(
-            query,
-            parameters=parameters,
-            column_formats=column_formats,
-            use_none=True,
-            settings=settings,
-        ) as stream:
-            if isinstance(stream.source, QueryResult):
-                summary = stream.source.summary
-            logger.info(
-                "clickhouse_stream_query",
+        try:
+            with self.ch_client.query_rows_stream(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            ) as stream:
+                if isinstance(stream.source, QueryResult):
+                    summary = stream.source.summary
+                logger.info(
+                    "clickhouse_stream_query",
+                    extra={
+                        "query": query,
+                        "parameters": parameters,
+                        "summary": summary,
+                    },
+                )
+                yield from stream
+        except Exception as e:
+            logger.exception(
+                "clickhouse_stream_query_error",
                 extra={
+                    "error": e,
                     "query": query,
                     "parameters": parameters,
-                    "summary": summary,
                 },
             )
-            yield from stream
+            raise
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
