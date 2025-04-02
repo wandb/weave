@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
-from weave.trace.traverse import PathElement
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes import base_object_def
+
+PathElement = Union[str, int]
 
 
 class Pin(BaseModel):
