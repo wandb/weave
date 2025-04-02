@@ -221,8 +221,6 @@ export const ExampleCompareSection: React.FC<{
     return 0;
   }, [filteredRows, props.state.selectedInputDigest]);
 
-  console.log('filteredRows', filteredRows);
-
   const target = useMemo(() => {
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
