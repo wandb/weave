@@ -283,46 +283,141 @@ const TraceCallsSection: React.FC<{
 
             if (inputValue === undefined) return null;
 
+            // Always expand all inputs one level for consistency
             return (
-              <Box
-                key={inputKey}
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-                  bgcolor: index % 2 === 0 ? '#ffffff' : '#fafafa',
-                }}>
+              <React.Fragment key={inputKey}>
+                {/* Parent row for all inputs */}
                 <Box
                   sx={{
-                    padding: '8px 16px',
-                    fontWeight: 'bold',
-                    borderRight: '1px solid #e0e0e0',
-                    textAlign: 'left',
+                    display: 'grid',
+                    gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                    bgcolor: '#f0f0f0',
                   }}>
-                  {inputKey}
+                  <Box
+                    sx={{
+                      padding: '8px 16px',
+                      fontWeight: 'bold',
+                      borderRight: '1px solid #e0e0e0',
+                      textAlign: 'left',
+                    }}>
+                    {inputKey}
+                  </Box>
+                  <Box
+                    sx={{
+                      gridColumn: `2 / span ${evaluationIds.length}`,
+                      padding: '8px 16px',
+                      fontStyle: 'italic',
+                      color: '#666',
+                    }}>
+                    {typeof inputValue === 'object' && inputValue !== null
+                      ? `${Object.keys(inputValue).length} properties`
+                      : typeof inputValue === 'string'
+                      ? inputValue.length > 50
+                        ? `${inputValue.slice(0, 50)}...`
+                        : inputValue
+                      : String(inputValue)}
+                  </Box>
                 </Box>
-                {/* Only show the value once for input, not per evaluation */}
-                <Box
-                  sx={{
-                    gridColumn: `2 / span ${evaluationIds.length}`,
-                    padding: '8px 16px',
-                    overflow: 'auto',
-                    maxHeight: '100px',
-                  }}>
-                  {typeof inputValue === 'object' ? (
-                    <pre
-                      style={{
-                        margin: 0,
-                        fontSize: '0.9em',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
+
+                {/* Child rows for first level properties if object */}
+                {typeof inputValue === 'object' && inputValue !== null ? (
+                  Object.entries(inputValue).map(
+                    ([subKey, subValue], subIndex) => (
+                      <Box
+                        key={`${inputKey}.${subKey}`}
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                          bgcolor: subIndex % 2 === 0 ? '#ffffff' : '#fafafa',
+                          borderTop: '1px solid #f0f0f0',
+                        }}>
+                        <Box
+                          sx={{
+                            padding: '8px 16px 8px 32px', // Increased left padding to show hierarchy
+                            fontWeight: 'normal',
+                            borderRight: '1px solid #e0e0e0',
+                            textAlign: 'left',
+                          }}>
+                          {subKey}
+                        </Box>
+                        <Box
+                          sx={{
+                            gridColumn: `2 / span ${evaluationIds.length}`,
+                            padding: '8px 16px',
+                            overflow: 'auto',
+                            maxHeight: '100px',
+                          }}>
+                          {typeof subValue === 'object' && subValue !== null ? (
+                            <pre
+                              style={{
+                                margin: 0,
+                                fontSize: '0.9em',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                              }}>
+                              {JSON.stringify(subValue, null, 2)}
+                            </pre>
+                          ) : Array.isArray(subValue) ? (
+                            <pre
+                              style={{
+                                margin: 0,
+                                fontSize: '0.9em',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                              }}>
+                              {JSON.stringify(subValue, null, 2)}
+                            </pre>
+                          ) : (
+                            String(subValue)
+                          )}
+                        </Box>
+                      </Box>
+                    )
+                  )
+                ) : (
+                  // For primitive values, create a single child row showing the full value
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                      bgcolor: '#ffffff',
+                      borderTop: '1px solid #f0f0f0',
+                    }}>
+                    <Box
+                      sx={{
+                        padding: '8px 16px 8px 32px',
+                        fontWeight: 'normal',
+                        fontStyle: 'italic',
+                        borderRight: '1px solid #e0e0e0',
+                        textAlign: 'left',
+                        color: '#666',
                       }}>
-                      {JSON.stringify(inputValue, null, 2)}
-                    </pre>
-                  ) : (
-                    String(inputValue)
-                  )}
-                </Box>
-              </Box>
+                      value
+                    </Box>
+                    <Box
+                      sx={{
+                        gridColumn: `2 / span ${evaluationIds.length}`,
+                        padding: '8px 16px',
+                        overflow: 'auto',
+                        maxHeight: '100px',
+                      }}>
+                      {typeof inputValue === 'object' ? (
+                        <pre
+                          style={{
+                            margin: 0,
+                            fontSize: '0.9em',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}>
+                          {JSON.stringify(inputValue, null, 2)}
+                        </pre>
+                      ) : (
+                        String(inputValue)
+                      )}
+                    </Box>
+                  </Box>
+                )}
+              </React.Fragment>
             );
           })}
         </Box>
