@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from typing import Literal, Optional, cast
+from typing import Callable, Literal, Optional, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
@@ -116,6 +116,40 @@ class CallsMergedDynamicField(CallsMergedAggField):
 
     def is_heavy(self) -> bool:
         return True
+
+
+class CallsMergedSummaryField(CallsMergedField):
+    """Field class for computed summary values."""
+
+    field: str
+    summary_field: str
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # Look up handler for the requested summary field
+        handler = get_summary_field_handler(self.summary_field)
+        if handler:
+            sql = handler(pb, table_alias)
+            return clickhouse_cast(sql, cast)
+        else:
+            supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
+            raise NotImplementedError(
+                f"Summary field '{self.summary_field}' not implemented. "
+                f"Supported fields are: {supported_fields}"
+            )
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+
+    def is_heavy(self) -> bool:
+        # These are computed from non-heavy fields (status uses exception and ended_at)
+        # If we add more summary fields that depend on heavy fields,
+        # this would need to be made more sophisticated
+        return False
 
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
@@ -662,14 +696,14 @@ class CallsQuery(BaseModel):
             )
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
+        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
@@ -713,6 +747,10 @@ def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
+        elif name.startswith("summary.weave."):
+            # Handle summary.weave.* fields
+            summary_field = name[len("summary.weave.") :]
+            return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
             field_parts = name.split(".")
             start_part = field_parts[0]
@@ -725,6 +763,78 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
+
+
+# Handler function for status summary field
+def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+    # Status logic:
+    # - If exception is not null -> ERROR
+    # - Else if ended_at is null -> RUNNING
+    # - Else -> SUCCESS
+    exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
+    ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+
+    error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
+    running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
+    success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
+
+    return f"""CASE
+        WHEN {exception_sql} IS NOT NULL THEN {_param_slot(error_param, "String")}
+        WHEN {ended_to_sql} IS NULL THEN {_param_slot(running_param, "String")}
+        ELSE {_param_slot(success_param, "String")}
+    END"""
+
+
+# Handler function for latency_ms summary field
+def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+    # Latency_ms logic:
+    # - If ended_at is null or there's an exception, return null
+    # - Otherwise calculate milliseconds between started_at and ended_at
+    started_at_sql = get_field_by_name("started_at").as_sql(pb, table_alias)
+    ended_at_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+
+    # Convert time difference to milliseconds
+    # Use toUnixTimestamp64Milli for direct and precise millisecond difference
+    return f"""CASE
+        WHEN {ended_at_sql} IS NULL THEN NULL
+        ELSE (
+            toUnixTimestamp64Milli({ended_at_sql}) - toUnixTimestamp64Milli({started_at_sql})
+        )
+    END"""
+
+
+# Handler function for trace_name summary field
+def _handle_trace_name_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+    # Trace_name logic:
+    # - If display_name is available, use that
+    # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
+    # - Otherwise, just use op_name directly
+
+    display_name_sql = get_field_by_name("display_name").as_sql(pb, table_alias)
+    op_name_sql = get_field_by_name("op_name").as_sql(pb, table_alias)
+
+    return f"""CASE
+        WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
+        WHEN {op_name_sql} IS NOT NULL AND {op_name_sql} LIKE 'weave-trace-internal:///%' THEN
+            regexpExtract(toString({op_name_sql}), '/([^/:]*):', 1)
+        ELSE {op_name_sql}
+    END"""
+
+
+# Map of summary fields to their handler functions
+SUMMARY_FIELD_HANDLERS = {
+    "status": _handle_status_summary_field,
+    "latency_ms": _handle_latency_ms_summary_field,
+    "trace_name": _handle_trace_name_summary_field,
+}
+
+
+# Helper function to get a summary field handler by name
+def get_summary_field_handler(
+    summary_field: str,
+) -> Optional[Callable[[ParamBuilder, str], str]]:
+    """Returns the handler function for a given summary field name."""
+    return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
 
 class FilterToConditions(BaseModel):
@@ -1067,6 +1177,7 @@ def _create_like_optimized_eq_condition(
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
         return None
+
     # Return if right-side isn't a string literal
     if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
         operation.eq_[1].literal_, str
@@ -1075,10 +1186,16 @@ def _create_like_optimized_eq_condition(
 
     field = get_field_by_name(operation.eq_[0].get_field_).field
     literal_value = operation.eq_[1].literal_
+
     if not literal_value:
         # Empty string is not a valid value for LIKE optimization
         return None
-    like_pattern = f'%"{literal_value}"%'
+
+    # Boolean literals are not wrapped in quotes in JSON payloads
+    if literal_value in ("true", "false"):
+        like_pattern = f"%{literal_value}%"
+    else:
+        like_pattern = f'%"{literal_value}"%'
 
     return _create_like_condition(field, like_pattern, pb, table_alias)
 

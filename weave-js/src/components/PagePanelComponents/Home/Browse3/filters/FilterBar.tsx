@@ -26,12 +26,15 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
@@ -50,6 +53,8 @@ const isFilterIncomplete = (filter: GridFilterItem): boolean => {
 };
 
 export const FilterBar = ({
+  entity,
+  project,
   filterModel,
   setFilterModel,
   columnInfo,
@@ -159,7 +164,7 @@ export const FilterBar = ({
         items: [
           ...localFilterModel.items,
           {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },
@@ -191,7 +196,7 @@ export const FilterBar = ({
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
-      // Set this filter as the active edit
+      // Set this filter as active edit, highlighting filter bar children in teal
       setActiveEditId(item.id);
 
       if (index === -1) {
@@ -230,13 +235,13 @@ export const FilterBar = ({
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
@@ -254,6 +259,11 @@ export const FilterBar = ({
     setActiveEditId(null);
   }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
+  const onFilterTagClick = useCallback((filterId: FilterId) => {
+    setActiveEditId(filterId);
+    setAnchorEl(refBar.current);
+  }, []);
+
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
   const iconW = 20;
@@ -265,25 +275,42 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  // Determine if we should show a border based on whether there are active filters
+  const hasBorder = completeItems.length > 0;
+
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
+  }, [completeItems, activeEditId]);
+
   return (
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+          hasBorder
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-700 dark:hover:border-teal-300 dark:hover:ring-teal-300'
+            : ''
+        } ${
+          !hasBorder
+            ? 'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400'
+            : ''
+        }`}
         onClick={onClick}>
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none">
+        <div ref={refLabel} className="select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
-              isEditing={f.id === activeEditId}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
+              onClick={() => onFilterTagClick(f.id)}
             />
           ))}
         </VariableChildrenDisplay>
@@ -329,16 +356,21 @@ export const FilterBar = ({
               {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
+                  entity={entity}
+                  project={project}
                   item={item}
                   options={options}
                   onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
+                  activeEditId={activeEditId}
                 />
               ))}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
+                entity={entity}
+                project={project}
                 item={{
                   id: undefined,
                   field: '',
@@ -349,6 +381,7 @@ export const FilterBar = ({
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
+                activeEditId={activeEditId}
               />
             )}
             <div className="mt-8 flex items-center">

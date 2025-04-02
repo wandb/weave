@@ -23,6 +23,7 @@ pil_format_to_ext = InvertableDict[str, str](
     {
         "JPEG": "jpg",
         "PNG": "png",
+        "WEBP": "webp",
     }
 )
 ext_to_pil_format = pil_format_to_ext.inv

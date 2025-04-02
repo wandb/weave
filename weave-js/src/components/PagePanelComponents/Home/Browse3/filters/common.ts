@@ -31,13 +31,14 @@ export type FilterId = number | string | undefined;
 // These are columns we won't allow the user to filter on.
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
-  'op_name',
   'feedback',
-  'status',
+  'summary.weave.status',
+  'summary.weave.latency_ms',
+  'summary.weave.trace_name',
   'tokens',
   'cost',
-  'latency',
   'wb_user_id', // Option+Click works
+  'wb_run_id', // Option+Click works
 ];
 
 export type ColumnInfo = {
@@ -200,6 +201,10 @@ export const isValuelessOperator = (operator: string) => {
 
 export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
+};
+
+export const isDateOperator = (operator: string) => {
+  return operator.startsWith('(date):');
 };
 
 export const getOperatorLabel = (operatorValue: string): string => {

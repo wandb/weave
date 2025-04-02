@@ -1,4 +1,8 @@
-# Redact PII from Traces
+# Redacting PII
+
+:::important
+This feature is only accessible via the Python SDK.
+:::
 
 Some organizations process Personally Identifiable Information (PII) such as names, phone numbers, and email addresses in their Large Language Model (LLM) workflows. Storing this data in Weights & Biases (W&B) Weave poses compliance and security risks.
 

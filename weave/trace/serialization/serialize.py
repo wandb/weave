@@ -39,6 +39,13 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
+def _is_inline_custom_obj(encoded: dict) -> bool:
+    """Custom object values may be inline or backed by a file.
+
+    This separate function for readability checks which we are dealing with."""
+    return "val" in encoded
+
+
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
@@ -93,8 +100,9 @@ def to_json(
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
+    if _is_inline_custom_obj(encoded):
+        return encoded
     result = _build_result_from_encoded(encoded, project_id, client)
-
     return result
 
 
@@ -290,8 +298,10 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
+            if _is_inline_custom_obj(obj):
+                return custom_objs.decode_custom_inline_obj(obj)
             files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_obj(
+            return custom_objs.decode_custom_files_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
         elif (

@@ -1,3 +1,5 @@
+import levenshtein from 'js-levenshtein';
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
@@ -508,22 +510,28 @@ export const LLM_MAX_TOKENS = {
   },
 };
 
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4o-mini-2024-07-18';
+
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
 export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-export const LLM_PROVIDERS = [
-  'openai',
-  'anthropic',
-  'azure',
-  'gemini',
-  'groq',
-  'bedrock',
-  'xai',
-  'deepseek',
-];
+export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
+  openai: ['OPENAI_API_KEY'],
+  anthropic: ['ANTHROPIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
+  xai: ['XAI_API_KEY'],
+  bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
+  azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
+  groq: ['GEMMA_API_KEY'],
+  deepseek: ['DEEPSEEK_API_KEY'],
+};
+
+export const LLM_PROVIDERS = Object.keys(LLM_PROVIDER_SECRETS) as Array<
+  keyof typeof LLM_PROVIDER_SECRETS
+>;
 
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
@@ -537,4 +545,41 @@ export const LLM_PROVIDER_LABELS: Record<
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
   deepseek: 'DeepSeek',
+};
+
+// Example usage:
+// findMaxTokensByModelName('gpt-4') // returns 4096
+// findMaxTokensByModelName('gpt-4-turbo') // returns 4096
+// findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
+// findMaxTokensByModelName('completely-unknown-model') // returns 4096
+export const findMaxTokensByModelName = (modelName: string): number => {
+  // Default to a reasonable max_tokens value if no close match is found
+  const DEFAULT_MAX_TOKENS = 4096;
+
+  // If the model name is an exact match, return its max_tokens
+  if (modelName in LLM_MAX_TOKENS) {
+    return LLM_MAX_TOKENS[modelName as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Find the closest match using Levenshtein distance
+  let closestMatch = '';
+  let minDistance = Infinity;
+
+  Object.keys(LLM_MAX_TOKENS).forEach(key => {
+    const distance = levenshtein(modelName.toLowerCase(), key.toLowerCase());
+
+    // Update closest match if this distance is smaller
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestMatch = key;
+    }
+  });
+
+  // If we found a reasonably close match (distance less than half the length of the model name)
+  if (minDistance < modelName.length / 2) {
+    return LLM_MAX_TOKENS[closestMatch as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Return default if no close match found
+  return DEFAULT_MAX_TOKENS;
 };

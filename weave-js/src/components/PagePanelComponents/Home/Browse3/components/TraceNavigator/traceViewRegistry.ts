@@ -1,7 +1,7 @@
 import {IconName} from '@wandb/weave/components/Icon';
 import {FC} from 'react';
 
-import {CompositionView, FlameGraphView, GraphView} from './TraceViews';
+import {CompositionView, FlameGraphView} from './TraceViews';
 import {FilterableTreeView} from './TraceViews/TreeView';
 import {TraceViewProps} from './TraceViews/types';
 
@@ -49,12 +49,5 @@ export const traceViews: TraceViewRegistry = [
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
     maxTraces: 500,
-  },
-  {
-    id: 'graph',
-    label: 'Graph',
-    icon: 'chart-scatterplot',
-    component: GraphView,
-    maxTraces: 50,
   },
 ];

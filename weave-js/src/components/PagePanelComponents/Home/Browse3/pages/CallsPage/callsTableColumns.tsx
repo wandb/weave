@@ -26,7 +26,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
-import {CellValueString} from '../../../Browse2/CellValueString';
+import {CellValueRun} from '../../../Browse2/CellValueRun';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   convertFeedbackFieldToBackendFilter,
@@ -262,7 +262,7 @@ function buildCallsTableColumns(
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
-      field: 'op_name',
+      field: 'summary.weave.trace_name',
       headerName: 'Trace',
       minWidth: 100,
       width: 250,
@@ -327,23 +327,11 @@ function buildCallsTableColumns(
           },
         ]
       : []),
-    // {
-    //   field: 'run_id',
-    //   headerName: 'Run',
-    //   disableColumnMenu: true,
-    //   renderCell: cellParams => {
-    //     return (
-    //       <div style={{margin: 'auto'}}>
-    //         {cellParams.row.call.runId ?? <NotApplicable />}
-    //       </div>
-    //     );
-    //   },
-    // },
     {
-      field: 'status',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
-      sortable: false,
+      sortable: true,
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
@@ -404,6 +392,8 @@ function buildCallsTableColumns(
           field: convertFeedbackFieldToBackendFilter(c),
           headerName: parsed ? parsed.displayName : `${c}`,
           width: 150,
+          minWidth: 150,
+          flex: 1,
           renderHeader: () => {
             return <div>{parsed ? parsed.userDefinedType : c}</div>;
           },
@@ -411,13 +401,7 @@ function buildCallsTableColumns(
             return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            if (typeof params.value === 'boolean') {
-              return <div>{params.value ? 'true' : 'false'}</div>;
-            }
-            if (typeof params.value === 'string') {
-              return <CellValueString value={params.value} />;
-            }
-            return <div>{params.value}</div>;
+            return <CellValue value={params.value} />;
           },
         };
       });
@@ -652,14 +636,14 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'latency',
+    field: 'summary.weave.latency_ms',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     // Should probably have a custom filter here.
     filterable: false,
-    sortable: false,
+    sortable: true,
     valueGetter: (unused: any, row: any) => {
       if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
@@ -675,6 +659,45 @@ function buildCallsTableColumns(
         return null;
       }
       return monthRoundedTime(traceCallLatencyS(cellParams.row));
+    },
+  });
+
+  cols.push({
+    field: 'wb_run_id',
+    width: 150,
+    minWidth: 150,
+    headerName: 'Run',
+    sortable: false,
+    filterable: false,
+    renderCell: cellParams => {
+      const runId = cellParams.row.wb_run_id;
+      if (runId == null) {
+        return null;
+      }
+      const parts = runId.split('/');
+      if (parts.length !== 3) {
+        return <span>{runId}</span>;
+      }
+      const [entityName, projectName, runName] = parts;
+      // The filtering here is kind of hacky.
+      // We would need the project internal id to construct an equals filter,
+      // or we need to pass the restriction in as part of the "filter" argument
+      // instead of the "query" argument. A slight improvement that wouldn't go
+      // that far would be if we had an "ends with" operator.
+      return (
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="wb_run_id"
+          rowId={cellParams.id.toString()}
+          operation="(string): contains"
+          value={':' + runName}>
+          <CellValueRun
+            entity={entityName}
+            project={projectName}
+            run={runName}
+          />
+        </CellFilterWrapper>
+      );
     },
   });
 
