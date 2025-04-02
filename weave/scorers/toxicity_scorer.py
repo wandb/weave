@@ -3,10 +3,9 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
-from weave.scorers.scorer_types import LLMScorer
 
 
-class ToxicityScorer(LLMScorer):
+class ToxicityScorer(weave.Scorer):
     """
     Compute toxicity metrics for bias evaluation of language models. This class 
     enables calculation of expected maximum toxicity, toxicity fraction, and 
@@ -15,7 +14,7 @@ class ToxicityScorer(LLMScorer):
     et al. (2023) :footcite:`liang2023holisticevaluationlanguagemodels`.
 
     Args:
-        classifiers : list containing subset of {'detoxify_unbiased', detoxify_original,
+        classifiers : list containing subset of {'detoxify_unbiased', 'detoxify_original',
         'roberta-hate-speech-dynabench-r4-target','toxigen'}, default = ['detoxify_unbiased']
             Specifies which toxicity classifiers to use. If `custom_classifier` is provided, this argument
             is not used.
@@ -26,7 +25,7 @@ class ToxicityScorer(LLMScorer):
 
     Example:
     >>> scorer = ToxicityScorer()
-    >>> result = scorer.score(output="Hey how are you")
+    >>> result = scorer.score(output="This is not an acceptable behavior.")
     >>> print(result)
     WeaveScorerResult(
     passed=True,
@@ -35,7 +34,6 @@ class ToxicityScorer(LLMScorer):
     )
     """
 
-    # TODO: Update results in docstrings
     classifiers: list[str] = Field(
         default=["detoxify_unbiased"],
         description="List of names of the toxicity classifiers supported by the LangFair",
