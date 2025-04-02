@@ -92,7 +92,8 @@ class BetaEvaluationLogger(BaseModel):
     _pseudo_model: Model = PrivateAttr(default_factory=lambda: Model())
     _pseudo_evaluation: Evaluation = PrivateAttr(
         default_factory=lambda: Evaluation(
-            dataset=weave.Dataset(rows=weave.Table([{"": ""}]))
+            dataset=weave.Dataset(rows=weave.Table([{"": ""}])),
+            scorers=[],
         )
     )
     _starting_stack: list[Call] = PrivateAttr(default_factory=list)
