@@ -13,10 +13,12 @@
  */
 import _ from 'lodash';
 
-import {EvaluationComparisonSummary, MetricDefinition} from './ecpTypes';
-import {MetricType} from './ecpTypes';
-import {getScoreKeyNameFromScorerRef} from './ecpUtil';
-import {flattenedDimensionPath} from './ecpUtil';
+import {
+  EvaluationComparisonSummary,
+  MetricDefinition,
+  MetricType,
+} from './ecpTypes';
+import {flattenedDimensionPath, getScoreKeyNameFromScorerRef} from './ecpUtil';
 
 export const DERIVED_SCORER_REF_PLACEHOLDER = '__DERIVED__';
 
@@ -79,6 +81,8 @@ export const buildCompositeMetricsMap = (
   selectedMetrics: Record<string, boolean> | undefined = undefined
 ): CompositeScoreMetrics => {
   const composite: CompositeScoreMetrics = {};
+
+  console.log('summaryData', summaryData);
 
   // Get the metric definition map based on the metric type
   let metricDefinitionMap;
