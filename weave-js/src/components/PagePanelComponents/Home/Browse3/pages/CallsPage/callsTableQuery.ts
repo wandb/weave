@@ -8,8 +8,11 @@ import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
+  getCachedByKeyWithExpiry,
+  setCacheByKeyWithExpiry,
+} from '../../browserCacheUtils';
+import {
   isValuelessOperator,
-  make30DayDateFilter,
   makeDateFilter,
   makeRawDateFilter,
 } from '../../filters/common';
@@ -25,10 +28,6 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 
 export const DEFAULT_FILTER_CALLS: GridFilterModel = {
   items: [],
-  logicOperator: GridLogicOperator.And,
-};
-export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
-  items: [make30DayDateFilter()],
   logicOperator: GridLogicOperator.And,
 };
 
@@ -277,17 +276,26 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
   });
 };
 
+const CACHE_KEY_PREFIX = 'weave_datetime_filter_';
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
+
+const datetimeFilterCacheKey = (entity: string, project: string) => {
+  return `${CACHE_KEY_PREFIX}${entity}_${project}`;
+};
+
 export const useMakeInitialDatetimeFilter = (
   entity: string,
   project: string,
   filter: CallFilter,
   skip: boolean
-) => {
+): {initialDatetimeFilter: GridFilterModel} => {
   // Fire off 2 stats queries, one for the # of calls in the last 7 days
   // one for the  # of calls in the last 30 days.
   // If the first query returns > 50 calls, set the default filter to 7 days
   // Else if the second query returns > 50 calls, set to 30 days
   // Else set a default filter to 6 months
+  // On the creation of a filter --> stash to browser history with 1 day expiry
+  // Use the cache preferentially when available
   const {useCallsStats} = useWFHooks();
   const d30filter = useMemo(() => {
     return makeRawDateFilter(30);
@@ -302,28 +310,53 @@ export const useMakeInitialDatetimeFilter = (
   const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
     skip,
   });
+  const defaultDatetimeFilter = useMemo(
+    () => ({
+      items: [makeDateFilter(7)],
+      logicOperator: GridLogicOperator.And,
+    }),
+    []
+  );
+
   const datetimeFilter = useMemo(() => {
+    // Try to get cached filter first
+    const key = datetimeFilterCacheKey(entity, project);
+    const cachedFilter = getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS);
+    if (cachedFilter) {
+      return cachedFilter as GridFilterModel;
+    }
+
+    // If no cache or expired, compute new filter
+    let newFilter = null;
     if (callStats7Days.result && callStats7Days.result.count >= 50) {
-      return {
-        items: [makeDateFilter(7)],
-        logicOperator: GridLogicOperator.And,
-      };
+      newFilter = defaultDatetimeFilter;
     } else if (callStats30Days.result && callStats30Days.result.count >= 50) {
-      return {
+      newFilter = {
         items: [makeDateFilter(30)],
         logicOperator: GridLogicOperator.And,
       };
     } else if (callStats30Days.result && callStats30Days.result.count < 50) {
-      return {
+      newFilter = {
         items: [makeDateFilter(180)],
         logicOperator: GridLogicOperator.And,
       };
     }
-    return null;
-  }, [callStats7Days.result, callStats30Days.result]);
 
-  if (datetimeFilter != null) {
-    return {initialDatetimeFilter: datetimeFilter};
-  }
-  return {initialDatetimeFilter: DEFAULT_FILTER_CALLS_WITH_DATE};
+    // Cache the new filter if we computed one
+    if (newFilter) {
+      setCacheByKeyWithExpiry(key, newFilter);
+    }
+
+    return newFilter;
+  }, [
+    callStats7Days.result,
+    callStats30Days.result,
+    defaultDatetimeFilter,
+    entity,
+    project,
+  ]);
+
+  return {
+    initialDatetimeFilter: datetimeFilter ?? defaultDatetimeFilter,
+  };
 };
