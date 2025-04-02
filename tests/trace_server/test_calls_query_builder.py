@@ -1,7 +1,11 @@
 import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder import CallsQuery, HardCodedFilter
+from weave.trace_server.calls_query_builder import (
+    AggregatedDataSizeField,
+    CallsQuery,
+    HardCodedFilter,
+)
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 
@@ -1517,44 +1521,80 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
     )
 
 
-def test_datetime_optimization_simple() -> None:
-    """Test basic datetime optimization with a single timestamp condition."""
-    cq = CallsQuery(project_id="project")
+def test_storage_size_fields():
+    """Test querying with storage size fields"""
+    cq = CallsQuery(project_id="test/project", include_storage_size=True)
     cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "started_at"},
-                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
-                ]
-            }
-        )
+    cq.add_field("storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id,
+           any(storage_size_tbl.storage_size_bytes) AS storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN
+        (SELECT id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) as storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY id) as storage_size_tbl on calls_merged.id = storage_size_tbl.id
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": "test/project"},
     )
 
-    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
+def test_total_storage_size():
+    """Test querying with total storage size"""
+    cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("total_storage_size_bytes")
+
     assert_sql(
         cq,
         """
         SELECT
-            calls_merged.id AS id
+            calls_merged.id AS id,
+            CASE
+                WHEN any(calls_merged.parent_id) IS NULL
+                THEN any(rolled_up_cms.total_storage_size_bytes)
+                ELSE NULL
+            END AS total_storage_size_bytes
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_2:String}
-            AND ((calls_merged.id <= 'ffffffffffffffff'
-                OR calls_merged.id > {pb_1:String}))
+        LEFT JOIN (SELECT
+            trace_id,
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY trace_id) as rolled_up_cms
+        on calls_merged.trace_id = rolled_up_cms.trace_id
+        WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.started_at) > {pb_0:UInt64}))
-            AND ((any(calls_merged.deleted_at) IS NULL))
+            ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {
-            "pb_0": 1709251200,
-            "pb_2": "project",
-            "pb_1": "018df74e-99a0-7000-8000-000000000000",
-        },
+        {"pb_0": "test/project"},
     )
+
+
+def test_aggregated_data_size_field():
+    """Test the AggregatedDataSizeField class"""
+    field = AggregatedDataSizeField(
+        field="total_storage_size_bytes", join_table_name="rolled_up_cms"
+    )
+    pb = ParamBuilder()
+
+    # Test SQL generation
+    sql = field.as_select_sql(pb, "calls_merged")
+    assert "CASE" in sql
+    assert "parent_id" in sql
+    assert "rolled_up_cms.total_storage_size_bytes" in sql
 
 
 def test_datetime_optimization_not_operation() -> None:
@@ -1735,3 +1775,21 @@ def test_datetime_optimization_invalid_field() -> None:
         """,
         {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
     )
+
+
+def test_datetime_optimization_simple() -> None:
+    """Test basic datetime optimization with a single timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
