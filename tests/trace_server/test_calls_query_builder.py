@@ -1548,6 +1548,7 @@ def test_storage_size_fields():
         {"pb_0": "test/project"},
     )
 
+
 def test_total_storage_size():
     """Test querying with total storage size"""
     cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
@@ -1595,6 +1596,46 @@ def test_aggregated_data_size_field():
     assert "CASE" in sql
     assert "parent_id" in sql
     assert "rolled_up_cms.total_storage_size_bytes" in sql
+
+
+def test_datetime_optimization_simple() -> None:
+    """Test basic datetime optimization with a single timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND ((calls_merged.id <= 'ffffffffffffffff'
+                OR calls_merged.id > {pb_1:String}))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) > {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+        },
+    )
 
 
 def test_datetime_optimization_not_operation() -> None:
@@ -1775,21 +1816,3 @@ def test_datetime_optimization_invalid_field() -> None:
         """,
         {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
     )
-
-
-def test_datetime_optimization_simple() -> None:
-    """Test basic datetime optimization with a single timestamp condition."""
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "started_at"},
-                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
-                ]
-            }
-        )
-    )
-
-    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
