@@ -6,6 +6,27 @@ import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {MarkdownView} from './Markdown/MarkdownView';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
+// Export the CustomWeaveTypePayload type
+export type {CustomWeaveTypePayload} from './customWeaveType.types';
+
+// Helper function to check if a value is a CustomWeaveType
+export const isCustomWeaveType = (
+  value: any
+): value is CustomWeaveTypePayload => {
+  return (
+    value &&
+    typeof value === 'object' &&
+    '_type' in value &&
+    value._type === 'CustomWeaveType' &&
+    'weave_type' in value &&
+    value.weave_type &&
+    typeof value.weave_type === 'object' &&
+    'type' in value.weave_type &&
+    // Only return true for types we actually have components for
+    value.weave_type.type in customWeaveTypeRegistry
+  );
+};
+
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;
   // Entity and Project can be optionally provided as props, but if they are not

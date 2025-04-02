@@ -7,6 +7,7 @@ import {
   CustomWeaveTypeDispatcher,
   CustomWeaveTypePayload,
   CustomWeaveTypeProjectContext,
+  isCustomWeaveType,
 } from '../../typeViews/CustomWeaveTypeDispatcher';
 import {EvaluationComparisonState} from './ecpState';
 import {HorizontalBox, VerticalBox} from './Layout';
@@ -341,21 +342,8 @@ export const TraceCallsSection: React.FC<{
                             maxHeight: '100px',
                           }}>
                           {typeof subValue === 'object' && subValue !== null ? (
-                            // Check if this is a PIL image type that we should render
-                            subValue &&
-                            typeof subValue === 'object' &&
-                            '_type' in subValue &&
-                            subValue._type === 'CustomWeaveType' &&
-                            'weave_type' in subValue &&
-                            subValue.weave_type &&
-                            typeof subValue.weave_type === 'object' &&
-                            'type' in subValue.weave_type &&
-                            (subValue.weave_type.type === 'PIL.Image.Image' ||
-                              subValue.weave_type.type ===
-                                'PIL.JpegImagePlugin.JpegImageFile' ||
-                              subValue.weave_type.type ===
-                                'PIL.PngImagePlugin.PngImageFile' ||
-                              subValue.weave_type.type === 'wave.Wave_read') ? (
+                            // Check if this is a type that we should render using the CustomWeaveTypeDispatcher
+                            isCustomWeaveType(subValue) ? (
                               <CustomWeaveTypeProjectContext.Provider
                                 value={{
                                   entity: entity || '',
