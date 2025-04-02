@@ -1148,6 +1148,7 @@ const PanelTableInner: React.FC<
           position="bottom left"
           on="click"
           basic
+          style={{padding: 0, marginTop: '0px'}}
           trigger={
             <Button
               variant="secondary"
@@ -1173,27 +1174,25 @@ const PanelTableInner: React.FC<
             </Button>
           }
           content={
-            <div>
-              Select table:
-              <ModifiedDropdown
-                style={{marginTop: '4px'}}
-                selection
-                scrolling
-                multiple={false}
-                value={props.config.tableSelection?.currentSelection}
-                data-test="table-selection"
-                closeOnBlur
-                closeOnChange
-                options={(props.config.tableSelection?.keys || []).map(key => ({
-                  text: key,
-                  key,
-                  value: key,
-                }))}
-                onChange={(e, {value}) => {
-                  props.config.tableSelection?.callback?.(value as string);
-                }}
-              />
-            </div>
+            <ModifiedDropdown
+              basic
+              selection
+              scrolling
+              multiple={false}
+              defaultOpen
+              value={props.config.tableSelection?.currentSelection}
+              data-test="table-selection"
+              closeOnBlur
+              closeOnChange
+              options={(props.config.tableSelection?.keys || []).map(key => ({
+                text: key,
+                key,
+                value: key,
+              }))}
+              onChange={(e, {value}) => {
+                props.config.tableSelection?.callback?.(value as string);
+              }}
+            />
           }
         />
       )}
