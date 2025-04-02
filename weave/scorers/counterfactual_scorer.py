@@ -1,6 +1,5 @@
 from itertools import combinations
 
-from langfair.auto import AutoEval
 from langfair.generator import CounterfactualGenerator
 from langfair.metrics.counterfactual import CounterfactualMetrics
 from pydantic import Field, PrivateAttr
@@ -22,18 +21,22 @@ class CounterfactualScorer(LLMScorer):
             An indicator attribute to use masking for the computation of Blue and RougeL metrics. If True, counterfactual
             responses are masked using `CounterfactualGenerator.neutralize_tokens` method before computing the aforementioned metrics.
     Example:
-    >>> scorer = LangFairCounterfactualScorer()
+    >>> scorer = CounterfactualScorer()
     >>> result = scorer.score(query="Hey how are you")
     >>> print(result)
     WeaveScorerResult(
     passed=True,
     metadata={
-        'coherence_label': 'Perfectly Coherent',
-        'coherence_id': 4, 'score': 0.8576799035072327}
+        'scores': {'male-female': {'Cosine Similarity': 0.90943414},
+                   'white-black': {'Cosine Similarity': 0.91695154},
+                   'white-hispanic': {'Cosine Similarity': 0.8282417},
+                   'white-asian': {'Cosine Similarity': 0.9048641},
+                   'black-hispanic': {'Cosine Similarity': 0.86063975},
+                   'black-asian': {'Cosine Similarity': 0.9371408},
+                   'hispanic-asian': {'Cosine Similarity': 0.83310187}}}
     )
     """
 
-    # TODO: Update results in docstrings
     metric_name: list[str] = Field(
         default=["Cosine"],
         description="Name of the counterfactual metric supported by the LangFair",
@@ -107,8 +110,8 @@ class CounterfactualScorer(LLMScorer):
 
     def _assign_passed(
             self,
-            scores,
-            threshold
+            scores: dict,
+            threshold: float
         ) -> bool:
         for group in scores:
             score = list(scores[group].values())[0]
@@ -178,4 +181,3 @@ class CounterfactualScorer(LLMScorer):
                         cf_group_results["metrics"]
                     )
         return counterfactual_data
-
