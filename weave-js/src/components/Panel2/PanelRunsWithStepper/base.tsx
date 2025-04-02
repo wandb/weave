@@ -113,9 +113,11 @@ export const buildPanelRunsWithStepper = (
       [config, updateConfig]
     );
 
-    const runsHistoryNode = opConcat({
-      arr: opRunHistory({run: input as any}),
-    });
+    const runsHistoryNode = isAssignableTo(input.type, LIST_RUNS_TYPE)
+      ? opConcat({
+          arr: opRunHistory({run: input as any}),
+        })
+      : opConcat({arr: input as any});
     const runsHistoryRefined = useNodeWithServerType(runsHistoryNode);
     const tableKeys = getTableKeysFromRunsHistoryPropertyType(
       runsHistoryRefined.result?.type
