@@ -103,8 +103,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   return (
     <div style={style}>
-      <Button
-        variant="ghost"
+      <div
         style={{
           opacity: isDeemphasized ? 0.7 : 1,
           backgroundColor: id === focusedCallId ? `${TEAL_300}52` : undefined,
@@ -112,7 +111,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         }}
         onClick={() => setFocusedCallId(id)}
         onDoubleClick={() => setRootCallId(id)}
-        className="h-[32px] w-full justify-start rounded-none px-8 text-left text-sm hover:bg-moon-150">
+        className="h-[32px] w-full cursor-pointer select-none justify-start rounded-none px-8 text-left text-sm font-semibold tracking-normal text-moon-600 hover:bg-oblivion/[0.07] hover:text-moon-800 [&_svg]:h-18 [&_svg]:w-18">
         <div className="relative flex w-full items-center justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-center">
             <div
@@ -181,7 +180,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             <StatusChip value={statusCode} iconOnly />
           </div>
         </div>
-      </Button>
+      </div>
     </div>
   );
 };

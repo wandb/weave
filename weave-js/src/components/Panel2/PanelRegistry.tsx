@@ -48,6 +48,7 @@ import {Spec as RunColorSpec} from './PanelRunColor';
 import {Spec as RunOverviewSpec} from './PanelRunOverview';
 import {Spec as PanelRunsTableSpec} from './PanelRunsTable';
 import {Spec as PanelRunHistoryTablesStepperSpec} from './PanelRunsWithStepper/HistoryTables';
+import {Spec as PanelRunsPlotsWithStepperSpec} from './PanelRunsWithStepper/Plots';
 import {Spec as SavedModelSpec} from './PanelSavedModel';
 import {Spec as StringSpec} from './PanelString';
 import {Spec as StringCompare} from './PanelStringCompare';
@@ -239,4 +240,5 @@ export const ConverterSpecs = (): ConverterSpecArray =>
         Panel.toConvertSpec(ProjectionSpec),
         Panel.toConvertSpec(PanelRunsTableSpec),
         Panel.toConvertSpec(PanelRunHistoryTablesStepperSpec),
+        Panel.toConvertSpec(PanelRunsPlotsWithStepperSpec),
       ]);
