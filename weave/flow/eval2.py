@@ -140,7 +140,7 @@ class BetaEvaluationLogger(BaseModel):
 
             @weave.op
             def summarize(self: Evaluation) -> dict:
-                return current_summary.get()
+                return cast(dict, current_summary.get())
 
             self._pseudo_evaluation.__dict__.update(
                 {
