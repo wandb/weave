@@ -93,12 +93,16 @@ export const CompareEvaluationsPageContent: React.FC<
     parentIds: props.evaluationCallIds,
   });
 
+  console.log('childCalls', childCalls);
+
   const traceCalls = childCalls.result
     ?.filter(call => call.traceCall?.op_name?.includes('predict_and_score'))
     ?.map(call => ({
       callId: call.callId,
       traceCall: call.traceCall,
     }));
+
+  console.log('traceCalls', traceCalls);
 
   // --------------------------------------
 

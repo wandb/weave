@@ -23,6 +23,7 @@ NOT_DEFINED = "Not defined for custom scoring"
 # contents are always the same.
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
 current_score: ContextVar[float | None] = ContextVar("current_score", default=None)
+current_summary: ContextVar[dict | None] = ContextVar("current_summary", default=None)
 
 
 @contextmanager
@@ -42,6 +43,15 @@ def set_current_score(score: float) -> Iterator[None]:
         yield
     finally:
         current_score.reset(token)
+
+
+@contextmanager
+def set_current_summary(summary: dict) -> Iterator[None]:
+    token = current_summary.set(summary)
+    try:
+        yield
+    finally:
+        current_summary.reset(token)
 
 
 class BetaScoreLogger(BaseModel):
@@ -130,7 +140,7 @@ class BetaEvaluationLogger(BaseModel):
 
             @weave.op
             def summarize(self: Evaluation) -> dict:
-                return {}
+                return current_summary.get()
 
             self._pseudo_evaluation.__dict__.update(
                 {
@@ -179,20 +189,11 @@ class BetaEvaluationLogger(BaseModel):
         if self._logged_summary:
             return
         self._logged_summary = True
-
-        # Replace the summarize method with real implementation
-        @weave.op(name="Evaluation.summarize")
-        def summarize(self: Evaluation) -> dict:
-            return summary
-
-        self._pseudo_evaluation.__dict__["summarize"] = MethodType(
-            summarize, self._pseudo_evaluation
-        )
-
         # Call the summarize method with the proper context
         assert self._evaluate_call is not None
         with call_context.set_call_stack([self._evaluate_call]):
-            self._pseudo_evaluation.summarize()
+            with set_current_summary(summary):
+                self._pseudo_evaluation.summarize()
 
         # Finish the evaluation call
         wc = require_weave_client()
