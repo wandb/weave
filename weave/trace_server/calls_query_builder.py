@@ -612,6 +612,7 @@ class CallsQuery(BaseModel):
 
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
+            print("0000000 not optimizing")
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -649,8 +650,28 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
+        # Very special case where we have NO heavy filters, we do a raw light filter
+        # with a double limit/offset, to account for potential unmerged calls.
+        print("????", self.query_conditions)
+        if len([c for c in self.query_conditions if c.is_heavy()]) == 0:
+            outer_filter_query = f"""
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {_param_slot(pb.add_param(self.project_id), "String")}
+            ORDER BY id DESC
+            LIMIT {self.limit * 2 if self.limit else 10000}
+            OFFSET {self.offset or 0}
+            """
+
+            # and also now put all the light conditions into the heavy filter
+            for condition in filter_query.query_conditions:
+                if not condition.is_heavy():
+                    outer_query.query_conditions.append(condition)
+        else:
+            outer_filter_query = filter_query._as_sql_base_format(pb, table_alias)
+
         raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
+        WITH filtered_calls AS ({outer_filter_query})
         """
 
         if self.include_costs:
@@ -708,6 +729,8 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
+
+        # print(">>>>>\n\n", having_filter_sql, "\n", having_filter_opt_sql, "\n")
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
