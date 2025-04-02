@@ -97,6 +97,9 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
     const currentFilterModel = {...filterModelResolved};
     const items = [...currentFilterModel.items];
 
+    const existingFilter = items.find(
+      item => item.field === 'started_at' && item.operator === '(date): after'
+    );
     // Remove any existing started_at filters
     const filteredItems = items.filter(item => item.field !== 'started_at');
 
@@ -106,25 +109,33 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
       const filterDate = new Date(opCreatedAt);
       const now = new Date();
 
-      const daysDifference = Math.round(
+      const daysSinceOpCreated = Math.round(
         (now.getTime() - filterDate.getTime()) / (24 * 60 * 60 * 1000)
       );
 
-      // buckets of time to create filters for, based on the most recent
-      // op created date.
-      if (daysDifference < 7) {
-        newDateFilter = makeDateFilter(7);
-      } else if (daysDifference <= 30) {
-        newDateFilter = makeDateFilter(30);
-      } else if (daysDifference <= 90) {
-        newDateFilter = makeDateFilter(90);
-      } else if (daysDifference <= 180) {
-        newDateFilter = makeDateFilter(180);
-      } else if (daysDifference <= 365) {
-        newDateFilter = makeDateFilter(365);
+      // If there's an existing filter, calculate how many days it spans
+      // default to the number of days since last op
+      let existingFilterDays = daysSinceOpCreated;
+      if (existingFilter) {
+        const existingDate = new Date(existingFilter.value);
+        existingFilterDays = Math.round(
+          (now.getTime() - existingDate.getTime()) / (24 * 60 * 60 * 1000)
+        );
       }
-      // For any other case, don't add a datetime filter
-      else {
+
+      // Determine the appropriate bucket size, ensuring it's larger than the existing filter
+      if (existingFilterDays < 4) {
+        newDateFilter = makeDateFilter(7);
+      } else if (existingFilterDays < 7) {
+        newDateFilter = makeDateFilter(30);
+      } else if (existingFilterDays <= 30) {
+        newDateFilter = makeDateFilter(90);
+      } else if (existingFilterDays <= 90) {
+        newDateFilter = makeDateFilter(180);
+      } else if (existingFilterDays <= 180) {
+        newDateFilter = makeDateFilter(365);
+      } else {
+        // If we're already at the largest bucket, remove the date filter
         setFilterModel({
           ...currentFilterModel,
           items: filteredItems,
