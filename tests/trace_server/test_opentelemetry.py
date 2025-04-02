@@ -1,4 +1,5 @@
 import uuid
+from binascii import hexlify
 from datetime import datetime
 from unittest.mock import patch
 
@@ -140,6 +141,32 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     )
     # Verify that the start and end calls were merged into a single call
     assert len(res.calls) == 1
+
+    call = res.calls[0]
+    export_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    decoded_trace = hexlify(export_span.trace_id).decode("ascii")
+    decoded_span= hexlify(export_span.span_id).decode("ascii")
+
+    # TODO: Once postprocessing is added we should have tests for input, output and summary propogation
+    assert call.id == decoded_span
+    assert call.trace_id == decoded_trace
+
+    # Verify call deletion using client provided ID works
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[decoded_span],
+        )
+    )
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+
+    # Verify that the call was deleted
+    assert len(res.calls) == 0
 
 
 class TestPythonSpans:
