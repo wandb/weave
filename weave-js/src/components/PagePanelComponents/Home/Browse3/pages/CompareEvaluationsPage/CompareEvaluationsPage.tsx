@@ -40,6 +40,9 @@ import {useWFHooks} from '../wfReactInterface/context';
 const TraceCallsSection: React.FC<{
   traceCalls: Array<{callId: string; traceCall: any}>;
 }> = ({traceCalls}) => {
+  // Pagination state - must be at the top level of the component
+  const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
+
   // Group calls by their parent evaluation
   const callsByParent = useMemo(() => {
     const grouped: Record<string, any[]> = {};
@@ -109,6 +112,10 @@ const TraceCallsSection: React.FC<{
   // Column headers (evaluation IDs)
   const evaluationIds = Object.keys(callsByParent);
 
+  // Group inputs by example
+  const inputGroups = Object.entries(callsGroupedByInput);
+
+  // If no trace calls, show message
   if (traceCalls.length === 0) {
     return (
       <Alert severity="info">
@@ -117,154 +124,232 @@ const TraceCallsSection: React.FC<{
     );
   }
 
-  // Group inputs by example
-  const inputGroups = Object.entries(callsGroupedByInput);
+  // If no examples, show message
+  if (inputGroups.length === 0) {
+    return <Alert severity="info">No examples available to display.</Alert>;
+  }
+
+  // Guard against out-of-bounds index after re-renders
+  const safeCurrentIndex = Math.min(
+    currentExampleIndex,
+    inputGroups.length - 1
+  );
+  const currentExample = inputGroups[safeCurrentIndex];
 
   return (
-    <Box sx={{width: '100%', padding: STANDARD_PADDING}}>
-      {inputGroups.map(([inputHash, callGroup], groupIndex) => (
-        <Box key={inputHash} sx={{marginBottom: '32px'}}>
-          <Box
-            sx={{
-              fontSize: '1.2em',
-              fontWeight: 'bold',
-              marginBottom: '8px',
-              borderBottom: '1px solid #e0e0e0',
-              paddingBottom: '8px',
-            }}>
-            Example {groupIndex + 1} of {inputGroups.length}
+    <VerticalBox
+      sx={{
+        height: '100%',
+        width: '100%',
+        gridGap: '0px',
+      }}>
+      {/* Pagination header for examples */}
+      <HorizontalBox
+        sx={{
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          bgcolor: '#f5f5f5',
+          padding: '16px',
+          borderBottom: '1px solid #ccc',
+        }}>
+        <HorizontalBox
+          sx={{
+            alignItems: 'center',
+            flex: 1,
+          }}>
+          <Box sx={{fontSize: '14px'}}>
+            {`Example ${safeCurrentIndex + 1} of ${inputGroups.length}`}
           </Box>
+        </HorizontalBox>
+        <Box>
+          <Button
+            className="mx-16"
+            style={{marginLeft: '0px'}}
+            size="small"
+            disabled={safeCurrentIndex === 0}
+            onClick={() => setCurrentExampleIndex(prev => prev - 1)}
+            icon="chevron-back"
+          />
+          <Button
+            style={{marginLeft: '0px'}}
+            disabled={safeCurrentIndex === inputGroups.length - 1}
+            size="small"
+            onClick={() => setCurrentExampleIndex(prev => prev + 1)}
+            icon="chevron-next"
+          />
+        </Box>
+      </HorizontalBox>
 
-          {/* Input section */}
-          <Box sx={{marginBottom: '24px'}}>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-                borderBottom: '1px solid #e0e0e0',
-                paddingBottom: '8px',
-                fontWeight: 'bold',
-              }}>
-              <Box sx={{padding: '8px'}}>Value</Box>
-              {evaluationIds.map(evalId => (
-                <Box key={evalId} sx={{padding: '8px', textAlign: 'center'}}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Box
-                      sx={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        bgcolor:
-                          evalId === evaluationIds[0] ? '#f06292' : '#42a5f5',
-                        marginRight: '8px',
-                      }}
-                    />
-                    model{' '}
-                    <Box
-                      component="span"
-                      sx={{fontSize: '0.9em', color: '#666'}}>
-                      {evalId.slice(-4)}
-                    </Box>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-
-            {/* Input rows */}
-            {uniqueInputKeys.map((inputKey, index) => {
-              // Get a sample call from this input group
-              const sampleCall = callGroup[0]?.call;
-              const inputValue = sampleCall?.traceCall?.inputs?.[inputKey];
-
-              if (inputValue === undefined) return null;
-
-              return (
-                <Box
-                  key={inputKey}
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-                    borderBottom: '1px solid #f5f5f5',
-                    bgcolor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
-                  }}>
-                  <Box sx={{padding: '8px', fontWeight: 'bold'}}>
-                    {inputKey}
-                  </Box>
-                  {evaluationIds.map(evalId => {
-                    const evalCall = callGroup.find(
-                      c => c.evalId === evalId
-                    )?.call;
-                    const thisInputValue =
-                      evalCall?.traceCall?.inputs?.[inputKey];
-                    return (
-                      <Box
-                        key={evalId}
-                        sx={{
-                          padding: '8px',
-                          borderLeft: '1px solid #f5f5f5',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}>
-                        {thisInputValue !== undefined ? (
-                          <Box
-                            sx={{
-                              maxHeight: '100px',
-                              overflow: 'auto',
-                            }}>
-                            <pre
-                              style={{
-                                margin: 0,
-                                fontSize: '0.9em',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                              }}>
-                              {JSON.stringify(thisInputValue, null, 2)}
-                            </pre>
-                          </Box>
-                        ) : (
-                          '-'
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Box>
-              );
-            })}
-          </Box>
-
-          {/* Model Outputs Section */}
-          <Box
-            sx={{
-              fontWeight: 'bold',
-              borderBottom: '1px solid #e0e0e0',
-              paddingBottom: '8px',
-              marginBottom: '8px',
-            }}>
-            Model Outputs
-          </Box>
-
+      {/* Main content area */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          borderBottom: '1px solid #e0e0e0',
+        }}>
+        {/* Input section */}
+        <Box sx={{borderBottom: '1px solid #e0e0e0'}}>
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-              borderBottom: '1px solid #f5f5f5',
+              bgcolor: '#f5f5f5',
+              fontWeight: 'bold',
+            }}>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                borderRight: '1px solid #e0e0e0',
+                borderBottom: '1px solid #e0e0e0',
+              }}>
+              Input
+            </Box>
+            <Box
+              sx={{
+                gridColumn: `2 / span ${evaluationIds.length}`,
+                padding: '8px 16px',
+                borderBottom: '1px solid #e0e0e0',
+              }}>
+              Value
+            </Box>
+          </Box>
+
+          {/* Input rows */}
+          {uniqueInputKeys.map((inputKey, index) => {
+            // Get a sample call from this input group - use currentExample
+            const sampleCall = currentExample[1][0]?.call;
+            const inputValue = sampleCall?.traceCall?.inputs?.[inputKey];
+
+            if (inputValue === undefined) return null;
+
+            return (
+              <Box
+                key={inputKey}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                  bgcolor: index % 2 === 0 ? '#ffffff' : '#fafafa',
+                }}>
+                <Box
+                  sx={{
+                    padding: '8px 16px',
+                    fontWeight: 'bold',
+                    borderRight: '1px solid #e0e0e0',
+                    textAlign: 'left',
+                  }}>
+                  {inputKey}
+                </Box>
+                {/* Only show the value once for input, not per evaluation */}
+                <Box
+                  sx={{
+                    gridColumn: `2 / span ${evaluationIds.length}`,
+                    padding: '8px 16px',
+                    overflow: 'auto',
+                    maxHeight: '100px',
+                  }}>
+                  {typeof inputValue === 'object' ? (
+                    <pre
+                      style={{
+                        margin: 0,
+                        fontSize: '0.9em',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}>
+                      {JSON.stringify(inputValue, null, 2)}
+                    </pre>
+                  ) : (
+                    String(inputValue)
+                  )}
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* Model Outputs section */}
+        <Box sx={{marginTop: '8px'}}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+              bgcolor: '#f5f5f5',
+              fontWeight: 'bold',
+            }}>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                borderRight: '1px solid #e0e0e0',
+                borderBottom: '1px solid #e0e0e0',
+              }}>
+              Model Outputs
+            </Box>
+            {evaluationIds.map(evalId => (
+              <Box
+                key={evalId}
+                sx={{
+                  padding: '8px',
+                  textAlign: 'center',
+                  borderRight:
+                    evalId !== evaluationIds[evaluationIds.length - 1]
+                      ? '1px solid #e0e0e0'
+                      : 'none',
+                  borderBottom: '1px solid #e0e0e0',
+                }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Box
+                    sx={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      bgcolor:
+                        evalId === evaluationIds[0] ? '#f06292' : '#42a5f5',
+                      marginRight: '8px',
+                    }}
+                  />
+                  model{' '}
+                  <Box component="span" sx={{fontSize: '0.9em', color: '#666'}}>
+                    {evalId.slice(-4)}
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Output row */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
               bgcolor: '#ffffff',
             }}>
-            <Box sx={{padding: '8px', fontWeight: 'bold'}}>output</Box>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                borderRight: '1px solid #e0e0e0',
+              }}>
+              output
+            </Box>
+
             {evaluationIds.map(evalId => {
-              const evalCall = callGroup.find(c => c.evalId === evalId)?.call;
+              const evalCall = currentExample[1].find(
+                c => c.evalId === evalId
+              )?.call;
               const output = evalCall?.traceCall?.output;
               return (
                 <Box
                   key={evalId}
                   sx={{
-                    padding: '8px',
-                    borderLeft: '1px solid #f5f5f5',
+                    padding: '8px 16px',
+                    borderRight:
+                      evalId !== evaluationIds[evaluationIds.length - 1]
+                        ? '1px solid #e0e0e0'
+                        : 'none',
                     maxHeight: '300px',
                     overflow: 'auto',
                   }}>
@@ -289,35 +374,73 @@ const TraceCallsSection: React.FC<{
               );
             })}
           </Box>
+        </Box>
 
-          {/* Metrics Section */}
-          <Box
-            sx={{
-              marginTop: '24px',
-              fontWeight: 'bold',
-              borderBottom: '1px solid #e0e0e0',
-              paddingBottom: '8px',
-              marginBottom: '8px',
-            }}>
-            Metrics
-          </Box>
-
+        {/* Metrics Section */}
+        <Box sx={{marginTop: '8px'}}>
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
-              borderBottom: '1px solid #f5f5f5',
+              bgcolor: '#f5f5f5',
+              fontWeight: 'bold',
+            }}>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                borderRight: '1px solid #e0e0e0',
+                borderBottom: '1px solid #e0e0e0',
+              }}>
+              Metrics
+            </Box>
+            {evaluationIds.map(evalId => (
+              <Box
+                key={evalId}
+                sx={{
+                  padding: '8px 16px',
+                  textAlign: 'center',
+                  borderRight:
+                    evalId !== evaluationIds[evaluationIds.length - 1]
+                      ? '1px solid #e0e0e0'
+                      : 'none',
+                  borderBottom: '1px solid #e0e0e0',
+                }}>
+                Trials
+              </Box>
+            ))}
+          </Box>
+
+          {/* Metrics rows */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
               bgcolor: '#ffffff',
             }}>
-            <Box sx={{padding: '8px', fontWeight: 'bold'}}>Model Latency</Box>
+            <Box
+              sx={{
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                borderRight: '1px solid #e0e0e0',
+              }}>
+              Model Latency
+            </Box>
+
             {evaluationIds.map(evalId => {
-              const evalCall = callGroup.find(c => c.evalId === evalId)?.call;
-              // Attempt to extract latency from the traceCall
+              const evalCall = currentExample[1].find(
+                c => c.evalId === evalId
+              )?.call;
               const executionTime = evalCall?.traceCall?.execution_time;
               return (
                 <Box
                   key={evalId}
-                  sx={{padding: '8px', borderLeft: '1px solid #f5f5f5'}}>
+                  sx={{
+                    padding: '8px 16px',
+                    borderRight:
+                      evalId !== evaluationIds[evaluationIds.length - 1]
+                        ? '1px solid #e0e0e0'
+                        : 'none',
+                  }}>
                   {executionTime !== undefined
                     ? `${(executionTime * 1000).toFixed(3)}ms`
                     : '-'}
@@ -326,8 +449,8 @@ const TraceCallsSection: React.FC<{
             })}
           </Box>
         </Box>
-      ))}
-    </Box>
+      </Box>
+    </VerticalBox>
   );
 };
 
