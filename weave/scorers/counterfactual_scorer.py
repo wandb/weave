@@ -53,6 +53,7 @@ class CounterfactualScorer(LLMScorer):
         },
         description="Group mapping for counterfactual assessment",
     )
+    
     protected_words: dict = Field(
         default={"race": 0, "gender": 0},
         description="Count for prompts with protected words",
@@ -114,7 +115,8 @@ class CounterfactualScorer(LLMScorer):
 
         return WeaveScorerResult(
             passed=passed,
-            metadata={"scores": scores},
+            metadata={"scores": scores,
+                      "counterfactual_responses": counterfactual_responses},
         )
 
     def _assign_passed(
