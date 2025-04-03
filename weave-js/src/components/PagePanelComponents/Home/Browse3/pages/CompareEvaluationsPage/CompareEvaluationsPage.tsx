@@ -101,6 +101,20 @@ export const CompareEvaluationsPageContent: React.FC<
 
   console.log('traceCalls', traceCalls);
 
+  // Filter for summarize calls
+  const summarizeCalls = childCalls.result
+    ?.filter(
+      call =>
+        call.traceCall?.op_name?.includes('summarize') ||
+        call.traceCall?.op_name?.includes('Evaluation.summarize')
+    )
+    ?.map(call => ({
+      callId: call.callId,
+      traceCall: call.traceCall,
+    }));
+
+  console.log('summarizeCalls', summarizeCalls);
+
   // --------------------------------------
 
   const setComparisonDimensionsAndClearInputDigest = useCallback(
@@ -144,6 +158,7 @@ export const CompareEvaluationsPageContent: React.FC<
             <CompareEvaluationsPageInner
               height={height}
               traceCalls={traceCalls}
+              summarizeCalls={summarizeCalls}
             />
           )}
         </AutoSizer>
@@ -201,6 +216,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
   traceCalls?: Array<{callId: string; traceCall: any}>;
+  summarizeCalls?: Array<{callId: string; traceCall: any}>;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
@@ -220,6 +236,7 @@ const CompareEvaluationsPageInner: React.FC<{
       <TraceCallsCompareEvaluationsPage
         height={props.height}
         traceCalls={props.traceCalls || []}
+        summarizeCalls={props.summarizeCalls || []}
         state={state}
       />
     );
