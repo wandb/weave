@@ -54,7 +54,7 @@ dependencies = [
   #    weave_server_sdk==0.0.1
 
   # TODO: Uncomment when ready to commit to the new bindings.
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
+  # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
 ]
 
 [project.optional-dependencies]
@@ -188,8 +188,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
+# [tool.hatch.metadata]
+# allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
