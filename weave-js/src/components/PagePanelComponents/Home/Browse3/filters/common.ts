@@ -426,9 +426,14 @@ export const makeDateFilter = (
   };
 };
 
-// Default time ranges for date filters in days
-const DEFAULT_DATE_RANGE_DAYS = 30;
-
-export const make30DayDateFilter = (): GridFilterItem => {
-  return makeDateFilter(DEFAULT_DATE_RANGE_DAYS);
+export const makeMonthFilter = (): GridFilterItem => {
+  // Get last month
+  const curMonth = new Date().getMonth();
+  // Number of days in the previous month
+  const prevMonthDays = new Date(
+    new Date().getFullYear(),
+    curMonth,
+    0
+  ).getDate();
+  return makeDateFilter(prevMonthDays);
 };

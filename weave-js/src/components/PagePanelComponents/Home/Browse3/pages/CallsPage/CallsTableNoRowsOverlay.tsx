@@ -3,7 +3,7 @@ import {GridFilterModel} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {make30DayDateFilter, makeDateFilter} from '../../filters/common';
+import {makeDateFilter, makeMonthFilter} from '../../filters/common';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -126,9 +126,10 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
       // Determine the appropriate bucket size, ensuring it's larger than the existing filter
       if (existingFilterDays < 4) {
         newDateFilter = makeDateFilter(7);
-      } else if (existingFilterDays < 7) {
-        newDateFilter = makeDateFilter(30);
-      } else if (existingFilterDays <= 30) {
+      } else if (existingFilterDays <= 7) {
+        // Month is a special case, depends on the # of days in last month
+        newDateFilter = makeMonthFilter();
+      } else if (existingFilterDays <= 31) {
         newDateFilter = makeDateFilter(90);
       } else if (existingFilterDays <= 90) {
         newDateFilter = makeDateFilter(180);
@@ -144,7 +145,7 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
       }
     } else {
       // Impossible (block conditioned on hasDateFilter), but default to 3 months
-      newDateFilter = make30DayDateFilter();
+      newDateFilter = makeMonthFilter();
     }
 
     // Add the new date filter

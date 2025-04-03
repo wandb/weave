@@ -15,6 +15,7 @@ import {
 import {
   isValuelessOperator,
   makeDateFilter,
+  makeMonthFilter,
   makeRawDateFilter,
 } from '../../filters/common';
 import {addCostsToCallResults} from '../CallPage/cost';
@@ -341,7 +342,7 @@ export const useMakeInitialDatetimeFilter = (
       newFilter = defaultDatetimeFilter;
     } else if (callStats30Days.result && callStats30Days.result.count >= 50) {
       newFilter = {
-        items: [makeDateFilter(30)],
+        items: [makeMonthFilter()],
         logicOperator: GridLogicOperator.And,
       };
     } else if (callStats30Days.result && callStats30Days.result.count < 50) {
