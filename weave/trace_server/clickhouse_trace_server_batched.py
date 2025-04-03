@@ -1951,7 +1951,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             logger.exception(
                 "clickhouse_stream_query_error",
                 extra={
-                    "error": e,
+                    "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
                 },
@@ -1964,12 +1964,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: Optional[dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
+        try:
+            res = self.ch_client.query(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            )
+        except Exception as e:
+            logger.exception(
+                "clickhouse_query_error",
+                extra={"error_str": str(e), "query": query, "parameters": parameters},
+            )
+            raise
+
         logger.info(
             "clickhouse_query",
             extra={
