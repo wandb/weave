@@ -188,8 +188,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
+# [tool.hatch.metadata]
+# allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
