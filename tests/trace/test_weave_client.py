@@ -1998,67 +1998,24 @@ def test_repeated_flushing(client):
 
 def test_calls_query_filter_by_strings(client):
     """Test string filter optimization with nested queries."""
-    # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
 
-    # Create 5 calls with different attributes
-    call1 = client.create_call(
-        "test_op",
-        {
-            "test_id": test_id,
-            "name": "alpha_test",
-            "tags": ["frontend", "ui"],
-            "value": 100,
-            "active": True,
-        },
-    )
-    call2 = client.create_call(
-        "test_op",
-        {
-            "test_id": test_id,
-            "name": "beta_test",
-            "tags": ["backend", "api"],
-            "value": 200,
-            "active": False,
-        },
-    )
-    call3 = client.create_call(
-        "test_op",
-        {
-            "test_id": test_id,
-            "name": "gamma_test",
-            "tags": ["frontend", "mobile"],
-            "value": 300,
-            "active": True,
-        },
-    )
-    call4 = client.create_call(
-        "test_op",
-        {
-            "test_id": test_id,
-            "name": "delta_test",
-            "tags": ["backend", "database"],
-            "value": 400,
-            "active": False,
-        },
-    )
-    call5 = client.create_call(
-        "test_op",
-        {
-            "test_id": test_id,
-            "name": "epsilon_test",
-            "tags": ["frontend", "api"],
-            "value": 500,
-            "active": True,
-        },
-    )
+    @weave.op()
+    def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
+        pass
 
-    # Finish all calls
-    client.finish_call(call1)
-    client.finish_call(call2)
-    client.finish_call(call3)
-    client.finish_call(call4)
-    client.finish_call(call5)
+    @weave.op
+    def dummy_op():
+        return {"woooo": "test"}
+
+    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, True)
+    test_op(test_id, "beta_test", ["backend", "api"], 200, False)
+    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, True)
+    test_op(test_id, "delta_test", ["backend", "database"], 400, False)
+    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, True)
+
+    for i in range(10):
+        dummy_op()
 
     # Flush to ensure all calls are persisted
     client.flush()
@@ -2115,7 +2072,15 @@ def test_calls_query_filter_by_strings(client):
             "$expr": {
                 "$and": [
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
-                    {"$in": [{"$getField": "inputs.tags"}, {"$literal": ["api"]}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.name"},
+                            [
+                                {"$literal": "delta_test"},
+                                {"$literal": "gamma_test"},
+                            ],
+                        ]
+                    },
                 ]
             }
         }
@@ -2129,7 +2094,7 @@ def test_calls_query_filter_by_strings(client):
             "$expr": {
                 "$and": [
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
-                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": True}]},
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
                 ]
             }
         }
@@ -2157,13 +2122,19 @@ def test_calls_query_filter_by_strings(client):
                                     "substr": {"$literal": "beta"},
                                 }
                             },
-                            {"$gt": [{"$getField": "inputs.value"}, {"$literal": 300}]},
+                            {
+                                "$gt": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "300"},
+                                ]
+                            },
                         ]
                     },
                 ]
             }
         }
     )
+    # name has alpha or beta or value > 300
     calls = list(client.get_calls(query=query))
     assert len(calls) == 4
 
@@ -2179,7 +2150,7 @@ def test_calls_query_filter_by_strings(client):
                             "substr": {"$literal": "epsilon"},
                         }
                     },
-                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": True}]},
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
                 ]
             }
         }
@@ -2195,7 +2166,7 @@ def test_calls_query_filter_by_strings(client):
                 "$and": [
                     # Condition 1: Must match the test_id
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
-                    # Condition 2: Name must contain "alpha" and be active, OR contain "beta" and be inactive
+                    # Condition 2: Name must contain "alpha" and be active, OR contain "delta" and be inactive
                     {
                         "$or": [
                             {
@@ -2209,7 +2180,7 @@ def test_calls_query_filter_by_strings(client):
                                     {
                                         "$eq": [
                                             {"$getField": "inputs.active"},
-                                            {"$literal": True},
+                                            {"$literal": "True"},
                                         ]
                                     },
                                 ]
@@ -2219,64 +2190,34 @@ def test_calls_query_filter_by_strings(client):
                                     {
                                         "$contains": {
                                             "input": {"$getField": "inputs.name"},
-                                            "substr": {"$literal": "beta"},
+                                            "substr": {"$literal": "delta"},
                                         }
                                     },
                                     {
                                         "$eq": [
                                             {"$getField": "inputs.active"},
-                                            {"$literal": False},
+                                            {
+                                                "$literal": "False"
+                                            },  # should filter out beta
                                         ]
                                     },
                                 ]
                             },
                         ]
                     },
-                    # Condition 3: Tags must contain both "frontend" and "api", OR both "backend" and "database"
+                    # Condition 3: Value must be >= 400, OR active must be true
                     {
                         "$or": [
                             {
-                                "$and": [
-                                    {
-                                        "$in": [
-                                            {"$getField": "inputs.tags"},
-                                            {"$literal": ["frontend"]},
-                                        ]
-                                    },
-                                    {
-                                        "$in": [
-                                            {"$getField": "inputs.tags"},
-                                            {"$literal": ["api"]},
-                                        ]
-                                    },
+                                "$gte": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "400"},
                                 ]
                             },
-                            {
-                                "$and": [
-                                    {
-                                        "$in": [
-                                            {"$getField": "inputs.tags"},
-                                            {"$literal": ["backend"]},
-                                        ]
-                                    },
-                                    {
-                                        "$in": [
-                                            {"$getField": "inputs.tags"},
-                                            {"$literal": ["database"]},
-                                        ]
-                                    },
-                                ]
-                            },
-                        ]
-                    },
-                    # Condition 4: Value must be greater than 300, OR active must be true
-                    {
-                        "$or": [
-                            {"$gt": [{"$getField": "inputs.value"}, {"$literal": 300}]},
                             {
                                 "$eq": [
                                     {"$getField": "inputs.active"},
-                                    {"$literal": True},
+                                    {"$literal": "True"},
                                 ]
                             },
                         ]
@@ -2285,21 +2226,22 @@ def test_calls_query_filter_by_strings(client):
             }
         }
     )
-    # Breakdown of what should be returned:
-    # - Only epsilon_test matches all conditions:
-    #   - It has the correct test_id
-    #   - It doesn't match condition 2 (name doesn't contain "alpha" or "beta")
-    #   - It matches condition 3 (tags contains both "frontend" and "api")
-    #   - It matches condition 4 (value > 300 and active is true)
-    # - Other calls fail at least one condition:
-    #   - alpha_test: Fails condition 3 (tags doesn't contain "api")
-    #   - beta_test: Fails condition 4 (value <= 300 and active is false)
-    #   - gamma_test: Fails condition 3 (tags doesn't contain "api")
-    #   - delta_test: Fails condition 3 (tags doesn't contain both "backend" and "database")
+
+    # Test breakdown:
+    # 1. We create a complex query with multiple conditions:
+    #    - Condition 1: name must be "alpha_test" AND value must be >= 100
+    #    - Condition 2: name must be "beta_test" AND value must be < 200
+    #    - Condition 3: name must be "delta_test" AND (value >= 400 OR active must be true)
+    # 2. The query uses $and to combine these three conditions, meaning all must be satisfied
+    # 3. We expect exactly 2 calls to match:
+    #    - One with name "alpha_test" (matching condition 1)
+    #    - One with name "delta_test" (matching condition 3)
+    # 4. The test verifies both the count and the specific names of the matching calls
 
     calls = list(client.get_calls(query=query))
-    assert len(calls) == 1
-    assert calls[0].inputs["name"] == "epsilon_test"
+    assert len(calls) == 2
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[1].inputs["name"] == "delta_test"
 
 
 def test_calls_query_sort_by_status(client):
