@@ -84,8 +84,9 @@ class Monitor(Object):
         if not isinstance(call_filter["op_names"], list):
             raise ValueError("op_names must be a list")  # noqa: TRY004
 
-        if "query" not in call_filter:
-            raise ValueError("call_filter must contain a query key")
+        if "query" in call_filter:
+            if "$expr" not in call_filter["query"]:
+                raise ValueError("call_filter must contain a $expr key")
 
         return call_filter
 
