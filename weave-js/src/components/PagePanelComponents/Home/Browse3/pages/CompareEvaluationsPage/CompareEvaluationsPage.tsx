@@ -206,16 +206,76 @@ const CompareEvaluationsPageInner: React.FC<{
   traceCalls?: Array<{callId: string; traceCall: any}>;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
-  // const showExamples =
-  //   Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
-  //     .length > 0;
-
   const showExamples = true;
   console.log('showExampleFilter', showExampleFilter);
   console.log('showExamples', showExamples);
   const resultsLoading = state.loadableComparisonResults.loading;
+
+  // Check if we should show the traceCalls UI
+  const isTraceCallsPath = props.traceCalls && props.traceCalls.length > 0;
+
+  if (isTraceCallsPath) {
+    // Completely different UI for trace calls path
+    return (
+      <Box
+        sx={{
+          height: props.height,
+          width: '100%',
+          overflow: 'auto',
+        }}>
+        <VerticalBox
+          sx={{
+            paddingTop: STANDARD_PADDING,
+            alignItems: 'flex-start',
+            gridGap: STANDARD_PADDING * 2,
+          }}>
+          <InvalidEvaluationBanner
+            evaluationCalls={Object.values(state.summary.evaluationCalls)}
+          />
+          <VerticalBox
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+            }}>
+            <HorizontalBox
+              sx={{
+                flex: '0 0 auto',
+                paddingLeft: STANDARD_PADDING,
+                paddingRight: STANDARD_PADDING,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+              }}>
+              <Box
+                sx={{
+                  fontSize: '1.5em',
+                  fontWeight: 'bold',
+                }}>
+                Trace Call Outputs
+              </Box>
+            </HorizontalBox>
+            <Box
+              sx={{
+                height: props.height,
+                overflow: 'auto',
+              }}>
+              <TraceCallsSection
+                traceCalls={props.traceCalls || []}
+                entity={projectContext?.entity}
+                project={projectContext?.project}
+                state={state}
+              />
+            </Box>
+          </VerticalBox>
+        </VerticalBox>
+      </Box>
+    );
+  }
+
+  // Original UI for regular comparison path
   return (
     <Box
       sx={{
@@ -249,16 +309,11 @@ const CompareEvaluationsPageInner: React.FC<{
         ) : showExamples ? (
           <>
             {showExampleFilter && <ExampleFilterSection state={state} />}
-            <ResultExplorer
-              state={state}
-              height={props.height}
-              traceCalls={props.traceCalls}
-            />
+            <ResultExplorer state={state} height={props.height} />
           </>
         ) : (
           <VerticalBox
             sx={{
-              // alignItems: '',
               paddingLeft: STANDARD_PADDING,
               paddingRight: STANDARD_PADDING,
               width: '100%',
@@ -286,8 +341,7 @@ const CompareEvaluationsPageInner: React.FC<{
 const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
-  traceCalls?: Array<{callId: string; traceCall: any}>;
-}> = ({state, height, traceCalls}) => {
+}> = ({state, height}) => {
   // Get entity and project from context
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
 
@@ -311,9 +365,7 @@ const ResultExplorer: React.FC<{
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          {traceCalls && traceCalls.length > 0
-            ? 'Trace Call Outputs'
-            : 'Output Comparison'}
+          Output Comparison
         </Box>
       </HorizontalBox>
       <Box
@@ -321,16 +373,7 @@ const ResultExplorer: React.FC<{
           height,
           overflow: 'auto',
         }}>
-        {traceCalls && traceCalls.length > 0 ? (
-          <TraceCallsSection
-            traceCalls={traceCalls}
-            entity={projectContext?.entity}
-            project={projectContext?.project}
-            state={state}
-          />
-        ) : (
-          <ExampleCompareSection state={state} />
-        )}
+        <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
   );
