@@ -2002,7 +2002,13 @@ def test_calls_query_filter_by_strings(client):
 
     @weave.op()
     def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
-        pass
+        return {
+            "test_id": test_id,
+            "name": name,
+            "tags": tags,
+            "value": value,
+            "active": active,
+        }
 
     @weave.op
     def dummy_op():
@@ -2045,6 +2051,12 @@ def test_calls_query_filter_by_strings(client):
     )
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5  # All names contain "test"
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
 
     # Filter with string contains - should return 1 call (name contains "alpha")
     query = tsi.Query(
@@ -2065,6 +2077,10 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 1
     assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 100
 
     # Filter with string in - should return 2 calls (tags contains "api")
     query = tsi.Query(
@@ -2087,6 +2103,12 @@ def test_calls_query_filter_by_strings(client):
     )
     calls = list(client.get_calls(query=query))
     assert len(calls) == 2
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
 
     # Filter with boolean - should return 3 calls (active is true)
     query = tsi.Query(
@@ -2101,6 +2123,12 @@ def test_calls_query_filter_by_strings(client):
     )
     calls = list(client.get_calls(query=query))
     assert len(calls) == 3
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
 
     # Filter with OR - should return 4 calls (name contains "alpha" or "beta" or value > 300)
     query = tsi.Query(
@@ -2137,6 +2165,12 @@ def test_calls_query_filter_by_strings(client):
     # name has alpha or beta or value > 300
     calls = list(client.get_calls(query=query))
     assert len(calls) == 4
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
 
     # Complex nested filter - should return exactly 1 call (name contains "epsilon" and active is true)
     query = tsi.Query(
@@ -2158,6 +2192,10 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 1
     assert calls[0].inputs["name"] == "epsilon_test"
+    assert calls[0].output["name"] == "epsilon_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 500
 
     # Extremely complex nested filter with multiple levels of nesting
     query = tsi.Query(
@@ -2241,7 +2279,13 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 2
     assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
     assert calls[1].inputs["name"] == "delta_test"
+    assert calls[1].output["name"] == "delta_test"
+    for call in calls:
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
 
 
 def test_calls_query_sort_by_status(client):
