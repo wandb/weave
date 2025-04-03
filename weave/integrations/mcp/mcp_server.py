@@ -68,7 +68,6 @@ def get_mcp_server_patcher(
         return _mcp_server_patcher
 
     base = settings.op_settings
-    print("base", base)
 
     # Settings for core methods
     call_tool_settings = base.model_copy(
@@ -161,7 +160,6 @@ def get_mcp_server_patcher(
             decorator_wrapper(prompt_decorator_settings),
         ),
     ]
-    print("patchers", patchers)
 
     _mcp_server_patcher = MultiPatcher(patchers)
 
