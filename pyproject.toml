@@ -153,6 +153,9 @@ test = [
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
+
+  # Bultins
+  "litellm>=1.49.1",
 ]
 dev = [
   # codegen

@@ -53,6 +53,10 @@ class EvaluationResults(Object):
     rows: weave.Table
 
 
+ON_START_CALLBACK_TYPE = Callable[[], None]
+ON_ROW_COMPLETE_CALLBACK_TYPE = Callable[[str, dict], None]
+
+
 @register_object
 class Evaluation(Object):
     """
@@ -192,14 +196,26 @@ class Evaluation(Object):
                     summary[name] = model_output_summary
         return summary
 
-    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
+    async def get_eval_results(
+        self,
+        model: Union[Op, Model],
+        on_row_complete: Optional[ON_ROW_COMPLETE_CALLBACK_TYPE] = None,
+    ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
         async def eval_example(example: dict) -> dict:
             try:
-                eval_row = await self.predict_and_score(model, example)
+                eval_row, eval_row_call = await self.predict_and_score.call(
+                    self, model, example
+                )
+                if on_row_complete:
+                    try:
+                        on_row_complete(eval_row_call.id, eval_row)
+                    except Exception:
+                        print("On row complete failed")
+                        traceback.print_exc()
             except OpCallError as e:
                 raise e
             except Exception:
@@ -233,8 +249,19 @@ class Evaluation(Object):
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Op, Model]) -> dict:
-        eval_results = await self.get_eval_results(model)
+    async def evaluate(
+        self,
+        model: Union[Op, Model],
+        on_start: Optional[ON_START_CALLBACK_TYPE] = None,
+        on_row_complete: Optional[ON_ROW_COMPLETE_CALLBACK_TYPE] = None,
+    ) -> dict:
+        if on_start:
+            try:
+                on_start()
+            except Exception:
+                print("On start failed")
+                traceback.print_exc()
+        eval_results = await self.get_eval_results(model, on_row_complete)
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)

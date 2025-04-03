@@ -83,7 +83,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--weave-server",
         action="store",
-        default="sqlite",
+        default="clickhouse",
         help="Specify the client object to use: sqlite or clickhouse",
     )
 
@@ -391,6 +391,14 @@ class TestOnlyUserInjectingExternalTraceServer(
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)
+
+    # Missing for call method and score call?
+
+    async def evaluate_stream(
+        self, req: tsi.EvaluateReq
+    ) -> typing.AsyncIterator[tsi.EvaluateStepRes]:
+        req.wb_user_id = self._user_id
+        return await super().evaluate_stream(req)
 
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
