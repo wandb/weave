@@ -1,5 +1,5 @@
 
-CREATE TABLE calls_merged_final (
+CREATE TABLE IF NOT EXISTS calls_merged_final (
     id String,
     project_id String,
     started_at DateTime64(6),
@@ -40,23 +40,23 @@ CREATE MATERIALIZED VIEW calls_merged_final_view TO calls_merged_final AS
 SELECT
     id,
     project_id,
-    calls_merged.started_at as started_at,
+    anySimpleState(calls_merged.started_at) as started_at,
 
-    anySimpleMergeState(wb_run_id) as wb_run_id,
-    anySimpleMergeStateIf(wb_user_id, isNotNull(call_parts.started_at)) as wb_user_id,
-    anySimpleMergeState(trace_id) as trace_id,
-    anySimpleMergeState(parent_id) as parent_id,
-    anySimpleMergeState(op_name) as op_name,
-    anySimpleMergeState(ended_at) as ended_at,
-    anySimpleMergeState(attributes_dump) as attributes_dump,
-    anySimpleMergeState(inputs_dump) as inputs_dump,
-    anySimpleMergeState(output_dump) as output_dump,
-    array_concat_aggSimpleMergeState(input_refs) as input_refs,
-    array_concat_aggSimpleMergeState(output_refs) as output_refs,
-    anySimpleMergeState(exception) as exception,
-    anySimpleMergeState(deleted_at) as deleted_at,
-    anySimpleMergeState(summary_dump) as summary_dump,
-    argMaxMergeState(display_name, call_parts.created_at) as display_name
+    anySimpleState(wb_run_id) as wb_run_id,
+    anySimpleStateIf(wb_user_id, isNotNull(calls_merged.started_at)) as wb_user_id,
+    anySimpleState(trace_id) as trace_id,
+    anySimpleState(parent_id) as parent_id,
+    anySimpleState(op_name) as op_name,
+    anySimpleState(ended_at) as ended_at,
+    anySimpleState(attributes_dump) as attributes_dump,
+    anySimpleState(inputs_dump) as inputs_dump,
+    anySimpleState(output_dump) as output_dump,
+    array_concat_aggSimpleState(input_refs) as input_refs,
+    array_concat_aggSimpleState(output_refs) as output_refs,
+    anySimpleState(exception) as exception,
+    anySimpleState(deleted_at) as deleted_at,
+    anySimpleState(summary_dump) as summary_dump,
+    anySimpleState(display_name) as display_name
 FROM calls_merged
 -- do i need to push this into a having?
 WHERE isNotNull(calls_merged.started_at)
