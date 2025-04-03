@@ -846,10 +846,6 @@ def _field_requires_null_check(field: str) -> bool:
     return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
-def _field_requires_null_check(field: str) -> bool:
-    return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
-
-
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
@@ -1429,12 +1425,8 @@ def process_query_to_optimization_sql(
                     id_datetime_filters_sql="",
                 )
             return OptimizationConditions(
-                str_filter_opt_sql=field.as_sql(
-                    param_builder, table_alias, use_agg_fn=False
-                ),
-                id_datetime_filters_sql=field.as_sql(
-                    param_builder, table_alias, use_agg_fn=False
-                ),
+                str_filter_opt_sql=field.as_sql(param_builder, table_alias),
+                id_datetime_filters_sql=field.as_sql(param_builder, table_alias),
             )
         elif isinstance(operand, tsi_query.ConvertOperation):
             return process_operand(operand.convert_.input)
@@ -1451,10 +1443,7 @@ def process_query_to_optimization_sql(
                 tsi_query.ContainsOperation,
             ),
         ):
-            processed = process_operation(operand)
-            if processed is None:
-                return None
-            return processed.str_filter_opt_sql
+            return process_operation(operand)
         return None
 
     # Create a single AND operation from all conditions
