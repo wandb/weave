@@ -24,6 +24,7 @@ import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
 } from '../pages/wfReactInterface/constants';
+import {Query} from '../pages/wfReactInterface/traceServerClientInterface/query';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -387,4 +388,52 @@ export const upsertFilter = (
 export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
+};
+
+export const makeRawDateFilter = (
+  days: number,
+  field: string = 'started_at'
+): Query => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  return {
+    $expr: {
+      $gt: [{$getField: field}, {$literal: d.getTime() / 1000}],
+    },
+  };
+};
+
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
+  };
+};
+
+export const makeMonthFilter = (): GridFilterItem => {
+  // Get last month
+  const curMonth = new Date().getMonth();
+  // Number of days in the previous month
+  const prevMonthDays = new Date(
+    new Date().getFullYear(),
+    curMonth,
+    0
+  ).getDate();
+  return makeDateFilter(prevMonthDays);
 };
