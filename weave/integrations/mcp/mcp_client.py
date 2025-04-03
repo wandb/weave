@@ -1,4 +1,3 @@
-print("I AM IN THE MCP CLIENT INTEGRATION")
 import importlib
 from typing import Callable
 
