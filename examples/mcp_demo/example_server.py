@@ -1,9 +1,8 @@
-from typing import Any
 import httpx
+
 # import weave
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.prompts import base
-
 from PIL import Image as PILImage
 
 # # Initialize Weave for tracing
@@ -12,6 +11,7 @@ from PIL import Image as PILImage
 
 # Create an MCP server
 mcp = FastMCP("Demo")
+
 
 # Add an addition tool
 @mcp.tool()
@@ -51,7 +51,7 @@ async def fetch_weather(city: str) -> str:
     async with httpx.AsyncClient() as client:
         response = await client.get(f"https://api.weather.com/{city}")
         return response.text
-    
+
 
 @mcp.prompt()
 def review_code(code: str) -> str:
@@ -78,4 +78,4 @@ def create_thumbnail(image_path: str) -> Image:
 if __name__ == "__main__":
     # Initialize and run the server
     print("Starting MCP server...")
-    mcp.run(transport='stdio')
+    mcp.run(transport="stdio")

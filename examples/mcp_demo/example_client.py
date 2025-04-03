@@ -1,13 +1,13 @@
 import asyncio
 import sys
-from typing import Optional, Dict, Any, List
 from contextlib import AsyncExitStack
-from pydantic import AnyUrl
+from typing import Any, Dict, Optional
 
 # import weave
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import TextContent
+from pydantic import AnyUrl
 
 # Initialize Weave for tracing
 # weave_client = weave.init("mcp_example")
@@ -19,76 +19,91 @@ class MCPClient:
         # Initialize session and client objects
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
-        
+
     # @weave.op()
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
-        
+
         Args:
             server_script_path: Path to the server script (.py or .js)
         """
         print(f"Connecting to server at: {server_script_path}")
-        
+
         server_params = StdioServerParameters(
-            command="python",
-            args=[server_script_path],
-            env=None
+            command="python", args=[server_script_path], env=None
         )
-        
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+
+        stdio_transport = await self.exit_stack.enter_async_context(
+            stdio_client(server_params)
+        )
         self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
-        
+        self.session = await self.exit_stack.enter_async_context(
+            ClientSession(self.stdio, self.write)
+        )
+
         await self.session.initialize()
-        
+
         # List available tools
         tools_response = await self.session.list_tools()
         print("\nAvailable tools:", [tool.name for tool in tools_response.tools])
-        
+
         # List available resources
         resources_response = await self.session.list_resources()
-        print("Available resources:", [resource.uri for resource in resources_response.resources])
-        
+        print(
+            "Available resources:",
+            [resource.uri for resource in resources_response.resources],
+        )
+
         # List available prompts
         prompts_response = await self.session.list_prompts()
-        print("Available prompts:", [prompt.name for prompt in prompts_response.prompts])
-        
+        print(
+            "Available prompts:", [prompt.name for prompt in prompts_response.prompts]
+        )
+
         print("\nServer connection established!")
         return {
             "tools": tools_response.tools,
             "resources": resources_response.resources,
-            "prompts": prompts_response.prompts
+            "prompts": prompts_response.prompts,
         }
 
     # @weave.op()
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]):
         """Call a tool on the MCP server
-        
+
         Args:
             tool_name: Name of the tool to call
             arguments: Arguments to pass to the tool
         """
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         # with weave.attributes({"mcp_component": "client", "mcp_method": "call_tool", "tool": tool_name}):
         print(f"Calling tool: {tool_name} with arguments: {arguments}")
         result = await self.session.call_tool(tool_name, arguments)
         content = result.content
-        if isinstance(content, list) and len(content) > 0 and isinstance(content[0], TextContent):
+        if (
+            isinstance(content, list)
+            and len(content) > 0
+            and isinstance(content[0], TextContent)
+        ):
             return content[0].text
         return content
 
     # @weave.op()
     async def read_resource(self, uri: str):
         """Read a resource from the MCP server
-        
+
         Args:
             uri: URI of the resource to read
         """
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         # with weave.attributes({"mcp_component": "client", "mcp_method": "read_resource", "uri": uri}):
         print(f"Reading resource: {uri}")
         result = await self.session.read_resource(AnyUrl(uri))
@@ -97,14 +112,16 @@ class MCPClient:
     # @weave.op()
     async def get_prompt(self, prompt_name: str, arguments: Dict[str, str] = None):
         """Get a prompt from the MCP server
-        
+
         Args:
             prompt_name: Name of the prompt to get
             arguments: Arguments to pass to the prompt
         """
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         # with weave.attributes({"mcp_component": "client", "mcp_method": "get_prompt", "prompt": prompt_name}):
         print(f"Getting prompt: {prompt_name} with arguments: {arguments}")
         result = await self.session.get_prompt(prompt_name, arguments)
@@ -114,55 +131,63 @@ class MCPClient:
     async def demo_all_tools(self):
         """Demonstrate all available tools"""
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         print("\n=== TOOL DEMO ===")
         tools_response = await self.session.list_tools()
-        
+
         results = []
         for tool in tools_response.tools:
             try:
                 name = tool.name
                 print(f"\nDemonstrating tool: {name}")
                 print(f"Description: {tool.description}")
-                
+
                 if name == "add":
                     result = await self.call_tool("add", {"a": 5, "b": 7})
                     print(f"Result of adding 5 + 7: {result}")
                     results.append({"name": name, "result": result})
-                
+
                 elif name == "calculate_bmi":
-                    result = await self.call_tool("calculate_bmi", {"weight_kg": 70, "height_m": 1.75})
+                    result = await self.call_tool(
+                        "calculate_bmi", {"weight_kg": 70, "height_m": 1.75}
+                    )
                     print(f"BMI for 70kg/1.75m: {result}")
                     results.append({"name": name, "result": result})
-                
+
                 elif name == "fetch_weather":
                     try:
-                        result = await self.call_tool("fetch_weather", {"city": "San Francisco"})
+                        result = await self.call_tool(
+                            "fetch_weather", {"city": "San Francisco"}
+                        )
                         print(f"Weather for San Francisco: {result}")
                         results.append({"name": name, "result": result})
                     except Exception as e:
                         print(f"Weather API error (expected in demo): {e}")
                         results.append({"name": name, "error": str(e)})
-                
+
                 elif name == "create_thumbnail":
                     print("Skipping create_thumbnail as it requires an image file path")
-            
+
             except Exception as e:
                 print(f"Error with {name}: {e}")
                 results.append({"name": name, "error": str(e)})
-        
+
         return results
 
     # @weave.op()
     async def demo_all_resources(self):
         """Demonstrate all available resources"""
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         print("\n=== RESOURCE DEMO ===")
         resources_response = await self.session.list_resources()
-        
+
         results = []
         # Fixed resources
         try:
@@ -172,7 +197,7 @@ class MCPClient:
         except Exception as e:
             print(f"Error reading config: {e}")
             results.append({"uri": "config://app", "error": str(e)})
-        
+
         # Dynamic resources with parameters
         try:
             greeting = await self.read_resource("greeting://Alice")
@@ -181,7 +206,7 @@ class MCPClient:
         except Exception as e:
             print(f"Error reading greeting: {e}")
             results.append({"uri": "greeting://Alice", "error": str(e)})
-        
+
         try:
             profile = await self.read_resource("users://123/profile")
             print(f"User Profile: {profile}")
@@ -189,46 +214,54 @@ class MCPClient:
         except Exception as e:
             print(f"Error reading profile: {e}")
             results.append({"uri": "users://123/profile", "error": str(e)})
-        
+
         return results
 
     # @weave.op()
     async def demo_all_prompts(self):
         """Demonstrate all available prompts"""
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         print("\n=== PROMPT DEMO ===")
         prompts_response = await self.session.list_prompts()
-        
+
         results = []
         for prompt in prompts_response.prompts:
             try:
                 name = prompt.name
                 print(f"\nDemonstrating prompt: {name}")
-                
+
                 if name == "review_code":
-                    result = await self.get_prompt("review_code", {"code": "def hello(): print('Hello World')"})
+                    result = await self.get_prompt(
+                        "review_code", {"code": "def hello(): print('Hello World')"}
+                    )
                     print(f"Code review prompt: {result}")
                     results.append({"name": name, "result": result})
-                
+
                 elif name == "debug_error":
-                    result = await self.get_prompt("debug_error", {"error": "NameError: name 'x' is not defined"})
+                    result = await self.get_prompt(
+                        "debug_error", {"error": "NameError: name 'x' is not defined"}
+                    )
                     print(f"Debug error prompt: {result}")
                     results.append({"name": name, "result": result})
-            
+
             except Exception as e:
                 print(f"Error with {name}: {e}")
                 results.append({"name": name, "error": str(e)})
-        
+
         return results
 
     # @weave.op()
     async def interactive_session(self):
         """Run an interactive session to use MCP tools and resources"""
         if not self.session:
-            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
-        
+            raise RuntimeError(
+                "Not connected to a server. Call connect_to_server first."
+            )
+
         print("\nMCP Interactive Session")
         print("Available commands:")
         print("  tools - List all available tools")
@@ -244,32 +277,32 @@ class MCPClient:
         print("  debug <error> - Get debug error prompt")
         print("  demo - Run demos for all features")
         print("  quit - Exit the session")
-        
+
         while True:
             try:
                 command = input("\nCommand: ").strip()
-                
+
                 if command.lower() == "quit":
                     break
-                
+
                 parts = command.split()
                 if not parts:
                     continue
-                
+
                 cmd = parts[0].lower()
-                
+
                 if cmd == "tools":
                     tools_response = await self.session.list_tools()
                     print("\nAvailable tools:")
                     for tool in tools_response.tools:
                         print(f"  {tool.name}: {tool.description}")
-                
+
                 elif cmd == "resources":
                     resources_response = await self.session.list_resources()
                     print("\nAvailable resources:")
                     for resource in resources_response.resources:
                         print(f"  {resource.uri}: {resource.description}")
-                
+
                 elif cmd == "prompts":
                     prompts_response = await self.session.list_prompts()
                     print("\nAvailable prompts:")
@@ -278,8 +311,10 @@ class MCPClient:
                         if prompt.arguments:
                             print("    Arguments:")
                             for arg in prompt.arguments:
-                                print(f"      {arg.name}: {arg.description} ({'required' if arg.required else 'optional'})")
-                
+                                print(
+                                    f"      {arg.name}: {arg.description} ({'required' if arg.required else 'optional'})"
+                                )
+
                 elif cmd == "add" and len(parts) == 3:
                     try:
                         a = int(parts[1])
@@ -288,16 +323,18 @@ class MCPClient:
                         print(f"\nResult: {a} + {b} = {result}")
                     except ValueError:
                         print("Error: Arguments must be integers")
-                
+
                 elif cmd == "bmi" and len(parts) == 3:
                     try:
                         weight = float(parts[1])
                         height = float(parts[2])
-                        result = await self.call_tool("calculate_bmi", {"weight_kg": weight, "height_m": height})
+                        result = await self.call_tool(
+                            "calculate_bmi", {"weight_kg": weight, "height_m": height}
+                        )
                         print(f"\nBMI for {weight}kg/{height}m: {result}")
                     except ValueError:
                         print("Error: Arguments must be numbers")
-                
+
                 elif cmd == "weather" and len(parts) == 2:
                     city = parts[1]
                     try:
@@ -305,7 +342,7 @@ class MCPClient:
                         print(f"\nWeather for {city}: {result}")
                     except Exception as e:
                         print(f"Error fetching weather: {e}")
-                
+
                 elif cmd == "greeting" and len(parts) == 2:
                     name = parts[1]
                     try:
@@ -313,7 +350,7 @@ class MCPClient:
                         print(f"\nGreeting: {result}")
                     except Exception as e:
                         print(f"Error reading greeting: {e}")
-                
+
                 elif cmd == "user" and len(parts) == 2:
                     user_id = parts[1]
                     try:
@@ -321,14 +358,14 @@ class MCPClient:
                         print(f"\nUser Profile: {result}")
                     except Exception as e:
                         print(f"Error reading user profile: {e}")
-                
+
                 elif cmd == "config":
                     try:
                         result = await self.read_resource("config://app")
                         print(f"\nApp Configuration: {result}")
                     except Exception as e:
                         print(f"Error reading config: {e}")
-                
+
                 elif cmd == "code-review" and len(parts) >= 2:
                     code = " ".join(parts[1:])
                     try:
@@ -336,7 +373,7 @@ class MCPClient:
                         print(f"\nCode Review Prompt: {result}")
                     except Exception as e:
                         print(f"Error getting prompt: {e}")
-                
+
                 elif cmd == "debug" and len(parts) >= 2:
                     error = " ".join(parts[1:])
                     try:
@@ -344,19 +381,19 @@ class MCPClient:
                         print(f"\nDebug Error Prompt: {result}")
                     except Exception as e:
                         print(f"Error getting prompt: {e}")
-                
+
                 elif cmd == "demo":
                     print("\nRunning full demo...")
                     await self.demo_all_tools()
                     await self.demo_all_resources()
                     await self.demo_all_prompts()
-                
+
                 else:
                     print("Unknown command or invalid arguments")
-            
+
             except Exception as e:
                 print(f"Error: {str(e)}")
-    
+
     async def cleanup(self):
         """Clean up resources"""
         await self.exit_stack.aclose()
@@ -377,6 +414,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: uv run example_client.py <path_to_server_script>")
         sys.exit(1)
-    
+
     server_script_path = sys.argv[1]
     asyncio.run(run_client(server_script_path))

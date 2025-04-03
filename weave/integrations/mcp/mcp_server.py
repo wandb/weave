@@ -33,9 +33,7 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
                 base_name = settings.name or ""
 
                 display_name = (
-                    f"{base_name}.{weave_op_name}"
-                    if weave_op_name != ""
-                    else base_name
+                    f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
                 )
 
                 settings_copy = settings.model_copy(
