@@ -38,6 +38,18 @@ const formatSmallTime = (then: moment.Moment): string | null => {
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
+  const years = now.diff(then, 'years');
+  if (years > 0) {
+    const remainingDays = days - years * 365;
+    if (remainingDays < 7) {
+      if (years === 1) {
+        return '1y';
+      } else if (years > 1) {
+        return `${years}y`;
+      }
+    }
+  }
+
   // Calculate months using moment's diff
   const months = now.diff(then, 'months');
   if (months > 0) {
@@ -49,15 +61,6 @@ const formatSmallTime = (then: moment.Moment): string | null => {
       } else if (months > 1) {
         return `${months}mo`;
       }
-    }
-  }
-
-  const years = now.diff(then, 'years');
-  if (years > 0) {
-    if (years === 1) {
-      return '1y';
-    } else if (years > 1) {
-      return `${years}y`;
     }
   }
 
