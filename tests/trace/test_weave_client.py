@@ -2008,11 +2008,11 @@ def test_calls_query_filter_by_strings(client):
     def dummy_op():
         return {"woooo": "test"}
 
-    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, True)
-    test_op(test_id, "beta_test", ["backend", "api"], 200, False)
-    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, True)
-    test_op(test_id, "delta_test", ["backend", "database"], 400, False)
-    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, True)
+    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, "True")
+    test_op(test_id, "beta_test", ["backend", "api"], 200, "False")
+    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, "True")
+    test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
+    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
     for i in range(10):
         dummy_op()
