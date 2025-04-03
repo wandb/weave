@@ -320,8 +320,8 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
-    assert found_formatted == exp_formatted
-    assert params == exp_params
+    assert exp_formatted == found_formatted
+    assert exp_params == params
 
 
 def test_query_light_column_with_costs() -> None:
@@ -1358,6 +1358,40 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             "pb_10": '%"%weather%"%',
             "pb_11": '%"0.7"%',
             "pb_12": '%"0.8"%',
+        },
+    )
+
+
+def test_calls_query_filter_by_empty_string() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
+        )
+    )
+    # Empty string is not a valid value for LIKE optimization, this test ensures we do
+    # not try to optimize
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"."val"',
+            "pb_1": "",
+            "pb_2": "project",
         },
     )
 
