@@ -34,6 +34,34 @@ output = llm_chain.invoke({"number": 2})
 print(output)
 ```
 
+## Tracking Call Attributes
+
+To track attributes for your langchain calls, you can use the [`weave.attributes`](https://weave-docs.wandb.ai/reference/python-sdk/weave/#function-attributes) context manager. This context manager allows you to set attributes for a specific block of code, such as a chain or a single request.
+
+```python
+import weave
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+# Initialize Weave with your project name
+# highlight-next-line
+weave.init("langchain_demo")
+
+llm = ChatOpenAI()
+prompt = PromptTemplate.from_template("1 + {number} = ")
+
+llm_chain = prompt | llm
+
+# highlight-next-line
+with weave.attributes({"my_awesome_attribute": "value"}):
+    output = llm_chain.invoke()
+
+print(output)
+```
+Weave automatically tracks the attributes against the trace of the LangChain call. You can view the attributes in the Weave web interface as shown below:
+
+[![langchain_attributes.png](imgs/langchain_attributes.png)](https://wandb.ai/parambharat/langchain_demo/weave/traces?cols=%7B%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
+
 ## Traces
 
 Storing traces of LLM applications in a central database is crucial during both development and production. These traces are essential for debugging and improving your application by providing a valuable dataset.
