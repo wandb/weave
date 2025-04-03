@@ -47,6 +47,7 @@ import {Spec as RowSpec} from './PanelRow';
 import {Spec as RunColorSpec} from './PanelRunColor';
 import {Spec as RunOverviewSpec} from './PanelRunOverview';
 import {Spec as PanelRunsTableSpec} from './PanelRunsTable';
+import {StepperSpec as PanelStepperSpec} from './PanelRunsWithStepper/base';
 import {Spec as PanelRunHistoryTablesStepperSpec} from './PanelRunsWithStepper/HistoryTables';
 import {Spec as PanelRunsPlotsWithStepperSpec} from './PanelRunsWithStepper/Plots';
 import {Spec as SavedModelSpec} from './PanelSavedModel';
@@ -235,6 +236,7 @@ export const ConverterSpecs = (): ConverterSpecArray =>
         RowSpec,
         WBObjectSpec,
         MaybeSpec,
+        PanelStepperSpec,
         // NumberToTimestampSpec,
         Panel.toConvertSpec(MultiTableSpec2),
         Panel.toConvertSpec(ProjectionSpec),
