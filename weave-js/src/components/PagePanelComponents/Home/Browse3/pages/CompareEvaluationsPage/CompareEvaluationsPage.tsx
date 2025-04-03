@@ -5,9 +5,7 @@
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -26,15 +24,14 @@ import {
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
-import {EvaluationCall} from './ecpTypes';
-import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
+import {InvalidEvaluationBanner} from './InvalidEvaluationBanner';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
-import {TraceCallsSection} from './TraceCallsSection';
+import {TraceCallsCompareEvaluationsPage} from './TraceCallsCompareEvaluationsPage';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -218,60 +215,13 @@ const CompareEvaluationsPageInner: React.FC<{
   const isTraceCallsPath = props.traceCalls && props.traceCalls.length > 0;
 
   if (isTraceCallsPath) {
-    // Completely different UI for trace calls path
+    // Use the new TraceCallsCompareEvaluationsPage component
     return (
-      <Box
-        sx={{
-          height: props.height,
-          width: '100%',
-          overflow: 'auto',
-        }}>
-        <VerticalBox
-          sx={{
-            paddingTop: STANDARD_PADDING,
-            alignItems: 'flex-start',
-            gridGap: STANDARD_PADDING * 2,
-          }}>
-          <InvalidEvaluationBanner
-            evaluationCalls={Object.values(state.summary.evaluationCalls)}
-          />
-          <VerticalBox
-            sx={{
-              width: '100%',
-              overflow: 'hidden',
-            }}>
-            <HorizontalBox
-              sx={{
-                flex: '0 0 auto',
-                paddingLeft: STANDARD_PADDING,
-                paddingRight: STANDARD_PADDING,
-                width: '100%',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-              }}>
-              <Box
-                sx={{
-                  fontSize: '1.5em',
-                  fontWeight: 'bold',
-                }}>
-                Trace Call Outputs
-              </Box>
-            </HorizontalBox>
-            <Box
-              sx={{
-                height: props.height,
-                overflow: 'auto',
-              }}>
-              <TraceCallsSection
-                traceCalls={props.traceCalls || []}
-                entity={projectContext?.entity}
-                project={projectContext?.project}
-                state={state}
-              />
-            </Box>
-          </VerticalBox>
-        </VerticalBox>
-      </Box>
+      <TraceCallsCompareEvaluationsPage
+        height={props.height}
+        traceCalls={props.traceCalls || []}
+        state={state}
+      />
     );
   }
 
@@ -376,62 +326,5 @@ const ResultExplorer: React.FC<{
         <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
-  );
-};
-
-/*
- * Returns true if the evaluation call has summary metrics.
- */
-const isValidEval = (evalCall: EvaluationCall) => {
-  return Object.keys(evalCall.summaryMetrics).length > 0;
-};
-
-const InvalidEvaluationBanner: React.FC<{
-  evaluationCalls: EvaluationCall[];
-}> = ({evaluationCalls}) => {
-  const [dismissed, setDismissed] = useState(false);
-  const invalidEvals = useMemo(() => {
-    return Object.values(evaluationCalls)
-      .filter(call => !isValidEval(call))
-      .map(call =>
-        call.name !== EVALUATION_NAME_DEFAULT
-          ? call.name
-          : call.callId.slice(-4)
-      );
-  }, [evaluationCalls]);
-  if (invalidEvals.length === 0 || dismissed) {
-    return null;
-  }
-  return (
-    <Box
-      sx={{
-        width: '100%',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-      }}>
-      <Tailwind>
-        <Alert
-          severity="info"
-          classes={{
-            root: 'bg-teal-300/[0.30] text-teal-600',
-            action: 'text-teal-600',
-          }}
-          action={
-            <Button
-              // override the default tailwind classes for text and background hover
-              className="text-override hover:bg-override"
-              variant="ghost"
-              onClick={() => setDismissed(true)}>
-              Dismiss
-            </Button>
-          }>
-          <span style={{fontWeight: 'bold'}}>
-            No summary information found for{' '}
-            {maybePluralizeWord(invalidEvals.length, 'evaluation')}:{' '}
-            {invalidEvals.join(', ')}.
-          </span>
-        </Alert>
-      </Tailwind>
-    </Box>
   );
 };
