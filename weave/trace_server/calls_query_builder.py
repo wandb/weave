@@ -799,8 +799,6 @@ class CallsQuery(BaseModel):
         {offset_sql}
         """
 
-        print("\n>>>> raw_sql:", raw_sql)
-
         return _safely_format_sql(raw_sql)
 
 
@@ -1314,8 +1312,12 @@ def process_query_to_optimization_sql(
 
             for op in operation.or_:
                 result = process_operand(op)
+                # If any operand can't be optimized, the whole OR can't be optimized
                 if result is None:
-                    return None  # If any operand can't be optimized, the whole OR can't be optimized
+                    return None
+                if not result.str_filter_opt_sql and not result.id_datetime_filters_sql:
+                    return None
+
                 if result.str_filter_opt_sql:
                     str_conditions.append(result.str_filter_opt_sql)
                 if result.id_datetime_filters_sql:
