@@ -2027,7 +2027,7 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5
 
-    # Filter with string contains - should return 3 calls (name contains "test")
+    # Filter with string contains - should return 5 calls (name contains "test")
     query = tsi.Query(
         **{
             "$expr": {
@@ -2046,7 +2046,7 @@ def test_calls_query_filter_by_strings(client):
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5  # All names contain "test"
 
-    # Filter with string contains - should return 3 calls (name contains "alpha")
+    # Filter with string contains - should return 1 call (name contains "alpha")
     query = tsi.Query(
         **{
             "$expr": {
