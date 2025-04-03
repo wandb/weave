@@ -33,7 +33,9 @@ from weave.trace.context.weave_client_context import (
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ENTITY_TOO_LARGE_PAYLOAD,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -181,6 +183,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -227,6 +231,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
 
@@ -3471,3 +3477,150 @@ def test_call_stream_query_heavy_query_batch(client):
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
+
+
+def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def test_op(x: dict):
+        return x
+
+    # Create a call with some data
+    result = test_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client), include_storage_size=True
+            )
+        )
+    )
+    assert len(calls) == 1
+    call = calls[0]
+
+    # Verify storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert call.storage_size_bytes is not None
+
+
+def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_total_storage_size=True,
+            )
+        )
+    )
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the total storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert (
+        parent_call.total_storage_size_bytes is not None
+    )  # Parent should have total size
+    assert child_call.storage_size_bytes is None
+    assert (
+        child_call.total_storage_size_bytes is None
+    )  # Child should not have total size
+
+
+def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_storage_size=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the storage sizes are present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert parent_call.storage_size_bytes is not None
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is not None
+    # Child should not have total size
+    assert child_call.total_storage_size_bytes is None

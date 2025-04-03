@@ -231,8 +231,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "trace_server",
             "anthropic",

@@ -119,9 +119,25 @@ To improve docs, basically follow FastAPI's instructions to create good Swagger 
 
 ### Notebook Doc Gen
 
-See `docs/scripts/generate_notebooks.py`, `./docs/notebooks`, and `./docs/reference/gen_notebooks`.
+Summary: Use `docs/scripts/generate_notebooks.py` to convert Jupyter notebooks (`.ipynb`) in  `./docs/notebooks` to Markdown files in `./docs/reference/gen_notebooks`.
 
-This script will load all notebooks in `./docs/notebooks`, transforming them into viable markdown docs in `./docs/reference/gen_notebooks` which can be referenced by docusaurus just like any other markdown file. If you need header metadata, you can add a markdown block at the top of your notebook with:
+This script converts Jupyter notebooks (`.ipynb`) into Markdown files that can be referenced by Docusaurus just like any other `.md` doc. By default, it loads all notebooks in `./docs/notebooks` and writes the converted Markdown to `./docs/reference/gen_notebooks`.
+
+To run the default export for all notebooks:
+
+```bash
+python docs/scripts/generate_notebooks.py
+```
+
+To convert a single notebook:
+
+```bash
+python docs/scripts/generate_notebooks.py path/to/your_notebook.ipynb
+```
+
+This will generate a Markdown file with the same base name in `./docs/reference/gen_notebooks`.
+
+If your notebook requires Docusaurus header metadata, you can include a special markdown block at the top of a markdown cell in your notebook:
 
 ```
 <!-- docusaurus_head_meta::start
