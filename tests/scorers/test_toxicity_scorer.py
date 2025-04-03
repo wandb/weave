@@ -14,7 +14,7 @@ async def test_toxicity_scorer1():
     
 @pytest.mark.asyncio
 async def test_toxicity_scorer2():
-    tox = ToxicityScorer(classifiers=["detoxify_original"])
+    tox = ToxicityScorer(classifiers="detoxify_original")
     score = await tox.score(output="This is not an acceptable behavior.")
     assert score.passed == True
     np.testing.assert_allclose(score.metadata["scores"], 0.0013684174045920372, rtol=1e-5)
