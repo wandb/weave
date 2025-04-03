@@ -399,8 +399,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             filter_cond = process_operation(req.query.expr_)
 
-            print("FILTER_COND", filter_cond)
-
             conds.append(filter_cond)
 
         required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
