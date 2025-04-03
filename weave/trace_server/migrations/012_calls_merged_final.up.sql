@@ -4,25 +4,25 @@ CREATE TABLE IF NOT EXISTS calls_merged_final (
     project_id String,
     started_at DateTime64(6),
 
-    parent_id SimpleAggregateFunction(any, Nullable(String)),
     trace_id SimpleAggregateFunction(any, String),
     op_name SimpleAggregateFunction(any, String),
+    parent_id SimpleAggregateFunction(any, Nullable(String)),
     ended_at SimpleAggregateFunction(any, Nullable(DateTime64(6))),
 
     deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(6))),
     display_name SimpleAggregateFunction(any, Nullable(String)),
     
-    summary_dump SimpleAggregateFunction(any, String),
-    attributes_dump SimpleAggregateFunction(any, String),
     inputs_dump SimpleAggregateFunction(any, String),
-    output_dump SimpleAggregateFunction(any, String),
+    attributes_dump SimpleAggregateFunction(any, String),
+    output_dump SimpleAggregateFunction(any, Nullable(String)),
+    summary_dump SimpleAggregateFunction(any, Nullable(String)),
 
     input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
     output_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
     
     exception SimpleAggregateFunction(any, Nullable(String)),
     wb_run_id SimpleAggregateFunction(any, Nullable(String)),
-    wb_user_id SimpleAggregateFunction(any, String)
+    wb_user_id SimpleAggregateFunction(any, String),
 
     -- Computed fields?
     -- duration_ms Float64,
@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS calls_merged_final (
     -- storage_size_bytes UInt64,
     -- storage_size_bytes_total UInt64,
     -- storage_size_bytes_total_raw UInt64,
+
+    INDEX idx_op_name op_name TYPE bloom_filter(0.01) GRANULARITY 1,
+    -- More indices? trace_id? do we want to go crazy and try to index inputs/output?
     
 ) ENGINE = AggregatingMergeTree
 ORDER BY (project_id, started_at);
@@ -58,7 +61,6 @@ SELECT
     anySimpleState(summary_dump) as summary_dump,
     anySimpleState(display_name) as display_name
 FROM calls_merged
--- do i need to push this into a having?
 WHERE isNotNull(calls_merged.started_at)
 GROUP BY
     project_id,
