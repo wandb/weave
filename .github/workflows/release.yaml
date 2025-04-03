@@ -32,6 +32,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ inputs.is_test }}
         with:
+          verbose: true
           repository-url: https://test.pypi.org/legacy/
       - name: upload distribution
         uses: pypa/gh-action-pypi-publish@release/v1
