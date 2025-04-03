@@ -1996,6 +1996,298 @@ def test_repeated_flushing(client):
     assert client._has_pending_jobs() == False
 
 
+def test_calls_query_filter_by_strings(client):
+    """Test string filter optimization with nested queries."""
+    test_id = str(uuid.uuid4())
+
+    @weave.op()
+    def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
+        return {
+            "test_id": test_id,
+            "name": name,
+            "tags": tags,
+            "value": value,
+            "active": active,
+        }
+
+    @weave.op
+    def dummy_op():
+        return {"woooo": "test"}
+
+    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, "True")
+    test_op(test_id, "beta_test", ["backend", "api"], 200, "False")
+    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, "True")
+    test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
+    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
+
+    for i in range(10):
+        dummy_op()
+
+    # Flush to ensure all calls are persisted
+    client.flush()
+
+    # Basic filter - should return all 5 calls
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5
+
+    # Filter with string contains - should return 5 calls (name contains "test")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "test"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5  # All names contain "test"
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with string contains - should return 1 call (name contains "alpha")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "alpha"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 100
+
+    # Filter with string in - should return 2 calls (tags contains "api")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.name"},
+                            [
+                                {"$literal": "delta_test"},
+                                {"$literal": "gamma_test"},
+                            ],
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with boolean - should return 3 calls (active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with OR - should return 4 calls (name contains "alpha" or "beta" or value > 300)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$or": [
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "alpha"},
+                                }
+                            },
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "beta"},
+                                }
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "300"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    # name has alpha or beta or value > 300
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 4
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Complex nested filter - should return exactly 1 call (name contains "epsilon" and active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "epsilon"},
+                        }
+                    },
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "epsilon_test"
+    assert calls[0].output["name"] == "epsilon_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 500
+
+    # Extremely complex nested filter with multiple levels of nesting
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # Condition 1: Must match the test_id
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    # Condition 2: Name must contain "alpha" and be active, OR contain "delta" and be inactive
+                    {
+                        "$or": [
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "alpha"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {"$literal": "True"},
+                                        ]
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "delta"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {
+                                                "$literal": "False"
+                                            },  # should filter out beta
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                    # Condition 3: Value must be >= 400, OR active must be true
+                    {
+                        "$or": [
+                            {
+                                "$gte": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "400"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.active"},
+                                    {"$literal": "True"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+
+    # Test breakdown:
+    # 1. We create a complex query with multiple conditions:
+    #    - Condition 1: name must be "alpha_test" AND value must be >= 100
+    #    - Condition 2: name must be "beta_test" AND value must be < 200
+    #    - Condition 3: name must be "delta_test" AND (value >= 400 OR active must be true)
+    # 2. The query uses $and to combine these three conditions, meaning all must be satisfied
+    # 3. We expect exactly 2 calls to match:
+    #    - One with name "alpha_test" (matching condition 1)
+    #    - One with name "delta_test" (matching condition 3)
+    # 4. The test verifies both the count and the specific names of the matching calls
+
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[1].inputs["name"] == "delta_test"
+    assert calls[1].output["name"] == "delta_test"
+    for call in calls:
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+
 def test_calls_query_sort_by_status(client):
     """Test that sort_by summary.weave.status works with get_calls."""
     # Use a unique test ID to identify these calls

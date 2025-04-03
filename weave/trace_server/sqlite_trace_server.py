@@ -321,9 +321,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     rhs_part = process_operand(operation.and_[1])
                     cond = f"({lhs_part} AND {rhs_part})"
                 elif isinstance(operation, tsi_query.OrOperation):
-                    lhs_part = process_operand(operation.or_[0])
-                    rhs_part = process_operand(operation.or_[1])
-                    cond = f"({lhs_part} OR {rhs_part})"
+                    if len(operation.or_) == 0:
+                        raise ValueError("Empty OR operation")
+                    elif len(operation.or_) == 1:
+                        return process_operand(operation.or_[0])
+                    parts = [process_operand(op) for op in operation.or_]
+                    cond = f"({' OR '.join(parts)})"
                 elif isinstance(operation, tsi_query.NotOperation):
                     operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
