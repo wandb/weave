@@ -36,7 +36,7 @@ requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
-  "wandb @ git+https://github.com/wandb/wandb@tim/add_login_referrer",
+  "wandb @ git+https://github.com/wandb/wandb@master",
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback

@@ -95,11 +95,9 @@ def init_weave(
     wandb_context = wandb_api.get_wandb_api_context()
     if wandb_context is None:
         import wandb
-        from wandb.sdk.lib.apikey import api_key_prompt_referrer
 
         print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
-        with api_key_prompt_referrer("weave"):
-            wandb.login(anonymous="never", force=True)  # type: ignore
+        wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
