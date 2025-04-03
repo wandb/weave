@@ -29,7 +29,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 import uuid
-from typing import Callable, Literal, Optional, cast
+from typing import Callable, Literal, Optional, Union, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
@@ -1497,7 +1497,7 @@ def _uuidv7_from_timestamp_zeroed(ms_since_epoch: int) -> str:
 
 
 def _create_datetime_optimization_sql(
-    operation: tsi_query.GtOperation | tsi_query.GteOperation,
+    operation: Union[tsi_query.GtOperation, tsi_query.GteOperation],
     pb: ParamBuilder,
     table_alias: str,
 ) -> Optional[str]:
