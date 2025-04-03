@@ -78,7 +78,7 @@ trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
 ]
-docs = ["playwright", "lazydocs", "nbformat", "nbconvert", "opentelemetry-proto>=1.12.0"]
+docs = ["playwright", "lazydocs", "nbformat", "nbconvert", "weave[trace_server]"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
