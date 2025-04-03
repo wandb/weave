@@ -399,7 +399,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conds.append(filter_cond)
 
         required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
-        select_columns = list(tsi.CallSchema.model_fields.keys())
+        select_columns = [
+            key
+            for key in tsi.CallSchema.model_fields.keys()
+            if key not in ["storage_size_bytes", "total_storage_size_bytes"]
+        ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
@@ -408,7 +412,36 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             select_columns += [
                 rcol for rcol in required_columns if rcol not in select_columns
             ]
-        query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+
+        select_columns_names = [*select_columns]
+
+        if req.include_storage_size:
+            select_columns.append(
+                "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
+            )
+            select_columns_names.append("storage_size_bytes")
+
+        join_clause = ""
+        if req.include_total_storage_size:
+            select_columns.append(
+                """
+                CASE
+                    WHEN calls.parent_id IS NULL THEN trace_stats.total_storage_size_bytes
+                    ELSE NULL
+                END
+            """
+            )
+            select_columns_names.append("total_storage_size_bytes")
+
+            join_clause += """
+                LEFT JOIN (SELECT
+                    calls.trace_id as tid,
+                    sum(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0)) as total_storage_size_bytes
+                FROM calls
+                GROUP BY calls.trace_id) as trace_stats ON trace_stats.tid=calls.trace_id
+            """
+
+        query = f"SELECT {', '.join(select_columns)} FROM calls {join_clause} WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -516,7 +549,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchall()
         calls = []
         for row in query_result:
-            call_dict = dict(zip(select_columns, row))
+            call_dict = dict(zip(select_columns_names, row))
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):

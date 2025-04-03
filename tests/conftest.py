@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestException, client_is_sqlite
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
@@ -689,3 +689,12 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+
+    ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+    return ch_server.ch_client

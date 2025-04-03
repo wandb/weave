@@ -118,6 +118,12 @@ class CallSchema(BaseModel):
 
     deleted_at: Optional[datetime.datetime] = None
 
+    # Size of metadata storage for this call
+    storage_size_bytes: Optional[int] = None
+
+    # Total size of metadata storage for the entire trace
+    total_storage_size_bytes: Optional[int] = None
+
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -251,6 +257,8 @@ class CallReadReq(BaseModel):
     project_id: str
     id: str
     include_costs: Optional[bool] = False
+    include_storage_size: Optional[bool] = False
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
@@ -351,6 +359,16 @@ class CallsQueryReq(BaseModel):
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include feedback for each call.",
+    )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the storage size for a call.",
+    )
+    include_total_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the total storage size for a trace.",
     )
 
     # TODO: type this with call schema columns, following the same rules as
