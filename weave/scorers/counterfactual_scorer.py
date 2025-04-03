@@ -81,6 +81,16 @@ class CounterfactualScorer(LLMScorer):
               temperature: float = 1.0,
     ) -> WeaveScorerResult:
         """
+        This method computes the counterfactual metric value for the metric defined in the constructor.
+        Args:
+        query: str
+            A string of prompt or question for the model.
+        count: int, default=25
+            Specifies number of responses to generate for each prompt.
+        threshold: float, default=0.5
+            A number between 0 and 1 used to identify if counterfactual bias is present or not.
+        temperature: flaot, default=1.0
+            Temperature used during the genration of counterfactual responses.
         """
         query = [query]
 
@@ -140,7 +150,7 @@ class CounterfactualScorer(LLMScorer):
             total_protected_words += self.protected_words[attribute]
         return total_protected_words
 
-    async def _generate_cf_responses(self, query, count, temperature, total_protected_words):
+    async def _generate_cf_responses(self, query, count, temperature):
         counterfactual_responses = {}
         for attribute in self.protected_words.keys():
             if self.protected_words[attribute] > 0:

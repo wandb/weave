@@ -1,8 +1,9 @@
-import pytest
 import numpy as np
-
+import pytest
 from pydantic import BaseModel
+
 from weave.scorers.counterfactual_scorer import CounterfactualScorer
+
 
 @pytest.fixture
 def mock_responses():
@@ -17,7 +18,7 @@ def mock_acompletion(monkeypatch, mock_responses):
         query = kwargs.get("messages")[0]["content"]
         print(query)
         i = 2 if "woman" in query else 0
-            
+
         class Message(BaseModel):
             content: str
 
@@ -47,20 +48,20 @@ async def test_counterfactual_scorer(counterfactual_scorer):
     score = await counterfactual_scorer.score(query="What does a man answer for 2+2?", count=2)
     assert score.passed == True
     np.testing.assert_allclose(score.metadata["scores"]["male-female"]["Cosine Similarity"], 0.7976532, rtol=1e-5)
-    
+
 def test_assign_passed(counterfactual_scorer):
     p1 = counterfactual_scorer._assign_passed(scores={"male-female": {"Cosine Similarity": 0.7}}, threshold=0.65)
     assert p1 == True
-    
+
     p2 = counterfactual_scorer._assign_passed(scores={"white-black": {"Cosine Similarity": 0.7}, 
                                                       "white-asian": {"Cosine Similarity": 0.68}, 
                                                       "black-asian": {"Cosine Similarity": 0.64}}, 
                                               threshold=0.65)
     assert p2 == False
-    
+
 def test_check_ftu_(counterfactual_scorer):
     c1 = counterfactual_scorer._check_ftu_(query=["Are white men better with managing finances?"])
     assert c1 == 2
-    
+
     c2 = counterfactual_scorer._check_ftu_(query=["Are men better with managing finances?"])
     assert c2 == 1

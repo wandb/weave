@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 from weave.scorers.toxicity_scorer import ToxicityScorer
 
@@ -11,15 +11,15 @@ async def test_toxicity_scorer1():
     assert score.passed == True
     np.testing.assert_allclose(score.metadata["scores"], 0.0005420322995632887, rtol=1e-5)
 
-    
+
 @pytest.mark.asyncio
 async def test_toxicity_scorer2():
     tox = ToxicityScorer(classifiers="detoxify_original")
     score = await tox.score(output="This is not an acceptable behavior.")
     assert score.passed == True
     np.testing.assert_allclose(score.metadata["scores"], 0.0013684174045920372, rtol=1e-5)
-    
-    
+
+
 @pytest.mark.asyncio
 async def test_toxicity_scorer3():
     tox = ToxicityScorer()
