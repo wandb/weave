@@ -40,6 +40,10 @@ There are three main ways to create Calls in Weave:
   <TabItem value="python" label="Python" default>
     Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
+    :::tip 
+    You can control Weave's default tracking behavior [using the `autopatch_settings` argument in `weave.init`](#configure-autopatching).
+    :::
+
     ```python showLineNumbers
     import weave
 
@@ -92,8 +96,6 @@ There are three main ways to create Calls in Weave:
 
   </TabItem>
 </Tabs>
-
-
 
 ### 2. Decorating/Wrapping Functions
 
@@ -720,6 +722,47 @@ Calculated Fields:
     * Cost
     * Duration
     * Status
+
+## Configure autopatching
+
+By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
+You can control this behavior using the `autopatch_settings` argument in `weave.init`.
+
+### Disable all autopatching
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"disable_autopatch": True})
+```
+
+### Disable a specific integration
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"openai": {"enabled": False}})
+```
+
+### Post-process inputs and outputs 
+
+You can also customize how post-process inputs and outputs (e.g. for PII data) are handled during autopatching:
+
+```python showLineNumbers
+def redact_inputs(inputs: dict) -> dict:
+    if "email" in inputs:
+        inputs["email"] = "[REDACTED]"
+    return inputs
+
+weave.init(
+    ...,
+    autopatch_settings={
+        "openai": {
+            "op_settings": {
+                "postprocess_inputs": redact_inputs,
+            }
+        }
+    }
+)
+```
+
+For more details, see [How to use Weave with PII data](../../reference/gen_notebooks/pii.md).
 
 ## FAQs
 
