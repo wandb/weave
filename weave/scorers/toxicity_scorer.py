@@ -14,14 +14,14 @@ class ToxicityScorer(weave.Scorer):
     et al. (2023) :footcite:`liang2023holisticevaluationlanguagemodels`.
 
     Args:
-        classifiers : list containing subset of {'detoxify_unbiased', 'detoxify_original',
-        'roberta-hate-speech-dynabench-r4-target','toxigen'}, default = ['detoxify_unbiased']
-            Specifies which toxicity classifiers to use. If `custom_classifier` is provided, this argument
-            is not used.
+        classifiers : a str from {'detoxify_unbiased', 'detoxify_original',
+            'roberta-hate-speech-dynabench-r4-target','toxigen'}, default = 'detoxify_unbiased'
+            Specifies which toxicity classifiers to use.
 
         device: str or torch.device input or torch.device object, default="cpu"
-            Specifies the device that classifiers use for prediction. Set to "cuda" for classifiers to be able to leverage the GPU.
-            Currently, 'detoxify_unbiased' and 'detoxify_original' will use this parameter.
+            Specifies the device that classifiers use for prediction. Set to "cuda" for classifiers 
+            to be able to leverage the GPU. Currently, 'detoxify_unbiased' and 'detoxify_original' 
+            will use this parameter.
 
     Example:
     >>> scorer = ToxicityScorer()
@@ -34,8 +34,8 @@ class ToxicityScorer(weave.Scorer):
     )
     """
 
-    classifiers: list[str] = Field(
-        default=["detoxify_unbiased"],
+    classifiers: str = Field(
+        default="detoxify_unbiased",
         description="List of names of the toxicity classifiers supported by the LangFair",
     )
 
@@ -49,7 +49,8 @@ class ToxicityScorer(weave.Scorer):
     def __init__(self, **data):
         super().__init__(**data)
         self._tox_metric_object = ToxicityMetrics(
-            classifiers=self.classifiers,
+            classifiers=[self.classifiers], 
+            device=self.device,
         )
 
     @weave.op

@@ -66,7 +66,7 @@ class CounterfactualScorer(LLMScorer):
     _cf_metric_object: CounterfactualMetrics = PrivateAttr()
 
     def __init__(self, **data):
-        super().__init__(**data)
+        super().__init__(model_id=data["model_id"])
         self._cf_metric_object = CounterfactualMetrics(
             metrics=self.metric_name,
             neutralize_tokens=self.neutralize_tokens,
@@ -101,7 +101,7 @@ class CounterfactualScorer(LLMScorer):
 
             # 4. Define passed variable
             passed = self._assign_passed(scores=scores,
-                                        threshold=threshold)
+                                         threshold=threshold)
 
         return WeaveScorerResult(
             passed=passed,
@@ -113,6 +113,10 @@ class CounterfactualScorer(LLMScorer):
             scores: dict,
             threshold: float
         ) -> bool:
+        """
+        This method compares metric value for all group combination with the threshold. Only returns
+        True, if all group combination passes (bias metric under provided threshold), otherwise returns False.
+        """
         for group in scores:
             score = list(scores[group].values())[0]
             if self.metric_name[0] in ["Cosine", "Rougel", "Bleu"]:
@@ -157,7 +161,7 @@ class CounterfactualScorer(LLMScorer):
                         temperature=temperature,
                         )
 
-                    counterfactual_responses[attribute][group + "_response"] = responses.choices[0].message.content
+                    counterfactual_responses[attribute][group + "_response"] = [responses.choices[i].message.content for i in range(count)]
         return counterfactual_responses
 
     def _compute_metrics(self,
@@ -172,8 +176,8 @@ class CounterfactualScorer(LLMScorer):
                     group1_response = counterfactual_responses[attribute][group1 + "_response"]
                     group2_response = counterfactual_responses[attribute][group2 + "_response"]
                     cf_group_results = self._cf_metric_object.evaluate(
-                        texts1=[group1_response],
-                        texts2=[group2_response],
+                        texts1=group1_response,
+                        texts2=group2_response,
                         attribute=attribute,
                         return_data=True,
                     )
