@@ -103,7 +103,6 @@ class CounterfactualScorer(LLMScorer):
             counterfactual_responses = await self._generate_cf_responses(query=query,
                                                                          count=count,
                                                                          temperature=temperature,
-                                                                         total_protected_words=total_protected_words,
                                                                          )
 
             # 3. Calculate CF metrics (if FTU not satisfied)
