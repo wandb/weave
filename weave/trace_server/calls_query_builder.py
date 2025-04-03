@@ -713,10 +713,6 @@ class CallsQuery(BaseModel):
         id_datetime_sql = optimization_conditions.id_datetime_filters_sql or ""
         str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
 
-        print(">>>> id_datetime_sql:", id_datetime_sql)
-        print("PARAMS:", pb.get_params())
-        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
-
         order_by_sql = ""
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
@@ -844,6 +840,10 @@ ALLOWED_CALL_FIELDS = {
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+
+
+def _field_requires_null_check(field: str) -> bool:
+    return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
 def _field_requires_null_check(field: str) -> bool:
@@ -1319,19 +1319,25 @@ def process_query_to_optimization_sql(
             for op in operation.or_:
                 result = process_operand(op)
                 if result is None:
-                    return None
+                    return None  # If any operand can't be optimized, the whole OR can't be optimized
                 if result.str_filter_opt_sql:
                     str_conditions.append(result.str_filter_opt_sql)
                 if result.id_datetime_filters_sql:
                     datetime_conditions.append(result.id_datetime_filters_sql)
 
-            str_conditions_sql = "(" + " OR ".join(str_conditions) + ")"
-            datetime_conditions_sql = "(" + " OR ".join(datetime_conditions) + ")"
+            if str_conditions:
+                str_conditions_sql = "(" + " OR ".join(str_conditions) + ")"
+            else:
+                str_conditions_sql = None
+
+            if datetime_conditions:
+                datetime_conditions_sql = "(" + " OR ".join(datetime_conditions) + ")"
+            else:
+                datetime_conditions_sql = None
+
             return OptimizationConditions(
-                str_filter_opt_sql=str_conditions_sql if str_conditions else None,
-                id_datetime_filters_sql=datetime_conditions_sql
-                if datetime_conditions
-                else None,
+                str_filter_opt_sql=str_conditions_sql,
+                id_datetime_filters_sql=datetime_conditions_sql,
             )
 
         elif isinstance(operation, tsi_query.AndOperation):
@@ -1346,13 +1352,18 @@ def process_query_to_optimization_sql(
                 if result.id_datetime_filters_sql:
                     datetime_conditions.append(result.id_datetime_filters_sql)
 
-            str_conditions_sql = "(" + " AND ".join(str_conditions) + ")"
-            datetime_conditions_sql = "(" + " AND ".join(datetime_conditions) + ")"
+            if str_conditions:
+                str_conditions_sql = "(" + " AND ".join(str_conditions) + ")"
+            else:
+                str_conditions_sql = None
+
+            if datetime_conditions:
+                datetime_conditions_sql = "(" + " AND ".join(datetime_conditions) + ")"
+            else:
+                datetime_conditions_sql = None
             return OptimizationConditions(
-                str_filter_opt_sql=str_conditions_sql if str_conditions else None,
-                id_datetime_filters_sql=datetime_conditions_sql
-                if datetime_conditions
-                else None,
+                str_filter_opt_sql=str_conditions_sql,
+                id_datetime_filters_sql=datetime_conditions_sql,
             )
 
         elif isinstance(operation, tsi_query.NotOperation):
@@ -1369,10 +1380,8 @@ def process_query_to_optimization_sql(
                 id_datetime_not_condition = f"NOT ({result.id_datetime_filters_sql})"
 
             return OptimizationConditions(
-                str_filter_opt_sql=str_not_condition if str_not_condition else None,
-                id_datetime_filters_sql=id_datetime_not_condition
-                if id_datetime_not_condition
-                else None,
+                str_filter_opt_sql=str_not_condition,
+                id_datetime_filters_sql=id_datetime_not_condition,
             )
         elif isinstance(operation, tsi_query.EqOperation):
             eq_opt_sql = _create_like_optimized_eq_condition(
@@ -1420,8 +1429,12 @@ def process_query_to_optimization_sql(
                     id_datetime_filters_sql="",
                 )
             return OptimizationConditions(
-                str_filter_opt_sql=field.as_sql(param_builder, table_alias),
-                id_datetime_filters_sql=field.as_sql(param_builder, table_alias),
+                str_filter_opt_sql=field.as_sql(
+                    param_builder, table_alias, use_agg_fn=False
+                ),
+                id_datetime_filters_sql=field.as_sql(
+                    param_builder, table_alias, use_agg_fn=False
+                ),
             )
         elif isinstance(operand, tsi_query.ConvertOperation):
             return process_operand(operand.convert_.input)
@@ -1438,7 +1451,10 @@ def process_query_to_optimization_sql(
                 tsi_query.ContainsOperation,
             ),
         ):
-            return process_operation(operand)
+            processed = process_operation(operand)
+            if processed is None:
+                return None
+            return processed.str_filter_opt_sql
         return None
 
     # Create a single AND operation from all conditions

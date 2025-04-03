@@ -1362,6 +1362,83 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
     )
 
 
+def test_calls_query_with_unoptimizable_or_condition() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": "hello"}]},
+                    {"$gt": [{"$getField": "inputs.param.number"}, {"$literal": 10}]},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_5:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((
+            (JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
+            OR (JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) > {pb_3:UInt64})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."param"."number"',
+            "pb_3": 10,
+            "pb_4": '%"hello"%',
+            "pb_5": "project",
+        },
+    )
+
+
+def test_calls_query_filter_by_empty_string() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
+        )
+    )
+    # Empty string is not a valid value for LIKE optimization, this test ensures we do
+    # not try to optimize
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"."val"',
+            "pb_1": "",
+            "pb_2": "project",
+        },
+    )
+
+
 def test_query_with_summary_weave_latency_ms_sort() -> None:
     """Test sorting by summary.weave.latency_ms field."""
     cq = CallsQuery(project_id="project")
