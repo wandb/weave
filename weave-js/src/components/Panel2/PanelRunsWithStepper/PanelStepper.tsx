@@ -50,6 +50,8 @@ const LIST_ANY_TYPE = {
   objectType: 'any' as const,
 };
 
+const NONE_KEY_AND_TYPE: {[key: string]: Type} = {'<none>': 'any' as Type};
+
 export type PanelStepperProps = Panel2.PanelProps<
   typeof LIST_ANY_TYPE,
   PanelStepperConfigType
@@ -63,10 +65,10 @@ const getDefaultWorkingKeyAndType = (
     config?.workingKeyAndType?.key &&
     config.workingKeyAndType.key in propertyKeysAndTypes
       ? config.workingKeyAndType.key
-      : Object.keys(propertyKeysAndTypes)[0] ?? '';
+      : Object.keys(propertyKeysAndTypes)[0] ?? NONE_KEY_AND_TYPE.key;
   return {
     key: defaultKey,
-    type: propertyKeysAndTypes[defaultKey] ?? null,
+    type: propertyKeysAndTypes[defaultKey],
   };
 };
 
@@ -141,7 +143,10 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
   const convertedInputNode = convertInputNode(input);
 
   const propertyKeysAndTypes = useMemo(
-    () => getKeysAndTypesFromPropertyType(convertedInputNode.type),
+    () => ({
+      ...NONE_KEY_AND_TYPE,
+      ...getKeysAndTypesFromPropertyType(convertedInputNode.type),
+    }),
     [convertedInputNode.type]
   );
 
@@ -156,16 +161,22 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
     });
   }
 
-  const filteredNode = opFilter({
-    arr: convertedInputNode,
-    filterFn: constFunction({row: convertedInputNode.type}, ({row}) =>
-      opNot({
-        bool: opIsNone({
-          val: opPick({obj: row, key: constString(workingKeyAndType.key)}),
-        }),
-      })
-    ),
-  });
+  const filteredNode =
+    workingKeyAndType.key === '<none>'
+      ? convertedInputNode
+      : opFilter({
+          arr: convertedInputNode,
+          filterFn: constFunction({row: convertedInputNode.type}, ({row}) =>
+            opNot({
+              bool: opIsNone({
+                val: opPick({
+                  obj: row,
+                  key: constString(workingKeyAndType.key),
+                }),
+              }),
+            })
+          ),
+        });
 
   const exampleRow = opIndex({
     arr: filteredNode,
@@ -174,9 +185,27 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
   const exampleRowRefined = useNodeWithServerType(exampleRow);
   let outputNode: NodeOrVoidNode = voidNode();
   const currentStep = config?.currentStep ?? -1;
-  if (currentStep != null && currentStep >= 0 && workingKeyAndType.key) {
-    outputNode = opPick({
-      obj: opFilter({
+  if (currentStep != null && currentStep >= 0) {
+    if (workingKeyAndType.key !== '<none>') {
+      outputNode = opPick({
+        obj: opFilter({
+          arr: filteredNode,
+          filterFn: constFunction(
+            {row: exampleRowRefined.result.type},
+            ({row}) =>
+              opNumberEqual({
+                lhs: opPick({
+                  obj: row,
+                  key: constString(config?.workingSliderKey ?? '_step'),
+                }),
+                rhs: constNumber(currentStep),
+              })
+          ),
+        }),
+        key: constString(workingKeyAndType.key),
+      });
+    } else {
+      outputNode = opFilter({
         arr: filteredNode,
         filterFn: constFunction({row: exampleRowRefined.result.type}, ({row}) =>
           opNumberEqual({
@@ -187,9 +216,8 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
             rhs: constNumber(currentStep),
           })
         ),
-      }),
-      key: constString(workingKeyAndType.key),
-    });
+      });
+    }
   }
 
   const outputNodeRefined = useNodeWithServerType(outputNode);
