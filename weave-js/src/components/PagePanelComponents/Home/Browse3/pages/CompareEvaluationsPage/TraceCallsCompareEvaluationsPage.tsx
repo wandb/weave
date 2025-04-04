@@ -513,7 +513,7 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
                   fontSize: '1.5em',
                   fontWeight: 'bold',
                 }}>
-                Evaluation Summary
+                {/* Evaluation Summary */}
               </Box>
             </HorizontalBox>
             <Box
