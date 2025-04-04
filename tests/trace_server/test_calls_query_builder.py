@@ -320,8 +320,8 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
-    assert found_formatted == exp_formatted
-    assert params == exp_params
+    assert exp_formatted == found_formatted
+    assert exp_params == params
 
 
 def test_query_light_column_with_costs() -> None:
