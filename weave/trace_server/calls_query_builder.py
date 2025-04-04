@@ -1464,7 +1464,11 @@ def process_query_to_optimization_sql(
     if processed.str_filter_opt_sql:
         processed.str_filter_opt_sql = "AND " + processed.str_filter_opt_sql
     if processed.id_datetime_filters_sql:
-        processed.id_datetime_filters_sql = "AND " + processed.id_datetime_filters_sql
+        # Create non-uuidv7 condition
+        non_uuidv7_condition = f"({table_alias}.id <= 'ffffffffffffffff')"
+        processed.id_datetime_filters_sql = (
+            "AND " + non_uuidv7_condition + " OR " + processed.id_datetime_filters_sql
+        )
 
     return processed
 
@@ -1563,12 +1567,9 @@ def _create_datetime_optimization_sql(
         # If the timestamp is broken, skip optimizing that condition
         return None
 
-    # Create non-uuidv7 condition
-    non_uuidv7_condition = f"{table_alias}.id <= 'ffffffffffffffff'"
-
     # Add the condition
     param_name = pb.add_param(fake_uuid)
-    return f"({non_uuidv7_condition} OR {table_alias}.id > {_param_slot(param_name, 'String')})"
+    return f"({table_alias}.id > {_param_slot(param_name, 'String')})"
 
 
 def _param_slot(param_name: str, param_type: str) -> str:

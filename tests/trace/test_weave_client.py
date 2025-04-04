@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import datetime
 import json
 import platform
 import sys
@@ -2691,7 +2692,7 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
         return
 
     # Use a unique test ID to identify these calls
-    test_id = str(uuid.uuid4())
+    test_id = str(uuid.uuidv7())
 
     # Create calls with different timestamps
     # Call 1: Start at t=0, end at t=1
@@ -2928,3 +2929,227 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     assert len(calls) == 1
     call_ids = {call.id for call in calls}
     assert call_ids == {call3.id}
+
+
+def _make_call(client, _id):
+    trace_id = "trace" + "0" * (32 - len("trace"))
+    parent_id = "wo" + "0" * (16 - len("wo"))
+    call_res = client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=_id,
+                op_name="explicit_log_with_custom_ids",
+                display_name=f"call_{_id}",
+                trace_id=trace_id,
+                started_at=datetime.datetime.now(),
+                parent_id=None,
+                inputs={"test_id": _id},
+                attributes={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=call_res.id,
+                ended_at=datetime.datetime.now(),
+                outputs={"hello": "world"},
+                summary={"number": "1"},
+            )
+        )
+    )
+
+
+def test_calls_query_with_non_uuidv7_ids(client):
+    """Test that calls query works with non-uuidv7 ids."""
+    # Create a call with an 8 byte hex id
+    non_uuidv7_id1 = "1111111111111111"
+    non_uuidv7_id2 = "2222222222222222"
+    non_uuidv7_id3 = "3333333333333333"
+    non_uuidv7_id4 = "4444444444444444"
+
+    # Create calls with timestamps
+    call1 = _make_call(client, non_uuidv7_id1)
+    time.sleep(0.1)
+
+    call2 = _make_call(client, non_uuidv7_id2)
+    time.sleep(0.1)
+
+    call3 = _make_call(client, non_uuidv7_id3)
+    time.sleep(0.1)
+
+    call4 = _make_call(client, non_uuidv7_id4)
+    time.sleep(0.1)
+
+    client.flush()
+
+    all_calls = list(client.get_calls())
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test basic filtering with $eq
+    query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].id == non_uuidv7_id1
+
+    # Test filtering with $gt (greater than)
+    query = {
+        "$expr": {
+            "$gt": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test filtering with $gte (greater than or equal)
+    query = {
+        "$expr": {
+            "$gte": [
+                {"$getField": "started_at"},
+                {"$literal": call2_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test nested filtering with mixed operators
+    nested_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "$eq": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                    ]
+                }
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 2
+    assert calls[0].id == non_uuidv7_id3
+    assert calls[1].id == non_uuidv7_id4
+
+    # Add UUIDv7 calls and test mixed filtering
+    uuidv7_calls = []
+    for i in range(4):
+        time.sleep(0.1)
+        call = client.create_call("x", {"test_id": f"uuidv7_{i}", "special": "true"})
+        client.finish_call(call, "result")
+        uuidv7_calls.append(call)
+
+    client.flush()
+
+    # Test filtering with  mixed ID types
+    mixed_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$gt": [
+                        {"$getField": "started_at"},
+                        {"$literal": call2_ts},
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 6
+    # call3, call4, uuidv7_calls[1], uuidv7_calls[2], uuidv7_calls[3], uuidv7_calls[4]
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id3
+    assert call_ids[1] == non_uuidv7_id4
+    assert call_ids[2] == uuidv7_calls[0].id
+    assert call_ids[3] == uuidv7_calls[1].id
+    assert call_ids[4] == uuidv7_calls[2].id
+    assert call_ids[5] == uuidv7_calls[3].id
+
+    # test filtering nested, with bad or, and mixed ids
+    now = datetime.datetime.now().timestamp()
+    mixed_query = {
+        "$expr": {
+            "$or": [
+                {
+                    "$or": [
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call2_ts},
+                            ]
+                        },
+                        # all hex id calls satisfy this
+                        {
+                            "$eq": [
+                                {"$getField": "summary.number"},
+                                {"$literal": "1"},
+                            ]
+                        },
+                    ]
+                },
+                # all uuidv7 calls satisfy this
+                {
+                    "$and": [
+                        {
+                            "$not": [
+                                {
+                                    "$gt": [
+                                        {"$getField": "started_at"},
+                                        {"$literal": now},
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.special"},
+                                {"$literal": "true"},
+                            ]
+                        },
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 8
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id1
+    assert call_ids[1] == non_uuidv7_id2
+    assert call_ids[2] == non_uuidv7_id3
+    assert call_ids[3] == non_uuidv7_id4
+    assert call_ids[4] == uuidv7_calls[0].id
+    assert call_ids[5] == uuidv7_calls[1].id
+    assert call_ids[6] == uuidv7_calls[2].id
+    assert call_ids[7] == uuidv7_calls[3].id
