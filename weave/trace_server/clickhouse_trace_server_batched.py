@@ -100,6 +100,7 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -224,6 +225,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
         )
+
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        traces_data = [
+            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
+        ]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
+        # TODO: Actually populate the error fields if call_start_batch fails
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        return tsi.OtelExportRes()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
