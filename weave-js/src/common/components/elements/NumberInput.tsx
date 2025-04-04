@@ -90,7 +90,7 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         className={`number-input__input ${props.className || ''}`}
         disabled={props.disabled}
         placeholder={props.placeholder}
-        style={props.inputStyle}
+        style={{marginRight: 0, ...props.inputStyle}} // the default margin right is 4px but that misaligns the arrow buttons
         type="number"
         value={stringValue}
         onFocus={() => {
