@@ -40,34 +40,35 @@ const formatSmallTime = (then: moment.Moment): string | null => {
 
   const years = now.diff(then, 'years');
   if (years > 0) {
-    const remainingDays = days - years * 365;
-    if (remainingDays < 7) {
-      return `${years}y`;
-    }
+    return `${years}y`;
   }
 
-  // Calculate months using moment's diff
-  const months = now.diff(then, 'months');
-  if (months > 0) {
-    // Only show months if the remaining days are less than 7
-    const remainingDays = days - months * 30;
-    if (remainingDays < 7) {
-      if (months === 1) {
-        return '1mo';
-      } else if (months > 1) {
-        return `${months}mo`;
-      }
-    }
+  // Calculate months using moment's built-in month diff
+  const monthDiff = now.diff(then, 'months');
+
+  // Get remaining days by moving forward the months and checking what's left
+  const afterMonths = then.clone().add(monthDiff, 'months');
+  const remainingDays = now.diff(afterMonths, 'days');
+
+  // Always show months if 3 or more
+  if (monthDiff >= 3) {
+    return `${monthDiff}mo`;
   }
 
-  // Only use weeks when it's an exact multiple
+  // Show months if exact(ish) multiple
+  if (monthDiff > 0 && remainingDays < 5) {
+    return `${monthDiff}mo`;
+  }
+
+  // Show weeks when more than 14 days or exact
+  const weeks = Math.round(days / 7);
+  if (weeks >= 2) {
+    return `${weeks}w`;
+  }
+
+  // Show weeks when exact multiple
   if (days % 7 === 0) {
-    const weeks = days / 7;
-    if (weeks === 1) {
-      return '1w';
-    } else if (weeks > 1) {
-      return `${weeks}w`;
-    }
+    return `${weeks}w`;
   }
 
   // Otherwise use days for more precision
