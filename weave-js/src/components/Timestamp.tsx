@@ -42,11 +42,7 @@ const formatSmallTime = (then: moment.Moment): string | null => {
   if (years > 0) {
     const remainingDays = days - years * 365;
     if (remainingDays < 7) {
-      if (years === 1) {
-        return '1y';
-      } else if (years > 1) {
-        return `${years}y`;
-      }
+      return `${years}y`;
     }
   }
 
