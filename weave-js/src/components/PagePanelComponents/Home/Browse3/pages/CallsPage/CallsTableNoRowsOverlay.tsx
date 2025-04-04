@@ -52,16 +52,27 @@ export const CallsTableNoRowsOverlay: React.FC<
   }
 
   const opExists = opCreatedAt != null;
+  const hasDateFilter = filterHasCalledAfterDateFilter(filterModelResolved);
 
   // Handle special empty states
   if (isEvaluateTable) {
-    return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+    if (!hasDateFilter) {
+      return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+    } else {
+      return (
+        <DateFilterEmptyState
+          filterModelResolved={filterModelResolved}
+          opCreatedAt={opCreatedAt ?? null}
+          clearFilters={clearFilters}
+          setFilterModel={setFilterModel}
+        />
+      );
+    }
     // Show empty page if we have no ops, and thus haven't logged a real trace
   } else if (effectiveFilter.traceRootsOnly && !opExists) {
     return <Empty {...EMPTY_PROPS_TRACES} />;
   }
 
-  const hasDateFilter = filterHasCalledAfterDateFilter(filterModelResolved);
   if (hasDateFilter) {
     return (
       <DateFilterEmptyState
