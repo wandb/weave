@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS calls_merged_final (
     -- storage_size_bytes_total_raw UInt64,
 
     INDEX idx_op_name op_name TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_trace_id trace_id TYPE minmax GRANULARITY 1,
+    INDEX idx_parent_id parent_id TYPE minmax GRANULARITY 1,
     -- More indices? trace_id? do we want to go crazy and try to index inputs/output?
     
 ) ENGINE = AggregatingMergeTree
