@@ -35,6 +35,7 @@ import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {PanelComp2} from '../PanelComp';
 import * as PanelLib from '../panellib/libpanel';
+import {StackInfo} from '../panellib/stackinfo';
 
 export type PanelStepperConfigType = {
   currentStep: number;
@@ -55,18 +56,17 @@ export type PanelStepperProps = Panel2.PanelProps<
 >;
 
 const getDefaultWorkingKeyAndType = (
-  inputType: Type,
-  config: PanelStepperConfigType | undefined
+  config: PanelStepperConfigType | undefined,
+  propertyKeysAndTypes: {[key: string]: Type}
 ) => {
-  const keysAndTypes = getKeysAndTypesFromPropertyType(inputType);
   const defaultKey =
     config?.workingKeyAndType?.key &&
-    config.workingKeyAndType.key in keysAndTypes
+    config.workingKeyAndType.key in propertyKeysAndTypes
       ? config.workingKeyAndType.key
-      : Object.keys(keysAndTypes)[0] ?? '';
+      : Object.keys(propertyKeysAndTypes)[0] ?? '';
   return {
     key: defaultKey,
-    type: keysAndTypes[defaultKey] ?? null,
+    type: propertyKeysAndTypes[defaultKey] ?? null,
   };
 };
 
@@ -108,28 +108,139 @@ const convertInputNode = (inputNode: Node) => {
   return inputNode;
 };
 
-const safeUpdateConfigThunk =
-  (
-    config: PanelStepperConfigType | undefined,
-    updateConfig: (updates: Partial<PanelStepperConfigType>) => void
-  ) =>
-  (updates: Partial<PanelStepperConfigType>) => {
-    const needsUpdate = Object.entries(updates).some(
-      ([key, value]) => (config as any)?.[key] !== value
-    );
+type additionalProps = {
+  safeUpdateConfig: (updates: Partial<PanelStepperConfigType>) => void;
+  convertedInputNode: Node;
+  filteredNode: Node;
+  outputNode: NodeOrVoidNode;
+  propertyKeysAndTypes: {[key: string]: Type};
+  childPanelStackIds: StackInfo[];
+  childPanelHandler: PanelStack | undefined;
+};
 
-    if (needsUpdate) {
-      updateConfig(updates);
-    }
+type PanelStepperEntryProps = PanelStepperProps & {
+  isConfigMode: boolean;
+};
+
+const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
+  const {input, updateConfig, config, isConfigMode} = props;
+
+  const safeUpdateConfig = React.useCallback(
+    (updates: Partial<PanelStepperConfigType>) => {
+      const needsUpdate = Object.entries(updates).some(
+        ([key, value]) => (config as any)?.[key] !== value
+      );
+
+      if (needsUpdate) {
+        updateConfig(updates);
+      }
+    },
+    [config, updateConfig]
+  );
+
+  const convertedInputNode = convertInputNode(input);
+
+  const propertyKeysAndTypes = useMemo(
+    () => getKeysAndTypesFromPropertyType(convertedInputNode.type),
+    [convertedInputNode.type]
+  );
+
+  const workingKeyAndType = getDefaultWorkingKeyAndType(
+    config,
+    propertyKeysAndTypes
+  );
+
+  if (config?.workingKeyAndType == null) {
+    safeUpdateConfig({
+      workingKeyAndType,
+    });
+  }
+
+  const filteredNode = opFilter({
+    arr: convertedInputNode,
+    filterFn: constFunction({row: convertedInputNode.type}, ({row}) =>
+      opNot({
+        bool: opIsNone({
+          val: opPick({obj: row, key: constString(workingKeyAndType.key)}),
+        }),
+      })
+    ),
+  });
+
+  const exampleRow = opIndex({
+    arr: filteredNode,
+    index: constNumber(0),
+  });
+  const exampleRowRefined = useNodeWithServerType(exampleRow);
+  let outputNode: NodeOrVoidNode = voidNode();
+  const currentStep = config?.currentStep ?? -1;
+  if (currentStep != null && currentStep >= 0 && workingKeyAndType.key) {
+    outputNode = opPick({
+      obj: opFilter({
+        arr: filteredNode,
+        filterFn: constFunction({row: exampleRowRefined.result.type}, ({row}) =>
+          opNumberEqual({
+            lhs: opPick({
+              obj: row,
+              key: constString(config?.workingSliderKey ?? '_step'),
+            }),
+            rhs: constNumber(currentStep),
+          })
+        ),
+      }),
+      key: constString(workingKeyAndType.key),
+    });
+  }
+
+  const outputNodeRefined = useNodeWithServerType(outputNode);
+
+  const {stackIds, handler} = usePanelStacksForType(
+    outputNodeRefined.result.type,
+    config?.workingPanelId ?? undefined
+  );
+
+  if (config?.workingPanelId == null) {
+    safeUpdateConfig({
+      workingPanelId: stackIds[0].id,
+    });
+  }
+
+  const additionalProps = {
+    safeUpdateConfig,
+    convertedInputNode,
+    filteredNode,
+    outputNode,
+    propertyKeysAndTypes,
+    childPanelStackIds: stackIds,
+    childPanelHandler: handler,
   };
 
-export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
-  const {input, updateConfig, config} = props;
-
-  const keysAndTypes = useMemo(
-    () => getKeysAndTypesFromPropertyType(input.type),
-    [input.type]
+  return isConfigMode ? (
+    <PanelStepperConfig {...props} {...additionalProps} />
+  ) : (
+    <PanelStepper {...props} {...additionalProps} />
   );
+};
+
+const PanelStepperConfigComponent: React.FC<PanelStepperProps> = props => {
+  return <PanelStepperEntryComponent {...props} isConfigMode={true} />;
+};
+
+const PanelStepperComponent: React.FC<PanelStepperProps> = props => {
+  return <PanelStepperEntryComponent {...props} isConfigMode={false} />;
+};
+
+export const PanelStepperConfig: React.FC<
+  PanelStepperProps & additionalProps
+> = props => {
+  const {
+    safeUpdateConfig,
+    config,
+    propertyKeysAndTypes,
+    outputNode,
+    childPanelStackIds,
+    childPanelHandler,
+  } = props;
 
   // TODO (nicholaspun-wandb): Used for the "Slider Key" config option below
   // const sliderKeys = useMemo(
@@ -140,35 +251,11 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
   //   [keysAndTypes]
   // );
 
-  const safeUpdateConfig = React.useCallback(
-    (updates: Partial<PanelStepperConfigType>) =>
-      safeUpdateConfigThunk(config, updateConfig)(updates),
-    [config, updateConfig]
-  );
-
-  const defaultKeyAndType = getDefaultWorkingKeyAndType(input.type, config);
-
-  if (config?.workingKeyAndType == null) {
-    safeUpdateConfig({
-      workingKeyAndType: defaultKeyAndType,
-    });
-  }
-
-  const {stackIds, handler} = usePanelStacksForType(
-    defaultKeyAndType.type,
-    config?.workingPanelId ?? undefined
-  );
-
-  if (config?.workingPanelId == null) {
-    safeUpdateConfig({
-      workingPanelId: stackIds[0].id,
-    });
-  }
-
   const handlerHasConfigComponent =
-    handler != null &&
-    (handler.ConfigComponent != null ||
-      (PanelLib.isWithChild(handler) && handler.child.ConfigComponent != null));
+    childPanelHandler != null &&
+    (childPanelHandler.ConfigComponent != null ||
+      (PanelLib.isWithChild(childPanelHandler) &&
+        childPanelHandler.child.ConfigComponent != null));
 
   return (
     <>
@@ -205,17 +292,17 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
           scrolling
           item
           direction="left"
-          options={Object.keys(keysAndTypes).map(key => ({
+          options={Object.keys(propertyKeysAndTypes).map(key => ({
             key,
             value: key,
             text: key,
           }))}
-          value={defaultKeyAndType.key}
+          value={config?.workingKeyAndType?.key}
           onChange={(e, {value}) => {
             safeUpdateConfig({
               workingKeyAndType: {
                 key: value as string,
-                type: keysAndTypes[value as string],
+                type: propertyKeysAndTypes[value as string],
               },
               workingPanelId: undefined,
             });
@@ -230,7 +317,7 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
           scrolling
           item
           direction="left"
-          options={stackIds.map(si => ({
+          options={childPanelStackIds.map(si => ({
             text: si.displayName,
             value: si.id,
           }))}
@@ -243,10 +330,10 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
       {handlerHasConfigComponent && (
         <ConfigPanel.ConfigSection label="Panel Properties">
           <PanelComp2
-            input={input}
-            inputType={input.type}
+            input={outputNode}
+            inputType={outputNode.type}
             loading={props.loading}
-            panelSpec={handler as PanelStack}
+            panelSpec={childPanelHandler as PanelStack}
             configMode={true}
             config={config}
             context={props.context}
@@ -260,29 +347,16 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
   );
 };
 
-export const PanelStepper: React.FC<PanelStepperProps> = props => {
-  const {input, updateConfig, config} = props;
-
-  const safeUpdateConfig = React.useCallback(
-    (updates: Partial<PanelStepperConfigType>) =>
-      safeUpdateConfigThunk(config, updateConfig)(updates),
-    [config, updateConfig]
-  );
-
-  const workingKeyAndType = getDefaultWorkingKeyAndType(input.type, config);
-  const workingKey = workingKeyAndType.key;
-
-  const convertedInputNode = convertInputNode(input);
-  const filteredNode = opFilter({
-    arr: convertedInputNode,
-    filterFn: constFunction({row: convertedInputNode.type}, ({row}) =>
-      opNot({
-        bool: opIsNone({
-          val: opPick({obj: row, key: constString(workingKey)}),
-        }),
-      })
-    ),
-  });
+export const PanelStepper: React.FC<
+  PanelStepperProps & additionalProps
+> = props => {
+  const {
+    safeUpdateConfig,
+    config,
+    filteredNode,
+    outputNode,
+    childPanelHandler,
+  } = props;
 
   const stepsNode = opPick({
     obj: filteredNode,
@@ -323,41 +397,9 @@ export const PanelStepper: React.FC<PanelStepperProps> = props => {
     }
   }, [stepsNodeResult, stepsNodeLoading, config, safeUpdateConfig]);
 
-  const exampleRow = opIndex({
-    arr: filteredNode,
-    index: constNumber(0),
-  });
-  const exampleRowRefined = useNodeWithServerType(exampleRow);
-  let defaultNode: NodeOrVoidNode = voidNode();
-  const currentStep = config?.currentStep ?? -1;
-  if (currentStep != null && currentStep >= 0 && workingKey) {
-    defaultNode = opPick({
-      obj: opFilter({
-        arr: filteredNode,
-        filterFn: constFunction({row: exampleRowRefined.result.type}, ({row}) =>
-          opNumberEqual({
-            lhs: opPick({
-              obj: row,
-              key: constString(config?.workingSliderKey ?? '_step'),
-            }),
-            rhs: constNumber(currentStep),
-          })
-        ),
-      }),
-      key: constString(workingKey),
-    });
-  }
-
-  const defaultNodeRefined = useNodeWithServerType(defaultNode);
-
-  const {handler} = usePanelStacksForType(
-    defaultNodeRefined.result.type,
-    config?.workingPanelId
-  );
-
   return (
     <>
-      {defaultNode != null && !isVoidNode(defaultNode) && (
+      {outputNode != null && !isVoidNode(outputNode) && (
         <div
           style={{
             display: 'flex',
@@ -368,10 +410,10 @@ export const PanelStepper: React.FC<PanelStepperProps> = props => {
             overflowY: 'auto',
           }}>
           <PanelComp2
-            input={defaultNode}
-            inputType={defaultNode.type}
+            input={outputNode}
+            inputType={outputNode.type}
             loading={props.loading}
-            panelSpec={handler as PanelStack}
+            panelSpec={childPanelHandler as PanelStack}
             configMode={false}
             config={props.config}
             context={props.context}
@@ -415,7 +457,7 @@ export const PanelStepper: React.FC<PanelStepperProps> = props => {
 export const Spec: Panel2.PanelSpec<PanelStepperConfigType> = {
   id: 'panel-stepper',
   displayName: 'Stepper',
-  Component: PanelStepper,
-  ConfigComponent: PanelStepperConfig,
+  Component: PanelStepperComponent,
+  ConfigComponent: PanelStepperConfigComponent,
   inputType: LIST_ANY_TYPE,
 };
