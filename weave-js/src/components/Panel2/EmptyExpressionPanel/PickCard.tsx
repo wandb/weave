@@ -105,7 +105,7 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
           <span style={{color: IDENTIFER_COLOR}}>runs</span>
           <span style={{color: REGULAR_TEXT_COLOR}}>.</span>
           <span style={{color: OPERATOR_COLOR}}>summary</span>
-          <div className="bracket-group">
+          <S.BracketGroup>
             <span style={{padding: 0, margin: 0}}>["</span>
             <S.StyledDropdownWrapper>
               <Dropdown
@@ -133,7 +133,7 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
               />
             </S.StyledDropdownWrapper>
             <span style={{padding: 0, margin: 0}}>"]</span>
-          </div>
+          </S.BracketGroup>
         </S.ExpressionWrapper>
       </S.CardSubtitle>
     </S.Card>

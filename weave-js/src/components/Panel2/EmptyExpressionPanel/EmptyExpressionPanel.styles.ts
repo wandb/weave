@@ -199,22 +199,26 @@ export const ExpressionWrapper = styled.div`
   line-height: 1;
   flex-wrap: wrap;
 
+  .bracket-group-container {
+    display: inline-flex;
+    align-items: baseline;
+    margin: 0;
+    padding: 0;
+  }
+
   @container (max-width: 230px) {
     &.pickcard-expression {
       display: grid;
       grid-template-columns: auto;
       gap: ${SPACING.xs};
-
-      .bracket-group {
-        display: flex;
-        align-items: baseline;
-        margin: 0;
-        padding: 0;
-      }
     }
   }
+`;
 
-  .bracket-group {
+export const BracketGroup = styled.div.attrs({
+  className: 'bracket-group-container',
+})`
+  && {
     display: inline-flex;
     align-items: baseline;
     margin: 0;
