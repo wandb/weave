@@ -350,7 +350,7 @@ export const useMakeInitialDatetimeFilter = (
       };
     } else if (callStats30Days.result && callStats30Days.result.count < 50) {
       newFilter = {
-        items: [makeDateFilter(180)],
+        items: [makeDateFilter(365)],
         logicOperator: GridLogicOperator.And,
       };
     }

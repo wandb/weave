@@ -141,10 +141,6 @@ const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({
         // Month is a special case, depends on the # of days in last month
         newDateFilter = makeMonthFilter();
       } else if (existingFilterDays <= 31) {
-        newDateFilter = makeDateFilter(90);
-      } else if (existingFilterDays <= 90) {
-        newDateFilter = makeDateFilter(180);
-      } else if (existingFilterDays <= 180) {
         newDateFilter = makeDateFilter(365);
       } else {
         // If we're already at the largest bucket, remove the date filter
