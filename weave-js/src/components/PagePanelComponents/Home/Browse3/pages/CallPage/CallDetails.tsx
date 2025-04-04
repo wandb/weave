@@ -8,6 +8,7 @@ import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {PageType} from '../CallsPage/CallsPage';
 import {CallsTable} from '../CallsPage/CallsTable';
 import {CallLink} from '../common/Links';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -189,6 +190,7 @@ export const CallDetails: FC<{
 
           let callsTable = (
             <CallsTable
+              pageType={PageType.Calls}
               hideControls
               initialFilter={{
                 opVersionRefs: [opVersionRef],

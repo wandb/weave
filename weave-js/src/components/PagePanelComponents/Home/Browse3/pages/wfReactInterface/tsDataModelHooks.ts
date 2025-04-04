@@ -253,6 +253,7 @@ const useCallsNoExpansion = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -287,6 +288,9 @@ const useCallsNoExpansion = (
       columns,
       include_costs: opts?.includeCosts,
       include_feedback: opts?.includeFeedback,
+      ...(opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -299,18 +303,27 @@ const useCallsNoExpansion = (
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
     opts?.skip,
     opts?.includeCosts,
     opts?.includeFeedback,
-    getTsClient,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter.opVersionRefs,
+    deepFilter.inputObjectVersionRefs,
+    deepFilter.outputObjectVersionRefs,
+    deepFilter.parentIds,
+    deepFilter.traceId,
+    deepFilter.callIds,
+    deepFilter.traceRootsOnly,
+    deepFilter.runIds,
+    deepFilter.userIds,
+    limit,
     offset,
     sortBy,
     query,
     columns,
+    getTsClient,
   ]);
 
   // register doFetch as a callback after deletion
@@ -397,6 +410,7 @@ const useCalls = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
@@ -1953,6 +1967,7 @@ export const traceCallToUICallSchema = (
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
     traceCall,
+    totalStorageSizeBytes: traceCall.total_storage_size_bytes ?? null,
   };
 };
 
