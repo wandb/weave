@@ -55,8 +55,8 @@ const formatSmallTime = (then: moment.Moment): string | null => {
     return `${monthDiff}mo`;
   }
 
-  // Show months if exact(ish) multiple
-  if (monthDiff > 0 && remainingDays < 5) {
+  // Show months if exact multiple
+  if (monthDiff > 0 && remainingDays === 0) {
     return `${monthDiff}mo`;
   }
 
