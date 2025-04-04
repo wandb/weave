@@ -114,14 +114,16 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
                 search
                 selection
                 compact
+                scrolling
                 value={selectedKey}
                 text="<key>"
                 noResultsMessage="No tables found"
-                onChange={(_, data: DropdownProps) => {
+                onChange={(e: React.SyntheticEvent, data: DropdownProps) => {
                   handleKeySelect(data.value as string);
                 }}
                 onOpen={() => setDropdownOpen(true)}
                 onClose={() => setDropdownOpen(false)}
+                selectOnNavigation={false}
                 open={dropdownOpen}
                 onClick={e => {
                   e.stopPropagation();

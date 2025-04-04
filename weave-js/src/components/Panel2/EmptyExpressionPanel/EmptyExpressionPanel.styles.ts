@@ -256,6 +256,7 @@ export const StyledDropdownWrapper = styled.div`
       margin-top: ${SPACING.xs};
       min-width: 100px;
       width: auto;
+      max-height: 120px;
 
       > .item {
         font-size: ${FONTS.sizes.md};
@@ -268,6 +269,10 @@ export const StyledDropdownWrapper = styled.div`
         &:hover {
           background-color: ${COLORS.dropdown.itemHover} !important;
         }
+      }
+
+      > .item.selected {
+        background-color: ${COLORS.dropdown.itemHover} !important;
       }
     }
 
