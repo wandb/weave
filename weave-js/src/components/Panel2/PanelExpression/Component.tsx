@@ -9,6 +9,7 @@ import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import Sidebar from '../../Sidebar/Sidebar';
 import {themes} from '../Editor.styles';
+import {EmptyExpressionPanel} from '../EmptyExpressionPanel/EmptyExpressionPanel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -189,25 +190,32 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
             {isLoading ? (
               <Panel2Loader />
             ) : (
-              calledExpanded.nodeType !== 'void' &&
-              handler != null && (
-                <WeaveActionContextProvider newActions={actions}>
-                  <PanelComp2
-                    input={inputPath}
-                    inputType={calledExpanded.type}
-                    loading={false}
-                    panelSpec={handler}
-                    configMode={false}
-                    context={props.context}
-                    config={renderPanelConfig}
-                    updateConfig={updateRenderPanelConfig}
-                    updateConfig2={updateRenderPanelConfig2}
-                    updateContext={props.updateContext}
-                    updateInput={updatePanelInput}
-                    noPanelControls
+              <>
+                {calledExpanded.nodeType !== 'void' && handler != null ? (
+                  <WeaveActionContextProvider newActions={actions}>
+                    <PanelComp2
+                      input={inputPath}
+                      inputType={calledExpanded.type}
+                      loading={false}
+                      panelSpec={handler}
+                      configMode={false}
+                      context={props.context}
+                      config={renderPanelConfig}
+                      updateConfig={updateRenderPanelConfig}
+                      updateConfig2={updateRenderPanelConfig2}
+                      updateContext={props.updateContext}
+                      updateInput={updatePanelInput}
+                      noPanelControls
+                    />
+                  </WeaveActionContextProvider>
+                ) : (
+                  <EmptyExpressionPanel
+                    updateExp={updateExp}
+                    inputNode={props.input}
+                    newVars={newVars}
                   />
-                </WeaveActionContextProvider>
-              )
+                )}
+              </>
             )}
           </S.PanelHandlerContent>
         </S.PanelHandler>
