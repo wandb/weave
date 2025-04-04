@@ -31,9 +31,10 @@ import {LIST_RUNS_TYPE} from '../../../common/types/run';
 import {useNodeValue, useNodeWithServerType} from '../../../react';
 import {PanelStack, usePanelStacksForType} from '../availablePanels';
 import {ModifiedDropdownConfigField} from '../ConfigPanel';
-import {ConfigOption} from '../ConfigPanel';
+import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {PanelComp2} from '../PanelComp';
+import * as PanelLib from '../panellib/libpanel';
 
 export type PanelStepperConfigType = {
   currentStep: number;
@@ -153,7 +154,7 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
     });
   }
 
-  const {stackIds} = usePanelStacksForType(
+  const {stackIds, handler} = usePanelStacksForType(
     defaultKeyAndType.type,
     config?.workingPanelId ?? undefined
   );
@@ -163,6 +164,11 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
       workingPanelId: stackIds[0].id,
     });
   }
+
+  const handlerHasConfigComponent =
+    handler != null &&
+    (handler.ConfigComponent != null ||
+      (PanelLib.isWithChild(handler) && handler.child.ConfigComponent != null));
 
   return (
     <>
@@ -191,7 +197,7 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
       </ConfigOption> 
       
       */}
-      <ConfigOption label="Property Key">
+      <ConfigPanel.ConfigOption label="Property Key">
         <ModifiedDropdownConfigField
           selection
           search
@@ -215,8 +221,8 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
             });
           }}
         />
-      </ConfigOption>
-      <ConfigOption label="Panel Type">
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label="Panel Type">
         <ModifiedDropdownConfigField
           selection
           search
@@ -233,7 +239,23 @@ export const PanelStepperConfig: React.FC<PanelStepperProps> = props => {
             safeUpdateConfig({workingPanelId: value as string})
           }
         />
-      </ConfigOption>
+      </ConfigPanel.ConfigOption>
+      {handlerHasConfigComponent && (
+        <ConfigPanel.ConfigSection label="Panel Properties">
+          <PanelComp2
+            input={input}
+            inputType={input.type}
+            loading={props.loading}
+            panelSpec={handler as PanelStack}
+            configMode={true}
+            config={config}
+            context={props.context}
+            updateConfig={props.updateConfig}
+            updateContext={props.updateContext}
+            updateInput={props.updateInput}
+          />
+        </ConfigPanel.ConfigSection>
+      )}
     </>
   );
 };
