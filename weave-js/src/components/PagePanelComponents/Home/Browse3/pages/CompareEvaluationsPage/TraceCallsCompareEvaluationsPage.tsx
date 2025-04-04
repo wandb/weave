@@ -518,26 +518,44 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
             </HorizontalBox>
             <Box
               sx={{
+                height: 400, // Fixed height for plots section
+                overflow: 'auto',
+              }}>
+              <SummarizePlotsSection
+                summarizeCalls={summarizeCalls}
+                state={state}
+              />
+            </Box>
+
+            {/* Evaluation Summary Section */}
+            <HorizontalBox
+              sx={{
+                flex: '0 0 auto',
+                paddingLeft: STANDARD_PADDING,
+                paddingRight: STANDARD_PADDING,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                marginTop: STANDARD_PADDING,
+              }}>
+              <Box
+                sx={{
+                  fontSize: '1.5em',
+                  fontWeight: 'bold',
+                }}>
+                Summary
+              </Box>
+            </HorizontalBox>
+            <Box
+              sx={{
                 height: 300, // Fixed height for summary section
                 overflow: 'auto',
+                marginTop: STANDARD_PADDING,
               }}>
               <SummarizeCallsSection
                 summarizeCalls={summarizeCalls}
                 entity={projectContext?.entity}
                 project={projectContext?.project}
-                state={state}
-              />
-            </Box>
-
-            {/* New Summarize Plots Section */}
-            <Box
-              sx={{
-                height: 400, // Fixed height for plots section
-                overflow: 'auto',
-                marginTop: STANDARD_PADDING,
-              }}>
-              <SummarizePlotsSection
-                summarizeCalls={summarizeCalls}
                 state={state}
               />
             </Box>
