@@ -9,6 +9,9 @@ export type Model = z.infer<typeof ModelSchema>;
 export const ProviderReturnTypeSchema = z.enum(['openai']);
 export type ProviderReturnType = z.infer<typeof ProviderReturnTypeSchema>;
 
+export const DirectionSchema = z.enum(['asc', 'desc']);
+export type Direction = z.infer<typeof DirectionSchema>;
+
 export const ConfigSchema = z.object({
   action_type: ActionTypeSchema.optional(),
   model: ModelSchema.optional(),
@@ -53,6 +56,46 @@ export const ProviderModelSchema = z.object({
 });
 export type ProviderModel = z.infer<typeof ProviderModelSchema>;
 
+export const ColumnSchema = z.object({
+  label: z.union([z.null(), z.string()]).optional(),
+  path: z
+    .union([z.array(z.union([z.number(), z.string()])), z.null()])
+    .optional(),
+});
+export type Column = z.infer<typeof ColumnSchema>;
+
+export const CallsFilterSchema = z.object({
+  call_ids: z.union([z.array(z.string()), z.null()]).optional(),
+  input_refs: z.union([z.array(z.string()), z.null()]).optional(),
+  op_names: z.union([z.array(z.string()), z.null()]).optional(),
+  output_refs: z.union([z.array(z.string()), z.null()]).optional(),
+  parent_ids: z.union([z.array(z.string()), z.null()]).optional(),
+  trace_ids: z.union([z.array(z.string()), z.null()]).optional(),
+  trace_roots_only: z.union([z.boolean(), z.null()]).optional(),
+  wb_run_ids: z.union([z.array(z.string()), z.null()]).optional(),
+  wb_user_ids: z.union([z.array(z.string()), z.null()]).optional(),
+});
+export type CallsFilter = z.infer<typeof CallsFilterSchema>;
+
+export const PinSchema = z.object({
+  left: z.array(z.string()),
+  right: z.array(z.string()),
+});
+export type Pin = z.infer<typeof PinSchema>;
+
+export const ContainsSpecSchema = z.object({
+  case_insensitive: z.union([z.boolean(), z.null()]).optional(),
+  input: z.any(),
+  substr: z.any(),
+});
+export type ContainsSpec = z.infer<typeof ContainsSpecSchema>;
+
+export const SortBySchema = z.object({
+  direction: DirectionSchema,
+  field: z.string(),
+});
+export type SortBy = z.infer<typeof SortBySchema>;
+
 export const TestOnlyNestedBaseModelSchema = z.object({
   a: z.number(),
 });
@@ -83,6 +126,18 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
+export const ExprSchema = z.object({
+  $and: z.array(z.any()).optional(),
+  $or: z.array(z.any()).optional(),
+  $not: z.array(z.any()).optional(),
+  $eq: z.array(z.any()).optional(),
+  $gt: z.array(z.any()).optional(),
+  $gte: z.array(z.any()).optional(),
+  $in: z.array(z.any()).optional(),
+  $contains: ContainsSpecSchema.optional(),
+});
+export type Expr = z.infer<typeof ExprSchema>;
+
 export const TestOnlyExampleSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
   name: z.union([z.null(), z.string()]).optional(),
@@ -92,12 +147,38 @@ export const TestOnlyExampleSchema = z.object({
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 
+export const QuerySchema = z.object({
+  $expr: ExprSchema,
+});
+export type Query = z.infer<typeof QuerySchema>;
+
+export const SavedViewDefinitionSchema = z.object({
+  cols: z.union([z.record(z.string(), z.boolean()), z.null()]).optional(),
+  columns: z.union([z.array(ColumnSchema), z.null()]).optional(),
+  filter: z.union([CallsFilterSchema, z.null()]).optional(),
+  page_size: z.union([z.number(), z.null()]).optional(),
+  pin: z.union([PinSchema, z.null()]).optional(),
+  query: z.union([QuerySchema, z.null()]).optional(),
+  sort_by: z.union([z.array(SortBySchema), z.null()]).optional(),
+});
+export type SavedViewDefinition = z.infer<typeof SavedViewDefinitionSchema>;
+
+export const SavedViewSchema = z.object({
+  definition: SavedViewDefinitionSchema,
+  description: z.union([z.null(), z.string()]).optional(),
+  label: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
+  view_type: z.string(),
+});
+export type SavedView = z.infer<typeof SavedViewSchema>;
+
 export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
   Provider: ProviderSchema,
   ProviderModel: ProviderModelSchema,
+  SavedView: SavedViewSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
