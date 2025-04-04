@@ -51,13 +51,18 @@ export const useCallsForQuery = (
   gridPage: GridPaginationModel,
   gridSort?: GridSortModel,
   expandedColumns?: Set<string>,
-  columns?: string[]
+  columns?: string[],
+  options?: {
+    includeTotalStorageSize?: boolean;
+  }
 ): {
   costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
   refetch: () => void;
+  storageSizeLoading: boolean;
+  storageSizeResults: Map<string, number> | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -130,6 +135,37 @@ export const useCallsForQuery = (
     }
   );
 
+  const storageSizeCols = useMemo(() => ['id', 'total_storage_size_bytes'], []);
+  const storageSizeFilter = costFilter;
+
+  const storageSize = useCalls(
+    entity,
+    project,
+    storageSizeFilter,
+    effectiveLimit,
+    undefined,
+    undefined,
+    undefined,
+    storageSizeCols,
+    undefined,
+    {
+      skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+      includeTotalStorageSize: true,
+    }
+  );
+
+  const storageSizeResults = useMemo(() => {
+    if (storageSize.loading) {
+      return null;
+    }
+    return new Map(
+      storageSize.result?.map(r => [
+        r.callId,
+        r.totalStorageSizeBytes as number,
+      ])
+    );
+  }, [storageSize]);
+
   const costResults = useMemo(() => {
     return getFeedbackMerged(costs.result ?? []);
   }, [costs]);
@@ -147,11 +183,15 @@ export const useCallsForQuery = (
         result: [],
         total: 0,
         refetch,
+        storageSizeLoading: storageSize.loading,
+        storageSizeResults: null,
       };
     }
 
     return {
       costsLoading: costs.loading,
+      storageSizeLoading: storageSize.loading,
+      storageSizeResults,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
       result: calls.loading
@@ -162,7 +202,16 @@ export const useCallsForQuery = (
       total,
       refetch,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+  }, [
+    callResults,
+    calls.loading,
+    total,
+    costs.loading,
+    costResults,
+    refetch,
+    storageSize.loading,
+    storageSizeResults,
+  ]);
 };
 
 export const useFilterSortby = (

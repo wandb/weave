@@ -24,6 +24,13 @@ const HeaderExtras = () => {
   return <>{renderExtras()}</>;
 };
 
+export enum PageType {
+  Evaluations,
+  OpTraces,
+  Traces,
+  Calls,
+}
+
 export const CallsPage: FC<{
   entity: string;
   project: string;
@@ -58,17 +65,17 @@ export const CallsPage: FC<{
     props.project
   );
 
-  const title = useMemo(() => {
+  const [pageType, title] = useMemo(() => {
     if (isEvaluationTable) {
-      return 'Evaluations';
+      return [PageType.Evaluations, 'Evaluations'];
     }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       if (opName) {
-        return opNiceName(opName) + ' Traces';
+        return [PageType.OpTraces, opNiceName(opName) + ' Traces'];
       }
     }
-    return 'Traces';
+    return [PageType.Traces, 'Traces'];
   }, [filter.opVersionRefs, isEvaluationTable]);
 
   return (
@@ -82,6 +89,7 @@ export const CallsPage: FC<{
             content: (
               <CallsTable
                 {...props}
+                pageType={pageType}
                 // CPR (Tim): Applying "hide controls" when the filter is frozen is pretty crude.
                 // We will likely need finer-grained control over the filter enablement states
                 // rather than just a boolean flag. Note: "frozen === hideControls" at the moment.

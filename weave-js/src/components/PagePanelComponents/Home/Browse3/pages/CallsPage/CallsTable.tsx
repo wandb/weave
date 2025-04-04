@@ -83,6 +83,7 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
+import {PageType} from './CallsPage';
 import {
   BulkAddToDatasetButton,
   BulkDeleteButton,
@@ -140,6 +141,7 @@ export const CallsTable: FC<{
   project: string;
   frozenFilter?: WFHighLevelCallFilter;
   initialFilter?: WFHighLevelCallFilter;
+  pageType: PageType;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
@@ -165,6 +167,7 @@ export const CallsTable: FC<{
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
 }> = ({
+  pageType,
   entity,
   project,
   initialFilter,
@@ -272,7 +275,13 @@ export const CallsTable: FC<{
     filterModelResolved,
     paginationModelResolved,
     sortModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    undefined,
+    {
+      // The total storage size only makes sense for traces,
+      // and not for calls.
+      includeTotalStorageSize: pageType === PageType.Traces,
+    }
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -392,6 +401,7 @@ export const CallsTable: FC<{
         }
       : undefined;
 
+  const shouldIncludeTotalStorageSize = pageType === PageType.Traces;
   // Column Management: Build the columns needed for the table
   const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
     entity,
@@ -404,7 +414,10 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.costsLoading,
+    shouldIncludeTotalStorageSize,
+    shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading
   );
 
   // This contains columns which are suitable for selection and raw data
