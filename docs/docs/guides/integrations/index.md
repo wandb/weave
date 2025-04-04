@@ -37,5 +37,6 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[DSPy](/guides/integrations/dspy)**
 - **[Instructor](/guides/integrations/instructor)**
 - **[CrewAI](/guides/integrations/crewai)**
+- **[Smolagents](/guides/integrations/smolagents)**
 
 Choose an integration from the lists above to learn more about how to use Weave with your preferred LLM provider or framework. Whether you're directly accessing LLM APIs or building complex pipelines with orchestration frameworks, Weave provides the tools to trace and analyze your AI applications effectively.

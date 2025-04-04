@@ -191,6 +191,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/dspy",
             "guides/integrations/instructor",
             "guides/integrations/crewai",
+            "guides/integrations/smolagents",
           ],
         },
       ],
