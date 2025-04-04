@@ -11,6 +11,7 @@ import {EvaluationComparisonState} from './ecpState';
 import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
+import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizePlotsSection';
 import {TraceCallsSection} from './TraceCallsSection';
 
 // Inlined from InvalidEvaluationBanner.tsx to avoid import issues
@@ -527,6 +528,19 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
                 state={state}
               />
             </Box>
+
+            {/* New Summarize Plots Section */}
+            <Box
+              sx={{
+                height: 400, // Fixed height for plots section
+                overflow: 'auto',
+                marginTop: STANDARD_PADDING,
+              }}>
+              <SummarizePlotsSection
+                summarizeCalls={summarizeCalls}
+                state={state}
+              />
+            </Box>
           </VerticalBox>
         )}
         {/* Trace Calls Section */}
@@ -554,7 +568,7 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
           </HorizontalBox>
           <Box
             sx={{
-              height: summarizeCalls.length > 0 ? height - 300 : height, // Adjust height based on whether summary section is shown
+              height: summarizeCalls.length > 0 ? height - 700 : height, // Adjust height based on whether summary sections are shown
               overflow: 'auto',
             }}>
             <TraceCallsSection
