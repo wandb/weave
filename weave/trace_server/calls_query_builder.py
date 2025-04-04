@@ -1465,10 +1465,11 @@ def process_query_to_optimization_sql(
         processed.str_filter_opt_sql = "AND " + processed.str_filter_opt_sql
     if processed.id_datetime_filters_sql:
         # Create non-uuidv7 condition
-        non_uuidv7_condition = f"({table_alias}.id <= 'ffffffffffffffff')"
-        processed.id_datetime_filters_sql = (
-            "AND " + non_uuidv7_condition + " OR " + processed.id_datetime_filters_sql
+        non_uuidv7_condition = f"{table_alias}.id <= 'ffffffffffffffff'"
+        full_condition = (
+            f" AND ({non_uuidv7_condition} OR {processed.id_datetime_filters_sql})"
         )
+        processed.id_datetime_filters_sql = full_condition
 
     return processed
 

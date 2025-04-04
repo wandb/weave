@@ -1698,8 +1698,8 @@ def test_datetime_optimization_simple() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
-            AND ((calls_merged.id <= 'ffffffffffffffff'
-                OR calls_merged.id > {pb_1:String}))
+            AND (calls_merged.id <= 'ffffffffffffffff'
+            OR ((calls_merged.id > {pb_1:String})))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:UInt64}))
@@ -1742,8 +1742,8 @@ def test_datetime_optimization_not_operation() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
-            AND (NOT ((calls_merged.id <= 'ffffffffffffffff'
-                OR calls_merged.id > {pb_1:String})))
+            AND (calls_merged.id <= 'ffffffffffffffff'
+            OR (NOT ((calls_merged.id > {pb_1:String}))))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
             (NOT ((any(calls_merged.started_at) > {pb_0:UInt64}))))
@@ -1821,14 +1821,12 @@ def test_datetime_optimization_multiple_conditions() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_4:String}
-        AND ((calls_merged.id <= 'ffffffffffffffff' OR calls_merged.id > {pb_2:String})
-            AND (calls_merged.id <= 'ffffffffffffffff' OR calls_merged.id > {pb_3:String})
-            AND ((calls_merged.id <= 'ffffffffffffffff' OR calls_merged.id > {pb_2:String})
-                OR ((calls_merged.id <= 'ffffffffffffffff' OR calls_merged.id > {pb_2:String})
-                    AND (calls_merged.id <= 'ffffffffffffffff' OR calls_merged.id > {pb_3:String})
-                )
-            )
-        )
+            AND (calls_merged.id <= 'ffffffffffffffff'
+            OR ((calls_merged.id > {pb_2:String})
+                AND (calls_merged.id > {pb_3:String})
+                AND ((calls_merged.id > {pb_2:String})
+                    OR ((calls_merged.id > {pb_2:String})
+                        AND (calls_merged.id > {pb_3:String})))))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
             AND ((any(calls_merged.started_at) > {pb_1:UInt64}))
