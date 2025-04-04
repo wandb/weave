@@ -2927,6 +2927,7 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                                     },
                                 ]
                             },
+                            # or greater than call 2 and not greater than call 3
                             {
                                 "$and": [
                                     {
@@ -2954,9 +2955,10 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
         }
     )
     calls = list(client.get_calls(query=nested_query))
-    assert len(calls) == 1
-    call_ids = {call.id for call in calls}
-    assert call_ids == {call3.id}
+    assert len(calls) == 2
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == call2.id
+    assert call_ids[1] == call3.id
 
 
 def _make_call(client, _id):
