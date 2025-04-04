@@ -255,6 +255,7 @@ jobs:
             "vertexai",
             "scorers",
             "pandas-test",
+            "smolagents",
           ]
       fail-fast: false
     services:
