@@ -313,7 +313,10 @@ export const useMakeInitialDatetimeFilter = (
   }, []);
 
   const key = datetimeFilterCacheKey(entity, project, filter);
-  const cachedFilter = getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS);
+  const cachedFilter = useMemo(
+    () => getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS),
+    [key]
+  );
 
   const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
     skip: skip || cachedFilter != null,
