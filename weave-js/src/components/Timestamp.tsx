@@ -43,17 +43,16 @@ const formatSmallTime = (then: moment.Moment): string | null => {
     return `${years}y`;
   }
 
-  // Calculate months using moment's built-in month diff
   const monthDiff = now.diff(then, 'months');
-
-  // Get remaining days by moving forward the months and checking what's left
-  const afterMonths = then.clone().add(monthDiff, 'months');
-  const remainingDays = now.diff(afterMonths, 'days');
 
   // Always show months if 3 or more
   if (monthDiff >= 3) {
     return `${monthDiff}mo`;
   }
+
+  // Get remaining days by moving forward the months and checking what's left
+  const afterMonths = then.clone().add(monthDiff, 'months');
+  const remainingDays = now.diff(afterMonths, 'days');
 
   // Show months if exact multiple
   if (monthDiff > 0 && remainingDays === 0) {
@@ -71,7 +70,7 @@ const formatSmallTime = (then: moment.Moment): string | null => {
     return `${weeks}w`;
   }
 
-  // Otherwise use days for more precision
+  // Otherwise use days or more precise units
   if (days >= 1) {
     return days === 1 ? '1d' : `${days}d`;
   } else if (hours >= 1) {
