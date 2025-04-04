@@ -141,13 +141,14 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
   );
 
   const convertedInputNode = convertInputNode(input);
+  const convertedInputNodeRefined = useNodeWithServerType(convertedInputNode);
 
   const propertyKeysAndTypes = useMemo(
     () => ({
       ...NONE_KEY_AND_TYPE,
-      ...getKeysAndTypesFromPropertyType(convertedInputNode.type),
+      ...getKeysAndTypesFromPropertyType(convertedInputNodeRefined.result.type),
     }),
-    [convertedInputNode.type]
+    [convertedInputNodeRefined.result.type]
   );
 
   const workingKeyAndType = getDefaultWorkingKeyAndType(
@@ -166,15 +167,17 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
       ? convertedInputNode
       : opFilter({
           arr: convertedInputNode,
-          filterFn: constFunction({row: convertedInputNode.type}, ({row}) =>
-            opNot({
-              bool: opIsNone({
-                val: opPick({
-                  obj: row,
-                  key: constString(workingKeyAndType.key),
+          filterFn: constFunction(
+            {row: convertedInputNodeRefined.result.type},
+            ({row}) =>
+              opNot({
+                bool: opIsNone({
+                  val: opPick({
+                    obj: row,
+                    key: constString(workingKeyAndType.key),
+                  }),
                 }),
-              }),
-            })
+              })
           ),
         });
 
@@ -237,7 +240,7 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
     safeUpdateConfig,
     convertedInputNode,
     filteredNode,
-    outputNode,
+    outputNode: outputNodeRefined.result,
     propertyKeysAndTypes,
     childPanelStackIds: stackIds,
     childPanelHandler: handler,
