@@ -37,6 +37,7 @@ from weave.trace.serialization.serializer import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -2692,7 +2693,7 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
         return
 
     # Use a unique test ID to identify these calls
-    test_id = str(uuid.uuidv7())
+    test_id = generate_id()
 
     # Create calls with different timestamps
     # Call 1: Start at t=0, end at t=1
