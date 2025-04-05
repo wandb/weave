@@ -37,10 +37,9 @@ from typing_extensions import assert_never
 from weave.trace_server import trace_server_interface as tsi
 
 from .attributes import (
-    convert_numeric_keys_to_list,
-    get_attribute,
+    Attributes,
+    AttributesFactory,
     to_json_serializable,
-    unflatten_key_values,
 )
 
 
@@ -174,27 +173,6 @@ def _decode_value(any_value: AnyValue) -> Any:
 
 
 @dataclass
-class Attributes:
-    _attributes: dict[str, Any] = field(default_factory=dict)
-
-    def __getitem__(self, key: str) -> Any:
-        return self._attributes.__getitem__(key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        return self._attributes.__setitem__(key, value)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._attributes.get(key, default)
-
-    def get_attribute_value(self, key: str) -> Any:
-        return get_attribute(self._attributes, key)
-
-    @classmethod
-    def from_proto(cls, key_values: Iterable[KeyValue]) -> "Attributes":
-        return cls(unflatten_key_values(key_values))
-
-
-@dataclass
 class Span:
     """Represents a span in a trace."""
 
@@ -240,6 +218,10 @@ class Span:
     @classmethod
     def from_proto(cls, proto_span: PbSpan) -> "Span":
         """Create a Span from a protobuf Span."""
+        parent_id = None
+        if proto_span.parent_span_id:
+            parent_id = hexlify(proto_span.parent_span_id).decode("ascii")
+
         return cls(
             name=proto_span.name,
             trace_id=hexlify(proto_span.trace_id).decode("ascii"),
@@ -247,12 +229,10 @@ class Span:
             start_time_unix_nano=proto_span.start_time_unix_nano,
             end_time_unix_nano=proto_span.end_time_unix_nano,
             kind=SpanKind.from_proto(proto_span.kind),
-            parent_id=hexlify(proto_span.parent_span_id).decode("ascii")
-            if proto_span.parent_span_id
-            else None,
+            parent_id=parent_id,
             trace_state=proto_span.trace_state,
             flags=proto_span.flags,
-            attributes=Attributes.from_proto(proto_span.attributes),
+            attributes=AttributesFactory().from_proto(key_values=proto_span.attributes),
             dropped_attributes_count=proto_span.dropped_attributes_count,
             events=[Event.from_proto(e) for e in proto_span.events],
             dropped_events_count=proto_span.dropped_events_count,
@@ -264,9 +244,18 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        attributes = to_json_serializable(
-            convert_numeric_keys_to_list(self.attributes._attributes)
+        print("before summary")
+        summary_insert_map = tsi.SummaryInsertMap(
+            usage={"usage": self.attributes.extract_usage()}
         )
+        print("after summary")
+        inputs = to_json_serializable(self.attributes.extract_inputs())
+        print("after inputs")
+        outputs = to_json_serializable(self.attributes.extract_outputs())
+        print("after outputs")
+        attributes = to_json_serializable(self.attributes.extract_attributes())
+        print("after attributes")
+
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
@@ -276,21 +265,22 @@ class Span:
             parent_id=self.parent_id,
             started_at=self.start_time,
             attributes=attributes,
-            inputs={},
+            inputs=inputs,
             wb_user_id=None,
             wb_run_id=None,
         )
-        summary_insert_map = tsi.SummaryInsertMap(usage={})
+        print("after start_call")
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None
         )
 
+        print("after end_call")
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
             ended_at=self.end_time,
             exception=exception_msg,
-            output={},
+            output=outputs,
             summary=summary_insert_map,
         )
         return (start_call, end_call)

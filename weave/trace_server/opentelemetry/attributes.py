@@ -1,11 +1,18 @@
+import copy
 import json
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from dataclasses import field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Union
 from uuid import UUID
 
+import openinference.semconv.trace as oi
+import opentelemetry.semconv_ai as ot
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+
+from weave.trace_server.trace_server_interface import LLMUsageSchema
 
 
 def to_json_serializable(value: Any) -> Any:
@@ -99,13 +106,15 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     parts = key.split(".")
     current = d
     for part in parts:
-        if isinstance(current, list):
-            try:
-                index = int(part)
-                current = current[index]
-            except (ValueError, IndexError):
-                return None
-        elif not isinstance(current, dict) or part not in current:
+        # if isinstance(current, list):
+        #     try:
+        #         index = int(part)
+        #         current = current[index]
+        #     except (ValueError, IndexError):
+        #         return None
+        # elif not isinstance(current, dict) or part not in current:
+        #     return None
+        if part not in current or not isinstance(current, dict):
             return None
         current = current[part]
     return current
@@ -282,6 +291,25 @@ def get_attribute(data: dict[str, Any], key: str) -> Any:
     return _get_value_from_nested_dict(data, key)
 
 
+def pop_attribute(data: dict[str, Any], key: str) -> Any:
+    """
+    Pop the value of a nested attribute from either a nested or flattened dictionary.
+
+    Args:
+        data: dictionary to get value from
+        key: Dot-separated key to get
+
+    Returns:
+        The value at the specified key or None if not found
+    """
+    # Check if it's a flat dictionary
+    if key in data:
+        return data.pop(key)
+
+    # Try to get from nested structure
+    return _get_value_from_nested_dict(data, key)
+
+
 def unflatten_key_values(
     key_values: Iterable[KeyValue],
 ) -> dict[str, Any]:
@@ -314,3 +342,224 @@ def unflatten_key_values(
     """
     iterator = ((kv.key, resolve_pb_any_value(kv.value)) for kv in key_values)
     return expand_attributes(iterator, json_attributes=[])
+
+
+class ConventionType(Enum):
+    OPENINFERENCE = "openinference"
+    OPENTELEMETRY = "gen_ai"
+    CUSTOM = "custom"
+
+
+class AbstractAttributes(ABC):
+    _attributes: dict[str, Any] = field(default_factory=dict)
+    _original_attributes: dict[str, Any] = field(default_factory=dict)
+
+    @abstractmethod
+    def __getitem__(self, key: str) -> Any: ...
+
+    @abstractmethod
+    def __setitem__(self, key: str, value: Any) -> None: ...
+
+    @abstractmethod
+    def get(self, key: str, default: Any = None) -> Any: ...
+
+    @abstractmethod
+    def get_attribute_value(self, key: str) -> Any: ...
+
+    @abstractmethod
+    def extract_attribute_value(self, key: str) -> Any: ...
+
+    @abstractmethod
+    def extract_inputs(self) -> dict[str, Any]: ...
+
+    @abstractmethod
+    def extract_outputs(self) -> Any: ...
+
+    @abstractmethod
+    def extract_attributes(self) -> Any: ...
+
+    @abstractmethod
+    def extract_usage(self) -> LLMUsageSchema: ...
+
+
+class Attributes(AbstractAttributes):
+    _attributes: dict[str, Any] = field(default_factory=dict)
+    _original_attributes: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(self, attributes: dict[str, Any] = {}) -> None:
+        self._attributes = attributes
+        self._original_attributes = copy.deepcopy(attributes)
+
+    def __getitem__(self, key: str) -> Any:
+        return self._attributes.__getitem__(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        return self._attributes.__setitem__(key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._attributes.get(key, default)
+
+    def get_attribute_value(self, key: str) -> Any:
+        return get_attribute(self._attributes, key)
+
+    def extract_attribute_value(self, key: str) -> Any:
+        return pop_attribute(self._attributes, key)
+
+    def extract_usage(self) -> LLMUsageSchema:
+        raise NotImplementedError("extract_usage is not implemented")
+
+    def extract_inputs(self) -> Any:
+        raise NotImplementedError("extract_inputs is not implemented")
+
+    def extract_outputs(self) -> Any:
+        raise NotImplementedError("extract_outputs is not implemented")
+
+    def extract_attributes(self) -> Any:
+        raise NotImplementedError("extract_attributes is not implemented")
+
+
+class GenericAttributes(Attributes):
+    pass
+
+
+class OpenInferenceAttributes(Attributes):
+    def extract_attributes(self) -> dict[str, Any]:
+        system = self.extract_attribute_value(oi.SpanAttributes.LLM_SYSTEM)
+        provider = self.extract_attribute_value(oi.SpanAttributes.LLM_PROVIDER)
+        invocation_parameters = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_INVOCATION_PARAMETERS
+        )
+        kind = self.extract_attribute_value(oi.SpanAttributes.OPENINFERENCE_SPAN_KIND)
+        model = self.extract_attribute_value(oi.SpanAttributes.LLM_MODEL_NAME)
+        print(f"model: {model}")
+        print(f"kind: {kind}")
+        print(f"kind: {model}")
+        attributes = {
+            "system": str(system) if system else None,
+            "provider": str(provider) if provider else None,
+            "kind": str(kind) if kind else None,
+            "model": str(model) if model else None,
+            "_metadata": to_json_serializable(self._original_attributes),
+        }
+        print("after attributes")
+        if invocation_parameters:
+            try:
+                js = json.loads(invocation_parameters)
+                for k, v in js.items():
+                    attributes[k] = str(v)
+            except json.JSONDecodeError:
+                raise ValueError(f"Invalid JSON string: {invocation_parameters}")
+        return attributes
+
+    def extract_outputs(self) -> Any:
+        outputs: dict[str, Any] | None = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_OUTPUT_MESSAGES
+        )
+        if not outputs:
+            return None
+        keys = list(outputs.keys())
+        if len(keys) == 1:
+            outputs = outputs.get(keys[0])
+        return to_json_serializable(outputs)
+        # input_messages = self.extract_attribute_value(oi.SpanAttributes.LLM_INPUT_MESSAGES)
+        # input_messages = to_json_serializable(input_messages) if input_messages else None
+
+    def extract_inputs(self) -> Any:
+        inputs: dict[str, Any] | None = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_INPUT_MESSAGES
+        )
+        if not inputs:
+            return None
+        keys = list(inputs.keys())
+        if len(keys) == 1:
+            inputs = inputs.get(keys[0])
+        return to_json_serializable(inputs)
+        # value = self.extract_attribute_value(oi.SpanAttributes.OUTPUT_VALUE)
+        # mime_type = self.extract_attribute_value(oi.SpanAttributes.OUTPUT_MIME_TYPE)
+        # mime_type = str(mime_type) if mime_type else None
+        # if mime_type == "application/json":
+        #     return json.loads(value)
+        # return { 'value': str(value) }
+
+    def extract_usage(self) -> LLMUsageSchema:
+        prompt_tokens = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_TOKEN_COUNT_PROMPT
+        )
+        completion_tokens = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_TOKEN_COUNT_COMPLETION
+        )
+        total_tokens = self.extract_attribute_value(
+            oi.SpanAttributes.LLM_TOKEN_COUNT_TOTAL
+        )
+        return LLMUsageSchema(
+            prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
+            completion_tokens=int(completion_tokens) if completion_tokens else None,
+            total_tokens=int(total_tokens) if total_tokens else None,
+        )
+
+
+class OpenTelemetryAttributes(Attributes):
+    def extract_attributes(self) -> dict[str, Any]:
+        max_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS
+        )
+        system = self.extract_attribute_value(ot.SpanAttributes.LLM_SYSTEM)
+        kind = self.extract_attribute_value(ot.SpanAttributes.TRACELOOP_SPAN_KIND)
+        model = self.extract_attribute_value(ot.SpanAttributes.LLM_RESPONSE_MODEL)
+
+        attributes = {
+            "system": str(system) if system else None,
+            "max_tokens": int(max_tokens) if max_tokens else None,
+            "kind": str(kind) if kind else None,
+            "model": str(model) if model else None,
+            "_metadata": to_json_serializable(self._original_attributes),
+        }
+        return attributes
+
+    def extract_outputs(self) -> Any:
+        completions: dict[str, Any] | None = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_COMPLETIONS
+        )
+        if not completions:
+            return None
+        keys = list(completions.keys())
+        if len(keys) == 1:
+            completions = completions.get(keys[0])
+        return to_json_serializable(completions)
+
+    def extract_inputs(self) -> Any:
+        prompts: dict[str, Any] | None = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_PROMPTS
+        )
+        if not prompts:
+            return {}
+        keys = list(prompts.keys())
+        if len(keys) == 1:
+            prompts = prompts.get(keys[0])
+        return to_json_serializable(prompts)
+
+    def extract_usage(self) -> LLMUsageSchema:
+        prompt_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS
+        )
+        completion_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS
+        )
+        total_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS
+        )
+        return LLMUsageSchema(
+            prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
+            completion_tokens=int(completion_tokens) if completion_tokens else None,
+            total_tokens=int(total_tokens) if total_tokens else None,
+        )
+
+
+class AttributesFactory:
+    def from_proto(self, key_values: Iterable[KeyValue]) -> "Attributes":
+        expanded = unflatten_key_values(key_values)
+        if get_attribute(expanded, ConventionType.OPENINFERENCE.value):
+            return OpenInferenceAttributes(expanded)
+        elif get_attribute(expanded, ConventionType.OPENTELEMETRY.value):
+            return OpenTelemetryAttributes(expanded)
+        return GenericAttributes(expanded)
