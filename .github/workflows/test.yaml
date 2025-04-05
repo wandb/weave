@@ -255,6 +255,7 @@ jobs:
             "vertexai",
             "scorers",
             "pandas-test",
+            "gemma",
           ]
       fail-fast: false
     services:
