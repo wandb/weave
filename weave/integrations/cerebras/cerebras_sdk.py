@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from functools import wraps
-from typing import Any, Callable
+from typing import Callable
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -22,15 +21,8 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        def _fn_wrapper(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
-
-            return _async_wrapper
-
         op_kwargs = settings.model_dump()
-        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op = weave.op(fn, **op_kwargs)
         return op
 
     return wrapper
