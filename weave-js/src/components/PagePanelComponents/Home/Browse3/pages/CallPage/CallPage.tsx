@@ -280,7 +280,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
     }
   }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
 
-  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
+  const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
     focusedCall.entity,
     focusedCall.project
   );
@@ -323,14 +323,6 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
               active={!hideTraceTreeActual}
               onClick={onToggleTraceTree}
             />
-            <Button
-              icon="marker"
-              tooltip={`${showFeedbackActual ? 'Hide' : 'Show'} feedback`}
-              variant="ghost"
-              active={showFeedbackActual ?? false}
-              onClick={onToggleFeedbackExpand}
-              className="ml-4"
-            />
           </Box>
         </Box>
       }
@@ -344,11 +336,19 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
               callID={focusedCallId}
               entity={focusedCall.entity}
               project={focusedCall.project}
+              onReloadSpecs={refetch}
+              onClose={() => setShowFeedback(false)}
             />
           </div>
         </Tailwind>
       }
-      headerContent={<CallOverview call={focusedCall} />}
+      headerContent={
+        <CallOverview
+          call={focusedCall}
+          showFeedback={showFeedbackActual}
+          onToggleFeedback={onToggleFeedbackExpand}
+        />
+      }
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
