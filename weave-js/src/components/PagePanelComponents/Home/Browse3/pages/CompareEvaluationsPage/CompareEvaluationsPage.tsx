@@ -5,9 +5,7 @@
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -19,21 +17,21 @@ import {
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpState';
-import {ComparisonDimensionsType} from './ecpState';
-import {EvaluationCall} from './ecpTypes';
-import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
+import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
+import {InvalidEvaluationBanner} from './InvalidEvaluationBanner';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {TraceCallsCompareEvaluationsPage} from './TraceCallsCompareEvaluationsPage';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -85,6 +83,40 @@ export const CompareEvaluationsPageContent: React.FC<
     string | null
   >(null);
 
+  // --------------------------------------
+
+  const {useCalls} = useWFHooks();
+  const childCalls = useCalls(props.entity, props.project, {
+    parentIds: props.evaluationCallIds,
+  });
+
+  console.log('childCalls', childCalls);
+
+  const traceCalls = childCalls.result
+    ?.filter(call => call.traceCall?.op_name?.includes('predict_and_score'))
+    ?.map(call => ({
+      callId: call.callId,
+      traceCall: call.traceCall,
+    }));
+
+  console.log('traceCalls', traceCalls);
+
+  // Filter for summarize calls
+  const summarizeCalls = childCalls.result
+    ?.filter(
+      call =>
+        call.traceCall?.op_name?.includes('summarize') ||
+        call.traceCall?.op_name?.includes('Evaluation.summarize')
+    )
+    ?.map(call => ({
+      callId: call.callId,
+      traceCall: call.traceCall,
+    }));
+
+  console.log('summarizeCalls', summarizeCalls);
+
+  // --------------------------------------
+
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
       dimensions:
@@ -122,7 +154,13 @@ export const CompareEvaluationsPageContent: React.FC<
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
         <AutoSizer style={{height: '100%', width: '100%'}}>
-          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
+          {({height, width}) => (
+            <CompareEvaluationsPageInner
+              height={height}
+              traceCalls={traceCalls}
+              summarizeCalls={summarizeCalls}
+            />
+          )}
         </AutoSizer>
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
@@ -177,14 +215,34 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
+  traceCalls?: Array<{callId: string; traceCall: any}>;
+  summarizeCalls?: Array<{callId: string; traceCall: any}>;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
-  const showExamples =
-    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
-      .length > 0;
+  const showExamples = true;
+  console.log('showExampleFilter', showExampleFilter);
+  console.log('showExamples', showExamples);
   const resultsLoading = state.loadableComparisonResults.loading;
+
+  // Check if we should show the traceCalls UI
+  const isTraceCallsPath = props.traceCalls && props.traceCalls.length > 0;
+
+  if (isTraceCallsPath) {
+    // Use the new TraceCallsCompareEvaluationsPage component
+    return (
+      <TraceCallsCompareEvaluationsPage
+        height={props.height}
+        traceCalls={props.traceCalls || []}
+        summarizeCalls={props.summarizeCalls || []}
+        state={state}
+      />
+    );
+  }
+
+  // Original UI for regular comparison path
   return (
     <Box
       sx={{
@@ -223,7 +281,6 @@ const CompareEvaluationsPageInner: React.FC<{
         ) : (
           <VerticalBox
             sx={{
-              // alignItems: '',
               paddingLeft: STANDARD_PADDING,
               paddingRight: STANDARD_PADDING,
               width: '100%',
@@ -252,6 +309,9 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  // Get entity and project from context
+  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
+
   return (
     <VerticalBox
       sx={{
@@ -283,62 +343,5 @@ const ResultExplorer: React.FC<{
         <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
-  );
-};
-
-/*
- * Returns true if the evaluation call has summary metrics.
- */
-const isValidEval = (evalCall: EvaluationCall) => {
-  return Object.keys(evalCall.summaryMetrics).length > 0;
-};
-
-const InvalidEvaluationBanner: React.FC<{
-  evaluationCalls: EvaluationCall[];
-}> = ({evaluationCalls}) => {
-  const [dismissed, setDismissed] = useState(false);
-  const invalidEvals = useMemo(() => {
-    return Object.values(evaluationCalls)
-      .filter(call => !isValidEval(call))
-      .map(call =>
-        call.name !== EVALUATION_NAME_DEFAULT
-          ? call.name
-          : call.callId.slice(-4)
-      );
-  }, [evaluationCalls]);
-  if (invalidEvals.length === 0 || dismissed) {
-    return null;
-  }
-  return (
-    <Box
-      sx={{
-        width: '100%',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-      }}>
-      <Tailwind>
-        <Alert
-          severity="info"
-          classes={{
-            root: 'bg-teal-300/[0.30] text-teal-600',
-            action: 'text-teal-600',
-          }}
-          action={
-            <Button
-              // override the default tailwind classes for text and background hover
-              className="text-override hover:bg-override"
-              variant="ghost"
-              onClick={() => setDismissed(true)}>
-              Dismiss
-            </Button>
-          }>
-          <span style={{fontWeight: 'bold'}}>
-            No summary information found for{' '}
-            {maybePluralizeWord(invalidEvals.length, 'evaluation')}:{' '}
-            {invalidEvals.join(', ')}.
-          </span>
-        </Alert>
-      </Tailwind>
-    </Box>
   );
 };
