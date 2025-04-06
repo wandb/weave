@@ -95,11 +95,21 @@ A community hub for discovering and sharing MCP servers. While the registry impl
 The registry will integrate with Eden's configuration system, allowing users to easily import and use servers from the registry in their own Eden instances.
 
 #### 4. Development Environment
-Tools designed for the developer workflow:
-- Interactive playground for testing and experimentation
-- Real-time debugging and inspection
-- Performance monitoring and optimization
-- Documentation generation and sharing
+Tools designed for the developer workflow, focusing on a streamlined playground experience:
+
+##### Playground
+A modern chat interface that leverages existing open-source solutions while adding MCP-specific capabilities:
+- Support for various LLM vendors (from local Ollama to remote OpenAI)
+- Named, preconfigured model settings (system prompts, parameters)
+- Standard chat interface for model interaction
+- Integration with configured MCP servers for tool access
+- Session management and history
+
+The playground's key differentiator is its seamless integration with MCP servers, allowing developers to:
+- Test MCP server tools directly in chat sessions
+- Debug server interactions in real-time
+- Experiment with different tool configurations
+- Share working configurations with team members
 
 ### How It All Works Together
 
