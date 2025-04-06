@@ -21,6 +21,58 @@ Eden aims to be the unified platform for working with MCP servers. We envision a
 - Organizations can discover and verify reliable MCP servers
 - Everyone has the tools they need to debug and optimize their MCP workflows
 
+## System Architecture
+
+### Core API Layer
+Eden is built with a core API layer that provides programmatic access to all functionality:
+- Server management and configuration
+- Tool execution and approval flows
+- Session management
+- Monitoring and telemetry
+
+### Interfaces
+
+#### Command Line Interface
+A comprehensive CLI tool that exposes all Eden functionality:
+- Server configuration management
+- Tool execution and approval
+- Session control
+- Monitoring and debugging
+
+#### Python Library
+A native Python library for integrating Eden into applications:
+- Type-safe configuration management
+- Async tool execution
+- Session handling
+- Event streaming
+
+#### Graphical User Interface
+A modern web-based interface with multiple specialized views:
+
+##### Configuration View
+- Server configuration management
+- Tool settings and permissions
+- Environment setup
+- Authentication management
+
+##### Playground View
+- Chat interface with LLM integration
+- Tool execution and testing
+- Session management
+- Configuration sharing
+
+##### Inspector View
+- Real-time monitoring
+- Debug information
+- Performance metrics
+- Error tracking
+
+##### Approver View
+- Tool request management
+- Approval workflows
+- Request history
+- Audit logs
+
 ## System Overview
 
 ### Core Components
@@ -104,12 +156,26 @@ A modern chat interface that leverages existing open-source solutions while addi
 - Standard chat interface for model interaction
 - Integration with configured MCP servers for tool access
 - Session management and history
+- Tool approval interface for managing tool access requests
 
 The playground's key differentiator is its seamless integration with MCP servers, allowing developers to:
 - Test MCP server tools directly in chat sessions
 - Debug server interactions in real-time
 - Experiment with different tool configurations
 - Share working configurations with team members
+- Manage tool access approvals through a dedicated interface
+
+All tool calls are automatically routed through Eden's aggregator, making the playground the first client of the aggregator system.
+
+##### Tool Approval Interface
+A dedicated interface for managing tool access requests, showing approvers:
+- Tool details (name, arguments, expected impact)
+- Chat context (recent messages, conversation history)
+- Request metadata (requesting user, timestamp, server ID)
+- Previous approval history for similar requests
+- Quick actions (approve, deny, request more information)
+
+The interface is designed to give approvers full context for making informed decisions about tool access.
 
 ### How It All Works Together
 
