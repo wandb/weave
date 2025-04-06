@@ -56,10 +56,19 @@ A modern web-based interface with multiple specialized views:
 - Authentication management
 
 ##### Playground View
-- Chat interface with LLM integration
-- Tool execution and testing
-- Session management
-- Configuration sharing
+A modern chat interface that serves as the canonical example of an MCP client:
+- Implements full MCP client specification
+- Uses MCP sampling for LLM interactions
+- Demonstrates best practices for MCP client implementation
+- Features:
+  - Chat interface with LLM integration via MCP sampling
+  - Tool execution and testing
+  - Session management
+  - Configuration sharing
+  - Resource access and management
+  - Prompt template handling
+
+The playground's implementation serves as a reference for developers building their own MCP clients, showcasing proper protocol usage and integration patterns.
 
 ##### Inspector View
 - Real-time monitoring
