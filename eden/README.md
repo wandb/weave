@@ -28,7 +28,7 @@ Eden aims to be the unified platform for working with MCP servers. We envision a
 #### 1. Server Aggregator
 The heart of Eden is a central server that unifies access to multiple MCP servers. Think of it as a smart reverse proxy that:
 - Provides a single entry point to all your MCP servers
-- Maintains isolated namespaces for each server's tools and resources
+- Maintains isolated namespaces for each server's tools and resources (using server IDs as namespace prefixes)
 - Handles authentication and access control
 - Enables human-in-the-loop approvals for sensitive operations
 - Offers configurable rate limits and quotas
@@ -37,58 +37,16 @@ The heart of Eden is a central server that unifies access to multiple MCP server
 Eden supports multiple ways to run MCP servers through a unified configuration system:
 
 ##### Configuration Format
-The core of Eden is a configuration specification that defines MCP servers. Each server entry contains:
-- A unique ID
-- A server definition specifying the type and configuration
+The core of Eden is a configuration specification that defines MCP servers. The configuration format is defined in `spec.ts` using TypeScript types. This provides a clear specification that can be translated to various formats (JSON, TOML, etc.).
 
-Example configuration file (`eden.yaml`):
-```yaml
-servers:
-  # Remote MCP server
-  my-remote-server:
-    type: remote
-    url: https://api.example.com/mcp
-    auth:
-      type: bearer
-      token: ${ENV_VAR_TOKEN}
+Key aspects of the configuration:
+- Each server has a unique ID
+- Server types (Remote, Docker, Script, Local) have specific configuration requirements
+- Tool settings control access and approval requirements for each tool
+- Default port 8000 for Docker-based MCP servers
+- Environment variable support for sensitive configuration
 
-  # Docker-based MCP server
-  my-docker-server:
-    type: docker
-    image: my-mcp-server:latest
-    port: 8000  # Optional, defaults to 8000
-    env:
-      API_KEY: ${ENV_VAR_API_KEY}
-
-  # Script-based MCP server
-  my-script-server:
-    type: script
-    path: ./my_server.py
-    # Dependencies are managed by uv in the script itself
-
-  # Local directory MCP server
-  my-local-server:
-    type: local
-    path: ./my_mcp_project
-```
-
-Each server type has its own configuration requirements:
-
-1. **Remote**
-   - `url`: The URL of the MCP server
-   - `auth`: Authentication configuration (optional)
-
-2. **Docker**
-   - `image`: Docker image to run
-   - `port`: Port mapping (optional, defaults to 8000)
-   - `env`: Environment variables (optional)
-
-3. **Script**
-   - `path`: Path to the Python script
-   - Dependencies are managed by `uv` in the script itself
-
-4. **Local Directory**
-   - `path`: Path to the local MCP server project
+For the complete specification and examples, see `spec.ts`.
 
 ##### Server Types
 1. **Remote**
@@ -128,11 +86,13 @@ Each server type has its own configuration requirements:
    - Useful for active development and testing
 
 #### 3. Server Registry
-A community hub for discovering and sharing MCP servers:
-- Browse verified and community-tested servers
-- Access documentation and usage examples
-- Share your own server implementations
-- Get notified of updates and security patches
+A community hub for discovering and sharing MCP servers. While the registry implementation is beyond MVP scope, it's an important part of the Eden ecosystem vision:
+- Enables discovery of community-verified MCP servers
+- Provides a trusted source for server implementations
+- Facilitates sharing of best practices and patterns
+- Creates a foundation for the MCP server ecosystem
+
+The registry will integrate with Eden's configuration system, allowing users to easily import and use servers from the registry in their own Eden instances.
 
 #### 4. Development Environment
 Tools designed for the developer workflow:
