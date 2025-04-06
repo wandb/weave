@@ -34,13 +34,98 @@ The heart of Eden is a central server that unifies access to multiple MCP server
 - Offers configurable rate limits and quotas
 
 #### 2. Server Execution Framework
-Eden supports multiple ways to run MCP servers:
-- Connect to existing remote MCP servers
-- Run servers in Docker containers
-- Execute standalone Python scripts
-- Develop and test servers locally
+Eden supports multiple ways to run MCP servers through a unified configuration system:
 
-This flexibility allows teams to choose the right approach for their needs while maintaining consistent management and monitoring.
+##### Configuration Format
+The core of Eden is a configuration specification that defines MCP servers. Each server entry contains:
+- A unique ID
+- A server definition specifying the type and configuration
+
+Example configuration file (`eden.yaml`):
+```yaml
+servers:
+  # Remote MCP server
+  my-remote-server:
+    type: remote
+    url: https://api.example.com/mcp
+    auth:
+      type: bearer
+      token: ${ENV_VAR_TOKEN}
+
+  # Docker-based MCP server
+  my-docker-server:
+    type: docker
+    image: my-mcp-server:latest
+    port: 8000  # Optional, defaults to 8000
+    env:
+      API_KEY: ${ENV_VAR_API_KEY}
+
+  # Script-based MCP server
+  my-script-server:
+    type: script
+    path: ./my_server.py
+    # Dependencies are managed by uv in the script itself
+
+  # Local directory MCP server
+  my-local-server:
+    type: local
+    path: ./my_mcp_project
+```
+
+Each server type has its own configuration requirements:
+
+1. **Remote**
+   - `url`: The URL of the MCP server
+   - `auth`: Authentication configuration (optional)
+
+2. **Docker**
+   - `image`: Docker image to run
+   - `port`: Port mapping (optional, defaults to 8000)
+   - `env`: Environment variables (optional)
+
+3. **Script**
+   - `path`: Path to the Python script
+   - Dependencies are managed by `uv` in the script itself
+
+4. **Local Directory**
+   - `path`: Path to the local MCP server project
+
+##### Server Types
+1. **Remote**
+   - Connect to existing MCP servers
+   - Configure connection details and authentication
+
+2. **Docker**
+   - Run MCP servers in containers
+   - Standard port 8000 for MCP server exposure
+   - Configurable port mapping
+   - Container resource management
+
+3. **Script**
+   - Run Python scripts that implement MCP servers
+   - Uses `uv` package manager for dependency management
+   - Scripts must implement a standard MCP server using FastMCP:
+     ```python
+     from mcp.server.fastmcp import FastMCP
+     
+     mcp = FastMCP("My App")
+     
+     if __name__ == "__main__":
+         mcp.run()
+     ```
+   - Dependencies specified using `uv` script format:
+     ```python
+     # /// script
+     # dependencies = [
+     #   "mcp-server",
+     #   "other-dependencies",
+     # ]
+     # ///
+     ```
+
+4. **Local Directory**
+   - Run MCP servers from local development directories
+   - Useful for active development and testing
 
 #### 3. Server Registry
 A community hub for discovering and sharing MCP servers:
@@ -59,9 +144,9 @@ Tools designed for the developer workflow:
 ### How It All Works Together
 
 1. **Getting Started**
-   - Browse the registry to find MCP servers you need
-   - Deploy servers using your preferred method
-   - Connect them to your Eden instance
+   - Define your MCP servers in the Eden configuration
+   - Choose the appropriate server type for each use case
+   - Connect to the Eden aggregator
 
 2. **Daily Development**
    - Use the unified interface to interact with all your servers
