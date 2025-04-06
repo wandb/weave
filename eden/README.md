@@ -68,11 +68,34 @@ Configuration files:
 - Changes require restarting the service
 
 #### Python Library
-A native Python library for integrating Eden into applications:
-- Type-safe configuration management
-- Async tool execution
-- Session handling
-- Event streaming
+A Python library designed primarily as an onboarding tool for new users:
+- Provides in-process alternatives to the standalone `eden` service and GUI
+- Shares the same configuration file (`~/.eden/config.yaml`) as the standalone service
+- Creates and manages local configuration automatically if none exists
+- Spins up a local UI for development and testing
+- Perfect for quick experiments and learning
+- Not intended for production use (users should migrate to standalone service)
+
+Example usage:
+```python
+import eden
+
+# Start Eden in-process with automatic config and UI
+# Uses ~/.eden/config.yaml if it exists, creates it if it doesn't
+server_params = eden.start()
+
+# Connect to the in-process server
+async with sse_client(server_params) as (read, write):
+    async with ClientSession(
+        read, write, sampling_callback=handle_sampling_message
+    ) as session:
+        # Use the session as a normal MCP client
+        ...
+```
+
+This approach allows users to quickly get started with Eden without understanding the full architecture, while naturally guiding them toward the more robust standalone service as they become more familiar with the system. The shared configuration ensures a smooth transition between in-process and standalone usage.
+
+Note: Process management between in-process and standalone services (e.g., preventing both from running simultaneously) is a future consideration and not part of the MVP scope.
 
 #### Graphical User Interface
 A modern web-based interface that runs locally and includes multiple specialized views. The GUI is launched through the `eden` CLI tool and provides a complete development environment. When launched, it automatically starts a local aggregator service if one isn't already running, using the default configuration file (`~/.eden/config.yaml`).
