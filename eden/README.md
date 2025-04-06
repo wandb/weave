@@ -349,45 +349,114 @@ The interface is designed to give approvers full context for making informed dec
 
 ## Outstanding Topics
 
-1. **Python Library Design**
-   - Role and scope of the Python library
-   - Integration with aggregator service
-   - API design and features
+### MVP Implementation
+1. **Core Aggregator Development**
+   - Basic MCP server implementation
+   - Server connection management
+   - Simple error handling
+   - Basic monitoring
 
-2. **Security & Authentication**
-   - Authentication mechanisms for different server types
-   - API key management
-   - Access control implementation
+2. **Configuration System**
+   - YAML configuration parser
+   - Configuration validation
+   - Default configuration generation
 
-3. **Error Handling & Recovery**
-   - How to handle server/vendor connection failures
-   - Retry strategies
-   - Error reporting and logging
+3. **CLI Tool**
+   - Service management commands
+   - Configuration management
+   - Basic monitoring commands
 
-4. **Performance & Scaling**
-   - Connection pooling
-   - Request routing optimization
-   - Resource management
+4. **GUI Development**
+   - Playground implementation
+   - Basic configuration UI
+   - Tool approval interface
 
-5. **Testing & Development**
-   - Testing strategy
-   - Development workflow
-   - CI/CD considerations
+### Future Considerations
+1. **Advanced Features**
+   - Request queuing and retries
+   - Complex error handling
+   - Process management between in-process/standalone
+   - Server registry implementation
 
-6. **Deployment & Distribution**
-   - Package distribution
-   - Installation process
-   - Update mechanism
+2. **Production Features**
+   - High availability
+   - Load balancing
+   - Advanced monitoring
+   - Complex authentication
 
-7. **Monitoring & Observability**
-   - Metrics collection
-   - Logging strategy
-   - Debug tools
+3. **Community Features**
+   - Server registry
+   - Community guidelines
+   - Contribution process
+   - Documentation
 
-8. **Documentation & Examples**
-   - API documentation
-   - Usage examples
-   - Best practices
+4. **Integration Features**
+   - CI/CD integration
+   - Cloud provider integration
+   - Advanced deployment options
+   - Monitoring integrations
+
+Note: Many topics from the original list have been addressed in our MVP scope or moved to future considerations. The focus is now on implementing the core functionality needed to validate the product vision.
+
+## MVP Scope
+
+### Goals
+The MVP aims to validate the core value proposition: making it easier for ML Engineers to work with MCP servers. Success means:
+- ML Engineers can quickly start using multiple MCP servers
+- Basic tool access control is in place
+- Configuration is simple and clear
+- Development experience is smooth
+
+### Scope
+
+#### In Scope
+1. **Core Aggregator**
+   - Basic MCP server implementation
+   - Server connection management
+   - Simple tool access control
+   - LLM vendor integration
+
+2. **Configuration**
+   - TypeScript specification
+   - YAML configuration files
+   - Basic validation
+
+3. **Interfaces**
+   - CLI tool for service management
+   - Simple GUI with playground
+   - Basic Python library for onboarding
+
+4. **Server Types**
+   - Remote server connections
+   - Docker server execution
+   - Script server execution
+   - Local directory server
+
+#### Out of Scope
+1. **Advanced Features**
+   - Request queuing and retries
+   - Complex error handling
+   - Process management between in-process/standalone
+   - Server registry implementation
+
+2. **Production Features**
+   - High availability
+   - Load balancing
+   - Advanced monitoring
+   - Complex authentication
+
+### Development Priorities
+1. Core aggregator implementation
+2. Basic configuration system
+3. CLI tool
+4. Simple GUI with playground
+5. Python library for onboarding
+
+### Success Criteria
+- ML Engineers can connect to multiple MCP servers through a single interface
+- Basic tool access control is working
+- Configuration is understandable and maintainable
+- Development experience is smooth and intuitive
 
 ## Getting Started
 [Coming soon: Installation and quickstart guide]
