@@ -13,6 +13,28 @@ export interface ToolSettings {
   [toolName: string]: ToolSetting;
 }
 
+/** Configuration for LLM vendor settings */
+export interface LLMVendorConfig {
+  /** Unique identifier for this vendor configuration */
+  id: string;
+  /** The type of vendor (e.g., 'openai', 'anthropic', 'local') */
+  type: string;
+  /** Vendor-specific configuration */
+  config: {
+    /** API key or other authentication */
+    auth?: {
+      type: string;
+      token: string;
+    };
+    /** Default model to use */
+    default_model?: string;
+    /** Additional vendor-specific settings */
+    [key: string]: any;
+  };
+  /** Whether this vendor requires approval for sampling requests */
+  requires_approval?: boolean;
+}
+
 /** Configuration for connecting to an existing remote MCP server */
 export interface RemoteServerConfig {
   /** Identifies this as a remote server configuration */
@@ -76,5 +98,9 @@ export interface EdenConfig {
   /** Maps server IDs to their configurations */
   servers: {
     [serverId: string]: ServerConfig;
+  };
+  /** Maps vendor IDs to their configurations */
+  vendors: {
+    [vendorId: string]: LLMVendorConfig;
   };
 } 
