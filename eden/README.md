@@ -281,6 +281,91 @@ The interface is designed to give approvers full context for making informed dec
 - Organizations have better visibility and control
 - The MCP ecosystem grows through community contributions
 
+## References
+
+### Model Control Protocol (MCP)
+- [MCP Specification](https://github.com/wandb/mcp) - The core protocol that Eden implements and extends
+- [MCP Python Client](https://github.com/wandb/mcp-python) - Reference implementation of MCP client
+- [MCP Server](https://github.com/wandb/mcp-server) - Reference implementation of MCP server
+
+### Key Design Decisions
+
+#### Architecture
+1. **Single Connection Point**
+   - Clients only need to connect to the Eden aggregator
+   - Aggregator maintains all connections to MCP servers and LLM vendors
+   - Aggregator is a fully conformant MCP server
+
+2. **Configuration Management**
+   - Configuration defined in TypeScript types (`spec.ts`)
+   - Default config location: `~/.eden/config.yaml`
+   - Config cannot be changed while service is running
+   - Changes require service restart
+
+3. **Service Management**
+   - Primary interface is the `eden` CLI tool
+   - GUI automatically starts aggregator if needed
+   - Service state is managed transparently
+
+4. **LLM Integration**
+   - Aggregator maintains direct connections to LLM vendors
+   - Vendors configured in the same config file as servers
+   - Support for vendor-specific approval requirements
+
+5. **Tool Access Control**
+   - Per-tool settings (ALLOWED, DISALLOWED, NEEDS_APPROVAL)
+   - Server-level defaults
+   - Human-in-the-loop approval interface
+
+#### Implementation Priorities
+1. Core aggregator functionality
+2. Configuration system
+3. Server execution framework
+4. Development environment (CLI + GUI)
+5. Community features (registry, etc.)
+
+## Outstanding Topics
+
+1. **Python Library Design**
+   - Role and scope of the Python library
+   - Integration with aggregator service
+   - API design and features
+
+2. **Security & Authentication**
+   - Authentication mechanisms for different server types
+   - API key management
+   - Access control implementation
+
+3. **Error Handling & Recovery**
+   - How to handle server/vendor connection failures
+   - Retry strategies
+   - Error reporting and logging
+
+4. **Performance & Scaling**
+   - Connection pooling
+   - Request routing optimization
+   - Resource management
+
+5. **Testing & Development**
+   - Testing strategy
+   - Development workflow
+   - CI/CD considerations
+
+6. **Deployment & Distribution**
+   - Package distribution
+   - Installation process
+   - Update mechanism
+
+7. **Monitoring & Observability**
+   - Metrics collection
+   - Logging strategy
+   - Debug tools
+
+8. **Documentation & Examples**
+   - API documentation
+   - Usage examples
+   - Best practices
+
 ## Getting Started
 [Coming soon: Installation and quickstart guide]
 
