@@ -67,6 +67,10 @@ A modern chat interface that serves as the canonical example of an MCP client:
   - Configuration sharing
   - Resource access and management
   - Prompt template handling
+  - Smart LLM preference handling:
+    - Respects server model preferences when possible
+    - Falls back to playground's active LLM vendor when needed
+    - Maintains session consistency
 
 The playground's implementation serves as a reference for developers building their own MCP clients, showcasing proper protocol usage and integration patterns.
 
@@ -96,6 +100,13 @@ The heart of Eden is a central server that unifies access to multiple MCP server
 - Handles authentication and access control
 - Enables human-in-the-loop approvals for sensitive operations
 - Offers configurable rate limits and quotas
+
+The aggregator also manages LLM vendor configurations:
+- Supports multiple configured LLM vendors (OpenAI, Anthropic, local models, etc.)
+- Acts as an MCP client for sampling requests
+- Routes sampling requests to appropriate vendors
+- Handles vendor-specific authentication and settings
+- Provides unified approval interface for both tool and sampling requests
 
 This design means that any MCP client can connect to Eden as if it were a standard MCP server, while Eden handles the complexity of routing requests to the appropriate downstream servers. All MCP features are properly namespaced and managed through the aggregator.
 
