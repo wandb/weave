@@ -78,12 +78,17 @@ A modern web-based interface with multiple specialized views:
 ### Core Components
 
 #### 1. Server Aggregator
-The heart of Eden is a central server that unifies access to multiple MCP servers. Think of it as a smart reverse proxy that:
-- Provides a single entry point to all your MCP servers
+The heart of Eden is a central server that unifies access to multiple MCP servers. It is itself a fully conformant MCP server that implements the complete MCP specification:
+- Implements all MCP primitives (Tools, Resources, Prompts)
+- Supports all MCP features (Completions, Sampling, etc.)
+- Uses JSON-RPC message format and transport layer
+- Acts as a reverse proxy for multiple MCP servers
 - Maintains isolated namespaces for each server's tools and resources (using server IDs as namespace prefixes)
 - Handles authentication and access control
 - Enables human-in-the-loop approvals for sensitive operations
 - Offers configurable rate limits and quotas
+
+This design means that any MCP client can connect to Eden as if it were a standard MCP server, while Eden handles the complexity of routing requests to the appropriate downstream servers. All MCP features are properly namespaced and managed through the aggregator.
 
 #### 2. Server Execution Framework
 Eden supports multiple ways to run MCP servers through a unified configuration system:
