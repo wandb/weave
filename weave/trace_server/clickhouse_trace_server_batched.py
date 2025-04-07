@@ -1210,10 +1210,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         # dedupe parsed_refs
-        unique_refs = []
+        unique_refs = {}
         for ref in parsed_refs:
-            if ref not in unique_refs:
-                unique_refs.append(ref)
+            if ref.uri() not in unique_refs:
+                unique_refs[ref.uri()] = ref
 
         # Initialize the results with the parsed refs
         extra_results = [
@@ -1223,7 +1223,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 unresolved_table_ref=None,
                 val=None,
             )
-            for ref in unique_refs
+            for ref in unique_refs.values()
         ]
 
         # Loop until there is nothing left to resolve
