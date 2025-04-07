@@ -6,7 +6,11 @@ from weave.integrations.integration_utilities import op_name_from_call
 
 @pytest.fixture
 def user_dataset():
-    return [{"a": 1, "b": 2}, {"a": 2, "b": 3}, {"a": 3, "b": 4}]
+    return [
+        {"a": 1, "b": 2},
+        {"a": 2, "b": 3},
+        {"a": 3, "b": 4},
+    ]
 
 
 @pytest.fixture
