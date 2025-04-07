@@ -434,6 +434,7 @@ export const TraceCallsSection: React.FC<{
           // Extract all possible numeric fields from all outputs
           const allNumericFields: Set<string> = new Set();
           const outputsByEvalId: Record<string, any> = {};
+          let hasPrimitiveOutput = false;
 
           evaluationIds.forEach(evalId => {
             const evalCall = currentExample[1].find(
@@ -447,7 +448,14 @@ export const TraceCallsSection: React.FC<{
             // Extract model_output field if it exists
             const modelOutput = output?.model_output || output;
 
-            if (typeof modelOutput === 'object' && modelOutput !== null) {
+            // Handle primitive outputs (anything that's not an object or is null)
+            if (typeof modelOutput !== 'object' || modelOutput === null) {
+              hasPrimitiveOutput = true;
+              allNumericFields.add('value');
+            } else if (
+              typeof modelOutput === 'object' &&
+              modelOutput !== null
+            ) {
               // Recursively find all numeric fields in the object
               const findNumericFields = (obj: any, path: string = '') => {
                 if (typeof obj !== 'object' || obj === null) return;
@@ -486,6 +494,17 @@ export const TraceCallsSection: React.FC<{
             obj: any,
             path: string
           ): number | number[] | undefined => {
+            // Special case for primitive outputs when path is 'value'
+            if (path === 'value' && (typeof obj !== 'object' || obj === null)) {
+              // For non-numeric primitives, we can't show comparison pills,
+              // so convert to numbers where it makes sense
+              if (typeof obj === 'number') return obj;
+              if (typeof obj === 'boolean') return obj ? 1 : 0;
+              // For strings and other types, just return undefined
+              // so we don't show comparison pills
+              return undefined;
+            }
+
             try {
               const pathSegments = path.split('.');
               let current = obj;
@@ -532,47 +551,49 @@ export const TraceCallsSection: React.FC<{
                     borderRight: '1px solid #e0e0e0',
                     borderBottom: '1px solid #e0e0e0',
                   }}>
-                  Model Output Metrics
+                  {hasPrimitiveOutput
+                    ? 'Model Output Value'
+                    : 'Model Output Metrics'}
                 </Box>
-                {evaluationIds.map(evalId => (
-                  <Box
-                    key={evalId}
-                    sx={{
-                      padding: '8px',
-                      textAlign: 'center',
-                      borderRight:
-                        evalId !== evaluationIds[evaluationIds.length - 1]
-                          ? '1px solid #e0e0e0'
-                          : 'none',
-                      borderBottom: '1px solid #e0e0e0',
-                    }}>
-                    {console.log('Model evaluation ID:', evalId)}
+                {evaluationIds.map(evalId => {
+                  return (
                     <Box
+                      key={evalId}
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        padding: '8px',
+                        textAlign: 'center',
+                        borderRight:
+                          evalId !== evaluationIds[evaluationIds.length - 1]
+                            ? '1px solid #e0e0e0'
+                            : 'none',
+                        borderBottom: '1px solid #e0e0e0',
                       }}>
                       <Box
                         sx={{
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          bgcolor: state.summary.evaluationCalls[evalId].color,
-                          marginRight: '8px',
-                        }}
-                      />
-                      {/* Use model name if available, otherwise use "model" */}
-                      {state.summary.evaluationCalls[evalId].name ||
-                        'model'}{' '}
-                      <Box
-                        component="span"
-                        sx={{fontSize: '0.9em', color: '#666'}}>
-                        {evalId.slice(-4)}
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                        <Box
+                          sx={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            bgcolor:
+                              state.summary.evaluationCalls[evalId].color,
+                            marginRight: '8px',
+                          }}
+                        />
+                        {state.summary.evaluationCalls[evalId].name || 'model'}{' '}
+                        <Box
+                          component="span"
+                          sx={{fontSize: '0.9em', color: '#666'}}>
+                          {evalId.slice(-4)}
+                        </Box>
                       </Box>
                     </Box>
-                  </Box>
-                ))}
+                  );
+                })}
               </Box>
 
               {/* Render rows for each numeric field */}
@@ -609,6 +630,29 @@ export const TraceCallsSection: React.FC<{
                         outputsByEvalId[evalId]?.model_output ||
                         outputsByEvalId[evalId];
                       const value = getValueByPath(modelOutput, fieldPath);
+                      const isPrimitive =
+                        fieldPath === 'value' &&
+                        (typeof modelOutput !== 'object' ||
+                          modelOutput === null);
+
+                      // Determine what to display based on the value type
+                      let displayValue = '-';
+
+                      if (value !== undefined) {
+                        if (Array.isArray(value)) {
+                          displayValue = value
+                            .map(v => (typeof v === 'number' ? v : ''))
+                            .join(', ');
+                        } else if (isPrimitive) {
+                          displayValue = String(modelOutput);
+                        } else if (typeof value === 'number') {
+                          displayValue = value.toFixed(6);
+                        } else {
+                          displayValue = String(value);
+                        }
+                      } else if (isPrimitive) {
+                        displayValue = String(modelOutput);
+                      }
 
                       return (
                         <Box
@@ -622,29 +666,20 @@ export const TraceCallsSection: React.FC<{
                             display: 'flex',
                             alignItems: 'center',
                           }}>
-                          {value !== undefined ? (
-                            <>
-                              {Array.isArray(value)
-                                ? value
-                                    .map(v => (typeof v === 'number' ? v : ''))
-                                    .join(', ')
-                                : value.toFixed(6)}
-                              {/* Only show comparison pills for non-baseline elements and non-arrays */}
-                              {evalId !== baselineEvalId &&
-                                baselineValue !== undefined &&
-                                !Array.isArray(value) && (
-                                  <TraceCallComparisonPill
-                                    value={value}
-                                    baseline={baselineValue as number}
-                                    evalId={evalId}
-                                    baselineEvalId={baselineEvalId}
-                                    metricLowerIsBetter={false}
-                                  />
-                                )}
-                            </>
-                          ) : (
-                            '-'
-                          )}
+                          {displayValue}
+
+                          {value !== undefined &&
+                            evalId !== baselineEvalId &&
+                            baselineValue !== undefined &&
+                            !Array.isArray(value) && (
+                              <TraceCallComparisonPill
+                                value={value}
+                                baseline={baselineValue as number}
+                                evalId={evalId}
+                                baselineEvalId={baselineEvalId}
+                                metricLowerIsBetter={false}
+                              />
+                            )}
                         </Box>
                       );
                     })}
