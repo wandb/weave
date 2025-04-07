@@ -5,7 +5,6 @@ import requests
 from huggingface_hub import HfApi
 
 import weave
-from weave import Dataset, Evaluation
 from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
 
 # Testing the actual NvidiaNeMoEvaluatorScorer functionality is not possible
@@ -20,6 +19,7 @@ HfApi.upload_file = lambda self, *args, **kwargs: {"url": "http://fake-upload"}
 
 # --- Fake responses for external API calls ---
 
+
 class FakeResponse:
     def __init__(self, json_data):
         self._json = json_data
@@ -29,6 +29,7 @@ class FakeResponse:
 
     def raise_for_status(self):
         pass
+
 
 def fake_post(url, headers=None, json=None, **kwargs):
     # This fake_post mimics the evaluator endpoint calls used in _write_job.
