@@ -1,3 +1,4 @@
+import {makeEventRecorder} from '@wandb/weave/components/Panel2/panellib/libanalytics';
 import {ID} from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
 import {Ref} from 'semantic-ui-react';
@@ -19,6 +20,8 @@ import * as S from './styles';
 import {Suggestions} from './suggestions';
 import {WeaveExpressionProps} from './types';
 import {trace} from './util';
+
+const recordEvent = makeEventRecorder('Expression');
 
 // We attach some stuff to the window for test automation (see automation.ts)
 declare global {
@@ -129,6 +132,9 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
           applyPendingExpr();
           forceRender({});
         }
+        if (!isValid) {
+          recordEvent('ENTER_INVALID');
+        }
         setShowSuggestions(false);
       } else if (
         ev.key === 'Tab' &&
@@ -205,6 +211,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
         initialValue={slateValue}
         onChange={onChangeResetSuggestion}>
         <S.EditableContainer
+          data-dd-action-name="click on expression"
           ref={containerRef}
           data-test="expression-editor-container"
           data-test-ee-id={editorId}
@@ -236,6 +243,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
                 primary
                 size="tiny"
                 disabled={!exprIsModified || !isValid || isBusy}
+                data-dd-action-name="apply expression"
                 onMouseDown={(ev: any) => {
                   // Prevent this element from taking focus
                   // otherwise it disappears before the onClick

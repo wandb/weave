@@ -767,8 +767,16 @@ const PanelTableInner: React.FC<
         return props.config.simpleTable ? null : (
           <S.TableAction
             data-test="table-filter-button"
+            data-dd-action-name={`${
+              filterOpen ? 'close' : 'open'
+            } table filter`}
             highlight={isFiltered ?? false}
             onClick={() => {
+              if (filterOpen) {
+                recordEvent('CLOSE_FILTER');
+              } else {
+                recordEvent('OPEN_FILTER');
+              }
               setFilterOpen(!filterOpen);
             }}>
             <S.TableIcon
@@ -1138,7 +1146,8 @@ const PanelTableInner: React.FC<
   return (
     <GrowToParent
       data-test-weave-id="table"
-      data-test-row-count={unpinnedData.length}>
+      data-test-row-count={unpinnedData.length}
+      data-dd-action-name="click on query panel table">
       {filterOpen && (
         <PanelContextProvider newVars={preFilterFrame}>
           <ControlFilter

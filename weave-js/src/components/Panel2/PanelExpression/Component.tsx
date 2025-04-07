@@ -61,7 +61,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
 
   return (
     <ThemeProvider theme={themes.light}>
-      <S.Main>
+      <S.Main data-dd-action-name="query-panel interaction">
         <S.EditorBar style={{pointerEvents: isLoading ? 'none' : 'auto'}}>
           {
             <div style={{width: '100%'}}>
