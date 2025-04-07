@@ -1,15 +1,14 @@
 import os
+
 import httpx
+from dotenv import load_dotenv
 
 # import weave
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.prompts import base
-from PIL import Image as PILImage
-
 from openai import OpenAI
+from PIL import Image as PILImage
 from pydantic import BaseModel
-
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -61,11 +60,13 @@ class StationNameResponse(BaseModel):
 async def fetch_weather(city: str) -> str:
     """Fetch current weather for a city"""
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"https://api.weather.gov/stations")
+        response = await client.get("https://api.weather.gov/stations")
         get_stations = response.json()
-        
+
     stations = get_stations["features"]
-    stationid_names = {station["properties"]["name"]: station["id"] for station in stations}
+    stationid_names = {
+        station["properties"]["name"]: station["id"] for station in stations
+    }
 
     openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = openai_client.beta.chat.completions.parse(
@@ -74,27 +75,30 @@ async def fetch_weather(city: str) -> str:
         messages=[
             {
                 "role": "user",
-                "content": f"You are given the following weather station names: \n{list(stationid_names.keys())}\n\nYour job is to return the exact station name from the list that is closest to the city of {city}"
+                "content": f"You are given the following weather station names: \n{list(stationid_names.keys())}\n\nYour job is to return the exact station name from the list that is closest to the city of {city}",
             },
         ],
-        response_format=StationNameResponse
+        response_format=StationNameResponse,
     )
 
     station_name = response.choices[0].message.parsed.station_name
     station_id = stationid_names[station_name]
-    
+
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{station_id}/observations/latest")
         get_forecast = response.json()
-    
+
     forecast = get_forecast["properties"]
 
     weather_report = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=100,
         messages=[
-            {"role": "user", "content": f"You are given the following weather forecast: {forecast}\n\nYour job is to return a weather report for {city}."}
-        ]
+            {
+                "role": "user",
+                "content": f"You are given the following weather forecast: {forecast}\n\nYour job is to return a weather report for {city}.",
+            }
+        ],
     )
     return weather_report.choices[0].message.content
 

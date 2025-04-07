@@ -1,7 +1,7 @@
 import asyncio
 import sys
 from contextlib import AsyncExitStack
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 # import weave
 from mcp import ClientSession, StdioServerParameters
@@ -68,7 +68,7 @@ class MCPClient:
         }
 
     # @weave.op()
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]):
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]):
         """Call a tool on the MCP server
 
         Args:
@@ -110,7 +110,7 @@ class MCPClient:
         return result
 
     # @weave.op()
-    async def get_prompt(self, prompt_name: str, arguments: Dict[str, str] = None):
+    async def get_prompt(self, prompt_name: str, arguments: dict[str, str] = None):
         """Get a prompt from the MCP server
 
         Args:
