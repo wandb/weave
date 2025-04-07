@@ -106,14 +106,6 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     parts = key.split(".")
     current = d
     for part in parts:
-        # if isinstance(current, list):
-        #     try:
-        #         index = int(part)
-        #         current = current[index]
-        #     except (ValueError, IndexError):
-        #         return None
-        # elif not isinstance(current, dict) or part not in current:
-        #     return None
         if part not in current or not isinstance(current, dict):
             return None
         current = current[part]
@@ -419,7 +411,18 @@ class Attributes(AbstractAttributes):
 
 
 class GenericAttributes(Attributes):
-    pass
+    def extract_usage(self) -> LLMUsageSchema:
+        return {}
+
+    def extract_inputs(self) -> Any:
+        return {}
+
+    def extract_outputs(self) -> Any:
+        return {}
+
+    def extract_attributes(self) -> Any:
+        return to_json_serializable(self._original_attributes),
+
 
 
 class OpenInferenceAttributes(Attributes):
@@ -431,17 +434,13 @@ class OpenInferenceAttributes(Attributes):
         )
         kind = self.extract_attribute_value(oi.SpanAttributes.OPENINFERENCE_SPAN_KIND)
         model = self.extract_attribute_value(oi.SpanAttributes.LLM_MODEL_NAME)
-        print(f"model: {model}")
-        print(f"kind: {kind}")
-        print(f"kind: {model}")
         attributes = {
             "system": str(system) if system else None,
             "provider": str(provider) if provider else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "_metadata": to_json_serializable(self._original_attributes),
+            "trace_metadata": to_json_serializable(self._original_attributes),
         }
-        print("after attributes")
         if invocation_parameters:
             try:
                 js = json.loads(invocation_parameters)
@@ -512,7 +511,7 @@ class OpenTelemetryAttributes(Attributes):
             "max_tokens": int(max_tokens) if max_tokens else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "_metadata": to_json_serializable(self._original_attributes),
+            "trace_metadata": to_json_serializable(self._original_attributes),
         }
         return attributes
 
@@ -539,15 +538,9 @@ class OpenTelemetryAttributes(Attributes):
         return to_json_serializable(prompts)
 
     def extract_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.extract_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS
-        )
-        completion_tokens = self.extract_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS
-        )
-        total_tokens = self.extract_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS
-        )
+        prompt_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS)
+        completion_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS)
+        total_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS)
         return LLMUsageSchema(
             prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
             completion_tokens=int(completion_tokens) if completion_tokens else None,
