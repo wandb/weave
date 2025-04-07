@@ -6,10 +6,14 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Eden MCP Server")
 
-# Enable CORS
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, replace with specific origins
@@ -18,8 +22,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files from the React app
-app.mount("/", StaticFiles(directory="../eden-dash/build", html=True), name="static")
+# WebSocket connection
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Echo back for now
+            await websocket.send_text(f"Message received: {data}")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        await websocket.close()
+
+# API endpoints
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Only mount static files in production
+if os.getenv("ENVIRONMENT") == "production":
+    app.mount("/", StaticFiles(directory="../eden-dash/build", html=True), name="static")
 
 class ServerConfig(BaseModel):
     name: str
@@ -88,19 +112,6 @@ async def deny_request(request_id: str):
     
     pending_requests.remove(request)
     return {"status": "success"}
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # TODO: Implement WebSocket communication for real-time updates
-            await websocket.send_text(f"Message text was: {data}")
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-    finally:
-        await websocket.close()
 
 if __name__ == "__main__":
     import uvicorn

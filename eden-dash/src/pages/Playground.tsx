@@ -1,18 +1,22 @@
-import React from 'react';
-import { Box, Typography, Paper, TextField, Button, Grid } from '@mui/material';
-import { Send as SendIcon } from '@mui/icons-material';
+import React, { useState } from 'react';
+import { Box, TextField, Button, Paper, Typography, Grid } from '@mui/material';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 const Playground: React.FC = () => {
-  const [input, setInput] = React.useState('');
-  const [messages, setMessages] = React.useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const handleSend = () => {
+  const handleSubmit = () => {
     if (!input.trim()) return;
 
-    const newMessages = [
+    const newMessages: Message[] = [
       ...messages,
-      { role: 'user', content: input },
-      { role: 'assistant', content: 'This is a placeholder response. The actual response will come from the MCP server.' }
+      { role: 'user' as const, content: input },
+      { role: 'assistant' as const, content: 'This is a placeholder response. The actual response will come from the MCP server.' }
     ];
     setMessages(newMessages);
     setInput('');
@@ -21,46 +25,45 @@ const Playground: React.FC = () => {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Playground
+        MCP Playground
       </Typography>
-      <Paper sx={{ p: 3, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ flexGrow: 1, overflow: 'auto', mb: 2 }}>
-          {messages.map((message, index) => (
-            <Paper
-              key={index}
-              sx={{
-                p: 2,
-                mb: 2,
-                backgroundColor: message.role === 'user' ? 'primary.light' : 'grey.100',
-                color: message.role === 'user' ? 'white' : 'text.primary',
-              }}
-            >
-              <Typography>{message.content}</Typography>
-            </Paper>
-          ))}
-        </Box>
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Grid container spacing={2}>
-          <Grid item xs>
+          <Grid item xs={12}>
             <TextField
               fullWidth
-              variant="outlined"
-              placeholder="Type your message..."
+              multiline
+              rows={4}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Enter your message..."
+              variant="outlined"
             />
           </Grid>
-          <Grid item>
+          <Grid item xs={12}>
             <Button
               variant="contained"
               color="primary"
-              endIcon={<SendIcon />}
-              onClick={handleSend}
+              onClick={handleSubmit}
+              disabled={!input.trim()}
             >
               Send
             </Button>
           </Grid>
         </Grid>
+      </Paper>
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Conversation
+        </Typography>
+        {messages.map((message, index) => (
+          <Box key={index} sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="textSecondary">
+              {message.role}
+            </Typography>
+            <Typography>{message.content}</Typography>
+          </Box>
+        ))}
       </Paper>
     </Box>
   );
