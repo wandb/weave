@@ -15,11 +15,12 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
-from mcp.server.fastmcp import FastMCP
-from mcp.types import TextContent
 
-# Import from the example server for testing
-# To avoid import issues in tests, we'll mock the necessary components
+try:
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import TextContent
+except ImportError:
+    pytest.skip("mcp not installed", allow_module_level=True)
 
 
 class MockStdioTransport:
