@@ -89,6 +89,10 @@ export const CallDetails: FC<{
     () => getDisplayInputsAndOutput(call),
     [call]
   );
+  const {trace_metadata} = useMemo(
+    () => getDisplayTraceMetadata(call),
+    [call]
+  );
   const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
   const childCalls = useCalls(
     call.entity,
@@ -168,6 +172,25 @@ export const CallDetails: FC<{
                 mode: 'object_viewer',
               }}>
               <ObjectViewerSection title="Output" data={output} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
+          )}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
+            p: 2,
+          }}>
+          {Object.keys(trace_metadata).length > 0 && (
+            <CustomWeaveTypeProjectContext.Provider
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
+              <ObjectViewerSection title="Trace Attributes" data={trace_metadata} isExpanded />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
@@ -255,6 +278,16 @@ export const CallDetails: FC<{
       </Box>
     </Box>
   );
+};
+
+const getDisplayTraceMetadata = (call: CallSchema) => {
+  const span = call.rawSpan;
+  console.log(span);
+  console.log(span.attributes);
+  const trace_metadata = span.attributes
+    ? span.attributes['trace_metadata'] ?? {}
+    : {};
+  return {trace_metadata}
 };
 
 const getDisplayInputsAndOutput = (call: CallSchema) => {
