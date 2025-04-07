@@ -1,4 +1,3 @@
-import {LIST_ANY_TYPE} from '@wandb/weave/common/types/list';
 import {Node, NodeOrVoidNode, Type} from '@wandb/weave/core';
 
 import {PanelStack} from '../availablePanels';
@@ -11,6 +10,11 @@ export type PanelStepperConfigType = {
   workingPanelId: string | undefined;
   workingKeyAndType: {key: string; type: Type};
   workingSliderKey: string | null;
+};
+
+export const LIST_ANY_TYPE: Type = {
+  type: 'list' as const,
+  objectType: 'any' as const,
 };
 
 export type PanelStepperProps = Panel2.PanelProps<

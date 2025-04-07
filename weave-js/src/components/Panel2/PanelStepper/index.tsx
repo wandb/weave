@@ -1,4 +1,3 @@
-import {LIST_ANY_TYPE} from '@wandb/weave/common/types/list';
 import {
   constFunction,
   constNumber,
@@ -21,6 +20,7 @@ import * as Panel2 from '../panel';
 import {PanelStepper} from './component';
 import {PanelStepperConfig} from './configComponent';
 import {
+  LIST_ANY_TYPE,
   PanelStepperConfigType,
   PanelStepperEntryProps,
   PanelStepperProps,
