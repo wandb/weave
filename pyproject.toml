@@ -115,7 +115,8 @@ scorers = [
   "litellm>=1.58",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
-  "transformers>=4.48.2",
+  # Pin until transformers releases https://github.com/huggingface/transformers/pull/37337
+  "transformers>=4.48.2,<4.51.0",
   "torch>=2.4.1",
   "sentencepiece>=0.2.0",
   "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
