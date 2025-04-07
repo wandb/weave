@@ -516,7 +516,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    '([^\\#?%:]{1,128})', // Artifact name
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
