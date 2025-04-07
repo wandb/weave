@@ -498,9 +498,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
+            unique_refs = list(set(refs_to_resolve.values()))
+
             with self.with_new_client():
                 vals = self._refs_read_batch_within_project(
-                    project_id, list(refs_to_resolve.values()), ref_cache
+                    project_id, unique_refs, ref_cache
                 )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
@@ -1022,8 +1024,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
+        # Retain order, but deduplicate
+        unique_refs = []
+        for ref in req.refs:
+            if ref not in unique_refs:
+                unique_refs.append(ref)
+
         # First, parse the refs
-        parsed_raw_refs = [ri.parse_internal_uri(r) for r in req.refs]
+        parsed_raw_refs = [ri.parse_internal_uri(r) for r in unique_refs]
 
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_raw_refs):
@@ -1233,12 +1241,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     needed_extra_results.append((i, extra_result))
 
             if len(needed_extra_results) > 0:
-                refs: set[ri.InternalObjectRef] = set()
+                refs: list[ri.InternalObjectRef] = []
                 for i, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
-                    refs.add(extra_result.unresolved_obj_ref)
-                obj_roots = get_object_refs_root_val(list(refs))
+                    refs.append(extra_result.unresolved_obj_ref)
+                obj_roots = get_object_refs_root_val(refs)
                 for (i, extra_result), obj_root in zip(needed_extra_results, obj_roots):
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
