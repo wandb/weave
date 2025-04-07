@@ -17,6 +17,12 @@ This example demonstrates:
 
 ## Setup
 
+1. Add OPENAI_API_KEY in an `.env` file.
+
+```bash
+touch examples/mcp_demo/.env
+```
+
 1. Install the required dependencies:
 
 ```bash
