@@ -43,6 +43,7 @@ interface EditableFieldState {
   editing: boolean;
   origValue: string;
   currentValue: string;
+  fieldWidth?: number;
 }
 
 /**
@@ -78,8 +79,10 @@ export default class EditableField extends React.Component<
     editing: false,
     origValue: this.props.value,
     currentValue: this.props.value,
+    fieldWidth: undefined,
   };
   inputRef = React.createRef<Input>();
+  fieldRef = React.createRef<HTMLDivElement>();
 
   save = _.debounce((val: string) => {
     if (this.props.save) {
@@ -100,7 +103,10 @@ export default class EditableField extends React.Component<
     e.stopPropagation();
     e.preventDefault();
 
-    this.setState({editing: true}, () => {
+    // Capture the current width of the field before switching to edit mode
+    const fieldWidth = this.fieldRef.current?.getBoundingClientRect().width;
+    
+    this.setState({editing: true, fieldWidth}, () => {
       if (
         (this.props.autoSelect == null || this.props.autoSelect) &&
         this.inputRef.current
@@ -160,6 +166,11 @@ export default class EditableField extends React.Component<
 
     let fieldComponent: JSX.Element;
     if (this.state.editing) {
+      const inputStyle = this.state.fieldWidth ? {
+        width: `${this.state.fieldWidth}px`,
+        minWidth: `${this.state.fieldWidth}px`,
+      } : {};
+      
       if (this.props.multiline) {
         fieldComponent = (
           <Form>
@@ -174,6 +185,7 @@ export default class EditableField extends React.Component<
               placeholder={this.props.placeholder}
               onBlur={this.stopEditing}
               control={TextareaAutosize}
+              style={inputStyle}
             />
           </Form>
         );
@@ -196,6 +208,7 @@ export default class EditableField extends React.Component<
             onKeyDown={this.onKeyDown}
             ref={this.inputRef}
             onBlur={this.stopEditing}
+            style={inputStyle}
           />
         );
       }
@@ -257,6 +270,7 @@ export default class EditableField extends React.Component<
     return (
       <div
         className={className}
+        ref={this.fieldRef}
         onClick={
           this.state.editing
             ? e => {
