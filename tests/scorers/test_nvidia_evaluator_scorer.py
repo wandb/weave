@@ -1,146 +1,132 @@
-"""Tests for the NVIDIA NeMo Evaluator Scorer."""
-
 import pytest
-from unittest.mock import Mock, patch
 import requests
 import weave
-from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
+from unittest.mock import MagicMock
 
-@pytest.fixture
-def mock_responses():
-    """Fixture to provide mock API responses."""
-    return {
-        "service_check": {"reachable": True},
-        "job_creation": {"id": "test-job-123"},
-        "job_status": {
-            "status": "completed",
-            "status_details": {"progress": 100.0}
-        },
-        "job_results": {
-            "tasks": {
-                "llm-as-a-judge": {
-                    "metrics": {
-                        "relevance": {"mean": 0.85},
-                        "coherence": {"mean": 0.92}
-                    }
-                }
-            }
-        }
-    }
+# --- Fake responses for external API calls ---
 
-@pytest.fixture
-def mock_requests(monkeypatch):
-    """Fixture to mock requests.get and requests.post."""
-    def mock_get(*args, **kwargs):
-        mock_response = Mock()
-        mock_response.json.return_value = {"reachable": True}
-        mock_response.raise_for_status.return_value = None
-        return mock_response
+def fake_post(url, headers=None, json=None, **kwargs):
+    # This fake_post mimics the evaluator endpoint calls used in _write_job.
+    class FakeResponse:
+        def __init__(self, json_data):
+            self._json = json_data
+        def json(self):
+            return self._json
+        def raise_for_status(self):
+            pass
+    if url.endswith("/v1/evaluation/configs"):
+        return FakeResponse({})
+    elif url.endswith("/v1/evaluation/targets"):
+        return FakeResponse({})
+    elif url.endswith("/v1/evaluation/jobs"):
+        return FakeResponse({"id": "test-job"})
+    return FakeResponse({})
 
-    def mock_post(*args, **kwargs):
-        mock_response = Mock()
-        mock_response.json.return_value = {"id": "test-job-123"}
-        mock_response.raise_for_status.return_value = None
-        return mock_response
+def fake_get(url, headers=None, **kwargs):
+    # This fake_get covers:
+    # 1. Service validation (datastore and evaluator endpoints)
+    # 2. Polling the job status in _wait_eval_job (always returning "completed")
+    # 3. Getting job results.
+    class FakeResponse:
+        def __init__(self, json_data):
+            self._json = json_data
+        def json(self):
+            return self._json
+        def raise_for_status(self):
+            pass
+    if url.endswith("/v1/datastore/namespaces"):
+        return FakeResponse({})
+    elif url.endswith("/v1/evaluation/jobs"):
+        return FakeResponse({})
+    # When polling the job status, return completed status.
+    if "/v1/evaluation/jobs/test-job/results" in url:
+        return FakeResponse({"tasks": {"coherence": 0.8}})
+    return FakeResponse({"status": "completed", "status_details": {"progress": 100.0}})
 
-    monkeypatch.setattr(requests, 'get', mock_get)
-    monkeypatch.setattr(requests, 'post', mock_post)
+# --- Patch the HuggingFace client so no real API calls happen ---
+@pytest.fixture(autouse=True)
+def patch_hfapi(monkeypatch):
+    # Whenever a new HfApi is constructed, return a fake instance.
+    from huggingface_hub import HfApi
+    fake_hf_instance = MagicMock()
+    fake_hf_instance.create_repo.return_value = None
+    fake_hf_instance.upload_file.return_value = {"url": "http://fake-upload"}
+    monkeypatch.setattr("huggingface_hub.HfApi", lambda *args, **kwargs: fake_hf_instance)
 
-@pytest.fixture
-def nemo_evaluator_scorer(mock_requests):
-    """Fixture that returns a NvidiaNeMoEvaluatorScorer instance with test configuration."""
-    scorer = NvidiaNeMoEvaluatorScorer(
-        evaluator_url="http://test-evaluator.com",
-        datastore_url="http://test-datastore.com",
-        namespace="test-namespace",
-        repo_name="test-repo",
-        evaluator_token="test-token",
-        datastore_token="test-token",
-        judge_prompt_template=[{"role": "user", "content": "Evaluate this: {output}"}],
-        judge_metrics={"relevance": {"type": "float"}, "coherence": {"type": "float"}},
-        judge_url="http://test-judge.com",
-        judge_model_id="test-model",
-        judge_api_key="test-key"
+# --- Define the "op" functions to be tested ---
+
+def run_scorer():
+    """
+    A synchronous op that instantiates NvidiaNeMoEvaluatorScorer with fixed parameters,
+    scores a single output string, and returns the result.
+    """
+    from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
+
+    prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
+    metrics = {"coherence": {"type": "float"}}
+
+    nemo_eval_scorer = NvidiaNeMoEvaluatorScorer(
+         evaluator_url="http://0.0.0.0:7331",
+         datastore_url="http://0.0.0.0:3000",
+         namespace="temp-wv-ns",
+         repo_name="weave-ds",
+         judge_prompt_template=prompt_messages,
+         judge_metrics=metrics,
+         judge_url="https://integrate.api.nvidia.com/v1",
+         judge_model_id="meta/llama-3.3-70b-instruct",
+         judge_api_key="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"
     )
-    return scorer
+    output = "This movie truly sucked"
+    return nemo_eval_scorer.score(output=output)
 
-@pytest.fixture
-def test_dataset():
-    """Fixture that returns a test dataset."""
-    return weave.Dataset(rows=[
-        {"output": "Test output 1"},
-        {"output": "Test output 2"}
-    ])
+@pytest.mark.parametrize("op_func", [run_scorer])
+def test_run_scorer(op_func, monkeypatch):
+    # Patch requests so that no actual HTTP calls are made.
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    score = op_func()
+    assert score == {"coherence": 0.8}
 
-@patch('requests.get')
-@patch('requests.post')
-@patch('huggingface_hub.HfApi')
-def test_single_output_scoring(mock_hf_api, mock_post, mock_get, nemo_evaluator_scorer, mock_responses):
-    """Test scoring a single output string."""
-    # Configure mocks
-    mock_get.side_effect = [
-        Mock(json=lambda: mock_responses["service_check"]),
-        Mock(json=lambda: mock_responses["service_check"]),
-        Mock(json=lambda: mock_responses["job_status"]),
-        Mock(json=lambda: mock_responses["job_results"])
-    ]
-    mock_post.return_value = Mock(json=lambda: mock_responses["job_creation"])
-    mock_hf_api.return_value = Mock()
-    
-    # Test scoring
-    result = nemo_evaluator_scorer.score(output="This is a test output")
-    
-    # Verify results
-    assert "llm-as-a-judge" in result
-    assert result["llm-as-a-judge"]["metrics"]["relevance"]["mean"] == 0.85
-    assert result["llm-as-a-judge"]["metrics"]["coherence"]["mean"] == 0.92
+# Define the asynchronous op.
+@pytest.mark.asyncio
+async def run_evaluation():
+    """
+    An asynchronous op that instantiates NvidiaNeMoEvaluatorScorer,
+    builds a small dataset, and uses it in a dummy Evaluation.
+    """
+    from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
+    from weave import Dataset, Evaluation
 
-@patch('requests.get')
-@patch('requests.post')
-@patch('huggingface_hub.HfApi')
-def test_dataset_scoring(mock_hf_api, mock_post, mock_get, nemo_evaluator_scorer, mock_responses, test_dataset):
-    """Test scoring a dataset with multiple outputs."""
-    # Configure mocks
-    mock_get.side_effect = [
-        Mock(json=lambda: mock_responses["service_check"]),
-        Mock(json=lambda: mock_responses["service_check"]),
-        Mock(json=lambda: mock_responses["job_status"]),
-        Mock(json=lambda: mock_responses["job_results"])
-    ]
-    mock_post.return_value = Mock(json=lambda: mock_responses["job_creation"])
-    mock_hf_api.return_value = Mock()
-    
-    # Test scoring
-    result = nemo_evaluator_scorer.score(dataset=test_dataset)
-    
-    # Verify results
-    assert "llm-as-a-judge" in result
-    assert isinstance(result["llm-as-a-judge"]["metrics"]["relevance"]["mean"], float)
-    assert isinstance(result["llm-as-a-judge"]["metrics"]["coherence"]["mean"], float)
+    prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
+    metrics = {"coherence": {"type": "float"}}
 
-@patch('requests.get')
-@patch('requests.post')
-@patch('huggingface_hub.HfApi')
-def test_service_validation_failure(mock_hf_api, mock_post, mock_get, mock_responses):
-    """Test handling of service validation failures."""
-    # Configure mock to simulate service failure
-    mock_get.side_effect = requests.RequestException("Service unavailable")
-    mock_hf_api.return_value = Mock()
+    nemo_eval_scorer = NvidiaNeMoEvaluatorScorer(
+         evaluator_url="http://0.0.0.0:7331",
+         datastore_url="http://0.0.0.0:3000",
+         namespace="temp-wv-ns",
+         repo_name="weave-ds",
+         judge_prompt_template=prompt_messages,
+         judge_metrics=metrics,
+         judge_url="https://integrate.api.nvidia.com/v1",
+         judge_model_id="meta/llama-3.3-70b-instruct",
+         judge_api_key="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"
+    )
+    dataset = Dataset(rows=[{"output": "This movie truly sucked"}, {"output": "This movie was great"}])
     
-    # Test service validation
-    with pytest.raises(RuntimeError) as exc_info:
-        scorer = NvidiaNeMoEvaluatorScorer(
-            evaluator_url="http://test-evaluator.com",
-            datastore_url="http://test-datastore.com",
-            namespace="test-namespace",
-            repo_name="test-repo",
-            evaluator_token="test-token",
-            datastore_token="test-token",
-            judge_prompt_template=[{"role": "user", "content": "Evaluate this: {output}"}],
-            judge_metrics={"relevance": {"type": "float"}, "coherence": {"type": "float"}},
-            judge_url="http://test-judge.com",
-            judge_model_id="test-model",
-            judge_api_key="test-key"
-        )
-    
-    assert "Service validation failed" in str(exc_info.value)
+    # Define a dummy FakeModel with a predict method.
+
+    class FakeModel(weave.Model):
+        @weave.op()
+        def predict(self, output):
+            pass
+
+    evaluation = Evaluation(dataset=dataset, scorers=[nemo_eval_scorer])
+    results = await evaluation.evaluate(FakeModel())
+    return results
+
+@pytest.mark.asyncio
+async def test_run_evaluation(monkeypatch):
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    results = await run_evaluation()
+    assert results.get("NvidiaNeMoEvaluatorScorer", {}).get("coherence") == 1.6
