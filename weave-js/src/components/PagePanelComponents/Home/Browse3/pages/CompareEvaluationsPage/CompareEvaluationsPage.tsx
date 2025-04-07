@@ -83,14 +83,10 @@ export const CompareEvaluationsPageContent: React.FC<
     string | null
   >(null);
 
-  // --------------------------------------
-
   const {useCalls} = useWFHooks();
   const childCalls = useCalls(props.entity, props.project, {
     parentIds: props.evaluationCallIds,
   });
-
-  console.log('childCalls', childCalls);
 
   const traceCalls = childCalls.result
     ?.filter(call => call.traceCall?.op_name?.includes('predict_and_score'))
@@ -98,8 +94,6 @@ export const CompareEvaluationsPageContent: React.FC<
       callId: call.callId,
       traceCall: call.traceCall,
     }));
-
-  console.log('traceCalls', traceCalls);
 
   // Filter for summarize calls
   const summarizeCalls = childCalls.result
@@ -112,10 +106,6 @@ export const CompareEvaluationsPageContent: React.FC<
       callId: call.callId,
       traceCall: call.traceCall,
     }));
-
-  console.log('summarizeCalls', summarizeCalls);
-
-  // --------------------------------------
 
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
@@ -219,12 +209,9 @@ const CompareEvaluationsPageInner: React.FC<{
   summarizeCalls?: Array<{callId: string; traceCall: any}>;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples = true;
-  console.log('showExampleFilter', showExampleFilter);
-  console.log('showExamples', showExamples);
   const resultsLoading = state.loadableComparisonResults.loading;
 
   // Check if we should show the traceCalls UI
