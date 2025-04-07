@@ -764,30 +764,6 @@ const PanelTableInner: React.FC<
           />
         );
       },
-      headerRenderer: ({headerIndex}) => {
-        return props.config.simpleTable ? null : (
-          <S.TableAction
-            data-test="table-filter-button"
-            data-dd-action-name={`${
-              filterOpen ? 'close' : 'open'
-            } table filter`}
-            highlight={isFiltered ?? false}
-            onClick={() => {
-              if (filterOpen) {
-                recordEvent('CLOSE_FILTER');
-              } else {
-                recordEvent('OPEN_FILTER');
-              }
-              setFilterOpen(!filterOpen);
-            }}>
-            <S.TableIcon
-              name="filter"
-              // Pass undefined when false to avoid console warning.
-              highlight={isFiltered === false ? undefined : true}
-            />
-          </S.TableAction>
-        );
-      },
     });
     if (rowActions != null && rowActions.length > 0) {
       columns.unshift({
