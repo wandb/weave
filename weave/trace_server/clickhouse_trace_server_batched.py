@@ -1076,12 +1076,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if root_val_cache is None:
             root_val_cache = {}
 
-        # dedupe parsed_refs
-        unique_refs = []
-        for ref in parsed_refs:
-            if ref not in unique_refs:
-                unique_refs.append(ref)
-
         def make_root_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
@@ -1215,6 +1209,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val=val,
             )
 
+        # dedupe parsed_refs
+        unique_refs = []
+        for ref in parsed_refs:
+            if ref not in unique_refs:
+                unique_refs.append(ref)
+
         # Initialize the results with the parsed refs
         extra_results = [
             PartialRefResult(
@@ -1223,7 +1223,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 unresolved_table_ref=None,
                 val=None,
             )
-            for ref in parsed_refs
+            for ref in unique_refs
         ]
 
         # Loop until there is nothing left to resolve
