@@ -101,7 +101,7 @@ export const PlaygroundChat = ({
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
-                minWidth: '620px',
+                minWidth: '655px',
               }}>
               {state.loading && (
                 <Box
