@@ -48,7 +48,7 @@ import {Spec as RunColorSpec} from './PanelRunColor';
 import {Spec as RunOverviewSpec} from './PanelRunOverview';
 import {Spec as PanelRunsTableSpec} from './PanelRunsTable';
 import {Spec as PanelRunHistoryTablesStepperSpec} from './PanelRunsWithStepper/HistoryTables';
-import {Spec as PanelStepperSpec} from './PanelRunsWithStepper/PanelStepper';
+import {Spec as PanelStepperSpec} from './PanelStepper';
 import {Spec as PanelRunsPlotsWithStepperSpec} from './PanelRunsWithStepper/Plots';
 import {Spec as SavedModelSpec} from './PanelSavedModel';
 import {Spec as StringSpec} from './PanelString';
