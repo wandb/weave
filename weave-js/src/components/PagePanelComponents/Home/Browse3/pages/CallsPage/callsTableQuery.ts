@@ -313,7 +313,10 @@ export const useMakeInitialDatetimeFilter = (
   }, []);
 
   const key = datetimeFilterCacheKey(entity, project, filter);
-  const cachedFilter = getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS);
+  const cachedFilter = useMemo(
+    () => getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS),
+    [key]
+  );
 
   const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
     skip: skip || cachedFilter != null,
@@ -346,8 +349,9 @@ export const useMakeInitialDatetimeFilter = (
         logicOperator: GridLogicOperator.And,
       };
     } else if (callStats30Days.result && callStats30Days.result.count < 50) {
+      // If there are no calls found in the last 30 days, just don't set a filter
       newFilter = {
-        items: [makeDateFilter(180)],
+        items: [],
         logicOperator: GridLogicOperator.And,
       };
     }
