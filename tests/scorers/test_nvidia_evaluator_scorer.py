@@ -4,6 +4,8 @@ import pytest
 import requests
 
 import weave
+from weave import Dataset, Evaluation
+from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
 
 # --- Fake responses for external API calls ---
 
@@ -74,8 +76,6 @@ def run_scorer():
     A synchronous op that instantiates NvidiaNeMoEvaluatorScorer with fixed parameters,
     scores a single output string, and returns the result.
     """
-    from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
-
     prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
     metrics = {"coherence": {"type": "float"}}
 
@@ -110,9 +110,6 @@ async def run_evaluation():
     An asynchronous op that instantiates NvidiaNeMoEvaluatorScorer,
     builds a small dataset, and uses it in a dummy Evaluation.
     """
-    from weave import Dataset, Evaluation
-    from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
-
     prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
     metrics = {"coherence": {"type": "float"}}
 
@@ -149,3 +146,96 @@ async def test_run_evaluation(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
     results = await run_evaluation()
     assert results.get("NvidiaNeMoEvaluatorScorer", {}).get("coherence") == 1.6
+
+
+def test_score_with_both_inputs_fails(monkeypatch):
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
+    metrics = {"coherence": {"type": "float"}}
+    scorer = NvidiaNeMoEvaluatorScorer(
+        evaluator_url="http://0.0.0.0:7331",
+        datastore_url="http://0.0.0.0:3000",
+        namespace="temp-wv-ns",
+        repo_name="weave-ds",
+        judge_prompt_template=prompt_messages,
+        judge_metrics=metrics,
+        judge_url="https://integrate.api.nvidia.com/v1",
+        judge_model_id="meta/llama-3.3-70b-instruct",
+        judge_api_key="token",
+    )
+    dataset = weave.Dataset(rows=[{"output": "Sucks"}])
+    with pytest.raises(
+        ValueError, match="Only one of 'dataset' or 'output' can be provided."
+    ):
+        scorer.score(output="Test", dataset=dataset)
+
+
+def test_score_without_judge_prompt_or_configuration(monkeypatch):
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    # Provide None for judge_prompt_template and judge_metrics without setting configuration_name
+    scorer = NvidiaNeMoEvaluatorScorer(
+        evaluator_url="http://0.0.0.0:7331",
+        datastore_url="http://0.0.0.0:3000",
+        namespace="temp-wv-ns",
+        repo_name="weave-ds",
+        judge_prompt_template=None,
+        judge_metrics=None,
+        judge_url="https://integrate.api.nvidia.com/v1",
+        judge_model_id="meta/llama-3.3-70b-instruct",
+        judge_api_key="token",
+    )
+    with pytest.raises(
+        ValueError,
+        match="You must provide either 'judge_prompt_template' or 'configuration_name'.",
+    ):
+        scorer.score(output="Test")
+
+
+def test_score_without_judge_info(monkeypatch):
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
+    metrics = {"coherence": {"type": "float"}}
+    scorer = NvidiaNeMoEvaluatorScorer(
+        evaluator_url="http://0.0.0.0:7331",
+        datastore_url="http://0.0.0.0:3000",
+        namespace="temp-wv-ns",
+        repo_name="weave-ds",
+        judge_prompt_template=prompt_messages,
+        judge_metrics=metrics,
+        judge_url=None,
+        judge_model_id=None,
+        judge_api_key=None,
+    )
+    with pytest.raises(
+        ValueError,
+        match="You must provide either 'judge_url, judge_model_id, and judge_api_key' or 'target_name'.",
+    ):
+        scorer.score(output="Test")
+
+
+def test_run_scorer_with_10_data_points(monkeypatch):
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+    prompt_messages = [{"role": "user", "content": "Evaluate this: {output}"}]
+    metrics = {"coherence": {"type": "float"}}
+    scorer = NvidiaNeMoEvaluatorScorer(
+        evaluator_url="http://0.0.0.0:7331",
+        datastore_url="http://0.0.0.0:3000",
+        namespace="temp-wv-ns",
+        repo_name="weave-ds",
+        judge_prompt_template=prompt_messages,
+        judge_metrics=metrics,
+        judge_url="https://integrate.api.nvidia.com/v1",
+        judge_model_id="meta/llama-3.3-70b-instruct",
+        judge_api_key="token",
+    )
+    dataset = Dataset(rows=[{"output": f"Test output {i}"} for i in range(10)])
+    result = scorer.score(dataset=dataset)
+    # Since our fake GET always returns {"tasks": {"coherence": 0.8}},
+    # we expect the scoreboard to be exactly that.
+    assert isinstance(result, dict)
+    assert "coherence" in result
+    assert isinstance(result["coherence"], float)

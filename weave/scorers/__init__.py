@@ -14,6 +14,7 @@ from weave.scorers.moderation_scorer import (
     WeaveBiasScorerV1,
     WeaveToxicityScorerV1,
 )
+from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
 from weave.scorers.presidio_guardrail import (
     PresidioScorer,
 )
@@ -64,4 +65,5 @@ __all__ = [
     "WeaveHallucinationScorerV1",
     "WeaveContextRelevanceScorerV1",
     "WeaveTrustScorerV1",
+    "NvidiaNeMoEvaluatorScorer",
 ]

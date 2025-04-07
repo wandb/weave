@@ -1,17 +1,16 @@
 import os
 import random
+import re
 import string
+import tempfile
 from time import sleep
 from time import time as time_fn
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 import requests
 from huggingface_hub import HfApi
 
 import weave
-
-if TYPE_CHECKING:
-    from huggingface_hub import HfApi
 
 
 class NvidiaNeMoEvaluatorScorer(weave.Scorer):
@@ -112,8 +111,6 @@ class NvidiaNeMoEvaluatorScorer(weave.Scorer):
         Returns:
             tuple[dict[str, Any], str]: A tuple containing (initialization_response, extracted_weave_id).
         """
-        import re
-
         answer = self._initialize_datasets(dataset)
         id = None
 
@@ -199,8 +196,6 @@ class NvidiaNeMoEvaluatorScorer(weave.Scorer):
             )
         except Exception as e:
             print(f"Repo already exists -- using: {self.namespace}/{self.repo_name}")
-
-        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
             temp_file.write(wv_dataset.to_pandas().to_csv(index=False))
