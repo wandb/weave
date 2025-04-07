@@ -1891,3 +1891,65 @@ def test_datetime_optimization_invalid_field() -> None:
         """,
         {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
     )
+
+
+def test_query_with_feedback_filter_and_datetime_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gt": [
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                            },
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
+                            },
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+            (SELECT calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_2:String}
+                AND (calls_merged.id <= 'ffffffffffffffff'
+                    OR ((calls_merged.id > {pb_1:String})))
+            GROUP BY (calls_merged.project_id,
+                        calls_merged.id)
+            HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
+                    AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
+        WHERE calls_merged.project_id = {pb_2:String}
+        AND calls_merged.project_id = {pb_2:String}
+        AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_4:String}) > JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_5:String}))
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+            "pb_2": "project",
+            "pb_3": "wandb.runnable.my_op",
+            "pb_4": '$."output"."expected"',
+            "pb_5": '$."output"."found"',
+        },
+    )

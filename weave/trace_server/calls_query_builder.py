@@ -1449,9 +1449,7 @@ def process_query_to_optimization_sql(
         return None
 
     # Create a single AND operation from all conditions
-    and_operation = tsi_query.AndOperation(
-        **{"$and": [c.operand for c in conditions if not c.is_feedback()]}
-    )
+    and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
 
     # Process the combined operation
     processed = process_operation(and_operation)
