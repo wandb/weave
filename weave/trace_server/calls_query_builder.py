@@ -860,6 +860,14 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
+MAX_FILTER_LENGTH = 1000
+
+
+def assert_length_less_than_max(arr: list, max_length: int = MAX_FILTER_LENGTH) -> None:
+    if len(arr) > max_length:
+        raise ValueError(f"Array length is greater than max length: {len(arr)}")
+
+
 # Handler function for status summary field
 def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Status logic:
@@ -1056,6 +1064,8 @@ def process_calls_filter_to_conditions(
     conditions: list[str] = []
 
     if filter.op_names:
+        assert_length_less_than_max(filter.op_names)
+
         # We will build up (0 or 1) + N conditions for the op_version_refs
         # If there are any non-wildcarded names, then we at least have an IN condition
         # If there are any wildcarded names, then we have a LIKE condition for each
@@ -1085,26 +1095,31 @@ def process_calls_filter_to_conditions(
             conditions.append(combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
+        assert_length_less_than_max(filter.input_refs)
         conditions.append(
             f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
+        assert_length_less_than_max(filter.output_refs)
         conditions.append(
             f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
+        assert_length_less_than_max(filter.parent_ids)
         conditions.append(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.trace_ids:
+        assert_length_less_than_max(filter.trace_ids)
         conditions.append(
             f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
+        assert_length_less_than_max(filter.call_ids)
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
