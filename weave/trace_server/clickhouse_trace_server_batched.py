@@ -100,6 +100,7 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -224,6 +225,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
         )
+
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        traces_data = [
+            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
+        ]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
+        # TODO: Actually populate the error fields if call_start_batch fails
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        return tsi.OtelExportRes()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -1951,7 +1975,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             logger.exception(
                 "clickhouse_stream_query_error",
                 extra={
-                    "error": e,
+                    "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
                 },
@@ -1964,12 +1988,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: Optional[dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
+        try:
+            res = self.ch_client.query(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            )
+        except Exception as e:
+            logger.exception(
+                "clickhouse_query_error",
+                extra={"error_str": str(e), "query": query, "parameters": parameters},
+            )
+            raise
+
         logger.info(
             "clickhouse_query",
             extra={
