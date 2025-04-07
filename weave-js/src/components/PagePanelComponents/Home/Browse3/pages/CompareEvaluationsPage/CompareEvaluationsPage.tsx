@@ -296,9 +296,6 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
-  // Get entity and project from context
-  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
-
   return (
     <VerticalBox
       sx={{
