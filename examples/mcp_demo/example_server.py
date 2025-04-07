@@ -1,9 +1,17 @@
+import os
 import httpx
 
 # import weave
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.prompts import base
 from PIL import Image as PILImage
+
+from openai import OpenAI
+from pydantic import BaseModel
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # # Initialize Weave for tracing
 # weave_client = weave.init("mcp_example")
@@ -45,12 +53,50 @@ def calculate_bmi(weight_kg: float, height_m: float) -> float:
     return weight_kg / (height_m**2)
 
 
+class StationNameResponse(BaseModel):
+    station_name: str
+
+
 @mcp.tool()
 async def fetch_weather(city: str) -> str:
     """Fetch current weather for a city"""
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"https://api.weather.com/{city}")
-        return response.text
+        response = await client.get(f"https://api.weather.gov/stations")
+        get_stations = response.json()
+        
+    stations = get_stations["features"]
+    stationid_names = {station["properties"]["name"]: station["id"] for station in stations}
+
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    response = openai_client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        max_tokens=100,
+        messages=[
+            {
+                "role": "user",
+                "content": f"You are given the following weather station names: \n{list(stationid_names.keys())}\n\nYour job is to return the exact station name from the list that is closest to the city of {city}"
+            },
+        ],
+        response_format=StationNameResponse
+    )
+
+    station_name = response.choices[0].message.parsed.station_name
+    station_id = stationid_names[station_name]
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{station_id}/observations/latest")
+        get_forecast = response.json()
+    
+    forecast = get_forecast["properties"]
+
+    weather_report = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        max_tokens=100,
+        messages=[
+            {"role": "user", "content": f"You are given the following weather forecast: {forecast}\n\nYour job is to return a weather report for {city}."}
+        ]
+    )
+    return weather_report.choices[0].message.content
 
 
 @mcp.prompt()
@@ -68,9 +114,9 @@ def debug_error(error: str) -> list[base.Message]:
 
 
 @mcp.tool()
-def create_thumbnail(image_path: str) -> Image:
+def create_thumbnail() -> Image:
     """Create a thumbnail from an image"""
-    img = PILImage.open(image_path)
+    img = PILImage.open("docs/docs/media/codegen/eval_trace.png")
     img.thumbnail((100, 100))
     return Image(data=img.tobytes(), format="png")
 

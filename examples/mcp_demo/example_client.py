@@ -107,7 +107,7 @@ class MCPClient:
         # with weave.attributes({"mcp_component": "client", "mcp_method": "read_resource", "uri": uri}):
         print(f"Reading resource: {uri}")
         result = await self.session.read_resource(AnyUrl(uri))
-        return result.contents[0].content
+        return result
 
     # @weave.op()
     async def get_prompt(self, prompt_name: str, arguments: Dict[str, str] = None):
@@ -169,7 +169,9 @@ class MCPClient:
                         results.append({"name": name, "error": str(e)})
 
                 elif name == "create_thumbnail":
-                    print("Skipping create_thumbnail as it requires an image file path")
+                    image = await self.call_tool("create_thumbnail", {})
+                    print(f"Thumbnail: {image}")
+                    results.append({"name": name, "result": image})
 
             except Exception as e:
                 print(f"Error with {name}: {e}")
@@ -275,14 +277,15 @@ class MCPClient:
         print("  config - Get application configuration")
         print("  code-review <code> - Get code review prompt")
         print("  debug <error> - Get debug error prompt")
+        print("  create_thumbnail - Create a thumbnail")
         print("  demo - Run demos for all features")
-        print("  quit - Exit the session")
+        print("  q - Exit the session")
 
         while True:
             try:
                 command = input("\nCommand: ").strip()
 
-                if command.lower() == "quit":
+                if command.lower() == "q":
                     break
 
                 parts = command.split()
@@ -347,7 +350,7 @@ class MCPClient:
                     name = parts[1]
                     try:
                         result = await self.read_resource(f"greeting://{name}")
-                        print(f"\nGreeting: {result}")
+                        print(f"\nGreeting: {result.contents[0].text}")
                     except Exception as e:
                         print(f"Error reading greeting: {e}")
 
@@ -355,14 +358,14 @@ class MCPClient:
                     user_id = parts[1]
                     try:
                         result = await self.read_resource(f"users://{user_id}/profile")
-                        print(f"\nUser Profile: {result}")
+                        print(f"\nUser Profile: {result.contents[0].text}")
                     except Exception as e:
                         print(f"Error reading user profile: {e}")
 
                 elif cmd == "config":
                     try:
                         result = await self.read_resource("config://app")
-                        print(f"\nApp Configuration: {result}")
+                        print(f"\nApp Configuration: {result.contents[0].text}")
                     except Exception as e:
                         print(f"Error reading config: {e}")
 
@@ -381,6 +384,10 @@ class MCPClient:
                         print(f"\nDebug Error Prompt: {result}")
                     except Exception as e:
                         print(f"Error getting prompt: {e}")
+
+                elif cmd == "create_thumbnail":
+                    image = await self.call_tool("create_thumbnail", {})
+                    print(f"Thumbnail: {image}")
 
                 elif cmd == "demo":
                     print("\nRunning full demo...")
