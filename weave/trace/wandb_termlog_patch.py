@@ -1,7 +1,7 @@
 """
 This is a temporary patch for wandb in order to implement basic referrer tracking in
 auth URLs. This commit: https://github.com/wandb/wandb/commit/5db4d763516ba2a3e8d94a85ba67bdf6fc124423 
-adds a utility for refferer tracking, but is not yet released. Once released, this patch
+adds a utility for referrer tracking, but is not yet released. Once released, this patch
 can be removed and instead https://github.com/wandb/weave/pull/4004/files can be merged.
 
 Since this will take more than a month, we need a short-term patch to ensure that we can
