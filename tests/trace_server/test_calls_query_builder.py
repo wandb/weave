@@ -1,7 +1,8 @@
+import pytest
 import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder import (
+from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
@@ -1965,3 +1966,49 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             "pb_8": '%"hello"%',
         },
     )
+
+
+def test_filter_length_validation():
+    """Test that filter length validation works"""
+    pb = ParamBuilder()
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"op_names": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)

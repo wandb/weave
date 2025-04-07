@@ -28,13 +28,18 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-import uuid
-from typing import Callable, Literal, Optional, Union, cast
+from typing import Callable, Literal, Optional, cast
 
-import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.optimization_builder import (
+    process_query_to_optimization_sql,
+)
+from weave.trace_server.calls_query_builder.utils import (
+    _param_slot,
+    safely_format_sql,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -45,13 +50,12 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
+from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 
 logger = logging.getLogger(__name__)
-
-DATETIME_OPTIMIZATION_BUFFER = 60 * 1_000  # 60 seconds
 
 
 class QueryBuilderField(BaseModel):
@@ -675,7 +679,7 @@ class CallsQuery(BaseModel):
             {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
             """
 
-        return _safely_format_sql(raw_sql)
+        return safely_format_sql(raw_sql, logger)
 
     def _as_sql_base_format(
         self,
@@ -799,7 +803,7 @@ class CallsQuery(BaseModel):
         {offset_sql}
         """
 
-        return _safely_format_sql(raw_sql)
+        return safely_format_sql(raw_sql, logger)
 
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
@@ -834,14 +838,6 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
 }
-
-START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
-END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
-STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
-
-
-def _field_requires_null_check(field: str) -> bool:
-    return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -1062,6 +1058,8 @@ def process_calls_filter_to_conditions(
     conditions: list[str] = []
 
     if filter.op_names:
+        assert_parameter_length_less_than_max("op_names", len(filter.op_names))
+
         # We will build up (0 or 1) + N conditions for the op_version_refs
         # If there are any non-wildcarded names, then we at least have an IN condition
         # If there are any wildcarded names, then we have a LIKE condition for each
@@ -1091,26 +1089,31 @@ def process_calls_filter_to_conditions(
             conditions.append(combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
+        assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
             f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
+        assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
             f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
+        assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.trace_ids:
+        assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
         conditions.append(
             f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
+        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
@@ -1131,457 +1134,3 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
-
-
-def _create_like_condition(
-    field: str,
-    like_pattern: str,
-    pb: ParamBuilder,
-    table_alias: str,
-    case_insensitive: bool = False,
-) -> str:
-    """Creates a LIKE condition for a JSON field."""
-    field_name = f"{table_alias}.{field}"
-
-    if case_insensitive:
-        param_name = pb.add_param(like_pattern.lower())
-        return f"lower({field_name}) LIKE {_param_slot(param_name, 'String')}"
-    else:
-        param_name = pb.add_param(like_pattern)
-        return f"{field_name} LIKE {_param_slot(param_name, 'String')}"
-
-
-def _create_like_optimized_eq_condition(
-    operation: tsi_query.EqOperation,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for equality operations."""
-    # Check both sides for field and literal
-    field_operand = None
-    literal_operand = None
-
-    if isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
-        field_operand = operation.eq_[0]
-        literal_operand = operation.eq_[1]
-    elif isinstance(operation.eq_[1], tsi_query.GetFieldOperator):
-        field_operand = operation.eq_[1]
-        literal_operand = operation.eq_[0]
-    else:
-        return None
-
-    # Return if literal isn't a string
-    if not isinstance(literal_operand, tsi_query.LiteralOperation) or not isinstance(
-        literal_operand.literal_, str
-    ):
-        return None
-
-    field = get_field_by_name(field_operand.get_field_).field
-    literal_value = literal_operand.literal_
-
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
-        return None
-
-    if not literal_value:
-        # Empty string is not a valid value for LIKE optimization
-        return None
-
-    # Boolean literals are not wrapped in quotes in JSON payloads
-    if literal_value in ("true", "false"):
-        like_pattern = f"%{literal_value}%"
-    else:
-        like_pattern = f'%"{literal_value}"%'
-
-    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-    if _field_requires_null_check(field):
-        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
-    return like_condition
-
-
-def _create_like_optimized_contains_condition(
-    operation: tsi_query.ContainsOperation,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for contains operations."""
-    # Check if the input is a GetField operation on a JSON field
-    if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
-        return None
-    # Return if substr isn't a string literal
-    if not isinstance(
-        operation.contains_.substr, tsi_query.LiteralOperation
-    ) or not isinstance(operation.contains_.substr.literal_, str):
-        return None
-
-    field = get_field_by_name(operation.contains_.input.get_field_).field
-    substr_value = operation.contains_.substr.literal_
-    if not substr_value:
-        # Empty string is not a valid value for LIKE optimization
-        return None
-
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
-        return None
-
-    case_insensitive = operation.contains_.case_insensitive or False
-    like_pattern = f'%"%{substr_value}%"%'
-
-    like_condition = _create_like_condition(
-        field, like_pattern, pb, table_alias, case_insensitive
-    )
-    if _field_requires_null_check(field):
-        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
-    return like_condition
-
-
-def _create_like_optimized_in_condition(
-    operation: tsi_query.InOperation,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for in operations."""
-    # Check if the left side is a GetField operation on a JSON field
-    if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
-        return None
-    # Return if right-side isn't non-empty list
-    if (
-        len(operation.in_) != 2
-        or not isinstance(operation.in_[1], list)
-        or len(operation.in_[1]) == 0
-    ):
-        return None
-
-    field = get_field_by_name(operation.in_[0].get_field_).field
-
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
-        return None
-
-    # Create OR conditions for each value
-    like_conditions: list[str] = []
-
-    for value_operand in operation.in_[1]:
-        if (
-            not isinstance(value_operand, tsi_query.LiteralOperation)
-            or not isinstance(value_operand.literal_, str)
-            or not value_operand.literal_
-        ):
-            return None
-
-        like_pattern = f'%"{value_operand.literal_}"%'
-        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-        like_conditions.append(like_condition)
-
-    or_sql = "(" + " OR ".join(like_conditions) + ")"
-    if _field_requires_null_check(field):
-        return f"({or_sql} OR {table_alias}.{field} IS NULL)"
-    return or_sql
-
-
-class OptimizationConditions(BaseModel):
-    str_filter_opt_sql: Optional[str] = None
-    id_datetime_filters_sql: Optional[str] = None
-
-
-def process_query_to_optimization_sql(
-    conditions: list[Condition],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> OptimizationConditions:
-    """Converts a list of conditions to optimization conditions for a clickhouse query.
-
-    This function creates SQL conditions that can be applied before the GROUP BY
-    to filter out rows that definitely won't match the heavy conditions. These
-    conditions MUST be identical or less restrictive than the conditions in the
-    `conditions` list which will appear in HAVING after group by.
-
-    For fields that may only exist in start or end parts, we add special handling
-    to avoid filtering out rows where the field is NULL (as they might be part of
-    a valid call when combined with other parts).
-
-    Performance note: This optimization is critical for queries with heavy fields,
-    as it can significantly reduce peak memory by filtering before aggregation.
-    """
-    if not conditions:
-        return OptimizationConditions()
-
-    def process_operation(
-        operation: tsi_query.Operation,
-    ) -> Optional[OptimizationConditions]:
-        if isinstance(operation, tsi_query.OrOperation):
-            str_conditions = []
-            datetime_conditions = []
-
-            for op in operation.or_:
-                result = process_operand(op)
-                # If any operand can't be optimized, the whole OR can't be optimized
-                if result is None:
-                    return None
-                if not result.str_filter_opt_sql and not result.id_datetime_filters_sql:
-                    return None
-
-                if result.str_filter_opt_sql:
-                    str_conditions.append(result.str_filter_opt_sql)
-                if result.id_datetime_filters_sql:
-                    datetime_conditions.append(result.id_datetime_filters_sql)
-
-            if str_conditions:
-                str_conditions_sql = "(" + " OR ".join(str_conditions) + ")"
-            else:
-                str_conditions_sql = None
-
-            if datetime_conditions:
-                datetime_conditions_sql = "(" + " OR ".join(datetime_conditions) + ")"
-            else:
-                datetime_conditions_sql = None
-
-            return OptimizationConditions(
-                str_filter_opt_sql=str_conditions_sql,
-                id_datetime_filters_sql=datetime_conditions_sql,
-            )
-
-        elif isinstance(operation, tsi_query.AndOperation):
-            str_conditions = []
-            datetime_conditions = []
-            for op in operation.and_:
-                result = process_operand(op)
-                if result is None:
-                    return None
-                if result.str_filter_opt_sql:
-                    str_conditions.append(result.str_filter_opt_sql)
-                if result.id_datetime_filters_sql:
-                    datetime_conditions.append(result.id_datetime_filters_sql)
-
-            if str_conditions:
-                str_conditions_sql = "(" + " AND ".join(str_conditions) + ")"
-            else:
-                str_conditions_sql = None
-
-            if datetime_conditions:
-                datetime_conditions_sql = "(" + " AND ".join(datetime_conditions) + ")"
-            else:
-                datetime_conditions_sql = None
-            return OptimizationConditions(
-                str_filter_opt_sql=str_conditions_sql,
-                id_datetime_filters_sql=datetime_conditions_sql,
-            )
-
-        elif isinstance(operation, tsi_query.NotOperation):
-            result = process_operand(operation.not_[0])
-            if not result:
-                return None
-
-            str_not_condition = None
-            id_datetime_not_condition = None
-
-            if result.str_filter_opt_sql:
-                str_not_condition = f"NOT ({result.str_filter_opt_sql})"
-            if result.id_datetime_filters_sql:
-                id_datetime_not_condition = f"NOT ({result.id_datetime_filters_sql})"
-
-            return OptimizationConditions(
-                str_filter_opt_sql=str_not_condition,
-                id_datetime_filters_sql=id_datetime_not_condition,
-            )
-        elif isinstance(operation, tsi_query.EqOperation):
-            eq_opt_sql = _create_like_optimized_eq_condition(
-                operation, param_builder, table_alias
-            )
-            return OptimizationConditions(str_filter_opt_sql=eq_opt_sql)
-
-        elif isinstance(operation, tsi_query.ContainsOperation):
-            contains_opt_sql = _create_like_optimized_contains_condition(
-                operation, param_builder, table_alias
-            )
-            return OptimizationConditions(str_filter_opt_sql=contains_opt_sql)
-
-        elif isinstance(operation, tsi_query.InOperation):
-            in_opt_sql = _create_like_optimized_in_condition(
-                operation, param_builder, table_alias
-            )
-            return OptimizationConditions(str_filter_opt_sql=in_opt_sql)
-        elif isinstance(operation, (tsi_query.GtOperation, tsi_query.GteOperation)):
-            datetime_opt_sql = _create_datetime_optimization_sql(
-                operation, param_builder, table_alias
-            )
-            return OptimizationConditions(id_datetime_filters_sql=datetime_opt_sql)
-
-        return None
-
-    def process_operand(operand: tsi_query.Operand) -> Optional[OptimizationConditions]:
-        if isinstance(operand, tsi_query.LiteralOperation):
-            slot = _param_slot(
-                param_builder.add_param(operand.literal_),
-                python_value_to_ch_type(operand.literal_),
-            )
-            return OptimizationConditions(
-                str_filter_opt_sql=slot,
-                id_datetime_filters_sql=slot,
-            )
-        elif isinstance(operand, tsi_query.GetFieldOperator):
-            field = get_field_by_name(operand.get_field_)
-            if field.is_heavy():
-                heavy_field = cast(CallsMergedDynamicField, field)
-                return OptimizationConditions(
-                    str_filter_opt_sql=heavy_field.as_sql(
-                        param_builder, table_alias, use_agg_fn=False
-                    ),
-                    id_datetime_filters_sql="",
-                )
-            return OptimizationConditions(
-                str_filter_opt_sql=field.as_sql(param_builder, table_alias),
-                id_datetime_filters_sql=field.as_sql(param_builder, table_alias),
-            )
-        elif isinstance(operand, tsi_query.ConvertOperation):
-            return process_operand(operand.convert_.input)
-        elif isinstance(
-            operand,
-            (
-                tsi_query.AndOperation,
-                tsi_query.OrOperation,
-                tsi_query.NotOperation,
-                tsi_query.EqOperation,
-                tsi_query.GtOperation,
-                tsi_query.GteOperation,
-                tsi_query.InOperation,
-                tsi_query.ContainsOperation,
-            ),
-        ):
-            return process_operation(operand)
-        return None
-
-    # Create a single AND operation from all conditions
-    and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
-
-    # Process the combined operation
-    processed = process_operation(and_operation)
-    if processed is None:
-        return OptimizationConditions()
-
-    if not processed.str_filter_opt_sql and not processed.id_datetime_filters_sql:
-        return OptimizationConditions()
-
-    if processed.str_filter_opt_sql:
-        processed.str_filter_opt_sql = "AND " + processed.str_filter_opt_sql
-    if processed.id_datetime_filters_sql:
-        # Create non-uuidv7 condition
-        non_uuidv7_condition = f"{table_alias}.id <= 'ffffffffffffffff'"
-        full_condition = (
-            f" AND ({non_uuidv7_condition} OR {processed.id_datetime_filters_sql})"
-        )
-        processed.id_datetime_filters_sql = full_condition
-
-    return processed
-
-
-def _uuidv7_from_timestamp_zeroed(ms_since_epoch: int) -> str:
-    """Creates a UUIDv7 from a timestamp in milliseconds since epoch."""
-    if not (0 <= ms_since_epoch < 2**48):
-        raise ValueError("Timestamp must be a 48-bit integer (ms since epoch).")
-
-    # Split the 48-bit timestamp
-    time_low = (ms_since_epoch >> 16) & 0xFFFFFFFF  # First 32 bits
-    time_mid = ms_since_epoch & 0xFFFF  # Next 16 bits
-
-    # Set version (7) in high 4 bits, rest zero
-    time_hi_and_version = 0x7 << 12  # Version 7 + 12 zero bits
-
-    # Set variant bits (10xx....) and rest zero
-    clock_seq_hi_and_reserved = 0x80  # 10xx xxxx
-    clock_seq_low = 0x00
-    node = 0x000000000000  # 48 bits of zero
-
-    # Create UUID from fields
-    uuid_fields = (
-        time_low,
-        time_mid,
-        time_hi_and_version,
-        clock_seq_hi_and_reserved,
-        clock_seq_low,
-        node,
-    )
-    return str(uuid.UUID(fields=uuid_fields))
-
-
-def _create_datetime_optimization_sql(
-    operation: Union[tsi_query.GtOperation, tsi_query.GteOperation],
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates SQL for datetime optimization using UUIDv7 timestamp filtering.
-    This optimization takes advantage of the fact that UUIDv7 includes a timestamp
-    in the first 48 bits. For date range filters, we can create a pre-filter
-    condition that checks if the ID falls within the expected UUIDv7 range
-    for the given date range.
-
-    To account for ids that are not UUIDv7, we explicitly include any ids that are
-    < 'ffffffffffffffff', which should allow all OTEL 8 byte ids to pass through.
-
-    We include a buffer time (DATETIME_OPTIMIZATION_BUFFER) to ensure we don't
-    miss records due to slight timing differences.
-    """
-    # Check both sides for field and literal
-    field_operand = None
-    literal_operand = None
-
-    field1 = (
-        operation.gt_[0]
-        if isinstance(operation, tsi_query.GtOperation)
-        else operation.gte_[0]
-    )
-    field2 = (
-        operation.gt_[1]
-        if isinstance(operation, tsi_query.GtOperation)
-        else operation.gte_[1]
-    )
-
-    if isinstance(field1, tsi_query.GetFieldOperator) and isinstance(
-        field2, tsi_query.LiteralOperation
-    ):
-        field_operand = field1
-        literal_operand = field2
-    elif isinstance(field2, tsi_query.GetFieldOperator) and isinstance(
-        field1, tsi_query.LiteralOperation
-    ):
-        field_operand = field2
-        literal_operand = field1
-    else:
-        return None
-
-    field_name = field_operand.get_field_
-    if field_name not in ("started_at", "ended_at"):
-        return None
-
-    literal_value = literal_operand.literal_
-
-    if not literal_value or not isinstance(literal_value, (int, float)):
-        return None
-
-    timestamp = int(literal_value * 1_000)
-
-    # Conservative time buffer, includes more data
-    timestamp = timestamp - DATETIME_OPTIMIZATION_BUFFER
-
-    try:
-        fake_uuid = _uuidv7_from_timestamp_zeroed(timestamp)
-    except ValueError:
-        # If the timestamp is broken, skip optimizing that condition
-        return None
-
-    # Add the condition
-    param_name = pb.add_param(fake_uuid)
-    return f"({table_alias}.id > {_param_slot(param_name, 'String')})"
-
-
-def _param_slot(param_name: str, param_type: str) -> str:
-    """Helper function to create a parameter slot for a clickhouse query."""
-    return f"{{{param_name}:{param_type}}}"
-
-
-def _safely_format_sql(
-    sql: str,
-) -> str:
-    """Safely format a SQL string with parameters."""
-    try:
-        return sqlparse.format(sql, reindent=True)
-    except:
-        logger.info(f"Failed to format SQL: {sql}")
-        return sql

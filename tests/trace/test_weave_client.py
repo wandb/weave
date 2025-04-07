@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import json
 import platform
+import re
 import sys
 import time
 import uuid
@@ -2710,6 +2711,60 @@ async def test_tracing_enabled_context(client):
     # Test finish_call with tracing disabled
     with tracing_disabled():
         client.finish_call(call)  # Should not raise any error
+
+
+def test_calls_query_hardcoded_filter_length_validation(client):
+    @weave.op
+    def test():
+        return {"foo": "bar"}
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'call_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"call_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'op_names' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"op_names": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'input_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"input_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'output_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"output_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'parent_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"parent_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'trace_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
 
 
 def test_calls_query_datetime_optimization_with_gt_operation(client):
