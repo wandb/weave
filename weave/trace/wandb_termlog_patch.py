@@ -29,7 +29,13 @@ def unsafe_termlog(*args: Any, **kwargs: Any) -> None:
     bound_args.apply_defaults()
     if string_arg_val := bound_args.arguments.get("string"):
         if isinstance(string_arg_val, str):
-            if string_arg_val.endswith("/authorize"):
+            if (
+                string_arg_val.startswith(
+                    "You can find your API key in your browser here:"
+                )
+                and "http" in string_arg_val
+                and string_arg_val.endswith("/authorize")
+            ):
                 string_arg_val = string_arg_val + "?ref=weave"
     bound_args.arguments["string"] = string_arg_val
     return wandb_termlog(**bound_args.arguments)
