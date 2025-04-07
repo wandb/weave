@@ -566,9 +566,9 @@ export const ColumnHeader: React.FC<{
 
   // Used as a condition to change the background color of a column whose
   // action menu is open
-  const handleOpenChange = useCallback((open: boolean) => {
+  const handleOpenChange = (open: boolean) => {
     setMenuOpen(open);
-  }, []);
+  };
 
   return (
     <S.ColumnHeader
@@ -866,9 +866,7 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     style={{justifyContent: 'flex-start'}}>
     <ItemIcon
       style={{marginRight: '8px', marginLeft: 0}}
-      name={
-        option.icon ?? (selected && option.icon !== null ? 'check' : 'blank')
-      }
+      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
     />
     {option.name ?? option.value}
   </Item>
