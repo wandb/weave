@@ -1022,14 +1022,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        # Retain order, but deduplicate
-        unique_refs = []
-        for ref in req.refs:
-            if ref not in unique_refs:
-                unique_refs.append(ref)
-
         # First, parse the refs
-        parsed_raw_refs = [ri.parse_internal_uri(r) for r in unique_refs]
+        parsed_raw_refs = [ri.parse_internal_uri(r) for r in req.refs]
 
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_raw_refs):
@@ -1081,6 +1075,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> list[Any]:
         if root_val_cache is None:
             root_val_cache = {}
+
+        # dedupe parsed_refs
+        unique_refs = []
+        for ref in parsed_refs:
+            if ref not in unique_refs:
+                unique_refs.append(ref)
 
         def make_root_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
