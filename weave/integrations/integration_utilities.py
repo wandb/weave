@@ -1,7 +1,7 @@
 import hashlib
 import re
 from collections.abc import Iterable
-from typing import Any, Union
+from typing import Any, Union, cast
 
 from weave.trace.refs import OpRef, parse_uri
 from weave.trace.weave_client import Call, CallsIter
@@ -90,6 +90,11 @@ def flattened_calls_to_names(flattened_calls: list) -> list:
 
 def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
+
+
+def op_name_from_call(call: Call) -> str:
+    op_name = cast(str, call._op_name)
+    return op_name_from_ref(op_name)
 
 
 def filter_body(r: Any) -> Any:
