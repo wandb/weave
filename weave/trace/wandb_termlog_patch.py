@@ -13,38 +13,38 @@ from functools import wraps
 
 import wandb
 
-original_termlog = None
+wandb_termlog = wandb.termlog
+patched = False
 
-@wraps(wandb.termlog)
+@wraps(wandb_termlog)
 def unsafe_termlog(*args, **kwargs):
-    bound_args = inspect.signature(wandb.termlog).bind(*args, **kwargs)
+    bound_args = inspect.signature(wandb_termlog).bind(*args, **kwargs)
     bound_args.apply_defaults()
     if string_arg_val := bound_args.arguments.get("string"):
         if isinstance(string_arg_val, str):
             if string_arg_val.endswith("/authorize"):
                 string_arg_val = string_arg_val + "?ref=weave"
     bound_args.arguments["string"] = string_arg_val
-    return wandb.termlog(**bound_args.arguments)
+    return wandb_termlog(**bound_args.arguments)
 
-@wraps(wandb.termlog)
+@wraps(wandb_termlog)
 def safe_termlog(*args, **kwargs):
     try:
         return unsafe_termlog(*args, **kwargs)
     except Exception as e:
-        return wandb.termlog(*args, **kwargs)
+        return wandb_termlog(*args, **kwargs)
 
 
 def ensure_patched():
-    global original_termlog
-    if original_termlog:
+    global patched
+    if patched:
         return
-    original_termlog = wandb.termlog
     wandb.termlog = safe_termlog
-
+    patched = True
 
 def ensure_unpatched():
-    global original_termlog
-    if not original_termlog:
+    global patched
+    if not patched:
         return
-    wandb.termlog = original_termlog
-    original_termlog = None
+    wandb.termlog = wandb_termlog
+    patched = False
