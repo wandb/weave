@@ -2,8 +2,6 @@ import os
 
 import httpx
 from dotenv import load_dotenv
-
-# import weave
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.prompts import base
 from openai import OpenAI
@@ -12,9 +10,10 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-# # Initialize Weave for tracing
-# weave_client = weave.init("mcp_example")
-# print(f"Weave initialized: {weave_client}")
+# Initialize Weave for tracing
+import weave
+
+weave_client = weave.init("mcp_example")
 
 # Create an MCP server
 mcp = FastMCP("Demo")
