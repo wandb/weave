@@ -147,6 +147,20 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
 
   return isConfigMode ? (
     <PanelStepperConfig {...props} {...additionalProps} />
+  ) : !propertyKeysAndTypes.hasOwnProperty('_step') ? (
+    <div
+      style={{
+        height: '100%',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#666',
+        fontSize: '14px',
+      }}>
+      Panel currently unsupported for custom step metrics. Please use an
+      expression that returns the pre-defined step metric (_step) for now
+    </div>
   ) : (
     <PanelStepper {...props} {...additionalProps} />
   );
