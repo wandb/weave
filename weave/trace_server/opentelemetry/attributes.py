@@ -421,8 +421,7 @@ class GenericAttributes(Attributes):
         return {}
 
     def extract_attributes(self) -> Any:
-        return to_json_serializable(self._original_attributes),
-
+        return (to_json_serializable(self._original_attributes),)
 
 
 class OpenInferenceAttributes(Attributes):
@@ -439,7 +438,6 @@ class OpenInferenceAttributes(Attributes):
             "provider": str(provider) if provider else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "trace_metadata": to_json_serializable(self._original_attributes),
         }
         if invocation_parameters:
             try:
@@ -538,9 +536,15 @@ class OpenTelemetryAttributes(Attributes):
         return to_json_serializable(prompts)
 
     def extract_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS)
-        completion_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS)
-        total_tokens = self.extract_attribute_value(ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS)
+        prompt_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS
+        )
+        completion_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS
+        )
+        total_tokens = self.extract_attribute_value(
+            ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS
+        )
         return LLMUsageSchema(
             prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
             completion_tokens=int(completion_tokens) if completion_tokens else None,

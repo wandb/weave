@@ -16,7 +16,7 @@ from opentelemetry.proto.common.v1.common_pb2 import (
     InstrumentationScope,
     KeyValue,
 )
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     ResourceSpans as PbResourceSpans,
 )
@@ -39,8 +39,37 @@ from weave.trace_server import trace_server_interface as tsi
 from .attributes import (
     Attributes,
     AttributesFactory,
+    flatten_attributes,
     to_json_serializable,
+    unflatten_key_values,
 )
+
+
+def _decode_key_values(
+    key_values: Iterable[KeyValue],
+) -> Iterator[tuple[str, Any]]:
+    return ((kv.key, _decode_value(kv.value)) for kv in key_values)
+
+
+def _decode_value(any_value: AnyValue) -> Any:
+    which = any_value.WhichOneof("value")
+    if which == "string_value":
+        return any_value.string_value
+    if which == "bool_value":
+        return any_value.bool_value
+    if which == "int_value":
+        return any_value.int_value
+    if which == "double_value":
+        return any_value.double_value
+    if which == "array_value":
+        return [_decode_value(value) for value in any_value.array_value.values]
+    if which == "kvlist_value":
+        return dict(_decode_key_values(any_value.kvlist_value.values))
+    if which == "bytes_value":
+        return any_value.bytes_value
+    if which is None:
+        return None
+    assert_never(which)
 
 
 class SpanKind(Enum):
@@ -102,7 +131,7 @@ class Event:
 
     name: str
     timestamp: int  # nanoseconds since epoch
-    attributes: list[KeyValue] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
     dropped_attributes_count: int = 0
 
     @property
@@ -116,7 +145,7 @@ class Event:
         return cls(
             name=proto_event.name,
             timestamp=proto_event.time_unix_nano,
-            attributes=list(proto_event.attributes),
+            attributes=unflatten_key_values(proto_event.attributes),
             dropped_attributes_count=proto_event.dropped_attributes_count,
         )
 
@@ -128,7 +157,7 @@ class Link:
     trace_id: str
     span_id: str
     trace_state: str = ""
-    attributes: list[KeyValue] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
     dropped_attributes_count: int = 0
     flags: int = 0
 
@@ -139,43 +168,39 @@ class Link:
             trace_id=hexlify(proto_link.trace_id).decode("ascii"),
             span_id=hexlify(proto_link.span_id).decode("ascii"),
             trace_state=proto_link.trace_state,
-            attributes=list(proto_link.attributes),
+            attributes=unflatten_key_values(proto_link.attributes),
             dropped_attributes_count=proto_link.dropped_attributes_count,
             flags=proto_link.flags,
         )
 
 
-def _decode_key_values(
-    key_values: Iterable[KeyValue],
-) -> Iterator[tuple[str, Any]]:
-    return ((kv.key, _decode_value(kv.value)) for kv in key_values)
+@dataclass
+class Resource:
+    attributes: dict[str, Any] = field(default_factory=dict)
+    dropped_attributes_count: int = 0
 
+    @classmethod
+    def from_proto(cls, proto_resource: PbResource) -> "Resource":
+        attributes = {}
+        if proto_resource.attributes:
+            attributes = unflatten_key_values(proto_resource.attributes)
+        dropped_attributes_count = 0
+        if proto_resource.dropped_attributes_count:
+            dropped_attributes_count = proto_resource.dropped_attributes_count
+        return cls(attributes, dropped_attributes_count)
 
-def _decode_value(any_value: AnyValue) -> Any:
-    which = any_value.WhichOneof("value")
-    if which == "string_value":
-        return any_value.string_value
-    if which == "bool_value":
-        return any_value.bool_value
-    if which == "int_value":
-        return any_value.int_value
-    if which == "double_value":
-        return any_value.double_value
-    if which == "array_value":
-        return [_decode_value(value) for value in any_value.array_value.values]
-    if which == "kvlist_value":
-        return dict(_decode_key_values(any_value.kvlist_value.values))
-    if which == "bytes_value":
-        return any_value.bytes_value
-    if which is None:
-        return None
-    assert_never(which)
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "attributes": self.attributes,
+            "dropped_attributes_count": self.dropped_attributes_count,
+        }
 
 
 @dataclass
 class Span:
     """Represents a span in a trace."""
 
+    resource: Optional[Resource]
     name: str
     trace_id: str
     span_id: str
@@ -216,7 +241,7 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan) -> "Span":
+    def from_proto(cls, proto_span: PbSpan, resource: Optional[Resource]) -> "Span":
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -239,22 +264,39 @@ class Span:
             links=[Link.from_proto(l) for l in proto_span.links],
             dropped_links_count=proto_span.dropped_links_count,
             status=Status.from_proto(proto_span.status),
+            resource=resource,
         )
+
+    # The full OTEL Span as it is recieved
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "context": {
+                "trace_id": self.trace_id,
+                "span_id": self.span_id,
+                "trace_state": self.trace_state,
+            },
+            "kind": self.kind,
+            "parent_id": self.parent_id,
+            "start_time": self.start_time,
+            "end_time": self.start_time,
+            "status": {"status_code": self.status},
+            "attributes": flatten_attributes(self.attributes._original_attributes),
+            "events": self.events,
+            "links": self.links,
+            "resource": self.resource.as_dict() if self.resource else None,
+        }
 
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        print("before summary")
         summary_insert_map = tsi.SummaryInsertMap(
             usage={"usage": self.attributes.extract_usage()}
         )
-        print("after summary")
         inputs = to_json_serializable(self.attributes.extract_inputs())
-        print("after inputs")
         outputs = to_json_serializable(self.attributes.extract_outputs())
-        print("after outputs")
         attributes = to_json_serializable(self.attributes.extract_attributes())
-        print("after attributes")
+        attributes["otel_span"] = to_json_serializable(self.as_dict())
 
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
@@ -269,7 +311,6 @@ class Span:
             wb_user_id=None,
             wb_run_id=None,
         )
-        print("after start_call")
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None
         )
@@ -298,11 +339,13 @@ class ScopeSpans:
         yield from self.spans
 
     @classmethod
-    def from_proto(cls, proto_scope_spans: PbScopeSpans) -> "ScopeSpans":
+    def from_proto(
+        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource]
+    ) -> "ScopeSpans":
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
-            spans=[Span.from_proto(s) for s in proto_scope_spans.spans],
+            spans=[Span.from_proto(s, resource) for s in proto_scope_spans.spans],
             schema_url=proto_scope_spans.schema_url,
         )
 
@@ -321,10 +364,12 @@ class ResourceSpans:
     @classmethod
     def from_proto(cls, proto_resource_spans: PbResourceSpans) -> "ResourceSpans":
         """Create a ResourceSpans from a protobuf ResourceSpans."""
+        resource = Resource.from_proto(proto_resource_spans.resource)
         return cls(
-            resource=proto_resource_spans.resource,
+            resource=resource,
             scope_spans=[
-                ScopeSpans.from_proto(s) for s in proto_resource_spans.scope_spans
+                ScopeSpans.from_proto(s, resource)
+                for s in proto_resource_spans.scope_spans
             ],
             schema_url=proto_resource_spans.schema_url,
         )
