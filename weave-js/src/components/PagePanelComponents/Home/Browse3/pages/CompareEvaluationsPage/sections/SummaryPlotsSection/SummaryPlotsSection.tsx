@@ -31,8 +31,6 @@ export const SummaryPlots: React.FC<{
   const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
-  console.log('state', state);
-
   // Initialize selectedMetrics if null
   useEffect(() => {
     if (selectedMetrics == null) {

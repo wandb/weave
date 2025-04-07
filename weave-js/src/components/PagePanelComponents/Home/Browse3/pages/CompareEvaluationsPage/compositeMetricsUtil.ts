@@ -82,8 +82,6 @@ export const buildCompositeMetricsMap = (
 ): CompositeScoreMetrics => {
   const composite: CompositeScoreMetrics = {};
 
-  console.log('summaryData', summaryData);
-
   // Get the metric definition map based on the metric type
   let metricDefinitionMap;
   if (mType === 'score') {
