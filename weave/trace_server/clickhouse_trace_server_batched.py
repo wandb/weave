@@ -498,11 +498,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            unique_refs = list(set(refs_to_resolve.values()))
-
             with self.with_new_client():
                 vals = self._refs_read_batch_within_project(
-                    project_id, unique_refs, ref_cache
+                    project_id, list(refs_to_resolve.values()), ref_cache
                 )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
