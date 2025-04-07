@@ -1893,7 +1893,7 @@ def test_datetime_optimization_invalid_field() -> None:
     )
 
 
-def test_query_with_feedback_filter_and_datetime_filter() -> None:
+def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(
@@ -1914,6 +1914,12 @@ def test_query_with_feedback_filter_and_datetime_filter() -> None:
                         "$gt": [
                             {"$getField": "started_at"},
                             {"$literal": 1709251200},
+                        ]
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.message"},
+                            {"$literal": "hello"},
                         ]
                     },
                 ]
@@ -1938,11 +1944,14 @@ def test_query_with_feedback_filter_and_datetime_filter() -> None:
         FROM calls_merged
         LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
         WHERE calls_merged.project_id = {pb_2:String}
-        AND calls_merged.project_id = {pb_2:String}
-        AND (calls_merged.id IN filtered_calls)
+            AND calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.id IN filtered_calls)
+            AND ((calls_merged.inputs_dump LIKE {pb_8:String}
+                OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
-        HAVING (JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_4:String}) > JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_5:String}))
+        HAVING (((JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_4:String}) > JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_5:String})))
+            AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) = {pb_7:String})))
         """,
         {
             "pb_0": 1709251200,
@@ -1951,5 +1960,8 @@ def test_query_with_feedback_filter_and_datetime_filter() -> None:
             "pb_3": "wandb.runnable.my_op",
             "pb_4": '$."output"."expected"',
             "pb_5": '$."output"."found"',
+            "pb_6": '$."message"',
+            "pb_7": "hello",
+            "pb_8": '%"hello"%',
         },
     )
