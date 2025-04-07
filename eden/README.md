@@ -43,21 +43,22 @@ The MVP aims to validate the core value proposition: making it easier for ML Eng
 ### Scope
 
 #### In Scope
-1. **Core Aggregator**
+1. **Core Server**
    - Basic MCP server implementation
    - Server connection management
    - Simple tool access control
    - LLM vendor integration
+   - Built-in UI for configuration, playground, and debugging
 
 2. **Configuration**
-   - TypeScript specification
-   - YAML configuration files
+   - JSON configuration file (`eden.json`)
+   - TypeScript specification for type safety
    - Basic validation
 
-3. **Interfaces**
-   - CLI tool for service management
-   - Simple GUI with playground
-   - Basic Python library for onboarding
+3. **Command Line Interface**
+   - `eden up` for starting the server
+   - Utility commands for config management
+   - Simple monitoring commands
 
 4. **Server Types**
    - Remote server connections
@@ -79,11 +80,11 @@ The MVP aims to validate the core value proposition: making it easier for ML Eng
    - Complex authentication
 
 ### Development Priorities
-1. Core aggregator implementation
-2. Basic configuration system
+1. Core server implementation
+2. Configuration system
 3. CLI tool
-4. Simple GUI with playground
-5. Python library for onboarding
+4. Built-in UI
+5. Server type implementations
 
 ### Success Criteria
 - ML Engineers can connect to multiple MCP servers through a single interface
@@ -95,33 +96,34 @@ The MVP aims to validate the core value proposition: making it easier for ML Eng
 
 ### Core Components
 
-#### 1. Server Aggregator
-The heart of Eden is a central server that unifies access to multiple MCP servers and LLM vendors. It is itself a fully conformant MCP server that implements the complete MCP specification:
+#### 1. Eden Server
+The heart of Eden is a stateless MCP server that unifies access to multiple MCP servers and LLM vendors. It is itself a fully conformant MCP server that implements the complete MCP specification:
 - Implements all MCP primitives (Tools, Resources, Prompts)
 - Supports all MCP features (Completions, Sampling, etc.)
 - Uses JSON-RPC message format and transport layer
 - Maintains direct connections to all configured MCP servers and LLM vendors
-- Clients only need a single connection to the Eden aggregator
+- Clients only need a single connection to the Eden server
 - Acts as a reverse proxy for multiple MCP servers
 - Maintains isolated namespaces for each server's tools and resources (using server IDs as namespace prefixes)
 - Handles authentication and access control
 - Enables human-in-the-loop approvals for sensitive operations
 - Offers configurable rate limits and quotas
+- Exposes a built-in UI for configuration, playground, and debugging
 
-The aggregator manages all external connections:
+The server manages all external connections:
 - Maintains direct connections to all configured MCP servers
 - Maintains direct connections to all configured LLM vendors
 - Handles all routing between clients and servers/vendors
 - Manages authentication for all connections
 - Provides unified approval interface for both tool and sampling requests
 
-This design means that any MCP client can connect to Eden as if it were a standard MCP server, while Eden handles the complexity of routing requests to the appropriate downstream servers and vendors. All MCP features are properly namespaced and managed through the aggregator.
+This design means that any MCP client can connect to Eden as if it were a standard MCP server, while Eden handles the complexity of routing requests to the appropriate downstream servers and vendors. All MCP features are properly namespaced and managed through the server.
 
-#### 2. Server Execution Framework
-Eden supports multiple ways to run MCP servers through a unified configuration system:
+#### 2. Configuration System
+Eden uses a single JSON configuration file (`eden.json`) to define all aspects of the system:
 
 ##### Configuration Format
-The core of Eden is a configuration specification that defines MCP servers and LLM vendors. The configuration format is defined in `spec.ts` using TypeScript types. This provides a clear specification that can be translated to various formats (JSON, TOML, etc.).
+The core of Eden is a configuration specification that defines MCP servers and LLM vendors. The configuration format is defined in `spec.ts` using TypeScript types. This provides a clear specification that can be translated to JSON.
 
 Key aspects of the configuration:
 - Each server has a unique ID
@@ -171,141 +173,75 @@ For the complete specification and examples, see `spec.ts`.
    - Run MCP servers from local development directories
    - Useful for active development and testing
 
-#### 3. Server Registry
-A community hub for discovering and sharing MCP servers. While the registry implementation is beyond MVP scope, it's an important part of the Eden ecosystem vision:
-- Enables discovery of community-verified MCP servers
-- Provides a trusted source for server implementations
-- Facilitates sharing of best practices and patterns
-- Creates a foundation for the MCP server ecosystem
+### Command Line Interface
+The primary interface for Eden is the `eden` CLI tool, which follows a pattern similar to Docker, Makefiles, and other development tools:
 
-The registry will integrate with Eden's configuration system, allowing users to easily import and use servers from the registry in their own Eden instances.
+1. **Primary Command**
+   ```bash
+   # Start the Eden server using eden.json configuration
+   eden up
+   ```
 
-#### 4. Development Environment
-Tools designed for the developer workflow, focusing on a streamlined playground experience:
+2. **Configuration Commands**
+   ```bash
+   # Initialize a new eden.json file
+   eden init
 
-##### Playground
-A modern chat interface that leverages existing open-source solutions while adding MCP-specific capabilities:
-- Support for various LLM vendors (from local Ollama to remote OpenAI)
-- Named, preconfigured model settings (system prompts, parameters)
-- Standard chat interface for model interaction
-- Integration with configured MCP servers for tool access
-- Session management and history
-- Tool approval interface for managing tool access requests
+   # Add a new server to the configuration
+   eden add server <type> <id> [options]
 
-The playground's key differentiator is its seamless integration with MCP servers, allowing developers to:
-- Test MCP server tools directly in chat sessions
-- Debug server interactions in real-time
-- Experiment with different tool configurations
-- Share working configurations with team members
-- Manage tool access approvals through a dedicated interface
+   # Add a new LLM vendor
+   eden add vendor <id> [options]
 
-All tool calls are automatically routed through Eden's aggregator, making the playground the first client of the aggregator system.
+   # Update server or vendor settings
+   eden set <id> <key> <value>
 
-##### Tool Approval Interface
-A dedicated interface for managing tool access requests, showing approvers:
-- Tool details (name, arguments, expected impact)
-- Chat context (recent messages, conversation history)
-- Request metadata (requesting user, timestamp, server ID)
-- Previous approval history for similar requests
-- Quick actions (approve, deny, request more information)
+   # Remove a server or vendor
+   eden remove <id>
+   ```
 
-The interface is designed to give approvers full context for making informed decisions about tool access.
+3. **Utility Commands**
+   ```bash
+   # Validate the configuration file
+   eden validate
 
-### Interfaces
+   # Show server status
+   eden status
 
-#### Command Line Interface
-The primary interface for Eden is the `eden` CLI tool, which serves two main purposes:
+   # View logs
+   eden logs
+   ```
 
-1. **Aggregator Service Management**
-   - Start/stop the Eden aggregator service
-   - Load and validate configuration files
-   - Manage server and vendor connections
-   - Handle service logs and monitoring
+The configuration file (`eden.json`) serves as the single source of truth for the entire system, making it easy to version control, share, and modify configurations.
 
-2. **Local Development Environment**
-   - Launch the local GUI interface (automatically starts aggregator if needed)
-   - Access the playground and other development tools
-   - Manage local configurations
-   - View logs and debug information
+### Built-in UI
+The Eden server exposes a built-in web interface that provides:
+- Configuration management
+- Playground for testing MCP servers
+- Inspector for debugging
+- Approval interface for tool access
 
-Example usage:
-```bash
-# Start the aggregator service with a config file
-eden serve --config eden.yaml
-
-# Launch the local GUI (automatically starts aggregator if needed)
-eden gui
-
-# Other common commands
-eden status      # Check aggregator status
-eden logs        # View service logs
-eden config      # Validate/edit configuration
-```
-
-Configuration files:
-- Default location: `~/.eden/config.yaml`
-- Can be specified at startup with `--config`
-- Configuration cannot be changed while the service is running
-- Changes require restarting the service
-
-#### Python Library
-A Python library designed primarily as an onboarding tool for new users:
-- Provides in-process alternatives to the standalone `eden` service and GUI
-- Shares the same configuration file (`~/.eden/config.yaml`) as the standalone service
-- Creates and manages local configuration automatically if none exists
-- Spins up a local UI for development and testing
-- Perfect for quick experiments and learning
-- Not intended for production use (users should migrate to standalone service)
-
-Example usage:
-```python
-import eden
-
-# Start Eden in-process with automatic config and UI
-# Uses ~/.eden/config.yaml if it exists, creates it if it doesn't
-server_params = eden.start()
-
-# Connect to the in-process server
-async with sse_client(server_params) as (read, write):
-    async with ClientSession(
-        read, write, sampling_callback=handle_sampling_message
-    ) as session:
-        # Use the session as a normal MCP client
-        ...
-```
-
-This approach allows users to quickly get started with Eden without understanding the full architecture, while naturally guiding them toward the more robust standalone service as they become more familiar with the system. The shared configuration ensures a smooth transition between in-process and standalone usage.
-
-Note: Process management between in-process and standalone services (e.g., preventing both from running simultaneously) is a future consideration and not part of the MVP scope.
-
-#### Graphical User Interface
-A modern web-based interface that runs locally and includes multiple specialized views. The GUI is launched through the `eden` CLI tool and provides a complete development environment. When launched, it automatically starts a local aggregator service if one isn't already running, using the default configuration file (`~/.eden/config.yaml`).
-
-The GUI provides seamless access to all Eden functionality while managing the underlying aggregator service transparently. Note that configuration changes require restarting the aggregator service.
+The UI is automatically available when the server is running and can be accessed through any web browser.
 
 ## Outstanding Topics
 
 ### MVP Implementation
-1. **Core Aggregator Development**
+1. **Core Server Development**
    - Basic MCP server implementation
    - Server connection management
    - Simple error handling
    - Basic monitoring
+   - Built-in UI implementation
 
 2. **Configuration System**
-   - YAML configuration parser
+   - JSON configuration parser
    - Configuration validation
    - Default configuration generation
 
 3. **CLI Tool**
-   - Service management commands
-   - Configuration management
+   - `eden up` command
+   - Configuration management commands
    - Basic monitoring commands
-
-4. **GUI Development**
-   - Playground implementation
-   - Basic configuration UI
-   - Tool approval interface
 
 ### Future Considerations
 1. **Advanced Features**
@@ -345,23 +281,23 @@ Note: Many topics from the original list have been addressed in our MVP scope or
 
 #### Architecture
 1. **Single Connection Point**
-   - Clients only need to connect to the Eden aggregator
-   - Aggregator maintains all connections to MCP servers and LLM vendors
-   - Aggregator is a fully conformant MCP server
+   - Clients only need to connect to the Eden server
+   - Server maintains all connections to MCP servers and LLM vendors
+   - Server is a fully conformant MCP server
 
 2. **Configuration Management**
    - Configuration defined in TypeScript types (`spec.ts`)
-   - Default config location: `~/.eden/config.yaml`
-   - Config cannot be changed while service is running
-   - Changes require service restart
+   - Single JSON configuration file (`eden.json`)
+   - Configuration cannot be changed while server is running
+   - Changes require server restart
 
 3. **Service Management**
    - Primary interface is the `eden` CLI tool
-   - GUI automatically starts aggregator if needed
+   - Server automatically starts UI
    - Service state is managed transparently
 
 4. **LLM Integration**
-   - Aggregator maintains direct connections to LLM vendors
+   - Server maintains direct connections to LLM vendors
    - Vendors configured in the same config file as servers
    - Support for vendor-specific approval requirements
 
@@ -371,11 +307,11 @@ Note: Many topics from the original list have been addressed in our MVP scope or
    - Human-in-the-loop approval interface
 
 #### Implementation Priorities
-1. Core aggregator functionality
+1. Core server functionality
 2. Configuration system
-3. Server execution framework
-4. Development environment (CLI + GUI)
-5. Community features (registry, etc.)
+3. CLI tool
+4. Built-in UI
+5. Server type implementations
 
 ## Getting Started
 [Coming soon: Installation and quickstart guide]
