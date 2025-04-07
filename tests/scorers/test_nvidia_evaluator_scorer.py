@@ -2,11 +2,11 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from huggingface_hub import HfApi
 
 import weave
 from weave import Dataset, Evaluation
 from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
-from huggingface_hub import HfApi
 
 # --- Fake responses for external API calls ---
 
