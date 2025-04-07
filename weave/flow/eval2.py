@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -15,6 +16,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 
 ID = str
+ScoreType = float | bool | dict
 
 NOT_DEFINED = "Not defined for custom scoring"
 
@@ -22,7 +24,7 @@ NOT_DEFINED = "Not defined for custom scoring"
 # ensures that only 1 version of the predict method is saved because the code
 # contents are always the same.
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
-current_score: ContextVar[float | None] = ContextVar("current_score", default=None)
+current_score: ContextVar[ScoreType | None] = ContextVar("current_score", default=None)
 current_summary: ContextVar[dict | None] = ContextVar("current_summary", default=None)
 
 
@@ -37,7 +39,7 @@ def set_current_output(output: Any) -> Iterator[None]:
 
 
 @contextmanager
-def set_current_score(score: float) -> Iterator[None]:
+def set_current_score(score: ScoreType) -> Iterator[None]:
     token = current_score.set(score)
     try:
         yield
@@ -54,13 +56,37 @@ def set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
-class BetaScoreLogger(BaseModel):
+def validate_scorer_name(name: str) -> None:
+    """Validate the scorer name to be a valid class name."""
+    # Check if name is not empty
+    if not name:
+        raise ValueError("Scorer name cannot be empty")
+
+    # Check if name follows Python class naming conventions
+    # Class names should start with a letter or underscore and contain only
+    # alphanumeric characters and underscores
+    import re
+
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+        raise ValueError(
+            f"Invalid scorer name: '{name}'. Scorer names must start with a letter or underscore "
+            "and contain only alphanumeric characters and underscores."
+        )
+
+    # Check if name is not a Python keyword
+    import keyword
+
+    if keyword.iskeyword(name):
+        raise ValueError(f"Scorer name '{name}' cannot be a Python keyword")
+
+
+class ImperativeScoreLogger(BaseModel):
     prediction_id: ID
-    score: float
+    score: ScoreType
     metadata: dict | None
 
 
-class BetaPredictionLogger(BaseModel):
+class ImperativePredictionLogger(BaseModel):
     model_id: ID
     inputs: dict
     output: Any
@@ -69,10 +95,22 @@ class BetaPredictionLogger(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def log_score(
-        self, scorer_name: str, score: float, metadata: dict | None = None
-    ) -> BetaScoreLogger:
+    def log_score(
+        self,
+        scorer_name: str,
+        score: ScoreType,
+        metadata: dict | None = None,
+    ) -> ImperativeScoreLogger:
+        return asyncio.run(self.alog_score(scorer_name, score, metadata))
+
+    async def alog_score(
+        self,
+        scorer_name: str,
+        score: ScoreType,
+        metadata: dict | None = None,
+    ) -> ImperativeScoreLogger:
         # Define the scorer class dynamically
+        validate_scorer_name(scorer_name)
         cls_name = scorer_name.replace(".", "_")
         DynamicScorer = type(cls_name, (Scorer,), {})
         scorer_instance = DynamicScorer()
@@ -87,14 +125,24 @@ class BetaPredictionLogger(BaseModel):
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
-            [self.hack_reference_to_evaluate, self.hack_reference_to_predict_and_score]
+            [
+                self.hack_reference_to_evaluate,
+                self.hack_reference_to_predict_and_score,
+            ]
         ):
-            await self.hack_reference_to_predict_and_score.apply_scorer(scorer_instance)
+            with set_current_score(score):
+                await self.hack_reference_to_predict_and_score.apply_scorer(
+                    scorer_instance
+                )
 
-        return BetaScoreLogger(prediction_id="123", score=score, metadata=metadata)
+        return ImperativeScoreLogger(
+            prediction_id="123",
+            score=score,
+            metadata=metadata,
+        )
 
 
-class BetaEvaluationLogger(BaseModel):
+class ImperativeEvaluationLogger(BaseModel):
     model_id: ID = ""
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -108,7 +156,7 @@ class BetaEvaluationLogger(BaseModel):
     )
     _starting_stack: list[Call] = PrivateAttr(default_factory=list)
 
-    def log_prediction(self, inputs: dict, output: Any) -> BetaPredictionLogger:
+    def log_prediction(self, inputs: dict, output: Any) -> ImperativePredictionLogger:
         if not self._eval_started:
             self._eval_started = True
 
@@ -177,7 +225,7 @@ class BetaEvaluationLogger(BaseModel):
         model_output = predict_and_score_call.output.get("model_output")
 
         assert self._evaluate_call is not None
-        return BetaPredictionLogger(
+        return ImperativePredictionLogger(
             model_id="123",
             inputs=inputs,
             output=model_output,
