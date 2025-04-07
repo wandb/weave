@@ -461,6 +461,21 @@ There are three main ways to use the NeMo Evaluator scorer:
 2. Scoring using existing configuration and target
 3. Using it within a Weave evaluation
 
+### Helper Functions
+
+The `NvidiaNeMoEvaluatorScorer` provides several helper functions to manage interactions with the NeMo Evaluator service:
+
+#### `publish_configuration`
+Publishes an evaluation configuration to the NeMo Evaluator service. Takes a configuration dictionary containing evaluation parameters and returns the service's JSON response with configuration details.
+
+#### `publish_target` 
+Publishes an evaluation target to the NeMo Evaluator service. Takes a target dictionary containing model endpoint and authentication details and returns the service's JSON response with target details.
+
+#### `upload_dataset`
+Uploads a dataset to be used for evaluation. Takes a Weave Dataset object and returns a tuple containing:
+- The initialization response from the service
+- An extracted Weave ID string for the uploaded dataset
+
 #### Direct Scoring with New Configuration
 
 This approach creates a new configuration and target for the evaluation and utilizes NeMo Evaluator's LLM as a judge functionality:

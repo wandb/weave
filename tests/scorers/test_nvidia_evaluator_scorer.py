@@ -6,6 +6,7 @@ import requests
 import weave
 from weave import Dataset, Evaluation
 from weave.scorers.nvidia_evaluator_scorer import NvidiaNeMoEvaluatorScorer
+from huggingface_hub import HfApi
 
 # --- Fake responses for external API calls ---
 
@@ -239,3 +240,10 @@ def test_run_scorer_with_10_data_points(monkeypatch):
     assert isinstance(result, dict)
     assert "coherence" in result
     assert isinstance(result["coherence"], float)
+
+
+NvidiaNeMoEvaluatorScorer._validate_services = lambda self: None
+
+HfApi.__init__ = lambda self, *args, **kwargs: None
+HfApi.create_repo = lambda self, *args, **kwargs: None
+HfApi.upload_file = lambda self, *args, **kwargs: {"url": "http://fake-upload"}
