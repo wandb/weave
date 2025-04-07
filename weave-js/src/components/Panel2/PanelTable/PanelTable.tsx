@@ -1,5 +1,6 @@
 import 'react-base-table/lib/TableRow';
 
+import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useRunName} from '@wandb/weave/common/hooks/useRunName';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
@@ -1121,6 +1122,119 @@ const PanelTableInner: React.FC<
     () => TableActions(weave, tableState.preFilterFunction, setFilterFunction),
     [weave, tableState.preFilterFunction, setFilterFunction]
   );
+
+  const [actionBarDimensions, setActionBarDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+  const actionBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (actionBarRef.current) {
+        const {width: actionBarWidth, height: actionBarHeight} =
+          actionBarRef.current.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(actionBarRef.current);
+        const marginTop = parseInt(computedStyle.marginTop, 10);
+        const marginBottom = parseInt(computedStyle.marginBottom, 10);
+
+        setActionBarDimensions({
+          width: Math.floor(actionBarWidth),
+          height: Math.floor(actionBarHeight) + marginTop + marginBottom,
+        });
+      }
+    };
+
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+
+    if (actionBarRef.current) {
+      resizeObserver.observe(actionBarRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const ActionBar = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        gap: '8px',
+        margin: '8px',
+      }}
+      ref={actionBarRef}>
+      {props.config.tableSelection?.show && (
+        <Popup
+          hoverable
+          position="bottom left"
+          on="click"
+          basic
+          style={{padding: 0, marginTop: '0px'}}
+          trigger={
+            <Button
+              variant="secondary"
+              size="small"
+              icon="table"
+              tooltip="Select table"
+              tooltipProps={{className: 'py-8 px-12'}}>
+              <>
+                Table:{' '}
+                <span
+                  style={{
+                    fontWeight: 'bold',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: 'inline-block',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'bottom',
+                  }}>
+                  {props.config.tableSelection?.currentSelection || 'Table'}
+                </span>
+              </>
+            </Button>
+          }
+          content={
+            <ModifiedDropdown
+              basic
+              selection
+              scrolling
+              multiple={false}
+              defaultOpen
+              value={props.config.tableSelection?.currentSelection}
+              data-test="table-selection"
+              closeOnBlur
+              closeOnChange
+              options={(props.config.tableSelection?.keys || []).map(key => ({
+                text: key,
+                key,
+                value: key,
+              }))}
+              onChange={(e, {value}) => {
+                props.config.tableSelection?.callback?.(value as string);
+              }}
+            />
+          }
+        />
+      )}
+      <Button
+        variant="secondary"
+        size="small"
+        data-test="table-filter-button"
+        icon="filter-alt"
+        onClick={() => {
+          setFilterOpen(!filterOpen);
+        }}
+        tooltip="Filter"
+        tooltipProps={{className: 'py-8 px-12'}}>
+        Filter
+      </Button>
+    </div>
+  );
+
   const ConfiguredTable = (
     <BaseTable
       ignoreFunctionInColumnCompare={false}
@@ -1128,7 +1242,7 @@ const PanelTableInner: React.FC<
       onColumnResizeEnd={onColumnResizeEnd}
       fixed
       width={width}
-      height={height}
+      height={height - actionBarDimensions.height}
       columns={baseTableColumns}
       data={unpinnedData}
       frozenData={pinnedData}
@@ -1143,6 +1257,7 @@ const PanelTableInner: React.FC<
       footerHeight={footerHeight}
     />
   );
+
   return (
     <GrowToParent
       data-test-weave-id="table"
@@ -1199,7 +1314,10 @@ const PanelTableInner: React.FC<
         ConfiguredTable
       ) : (
         <WeaveActionContextProvider newActions={actions}>
-          {ConfiguredTable}
+          <div style={{display: 'flex', flexDirection: 'column'}}>
+            {ActionBar}
+            {ConfiguredTable}
+          </div>
         </WeaveActionContextProvider>
       )}
     </GrowToParent>
