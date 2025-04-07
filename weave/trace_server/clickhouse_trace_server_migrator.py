@@ -331,11 +331,11 @@ class ClickHouseTraceServerMigrator:
                 SELECT
                     id,
                     project_id,
-                    anySimpleState(coalesce(calls_merged.started_at, calls_merged.ended_at)) as started_at,
-                    anySimpleState(-toUnixTimestamp(coalesce(calls_merged.started_at, calls_merged.ended_at))) AS inv_started_at,
+                    anySimpleState(coalesce(call_parts.started_at, call_parts.created_at)) as started_at,
+                    anySimpleState(-toUnixTimestamp(coalesce(call_parts.started_at, call_parts.created_at))) AS inv_started_at,
 
                     anySimpleState(wb_run_id) as wb_run_id,
-                    anySimpleStateIf(wb_user_id, isNotNull(calls_merged.started_at)) as wb_user_id,
+                    anySimpleStateIf(wb_user_id, isNotNull(call_parts.started_at)) as wb_user_id,
                     anySimpleState(trace_id) as trace_id,
                     anySimpleState(parent_id) as parent_id,
                     anySimpleState(op_name) as op_name,
@@ -351,11 +351,10 @@ class ClickHouseTraceServerMigrator:
                     anySimpleState(display_name) as display_name
                 FROM (
                     SELECT *
-                    FROM calls_merged
-                    -- WHERE isNotNull(calls_merged.started_at)
+                    FROM call_parts
                     LIMIT {batch_size}
                     OFFSET {offset}
-                ) AS calls_merged
+                ) AS call_parts
                 GROUP BY
                     project_id,
                     id
