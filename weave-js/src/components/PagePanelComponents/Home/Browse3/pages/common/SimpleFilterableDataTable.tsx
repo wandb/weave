@@ -2,9 +2,6 @@ import {Box, SxProps} from '@mui/material';
 import React from 'react';
 
 export const FilterLayoutTemplate: React.FC<{
-  filterPopoutTargetUrl?: string;
-  showFilterIndicator?: boolean;
-  showPopoutButton?: boolean;
   filterListItems?: React.ReactNode;
   filterListSx?: SxProps;
 }> = props => {
