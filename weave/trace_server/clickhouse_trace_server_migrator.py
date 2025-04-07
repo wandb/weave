@@ -1,7 +1,9 @@
 # Clickhouse Trace Server Manager
+
 import logging
 import os
 import re
+import time
 from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
@@ -310,11 +312,12 @@ class ClickHouseTraceServerMigrator:
         total_rows = result.result_rows[0][0]
         logger.info(f"Total rows to backfill: {total_rows}")
 
-        batch_size = 1_000_000
+        batch_size = 100_000
         total_batches = (total_rows + batch_size - 1) // batch_size
 
         for batch_num in range(total_batches):
             offset = batch_num * batch_size
+            start_time = time.time()
             print(
                 f"Processing batch {batch_num + 1}/{total_batches} (offset: {offset})"
             )
@@ -328,8 +331,8 @@ class ClickHouseTraceServerMigrator:
                 SELECT
                     id,
                     project_id,
-                    anySimpleState(calls_merged.started_at) as started_at,
-                    anySimpleState(-toUnixTimestamp(calls_merged.started_at)) AS inv_started_at,
+                    anySimpleState(coalesce(calls_merged.started_at, calls_merged.ended_at)) as started_at,
+                    anySimpleState(-toUnixTimestamp(coalesce(calls_merged.started_at, calls_merged.ended_at))) AS inv_started_at,
 
                     anySimpleState(wb_run_id) as wb_run_id,
                     anySimpleStateIf(wb_user_id, isNotNull(calls_merged.started_at)) as wb_user_id,
@@ -346,15 +349,20 @@ class ClickHouseTraceServerMigrator:
                     anySimpleState(exception) as exception,
                     anySimpleState(deleted_at) as deleted_at,
                     anySimpleState(display_name) as display_name
-                FROM calls_merged
-                WHERE isNotNull(calls_merged.started_at)
+                FROM (
+                    SELECT *
+                    FROM calls_merged
+                    -- WHERE isNotNull(calls_merged.started_at)
+                    LIMIT {batch_size}
+                    OFFSET {offset}
+                ) AS calls_merged
                 GROUP BY
                     project_id,
                     id
-                LIMIT {batch_size}
-                OFFSET {offset}
             """
 
             self.ch_client.command(insert_query)
+            end_time = time.time()
+            print(f"Batch {batch_num + 1} completed in {end_time - start_time} seconds")
 
         logger.info("Completed backfill of calls_merged_final table")
