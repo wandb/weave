@@ -1032,6 +1032,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parsed_refs = cast(ObjRefListType, parsed_raw_refs)
         vals = self._parsed_refs_read_batch(parsed_refs)
 
+        print('vals', vals)
+
         return tsi.RefsReadBatchRes(vals=vals)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
@@ -1040,9 +1042,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parsed_refs: ObjRefListType,
         root_val_cache: Optional[dict[str, Any]] = None,
     ) -> list[Any]:
+        # dedupe parsed_refs
+        print(f"len parsed_refs: {len(parsed_refs)}")
+        unique_refs = {}
+        for ref in parsed_refs:
+            if ref.uri() not in unique_refs:
+                unique_refs[ref.uri()] = ref
+        print(f"len unique_refs: {len(unique_refs)}")
+
         # Next, group the refs by project_id
         refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
-        for ref in parsed_refs:
+        for ref in unique_refs.values():
             refs_by_project_id[ref.project_id].append(ref)
 
         # Lookup data for each project, scoped to each project
@@ -1062,6 +1072,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 final_result_cache[make_ref_cache_key(ref)] = result
 
         # Return the final data payload
+        print(f"len final_result_cache: {len(final_result_cache)}")
         return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
 
     @ddtrace.tracer.wrap(
