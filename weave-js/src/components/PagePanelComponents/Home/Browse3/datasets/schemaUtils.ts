@@ -140,12 +140,14 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
     }
   });
 
-  return allFields.reduce((acc, field) => {
-    if (!acc.some(f => f.name === field.name)) {
-      acc.push(field);
-    }
-    return acc;
-  }, [] as SchemaField[]);
+  return allFields
+    .filter(field => field.name !== 'inputs.self')
+    .reduce((acc, field) => {
+      if (!acc.some(f => f.name === field.name)) {
+        acc.push(field);
+      }
+      return acc;
+    }, [] as SchemaField[]);
 };
 
 /**

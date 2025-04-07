@@ -12,7 +12,7 @@ import NumberInput from './NumberInput';
 export interface SliderInputProps {
   min: number;
   max: number;
-  step: number;
+  step: number | 'any';
   value?: number;
   // if true, only input will be displayed, with slider appearing in a hover popup
   sliderInPopup?: boolean;

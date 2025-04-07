@@ -46,6 +46,15 @@ dependencies = [
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",      # Used by scorers for field validation
   "diskcache==5.6.3",        # Used for data caching
+
+  # This dependency will be updated each time we regenerate the trace server bindings.
+  # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
+  #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
+  # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
+  #    weave_server_sdk==0.0.1
+
+  # TODO: Uncomment when ready to commit to the new bindings.
+  # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
 ]
 
 [project.optional-dependencies]
@@ -62,24 +71,27 @@ trace_server = [
   "google-cloud-storage>=2.7.0",
   # LLM Support
   "litellm>=1.36.1",
+   # OTEL tracing support
+  "opentelemetry-proto>=1.12.0",
 ]
 trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
 ]
-docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
+docs = ["playwright", "lazydocs", "nbformat", "nbconvert", "weave[trace_server]"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=2.6.3", "litellm<=1.61.6"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
+google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
-  "google-genai>=1.5.0"
+  "google-genai>=1.5.0",
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -94,7 +106,8 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
-llamaindex = ["llama-index>=0.10.35,<0.12.0"] # temporary max pin b/c 0.12.0 changes call structure and therefor tests
+# temporary max pin b/c 0.12.0 changes call structure and therefor tests
+llamaindex = ["llama-index>=0.10.35,<0.12.0"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
@@ -102,10 +115,11 @@ scorers = [
   "litellm>=1.58",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
-  "transformers>=4.48.2",
+  # Pin until transformers releases https://github.com/huggingface/transformers/pull/37337
+  "transformers>=4.48.2,<4.51.0",
   "torch>=2.4.1",
   "sentencepiece>=0.2.0",
-  "pip>=20.0", # this is needed for presidio-analyzer to pull the spacy models
+  "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
 ]
@@ -139,9 +153,15 @@ test = [
   "pillow",
   "filelock",
   "httpx",
-  
+
   "weave[trace_server]",
   "weave[trace_server_tests]",
+]
+dev = [
+  # codegen
+  "tomlkit",
+  "python-multipart",
+
 ]
 
 [project.urls]
@@ -171,6 +191,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
+# [tool.hatch.metadata]
+# allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
@@ -258,7 +280,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.40-dev0"
+current_version = "0.51.42-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

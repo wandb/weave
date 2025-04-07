@@ -43,6 +43,18 @@ RETRY_MAX_WAIT = 10  # seconds
 # Publicly exposed methods:
 
 
+class FileStorageWriteError(Exception):
+    """Exception for failed file writes."""
+
+    pass
+
+
+class FileStorageReadError(Exception):
+    """Exception for failed file reads."""
+
+    pass
+
+
 def store_in_bucket(file_storage_uri: FileStorageURI, data: bytes) -> None:
     """Store a file in a storage bucket."""
     client = _get_storage_client(file_storage_uri)
@@ -50,7 +62,9 @@ def store_in_bucket(file_storage_uri: FileStorageURI, data: bytes) -> None:
         return client.store(file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s: %s", file_storage_uri, str(e))
-        raise type(e)(f"Failed to store file at {file_storage_uri}: {str(e)}") from e
+        raise FileStorageWriteError(
+            f"Failed to store file at {file_storage_uri}: {str(e)}"
+        ) from e
 
 
 def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
@@ -60,7 +74,9 @@ def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
         return client.read(file_storage_uri)
     except Exception as e:
         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
-        raise type(e)(f"Failed to read file from {file_storage_uri}: {str(e)}") from e
+        raise FileStorageReadError(
+            f"Failed to read file from {file_storage_uri}: {str(e)}"
+        ) from e
 
 
 ### Everything below here is interal

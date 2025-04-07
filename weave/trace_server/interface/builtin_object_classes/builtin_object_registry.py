@@ -10,6 +10,7 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
 )
+from weave.trace_server.interface.builtin_object_classes.saved_view import SavedView
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyExample,
     TestOnlyNestedBaseObject,
@@ -35,3 +36,4 @@ register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)
 register_base_object(Provider)
 register_base_object(ProviderModel)
+register_base_object(SavedView)
