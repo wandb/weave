@@ -18,6 +18,11 @@ patched = False
 
 @wraps(wandb_termlog)
 def unsafe_termlog(*args, **kwargs):
+    """
+    Appends a `?ref=weave` to the end of the string if it ends with `/authorize`.
+    This is used deep in the auth flow in wandb and allows us to determine that 
+    signups are coming from weave.
+    """
     bound_args = inspect.signature(wandb_termlog).bind(*args, **kwargs)
     bound_args.apply_defaults()
     if string_arg_val := bound_args.arguments.get("string"):
