@@ -227,7 +227,10 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
 
   const {stackIds, handler} = usePanelStacksForType(
     outputNodeRefined.result.type,
-    config?.workingPanelId ?? undefined
+    config?.workingPanelId ?? undefined,
+    {
+      disallowedPanels: ['panel-stepper'],
+    }
   );
 
   if (config?.workingPanelId == null) {
