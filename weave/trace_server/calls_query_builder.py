@@ -731,25 +731,23 @@ class CallsQuery(BaseModel):
 
         id_subquery_sql = ""
         if id_subquery_name is not None:
-            id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
+            id_subquery_sql = f"AND ({table_alias}.id IN {id_subquery_name})"
 
         project_param = pb.add_param(self.project_id)
 
         # Special Optimization
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask_sql = f"AND (calls_merged.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask_sql = f"AND ({table_alias}.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
         feedback_where_sql = ""
         if needs_feedback:
-            feedback_where_sql = (
-                f" AND calls_merged.project_id = {_param_slot(project_param, 'String')}"
-            )
+            feedback_where_sql = f" AND {table_alias}.project_id = {_param_slot(project_param, 'String')}"
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', {table_alias}.id))
             """
 
         storage_size_sql = ""
@@ -761,7 +759,7 @@ class CallsQuery(BaseModel):
             FROM calls_merged_stats
             WHERE project_id = {_param_slot(project_param, "String")}
             GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
-            on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            on {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
         total_storage_size_sql = ""
@@ -773,21 +771,21 @@ class CallsQuery(BaseModel):
             FROM calls_merged_stats
             WHERE project_id = {_param_slot(project_param, "String")}
             GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+            on {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
+        FROM {table_alias}
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
+        WHERE {table_alias}.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
         {str_filter_opt_sql}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
+        GROUP BY ({table_alias}.project_id, {table_alias}.id)
         {having_filter_sql}
         {order_by_sql}
         {limit_sql}

@@ -288,7 +288,73 @@ class ClickHouseTraceServerMigrator:
         for command in migration_sub_commands:
             self._execute_migration_command(target_db, command)
 
+        # If this is the calls_merged_final migration, perform the backfill
+        if migration_file == "012_calls_merged_final.up.sql":
+            self._backfill_calls_merged_final(target_db)
+
         # Mark migration as fully applied
         self._update_migration_status(target_db, target_version, is_start=False)
 
         logger.info(f"Migration {migration_file} applied to `{target_db}`")
+
+    def _backfill_calls_merged_final(self, target_db: str) -> None:
+        """Backfill the calls_merged_final table from calls_merged in batches."""
+        logger.info("Starting backfill of calls_merged_final table")
+
+        # Get total count of rows to process
+        count_query = f"""
+            SELECT count() as total_rows
+            FROM {target_db}.calls_merged
+        """
+        result = self.ch_client.query(count_query)
+        total_rows = result.result_rows[0][0]
+        logger.info(f"Total rows to backfill: {total_rows}")
+
+        batch_size = 1_000_000
+        total_batches = (total_rows + batch_size - 1) // batch_size
+
+        for batch_num in range(total_batches):
+            offset = batch_num * batch_size
+            print(
+                f"Processing batch {batch_num + 1}/{total_batches} (offset: {offset})"
+            )
+            logger.info(
+                f"Processing batch {batch_num + 1}/{total_batches} (offset: {offset})"
+            )
+
+            # Insert batch using the same logic as the materialized view
+            insert_query = f"""
+                INSERT INTO {target_db}.calls_merged_final
+                SELECT
+                    id,
+                    project_id,
+                    anySimpleState(calls_merged.started_at) as started_at,
+                    anySimpleState(-toUnixTimestamp(calls_merged.started_at)) AS inv_started_at,
+
+                    anySimpleState(wb_run_id) as wb_run_id,
+                    anySimpleStateIf(wb_user_id, isNotNull(calls_merged.started_at)) as wb_user_id,
+                    anySimpleState(trace_id) as trace_id,
+                    anySimpleState(parent_id) as parent_id,
+                    anySimpleState(op_name) as op_name,
+                    anySimpleState(ended_at) as ended_at,
+                    anySimpleState(attributes_dump) as attributes_dump,
+                    anySimpleState(inputs_dump) as inputs_dump,
+                    anySimpleState(coalesce(output_dump, '{{}}')) as output_dump,
+                    anySimpleState(coalesce(summary_dump, '{{}}')) as summary_dump,
+                    array_concat_aggSimpleState(input_refs) as input_refs,
+                    array_concat_aggSimpleState(output_refs) as output_refs,
+                    anySimpleState(exception) as exception,
+                    anySimpleState(deleted_at) as deleted_at,
+                    anySimpleState(display_name) as display_name
+                FROM calls_merged
+                WHERE isNotNull(calls_merged.started_at)
+                GROUP BY
+                    project_id,
+                    id
+                LIMIT {batch_size}
+                OFFSET {offset}
+            """
+
+            self.ch_client.command(insert_query)
+
+        logger.info("Completed backfill of calls_merged_final table")
