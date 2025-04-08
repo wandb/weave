@@ -10,12 +10,12 @@ import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
 import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotationFieldDrawer';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
-import {useWeaveflowRouteContext} from '../../context';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -39,7 +39,8 @@ export const FeedbackSidebar = ({
   onClose,
 }: FeedbackSidebarProps) => {
   const [isSaving, setIsSaving] = useState(false);
-  const [isNewAnnotationDrawerOpen, setIsNewAnnotationDrawerOpen] = useState(false);
+  const [isNewAnnotationDrawerOpen, setIsNewAnnotationDrawerOpen] =
+    useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
@@ -115,11 +116,13 @@ export const FeedbackSidebar = ({
       <div className="flex min-h-[32px] w-full items-center justify-between px-12">
         <div className="text-sm font-semibold">Annotation</div>
         <div className="flex items-center gap-2">
-          <Tooltip 
+          <Tooltip
             content="Manage annotation fields"
             trigger={
               <Button
-                onClick={() => history.push(baseRouter.scorersUIUrl(entity, project))}
+                onClick={() =>
+                  history.push(baseRouter.scorersUIUrl(entity, project))
+                }
                 variant="ghost"
                 size="small"
                 icon="settings"
@@ -170,8 +173,8 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-full">
-          <div className="flex flex-col items-center mx-8 gap-16 mt-[38px]">
+        <div className="flex h-full flex-col items-center justify-center">
+          <div className="mx-8 mt-[38px] flex flex-col items-center gap-16">
             <Empty {...EMPTY_PROPS_ANNOTATIONS} />
             <Button
               onClick={() => setIsNewAnnotationDrawerOpen(true)}

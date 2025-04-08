@@ -106,7 +106,10 @@ export const CallPage: FC<CallPageProps> = props => {
   }
 };
 
-const useCallTabs = (call: CallSchema, setShowFeedback: (showFeedback: boolean | undefined) => void) => {
+const useCallTabs = (
+  call: CallSchema,
+  setShowFeedback: (showFeedback: boolean | undefined) => void
+) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);

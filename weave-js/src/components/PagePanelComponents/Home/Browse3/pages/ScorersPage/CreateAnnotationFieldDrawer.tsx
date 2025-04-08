@@ -1,10 +1,10 @@
 import {Box, Typography} from '@mui/material';
+import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useState} from 'react';
 
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {ResizableDrawer} from '../common/ResizableDrawer';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
-import {Button} from '@wandb/weave/components/Button';
 
 // Define typography style with Source Sans Pro font
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
@@ -17,13 +17,9 @@ interface CreateAnnotationFieldDrawerProps {
   onSave?: () => void;
 }
 
-export const CreateAnnotationFieldDrawer: FC<CreateAnnotationFieldDrawerProps> = ({
-  entity,
-  project,
-  open,
-  onClose,
-  onSave,
-}) => {
+export const CreateAnnotationFieldDrawer: FC<
+  CreateAnnotationFieldDrawerProps
+> = ({entity, project, open, onClose, onSave}) => {
   const [formData, setFormData] = useState<any>(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const getClient = useGetTraceServerClientContext();
@@ -131,4 +127,4 @@ export const CreateAnnotationFieldDrawer: FC<CreateAnnotationFieldDrawerProps> =
       </Box>
     </ResizableDrawer>
   );
-}; 
+};

@@ -227,7 +227,8 @@ export const EMPTY_PROPS_FEEDBACK: EmptyProps = {
   size: 'small',
   icon: 'add-reaction' as const,
   heading: 'No feedback yet',
-  description: 'You can provide feedback directly within the Weave UI or through the API.',
+  description:
+    'You can provide feedback directly within the Weave UI or through the API.',
   moreInformation: (
     <>
       Learn how to{' '}
