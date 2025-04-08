@@ -1032,7 +1032,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parsed_refs = cast(ObjRefListType, parsed_raw_refs)
         vals = self._parsed_refs_read_batch(parsed_refs)
 
-        print('vals', vals)
+        print("vals", vals)
 
         return tsi.RefsReadBatchRes(vals=vals)
 
