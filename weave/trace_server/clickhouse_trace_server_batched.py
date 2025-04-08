@@ -272,6 +272,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
+        kafka_producer = KafkaProducer.from_env()
+        kafka_producer.produce_call_end(req.end)
+
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
@@ -1919,7 +1922,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
-            logger.info(
+            logger.debug(
                 "clickhouse_stream_query",
                 extra={
                     "query": query,
