@@ -33,6 +33,8 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
@@ -51,6 +53,8 @@ const isFilterIncomplete = (filter: GridFilterItem): boolean => {
 };
 
 export const FilterBar = ({
+  entity,
+  project,
   filterModel,
   setFilterModel,
   columnInfo,
@@ -160,7 +164,7 @@ export const FilterBar = ({
         items: [
           ...localFilterModel.items,
           {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },
@@ -255,6 +259,11 @@ export const FilterBar = ({
     setActiveEditId(null);
   }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
+  const onFilterTagClick = useCallback((filterId: FilterId) => {
+    setActiveEditId(filterId);
+    setAnchorEl(refBar.current);
+  }, []);
+
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
   const iconW = 20;
@@ -301,6 +310,7 @@ export const FilterBar = ({
               item={f}
               onRemoveFilter={onRemoveFilter}
               isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
+              onClick={() => onFilterTagClick(f.id)}
             />
           ))}
         </VariableChildrenDisplay>
@@ -346,16 +356,21 @@ export const FilterBar = ({
               {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
+                  entity={entity}
+                  project={project}
                   item={item}
                   options={options}
                   onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
+                  activeEditId={activeEditId}
                 />
               ))}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
+                entity={entity}
+                project={project}
                 item={{
                   id: undefined,
                   field: '',
@@ -366,6 +381,7 @@ export const FilterBar = ({
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
+                activeEditId={activeEditId}
               />
             )}
             <div className="mt-8 flex items-center">
