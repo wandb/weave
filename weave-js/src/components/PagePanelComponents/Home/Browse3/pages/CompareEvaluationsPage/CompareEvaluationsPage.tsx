@@ -24,7 +24,6 @@ import {
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
-import {InvalidEvaluationBanner} from './InvalidEvaluationBanner';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
@@ -243,9 +242,6 @@ const CompareEvaluationsPageInner: React.FC<{
           alignItems: 'flex-start',
           gridGap: STANDARD_PADDING * 2,
         }}>
-        <InvalidEvaluationBanner
-          evaluationCalls={Object.values(state.summary.evaluationCalls)}
-        />
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
