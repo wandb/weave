@@ -14,6 +14,14 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
+# If a list of len 1 is provided, don't bother indexing it, just treat it as a singleton
+# This could cause issues actually if
+def _flatten_single_key(d: dict[str, Any] | None) -> Any:
+    if not d:
+        return None
+    keys = list(d.keys())
+    if len(keys) == 1:
+        return d.get(keys[0])
 
 def to_json_serializable(value: Any) -> Any:
     """
@@ -344,7 +352,6 @@ class ConventionType(Enum):
 
 class AbstractAttributes(ABC):
     _attributes: dict[str, Any] = field(default_factory=dict)
-    _original_attributes: dict[str, Any] = field(default_factory=dict)
 
     @abstractmethod
     def __getitem__(self, key: str) -> Any: ...
@@ -359,28 +366,20 @@ class AbstractAttributes(ABC):
     def get_attribute_value(self, key: str) -> Any: ...
 
     @abstractmethod
-    def extract_attribute_value(self, key: str) -> Any: ...
+    def get_weave_inputs(self) -> dict[str, Any]: ...
 
     @abstractmethod
-    def extract_inputs(self) -> dict[str, Any]: ...
+    def get_weave_outputs(self) -> Any: ...
 
     @abstractmethod
-    def extract_outputs(self) -> Any: ...
-
-    @abstractmethod
-    def extract_attributes(self) -> Any: ...
-
-    @abstractmethod
-    def extract_usage(self) -> LLMUsageSchema: ...
+    def get_weave_usage(self) -> LLMUsageSchema: ...
 
 
 class Attributes(AbstractAttributes):
     _attributes: dict[str, Any] = field(default_factory=dict)
-    _original_attributes: dict[str, Any] = field(default_factory=dict)
 
     def __init__(self, attributes: dict[str, Any] = {}) -> None:
         self._attributes = attributes
-        self._original_attributes = copy.deepcopy(attributes)
 
     def __getitem__(self, key: str) -> Any:
         return self._attributes.__getitem__(key)
@@ -394,45 +393,41 @@ class Attributes(AbstractAttributes):
     def get_attribute_value(self, key: str) -> Any:
         return get_attribute(self._attributes, key)
 
-    def extract_attribute_value(self, key: str) -> Any:
-        return pop_attribute(self._attributes, key)
+    def get_weave_usage(self) -> LLMUsageSchema:
+        raise NotImplementedError("get_weave_usage is not implemented")
 
-    def extract_usage(self) -> LLMUsageSchema:
-        raise NotImplementedError("extract_usage is not implemented")
+    def get_weave_inputs(self) -> Any:
+        raise NotImplementedError("get_weave_inputs is not implemented")
 
-    def extract_inputs(self) -> Any:
-        raise NotImplementedError("extract_inputs is not implemented")
+    def get_weave_outputs(self) -> Any:
+        raise NotImplementedError("get_weave_outputs is not implemented")
 
-    def extract_outputs(self) -> Any:
-        raise NotImplementedError("extract_outputs is not implemented")
-
-    def extract_attributes(self) -> Any:
-        raise NotImplementedError("extract_attributes is not implemented")
+    def get_weave_attributes(self) -> Any:
+        raise NotImplementedError("get_weave_attributes is not implemented")
 
 
+# If we don't have any conventions to follow, just dump everything to attributes
+# Later we may add support for user defined conventions through headers
 class GenericAttributes(Attributes):
-    def extract_usage(self) -> LLMUsageSchema:
-        return {}
+    def get_weave_usage(self) -> LLMUsageSchema: return {}
 
-    def extract_inputs(self) -> Any:
-        return {}
+    def get_weave_inputs(self) -> Any: return {}
 
-    def extract_outputs(self) -> Any:
-        return {}
+    def get_weave_outputs(self) -> Any: return {}
 
-    def extract_attributes(self) -> Any:
-        return (to_json_serializable(self._original_attributes),)
+    def get_weave_attributes(self) -> Any:
+        return (to_json_serializable(self._attributes))
 
 
 class OpenInferenceAttributes(Attributes):
-    def extract_attributes(self) -> dict[str, Any]:
-        system = self.extract_attribute_value(oi.SpanAttributes.LLM_SYSTEM)
-        provider = self.extract_attribute_value(oi.SpanAttributes.LLM_PROVIDER)
-        invocation_parameters = self.extract_attribute_value(
+    def get_weave_attributes(self) -> dict[str, Any]:
+        system = self.get_attribute_value(oi.SpanAttributes.LLM_SYSTEM)
+        provider = self.get_attribute_value(oi.SpanAttributes.LLM_PROVIDER)
+        invocation_parameters = self.get_attribute_value(
             oi.SpanAttributes.LLM_INVOCATION_PARAMETERS
         )
-        kind = self.extract_attribute_value(oi.SpanAttributes.OPENINFERENCE_SPAN_KIND)
-        model = self.extract_attribute_value(oi.SpanAttributes.LLM_MODEL_NAME)
+        kind = self.get_attribute_value(oi.SpanAttributes.OPENINFERENCE_SPAN_KIND)
+        model = self.get_attribute_value(oi.SpanAttributes.LLM_MODEL_NAME)
         attributes = {
             "system": str(system) if system else None,
             "provider": str(provider) if provider else None,
@@ -448,36 +443,26 @@ class OpenInferenceAttributes(Attributes):
                 raise ValueError(f"Invalid JSON string: {invocation_parameters}")
         return attributes
 
-    def extract_outputs(self) -> Any:
-        outputs: dict[str, Any] | None = self.extract_attribute_value(
+    def get_weave_outputs(self) -> Any:
+        outputs: dict[str, Any] | None = self.get_attribute_value(
             oi.SpanAttributes.LLM_OUTPUT_MESSAGES
         )
-        if not outputs:
-            return None
-        keys = list(outputs.keys())
-        if len(keys) == 1:
-            outputs = outputs.get(keys[0])
         return to_json_serializable(outputs)
 
-    def extract_inputs(self) -> Any:
-        inputs: dict[str, Any] | None = self.extract_attribute_value(
+    def get_weave_inputs(self) -> Any:
+        inputs: dict[str, Any] | None = self.get_attribute_value(
             oi.SpanAttributes.LLM_INPUT_MESSAGES
         )
-        if not inputs:
-            return None
-        keys = list(inputs.keys())
-        if len(keys) == 1:
-            inputs = inputs.get(keys[0])
         return to_json_serializable(inputs)
 
-    def extract_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.extract_attribute_value(
+    def get_weave_usage(self) -> LLMUsageSchema:
+        prompt_tokens = self.get_attribute_value(
             oi.SpanAttributes.LLM_TOKEN_COUNT_PROMPT
         )
-        completion_tokens = self.extract_attribute_value(
+        completion_tokens = self.get_attribute_value(
             oi.SpanAttributes.LLM_TOKEN_COUNT_COMPLETION
         )
-        total_tokens = self.extract_attribute_value(
+        total_tokens = self.get_attribute_value(
             oi.SpanAttributes.LLM_TOKEN_COUNT_TOTAL
         )
         return LLMUsageSchema(
@@ -488,53 +473,42 @@ class OpenInferenceAttributes(Attributes):
 
 
 class OpenTelemetryAttributes(Attributes):
-    def extract_attributes(self) -> dict[str, Any]:
-        max_tokens = self.extract_attribute_value(
+    def get_weave_attributes(self) -> dict[str, Any]:
+        max_tokens = self.get_attribute_value(
             ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS
         )
-        system = self.extract_attribute_value(ot.SpanAttributes.LLM_SYSTEM)
-        kind = self.extract_attribute_value(ot.SpanAttributes.TRACELOOP_SPAN_KIND)
-        model = self.extract_attribute_value(ot.SpanAttributes.LLM_RESPONSE_MODEL)
+        system = self.get_attribute_value(ot.SpanAttributes.LLM_SYSTEM)
+        kind = self.get_attribute_value(ot.SpanAttributes.TRACELOOP_SPAN_KIND)
+        model = self.get_attribute_value(ot.SpanAttributes.LLM_RESPONSE_MODEL)
 
         attributes = {
             "system": str(system) if system else None,
             "max_tokens": int(max_tokens) if max_tokens else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "trace_metadata": to_json_serializable(self._original_attributes),
         }
         return attributes
 
-    def extract_outputs(self) -> Any:
-        completions: dict[str, Any] | None = self.extract_attribute_value(
+    def get_weave_outputs(self) -> Any:
+        completions: dict[str, Any] | None = self.get_attribute_value(
             ot.SpanAttributes.LLM_COMPLETIONS
         )
-        if not completions:
-            return None
-        keys = list(completions.keys())
-        if len(keys) == 1:
-            completions = completions.get(keys[0])
-        return to_json_serializable(completions)
+        return to_json_serializable(completions) or {}
 
-    def extract_inputs(self) -> Any:
-        prompts: dict[str, Any] | None = self.extract_attribute_value(
+    def get_weave_inputs(self) -> Any:
+        prompts: dict[str, Any] | None = self.get_attribute_value(
             ot.SpanAttributes.LLM_PROMPTS
         )
-        if not prompts:
-            return {}
-        keys = list(prompts.keys())
-        if len(keys) == 1:
-            prompts = prompts.get(keys[0])
-        return to_json_serializable(prompts)
+        return to_json_serializable(prompts) or {}
 
-    def extract_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.extract_attribute_value(
+    def get_weave_usage(self) -> LLMUsageSchema:
+        prompt_tokens = self.get_attribute_value(
             ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS
         )
-        completion_tokens = self.extract_attribute_value(
+        completion_tokens = self.get_attribute_value(
             ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS
         )
-        total_tokens = self.extract_attribute_value(
+        total_tokens = self.get_attribute_value(
             ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS
         )
         return LLMUsageSchema(
