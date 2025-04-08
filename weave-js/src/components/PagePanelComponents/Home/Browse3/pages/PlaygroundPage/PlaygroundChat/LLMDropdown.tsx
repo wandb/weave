@@ -1,5 +1,5 @@
 import {Box} from '@mui/material';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {useIsViewerTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useState} from 'react';
 
@@ -59,8 +59,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   const customLoading = customProvidersLoading || customProviderModelsLoading;
 
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isTeamAdmin = !loadingUserInfo && userInfo?.roles[entity] === 'admin';
+  const isTeamAdmin = useIsViewerTeamAdmin(entity);
 
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
