@@ -151,9 +151,9 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mt-12 items-center justify-center px-12">
-          <Empty {...EMPTY_PROPS_ANNOTATIONS} />
-          <div className="mt-4 flex w-full justify-center">
+        <div className="flex flex-col items-center justify-center h-full">
+          <div className="flex flex-col items-center mx-8 gap-16 mt-[38px]">
+            <Empty {...EMPTY_PROPS_ANNOTATIONS} />
             <Button
               onClick={() => setIsNewScorerDrawerOpen(true)}
               variant="primary"
