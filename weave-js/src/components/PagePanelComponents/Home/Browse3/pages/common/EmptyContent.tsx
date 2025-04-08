@@ -214,10 +214,9 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
   description: 'Create fields in the UI or Python.',
   moreInformation: (
     <>
-      More information about creating and using annotations for
-      human labeling can be found in the{' '}
+      Learn more about labeling with{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
-        documentation
+        human annotations
       </TargetBlank>
       .
     </>
