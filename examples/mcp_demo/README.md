@@ -23,13 +23,13 @@ This example demonstrates:
 touch examples/mcp_demo/.env
 ```
 
-1. Install the required dependencies:
+2. Install the required dependencies:
 
 ```bash
 uv pip install -e ".[mcp]"
 ```
 
-2. No API keys are required for running this example
+3. No API keys are required for running this example
 
 ## Running the Example
 
