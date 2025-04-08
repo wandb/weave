@@ -14,6 +14,11 @@ import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceSer
 import {FeedbackGridInner} from './FeedbackGridInner';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
+import {Popover} from '@mui/material';
+import {TextField} from '../../../../Form/TextField';
+import {WeaveEmojiPicker} from './WeaveEmojiPicker';
+import EmojiPicker, {EmojiClickData} from 'emoji-picker-react';
+import {Notes} from './Notes';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
@@ -33,6 +38,12 @@ export const FeedbackGrid = ({
   onOpenFeedbackSidebar,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
+  const [showNoteInput, setShowNoteInput] = React.useState(false);
+  const [note, setNote] = React.useState('');
+  const [showFullPicker, setShowFullPicker] = React.useState(false);
+  const emojiButtonRef = React.useRef<HTMLButtonElement>(null);
+  const noteButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -86,6 +97,33 @@ export const FeedbackGrid = ({
 
   const paths = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
+  const onAddEmoji = (emoji: string) => {
+    const req = {
+      project_id: `${entity}/${project}`,
+      weave_ref: weaveRef,
+      creator: null,
+      feedback_type: 'wandb.reaction.1',
+      payload: {emoji},
+    };
+    getTsClient().feedbackCreate(req);
+    setShowEmojiPicker(false);
+  };
+
+  const onAddNote = () => {
+    if (note.trim()) {
+      const req = {
+        project_id: `${entity}/${project}`,
+        weave_ref: weaveRef,
+        creator: null,
+        feedback_type: 'wandb.note.1',
+        payload: {note: note.trim()},
+      };
+      getTsClient().feedbackCreate(req);
+      setNote('');
+      setShowNoteInput(false);
+    }
+  };
+
   if (query.loading || loadingUserInfo) {
     return (
       <Box
@@ -112,12 +150,90 @@ export const FeedbackGrid = ({
       <div className="flex h-full flex-col items-center justify-center">
         <div className="mx-8 flex flex-col items-center gap-16">
           <Empty size="small" {...EMPTY_PROPS_FEEDBACK} />
-          <Button
-            variant="secondary"
-            icon="add-new"
-            onClick={onOpenFeedbackSidebar}>
-            Create annotation
-          </Button>
+          <div className="flex gap-8">
+            <div>
+              <Button
+                ref={emojiButtonRef}
+                variant="secondary"
+                icon="add-reaction"
+                onClick={() => setShowEmojiPicker(true)}>
+                Reaction
+              </Button>
+              <Popover
+                open={showEmojiPicker}
+                anchorEl={emojiButtonRef.current}
+                onClose={() => setShowEmojiPicker(false)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      backgroundColor: 'transparent',
+                      boxShadow: 'none',
+                    },
+                  },
+                }}>
+                {!showFullPicker && (
+                  <WeaveEmojiPicker
+                    onEmojiClick={(emojiData) => onAddEmoji(emojiData.emoji)}
+                    skinTonesDisabled={true}
+                    reactionsDefaultOpen={true}
+                    reactions={[
+                      '1f44d', // thumbs up
+                      '1f44e', // thumbs down
+                    ]}
+                    onPlusButtonClick={() => {
+                      setShowFullPicker(true);
+                    }}
+                  />
+                )}
+                {showFullPicker && (
+                  <EmojiPicker
+                    onEmojiClick={(emojiData) => onAddEmoji(emojiData.emoji)}
+                    skinTonesDisabled={true}
+                    previewConfig={{
+                      defaultEmoji: '1f44d',
+                      defaultCaption: 'Hover for emoji name',
+                    }}
+                  />
+                )}
+              </Popover>
+            </div>
+            <div>
+              <Button
+                ref={noteButtonRef}
+                variant="secondary"
+                icon="forum-chat-bubble"
+                onClick={() => setShowNoteInput(true)}>
+                Note
+              </Button>
+              <Popover
+                open={showNoteInput}
+                anchorEl={noteButtonRef.current}
+                onClose={() => setShowNoteInput(false)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}>
+                <Notes
+                  notes={[]}
+                  readonly={false}
+                  note={note}
+                  setNote={setNote}
+                  onNoteAdded={onAddNote}
+                  onClose={() => setShowNoteInput(false)}
+                />
+              </Popover>
+            </div>
+            <Button
+              variant="secondary"
+              icon="marker"
+              onClick={onOpenFeedbackSidebar}>
+              Annotation
+            </Button>
+          </div>
         </div>
       </div>
     );
