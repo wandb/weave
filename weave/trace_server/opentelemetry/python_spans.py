@@ -35,6 +35,7 @@ from .attributes import (
     Attributes,
     AttributesFactory,
     flatten_attributes,
+    to_json_serializable,
     unflatten_key_values,
 )
 
@@ -51,7 +52,6 @@ class SpanKind(Enum):
 
     @classmethod
     def from_proto(cls, proto_kind: int) -> "SpanKind":
-        """Convert from protobuf enum value to SpanKind."""
         return cls(proto_kind)
 
 
@@ -82,7 +82,7 @@ class Status:
             code=StatusCode.from_proto(proto_status.code), message=proto_status.message
         )
 
-    def to_weave_status(self) -> Optional[tsi.TraceStatus]:
+    def as_weave_status(self) -> Optional[tsi.TraceStatus]:
         """Convert from protobuf enum value to StatusCode."""
         if self.code == StatusCode.OK:
             return tsi.TraceStatus.SUCCESS
@@ -90,6 +90,14 @@ class Status:
             return tsi.TraceStatus.ERROR
         # UNSET: This is not 'running' because if the trace was sent the call completed
         return None
+
+    def as_dict(self) -> dict[str, Any]:
+        return to_json_serializable(
+            {
+                "code": self.code.name,
+                "message": self.message,
+            }
+        )
 
 
 @dataclass
@@ -208,7 +216,9 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan, resource: Optional[Resource]) -> "Span":
+    def from_proto(
+        cls, proto_span: PbSpan, resource: Optional[Resource] = None
+    ) -> "Span":
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -243,11 +253,11 @@ class Span:
                 "span_id": self.span_id,
                 "trace_state": self.trace_state,
             },
-            "kind": self.kind,
+            "kind": self.kind.name,
             "parent_id": self.parent_id,
-            "start_time": self.start_time,
-            "end_time": self.start_time,
-            "status": {"status_code": self.status},
+            "start_time": self.start_time_unix_nano,
+            "end_time": self.end_time_unix_nano,
+            "status": self.status.as_dict(),
             "attributes": flatten_attributes(self.attributes._attributes),
             "events": self.events,
             "links": self.links,
@@ -305,7 +315,7 @@ class ScopeSpans:
 
     @classmethod
     def from_proto(
-        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource]
+        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None
     ) -> "ScopeSpans":
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(

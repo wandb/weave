@@ -369,8 +369,8 @@ class AbstractAttributes(ABC):
 class Attributes(AbstractAttributes):
     _attributes: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, attributes: dict[str, Any] = {}) -> None:
-        self._attributes = attributes
+    def __init__(self, _attributes: dict[str, Any] = {}) -> None:
+        self._attributes = _attributes
 
     def __getitem__(self, key: str) -> Any:
         return self._attributes.__getitem__(key)
@@ -384,23 +384,18 @@ class Attributes(AbstractAttributes):
     def get_attribute_value(self, key: str) -> Any:
         return get_attribute(self._attributes, key)
 
-    @abstractmethod
     def get_weave_usage(self) -> LLMUsageSchema:
         raise NotImplementedError("get_weave_usage is not implemented")
 
-    @abstractmethod
     def get_weave_summary(self) -> SummaryInsertMap:
         raise NotImplementedError("get_weave_summary is not implemented")
 
-    @abstractmethod
     def get_weave_inputs(self) -> Any:
         raise NotImplementedError("get_weave_inputs is not implemented")
 
-    @abstractmethod
     def get_weave_outputs(self) -> Any:
         raise NotImplementedError("get_weave_outputs is not implemented")
 
-    @abstractmethod
     def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any:
         raise NotImplementedError("get_weave_attributes is not implemented")
 
