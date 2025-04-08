@@ -208,12 +208,13 @@ export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
 };
 
 export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
+  size: 'small',
   icon: 'type-number-alt' as const,
-  heading: 'No annotations yet',
-  description: 'Create annotations in the UI or Python.',
+  heading: 'No annotation fields',
+  description: 'Create fields in the UI or Python.',
   moreInformation: (
     <>
-      More information about creating and using annotation specifications for
+      More information about creating and using annotations for
       human labeling can be found in the{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
         documentation
@@ -224,6 +225,7 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
 };
 
 export const EMPTY_PROPS_FEEDBACK: EmptyProps = {
+  size: 'small',
   icon: 'add-reaction' as const,
   heading: 'No feedback yet',
   description: 'You can provide feedback directly within the Weave UI or through the API.',
