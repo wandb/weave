@@ -222,3 +222,18 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_FEEDBACK: EmptyProps = {
+  icon: 'add-reaction' as const,
+  heading: 'No feedback yet',
+  description: 'You can provide feedback directly within the Weave UI or through the API.',
+  moreInformation: (
+    <>
+      Learn how to{' '}
+      <TargetBlank href="http://wandb.me/weave_feedback">
+        add feedback
+      </TargetBlank>
+      .
+    </>
+  ),
+};

@@ -8,6 +8,7 @@ import {Alert} from '../../../../Alert';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
 import {Empty} from '../pages/common/Empty';
+import {EMPTY_PROPS_FEEDBACK} from '../pages/common/EmptyContent';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
@@ -105,23 +106,7 @@ export const FeedbackGrid = ({
   }
 
   if (!paths.length) {
-    return (
-      <Empty
-        size="small"
-        icon="add-reaction"
-        heading="No feedback yet"
-        description="You can provide feedback directly within the Weave UI or through the API."
-        moreInformation={
-          <>
-            Learn how to{' '}
-            <TargetBlank href="http://wandb.me/weave_feedback">
-              add feedback
-            </TargetBlank>
-            .
-          </>
-        }
-      />
-    );
+    return <Empty size="small" {...EMPTY_PROPS_FEEDBACK} />;
   }
 
   const currentViewerId = userInfo ? userInfo.id : null;
