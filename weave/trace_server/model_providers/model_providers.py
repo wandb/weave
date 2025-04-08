@@ -18,7 +18,7 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "deepseek": "DEEPSEEK_API_KEY",
     "fireworks": "FIREWORKS_API_KEY",
     "gemini": "GOOGLE_API_KEY",
-    "groq": "GEMMA_API_KEY",
+    "groq": "GROQ_API_KEY",
     "openai": "OPENAI_API_KEY",
     "xai": "XAI_API_KEY",
 }
