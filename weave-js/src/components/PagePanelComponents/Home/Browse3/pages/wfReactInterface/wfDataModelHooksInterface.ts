@@ -232,6 +232,7 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
+    orderBy?: traceServerClientTypes.SortBy[],
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (

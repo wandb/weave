@@ -793,6 +793,7 @@ const useOpVersions = (
   filter: OpVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
+  orderBy?: traceServerTypes.SortBy[],
   opts?: {skip?: boolean}
 ): LoadableWithError<OpVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -805,6 +806,7 @@ const useOpVersions = (
     result: null,
   });
   const deepFilter = useDeepMemo(filter);
+  const deepOrderBy = useDeepMemo(orderBy);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -822,6 +824,7 @@ const useOpVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: deepOrderBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -845,6 +848,7 @@ const useOpVersions = (
     project,
     limit,
     metadataOnly,
+    deepOrderBy,
   ]);
 
   useEffect(() => {

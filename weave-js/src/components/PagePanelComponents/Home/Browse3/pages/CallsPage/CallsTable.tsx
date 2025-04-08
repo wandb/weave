@@ -8,18 +8,15 @@
 
 import {
   Autocomplete,
-  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
-  Typography,
 } from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
-  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridRowSelectionModel,
@@ -48,7 +45,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -69,11 +65,6 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
-import {Empty} from '../common/Empty';
-import {
-  EMPTY_PROPS_EVALUATIONS,
-  EMPTY_PROPS_TRACES,
-} from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
@@ -110,7 +101,8 @@ import {
   useOutputObjectVersionOptions,
   WFHighLevelCallFilter,
 } from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
+import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
+import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
@@ -130,12 +122,14 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
-export const DEFAULT_FILTER_CALLS: GridFilterModel = {
-  items: [],
-  logicOperator: GridLogicOperator.And,
+
+export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
+  return filter.items.some(
+    item => item.field === 'started_at' && item.operator === '(date): after'
+  );
 };
 
-const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
 };
@@ -1006,56 +1000,19 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => {
-            if (callsLoading) {
-              return <></>;
-            }
-            const isEmpty = callsResult.length === 0;
-            if (isEmpty) {
-              // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
-              if (isEvaluateTable) {
-                return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-              } else if (
-                effectiveFilter.traceRootsOnly &&
-                filterModelResolved.items.length === 0
-              ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;
-              }
-            }
-            return (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <Typography color="textSecondary">
-                  No calls found.{' '}
-                  {clearFilters != null ? (
-                    <>
-                      Try{' '}
-                      <A
-                        onClick={() => {
-                          clearFilters();
-                        }}>
-                        clearing the filters
-                      </A>{' '}
-                      or l
-                    </>
-                  ) : (
-                    'L'
-                  )}
-                  earn more about how to log calls by visiting{' '}
-                  <TargetBlank href="https://wandb.me/weave">
-                    the docs
-                  </TargetBlank>
-                  .
-                </Typography>
-              </Box>
-            );
-          },
+          noRowsOverlay: () => (
+            <CallsTableNoRowsOverlay
+              entity={entity}
+              project={project}
+              callsLoading={callsLoading}
+              callsResult={callsResult}
+              isEvaluateTable={isEvaluateTable}
+              effectiveFilter={effectiveFilter}
+              filterModelResolved={filterModelResolved}
+              clearFilters={clearFilters}
+              setFilterModel={setFilterModel}
+            />
+          ),
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
