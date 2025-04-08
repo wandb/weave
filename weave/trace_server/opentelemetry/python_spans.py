@@ -6,16 +6,12 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 
 import datetime
 from binascii import hexlify
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from opentelemetry.proto.common.v1.common_pb2 import (
-    AnyValue,
-    InstrumentationScope,
-    KeyValue,
-)
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     ResourceSpans as PbResourceSpans,
@@ -32,7 +28,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     TracesData as PbTracesData,
 )
-from typing_extensions import assert_never
 
 from weave.trace_server import trace_server_interface as tsi
 
@@ -43,34 +38,6 @@ from .attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
-
-
-def _decode_key_values(
-    key_values: Iterable[KeyValue],
-) -> Iterator[tuple[str, Any]]:
-    return ((kv.key, _decode_value(kv.value)) for kv in key_values)
-
-
-def _decode_value(any_value: AnyValue) -> Any:
-    which = any_value.WhichOneof("value")
-    if which == "string_value":
-        return any_value.string_value
-    if which == "bool_value":
-        return any_value.bool_value
-    if which == "int_value":
-        return any_value.int_value
-    if which == "double_value":
-        return any_value.double_value
-    if which == "array_value":
-        return [_decode_value(value) for value in any_value.array_value.values]
-    if which == "kvlist_value":
-        return dict(_decode_key_values(any_value.kvlist_value.values))
-    if which == "bytes_value":
-        return any_value.bytes_value
-    if which is None:
-        return None
-    assert_never(which)
-
 
 class SpanKind(Enum):
     """Enum representing the span's kind."""
