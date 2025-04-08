@@ -46,6 +46,7 @@ export const CellValueImage = ({value}: CellValueImageProps) => {
           buttonNext: () => null,
         }}
         carousel={{finite: true}}
+        zoom={{maxZoomPixelRatio: 5}}
       />
     </>
   );

@@ -8,18 +8,15 @@
 
 import {
   Autocomplete,
-  Box,
   Chip,
   FormControl,
   ListItem,
   Tooltip,
-  Typography,
 } from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
-  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridRowSelectionModel,
@@ -48,7 +45,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -69,11 +65,6 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
-import {Empty} from '../common/Empty';
-import {
-  EMPTY_PROPS_EVALUATIONS,
-  EMPTY_PROPS_TRACES,
-} from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
@@ -110,7 +101,8 @@ import {
   useOutputObjectVersionOptions,
   WFHighLevelCallFilter,
 } from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
+import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
+import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
@@ -131,12 +123,14 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
-export const DEFAULT_FILTER_CALLS: GridFilterModel = {
-  items: [],
-  logicOperator: GridLogicOperator.And,
+
+export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
+  return filter.items.some(
+    item => item.field === 'started_at' && item.operator === '(date): after'
+  );
 };
 
-const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
 };
@@ -178,7 +172,7 @@ export const CallsTable: FC<{
   frozenFilter,
   hideControls,
   hideOpSelector,
-  columnVisibilityModel,
+  columnVisibilityModel: columnVisibilityModelProp,
   setColumnVisibilityModel,
   pinModel,
   setPinModel,
@@ -222,6 +216,13 @@ export const CallsTable: FC<{
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
+
+  const clearFilters = useCallback(() => {
+    setFilter({});
+    if (setFilterModel) {
+      setFilterModel({items: []});
+    }
+  }, [setFilter, setFilterModel]);
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -516,14 +517,6 @@ export const CallsTable: FC<{
     }
   }, [rowIds, isPeeking, setRowIds]);
 
-  // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
-  const clearFilters = useCallback(() => {
-    setFilter({});
-    if (setFilterModel) {
-      setFilterModel({items: []});
-    }
-  }, [setFilter, setFilterModel]);
-
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
   const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
@@ -532,10 +525,9 @@ export const CallsTable: FC<{
     project
   );
 
-  // Set default hidden columns to be hidden
-  useEffect(() => {
-    if (!setColumnVisibilityModel || !columnVisibilityModel) {
-      return;
+  const columnVisibilityModel = useMemo(() => {
+    if (!columnVisibilityModelProp) {
+      return undefined;
     }
     const hiddenColumns: string[] = [];
     for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
@@ -544,32 +536,32 @@ export const CallsTable: FC<{
       );
       hiddenColumns.push(...cols.map(col => col.field));
     }
-    // Check if we need to update - only update if any annotation columns are missing from the model
-    const needsUpdate = hiddenColumns.some(
-      col => columnVisibilityModel[col] === undefined
-    );
-    if (!needsUpdate) {
-      return;
-    }
+
     const hiddenColumnVisibilityFalse = hiddenColumns.reduce((acc, col) => {
       // Only add columns=false when not already in the model
-      if (columnVisibilityModel[col] === undefined) {
+      if (columnVisibilityModelProp[col] === undefined) {
         acc[col] = false;
       }
       return acc;
     }, {} as Record<string, boolean>);
 
-    setColumnVisibilityModel({
-      ...columnVisibilityModel,
+    return {
+      ...columnVisibilityModelProp,
       ...hiddenColumnVisibilityFalse,
-    });
-  }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
+    };
+  }, [columns.cols, columnVisibilityModelProp]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  // Clear selections when switching table types
+  useEffect(() => {
+    clearSelectedCalls();
+  }, [isEvaluateTable, clearSelectedCalls]);
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -801,7 +793,14 @@ export const CallsTable: FC<{
               />
               <div className="text-sm">
                 {selectedCalls.length}{' '}
-                {isEvaluateTable ? 'evaluations' : 'traces'} selected:
+                {isEvaluateTable
+                  ? selectedCalls.length === 1
+                    ? 'evaluation'
+                    : 'evaluations'
+                  : selectedCalls.length === 1
+                  ? 'trace'
+                  : 'traces'}{' '}
+                selected:
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
@@ -1007,56 +1006,19 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => {
-            if (callsLoading) {
-              return <></>;
-            }
-            const isEmpty = callsResult.length === 0;
-            if (isEmpty) {
-              // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
-              if (isEvaluateTable) {
-                return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-              } else if (
-                effectiveFilter.traceRootsOnly &&
-                filterModelResolved.items.length === 0
-              ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;
-              }
-            }
-            return (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <Typography color="textSecondary">
-                  No calls found.{' '}
-                  {clearFilters != null ? (
-                    <>
-                      Try{' '}
-                      <A
-                        onClick={() => {
-                          clearFilters();
-                        }}>
-                        clearing the filters
-                      </A>{' '}
-                      or l
-                    </>
-                  ) : (
-                    'L'
-                  )}
-                  earn more about how to log calls by visiting{' '}
-                  <TargetBlank href="https://wandb.me/weave">
-                    the docs
-                  </TargetBlank>
-                  .
-                </Typography>
-              </Box>
-            );
-          },
+          noRowsOverlay: () => (
+            <CallsTableNoRowsOverlay
+              entity={entity}
+              project={project}
+              callsLoading={callsLoading}
+              callsResult={callsResult}
+              isEvaluateTable={isEvaluateTable}
+              effectiveFilter={effectiveFilter}
+              filterModelResolved={filterModelResolved}
+              clearFilters={clearFilters}
+              setFilterModel={setFilterModel}
+            />
+          ),
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,

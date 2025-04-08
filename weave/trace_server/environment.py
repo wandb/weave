@@ -27,12 +27,47 @@ def wf_clickhouse_database() -> str:
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
 
 
+def wf_clickhouse_max_memory_usage() -> Optional[int]:
+    """The maximum memory usage for the clickhouse server."""
+    mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
+    if mem is None:
+        return None
+    try:
+        return int(mem)
+    except ValueError:
+        return None
+
+
 # BYOB Settings
 
 
 def wf_file_storage_uri() -> Optional[str]:
     """The storage bucket URI."""
     return os.environ.get("WF_FILE_STORAGE_URI")
+
+
+def wf_file_storage_project_allow_list() -> Optional[list[str]]:
+    """Get the list of project IDs allowed to use file storage.
+
+    Returns:
+        Optional[list[str]]: A list of project IDs that are allowed to use file storage.
+            Returns None if no allow list is configured.
+
+    Raises:
+        ValueError: If the allow list environment variable is set but contains invalid data.
+            The value must be a comma-separated list of non-empty project IDs.
+    """
+    allow_list = os.environ.get("WF_FILE_STORAGE_PROJECT_ALLOW_LIST")
+    if allow_list is None:
+        return None
+    try:
+        project_ids = [pid.strip() for pid in allow_list.split(",") if pid.strip()]
+    except Exception as e:
+        raise ValueError(
+            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {str(e)}"
+        )
+
+    return project_ids
 
 
 def wf_storage_bucket_aws_access_key_id() -> Optional[str]:

@@ -18,9 +18,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "scorers",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai"]
 
 
 @nox.session
@@ -47,6 +45,7 @@ def lint(session):
         "crewai",
         "dspy",
         "google_ai_studio",
+        "google_genai",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
@@ -87,6 +86,9 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
+    if shard in ["google_ai_studio", "google_genai"]:
+        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
+
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 

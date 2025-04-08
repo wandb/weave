@@ -231,8 +231,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "trace_server",
             "anthropic",
@@ -244,6 +243,7 @@ jobs:
             "groq",
             "huggingface",
             "google_ai_studio",
+            "google_genai",
             "instructor",
             "langchain",
             "litellm",
@@ -253,7 +253,6 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "scorers",
             "pandas-test",
           ]
       fail-fast: false
