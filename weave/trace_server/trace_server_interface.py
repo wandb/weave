@@ -1,12 +1,14 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Protocol, Union
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-    ExportTraceServiceResponse,
-)
+if TYPE_CHECKING:
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+        ExportTraceServiceRequest,
+        ExportTraceServiceResponse,
+    )
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -230,7 +232,7 @@ class TableSchemaForInsert(BaseModel):
 class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
-    traces: ExportTraceServiceRequest
+    traces: "ExportTraceServiceRequest"
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -238,13 +240,25 @@ class OtelExportReq(BaseModel):
 # https://opentelemetry.io/docs/specs/otlp/
 class OtelExportRes(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    _response: ExportTraceServiceResponse
+    _response: "ExportTraceServiceResponse"
+
+    # Class variable to cache the imported class
+    _ExportTraceServiceResponse: ClassVar[Any] = None
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
+
+        # Lazily import the response type only once
+        if OtelExportRes._ExportTraceServiceResponse is None:
+            from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+                ExportTraceServiceResponse,
+            )
+
+            OtelExportRes._ExportTraceServiceResponse = ExportTraceServiceResponse
+
         # Set the response type to ExportTraceServiceResponse
         # TODO: Actually populate the error fields
-        self._response = ExportTraceServiceResponse()
+        self._response = OtelExportRes._ExportTraceServiceResponse()
 
 
 class CallStartReq(BaseModel):
