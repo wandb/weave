@@ -499,18 +499,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 continue
 
             with self.with_new_client():
+                # Get unique refs to fetch
                 unique_refs_to_resolve = list(set(refs_to_resolve.values()))
+                if not unique_refs_to_resolve:
+                    continue
+
+                # Fetch values only for the unique refs
                 vals = self._refs_read_batch_within_project(
                     project_id, unique_refs_to_resolve, ref_cache
                 )
-                val_map = {u.uri(): v for u, v in zip(unique_refs_to_resolve, vals)}
-                non_unique_vals = [val_map[r.uri()] for r in refs_to_resolve.values()]
-                for ((i, col), ref), val in zip(
-                    refs_to_resolve.items(), non_unique_vals
-                ):
-                    if isinstance(val, dict) and "_ref" not in val:
-                        val["_ref"] = ref.uri()
-                    set_nested_key(calls[i], col, val)
+
+                # Create a map from ref URI to its fetched value
+                if len(unique_refs_to_resolve) == len(vals):
+                    val_map = {
+                        ref.uri(): val for ref, val in zip(unique_refs_to_resolve, vals)
+                    }
+                else:
+                    raise ValueError(
+                        f"Mismatch between requested refs ({len(unique_refs_to_resolve)}) and fetched values ({len(vals)}) in project {project_id}."
+                    )
+
+                # Replace the refs with values and add ref key
+                for (i, col), ref in refs_to_resolve.items():
+                    # Look up the value using the ref's URI
+                    val = val_map.get(ref.uri())
+                    if val is not None:
+                        if isinstance(val, dict) and "_ref" not in val:
+                            val["_ref"] = ref.uri()
+                        set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
