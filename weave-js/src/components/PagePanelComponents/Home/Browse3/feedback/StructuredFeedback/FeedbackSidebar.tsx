@@ -117,6 +117,18 @@ export const FeedbackSidebar = ({
         <div className="text-sm font-semibold">Annotation</div>
         <div className="flex items-center gap-2">
           <Tooltip
+            content="Add annotation field"
+            trigger={
+              <Button
+                onClick={() => setIsNewAnnotationDrawerOpen(true)}
+                variant="ghost"
+                size="small"
+                icon="add-new"
+                aria-label="Add annotation field"
+              />
+            }
+          />
+          <Tooltip
             content="Manage annotation fields"
             trigger={
               <Button
@@ -183,22 +195,22 @@ export const FeedbackSidebar = ({
               Add field
             </Button>
           </div>
-          <CreateAnnotationFieldDrawer
-            entity={entity}
-            project={project}
-            open={isNewAnnotationDrawerOpen}
-            onClose={() => {
-              setIsNewAnnotationDrawerOpen(false);
-              query.refetch();
-              onReloadSpecs?.();
-            }}
-            onSave={() => {
-              query.refetch();
-              onReloadSpecs?.();
-            }}
-          />
         </div>
       )}
+      <CreateAnnotationFieldDrawer
+        entity={entity}
+        project={project}
+        open={isNewAnnotationDrawerOpen}
+        onClose={() => {
+          setIsNewAnnotationDrawerOpen(false);
+          query.refetch();
+          onReloadSpecs?.();
+        }}
+        onSave={() => {
+          query.refetch();
+          onReloadSpecs?.();
+        }}
+      />
     </div>
   );
 };
