@@ -72,8 +72,8 @@ trace_server = [
   "google-cloud-storage>=2.7.0",
   # LLM Support
   "litellm>=1.36.1",
-  "opentelemetry-semantic-conventions-ai >= ^0.4.3",
-  "openinference-semantic-conventions >= ^0.1.17"
+  "opentelemetry-semantic-conventions-ai>=0.4.3",
+  "openinference-semantic-conventions>=0.1.17"
 ]
 trace_server_tests = [
   # BYOB - S3
