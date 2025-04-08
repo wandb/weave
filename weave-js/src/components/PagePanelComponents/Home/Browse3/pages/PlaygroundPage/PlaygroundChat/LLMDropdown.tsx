@@ -157,8 +157,6 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   const handleCloseConfigDrawer = useCallback(() => {
     setConfigDrawerOpen(false);
     setSelectedProvider(null);
-
-    console.log('handleCloseConfigDrawer');
     refetchConfiguredProviders();
   }, [refetchConfiguredProviders]);
 

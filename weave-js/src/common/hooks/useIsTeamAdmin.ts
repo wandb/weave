@@ -10,10 +10,7 @@ export const TEAM_MEMBER_ROLES_QUERY = gql`
       members {
         id
         username
-        memberRole {
-          ID
-          name
-        }
+        role
       }
     }
   }
@@ -67,7 +64,7 @@ export const useIsTeamAdmin = (
 
         setResponse({
           loading: false,
-          isAdmin: userMember?.memberRole.name === 'admin',
+          isAdmin: userMember?.role === 'admin',
         });
       } catch (error) {
         if (mounted) {

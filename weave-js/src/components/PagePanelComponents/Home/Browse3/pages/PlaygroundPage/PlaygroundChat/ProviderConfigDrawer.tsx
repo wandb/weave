@@ -1,4 +1,5 @@
 import {Box} from '@mui/material';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_200, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useInsertSecret} from '@wandb/weave/common/hooks/useSecrets';
 import {Button} from '@wandb/weave/components/Button';
@@ -57,10 +58,14 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
           secretValue: apiKey,
         },
       });
+      toast('Provider secret saved successfully');
       onClose();
       setApiKey('');
     } catch (error) {
       console.error('Error saving secret:', error);
+      toast('Error saving secret', {
+        type: 'error',
+      });
     }
   };
 
