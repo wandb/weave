@@ -39,6 +39,7 @@ from .attributes import (
     unflatten_key_values,
 )
 
+
 class SpanKind(Enum):
     """Enum representing the span's kind."""
 
@@ -248,7 +249,7 @@ class Span:
             "start_time": self.start_time,
             "end_time": self.start_time,
             "status": {"status_code": self.status},
-            "attributes": flatten_attributes(self.attributes._original_attributes),
+            "attributes": flatten_attributes(self.attributes._attributes),
             "events": self.events,
             "links": self.links,
             "resource": self.resource.as_dict() if self.resource else None,
@@ -258,11 +259,11 @@ class Span:
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         summary_insert_map = tsi.SummaryInsertMap(
-            usage={"usage": self.attributes.extract_usage()}
+            usage={"usage": self.attributes.get_weave_usage()}
         )
-        inputs = to_json_serializable(self.attributes.extract_inputs())
-        outputs = to_json_serializable(self.attributes.extract_outputs())
-        attributes = to_json_serializable(self.attributes.extract_attributes())
+        inputs = to_json_serializable(self.attributes.get_weave_inputs())
+        outputs = to_json_serializable(self.attributes.get_weave_outputs())
+        attributes = to_json_serializable(self.attributes.get_weave_attributes())
         attributes["otel_span"] = to_json_serializable(self.as_dict())
 
         # Options: set
@@ -282,7 +283,6 @@ class Span:
             self.status.message if self.status.code == StatusCode.ERROR else None
         )
 
-        print("after end_call")
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
