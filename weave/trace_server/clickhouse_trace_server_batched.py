@@ -1032,8 +1032,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parsed_refs = cast(ObjRefListType, parsed_raw_refs)
         vals = self._parsed_refs_read_batch(parsed_refs)
 
-        print("vals", vals)
-
         return tsi.RefsReadBatchRes(vals=vals)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
@@ -1043,12 +1041,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         root_val_cache: Optional[dict[str, Any]] = None,
     ) -> list[Any]:
         # dedupe parsed_refs
-        print(f"len parsed_refs: {len(parsed_refs)}")
         unique_refs = {}
         for ref in parsed_refs:
             if ref.uri() not in unique_refs:
                 unique_refs[ref.uri()] = ref
-        print(f"len unique_refs: {len(unique_refs)}")
 
         # Next, group the refs by project_id
         refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
@@ -1226,7 +1222,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if ref.uri() not in unique_refs:
                 unique_refs[ref.uri()] = ref
 
-        # Initialize the results with the parsed refs
+        # Initialize the results with the unique parsed refs
         extra_results = [
             PartialRefResult(
                 remaining_extra=[],
@@ -1321,7 +1317,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra, extra_result.val
                     )
 
-        return [r.val for r in extra_results]
+        # map from unique ref to value returned
+        val_map = {u.uri(): r.val for u, r in zip(unique_refs.values(), extra_results)}
+
+        # use the provided parsed refs to determine what values to return
+        non_unique_results = [val_map[r.uri()] for r in parsed_refs]
+
+        return non_unique_results
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
