@@ -292,12 +292,37 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Groq models
-  'groq/gemma-7b-it': {
+  'groq/deepseek-r1-distill-llama-70b': {
+    provider: 'groq',
+    max_tokens: 131072,
+    supports_function_calling: false,
+  },
+  'groq/llama-3.3-70b-versatile': {
     provider: 'groq',
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'groq/gemma2-9b-it': {
+  'groq/llama-3.3-70b-specdec': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: false,
+  },
+  'groq/llama-3.2-1b-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-3b-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-11b-vision-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-90b-vision-preview': {
     provider: 'groq',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -317,14 +342,9 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'groq/llama3-groq-8b-8192-tool-use-preview': {
+  'groq/gemma2-9b-it': {
     provider: 'groq',
     max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'groq/mixtral-8x7b-32768': {
-    provider: 'groq',
-    max_tokens: 32768,
     supports_function_calling: true,
   },
 
