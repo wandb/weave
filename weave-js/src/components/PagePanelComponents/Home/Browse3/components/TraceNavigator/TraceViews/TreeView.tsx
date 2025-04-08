@@ -428,9 +428,20 @@ export const TreeView: React.FC<
   const handleToggleExpand = (id: string) => {
     const newExpandedNodes = new Set(collapsedNodes);
     if (newExpandedNodes.has(id)) {
+      // When expanding, only remove current node from collapsed nodes
       newExpandedNodes.delete(id);
     } else {
-      newExpandedNodes.add(id);
+      // When collapsing, we add this node and all its descendants to collapsed nodes
+      const addDescendants = (nodeId: string) => {
+        newExpandedNodes.add(nodeId);
+        const node = traceTreeFlat[nodeId];
+        if (node) {
+          node.childrenIds.forEach(childId => {
+            addDescendants(childId);
+          });
+        }
+      };
+      addDescendants(id);
     }
     setCollapsedNodes(newExpandedNodes);
   };
