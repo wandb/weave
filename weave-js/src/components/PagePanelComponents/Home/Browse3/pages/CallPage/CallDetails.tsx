@@ -89,8 +89,8 @@ export const CallDetails: FC<{
     () => getDisplayInputsAndOutput(call),
     [call]
   );
-  const {trace_metadata} = useMemo(
-    () => getDisplayTraceMetadata(call),
+  const { attributes, events, links, resource } = useMemo(
+    () => getDisplayOtelSpan(call),
     [call]
   );
   const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
@@ -183,14 +183,71 @@ export const CallDetails: FC<{
             }px)`,
             p: 2,
           }}>
-          {Object.keys(trace_metadata).length > 0 && (
+          {attributes && Object.keys(attributes).length > 0 && (
             <CustomWeaveTypeProjectContext.Provider
               value={{
                 entity: call.entity,
                 project: call.project,
                 mode: 'object_viewer',
               }}>
-              <ObjectViewerSection title="Trace Attributes" data={trace_metadata} isExpanded />
+              <ObjectViewerSection title="OTEL Attributes" data={attributes} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
+          )}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
+            p: 2,
+          }}>
+          {events && Object.keys(events).length > 0 && (
+            <CustomWeaveTypeProjectContext.Provider
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
+              <ObjectViewerSection title="OTEL Events" data={events} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
+          )}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
+            p: 2,
+          }}>
+          {links && Object.keys(links).length > 0 && (
+            <CustomWeaveTypeProjectContext.Provider
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
+              <ObjectViewerSection title="OTEL Links" data={links} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
+          )}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
+            p: 2,
+          }}>
+          {resource && Object.keys(resource).length > 0 && (
+            <CustomWeaveTypeProjectContext.Provider
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
+              <ObjectViewerSection title="OTEL Resource" data={resource} isExpanded />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
@@ -280,14 +337,13 @@ export const CallDetails: FC<{
   );
 };
 
-const getDisplayTraceMetadata = (call: CallSchema) => {
+const getDisplayOtelSpan = (call: CallSchema) => {
   const span = call.rawSpan;
-  console.log(span);
-  console.log(span.attributes);
-  const trace_metadata = span.attributes
-    ? span.attributes['trace_metadata'] ?? {}
+  const otel_span = span.attributes
+    ? span.attributes['otel_span'] ?? {}
     : {};
-  return {trace_metadata}
+  const { attributes, events, links, resource } = otel_span;
+  return { attributes, events, links, resource }
 };
 
 const getDisplayInputsAndOutput = (call: CallSchema) => {
