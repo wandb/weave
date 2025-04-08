@@ -458,8 +458,6 @@ class OpenInferenceAttributes(Attributes):
         if len(keys) == 1:
             outputs = outputs.get(keys[0])
         return to_json_serializable(outputs)
-        # input_messages = self.extract_attribute_value(oi.SpanAttributes.LLM_INPUT_MESSAGES)
-        # input_messages = to_json_serializable(input_messages) if input_messages else None
 
     def extract_inputs(self) -> Any:
         inputs: dict[str, Any] | None = self.extract_attribute_value(
@@ -471,12 +469,6 @@ class OpenInferenceAttributes(Attributes):
         if len(keys) == 1:
             inputs = inputs.get(keys[0])
         return to_json_serializable(inputs)
-        # value = self.extract_attribute_value(oi.SpanAttributes.OUTPUT_VALUE)
-        # mime_type = self.extract_attribute_value(oi.SpanAttributes.OUTPUT_MIME_TYPE)
-        # mime_type = str(mime_type) if mime_type else None
-        # if mime_type == "application/json":
-        #     return json.loads(value)
-        # return { 'value': str(value) }
 
     def extract_usage(self) -> LLMUsageSchema:
         prompt_tokens = self.extract_attribute_value(
