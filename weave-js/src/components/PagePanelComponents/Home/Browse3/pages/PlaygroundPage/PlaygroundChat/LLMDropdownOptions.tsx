@@ -226,6 +226,7 @@ const SubMenuOption = ({
       </Box>
     ),
     [
+      isAdmin,
       children,
       isDisabled,
       isHovered,

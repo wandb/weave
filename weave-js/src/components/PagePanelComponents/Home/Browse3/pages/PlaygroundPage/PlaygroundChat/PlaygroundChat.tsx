@@ -1,9 +1,8 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_200, MOON_500, WHITE} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
-import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import getConfig from '@wandb/weave/config';

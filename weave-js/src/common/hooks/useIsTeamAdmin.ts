@@ -1,10 +1,25 @@
-import {gql, useApolloClient} from '@apollo/client';
+import {gql, TypedDocumentNode, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
 import {useViewerInfo} from './useViewerInfo';
 
-export const TEAM_MEMBER_ROLES_QUERY = gql`
-  query TeamMemberRoles($entityName: String!) {
+interface EntityMemberRolesData {
+  entity: {
+    id: string;
+    members: Array<{
+      id: string;
+      username: string;
+      role: string;
+    }>;
+  };
+}
+
+interface EntityMemberRolesVars {
+  entityName: string;
+}
+
+export const ENTITY_MEMBER_ROLES_QUERY = gql`
+  query EntityMemberRoles($entityName: String!) {
     entity(name: $entityName) {
       id
       members {
@@ -14,7 +29,7 @@ export const TEAM_MEMBER_ROLES_QUERY = gql`
       }
     }
   }
-`;
+` as TypedDocumentNode<EntityMemberRolesData, EntityMemberRolesVars>;
 
 type TeamAdminResponse = {
   loading: boolean;
@@ -39,7 +54,7 @@ export const useIsTeamAdmin = (
     const fetchEntityData = async () => {
       try {
         const result = await apolloClient.query({
-          query: TEAM_MEMBER_ROLES_QUERY,
+          query: ENTITY_MEMBER_ROLES_QUERY,
           variables: {entityName},
         });
 
@@ -59,7 +74,8 @@ export const useIsTeamAdmin = (
         }
 
         const userMember = entityData.members.find(
-          (member: any) => member.username === username
+          (member: {username: string; role: string}) =>
+            member.username === username
         );
 
         setResponse({

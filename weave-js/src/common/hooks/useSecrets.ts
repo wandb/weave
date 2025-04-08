@@ -9,7 +9,7 @@ import {
   useApolloClient,
   useMutation,
 } from '@apollo/client';
-import {useCallback,useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 
 const SECRETS_QUERY = gql`
   query secrets($entityName: String!) {
