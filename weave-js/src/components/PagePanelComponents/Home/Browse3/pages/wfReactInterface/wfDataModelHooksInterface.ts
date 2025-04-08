@@ -76,6 +76,7 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
+  userId?: string;
 };
 
 export type OpVersionFilter = {
@@ -232,6 +233,7 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
+    orderBy?: traceServerClientTypes.SortBy[],
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (

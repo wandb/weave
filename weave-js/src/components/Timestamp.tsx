@@ -29,42 +29,59 @@ type TimestampProps = {
 };
 
 // Format a time difference to a micro string (1h, 1d, 1w, etc.)
-const formatSmallTime = (then: moment.Moment): string => {
+const formatSmallTime = (then: moment.Moment): string | null => {
   const now = moment();
   const diffMs = now.diff(then);
 
   const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  // Only use weeks when it's an exact multiple
-  if (days % 7 === 0) {
-    const weeks = days / 7;
-    if (weeks === 1) {
-      return '1w';
-    } else if (weeks > 1) {
-      return `${weeks}w`;
-    }
+  const years = now.diff(then, 'years');
+  if (years > 0) {
+    return `${years}y`;
   }
 
-  // Only use months when it's an exact multiple of 30
-  if (days % 30 === 0) {
-    const months = days / 30;
-    if (months === 1) {
-      return '1mo';
-    } else if (months > 1) {
-      return `${months}mo`;
-    }
+  const monthDiff = now.diff(then, 'months');
+
+  // Always show months if 3 or more
+  if (monthDiff >= 3) {
+    return `${monthDiff}mo`;
   }
 
-  // Otherwise use days for more precision
+  // Get remaining days by moving forward the months and checking what's left
+  const afterMonths = then.clone().add(monthDiff, 'months');
+  const remainingDays = now.diff(afterMonths, 'days');
+
+  // Show months if exact multiple
+  if (monthDiff > 0 && remainingDays === 0) {
+    return `${monthDiff}mo`;
+  }
+
+  // Show weeks when more than 14 days or exact
+  const weeks = Math.round(days / 7);
+  if (weeks >= 2) {
+    return `${weeks}w`;
+  }
+
+  // Show weeks when exact multiple
+  if (days >= 7 && days % 7 === 0) {
+    return `${weeks}w`;
+  }
+
+  // Otherwise use days or more precise units
   if (days >= 1) {
     return days === 1 ? '1d' : `${days}d`;
   } else if (hours >= 1) {
     return hours === 1 ? '1h' : `${hours}h`;
+  } else if (minutes >= 1) {
+    return minutes === 1 ? '1m' : `${minutes}m`;
+  } else if (seconds >= 1) {
+    return seconds === 1 ? '1s' : `${seconds}s`;
   } else {
-    return '<1h';
+    // If the time is in the future, return null
+    return null;
   }
 };
 
@@ -147,9 +164,7 @@ export const Timestamp = ({
 
   // Use different formats based on whether it's midnight
   const shortFormat = isMidnight ? 'MMM Do YYYY' : 'MMM Do YYYY [at] h:mma';
-  const longFormat = isMidnight
-    ? 'dddd, MMMM Do YYYY'
-    : 'dddd, MMMM Do YYYY [at] h:mm:ss a';
+  const longFormat = 'dddd, MMMM Do YYYY [at] h:mm:ss a';
 
   const short = then.format(shortFormat);
   const long = then.format(longFormat);
@@ -165,8 +180,12 @@ export const TimestampSmall = ({
   /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
      in a nice gray tooltip
    */
-  const then = valueToMoment(value);
-  const {long, small} = formatTimestampInternal(then);
+  const localValueMoment = moment(value);
+  const {long, small} = formatTimestampInternal(localValueMoment);
+  if (!small) {
+    // default to regular timestamp, which expects utc
+    return <Timestamp value={value} dropTimeWhenDefault />;
+  }
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />

@@ -2,7 +2,7 @@
 
 > **The LLM Playground is currently in preview.**
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure.
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
 ## Features
 
@@ -25,6 +25,10 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Add a new message](#add-a-new-message)
 - [Compare LLMs](#compare-llms)
 - [Adjust the number of trials](#adjust-the-number-of-trials)
+- [Add a custom provider](#add-a-custom-provider)
+- [Edit a custom provider](#edit-a-custom-provider)
+- [Remove a custom provider](#remove-a-custom-provider)
+- [Use ngrok with Ollama](#use-ngrok-with-ollama)
 
 ## Prerequisites
 
@@ -37,7 +41,7 @@ Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazo
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
 - Google: `GOOGLE_API_KEY`
-- Groq: `GEMMA_API_KEY`
+- Groq: `GROQ_API_KEY`
 - Amazon Bedrock:
   - `AWS_ACCESS_KEY_ID`
   - `AWS_SECRET_ACCESS_KEY`
@@ -46,6 +50,10 @@ Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazo
   - `AZURE_API_KEY`
   - `AZURE_API_BASE`
   - `AZURE_API_VERSION`
+- X.AI:
+  - `XAI_API_KEY`
+- Deepseek
+  - `DEEPSEEK_API_KEY`
 
 ### Access the Playground
 
@@ -70,6 +78,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - [Groq](#groq)
 - [OpenAI](#openai)
 - [X.AI](#xai)
+- [Deepseek](#deepseek)
 
 ### [Amazon Bedrock](../integrations/bedrock.md)
 
@@ -183,6 +192,11 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - xai/grok-2
 - xai/grok-2-latest
 
+### Deepseek
+
+- deepseek/deepseek-reasoner
+- deepseek/deepseek-chat
+
 ## Adjust LLM parameters
 
 You can experiment with different parameter values for your selected model. To adjust parameters, do the following:
@@ -241,3 +255,127 @@ Playground allows you to generate multiple outputs for the same input by setting
 
 1. In the Playground UI, open the settings sidebar if it is not already open.
 2. Adjust the **Number of trials**.
+
+## Add a custom provider
+
+In addition to the [supported providers](#select-an-llm), you can use the Playground to test OpenAI compatible API endpoints for custom models. Examples include:
+
+- Older versions of supported model providers
+- Local models
+
+To add a custom provider to the Playground, do the following:
+
+1. In the upper left corner of the Playground UI, click the **Select a model** dropdown.
+2. Select **+ Add AI provider**.
+3. In the pop-up modal, enter the provider information:
+
+   - _Provider name_: For example, `openai` or `ollama`.
+   - _API key_: For example, an OpenAI API key.
+   - _Base URL_: For example, `https://api.openai.com/v1/` or a ngrok URL `https://e452-2600-1700-45f0-3e10-2d3f-796b-d6f2-8ba7.ngrok-free.app`.
+   - _Headers_ (optional): You can add multiple header keys and values.
+   - _Models_: You can add multiple models for one provider. For example, `deepseek-r1` and `qwq`.
+   - _Max tokens_ (optional): For each model, you can specify the max tokens that the model can generate in a response.
+
+4. Once you've entered your provider information, click **Add provider**.
+5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI.
+
+:::important
+Because of CORS restrictions, you can't call localhost or 127.0.0.1 URLs directly from the Playground. If you're running a local model server (such as Ollama), use a tunneling service like ngrok to expose it securely. For details, see [Use ngrok with Ollama](#use-ngrok-with-ollama).
+:::
+
+Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
+
+## Edit a custom provider
+
+To edit information for a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overview**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the edit button (the pencil icon).
+5. In the pop-up modal, edit the provider information.
+6. Click **Save**.
+
+## Remove a custom provider
+
+To remove a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overview**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the delete button (the trashcan icon).
+5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
+6. Click **Delete**.
+
+## Use ngrok with Ollama
+
+To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions.
+
+To set it up, do the following:
+
+1. [Install ngrok](https://ngrok.com/docs/getting-started/#step-1-install) for your operating system.
+2. Start your Ollama model:
+
+   ```bash
+   ollama run <model>
+   ```
+
+3. In a separate terminal, create an ngrok tunnel with the required CORS headers:
+
+   ```bash
+   ngrok http 11434 --response-header-add "Access-Control-Allow-Origin: *" --host-header rewrite
+   ```
+
+After ngrok starts, it will display a public URL, such as `https://xxxx-xxxx.ngrok-free.app`. Use this URL as the base URL when you add Ollama as a custom provider in the Playground.
+
+The following diagram illustrates the data flow between your local environment, the ngrok proxy, and the W&B cloud services:
+
+```mermaid
+flowchart LR
+    %% Style definitions
+    classDef clientMachine fill:#FFD95CCC,stroke:#454B52,stroke-width:2px
+    classDef proxy fill:#00CDDBCC,stroke:#454B52,stroke-width:2px
+    classDef wandbCloud fill:#DE72FFCC,stroke:#454B52,stroke-width:2px
+    classDef publicCloud fill:#FFCBADCC,stroke:#454B52,stroke-width:2px
+
+    %% Subgraphs
+    subgraph Client_Machine
+        browser[Browser]
+        llm_local[Local LLM Provider]
+    end
+
+    subgraph Proxy
+        ngrok[Ngrok Proxy]
+    end
+
+    subgraph WandB_Cloud
+        trace_server[Trace Server]
+    end
+
+    subgraph Public_Cloud
+        llm_cloud[Public LLM Provider]
+    end
+
+    %% Apply styles to subgraphs
+    class Client_Machine clientMachine
+    class Proxy proxy
+    class WandB_Cloud wandbCloud
+    class Public_Cloud publicCloud
+
+    %% Current Data Flow
+    browser -->|Sends chat request| trace_server
+    trace_server -->|Uses Public LLM| llm_cloud
+    trace_server -->|Uses Local LLM| ngrok
+    ngrok -->|Forwards to| llm_local
+    llm_cloud -->|Returns response| trace_server
+    llm_local -->|Returns response| ngrok
+    ngrok -->|Forwards to| trace_server
+    trace_server -->|Returns response| browser
+
+    %% Future Possible Connection
+    browser -.->|Future: Call local LLM directly| llm_local
+
+    %% Link styles
+    linkStyle default stroke:#454B52,stroke-width:2px
+    linkStyle 8 stroke:#454B52,stroke-width:2px,stroke-dasharray:5
+```
