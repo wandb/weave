@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestException, client_is_sqlite
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
@@ -570,7 +570,9 @@ def create_client(
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+        )
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
@@ -687,3 +689,12 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+
+    ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+    return ch_server.ch_client
