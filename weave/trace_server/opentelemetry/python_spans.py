@@ -34,7 +34,6 @@ from weave.trace_server import trace_server_interface as tsi
 from .attributes import (
     Attributes,
     AttributesFactory,
-    flatten_attributes,
     to_json_serializable,
     unflatten_key_values,
 )
@@ -246,23 +245,25 @@ class Span:
 
     # The full OTEL Span as it is recieved
     def as_dict(self) -> dict[str, Any]:
-        return to_json_serializable({
-            "name": self.name,
-            "context": {
-                "trace_id": self.trace_id,
-                "span_id": self.span_id,
-                "trace_state": self.trace_state,
-            },
-            "kind": self.kind.name,
-            "parent_id": self.parent_id,
-            "start_time": self.start_time,
-            "end_time": self.end_time,
-            "status": self.status.as_dict(),
-            "attributes": flatten_attributes(self.attributes._attributes),
-            "events": self.events,
-            "links": self.links,
-            "resource": self.resource.as_dict() if self.resource else None,
-        })
+        return to_json_serializable(
+            {
+                "name": self.name,
+                "context": {
+                    "trace_id": self.trace_id,
+                    "span_id": self.span_id,
+                    "trace_state": self.trace_state,
+                },
+                "kind": self.kind.name,
+                "parent_id": self.parent_id,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "status": self.status.as_dict(),
+                "attributes": self.attributes._attributes,
+                "events": self.events,
+                "links": self.links,
+                "resource": self.resource.as_dict() if self.resource else None,
+            }
+        )
 
     def to_call(
         self, project_id: str
