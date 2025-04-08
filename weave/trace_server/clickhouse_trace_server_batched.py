@@ -128,6 +128,8 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.kafka import KafkaProducer
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
