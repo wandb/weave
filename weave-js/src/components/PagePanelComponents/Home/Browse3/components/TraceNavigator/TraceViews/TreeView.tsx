@@ -137,7 +137,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
             ) : (
-              <div className="w-[8px]" />
+              <div className="w-[18px]" />
             )}
             <div className="truncate pl-4 font-medium">
               <Tooltip
