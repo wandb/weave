@@ -4,9 +4,11 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React, {useEffect, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
@@ -45,6 +47,8 @@ export const FeedbackSidebar = ({
   const {loading: orgNameLoading, orgName} = useOrgName({
     entityName: entity,
   });
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -109,16 +113,30 @@ export const FeedbackSidebar = ({
   return (
     <div className="flex h-full w-full flex-col bg-white">
       <div className="flex min-h-[32px] w-full items-center justify-between px-12">
-        <div className="text-sm font-semibold">Annotations</div>
-        {onClose && (
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="small"
-            icon="close"
-            aria-label="Close feedback sidebar"
+        <div className="text-sm font-semibold">Annotation</div>
+        <div className="flex items-center gap-2">
+          <Tooltip 
+            content="Manage annotation fields"
+            trigger={
+              <Button
+                onClick={() => history.push(baseRouter.scorersUIUrl(entity, project))}
+                variant="ghost"
+                size="small"
+                icon="settings"
+                aria-label="Manage annotation fields"
+              />
+            }
           />
-        )}
+          {onClose && (
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="small"
+              icon="close"
+              aria-label="Close feedback sidebar"
+            />
+          )}
+        </div>
       </div>
       <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
