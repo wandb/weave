@@ -9,7 +9,6 @@ import {HorizontalBox, VerticalBox} from './Layout';
 import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizePlotsSection';
 import {TraceCallsSection} from './TraceCallsSection';
 
-// SummarizeCallsSection component
 export const SummarizeCallsSection: React.FC<{
   summarizeCalls: Array<{callId: string; traceCall: any}>;
   entity?: string;
@@ -28,7 +27,6 @@ export const SummarizeCallsSection: React.FC<{
       grouped[parentId].push(call);
     });
 
-    console.log('callsByParent', grouped);
     return grouped;
   }, [summarizeCalls]);
 
@@ -52,14 +50,6 @@ export const SummarizeCallsSection: React.FC<{
         const output = call?.traceCall?.output; // Check traceCall.output as indicated by user
         const inputs = call?.traceCall?.inputs || {};
 
-        // Log to debug the actual data structure
-        console.log(`Summarize call for ${parentId}:`, {
-          resultObj,
-          output,
-          inputs,
-          fullCall: call,
-        });
-
         // Try various paths where metrics might be stored
         const potentialMetricsObjects = [
           output, // Direct output as mentioned by user
@@ -81,7 +71,6 @@ export const SummarizeCallsSection: React.FC<{
       }
     });
 
-    console.log('Found metrics:', Array.from(metrics));
     return Array.from(metrics).sort();
   }, [callsByParent]);
 
