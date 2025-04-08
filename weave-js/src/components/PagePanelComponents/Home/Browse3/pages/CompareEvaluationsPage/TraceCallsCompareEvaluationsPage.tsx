@@ -11,7 +11,7 @@ import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizeP
 import {TraceCallsSection} from './TraceCallsSection';
 
 export const SummarizeCallsSection: React.FC<{
-  summarizeCalls: Array<{callId: string; traceCall: any}>;
+  summarizeCalls: Array<TraceCallData>;
   entity?: string;
   project?: string;
   state: EvaluationComparisonState;
@@ -221,7 +221,7 @@ export const SummarizeCallsSection: React.FC<{
           {allMetrics.map((metricName, metricIndex) => {
             // Get a sample of this metric to determine type
             let sampleValue;
-            for (const [evalId, calls] of Object.entries(callsByParent)) {
+            for (const [, calls] of Object.entries(callsByParent)) {
               if (calls.length > 0) {
                 const value = getMetricValue(calls[0], metricName);
                 if (value !== undefined) {
@@ -444,7 +444,7 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
             </HorizontalBox>
             <Box
               sx={{
-                height: 400, // Fixed height for plots section
+                minHeight: 300, // Fixed height for plots section
                 overflow: 'auto',
               }}>
               <SummarizePlotsSection
@@ -474,7 +474,7 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
             </HorizontalBox>
             <Box
               sx={{
-                height: 300, // Fixed height for summary section
+                minHeight: 200, // Minimum height for summary section
                 overflow: 'auto',
                 marginTop: STANDARD_PADDING,
               }}>
@@ -512,7 +512,7 @@ export const TraceCallsCompareEvaluationsPage: React.FC<
           </HorizontalBox>
           <Box
             sx={{
-              height: summarizeCalls.length > 0 ? height - 700 : height, // Adjust height based on whether summary sections are shown
+              height,
               overflow: 'auto',
             }}>
             <TraceCallsSection

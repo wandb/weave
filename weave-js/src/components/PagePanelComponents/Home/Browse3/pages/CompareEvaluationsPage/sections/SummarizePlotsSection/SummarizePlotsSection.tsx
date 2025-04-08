@@ -12,6 +12,7 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
+import {TraceCallData} from '../../ecpTypes';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {MetricsSelector} from '../SummaryPlotsSection/MetricsSelector';
 import {PlotlyBarPlot} from '../SummaryPlotsSection/PlotlyBarPlot';
@@ -64,7 +65,7 @@ export const getMetricsFromCall = (call: {
 };
 
 interface SummarizePlotsProps {
-  summarizeCalls: Array<{callId: string; traceCall: any}>;
+  summarizeCalls: Array<TraceCallData>;
   state: EvaluationComparisonState;
 }
 
