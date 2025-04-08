@@ -5,11 +5,11 @@
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
