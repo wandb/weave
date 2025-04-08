@@ -12,14 +12,12 @@ import {
 import {EvaluationComparisonState} from './ecpState';
 import {HorizontalBox, VerticalBox} from './Layout';
 
-// Add a new component for displaying trace calls
 export const TraceCallsSection: React.FC<{
   traceCalls: Array<{callId: string; traceCall: any}>;
   entity?: string;
   project?: string;
   state: EvaluationComparisonState;
 }> = ({traceCalls, entity, project, state}) => {
-  // Pagination state - must be at the top level of the component
   const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
 
   // Group calls by their parent evaluation
