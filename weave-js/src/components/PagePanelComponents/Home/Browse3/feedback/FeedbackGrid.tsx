@@ -1,10 +1,13 @@
 import {Box} from '@mui/material';
+import {Popover} from '@mui/material';
+import EmojiPicker, {EmojiClickData} from 'emoji-picker-react';
 import _ from 'lodash';
 import React, {useEffect, useMemo} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Alert} from '../../../../Alert';
 import {Button} from '../../../../Button';
+import {TextField} from '../../../../Form/TextField';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
 import {Empty} from '../pages/common/Empty';
@@ -12,13 +15,10 @@ import {EMPTY_PROPS_FEEDBACK} from '../pages/common/EmptyContent';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
+import {Notes} from './Notes';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
-import {Popover} from '@mui/material';
-import {TextField} from '../../../../Form/TextField';
 import {WeaveEmojiPicker} from './WeaveEmojiPicker';
-import EmojiPicker, {EmojiClickData} from 'emoji-picker-react';
-import {Notes} from './Notes';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
