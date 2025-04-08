@@ -10,9 +10,10 @@ import React, {useEffect, useState} from 'react';
 
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
-import {NewScorerDrawer} from '../../pages/ScorersPage/NewScorerDrawer';
+import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotationFieldDrawer';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
+import {useWeaveflowRouteContext} from '../../context';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -36,7 +37,7 @@ export const FeedbackSidebar = ({
   onClose,
 }: FeedbackSidebarProps) => {
   const [isSaving, setIsSaving] = useState(false);
-  const [isNewScorerDrawerOpen, setIsNewScorerDrawerOpen] = useState(false);
+  const [isNewAnnotationDrawerOpen, setIsNewAnnotationDrawerOpen] = useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
@@ -155,22 +156,25 @@ export const FeedbackSidebar = ({
           <div className="flex flex-col items-center mx-8 gap-16 mt-[38px]">
             <Empty {...EMPTY_PROPS_ANNOTATIONS} />
             <Button
-              onClick={() => setIsNewScorerDrawerOpen(true)}
+              onClick={() => setIsNewAnnotationDrawerOpen(true)}
               variant="primary"
               icon="add-new">
               Add field
             </Button>
           </div>
-          <NewScorerDrawer
+          <CreateAnnotationFieldDrawer
             entity={entity}
             project={project}
-            open={isNewScorerDrawerOpen}
+            open={isNewAnnotationDrawerOpen}
             onClose={() => {
-              setIsNewScorerDrawerOpen(false);
+              setIsNewAnnotationDrawerOpen(false);
               query.refetch();
               onReloadSpecs?.();
             }}
-            initialScorerType="ANNOTATION"
+            onSave={() => {
+              query.refetch();
+              onReloadSpecs?.();
+            }}
           />
         </div>
       )}
