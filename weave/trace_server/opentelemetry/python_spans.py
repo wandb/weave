@@ -39,7 +39,6 @@ from .attributes import (
     unflatten_key_values,
 )
 
-
 class SpanKind(Enum):
     """Enum representing the span's kind."""
 
@@ -262,8 +261,11 @@ class Span:
             usage={"usage": self.attributes.get_weave_usage()}
         )
         inputs = to_json_serializable(self.attributes.get_weave_inputs())
+        print(inputs)
         outputs = to_json_serializable(self.attributes.get_weave_outputs())
+        print(outputs)
         attributes = to_json_serializable(self.attributes.get_weave_attributes())
+        print(attributes)
         attributes["otel_span"] = to_json_serializable(self.as_dict())
 
         # Options: set

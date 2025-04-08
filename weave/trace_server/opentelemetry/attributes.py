@@ -13,17 +13,6 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
-
-# If a list of len 1 is provided, don't bother indexing it, just treat it as a singleton
-# This could cause issues actually if
-def _flatten_single_key(d: dict[str, Any] | None) -> Any:
-    if not d:
-        return None
-    keys = list(d.keys())
-    if len(keys) == 1:
-        return d.get(keys[0])
-
-
 def to_json_serializable(value: Any) -> Any:
     """
     Transform common data types into JSON-serializable values.
@@ -451,13 +440,29 @@ class OpenInferenceAttributes(Attributes):
         outputs: dict[str, Any] | None = self.get_attribute_value(
             oi.SpanAttributes.LLM_OUTPUT_MESSAGES
         )
-        return to_json_serializable(outputs)
+        result = {}
+        if isinstance(outputs, dict):
+            for k, v in outputs.items():
+                if k.isdigit() and isinstance(v, dict):
+                    for key in v.keys():
+                        result[key + f"_{k}"] = v[key]
+        else:
+            result = outputs
+        return result
 
     def get_weave_inputs(self) -> Any:
         inputs: dict[str, Any] | None = self.get_attribute_value(
             oi.SpanAttributes.LLM_INPUT_MESSAGES
         )
-        return to_json_serializable(inputs)
+        result = {}
+        if isinstance(inputs, dict):
+            for k, v in inputs.items():
+                if k.isdigit() and isinstance(v, dict):
+                    for key in v.keys():
+                        result[key + f"_{k}"] = v[key]
+        else:
+            result = inputs
+        return result
 
     def get_weave_usage(self) -> LLMUsageSchema:
         prompt_tokens = self.get_attribute_value(
@@ -490,16 +495,20 @@ class OpenTelemetryAttributes(Attributes):
         return attributes
 
     def get_weave_outputs(self) -> Any:
-        completions: dict[str, Any] | None = self.get_attribute_value(
+        outputs: dict[str, Any] | None = self.get_attribute_value(
             ot.SpanAttributes.LLM_COMPLETIONS
         )
-        return to_json_serializable(completions) or {}
+        if isinstance(outputs, dict) and outputs.keys():
+            return convert_numeric_keys_to_list(outputs)
+        return outputs or {}
 
     def get_weave_inputs(self) -> Any:
-        prompts: dict[str, Any] | None = self.get_attribute_value(
+        inputs: dict[str, Any] | None = self.get_attribute_value(
             ot.SpanAttributes.LLM_PROMPTS
         )
-        return to_json_serializable(prompts) or {}
+        if isinstance(inputs, dict) and inputs.keys():
+            return convert_numeric_keys_to_list(inputs)
+        return inputs or {}
 
     def get_weave_usage(self) -> LLMUsageSchema:
         prompt_tokens = self.get_attribute_value(
