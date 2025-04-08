@@ -4,9 +4,9 @@ import importlib
 from typing import TYPE_CHECKING, Callable
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from mistralai.models import (
@@ -88,7 +88,7 @@ def mistral_stream_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
+        acc_op = _add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
         return acc_op
 
     return wrapper

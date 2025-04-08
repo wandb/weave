@@ -1,7 +1,4 @@
-import isEqual from 'lodash/isEqual';
 import React, {createContext, useCallback, useContext, useState} from 'react';
-
-import {flattenObjectPreservingWeaveTypes} from '../flattenObject';
 
 export interface DatasetRow {
   [key: string]: any;
@@ -10,6 +7,7 @@ export interface DatasetRow {
     index?: number;
     isNew?: boolean;
     serverValue?: any;
+    editedFields?: Set<string>; // Set of field paths that have been edited
   };
 }
 
@@ -17,8 +15,14 @@ interface DatasetEditContextType {
   /** Map of complete edited rows, keyed by row absolute index */
   editedRows: Map<number, DatasetRow>;
   setEditedRows: React.Dispatch<React.SetStateAction<Map<number, DatasetRow>>>;
-  /** Get edited fields for a row */
-  getEditedFields: (rowIndex: number) => {[fieldName: string]: unknown};
+  /** Check if a specific field in a row has been edited */
+  isFieldEdited: (rowIndex: number, fieldName: string) => boolean;
+  /** Mark a field as edited or not edited within the row object */
+  setFieldEdited: (
+    rowIndex: number,
+    fieldName: string,
+    isEdited: boolean
+  ) => void;
   /** Array of row indices that have been marked for deletion */
   deletedRows: number[];
   setDeletedRows: React.Dispatch<React.SetStateAction<number[]>>;
@@ -31,6 +35,8 @@ interface DatasetEditContextType {
   convertEditsToTableUpdateSpec: () => Array<
     {pop: {index: number}} | {insert: {index: number; row: Record<string, any>}}
   >;
+  /** Get rows without any mui datagrid or weave metadata */
+  getRowsNoMeta: () => Array<Record<string, any>>;
 }
 
 export const DatasetEditContext = createContext<
@@ -49,59 +55,64 @@ export const useDatasetEditContext = () => {
 
 interface DatasetEditProviderProps {
   children: React.ReactNode;
+  initialAddedRows?: Map<string, DatasetRow>;
 }
 
 export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
   children,
+  initialAddedRows,
 }) => {
   const [editedRows, setEditedRows] = useState<Map<number, DatasetRow>>(
     new Map()
   );
   const [deletedRows, setDeletedRows] = useState<number[]>([]);
   const [addedRows, setAddedRows] = useState<Map<string, DatasetRow>>(
-    new Map()
+    initialAddedRows || new Map()
   );
 
-  const getEditedFields = useCallback(
-    (rowIndex: number) => {
+  const isFieldEdited = useCallback(
+    (rowIndex: number, fieldName: string): boolean => {
       const editedRow = editedRows.get(rowIndex);
-      const originalRow = editedRow?.___weave?.serverValue ?? editedRow;
       if (!editedRow) {
-        return {};
+        return false;
       }
-      const flattenedOriginalRow =
-        flattenObjectPreservingWeaveTypes(originalRow);
-      const flattenedEditedRow = flattenObjectPreservingWeaveTypes(editedRow);
-      return Object.fromEntries(
-        Object.entries(flattenedEditedRow).filter(
-          ([key, value]) =>
-            !key.startsWith('___weave') &&
-            !isEqual(value, flattenedOriginalRow[key])
-        )
-      );
+
+      return editedRow.___weave?.editedFields?.has(fieldName) ?? false;
     },
     [editedRows]
   );
 
-  // Cleanup effect to remove rows that no longer have any edits
-  // from the editedRows map.
-  React.useEffect(() => {
-    const rowsToRemove: number[] = [];
-    editedRows.forEach((editedRow, rowIndex) => {
-      const fields = getEditedFields(rowIndex);
-      if (Object.keys(fields).length === 0) {
-        rowsToRemove.push(rowIndex);
-      }
-    });
-
-    if (rowsToRemove.length > 0) {
+  const setFieldEdited = useCallback(
+    (rowIndex: number, fieldName: string, isEdited: boolean) => {
       setEditedRows(prev => {
         const newMap = new Map(prev);
-        rowsToRemove.forEach(index => newMap.delete(index));
+        const row = newMap.get(rowIndex);
+
+        if (!row) {
+          return newMap;
+        }
+
+        if (!row.___weave.editedFields) {
+          row.___weave.editedFields = new Set<string>();
+        }
+
+        if (isEdited) {
+          row.___weave.editedFields.add(fieldName);
+        } else {
+          row.___weave.editedFields.delete(fieldName);
+        }
+
+        if (row.___weave.editedFields.size === 0 && !row.___weave.isNew) {
+          newMap.delete(rowIndex);
+        } else {
+          newMap.set(rowIndex, row);
+        }
+
         return newMap;
       });
-    }
-  }, [editedRows, getEditedFields]);
+    },
+    [setEditedRows]
+  );
 
   const reset = useCallback(() => {
     setEditedRows(new Map());
@@ -153,20 +164,30 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
     return updates;
   }, [editedRows, deletedRows, addedRows, cleanRow]);
 
-  // Use an effect to always remove d
+  const getRowsNoMeta = useCallback(() => {
+    const allRows = [
+      ...Array.from(addedRows.values()),
+      ...Array.from(editedRows.values()),
+    ]
+      .filter((_, index) => !deletedRows.includes(index))
+      .map(row => cleanRow(row));
+    return allRows;
+  }, [addedRows, cleanRow, deletedRows, editedRows]);
 
   return (
     <DatasetEditContext.Provider
       value={{
         editedRows,
         setEditedRows,
-        getEditedFields,
+        isFieldEdited,
+        setFieldEdited,
         deletedRows,
         setDeletedRows,
         addedRows,
         setAddedRows,
         resetEditState: reset,
         convertEditsToTableUpdateSpec,
+        getRowsNoMeta,
       }}>
       {children}
     </DatasetEditContext.Provider>

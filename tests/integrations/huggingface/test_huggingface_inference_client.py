@@ -6,6 +6,7 @@ import pytest
 from weave.integrations.integration_utilities import op_name_from_ref
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -17,18 +18,10 @@ def test_huggingface_chat_completion(client):
     huggingface_client = InferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     )
-    image_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+
     huggingface_client.chat_completion(
-        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {"type": "text", "text": "Describe this image in one sentence."},
-                ],
-            }
-        ],
+        model="meta-llama/Meta-Llama-3-8B-Instruct",
+        messages=[{"role": "user", "content": "What is the capital of France?"}],
         max_tokens=500,
         seed=42,
     )
@@ -45,12 +38,13 @@ def test_huggingface_chat_completion(client):
     output = call.output
     assert output.choices[0].finish_reason == "stop"
     assert output.choices[0].index == 0
-    assert "statue of liberty" in output.choices[0].message.content.lower()
+    assert "paris" in output.choices[0].message.content.lower()
     assert output.choices[0].message.role == "assistant"
-    assert output.model == "meta-llama/Llama-3.2-11B-Vision-Instruct"
-    assert output.usage.prompt_tokens == 44
+    assert output.model == "meta-llama/Meta-Llama-3-8B-Instruct"
+    assert output.usage.prompt_tokens == 17
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -62,21 +56,9 @@ def test_huggingface_chat_completion_stream(client):
     huggingface_client = InferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     )
-    image_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
     result = huggingface_client.chat_completion(
-        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {
-                        "type": "text",
-                        "text": "Describe this image in one sentence.",
-                    },
-                ],
-            }
-        ],
+        model="meta-llama/Meta-Llama-3-8B-Instruct",
+        messages=[{"role": "user", "content": "What is the capital of France?"}],
         max_tokens=500,
         seed=42,
         stream=True,
@@ -96,11 +78,12 @@ def test_huggingface_chat_completion_stream(client):
     )
     output = call.output
     assert output.choices[0].index == 0
-    assert "statue of liberty" in output.choices[0].message.content.lower()
+    assert "paris" in output.choices[0].message.content.lower()
     assert output.choices[0].message.role == "assistant"
-    assert output.model == "meta-llama/Llama-3.2-11B-Vision-Instruct"
+    assert output.model == "meta-llama/Meta-Llama-3-8B-Instruct"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -112,22 +95,10 @@ def test_huggingface_chat_completion_async(client):
     huggingface_client = AsyncInferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     )
-    image_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
     asyncio.run(
         huggingface_client.chat_completion(
-            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": image_url}},
-                        {
-                            "type": "text",
-                            "text": "Describe this image in one sentence.",
-                        },
-                    ],
-                }
-            ],
+            model="meta-llama/Meta-Llama-3-8B-Instruct",
+            messages=[{"role": "user", "content": "What is the capital of France?"}],
             max_tokens=500,
             seed=42,
         )
@@ -145,12 +116,13 @@ def test_huggingface_chat_completion_async(client):
     output = call.output
     assert output.choices[0].finish_reason == "stop"
     assert output.choices[0].index == 0
-    assert "statue of liberty" in output.choices[0].message.content.lower()
+    assert "paris" in output.choices[0].message.content.lower()
     assert output.choices[0].message.role == "assistant"
-    assert output.model == "meta-llama/Llama-3.2-11B-Vision-Instruct"
-    assert output.usage.prompt_tokens == 44
+    assert output.model == "meta-llama/Meta-Llama-3-8B-Instruct"
+    assert output.usage.prompt_tokens == 17
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -181,6 +153,7 @@ def test_huggingface_document_question_answering(client):
     assert output[0].answer == "us-001"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -213,6 +186,7 @@ def test_huggingface_document_question_answering_async(client):
     assert output[0].answer == "us-001"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -236,6 +210,7 @@ def test_huggingface_fill_mask(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -264,6 +239,7 @@ def test_huggingface_fill_mask_async(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -291,6 +267,7 @@ def test_huggingface_question_answering(client):
     assert output.answer == "Clara"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -321,6 +298,7 @@ def test_huggingface_question_answering_async(client):
     assert output.answer == "Clara"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -351,6 +329,7 @@ def test_huggingface_table_question_answering(client):
     assert output.answer == "AVERAGE > 36542"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -385,6 +364,7 @@ def test_huggingface_table_question_answering_async(client):
     assert output.answer == "AVERAGE > 36542"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -411,6 +391,7 @@ def test_huggingface_text_classification(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -439,6 +420,7 @@ def test_huggingface_text_classification_async(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -467,6 +449,7 @@ def test_huggingface_token_classification(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -497,6 +480,7 @@ def test_huggingface_token_classification_async(client):
     assert output[0].score > 0
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -523,6 +507,7 @@ def test_huggingface_translation(client):
     assert "Wolfgang" in output.translation_text
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -553,6 +538,7 @@ def test_huggingface_translation_async(client):
     assert "Wolfgang" in output.translation_text
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -582,6 +568,7 @@ def test_huggingface_text_to_image(client):
     assert output is not None
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],

@@ -2,12 +2,11 @@
 
 from textwrap import dedent
 
-from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-from weave.scorers.llm_scorer import LLMScorer
+from weave.scorers.scorer_types import LLMScorer
 
 
 class EntityExtractionResponse(BaseModel):
@@ -32,8 +31,8 @@ class ContextEntityRecallScorer(LLMScorer):
         extraction_prompt (str): The prompt template used to extract entities from text. Must
           contain a {text} placeholder.
         model_id (str): The LLM model name, depending on the LLM provider being used.
-        temperature (float): LLM temperature setting.
-        max_tokens (int): Maximum number of tokens in the LLM's response.
+        temperature (float): Controls randomness in the LLM's responses (0.0 to 1.0).
+        max_tokens (int): Maximum number of tokens allowed in the LLM's response.
 
     Methods:
         score(output: str, context: str) -> dict:
@@ -48,13 +47,19 @@ class ContextEntityRecallScorer(LLMScorer):
     Entities:
     """)
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens allowed in the LLM's response",
+    )
 
     async def _extract_entities(self, text: str) -> list[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[{"role": "user", "content": prompt}],
             response_format=EntityExtractionResponse,
             model=self.model_id,
@@ -102,8 +107,8 @@ class ContextRelevancyScorer(LLMScorer):
         relevancy_prompt (str): The prompt template used to evaluate context relevancy. Must
           contain placeholders for both {question} and {context}.
         model_id (str): The LLM model name, depending on the LLM provider being used.
-        temperature (float): LLM temperature setting.
-        max_tokens (int): Maximum number of tokens in the LLM's response.
+        temperature (float): Controls randomness in the LLM's responses (0.0 to 1.0).
+        max_tokens (int): Maximum number of tokens allowed in the LLM's response.
 
     Methods:
         score(output: str, context: str) -> dict:
@@ -119,13 +124,19 @@ class ContextRelevancyScorer(LLMScorer):
     Relevancy Score (0-1):
     """)
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens allowed in the LLM's response",
+    )
 
     @weave.op
     async def score(self, output: str, context: str) -> dict:
         prompt = self.relevancy_prompt.format(question=output, context=context)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[{"role": "user", "content": prompt}],
             response_format=RelevancyResponse,
             model=self.model_id,

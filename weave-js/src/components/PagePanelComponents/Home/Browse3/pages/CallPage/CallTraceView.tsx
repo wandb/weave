@@ -27,6 +27,8 @@ const CallTrace = styled.div`
 `;
 CallTrace.displayName = 'S.CallTrace';
 
+const MAX_CHILDREN_TO_SHOW = 100;
+
 export const CallTraceView: FC<{
   call: CallSchema;
   selectedCall: CallSchema;
@@ -321,12 +323,18 @@ type CallRow = {
   isTraceRootCall: boolean;
   isParentRow?: boolean;
 };
-type CountRow = {
+type SiblingCountRow = {
   id: 'HIDDEN_SIBLING_COUNT';
   count: number;
   hierarchy: string[];
 };
-type Row = CallRow | CountRow;
+type HiddenChildrenCountRow = {
+  id: string; // <id>_HIDDEN_CHILDREN_COUNT
+  count: number;
+  hierarchy: string[];
+  parentId: string;
+};
+type Row = CallRow | SiblingCountRow | HiddenChildrenCountRow;
 
 type CallMap = Record<string, CallSchema>;
 type ChildCallLookup = Record<string, string[]>;
@@ -383,6 +391,7 @@ export const useCallFlattenedTraceTree = (
     // Refetch the trace tree on delete or rename
     {refetchOnDelete: true}
   );
+
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
     [traceCalls.result]
@@ -495,6 +504,24 @@ export const useCallFlattenedTraceTree = (
       });
     }
 
+    const updatePathSimilarity = (targetCall: CallSchema, path: string) => {
+      // Update the selected call if the new path is more similar
+      const idx = getIndexWithinSameNameSiblings(
+        targetCall,
+        traceCallMap,
+        childCallLookup
+      );
+      const newPath = updatePath(path, targetCall.spanName, idx);
+      const similarity = scorePathSimilarity(newPath, selectedPath ?? '');
+      if (similarity < selectedCallSimilarity) {
+        selectedCall = targetCall;
+        selectedCallSimilarity = similarity;
+      }
+      return newPath;
+    };
+
+    let hiddenChildrenCount = 0;
+
     // Descend to the leaves
     const queue: Array<{
       targetCall: CallSchema;
@@ -510,17 +537,17 @@ export const useCallFlattenedTraceTree = (
     while (queue.length > 0) {
       const {targetCall, parentHierarchy, path} = queue.shift()!;
       const newHierarchy = [...parentHierarchy, targetCall.callId];
-      const idx = getIndexWithinSameNameSiblings(
-        targetCall,
-        traceCallMap,
-        childCallLookup
-      );
-      const newPath = updatePath(path, targetCall.spanName, idx);
-      const similarity = scorePathSimilarity(newPath, selectedPath ?? '');
-      if (similarity < selectedCallSimilarity) {
-        selectedCall = targetCall;
-        selectedCallSimilarity = similarity;
+      // Special handling for hidden children count row
+      if (targetCall.callId.endsWith('_HIDDEN_CHILDREN_COUNT')) {
+        rows.push({
+          id: targetCall.callId,
+          count: hiddenChildrenCount,
+          hierarchy: newHierarchy,
+          parentId: targetCall.parentId ?? '',
+        });
+        continue;
       }
+      const newPath = updatePathSimilarity(targetCall, path);
       rows.push({
         id: targetCall.callId,
         call: targetCall,
@@ -534,13 +561,43 @@ export const useCallFlattenedTraceTree = (
         childIds.map(c => traceCallMap[c]).filter(c => c),
         [getCallSortExampleRow, getCallSortStartTime]
       );
-      childCalls.forEach(c =>
+
+      if (childCalls.length > MAX_CHILDREN_TO_SHOW) {
+        const visibleChildren = childCalls.slice(0, MAX_CHILDREN_TO_SHOW);
+        const hiddenChildren = childCalls.slice(MAX_CHILDREN_TO_SHOW);
+        hiddenChildrenCount = hiddenChildren.length;
+
+        // Check hidden children for better path matches
+        for (const hiddenChild of hiddenChildren) {
+          updatePathSimilarity(hiddenChild, newPath);
+        }
+
+        // Add visible children to queue
+        visibleChildren.forEach(c =>
+          queue.push({
+            targetCall: c,
+            parentHierarchy: newHierarchy,
+            path: newPath,
+          })
+        );
+        // Push sentinel summary row so summary shows up in the right place (end)
         queue.push({
-          targetCall: c,
+          targetCall: {
+            callId: `${targetCall.callId}_HIDDEN_CHILDREN_COUNT`,
+          } as CallSchema, // HACK for sentinel value
           parentHierarchy: newHierarchy,
           path: newPath,
-        })
-      );
+        });
+      } else {
+        // Add all children to queue if under limit
+        childCalls.forEach(c =>
+          queue.push({
+            targetCall: c,
+            parentHierarchy: newHierarchy,
+            path: newPath,
+          })
+        );
+      }
     }
 
     if (parentCall) {
@@ -587,7 +644,7 @@ export const useCallFlattenedTraceTree = (
       selectedCall = mainCall;
     }
 
-    // Epand the path to the selected call.
+    // Expand the path to the selected call.
     const expandKeys = new Set<string>();
     let callToExpand: CallSchema | null = selectedCall;
     while (callToExpand != null) {

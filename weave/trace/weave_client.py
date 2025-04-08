@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -45,7 +46,17 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import (
+    Op,
+    as_op,
+    is_op,
+    is_placeholder_call,
+    is_tracing_setting_disabled,
+    maybe_unbind_method,
+    placeholder_call,
+    print_call_link,
+    should_skip_tracing_for_op,
+)
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -58,16 +69,23 @@ from weave.trace.refs import (
     parse_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
-from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.serialization.serialize import (
+    from_json,
+    isinstance_namedtuple,
+    to_json,
+)
+from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
+    should_redact_pii,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -114,6 +132,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -251,9 +271,43 @@ class PaginatedIterator(Generic[T, R]):
             raise TypeError("This iterator does not support len()")
         return self.size_func()
 
+    def to_pandas(self) -> pd.DataFrame:
+        """Convert the iterator's contents to a pandas DataFrame.
+
+        Returns:
+            A pandas DataFrame containing all the data from the iterator.
+
+        Example:
+            ```python
+            calls = client.get_calls()
+            df = calls.to_pandas()
+            ```
+
+        Note:
+            This method will fetch all data from the iterator, which may involve
+            multiple network calls. For large datasets, consider using limits
+            or filters to reduce the amount of data fetched.
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required to use this method")
+
+        records = []
+        for item in self:
+            if isinstance(item, dict):
+                records.append(item)
+            elif hasattr(item, "to_dict"):
+                records.append(item.to_dict())
+            else:
+                raise ValueError(f"Unable to convert item to dict: {item}")
+
+        return pd.DataFrame(records)
+
 
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 def _make_calls_iterator(
@@ -267,24 +321,24 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
-        response = server.calls_query(
-            CallsQueryReq(
-                project_id=project_id,
-                filter=filter,
-                offset=offset,
-                limit=limit,
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                query=query,
-                sort_by=sort_by,
-                columns=columns,
-                expand_columns=expand_columns,
+        return list(
+            server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=project_id,
+                    filter=filter,
+                    offset=offset,
+                    limit=limit,
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    query=query,
+                    sort_by=sort_by,
+                    columns=columns,
+                )
             )
         )
-        return response.calls
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
@@ -308,6 +362,7 @@ def _make_calls_iterator(
         size_func=size_func,
         limit=limit_override,
         offset=offset_override,
+        page_size=page_size,
     )
 
 
@@ -547,7 +602,16 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> CallsIter:
+    def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
+        """
+        Get the children of the call.
+
+        Args:
+            page_size: Tune performance by changing the number of calls fetched at a time.
+
+        Returns:
+            An iterator of calls.
+        """
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
@@ -559,6 +623,7 @@ class Call:
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
+            page_size=page_size,
         )
 
     def delete(self) -> bool:
@@ -671,6 +736,13 @@ class Call:
         )
 
 
+class NoOpCall(Call):
+    def __init__(self) -> None:
+        super().__init__(
+            _op_name="", trace_id="", project_id="", parent_id=None, inputs={}
+        )
+
+
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
@@ -685,6 +757,7 @@ def make_client_call(
         id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -765,6 +838,10 @@ class WeaveClient:
     # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
     future_executor_fastlane: FutureExecutor | None
 
+    # Cache of files sent to the server to avoid sending the same file
+    # multiple times.
+    send_file_cache: WeaveClientSendFileCache
+
     """
     A client for interacting with the Weave trace server.
 
@@ -802,6 +879,7 @@ class WeaveClient:
         self._server_is_flushable = False
         if isinstance(self.server, RemoteHTTPTraceServer):
             self._server_is_flushable = self.server.should_batch
+        self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
 
@@ -905,6 +983,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
         scored_by: str | list[str] | None = None,
+        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -924,6 +1003,7 @@ class WeaveClient:
                 to filter by. Multiple scorers are ANDed together. If passing in just the name,
                 then scores for all versions of the scorer are returned. If passing in the full ref
                 URI, then scores for a specific version of the scorer are returned.
+            page_size: Tune performance by changing the number of calls fetched at a time.
 
         Returns:
             An iterator of calls.
@@ -944,6 +1024,7 @@ class WeaveClient:
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
+            page_size=page_size,
         )
 
     @deprecated(new_name="get_calls")
@@ -976,18 +1057,20 @@ class WeaveClient:
         Returns:
             A call object.
         """
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self._project_id(),
-                filter=CallsFilter(call_ids=[call_id]),
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                columns=columns,
+        calls = list(
+            self.server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self._project_id(),
+                    filter=CallsFilter(call_ids=[call_id]),
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    columns=columns,
+                )
             )
         )
-        if not response.calls:
+        if not calls:
             raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
+        response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
@@ -1022,7 +1105,12 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        from weave.trace.api import _global_postprocess_inputs
+        if is_tracing_setting_disabled() or (
+            is_op(op) and should_skip_tracing_for_op(cast(Op, op))
+        ):
+            return placeholder_call()
+
+        from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -1032,11 +1120,12 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1054,18 +1143,23 @@ class WeaveClient:
             trace_id = generate_id()
             parent_id = None
 
-        if attributes is None:
+        if not attributes:
             attributes = {}
 
-        attributes = AttributesDict(**attributes)
+        # First create an AttributesDict with global attributes, then update with local attributes
+        # Local attributes take precedence over global ones
+        attributes_dict = AttributesDict()
+        attributes_dict.update(_global_attributes)
+        attributes_dict.update(attributes)
+
         if should_capture_client_info():
-            attributes._set_weave_item("client_version", version.VERSION)
-            attributes._set_weave_item("source", "python-sdk")
-            attributes._set_weave_item("sys_version", sys.version)
+            attributes_dict._set_weave_item("client_version", version.VERSION)
+            attributes_dict._set_weave_item("source", "python-sdk")
+            attributes_dict._set_weave_item("sys_version", sys.version)
         if should_capture_system_info():
-            attributes._set_weave_item("os_name", platform.system())
-            attributes._set_weave_item("os_version", platform.version())
-            attributes._set_weave_item("os_release", platform.release())
+            attributes_dict._set_weave_item("os_name", platform.system())
+            attributes_dict._set_weave_item("os_version", platform.version())
+            attributes_dict._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
@@ -1078,7 +1172,7 @@ class WeaveClient:
             id=call_id,
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
-            attributes=attributes,
+            attributes=attributes_dict,
         )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
@@ -1095,8 +1189,19 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
+        _should_print_call_link = should_print_call_link()
+        _current_call = call_context.get_current_call()
+
+        def send_start_call() -> bool:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1108,13 +1213,23 @@ class WeaveClient:
                         started_at=started_at,
                         parent_id=parent_id,
                         inputs=inputs_json,
-                        attributes=attributes,
+                        attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        def on_complete(f: Future) -> None:
+            try:
+                root_call_did_not_error = f.result() and not _current_call
+                if root_call_did_not_error and _should_print_call_link:
+                    print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_start_call)
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -1130,6 +1245,13 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        if (
+            is_tracing_setting_disabled()
+            or (op is not None and should_skip_tracing_for_op(op))
+            or is_placeholder_call(call)
+        ):
+            return None
+
         from weave.trace.api import _global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1201,7 +1323,15 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -1230,6 +1360,22 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_calls(self, call_ids: list[str]) -> None:
+        """Delete calls by their IDs.
+
+        Deleting a call will also delete all of its children.
+
+        Args:
+            call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
+        """
+        self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
             )
         )
 
@@ -1876,17 +2022,161 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        cached_res = self.send_file_cache.get(req)
+        if cached_res:
+            return cached_res
+
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+        else:
+            res = self.future_executor.defer(self.server.file_create, req)
+
+        self.send_file_cache.put(req, res)
+        return res
+
+    @property
+    def num_outstanding_jobs(self) -> int:
+        """
+        Returns the total number of pending jobs across all executors and the server.
+
+        This property can be used to check the progress of background tasks
+        without blocking the main thread.
+
+        Returns:
+            int: The total number of pending jobs
+        """
+        total = self.future_executor.num_outstanding_futures
+        if self.future_executor_fastlane:
+            total += self.future_executor_fastlane.num_outstanding_futures
+
+        # Add call batch uploads if available
+        if self._server_is_flushable:
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            total += server.call_processor.num_outstanding_jobs
+        return total
+
+    def finish(
+        self,
+        use_progress_bar: bool = True,
+        callback: Callable[[FlushStatus], None] | None = None,
+    ) -> None:
+        """
+        Flushes all background tasks to ensure they are processed.
+
+        This method blocks until all currently enqueued jobs are processed,
+        displaying a progress bar to show the status of the pending tasks.
+        It ensures parallel processing during main thread execution and can
+        improve performance when user code completes before data has been
+        uploaded to the server.
+
+        Args:
+            use_progress_bar: Whether to display a progress bar during flush.
+                              Set to False for environments where a progress bar
+                              would not render well (e.g., CI environments).
+            callback: Optional callback function that receives status updates.
+                      Overrides use_progress_bar.
+        """
+        if use_progress_bar and callback is None:
+            from weave.trace.client_progress_bar import create_progress_bar_callback
+
+            callback = create_progress_bar_callback()
+
+        if callback is not None:
+            self._flush_with_callback(callback=callback)
+        else:
+            self._flush()
+
     def flush(self) -> None:
-        """
-        An optional flushing method for the client.
-        Forces all background tasks to be processed, which ensures parallel processing
-        during main thread execution. Can improve performance when user code completes
-        before data has been uploaded to the server.
-        """
+        """Flushes background asynchronous tasks, safe to call multiple times."""
         self._flush()
 
+    def _flush_with_callback(
+        self,
+        callback: Callable[[FlushStatus], None],
+        refresh_interval: float = 0.1,
+    ) -> None:
+        """Used to wait until all currently enqueued jobs are processed.
+
+        Args:
+            callback: Optional callback function that receives status updates.
+            refresh_interval: Time in seconds between status updates.
+        """
+        # Initialize tracking variables
+        prev_job_counts = self._get_pending_jobs()
+
+        total_completed = 0
+        while self._has_pending_jobs():
+            current_job_counts = self._get_pending_jobs()
+
+            # If new jobs were added, update the total
+            if (
+                current_job_counts["total_jobs"]
+                > prev_job_counts["total_jobs"] - total_completed
+            ):
+                new_jobs = current_job_counts["total_jobs"] - (
+                    prev_job_counts["total_jobs"] - total_completed
+                )
+                prev_job_counts["total_jobs"] += new_jobs
+
+            # Calculate completed jobs since last update
+            main_completed = max(
+                0, prev_job_counts["main_jobs"] - current_job_counts["main_jobs"]
+            )
+            fastlane_completed = max(
+                0,
+                prev_job_counts["fastlane_jobs"] - current_job_counts["fastlane_jobs"],
+            )
+            call_processor_completed = max(
+                0,
+                prev_job_counts["call_processor_jobs"]
+                - current_job_counts["call_processor_jobs"],
+            )
+            completed_this_iteration = (
+                main_completed + fastlane_completed + call_processor_completed
+            )
+
+            if completed_this_iteration > 0:
+                total_completed += completed_this_iteration
+
+            status = FlushStatus(
+                job_counts=current_job_counts,
+                completed_since_last_update=completed_this_iteration,
+                total_completed=total_completed,
+                max_total_jobs=prev_job_counts["total_jobs"],
+                has_pending_jobs=True,
+            )
+
+            callback(status)
+
+            # Store current counts for next iteration
+            prev_job_counts = current_job_counts
+
+            # Sleep briefly to allow background threads to make progress
+            time.sleep(refresh_interval)
+
+        # Do the actual flush
+        self._flush()
+
+        # Final callback with no pending jobs
+        final_status = FlushStatus(
+            job_counts=PendingJobCounts(
+                main_jobs=0,
+                fastlane_jobs=0,
+                call_processor_jobs=0,
+                total_jobs=0,
+            ),
+            completed_since_last_update=0,
+            total_completed=total_completed,
+            max_total_jobs=prev_job_counts["total_jobs"],
+            has_pending_jobs=False,
+        )
+        callback(final_status)
+
     def _flush(self) -> None:
-        # Used to wait until all currently enqueued jobs are processed
+        """Used to wait until all currently enqueued jobs are processed."""
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
         if self.future_executor_fastlane:
@@ -1895,15 +2185,74 @@ class WeaveClient:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
             # _server_is_flushable and only call this if we know the server is
-            # flushable. The # type: ignore is safe because we check the type
-            # first.
-            self.server.call_processor.wait_until_all_processed()  # type: ignore
+            # flushable.
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+            # Restart call processor processing thread after flushing
+            server.call_processor.accept_new_work()
+
+    def _get_pending_jobs(self) -> PendingJobCounts:
+        """Get the current number of pending jobs for each type.
+
+        Returns:
+            PendingJobCounts:
+                - main_jobs: Number of pending jobs in the main executor
+                - fastlane_jobs: Number of pending jobs in the fastlane executor
+                - call_processor_jobs: Number of pending jobs in the call processor
+                - total_jobs: Total number of pending jobs
+        """
+        main_jobs = self.future_executor.num_outstanding_futures
+        fastlane_jobs = 0
         if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
+            fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
+        call_processor_jobs = 0
+        if self._server_is_flushable:
+            server = cast(RemoteHTTPTraceServer, self.server)
+            assert server.call_processor is not None
+            call_processor_jobs = server.call_processor.num_outstanding_jobs
+
+        return PendingJobCounts(
+            main_jobs=main_jobs,
+            fastlane_jobs=fastlane_jobs,
+            call_processor_jobs=call_processor_jobs,
+            total_jobs=main_jobs + fastlane_jobs + call_processor_jobs,
+        )
+
+    def _has_pending_jobs(self) -> bool:
+        """Check if there are any pending jobs.
+
+        Returns:
+            True if there are pending jobs, False otherwise.
+        """
+        return self._get_pending_jobs()["total_jobs"] > 0
+
+
+class PendingJobCounts(TypedDict):
+    """Counts of pending jobs for each type."""
+
+    main_jobs: int
+    fastlane_jobs: int
+    call_processor_jobs: int
+    total_jobs: int
+
+
+class FlushStatus(TypedDict):
+    """Status information about the current flush operation."""
+
+    # Current job counts
+    job_counts: PendingJobCounts
+
+    # Tracking of completed jobs
+    completed_since_last_update: int
+    total_completed: int
+
+    # Maximum number of jobs seen during this flush operation
+    max_total_jobs: int
+
+    # Whether there are any pending jobs
+    has_pending_jobs: bool
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:

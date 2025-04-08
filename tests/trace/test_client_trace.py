@@ -33,7 +33,9 @@ from weave.trace.context.weave_client_context import (
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ENTITY_TOO_LARGE_PAYLOAD,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -123,7 +125,12 @@ def test_dataset(client):
     d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri()).get()
+
+    # This might seem redundant, but it is useful to ensure that the
+    # dataset can be re-iterated over multiple times and equality is preserved.
     assert list(d2.rows) == list(d2.rows)
+    assert list(d.rows) == list(d2.rows)
+    assert list(d.rows) == list(d.rows)
 
 
 def test_trace_server_call_start_and_end(client):
@@ -176,6 +183,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -222,6 +231,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
 
@@ -3300,3 +3311,316 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
             select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
             == 1
         )
+
+
+def test_calls_stream_heavy_condition_aggregation_parts(client):
+    def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
+        query = {
+            "$in": [
+                {"$getField": field},
+                [{"$literal": value}],
+            ]
+        }
+        res = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
+            )
+        )
+        return list(res)
+
+    call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        op_name="test_name",
+        trace_id=trace_id,
+        parent_id=parent_id,
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"param": {"value1": "hello"}},
+    )
+    client.server.call_start(tsi.CallStartReq(start=start))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert not res[0].output
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"c": 5},
+        output={"d": 5},
+    )
+    client.server.call_end(tsi.CallEndReq(end=end))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert res[0].output["d"] == 5
+
+
+def test_call_stream_query_heavy_query_batch(client):
+    # start 10 calls
+    call_ids = []
+    project_id = get_client_project_id(client)
+    for i in range(10):
+        call_id = generate_id()
+        call_ids.append(call_id)
+        trace_id = generate_id()
+        parent_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name="test_name",
+            trace_id=trace_id,
+            parent_id=parent_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            - datetime.timedelta(seconds=1),
+            attributes={"a": 5, "empty": "", "null": None},
+            inputs={"param": {"value1": "hello"}},
+        )
+        client.server.call_start(tsi.CallStartReq(start=start))
+
+    # end 10 calls
+    for i in range(10):
+        call_id = generate_id()
+        trace_id = generate_id()
+        parent_id = generate_id()
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_ids[i],
+            ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            summary={"c": 5},
+            output={"d": 5, "e": "f", "result": {"message": "completed"}},
+        )
+        client.server.call_end(tsi.CallEndReq(end=end))
+
+    # filter by output
+    output_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "output.e"},
+                    {"$literal": "f"},
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(output_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["a"] == 5
+
+    # now query for inputs by string. This should be okay,
+    # because we don't filter out started_at is NULL
+    input_string_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.value1"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                    {
+                        "$contains": {
+                            "input": {"$getField": "output.result.message"},
+                            "substr": {"$literal": "COMPleted"},
+                            "case_insensitive": True,
+                        }
+                    },
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
+        assert call.output["result"]["message"] == "COMPLETED"
+
+    # Now lets add a light filter, which
+    # changes how we filter out calls. Make sure that still works
+    input_string_query["filter"] = {"op_names": ["test_name"]}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "helslo"
+        assert call.output["d"] == 5
+
+    # now try to filter by the empty attribute string
+    query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}
+        },
+    }
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(query))
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["empty"] == ""
+
+
+def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def test_op(x: dict):
+        return x
+
+    # Create a call with some data
+    result = test_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client), include_storage_size=True
+            )
+        )
+    )
+    assert len(calls) == 1
+    call = calls[0]
+
+    # Verify storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert call.storage_size_bytes is not None
+
+
+def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_total_storage_size=True,
+            )
+        )
+    )
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the total storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert (
+        parent_call.total_storage_size_bytes is not None
+    )  # Parent should have total size
+    assert child_call.storage_size_bytes is None
+    assert (
+        child_call.total_storage_size_bytes is None
+    )  # Child should not have total size
+
+
+def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_storage_size=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the storage sizes are present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert parent_call.storage_size_bytes is not None
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is not None
+    # Child should not have total size
+    assert child_call.total_storage_size_bytes is None

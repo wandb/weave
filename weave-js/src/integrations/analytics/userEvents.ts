@@ -170,3 +170,33 @@ export const metricsPlotsViewed = makeTrackEvent<
     };
   }
 >('Weave metrics plots viewed');
+
+export const dateFilterDropdownUsed = makeTrackEvent<
+  {
+    entity: string;
+    project: string;
+    rawInput: string;
+    date: string;
+  },
+  {
+    _description: `User used the date filter dropdown`;
+    _location: '';
+    _motivation: 'Used for tracking date filter dropdown usage';
+    entity: {
+      description: 'Entity of call';
+      exampleValues: ['my-entity'];
+    };
+    project: {
+      description: 'Project of call';
+      exampleValues: ['my-project'];
+    };
+    rawInput: {
+      description: 'Raw input of date filter';
+      exampleValues: ['7d', '1m', '1y', '2024-01-01'];
+    };
+    date: {
+      description: 'Date of call';
+      exampleValues: ['2024-01-01', '2024-01-02'];
+    };
+  }
+>('Weave date filter dropdown used');

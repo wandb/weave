@@ -76,6 +76,7 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
+  userId?: string;
 };
 
 export type OpVersionFilter = {
@@ -213,7 +214,8 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefCols?: string[],
-    includeFeedback?: boolean
+    includeFeedback?: boolean,
+    includeCosts?: boolean
   ) => Promise<Blob>;
   useObjCreate: () => (
     projectId: string,
@@ -231,6 +233,7 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
+    orderBy?: traceServerClientTypes.SortBy[],
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
@@ -307,6 +310,9 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  useTableCreate: () => (
+    table: traceServerClientTypes.TableCreateReq
+  ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

@@ -176,8 +176,8 @@ const useCall = (
   const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
@@ -232,7 +232,7 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }
@@ -578,7 +578,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -600,6 +601,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -791,6 +793,7 @@ const useOpVersions = (
   filter: OpVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
+  orderBy?: traceServerTypes.SortBy[],
   opts?: {skip?: boolean}
 ): LoadableWithError<OpVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -803,6 +806,7 @@ const useOpVersions = (
     result: null,
   });
   const deepFilter = useDeepMemo(filter);
+  const deepOrderBy = useDeepMemo(orderBy);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -820,6 +824,7 @@ const useOpVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: deepOrderBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -843,6 +848,7 @@ const useOpVersions = (
     project,
     limit,
     metadataOnly,
+    deepOrderBy,
   ]);
 
   useEffect(() => {
@@ -876,6 +882,7 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionHash: obj.digest,
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -1909,22 +1916,24 @@ export const privateRefToSimpleName = (ref: string) => {
   }
 };
 
+export const parseSpanName = (opName: string) => {
+  if (
+    opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    opName.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return opVersionRefOpName(opName);
+  }
+  if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+    return privateRefToSimpleName(opName);
+  }
+  return opName;
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  const parseSpanName = (opName: string) => {
-    if (
-      opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      opName.startsWith(WEAVE_REF_PREFIX)
-    ) {
-      return opVersionRefOpName(opName);
-    }
-    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
-      return privateRefToSimpleName(opName);
-    }
-    return opName;
-  };
+
   return {
     entity,
     project,
@@ -2002,6 +2011,19 @@ export const useTableUpdate = (): ((
   );
 };
 
+export const useTableCreate = (): ((
+  table: traceServerTypes.TableCreateReq
+) => Promise<traceServerTypes.TableCreateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (table: traceServerTypes.TableCreateReq) => {
+      return getTsClient().tableCreate(table);
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2028,6 +2050,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableRowsQuery,
   useTableQueryStats,
   useTableUpdate,
+  useTableCreate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

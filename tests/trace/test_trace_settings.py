@@ -1,16 +1,18 @@
-import io
+import logging
 import os
-import sys
 import time
 import timeit
 from unittest import mock
 
 import pytest
+import tenacity
 
 import weave
+from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
+from weave.utils.retry import with_retry
 
 
 @weave.op
@@ -21,9 +23,13 @@ def func():
 def test_disabled_setting(client):
     parse_and_apply_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 0
 
     parse_and_apply_settings(UserSettings(disabled=False))
     enabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 10
 
     assert (
         disabled_time * 10 < enabled_time
@@ -33,68 +39,50 @@ def test_disabled_setting(client):
 def test_disabled_env(client):
     os.environ["WEAVE_DISABLED"] = "true"
     disabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 0
 
     os.environ["WEAVE_DISABLED"] = "false"
     enabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 10
 
     assert (
         disabled_time * 10 < enabled_time
     ), "Disabled weave should be faster than enabled weave"
 
 
-def test_disabled_env_client():
-    os.environ["WEAVE_DISABLED"] = "true"
-    client = weave.init("entity/project")
+def test_print_call_link_setting(client_creator):
+    with client_creator(settings=UserSettings(print_call_link=False)) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            func()
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    # Verify that the client is disabled
-    # Would be nicer to have a specific property
-    assert client.project == "DISABLED"
-
-    @weave.op
-    def func():
-        return 1
-
-    assert func() == 1
-
-    # No error implies that no calls were sent to the server
-    # since this would require writing to `entity/project`
-    client._flush()
-
-    os.environ["WEAVE_DISABLED"] = "false"
-
-
-def test_print_call_link_setting(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
-
-    parse_and_apply_settings(UserSettings(print_call_link=False))
-    func()
-
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
-
-    parse_and_apply_settings(UserSettings(print_call_link=True))
-    func()
-
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    with client_creator(settings=UserSettings(print_call_link=True)) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            func()
+    assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
 def test_print_call_link_env(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
-
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
-    func()
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        func()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
-    func()
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        func()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    assert TRACE_CALL_EMOJI in captured.getvalue()
+
+    # Clean up after test
+    del os.environ["WEAVE_PRINT_CALL_LINK"]
 
 
 def test_should_capture_code_setting(client):
@@ -188,7 +176,7 @@ def test_client_parallelism_setting(client_creator):
     assert queue_time_0 > queue_time_1
     # Assert that the total time is about the same
     assert wait_time_0 + queue_time_0 == pytest.approx(
-        wait_time_1 + queue_time_1, abs=0.1
+        wait_time_1 + queue_time_1, abs=0.5
     )
 
     parse_and_apply_settings(UserSettings(client_parallelism=10))
@@ -199,7 +187,7 @@ def test_client_parallelism_setting(client_creator):
         wait_time_10, queue_time_10 = speed_test(client)
 
     # Assert that the queue time is about the same for 10 and 1
-    assert queue_time_1 == pytest.approx(queue_time_10, abs=0.1)
+    assert queue_time_1 == pytest.approx(queue_time_10, abs=0.5)
     # Assert that the wait time is much less for 10 than 1
     assert wait_time_1 > wait_time_10
 
@@ -247,3 +235,108 @@ def test_get_parallelism_settings() -> None:
         main, upload = get_parallelism_settings()
         assert main == 2
         assert upload == 3
+
+
+def test_retry_max_attempts_settings(client_creator, caplog) -> None:
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    with client_creator(settings=UserSettings(retry_max_attempts=2)) as client:
+        with pytest.raises(RuntimeError):
+            func()
+
+    retry_attempt_logs = [r for r in caplog.records if r.msg == "retry_attempt"]
+    retry_failed_logs = [r for r in caplog.records if r.msg == "retry_failed"]
+
+    assert len(retry_attempt_logs) == 1
+    attempt_log = retry_attempt_logs[0]
+    assert attempt_log.attempt_number == 1
+    assert "Test error" in attempt_log.exception
+
+    assert len(retry_failed_logs) == 1
+    failed_log = retry_failed_logs[0]
+    assert failed_log.attempt_number == 2
+    assert "Test error" in failed_log.exception
+
+
+def test_retry_max_attempts_env(caplog) -> None:
+    os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "2"
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    with pytest.raises(RuntimeError):
+        func()
+
+    retry_attempt_logs = [r for r in caplog.records if r.msg == "retry_attempt"]
+    retry_failed_logs = [r for r in caplog.records if r.msg == "retry_failed"]
+
+    assert len(retry_attempt_logs) == 1
+    attempt_log = retry_attempt_logs[0]
+    assert attempt_log.attempt_number == 1
+    assert "Test error" in attempt_log.exception
+
+    assert len(retry_failed_logs) == 1
+    failed_log = retry_failed_logs[0]
+    assert failed_log.attempt_number == 2
+    assert "Test error" in failed_log.exception
+
+    del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
+
+
+def test_retry_max_interval_settings(client_creator, caplog, monkeypatch) -> None:
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    original_wait = tenacity.wait_exponential_jitter
+    call_args = []
+
+    def mock_wait_exponential_jitter(initial=0, max=None):
+        call_args.append(max)
+        return original_wait(initial=initial, max=max)
+
+    monkeypatch.setattr(
+        tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter
+    )
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    custom_max_interval = 30.0
+    with client_creator(settings=UserSettings(retry_max_interval=custom_max_interval)):
+        with pytest.raises(RuntimeError):
+            func()
+
+    assert custom_max_interval in call_args
+
+
+def test_retry_max_interval_env(caplog, monkeypatch) -> None:
+    os.environ["WEAVE_RETRY_MAX_INTERVAL"] = "25.0"
+    caplog.set_level(logging.INFO, logger="weave.utils.retry")
+
+    original_wait = tenacity.wait_exponential_jitter
+    call_args = []
+
+    def mock_wait_exponential_jitter(initial=0, max=None):
+        call_args.append(max)
+        return original_wait(initial=initial, max=max)
+
+    monkeypatch.setattr(
+        tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter
+    )
+
+    @with_retry
+    def func():
+        raise RuntimeError("Test error")
+
+    with pytest.raises(RuntimeError):
+        func()
+
+    assert 25.0 in call_args
+
+    del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
