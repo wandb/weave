@@ -112,7 +112,7 @@ export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
   'wb_run_id',
-  'attributes.otel_span'
+  'attributes.otel_span',
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];

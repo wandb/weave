@@ -264,7 +264,6 @@ export const ObjectViewer = ({
         // For now we'll hide all keys that start with an underscore, is a name field, or is a null description.
         // Eventually we might offer a user toggle to display them.
         if (context.path.hasHiddenKey() || isNullDescriptionOrName) {
-          console.log(context)
           return 'skip';
         }
         if (isExpandableRef(context.value)) {
