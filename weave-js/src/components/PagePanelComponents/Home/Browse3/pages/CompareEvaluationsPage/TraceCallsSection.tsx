@@ -10,10 +10,11 @@ import {
   isCustomWeaveType,
 } from '../../typeViews/CustomWeaveTypeDispatcher';
 import {EvaluationComparisonState} from './ecpState';
+import {TraceCallData} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 
 export const TraceCallsSection: React.FC<{
-  traceCalls: Array<{callId: string; traceCall: any}>;
+  traceCalls: Array<TraceCallData>;
   entity?: string;
   project?: string;
   state: EvaluationComparisonState;

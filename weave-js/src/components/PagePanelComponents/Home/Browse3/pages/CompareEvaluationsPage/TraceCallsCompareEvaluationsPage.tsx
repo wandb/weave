@@ -5,6 +5,7 @@ import React, {useMemo} from 'react';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {STANDARD_PADDING} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpState';
+import {TraceCallData} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizePlotsSection';
 import {TraceCallsSection} from './TraceCallsSection';
@@ -33,7 +34,7 @@ export const SummarizeCallsSection: React.FC<{
   // Column headers (evaluation IDs)
   const evaluationIds = useMemo(() => {
     // Get evaluation IDs in the same order as they appear in the state
-    // Reverse the array to match the order in the rest of the UI
+    // and reverse the array to match the order in the rest of the UI
     return Object.keys(state.summary.evaluationCalls).reverse();
   }, [state.summary.evaluationCalls]);
 
@@ -52,7 +53,7 @@ export const SummarizeCallsSection: React.FC<{
 
         // Try various paths where metrics might be stored
         const potentialMetricsObjects = [
-          output, // Direct output as mentioned by user
+          output, // Direct output
           resultObj, // Direct result object
           resultObj?.metrics, // Common pattern: {metrics: {...}}
           resultObj?.summary, // Common pattern: {summary: {...}}
@@ -394,8 +395,8 @@ export const SummarizeCallsSection: React.FC<{
 
 interface TraceCallsCompareEvaluationsPageProps {
   height: number;
-  traceCalls: Array<{callId: string; traceCall: any}>;
-  summarizeCalls: Array<{callId: string; traceCall: any}>;
+  traceCalls: Array<TraceCallData>;
+  summarizeCalls: Array<TraceCallData>;
   state: EvaluationComparisonState;
 }
 

@@ -25,6 +25,7 @@ import {
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
+import {TraceCallData} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
@@ -40,11 +41,6 @@ type CompareEvaluationsPageProps = {
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
-};
-
-type TraceCallData = {
-  callId: string;
-  traceCall: any;
 };
 
 const getCallsSubset = (
