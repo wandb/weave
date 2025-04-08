@@ -516,13 +516,13 @@ class OpenTelemetryAttributes(Attributes):
         outputs: dict[str, Any] = (
             self.get_attribute_value(ot.SpanAttributes.LLM_COMPLETIONS) or {}
         )
-        return outputs
+        return to_json_serializable(outputs)
 
     def get_weave_inputs(self) -> Any:
         inputs: dict[str, Any] = (
             self.get_attribute_value(ot.SpanAttributes.LLM_PROMPTS) or {}
         )
-        return inputs
+        return to_json_serializable(inputs)
 
     def get_weave_attributes(
         self, extra: Optional[dict[str, Any]] = None
@@ -542,7 +542,7 @@ class OpenTelemetryAttributes(Attributes):
         if extra:
             attributes.update(extra)
 
-        return attributes
+        return to_json_serializable(attributes)
 
 
 class AttributesFactory:
