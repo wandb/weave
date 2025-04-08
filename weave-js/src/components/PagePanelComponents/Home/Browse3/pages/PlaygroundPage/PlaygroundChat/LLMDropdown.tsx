@@ -1,5 +1,4 @@
 import {Box} from '@mui/material';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useState} from 'react';
 
@@ -17,12 +16,14 @@ import {
   dividerOption,
   ProviderOption,
 } from './LLMDropdownOptions';
+import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 
 interface LLMDropdownProps {
   value: LLMMaxTokensKey;
   onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
   entity: string;
   project: string;
+  isTeamAdmin: boolean;
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({
@@ -30,10 +31,16 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   onChange,
   entity,
   project,
+  isTeamAdmin,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
-  const {result: configuredProviders, loading: configuredProvidersLoading} =
-    useConfiguredProviders(entity);
+  const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entity);
 
   const {
     result: customProvidersResult,
@@ -58,9 +65,6 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   });
 
   const customLoading = customProvidersLoading || customProviderModelsLoading;
-
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isTeamAdmin = !loadingUserInfo && userInfo?.roles[entity] === 'admin';
 
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
@@ -145,6 +149,19 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     setIsAddProviderDrawerOpen(false);
   };
 
+  const handleConfigureProvider = (provider: string) => {
+    setSelectedProvider(provider);
+    setConfigDrawerOpen(true);
+  };
+
+  const handleCloseConfigDrawer = useCallback(() => {
+    setConfigDrawerOpen(false);
+    setSelectedProvider(null);
+
+    console.log('handleCloseConfigDrawer');
+    refetchConfiguredProviders();
+  }, [refetchConfiguredProviders]);
+
   return (
     <Box sx={{width: '300px'}}>
       <Select
@@ -190,6 +207,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               entity={entity}
               project={project}
               isAdmin={isTeamAdmin}
+              onConfigureProvider={handleConfigureProvider}
             />
           ),
         }}
@@ -217,6 +235,15 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
         projectId={`${entity}/${project}`}
         providers={customProvidersResult?.map(p => p.val.name || '') || []}
       />
+
+      {configDrawerOpen && selectedProvider && (
+        <ProviderConfigDrawer
+          open={configDrawerOpen}
+          onClose={handleCloseConfigDrawer}
+          entity={entity}
+          defaultProvider={selectedProvider}
+        />
+      )}
     </Box>
   );
 };

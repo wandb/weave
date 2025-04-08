@@ -20,8 +20,9 @@ export const useConfiguredProviders = (
 ): {
   result: Record<string, ProviderStatus>;
   loading: boolean;
+  refetch: () => void;
 } => {
-  const {loading: secretsLoading, secrets} = useSecrets({entityName});
+  const {loading: secretsLoading, secrets, refetch} = useSecrets({entityName});
 
   const providers = LLM_PROVIDERS.reduce((acc, provider) => {
     acc[provider] = {
@@ -34,5 +35,6 @@ export const useConfiguredProviders = (
   return {
     result: secretsLoading ? {} : providers,
     loading: secretsLoading,
+    refetch,
   };
 };

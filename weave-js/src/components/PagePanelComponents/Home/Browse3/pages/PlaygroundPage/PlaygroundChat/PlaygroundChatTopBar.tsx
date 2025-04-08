@@ -27,6 +27,7 @@ type PlaygroundChatTopBarProps = {
   project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
+  isTeamAdmin: boolean;
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -45,6 +46,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  isTeamAdmin,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -126,6 +128,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           }
           entity={entity}
           project={project}
+          isTeamAdmin={isTeamAdmin}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
