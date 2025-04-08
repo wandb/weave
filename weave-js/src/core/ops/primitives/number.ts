@@ -148,6 +148,16 @@ export const opNumbersMax = makeNumbersOp({
   resolver: ({numbers}) => _.max(numbers.filter(num => num != null)),
 });
 
+export const opNumberIsInteger = OpKinds.makeBasicOp({
+  name: 'number-isInteger',
+  argTypes: {number: 'number'},
+  argDescriptions: {number: `${docType('number')} to check`},
+  description: `Check if a ${docType('number')} is an integer`,
+  returnValueDescription: `Whether the ${docType('number')} is an integer`,
+  returnType: inputTypes => skipTaggable(inputTypes.number, t => 'boolean'),
+  resolver: ({number}) => Number.isInteger(number),
+});
+
 // Dimension preserving
 
 const makeNumberOp = OpKinds.makeBinaryStandardOp;
