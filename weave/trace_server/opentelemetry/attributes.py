@@ -13,6 +13,7 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
+
 def to_json_serializable(value: Any) -> Any:
     """
     Transform common data types into JSON-serializable values.
@@ -437,31 +438,25 @@ class OpenInferenceAttributes(Attributes):
         return attributes
 
     def get_weave_outputs(self) -> Any:
-        outputs: dict[str, Any] | None = self.get_attribute_value(
-            oi.SpanAttributes.LLM_OUTPUT_MESSAGES
+        outputs: dict[str, Any] = (
+            self.get_attribute_value(oi.SpanAttributes.LLM_OUTPUT_MESSAGES) or {}
         )
         result = {}
-        if isinstance(outputs, dict):
-            for k, v in outputs.items():
-                if k.isdigit() and isinstance(v, dict):
-                    for key in v.keys():
-                        result[key + f"_{k}"] = v[key]
-        else:
-            result = outputs
+        for k, v in outputs.items():
+            if k.isdigit() and isinstance(v, dict):
+                for key in v.keys():
+                    result[key + f"_{k}"] = v[key]
         return result
 
     def get_weave_inputs(self) -> Any:
-        inputs: dict[str, Any] | None = self.get_attribute_value(
-            oi.SpanAttributes.LLM_INPUT_MESSAGES
+        inputs: dict[str, Any] = (
+            self.get_attribute_value(oi.SpanAttributes.LLM_INPUT_MESSAGES) or {}
         )
         result = {}
-        if isinstance(inputs, dict):
-            for k, v in inputs.items():
-                if k.isdigit() and isinstance(v, dict):
-                    for key in v.keys():
-                        result[key + f"_{k}"] = v[key]
-        else:
-            result = inputs
+        for k, v in inputs.items():
+            if k.isdigit() and isinstance(v, dict):
+                for key in v.keys():
+                    result[key + f"_{k}"] = v[key]
         return result
 
     def get_weave_usage(self) -> LLMUsageSchema:

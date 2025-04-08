@@ -39,6 +39,7 @@ from .attributes import (
     unflatten_key_values,
 )
 
+
 class SpanKind(Enum):
     """Enum representing the span's kind."""
 
