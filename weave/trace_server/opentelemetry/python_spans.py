@@ -35,7 +35,6 @@ from .attributes import (
     Attributes,
     AttributesFactory,
     flatten_attributes,
-    to_json_serializable,
     unflatten_key_values,
 )
 
@@ -258,16 +257,12 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        summary_insert_map = tsi.SummaryInsertMap(
-            usage={"usage": self.attributes.get_weave_usage()}
+        summary_insert_map = self.attributes.get_weave_summary()
+        inputs = self.attributes.get_weave_inputs()
+        outputs = self.attributes.get_weave_outputs()
+        attributes = self.attributes.get_weave_attributes(
+            extra={"otel_span": self.as_dict()}
         )
-        inputs = to_json_serializable(self.attributes.get_weave_inputs())
-        print(inputs)
-        outputs = to_json_serializable(self.attributes.get_weave_outputs())
-        print(outputs)
-        attributes = to_json_serializable(self.attributes.get_weave_attributes())
-        print(attributes)
-        attributes["otel_span"] = to_json_serializable(self.as_dict())
 
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
