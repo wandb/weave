@@ -1,4 +1,3 @@
-import copy
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
@@ -14,6 +13,7 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server.trace_server_interface import LLMUsageSchema
 
+
 # If a list of len 1 is provided, don't bother indexing it, just treat it as a singleton
 # This could cause issues actually if
 def _flatten_single_key(d: dict[str, Any] | None) -> Any:
@@ -22,6 +22,7 @@ def _flatten_single_key(d: dict[str, Any] | None) -> Any:
     keys = list(d.keys())
     if len(keys) == 1:
         return d.get(keys[0])
+
 
 def to_json_serializable(value: Any) -> Any:
     """
@@ -409,14 +410,17 @@ class Attributes(AbstractAttributes):
 # If we don't have any conventions to follow, just dump everything to attributes
 # Later we may add support for user defined conventions through headers
 class GenericAttributes(Attributes):
-    def get_weave_usage(self) -> LLMUsageSchema: return {}
+    def get_weave_usage(self) -> LLMUsageSchema:
+        return {}
 
-    def get_weave_inputs(self) -> Any: return {}
+    def get_weave_inputs(self) -> Any:
+        return {}
 
-    def get_weave_outputs(self) -> Any: return {}
+    def get_weave_outputs(self) -> Any:
+        return {}
 
     def get_weave_attributes(self) -> Any:
-        return (to_json_serializable(self._attributes))
+        return to_json_serializable(self._attributes)
 
 
 class OpenInferenceAttributes(Attributes):
@@ -462,9 +466,7 @@ class OpenInferenceAttributes(Attributes):
         completion_tokens = self.get_attribute_value(
             oi.SpanAttributes.LLM_TOKEN_COUNT_COMPLETION
         )
-        total_tokens = self.get_attribute_value(
-            oi.SpanAttributes.LLM_TOKEN_COUNT_TOTAL
-        )
+        total_tokens = self.get_attribute_value(oi.SpanAttributes.LLM_TOKEN_COUNT_TOTAL)
         return LLMUsageSchema(
             prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
             completion_tokens=int(completion_tokens) if completion_tokens else None,
@@ -474,9 +476,7 @@ class OpenInferenceAttributes(Attributes):
 
 class OpenTelemetryAttributes(Attributes):
     def get_weave_attributes(self) -> dict[str, Any]:
-        max_tokens = self.get_attribute_value(
-            ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS
-        )
+        max_tokens = self.get_attribute_value(ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS)
         system = self.get_attribute_value(ot.SpanAttributes.LLM_SYSTEM)
         kind = self.get_attribute_value(ot.SpanAttributes.TRACELOOP_SPAN_KIND)
         model = self.get_attribute_value(ot.SpanAttributes.LLM_RESPONSE_MODEL)
