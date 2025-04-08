@@ -410,7 +410,7 @@ class GenericAttributes(Attributes):
         return {}
 
     def get_weave_attributes(self) -> Any:
-        return to_json_serializable(self._attributes)
+        return self._attributes
 
 
 class OpenInferenceAttributes(Attributes):
