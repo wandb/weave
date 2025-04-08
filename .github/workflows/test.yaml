@@ -254,6 +254,7 @@ jobs:
             "openai",
             "vertexai",
             "pandas-test",
+            "gemma",
           ]
       fail-fast: false
     services:
