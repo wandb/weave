@@ -246,7 +246,7 @@ class Span:
 
     # The full OTEL Span as it is recieved
     def as_dict(self) -> dict[str, Any]:
-        return {
+        return to_json_serializable({
             "name": self.name,
             "context": {
                 "trace_id": self.trace_id,
@@ -255,14 +255,14 @@ class Span:
             },
             "kind": self.kind.name,
             "parent_id": self.parent_id,
-            "start_time": self.start_time_unix_nano,
-            "end_time": self.end_time_unix_nano,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
             "status": self.status.as_dict(),
             "attributes": flatten_attributes(self.attributes._attributes),
             "events": self.events,
             "links": self.links,
             "resource": self.resource.as_dict() if self.resource else None,
-        }
+        })
 
     def to_call(
         self, project_id: str
