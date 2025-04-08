@@ -10,31 +10,36 @@ import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
 
 const AnnotationScorerFormSchema = z.object({
-  Name: z.string().min(1),
-  Description: z.string().optional(),
-  Type: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('Boolean'),
-    }),
-    z.object({
-      type: z.literal('Integer'),
-      Minimum: z.number().optional(),
-      Maximum: z.number().optional(),
-    }),
-    z.object({
-      type: z.literal('Number'),
-      Minimum: z.number().optional(),
-      Maximum: z.number().optional(),
-    }),
-    z.object({
-      type: z.literal('String'),
-      'Maximum length': z.number().optional(),
-    }),
-    z.object({
-      type: z.literal('Select'),
-      'Select options': z.array(z.string()).min(1),
-    }),
-  ]),
+  Name: z.string().min(1).describe('Annotation field name, shown in the interface.'),
+  Description: z
+    .string()
+    .optional()
+    .describe('Visible description of your field.'),
+  Type: z
+    .discriminatedUnion('type', [
+      z.object({
+        type: z.literal('Boolean'),
+      }),
+      z.object({
+        type: z.literal('Integer'),
+        Minimum: z.number().optional(),
+        Maximum: z.number().optional(),
+      }),
+      z.object({
+        type: z.literal('Number'),
+        Minimum: z.number().optional(),
+        Maximum: z.number().optional(),
+      }),
+      z.object({
+        type: z.literal('String'),
+        'Maximum length': z.number().optional(),
+      }),
+      z.object({
+        type: z.literal('Select'),
+        'Select options': z.array(z.string()).min(1),
+      }),
+    ])
+    .describe('The format of the annotation field\'s input.'),
 });
 
 const DEFAULT_STATE = {
