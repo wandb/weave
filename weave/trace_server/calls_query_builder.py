@@ -776,13 +776,27 @@ class CallsQuery(BaseModel):
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
+        table_alias_or_subquery = table_alias
+        if self.limit is not None:
+            inclusive_limit = ((self.offset or 0) + self.limit) * 2
+            table_alias_or_subquery = f"""(
+                SELECT *
+                FROM calls_merged
+                WHERE project_id = {_param_slot(project_param, 'String')}
+                {id_mask_sql}
+                {id_subquery_sql}
+                {str_filter_opt_sql}
+                LIMIT {inclusive_limit}
+            )
+            """
+
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
+        FROM {table_alias_or_subquery} as {table_alias}
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
+        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
