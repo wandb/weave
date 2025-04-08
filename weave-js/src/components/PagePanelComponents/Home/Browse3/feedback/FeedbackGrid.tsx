@@ -14,6 +14,7 @@ import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceSer
 import {FeedbackGridInner} from './FeedbackGridInner';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
+import {Button} from '../../../../Button';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
@@ -22,6 +23,7 @@ type FeedbackGridProps = {
   project: string;
   weaveRef: string;
   objectType?: string;
+  onOpenFeedbackSidebar?: () => void;
 };
 
 export const FeedbackGrid = ({
@@ -29,6 +31,7 @@ export const FeedbackGrid = ({
   project,
   weaveRef,
   objectType,
+  onOpenFeedbackSidebar,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
@@ -106,7 +109,19 @@ export const FeedbackGrid = ({
   }
 
   if (!paths.length) {
-    return <Empty size="small" {...EMPTY_PROPS_FEEDBACK} />;
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="flex flex-col items-center mx-8 gap-16">
+          <Empty size="small" {...EMPTY_PROPS_FEEDBACK} />
+          <Button
+            variant="secondary"
+            icon="add-new"
+            onClick={onOpenFeedbackSidebar}>
+            Create annotation
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const currentViewerId = userInfo ? userInfo.id : null;

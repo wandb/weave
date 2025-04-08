@@ -106,7 +106,7 @@ export const CallPage: FC<CallPageProps> = props => {
   }
 };
 
-const useCallTabs = (call: CallSchema) => {
+const useCallTabs = (call: CallSchema, setShowFeedback: (showFeedback: boolean | undefined) => void) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -196,6 +196,7 @@ const useCallTabs = (call: CallSchema) => {
             project={project}
             weaveRef={weaveRef}
             objectType="call"
+            onOpenFeedbackSidebar={() => setShowFeedback(true)}
           />
         </Tailwind>
       ),
@@ -289,7 +290,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
-  const callTabs = useCallTabs(focusedCall);
+  const callTabs = useCallTabs(focusedCall, setShowFeedback);
 
   const setRootCallIdForPagination = useCallback(
     (callId: string) => {
