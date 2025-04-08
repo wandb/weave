@@ -513,20 +513,16 @@ class OpenTelemetryAttributes(Attributes):
         return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
 
     def get_weave_outputs(self) -> Any:
-        outputs: dict[str, Any] | None = self.get_attribute_value(
-            ot.SpanAttributes.LLM_COMPLETIONS
+        outputs: dict[str, Any] = (
+            self.get_attribute_value(ot.SpanAttributes.LLM_COMPLETIONS) or {}
         )
-        if isinstance(outputs, dict) and outputs.keys():
-            return convert_numeric_keys_to_list(outputs)
-        return outputs or {}
+        return outputs
 
     def get_weave_inputs(self) -> Any:
-        inputs: dict[str, Any] | None = self.get_attribute_value(
-            ot.SpanAttributes.LLM_PROMPTS
+        inputs: dict[str, Any] = (
+            self.get_attribute_value(ot.SpanAttributes.LLM_PROMPTS) or {}
         )
-        if isinstance(inputs, dict) and inputs.keys():
-            return convert_numeric_keys_to_list(inputs)
-        return inputs or {}
+        return inputs
 
     def get_weave_attributes(
         self, extra: Optional[dict[str, Any]] = None
