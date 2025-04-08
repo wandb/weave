@@ -117,3 +117,36 @@ print(city_recommender.predict("New York"))
 print(city_recommender.predict("San Francisco"))
 print(city_recommender.predict("Los Angeles"))
 ```
+
+## Known Issue with `weave.Model` and Google GenAI
+
+If you are using the `weave.Model` class with a method that wraps a call to Google GenAI SDK, you may encounter the following error when decorating the method with `@weave.op()`:
+
+```text
+ValidationError: 1 validation error for EndedCallSchemaForInsert
+summary.usage.ObjectRef(...) [key]
+  Input should be a valid string [type=string_type, input_value=ObjectRef(...)]
+```
+
+This happens because the default trace postprocessing cannot handle some Google GenAI objects returned within `weave.Model` contexts.
+
+### Workaround
+
+To resolve this, you can explicitly use the postprocessing logic provided by Weave’s Google GenAI integration. Replace the default decorator with the following:
+
+```python
+from weave.integrations.google_genai.gemini_utils import google_genai_gemini_postprocess_inputs
+
+class CityVisitRecommender(weave.Model):
+    model: str
+
+    @weave.op(postprocess_inputs=google_genai_gemini_postprocess_inputs)
+    def predict(self, city: str) -> str:
+        response = google_client.models.generate_content(
+            model=self.model,
+            contents="You are a helpful assistant meant to suggest all budget-friendly places to visit in a city",
+        )
+        return response.text
+```
+
+This ensures that the inputs are properly serialized before being sent to the trace backend, avoiding validation errors and allowing the trace to complete successfully.
