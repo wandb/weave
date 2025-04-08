@@ -41,6 +41,7 @@ from weave_query import (
     trace_local,
     value_or_error,
     wandb_api,
+    artifact_local
 )
 from weave_query.language_features.tagging import (
     opdef_util,
@@ -566,33 +567,44 @@ def execute_forward_node(
                     if run.output is not None:
                         output_ref = run.output
                         # We must deref here to restore tags
-                        output = output_ref.get()
-                        logging.debug("Cache hit, returning")
-
-                        # Flowed tags are not cacheable(!),
-                        # because they may contain graph dependent information,
-                        # as in the case of gql tags that contain results for downstream
-                        # nodes. So we fix that up here, by flowing tags and overriding
-                        # the cached tags.
-                        # Note, this only works for outer tags, not tags that are inside
-                        # values. For those, we don't have a solution yet.
-                        if opdef_util.should_flow_tags(op_def):
-                            arg0_ref = next(iter(input_refs.values()))
-                            arg0 = ref_base.deref(arg0_ref)
-
+                        try:
                             output = output_ref.get()
+                            logging.debug("Cache hit, returning")
 
-                            process_opdef_resolve_fn.flow_tags(arg0, output)
+                            # Flowed tags are not cacheable(!),
+                            # because they may contain graph dependent information,
+                            # as in the case of gql tags that contain results for downstream
+                            # nodes. So we fix that up here, by flowing tags and overriding
+                            # the cached tags.
+                            # Note, this only works for outer tags, not tags that are inside
+                            # values. For those, we don't have a solution yet.
+                            if opdef_util.should_flow_tags(op_def):
+                                arg0_ref = next(iter(input_refs.values()))
+                                arg0 = ref_base.deref(arg0_ref)
 
-                        forward_node.set_result(output_ref)
+                                output = output_ref.get()
 
-                        return {
-                            "cache_used": True,
-                            "already_executed": False,
-                            "bytes_read_to_arrow": get_bytes_read_to_arrow(
-                                node, output
-                            ),
-                        }
+                                process_opdef_resolve_fn.flow_tags(arg0, output)
+
+                            forward_node.set_result(output_ref)
+
+                            return {
+                                "cache_used": True,
+                                "already_executed": False,
+                                "bytes_read_to_arrow": get_bytes_read_to_arrow(
+                                    node, output
+                                ),
+                            }
+                        except FileNotFoundError as e:
+                            if ("ArrowWeaveList" in str(e) and 
+                                isinstance(output_ref, artifact_local.LocalArtifactRef) and 
+                                hasattr(output_ref, "artifact") and 
+                                output_ref.artifact is not None):
+                                # Sometimes we experience a FileNotFoundError when loading up the AWL instance.
+                                # Unsure how/why this happens in the first place, but handle it by deleting the
+                                # corrupted artifact and sending execution down the cache miss path.
+                                logging.warn(f"AWL local artifact not found: {output_ref.artifact.uri}")
+                                output_ref.artifact.delete()
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {

@@ -120,4 +120,13 @@ describe('getClosestTick', () => {
     expect(actual).toBe(123458);
     expect(duration).toBeLessThanOrEqual(1.0);
   });
+
+  it('handles boundary conditions with ticks correctly', () => {
+    const ticks = [0, 0.5, 1];
+    expect(getClosestTick(-0.1, 0, 0, 1, ticks)).toBe(0);
+    expect(getClosestTick(1.1, 1, 0, 1, ticks)).toBe(1);
+    expect(getClosestTick(0.5, 0.5, 0, 1, ticks)).toBe(0.5);
+    expect(getClosestTick(0.7, 0.5, 0, 1, ticks)).toBe(1); // Moving up
+    expect(getClosestTick(0.7, 1, 0, 1, ticks)).toBe(0.5); // Moving down
+  });
 });

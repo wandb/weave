@@ -525,7 +525,7 @@ export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
   xai: ['XAI_API_KEY'],
   bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
   azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
-  groq: ['GEMMA_API_KEY'],
+  groq: ['GROQ_API_KEY'],
   deepseek: ['DEEPSEEK_API_KEY'],
 };
 
