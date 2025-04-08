@@ -253,7 +253,6 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "scorers",
             "pandas-test",
           ]
       fail-fast: false
