@@ -1209,13 +1209,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val=val,
             )
 
-        # dedupe parsed_refs
-        unique_refs = {}
-        for ref in parsed_refs:
-            if ref.uri() not in unique_refs:
-                unique_refs[ref.uri()] = ref
-
-        # Initialize the results with the unique parsed refs
+        # Initialize the results with the parsed refs
         extra_results = [
             PartialRefResult(
                 remaining_extra=[],
@@ -1223,7 +1217,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 unresolved_table_ref=None,
                 val=None,
             )
-            for ref in unique_refs.values()
+            for ref in parsed_refs
         ]
 
         # Loop until there is nothing left to resolve
@@ -1310,13 +1304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra, extra_result.val
                     )
 
-        # map from unique ref to value returned
-        val_map = {u.uri(): r.val for u, r in zip(unique_refs.values(), extra_results)}
-
-        # use the provided parsed refs to determine what values to return
-        non_unique_results = [val_map[r.uri()] for r in parsed_refs]
-
-        return non_unique_results
+        return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
