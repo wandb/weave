@@ -158,7 +158,7 @@ export const FeedbackSidebar = ({
               onClick={() => setIsNewScorerDrawerOpen(true)}
               variant="primary"
               icon="add-new">
-              Create scorer
+              Add field
             </Button>
           </div>
           <NewScorerDrawer
