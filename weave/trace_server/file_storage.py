@@ -137,7 +137,7 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
 class S3StorageClient(FileStorageClient):
     """AWS S3 storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(self, base_uri: FileStorageURI, credentials: AWSCredentials):
+    def __init__(self, base_uri: FileStorageURI, credentials: Optional[AWSCredentials]):
         """Initialize S3 client with credentials and default timeout configuration."""
         assert isinstance(base_uri, S3FileStorageURI)
         super().__init__(base_uri)
@@ -146,11 +146,18 @@ class S3StorageClient(FileStorageClient):
             read_timeout=DEFAULT_READ_TIMEOUT,
             retries={"max_attempts": 0},
         )
+        credential_params = {}
+        if credentials is not None:
+            credential_params["aws_access_key_id"] = credentials["access_key_id"]
+            credential_params["aws_secret_access_key"] = credentials[
+                "secret_access_key"
+            ]
+            session_token = credentials.get("session_token")
+            if session_token is not None:
+                credential_params["aws_session_token"] = session_token
         self.client = boto3.client(
             "s3",
-            aws_access_key_id=credentials.get("access_key_id"),
-            aws_secret_access_key=credentials.get("secret_access_key"),
-            aws_session_token=credentials.get("session_token"),
+            **credential_params,
             config=config,
         )
 
