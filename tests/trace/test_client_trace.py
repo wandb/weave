@@ -2178,7 +2178,8 @@ def test_call_query_stream_columns(client):
 
     # NO output returned because not required and not requested
     assert calls[0].output is None
-    assert calls[0].ended_at is None
+    # still need ended_at (always)
+    assert calls[0].ended_at is not None
     assert calls[0].attributes == {}
     assert calls[0].inputs == {"a": 0, "b": 0}
 
