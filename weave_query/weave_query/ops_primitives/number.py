@@ -379,12 +379,12 @@ def stddev(numbers):
 
 @op(
     name="number-isInteger",
-    input_type={"number": types.optional(types.Number())},
+    input_type={"value": types.optional(types.Number())},
     output_type=types.Boolean(),
 )
-def is_integer(number):
-    unboxed_number = box.unbox(number)
-    return unboxed_number is not None and unboxed_number == int(unboxed_number)
+def is_integer(value):
+    unboxed_value = box.unbox(value)
+    return unboxed_value is not None and unboxed_value == int(unboxed_value)
 
 
 @op(

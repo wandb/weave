@@ -150,12 +150,12 @@ export const opNumbersMax = makeNumbersOp({
 
 export const opNumberIsInteger = OpKinds.makeBasicOp({
   name: 'number-isInteger',
-  argTypes: {number: 'number'},
-  argDescriptions: {number: `${docType('number')} to check`},
+  argTypes: {value: 'number'},
+  argDescriptions: {value: `${docType('number')} to check`},
   description: `Check if a ${docType('number')} is an integer`,
   returnValueDescription: `Whether the ${docType('number')} is an integer`,
-  returnType: inputTypes => skipTaggable(inputTypes.number, t => 'boolean'),
-  resolver: ({number}) => Number.isInteger(number),
+  returnType: inputTypes => skipTaggable(inputTypes.value, t => 'boolean'),
+  resolver: ({value}) => Number.isInteger(value),
 });
 
 // Dimension preserving
