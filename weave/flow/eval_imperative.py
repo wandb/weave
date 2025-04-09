@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Any, cast
+from typing import Any, Union, cast
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -15,7 +17,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 
 ID = str
-ScoreType = float | bool | dict
+ScoreType = Union[float, bool, dict]
 
 NOT_DEFINED = "Not defined for custom scoring"
 
