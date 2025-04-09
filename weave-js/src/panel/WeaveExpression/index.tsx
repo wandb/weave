@@ -277,9 +277,6 @@ export const focusEditor = (editor: Editor): void => {
 
 const Container = styled.div`
   width: 100%;
-  padding-left: 8px;
-  padding-right: 8px;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding: 6px 8px;
 `;
 Container.displayName = 'S.Container';
