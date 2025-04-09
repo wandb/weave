@@ -5,7 +5,6 @@ from typing import Any, Literal, Optional, Protocol, Union
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
-    ExportTraceServiceResponse,
 )
 from pydantic import (
     BaseModel,
@@ -234,17 +233,18 @@ class OtelExportReq(BaseModel):
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
+class ExportTracePartialSuccess(BaseModel):
+    rejected_spans: int
+    error_message: str
+
+
 # Spec requires that the response be of type Export<signal>ServiceResponse
 # https://opentelemetry.io/docs/specs/otlp/
 class OtelExportRes(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    _response: ExportTraceServiceResponse
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-        # Set the response type to ExportTraceServiceResponse
-        # TODO: Actually populate the error fields
-        self._response = ExportTraceServiceResponse()
+    partial_success: Optional[ExportTracePartialSuccess] = Field(
+        default=None,
+        description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
+    )
 
 
 class CallStartReq(BaseModel):
