@@ -197,6 +197,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                               data-test="panel-config"
                               style={{
                                 padding: '5px',
+                                marginLeft: '8px',
                               }}>
                               <Icon
                                 name="cog"
