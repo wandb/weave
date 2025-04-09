@@ -231,34 +231,6 @@ export const FilterBar = ({
     [localFilterModel, setFilterModel, activeEditId]
   );
 
-  const onSetSelected = useCallback(() => {
-    const newFilter =
-      selectedCalls.length === 1
-        ? {
-            id: getNextFilterId(localFilterModel.items),
-            field: 'id',
-            operator: '(string): equals',
-            value: selectedCalls[0],
-          }
-        : {
-            id: getNextFilterId(localFilterModel.items),
-            field: 'id',
-            operator: '(string): in',
-            value: selectedCalls,
-          };
-    const newModel = upsertFilter(
-      localFilterModel,
-      newFilter,
-      f => f.field === 'id'
-    );
-    setFilterModel(newModel);
-    clearSelectedCalls();
-    setAnchorEl(null);
-
-    // Clear active edit when popover is closed
-    setActiveEditId(null);
-  }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
-
   const onFilterTagClick = useCallback((filterId: FilterId) => {
     setActiveEditId(filterId);
     setAnchorEl(refBar.current);
@@ -345,11 +317,6 @@ export const FilterBar = ({
             <DraggableHandle>
               <div className="handle flex items-center pb-12">
                 <div className="flex-auto font-semibold">Filters</div>
-                {selectedCalls.length > 0 && (
-                  <Button size="small" variant="ghost" onClick={onSetSelected}>
-                    {`Selected rows (${selectedCalls.length})`}
-                  </Button>
-                )}
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
