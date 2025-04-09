@@ -2,6 +2,7 @@ import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import React, {useMemo, useState} from 'react';
 
+import {Pill} from '@wandb/weave/components/Tag';
 import {Button} from '../../../../../Button';
 import {
   CustomWeaveTypeDispatcher,
@@ -583,12 +584,8 @@ export const TraceCallsSection: React.FC<{
                             marginRight: '8px',
                           }}
                         />
-                        {state.summary.evaluationCalls[evalId].name || 'model'}{' '}
-                        <Box
-                          component="span"
-                          sx={{fontSize: '0.9em', color: '#666'}}>
-                          {evalId.slice(-4)}
-                        </Box>
+                        {state.summary.evaluationCalls[evalId].name || 'model'}
+                        <Pill color="moon" label={evalId.slice(-4)} />
                       </Box>
                     </Box>
                   );

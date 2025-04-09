@@ -2,6 +2,7 @@ import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import React, {useMemo} from 'react';
 
+import {Pill} from '@wandb/weave/components/Tag/Pill';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {STANDARD_PADDING} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpState';
@@ -183,16 +184,8 @@ export const SummarizeCallsSection: React.FC<{
                       marginRight: '8px',
                     }}
                   />
-                  <Box>
-                    <span>
-                      {state.summary.evaluationCalls[evalId].name || 'model'}
-                    </span>
-                    <Box
-                      component="span"
-                      sx={{fontSize: '0.9em', color: '#666'}}>
-                      {evalId.slice(-4)}
-                    </Box>
-                  </Box>
+                  {state.summary.evaluationCalls[evalId].name || 'model'}
+                  <Pill color="moon" label={evalId.slice(-4)} />
                 </Box>
               </Box>
             ))}
