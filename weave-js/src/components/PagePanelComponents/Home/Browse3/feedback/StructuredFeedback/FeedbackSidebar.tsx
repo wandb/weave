@@ -117,19 +117,19 @@ export const FeedbackSidebar = ({
         <div className="text-sm font-semibold">Annotation</div>
         <div className="flex items-center gap-2">
           <Tooltip
-            content="Add annotation field"
+            content="Add annotation"
             trigger={
               <Button
                 onClick={() => setIsNewAnnotationDrawerOpen(true)}
                 variant="ghost"
                 size="small"
                 icon="add-new"
-                aria-label="Add annotation field"
+                aria-label="Add annotation"
               />
             }
           />
           <Tooltip
-            content="Manage annotation fields"
+            content="Manage annotations"
             trigger={
               <Button
                 onClick={() =>
@@ -138,7 +138,7 @@ export const FeedbackSidebar = ({
                 variant="ghost"
                 size="small"
                 icon="settings"
-                aria-label="Manage annotation fields"
+                aria-label="Manage annotations"
               />
             }
           />
@@ -192,7 +192,7 @@ export const FeedbackSidebar = ({
               onClick={() => setIsNewAnnotationDrawerOpen(true)}
               variant="primary"
               icon="add-new">
-              Add field
+              Add annotation
             </Button>
           </div>
         </div>

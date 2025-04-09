@@ -40,7 +40,7 @@ export const CreateAnnotationFieldDrawer: FC<
       onSave?.();
       onClose();
     } catch (error) {
-      console.error('Failed to create annotation field:', error);
+      console.error('Failed to create annotation:', error);
     }
   }, [entity, project, formData, getClient, onClose, onSave]);
 
@@ -63,7 +63,7 @@ export const CreateAnnotationFieldDrawer: FC<
             borderColor: 'divider',
           }}>
           <Typography variant="h6" sx={{...typographyStyle, fontWeight: 600}}>
-            Create annotation field
+            Create annotation
           </Typography>
           <Box sx={{display: 'flex', gap: 1}}>
             <Button
@@ -111,7 +111,7 @@ export const CreateAnnotationFieldDrawer: FC<
             onClick={handleSave}
             variant="primary"
             disabled={!isFormValid}
-            tooltip="Create annotation field"
+            tooltip="Create annotation"
             style={{
               width: '100%',
               margin: '0 16px',
@@ -121,7 +121,7 @@ export const CreateAnnotationFieldDrawer: FC<
               width: 'calc(100% - 32px)',
               display: 'block',
             }}>
-            Create annotation field
+            Create annotation
           </Button>
         </Box>
       </Box>
