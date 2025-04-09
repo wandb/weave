@@ -34,12 +34,17 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
                 weave_op_name = fn.__name__ or ""
                 base_name = settings.name or ""
 
-                display_name = (
-                    f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
-                )
+                # Set the op name to mcp.server.fastmcp.FastMCP.tool.<TOOL_NAME>
+                op_name = f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
+                
+                # Use just the function name as the display name
+                display_name = weave_op_name if weave_op_name != "" else base_name
 
                 settings_copy = settings.model_copy(
-                    update={"call_display_name": display_name}
+                    update={
+                        "name": op_name,
+                        "call_display_name": display_name
+                    }
                 )
 
                 weave_wrapped = weave.op(fn, **settings_copy.model_dump())
@@ -68,6 +73,9 @@ def get_mcp_server_patcher(
         return _mcp_server_patcher
 
     base = settings.op_settings
+    
+    # Check if list operations should be traced
+    # trace_list_operations = getattr(settings, "trace_list_operations", False)
 
     # Settings for core methods
     call_tool_settings = base.model_copy(
@@ -130,18 +138,8 @@ def get_mcp_server_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.server.fastmcp"),
-            "FastMCP.list_tools",
-            mcp_server_wrapper(list_tools_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.server.fastmcp"),
             "FastMCP.read_resource",
             mcp_server_wrapper(read_resource_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.server.fastmcp"),
-            "FastMCP.list_resources",
-            mcp_server_wrapper(list_resources_settings),
         ),
         # Decorator methods
         SymbolPatcher(
@@ -160,6 +158,20 @@ def get_mcp_server_patcher(
             decorator_wrapper(prompt_decorator_settings),
         ),
     ]
+    
+    # Only add list_* operations if opted in
+    patchers.extend([
+        SymbolPatcher(
+            lambda: importlib.import_module("mcp.server.fastmcp"),
+            "FastMCP.list_tools",
+            mcp_server_wrapper(list_tools_settings),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("mcp.server.fastmcp"),
+            "FastMCP.list_resources",
+            mcp_server_wrapper(list_resources_settings),
+        ),
+    ])
 
     _mcp_server_patcher = MultiPatcher(patchers)
 
