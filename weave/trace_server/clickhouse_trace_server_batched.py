@@ -81,10 +81,12 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.file_storage import (
     FileStorageWriteError,
+    _get_storage_client,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
 )
+from weave.trace_server.file_storage_client import FileStorageClient
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import (
@@ -103,6 +105,7 @@ from weave.trace_server.objects_query_builder import (
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.storage_client_manager import StorageClientManager
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -212,6 +215,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._storage_client: Optional[FileStorageClient] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -225,6 +229,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
         )
+
+    @property
+    def storage_client(self) -> FileStorageClient:
+        if self._storage_client is not None:
+            return self._storage_client
+        file_storage_uri = wf_env.wf_file_storage_uri()
+        if file_storage_uri is None:
+            return None
+        try:
+            parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
+        except Exception as e:
+            logger.exception(f"Error parsing file storage URI: {e}")
+            return None
+        self._storage_client = _get_storage_client(parsed_uri)
+        return self._storage_client
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         traces_data = [
@@ -1404,6 +1423,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "file_storage_uri",
             ],
         )
+
 
     def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
         """
