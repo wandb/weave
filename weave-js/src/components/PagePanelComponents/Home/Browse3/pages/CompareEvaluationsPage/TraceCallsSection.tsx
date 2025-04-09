@@ -1,8 +1,8 @@
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {Pill} from '@wandb/weave/components/Tag';
 import React, {useMemo, useState} from 'react';
 
-import {Pill} from '@wandb/weave/components/Tag';
 import {Button} from '../../../../../Button';
 import {
   CustomWeaveTypeDispatcher,
@@ -13,6 +13,12 @@ import {
 import {EvaluationComparisonState} from './ecpState';
 import {TraceCallData} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
+
+// Common border styles
+const BORDER_COLOR = '#e0e0e0';
+const HEADER_BORDER_COLOR = '#ccc';
+const STANDARD_BORDER = `1px solid ${BORDER_COLOR}`;
+const HEADER_BORDER = `1px solid ${HEADER_BORDER_COLOR}`;
 
 export const TraceCallsSection: React.FC<{
   traceCalls: Array<TraceCallData>;
@@ -191,6 +197,27 @@ export const TraceCallsSection: React.FC<{
     );
   };
 
+  // Common grid styles
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+    border: STANDARD_BORDER,
+    borderBottom: 'none',
+  };
+
+  // Common cell styles with borders that won't double up
+  const cellStyle = {
+    padding: '8px 16px',
+    borderRight: STANDARD_BORDER,
+    borderBottom: STANDARD_BORDER,
+  };
+
+  // Last cell in a row doesn't need right border
+  const lastCellStyle = {
+    ...cellStyle,
+    borderRight: 'none',
+  };
+
   return (
     <VerticalBox
       sx={{
@@ -205,7 +232,7 @@ export const TraceCallsSection: React.FC<{
           alignItems: 'center',
           bgcolor: '#f5f5f5',
           padding: '16px',
-          borderBottom: '1px solid #ccc',
+          borderBottom: HEADER_BORDER,
         }}>
         <HorizontalBox
           sx={{
@@ -240,30 +267,26 @@ export const TraceCallsSection: React.FC<{
         sx={{
           flex: 1,
           overflow: 'auto',
-          borderBottom: '1px solid #e0e0e0',
         }}>
         {/* Input section */}
-        <Box sx={{borderBottom: '1px solid #e0e0e0'}}>
+        <Box sx={{marginBottom: '16px'}}>
           <Box
             sx={{
-              display: 'grid',
-              gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+              ...gridStyle,
               bgcolor: '#f5f5f5',
               fontWeight: 'bold',
             }}>
             <Box
               sx={{
-                padding: '8px 16px',
-                borderRight: '1px solid #e0e0e0',
-                borderBottom: '1px solid #e0e0e0',
+                ...cellStyle,
               }}>
               Input
             </Box>
             <Box
               sx={{
+                ...cellStyle,
                 gridColumn: `2 / span ${evaluationIds.length}`,
-                padding: '8px 16px',
-                borderBottom: '1px solid #e0e0e0',
+                borderRight: 'none',
               }}>
               Value
             </Box>
@@ -283,25 +306,24 @@ export const TraceCallsSection: React.FC<{
                 {/* Parent row for all inputs */}
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                    ...gridStyle,
                     bgcolor: '#f0f0f0',
                   }}>
                   <Box
                     sx={{
-                      padding: '8px 16px',
+                      ...cellStyle,
                       fontWeight: 'bold',
-                      borderRight: '1px solid #e0e0e0',
                       textAlign: 'left',
                     }}>
                     {inputKey}
                   </Box>
                   <Box
                     sx={{
+                      ...cellStyle,
                       gridColumn: `2 / span ${evaluationIds.length}`,
-                      padding: '8px 16px',
                       fontStyle: 'italic',
                       color: '#666',
+                      borderRight: 'none',
                     }}>
                     {typeof inputValue === 'object' && inputValue !== null
                       ? `${Object.keys(inputValue).length} properties`
@@ -320,26 +342,25 @@ export const TraceCallsSection: React.FC<{
                       <Box
                         key={`${inputKey}.${subKey}`}
                         sx={{
-                          display: 'grid',
-                          gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                          ...gridStyle,
                           bgcolor: subIndex % 2 === 0 ? '#ffffff' : '#fafafa',
-                          borderTop: '1px solid #f0f0f0',
                         }}>
                         <Box
                           sx={{
+                            ...cellStyle,
                             padding: '8px 16px 8px 32px', // Increased left padding to show hierarchy
                             fontWeight: 'normal',
-                            borderRight: '1px solid #e0e0e0',
                             textAlign: 'left',
                           }}>
                           {subKey}
                         </Box>
                         <Box
                           sx={{
+                            ...cellStyle,
                             gridColumn: `2 / span ${evaluationIds.length}`,
-                            padding: '8px 16px',
                             overflow: 'auto',
                             maxHeight: '100px',
+                            borderRight: 'none',
                           }}>
                           {typeof subValue === 'object' && subValue !== null ? (
                             // Check if this is a type that we should render using the CustomWeaveTypeDispatcher
@@ -385,17 +406,15 @@ export const TraceCallsSection: React.FC<{
                   // For primitive values, create a single child row showing the full value
                   <Box
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                      ...gridStyle,
                       bgcolor: '#ffffff',
-                      borderTop: '1px solid #f0f0f0',
                     }}>
                     <Box
                       sx={{
+                        ...cellStyle,
                         padding: '8px 16px 8px 32px',
                         fontWeight: 'normal',
                         fontStyle: 'italic',
-                        borderRight: '1px solid #e0e0e0',
                         textAlign: 'left',
                         color: '#666',
                       }}>
@@ -403,10 +422,11 @@ export const TraceCallsSection: React.FC<{
                     </Box>
                     <Box
                       sx={{
+                        ...cellStyle,
                         gridColumn: `2 / span ${evaluationIds.length}`,
-                        padding: '8px 16px',
                         overflow: 'auto',
                         maxHeight: '100px',
+                        borderRight: 'none',
                       }}>
                       {typeof inputValue === 'object' ? (
                         <pre
@@ -540,33 +560,27 @@ export const TraceCallsSection: React.FC<{
             <Box sx={{marginTop: '16px'}}>
               <Box
                 sx={{
-                  display: 'grid',
-                  gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                  ...gridStyle,
                   bgcolor: '#f5f5f5',
                   fontWeight: 'bold',
                 }}>
                 <Box
                   sx={{
-                    padding: '8px 16px',
-                    borderRight: '1px solid #e0e0e0',
-                    borderBottom: '1px solid #e0e0e0',
+                    ...cellStyle,
                   }}>
                   {hasPrimitiveOutput
                     ? 'Model Output Value'
                     : 'Model Output Metrics'}
                 </Box>
-                {evaluationIds.map(evalId => {
+                {evaluationIds.map((evalId, idx) => {
+                  const isLast = idx === evaluationIds.length - 1;
                   return (
                     <Box
                       key={evalId}
                       sx={{
+                        ...(isLast ? lastCellStyle : cellStyle),
                         padding: '8px',
                         textAlign: 'center',
-                        borderRight:
-                          evalId !== evaluationIds[evaluationIds.length - 1]
-                            ? '1px solid #e0e0e0'
-                            : 'none',
-                        borderBottom: '1px solid #e0e0e0',
                       }}>
                       <Box
                         sx={{
@@ -605,15 +619,13 @@ export const TraceCallsSection: React.FC<{
                   <Box
                     key={fieldPath}
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: `200px repeat(${evaluationIds.length}, 1fr)`,
+                      ...gridStyle,
                       bgcolor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
                     }}>
                     <Box
                       sx={{
-                        padding: '8px 16px',
+                        ...cellStyle,
                         fontWeight: 'bold',
-                        borderRight: '1px solid #e0e0e0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -621,7 +633,8 @@ export const TraceCallsSection: React.FC<{
                       {fieldPath}
                     </Box>
 
-                    {evaluationIds.map(evalId => {
+                    {evaluationIds.map((evalId, idx) => {
+                      const isLast = idx === evaluationIds.length - 1;
                       const modelOutput =
                         outputsByEvalId[evalId]?.model_output ||
                         outputsByEvalId[evalId];
@@ -654,11 +667,7 @@ export const TraceCallsSection: React.FC<{
                         <Box
                           key={evalId}
                           sx={{
-                            padding: '8px 16px',
-                            borderRight:
-                              evalId !== evaluationIds[evaluationIds.length - 1]
-                                ? '1px solid #e0e0e0'
-                                : 'none',
+                            ...(isLast ? lastCellStyle : cellStyle),
                             display: 'flex',
                             alignItems: 'center',
                           }}>

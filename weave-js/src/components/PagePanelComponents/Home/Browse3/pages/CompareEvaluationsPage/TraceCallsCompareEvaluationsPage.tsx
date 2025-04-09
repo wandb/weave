@@ -11,6 +11,10 @@ import {HorizontalBox, VerticalBox} from './Layout';
 import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizePlotsSection';
 import {TraceCallsSection} from './TraceCallsSection';
 
+// Common border styles
+const BORDER_COLOR = '#e0e0e0';
+const STANDARD_BORDER = `1px solid ${BORDER_COLOR}`;
+
 export const SummarizeCallsSection: React.FC<{
   summarizeCalls: Array<TraceCallData>;
   entity?: string;
@@ -128,67 +132,92 @@ export const SummarizeCallsSection: React.FC<{
     return undefined;
   };
 
+  // Common table styles
+  const tableStyle = {
+    display: 'table',
+    width: '100%',
+    border: STANDARD_BORDER,
+    borderSpacing: 0,
+    borderCollapse: 'collapse' as const,
+  };
+
+  // Common cell styles
+  const cellStyle = {
+    padding: '8px 16px',
+    borderRight: STANDARD_BORDER,
+    borderBottom: STANDARD_BORDER,
+  };
+
+  // Last cell in a row style
+  const lastCellStyle = {
+    ...cellStyle,
+    borderRight: 'none',
+  };
+
+  // Header cell style
+  const headerCellStyle = {
+    ...cellStyle,
+    fontWeight: 'bold' as const,
+    bgcolor: '#f5f5f5',
+  };
+
+  // Header last cell style
+  const headerLastCellStyle = {
+    ...headerCellStyle,
+    borderRight: 'none',
+  };
+
   return (
     <VerticalBox>
       {/* Main content area */}
       <Box>
         {/* Output section */}
-        <Box
-          sx={{
-            display: 'table',
-            width: '100%',
-          }}>
+        <Box sx={tableStyle}>
           {/* Header row */}
           <Box
             sx={{
               display: 'table-row',
               bgcolor: '#f5f5f5',
-              fontWeight: 'bold',
             }}>
             <Box
               sx={{
                 display: 'table-cell',
                 width: '200px',
-                padding: '8px 16px',
-                borderRight: '1px solid #e0e0e0',
-                borderBottom: '1px solid #e0e0e0',
+                ...headerCellStyle,
               }}>
               Metric
             </Box>
-            {evaluationIds.map((evalId, colIndex) => (
-              <Box
-                key={evalId}
-                sx={{
-                  display: 'table-cell',
-                  padding: '8px 16px',
-                  borderRight:
-                    colIndex < evaluationIds.length - 1
-                      ? '1px solid #e0e0e0'
-                      : 'none',
-                  borderBottom: '1px solid #e0e0e0',
-                  textAlign: 'center',
-                  alignItems: 'center',
-                }}>
+            {evaluationIds.map((evalId, colIndex) => {
+              const isLast = colIndex === evaluationIds.length - 1;
+              return (
                 <Box
+                  key={evalId}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    display: 'table-cell',
+                    ...(isLast ? headerLastCellStyle : headerCellStyle),
+                    textAlign: 'center',
                   }}>
                   <Box
                     sx={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      bgcolor: state.summary.evaluationCalls[evalId].color,
-                      marginRight: '8px',
-                    }}
-                  />
-                  {state.summary.evaluationCalls[evalId].name || 'model'}
-                  <Pill color="moon" label={evalId.slice(-4)} />
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Box
+                      sx={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        bgcolor: state.summary.evaluationCalls[evalId].color,
+                        marginRight: '8px',
+                      }}
+                    />
+                    {state.summary.evaluationCalls[evalId].name || 'model'}
+                    <Pill color="moon" label={evalId.slice(-4)} />
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              );
+            })}
           </Box>
 
           {/* Render metrics from summarize calls */}
@@ -224,17 +253,15 @@ export const SummarizeCallsSection: React.FC<{
                   <Box
                     sx={{
                       display: 'table-cell',
-                      padding: '8px 16px',
+                      ...cellStyle,
                       fontWeight: 'bold',
-                      borderRight: '1px solid #e0e0e0',
-                      borderBottom: '1px solid #e0e0e0',
                       textAlign: 'left',
-                      alignItems: 'center',
                     }}>
                     {metricName}
                   </Box>
 
                   {evaluationIds.map((evalId, colIndex) => {
+                    const isLast = colIndex === evaluationIds.length - 1;
                     // Find call for this evaluation
                     const evalCalls = callsByParent[evalId] || [];
                     const evalCall = evalCalls[0];
@@ -247,17 +274,11 @@ export const SummarizeCallsSection: React.FC<{
                         key={evalId}
                         sx={{
                           display: 'table-cell',
-                          padding: '8px 16px',
-                          borderRight:
-                            colIndex < evaluationIds.length - 1
-                              ? '1px solid #e0e0e0'
-                              : 'none',
-                          borderBottom: '1px solid #e0e0e0',
+                          ...(isLast ? lastCellStyle : cellStyle),
                           textAlign: 'center',
                           color: typeof value === 'object' ? '#666' : 'inherit',
                           fontStyle:
                             typeof value === 'object' ? 'italic' : 'normal',
-                          alignItems: 'center',
                         }}>
                         {typeof value === 'object' && value !== null
                           ? `${Object.keys(value).length} properties`
@@ -292,17 +313,17 @@ export const SummarizeCallsSection: React.FC<{
                           <Box
                             sx={{
                               display: 'table-cell',
-                              padding: '8px 16px 8px 32px', // Increased left padding to show hierarchy
+                              ...cellStyle,
+                              padding: '8px 16px 8px 32px', // Increased left padding for hierarchy
                               fontWeight: 'normal',
-                              borderRight: '1px solid #e0e0e0',
-                              borderBottom: '1px solid #e0e0e0',
                               textAlign: 'left',
-                              alignItems: 'center',
                             }}>
                             {subKey}
                           </Box>
 
                           {evaluationIds.map((evalId, colIndex) => {
+                            const isLast =
+                              colIndex === evaluationIds.length - 1;
                             // Find call for this evaluation
                             const evalCalls = callsByParent[evalId] || [];
                             const evalCall = evalCalls[0];
@@ -320,17 +341,11 @@ export const SummarizeCallsSection: React.FC<{
                                 key={evalId}
                                 sx={{
                                   display: 'table-cell',
-                                  padding: '8px 16px',
-                                  borderRight:
-                                    colIndex < evaluationIds.length - 1
-                                      ? '1px solid #e0e0e0'
-                                      : 'none',
-                                  borderBottom: '1px solid #e0e0e0',
+                                  ...(isLast ? lastCellStyle : cellStyle),
                                   textAlign:
                                     typeof nestedValue === 'object'
                                       ? 'left'
                                       : 'center',
-                                  alignItems: 'center',
                                 }}>
                                 {typeof nestedValue === 'object' &&
                                 nestedValue !== null ? (
