@@ -1,5 +1,5 @@
 import json
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import field
 from datetime import datetime
@@ -320,6 +320,7 @@ class ConventionType(Enum):
     OPENINFERENCE = "openinference"
     OPENTELEMETRY = "gen_ai"
     CUSTOM = "custom"
+
 
 class Attributes:
     _attributes: dict[str, Any] = field(default_factory=dict)
