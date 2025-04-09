@@ -208,6 +208,7 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
   const numericalKeys = Object.keys(propertyKeysAndTypes).filter(
     key =>
       isAssignableTo(propertyKeysAndTypes[key], union(['none', 'number'])) &&
+      // Special filtering for metrics that could be integers but are not step related.
       !['loss', 'accuracy', 'precision', 'recall'].some(metric =>
         key.includes(metric)
       )
