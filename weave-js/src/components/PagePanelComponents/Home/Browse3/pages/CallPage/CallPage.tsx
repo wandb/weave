@@ -64,8 +64,9 @@ export const CallPage: FC<CallPageProps> = props => {
       entity: props.entity,
       project: props.project,
       callId: descendentCallId,
+      withStorageSize: true,
     },
-    {includeCosts: true}
+    {includeCosts: true, includeStorageSize: true}
   );
 
   // This is a little hack, but acceptable for now.

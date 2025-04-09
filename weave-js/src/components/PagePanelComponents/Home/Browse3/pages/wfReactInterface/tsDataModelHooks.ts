@@ -166,7 +166,7 @@ const useMakeTraceServerEndpoint = <
 
 const useCall = (
   key: CallKey | null,
-  opts?: {includeCosts?: boolean}
+  opts?: {includeCosts?: boolean; includeStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -183,13 +183,16 @@ const useCall = (
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
           include_costs: opts?.includeCosts,
+          ...(opts?.includeStorageSize
+            ? {include_total_storage_size: true}
+            : null),
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient, opts?.includeCosts]);
+  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeStorageSize]);
 
   useEffect(() => {
     doFetch();
