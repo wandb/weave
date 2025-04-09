@@ -80,6 +80,7 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageReadError,
     FileStorageWriteError,
     get_storage_client_for_uri,
     key_for_project_digest,
@@ -1347,10 +1348,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        file_storage_enabled = self._file_storage_write_enabled_for_project(req.project_id)
+        use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
-        if client is not None and file_storage_enabled:
+        if client is not None and use_file_storage:
             try:
                 self._file_create_bucket(req, digest, client)
             except FileStorageWriteError as e:
@@ -1396,7 +1397,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
-        store_in_bucket(client, key_for_project_digest(req.project_id, digest), req.content)
+        target_file_storage_uri = store_in_bucket(
+            client, key_for_project_digest(req.project_id, digest), req.content
+        )
         self._insert(
             "files",
             data=[
@@ -1423,7 +1426,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-    def _file_storage_write_enabled_for_project(self, project_id: str) -> bool:
+    def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
         """
         Get the base storage URI for a project.
 
@@ -1484,7 +1487,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                bytes += read_from_bucket(file_storage_uri)
+                client = self.file_storage_client
+                if client is None:
+                    raise FileStorageReadError("File storage client is not configured")
+                bytes += read_from_bucket(client, file_storage_uri)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes

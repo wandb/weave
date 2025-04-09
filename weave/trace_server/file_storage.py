@@ -1,5 +1,5 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, Union, cast
 
 import boto3
@@ -76,28 +76,33 @@ class FileStorageReadError(Exception):
     pass
 
 
-def store_in_bucket(client: FileStorageClient, path: str, data: bytes) -> None:
+def store_in_bucket(
+    client: FileStorageClient, path: str, data: bytes
+) -> FileStorageURI:
     """Store a file in a storage bucket."""
     try:
         target_file_storage_uri = client.base_uri.with_path(path)
-        return client.store(target_file_storage_uri, data)
+        client.store(target_file_storage_uri, data)
     except Exception as e:
-        logger.exception("Failed to store file at %s: %s", target_file_storage_uri, str(e))
-        raise FileStorageWriteError(
-            f"Failed to store file at {file_storage_uri}: {str(e)}"
+        logger.exception(
+            "Failed to store file at %s: %s", target_file_storage_uri, str(e)
+        )
+        raise FileStorageWriteError(f"Failed to store file at {path}: {str(e)}") from e
+    return target_file_storage_uri
+
+
+def read_from_bucket(
+    client: FileStorageClient, file_storage_uri: FileStorageURI
+) -> bytes:
+    """Read a file from a storage bucket."""
+    client = get_storage_client_for_uri(file_storage_uri)
+    try:
+        return client.read(file_storage_uri)
+    except Exception as e:
+        logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
+        raise FileStorageReadError(
+            f"Failed to read file from {file_storage_uri}: {str(e)}"
         ) from e
-
-
-# def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
-#     """Read a file from a storage bucket."""
-#     client = get_storage_client_for_uri(file_storage_uri)
-#     try:
-#         return client.read(file_storage_uri)
-#     except Exception as e:
-#         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
-#         raise FileStorageReadError(
-#             f"Failed to read file from {file_storage_uri}: {str(e)}"
-#         ) from e
 
 
 ### Everything below here is interal
@@ -127,7 +132,6 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
         before_sleep=before_sleep_log(logger, logging.DEBUG),
         after=after_retry,
     )
-
 
 
 class S3StorageClient(FileStorageClient):

@@ -29,6 +29,7 @@ AZURITE_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1
 AZURITE_B64_KEY = base64.b64encode(AZURITE_KEY.encode()).decode()
 AZURITE_URL = f"http://127.0.0.1:10000/{AZURITE_ACCOUNT}"
 
+
 @pytest.fixture
 def run_storage_test(client: WeaveClient):
     """Shared test runner for all storage implementations."""
@@ -55,6 +56,7 @@ def run_storage_test(client: WeaveClient):
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
     return _run_test
+
 
 class TestS3Storage:
     """Tests for AWS S3 storage implementation."""
@@ -103,11 +105,13 @@ class TestS3Storage:
 
     def test_client_caching(self, run_storage_test, s3, aws_storage_env):
         """Test that client is properly cached and reused."""
-        with mock.patch("weave.trace_server.file_storage.S3StorageClient") as mock_s3_client:
+        with mock.patch(
+            "weave.trace_server.file_storage.S3StorageClient"
+        ) as mock_s3_client:
             # First call should create a new client
             res1 = run_storage_test()
             mock_s3_client.assert_called_once()
-            
+
             # Second call should reuse the same client
             mock_s3_client.reset_mock()
             res2 = run_storage_test()
@@ -115,16 +119,18 @@ class TestS3Storage:
 
     def test_client_reset(self, run_storage_test, s3, aws_storage_env):
         """Test that client is properly reset when needed."""
-        with mock.patch("weave.trace_server.file_storage.S3StorageClient") as mock_s3_client:
+        with mock.patch(
+            "weave.trace_server.file_storage.S3StorageClient"
+        ) as mock_s3_client:
             # First call creates client
             res1 = run_storage_test()
             mock_s3_client.assert_called_once()
-            
+
             # Reset client
             client = run_storage_test.client.server
             if hasattr(client, "_reset_storage_client"):
                 client._reset_storage_client()
-            
+
             # Next call should create new client
             mock_s3_client.reset_mock()
             res2 = run_storage_test()
@@ -132,20 +138,22 @@ class TestS3Storage:
 
     def test_client_error_handling(self, run_storage_test, s3, aws_storage_env):
         """Test that client errors are properly handled."""
-        with mock.patch("weave.trace_server.file_storage_credentials.get_aws_credentials") as mock_get_creds:
+        with mock.patch(
+            "weave.trace_server.file_storage_credentials.get_aws_credentials"
+        ) as mock_get_creds:
             # First call succeeds
             res1 = run_storage_test()
-            
+
             # Make credentials fail
             mock_get_creds.side_effect = ValueError("Invalid credentials")
-            
+
             # Next call should fail but clear the client
             with pytest.raises(ValueError):
                 res2 = run_storage_test()
-            
+
             # Fix credentials
             mock_get_creds.side_effect = None
-            
+
             # Should work again with new client
             res3 = run_storage_test()
 
