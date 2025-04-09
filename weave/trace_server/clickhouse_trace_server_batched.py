@@ -369,6 +369,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in columns or req.include_costs:
+                columns += ["ended_at", "exception", "display_name"]
+
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
