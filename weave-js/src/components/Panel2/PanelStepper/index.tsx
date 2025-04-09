@@ -1,20 +1,28 @@
+import {useWeaveContext} from '@wandb/weave/context';
 import {
+  constBoolean,
   constFunction,
   constNumber,
   constString,
+  isAssignableTo,
   Node,
   NodeOrVoidNode,
+  opBooleanAll,
   opFilter,
   opIndex,
   opIsNone,
+  opMap,
   opNot,
   opNumberEqual,
+  opNumberIsInteger,
+  opOr,
   opPick,
+  union,
   voidNode,
 } from '@wandb/weave/core';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
-import {useNodeWithServerType} from '../../../react';
+import {useNodeValueExecutor, useNodeWithServerType} from '../../../react';
 import {usePanelStacksForType} from '../availablePanels';
 import * as Panel2 from '../panel';
 import {PanelStepper} from './component';
@@ -31,6 +39,71 @@ import {
   getKeysAndTypesFromPropertyType,
   NONE_KEY_AND_TYPE,
 } from './util';
+
+const useIntegralChecks = (
+  propertyKeys: string[],
+  inputNode: Node
+): {[key: string]: boolean} => {
+  const [results, setResults] = useState<{[key: string]: boolean}>({});
+  const executor = useNodeValueExecutor();
+  const inputNodeRefined = useNodeWithServerType(inputNode);
+
+  const hasRunRef = React.useRef(false);
+  useEffect(() => {
+    if (hasRunRef.current || propertyKeys.length === 0) {
+      return;
+    }
+
+    const checkKeys = async () => {
+      const newResults: {[key: string]: boolean} = {};
+
+      const promises = propertyKeys.map(async (key: string) => {
+        const node = opBooleanAll({
+          values: opMap({
+            arr: inputNode,
+            mapFn: constFunction({row: inputNodeRefined.result.type}, ({row}) =>
+              opOr({
+                lhs: opNumberIsInteger({
+                  number: opPick({
+                    obj: row,
+                    key: constString(key),
+                  }),
+                }),
+                rhs: opIsNone({
+                  val: opPick({
+                    obj: row,
+                    key: constString(key),
+                  }),
+                }),
+              })
+            ),
+          }),
+        });
+
+        try {
+          const result = await executor(node);
+          return {key, result};
+        } catch (e) {
+          console.error(e);
+          return {key, result: false};
+        }
+      });
+
+      const checkResults = await Promise.all(promises);
+
+      checkResults.forEach(({key, result}) => {
+        newResults[key] = result;
+      });
+
+      hasRunRef.current = true;
+      setResults(newResults);
+    };
+
+    checkKeys();
+  }, [propertyKeys, executor, inputNode, inputNodeRefined]);
+
+  return results;
+};
 
 const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
   const {input, updateConfig, config, isConfigMode} = props;
@@ -94,29 +167,28 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
     index: constNumber(0),
   });
   const exampleRowRefined = useNodeWithServerType(exampleRow);
-  const currentStep = config?.currentStep ?? -1;
-  const resultsAtStepNode = opFilter({
-    arr: workingInputNode,
-    filterFn: constFunction({row: exampleRowRefined.result.type}, ({row}) =>
-      opNumberEqual({
-        lhs: opPick({
-          obj: row,
-          key: constString(config?.workingSliderKey ?? '_step'),
-        }),
-        rhs: constNumber(currentStep),
-      })
-    ),
-  });
   let outputNode: NodeOrVoidNode = voidNode();
-  if (currentStep != null && currentStep >= 0) {
-    if (workingKeyAndType.key !== '<none>') {
-      outputNode = opPick({
-        obj: resultsAtStepNode,
-        key: constString(workingKeyAndType.key),
-      });
-    } else {
-      outputNode = resultsAtStepNode;
-    }
+  if (config?.currentStep != null && config?.workingSliderKey != null) {
+    const resultsAtStepNode = opFilter({
+      arr: workingInputNode,
+      filterFn: constFunction({row: exampleRowRefined.result.type}, ({row}) =>
+        opNumberEqual({
+          lhs: opPick({
+            obj: row,
+            key: constString(config?.workingSliderKey!),
+          }),
+          rhs: constNumber(config?.currentStep!),
+        })
+      ),
+    });
+
+    outputNode =
+      workingKeyAndType.key === '<none>'
+        ? resultsAtStepNode
+        : opPick({
+            obj: resultsAtStepNode,
+            key: constString(workingKeyAndType.key),
+          });
   }
 
   const outputNodeRefined = useNodeWithServerType(outputNode);
@@ -135,6 +207,56 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
     });
   }
 
+  const numericalKeys = Object.keys(propertyKeysAndTypes).filter(
+    key =>
+      isAssignableTo(propertyKeysAndTypes[key], union(['none', 'number'])) &&
+      !['loss', 'accuracy', 'precision', 'recall'].some(metric =>
+        key.includes(metric)
+      )
+  );
+
+  const isIntegerResults = useIntegralChecks(numericalKeys, workingInputNode);
+
+  useEffect(() => {
+    if (Object.keys(isIntegerResults).length === 0) {
+      return;
+    }
+
+    const validSliderKeys = numericalKeys.filter(
+      key => isIntegerResults[key] === true
+    );
+
+    const currentValidKeys = config?.validSliderKeys || [];
+    const currentWorkingKey = config?.workingSliderKey;
+
+    const keysChanged =
+      validSliderKeys.length !== currentValidKeys.length ||
+      validSliderKeys.some(key => !currentValidKeys.includes(key));
+
+    const needsNewWorkingKey =
+      (validSliderKeys.length > 0 && !currentWorkingKey) ||
+      (currentWorkingKey && !validSliderKeys.includes(currentWorkingKey));
+
+    if (keysChanged || needsNewWorkingKey) {
+      const update: Partial<PanelStepperConfigType> = {
+        validSliderKeys,
+      };
+
+      if (needsNewWorkingKey) {
+        update.workingSliderKey =
+          validSliderKeys.length > 0 ? validSliderKeys[0] : null;
+      }
+
+      safeUpdateConfig(update);
+    }
+  }, [
+    numericalKeys,
+    isIntegerResults,
+    config?.validSliderKeys,
+    config?.workingSliderKey,
+    safeUpdateConfig,
+  ]);
+
   const additionalProps = {
     safeUpdateConfig,
     convertedInputNode,
@@ -145,9 +267,7 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
     childPanelHandler: handler,
   };
 
-  return isConfigMode ? (
-    <PanelStepperConfig {...props} {...additionalProps} />
-  ) : !propertyKeysAndTypes.hasOwnProperty('_step') ? (
+  const noValidSliderKeysEmptyState = () => (
     <div
       style={{
         height: '100%',
@@ -161,9 +281,23 @@ const PanelStepperEntryComponent: React.FC<PanelStepperEntryProps> = props => {
       Panel currently unsupported for custom step metrics. Please use an
       expression that returns the pre-defined step metric (_step) for now
     </div>
-  ) : (
-    <PanelStepper {...props} {...additionalProps} />
   );
+
+  const renderConfigComponent = () =>
+    config?.validSliderKeys != null ? (
+      <PanelStepperConfig {...props} {...additionalProps} />
+    ) : (
+      noValidSliderKeysEmptyState()
+    );
+
+  const renderPanelComponent = () =>
+    config?.validSliderKeys != null ? (
+      <PanelStepper {...props} {...additionalProps} />
+    ) : (
+      noValidSliderKeysEmptyState()
+    );
+
+  return isConfigMode ? renderConfigComponent() : renderPanelComponent();
 };
 
 const PanelStepperConfigComponent: React.FC<PanelStepperProps> = props => {
