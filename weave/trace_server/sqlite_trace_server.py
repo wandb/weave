@@ -1366,7 +1366,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise ValueError(
+            raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
 
