@@ -21,7 +21,6 @@ import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {useShowDeleteButton} from '../common/DeleteModal';
 import {
-  CallLink,
   CallsLink,
   ObjectVersionsLink,
   objectVersionText,
@@ -597,7 +596,7 @@ const CallGroupRow: React.FC<{
 
   return (
     <tr>
-      <td className="whitespace-nowrap align-center border-r border-[#E0E0E0] bg-moon-50 p-[8px]">
+      <td className="align-center whitespace-nowrap border-r border-[#E0E0E0] bg-moon-50 p-[8px]">
         <OpVersionLink
           entityName={opVersion.result.entity}
           projectName={opVersion.result.project}
