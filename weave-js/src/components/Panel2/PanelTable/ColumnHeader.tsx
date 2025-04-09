@@ -459,6 +459,10 @@ export const ColumnHeader: React.FC<{
           render: ({hovered, selected}) => {
             return isUsedInFilter ? (
               <Item data-test="remove-column" hovered={hovered}>
+                <ItemIcon
+                  style={{color: '#888', marginRight: '8px', marginLeft: 0}}
+                  name="delete"
+                />
                 <div
                   style={{
                     display: 'flex',
@@ -466,16 +470,21 @@ export const ColumnHeader: React.FC<{
                     alignItems: 'flex-start',
                     color: '#888',
                   }}>
-                  <span style={{fontSize: 12}}>Remove</span>
+                  <span style={{fontSize: 12}}>Remove column</span>
                   <sub style={{fontSize: 10}}>
                     (Cannot remove column when used in a filter)
                   </sub>
                 </div>
-                <ItemIcon style={{color: '#888'}} name="delete" />
               </Item>
             ) : (
-              <Item data-test="remove-column" hovered={hovered}>
-                <ItemIcon name="delete" />
+              <Item
+                style={{justifyContent: 'flex-start'}}
+                data-test="remove-column"
+                hovered={hovered}>
+                <ItemIcon
+                  style={{marginRight: '8px', marginLeft: 0}}
+                  name="delete"
+                />
                 Remove column
               </Item>
             );

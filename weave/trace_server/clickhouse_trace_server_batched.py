@@ -499,13 +499,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 continue
 
             with self.with_new_client():
+                # Filter out non-unique refs
+                unique_ref_map = {}
+                for ref in refs_to_resolve.values():
+                    if ref.uri() not in unique_ref_map:
+                        unique_ref_map[ref.uri()] = ref
+
+                # Fetch values only for the unique refs
                 vals = self._refs_read_batch_within_project(
-                    project_id, list(refs_to_resolve.values()), ref_cache
+                    project_id, list(unique_ref_map.values()), ref_cache
                 )
-            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
-                if isinstance(val, dict) and "_ref" not in val:
-                    val["_ref"] = ref.uri()
-                set_nested_key(calls[i], col, val)
+
+                # update the ref map with the fetched values
+                ref_val_map = {}
+                for ref, val in zip(unique_ref_map.values(), vals):
+                    ref_val_map[ref.uri()] = val
+
+                # Replace the refs with values and add ref key
+                for (i, col), ref in refs_to_resolve.items():
+                    # Look up the value using the ref's URI
+                    val = ref_val_map.get(ref.uri())
+                    if val is not None:
+                        if isinstance(val, dict) and "_ref" not in val:
+                            val["_ref"] = ref.uri()
+                        set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
