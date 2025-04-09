@@ -1,6 +1,6 @@
 import logging
 from abc import abstractmethod
-from typing import Any, Callable, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 
 import boto3
 from azure.storage.blob import BlobServiceClient
@@ -15,6 +15,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from weave.trace_server.environment import wf_file_storage_uri
 from weave.trace_server.file_storage_credentials import (
     AWSCredentials,
     AzureAccountCredentials,
@@ -95,7 +96,6 @@ def read_from_bucket(
     client: FileStorageClient, file_storage_uri: FileStorageURI
 ) -> bytes:
     """Read a file from a storage bucket."""
-    client = get_storage_client_for_uri(file_storage_uri)
     try:
         return client.read(file_storage_uri)
     except Exception as e:
@@ -263,16 +263,30 @@ class AzureStorageClient(FileStorageClient):
         return stream.readall()
 
 
-def get_storage_client_for_uri(uri: FileStorageURI) -> FileStorageClient:
+def get_storage_client_from_env() -> Optional[FileStorageClient]:
     """Factory method that returns appropriate storage client based on URI type.
     Supports S3, GCS, and Azure storage URIs."""
-    if isinstance(uri, S3FileStorageURI):
-        return S3StorageClient(get_aws_credentials())
-    elif isinstance(uri, GCSFileStorageURI):
-        return GCSStorageClient(get_gcp_credentials())
-    elif isinstance(uri, AzureFileStorageURI):
-        return AzureStorageClient(get_azure_credentials())
+    file_storage_uri = wf_file_storage_uri()
+    if file_storage_uri is None:
+        return None
+    try:
+        parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
+    except Exception as e:
+        logger.exception(f"Error parsing file storage URI: {e}")
+        return None
+    if parsed_uri.has_path():
+        logger.error(
+            f"Supplied file storage uri contains path components: {file_storage_uri}"
+        )
+        return None
+
+    if isinstance(parsed_uri, S3FileStorageURI):
+        return S3StorageClient(parsed_uri, get_aws_credentials())
+    elif isinstance(parsed_uri, GCSFileStorageURI):
+        return GCSStorageClient(parsed_uri, get_gcp_credentials())
+    elif isinstance(parsed_uri, AzureFileStorageURI):
+        return AzureStorageClient(parsed_uri, get_azure_credentials())
     else:
         raise NotImplementedError(
-            f"Storage client for URI type {type(uri)} not supported"
+            f"Storage client for URI type {type(file_storage_uri)} not supported"
         )

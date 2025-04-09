@@ -82,7 +82,7 @@ from weave.trace_server.feedback import (
 from weave.trace_server.file_storage import (
     FileStorageReadError,
     FileStorageWriteError,
-    get_storage_client_for_uri,
+    get_storage_client_from_env,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
@@ -234,19 +234,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def file_storage_client(self) -> Optional[FileStorageClient]:
         if self._file_storage_client is not None:
             return self._file_storage_client
-        file_storage_uri = wf_env.wf_file_storage_uri()
-        if file_storage_uri is None:
-            return None
-        try:
-            parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
-        except Exception as e:
-            logger.exception(f"Error parsing file storage URI: {e}")
-            return None
-        if parsed_uri.has_path():
-            raise ValueError(
-                f"Supplied file storage uri contains path components: {file_storage_uri}"
-            )
-        self._file_storage_client = get_storage_client_for_uri(parsed_uri)
+        self._file_storage_client = get_storage_client_from_env()
         return self._file_storage_client
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
