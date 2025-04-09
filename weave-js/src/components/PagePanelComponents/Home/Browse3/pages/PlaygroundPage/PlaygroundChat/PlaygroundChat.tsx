@@ -60,7 +60,7 @@ const EmptyWithSettingsButton: React.FC<{
         )}
       </Box>
       <ProviderConfigDrawer
-        open={isDrawerOpen}
+        isOpen={isDrawerOpen}
         onClose={() => {
           onConfigureProvider();
           setIsDrawerOpen(false);

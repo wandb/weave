@@ -5,7 +5,7 @@ import {useInsertSecret} from '@wandb/weave/common/hooks/useSecrets';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../../common/ResizableDrawer';
 import {
@@ -22,14 +22,14 @@ type ProviderOption = {
 };
 
 interface ProviderConfigDrawerProps {
-  open: boolean;
+  isOpen: boolean;
   onClose: () => void;
   entity: string;
   defaultProvider?: Provider;
 }
 
 export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
-  open,
+  isOpen,
   onClose,
   entity,
   defaultProvider = 'openai',
@@ -87,6 +87,15 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
     }
     return `This key will be saved securely as a team secret named ${secretName}, and will be available for your entire team.`;
   };
+
+  useEffect(() => {
+    if (defaultProvider) {
+      setSelectedProvider(defaultProvider);
+      setApiKeys(
+        LLM_PROVIDER_SECRETS[defaultProvider]?.map(secret => '') || ['']
+      );
+    }
+  }, [defaultProvider]);
 
   const drawerContent = (
     <>
@@ -196,7 +205,7 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
 
   return (
     <ResizableDrawer
-      open={open}
+      open={isOpen}
       onClose={onClose}
       defaultWidth={500}
       headerContent={
