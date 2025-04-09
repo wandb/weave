@@ -31,7 +31,11 @@ export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
 
   // Special handling for __ref__ and __val__ pattern
   if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
-    return flattenObject(obj.__val__, prefix);
+    if (typeof obj.__val__ === 'object') {
+      return flattenObject(obj.__val__, prefix);
+    } else {
+      return [{name: prefix, type: inferType(obj.__val__)}];
+    }
   }
 
   for (const [key, value] of Object.entries(obj)) {
@@ -91,6 +95,36 @@ export interface FieldMapping {
 }
 
 /**
+ * Recursively unwraps reference objects with __ref__ and __val__ properties
+ * @param value The value to unwrap
+ * @returns The unwrapped value
+ */
+export const unwrapRefValue = (value: any): any => {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  // If this is an expanded reference object, return just the __val__ part (recursively unwrapped)
+  if (value.__ref__ && value.__val__) {
+    return unwrapRefValue(value.__val__);
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    return value.map(item => unwrapRefValue(item));
+  }
+
+  // Handle objects
+  const result: {[key: string]: any} = {};
+  for (const key in value) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      result[key] = unwrapRefValue(value[key]);
+    }
+  }
+  return result;
+};
+
+/**
  * Get a nested value from an object using a path array
  * @param obj The object to extract value from
  * @param path Array of property names to traverse
@@ -102,15 +136,15 @@ export const getNestedValue = (obj: any, path: string[]): any => {
     if (current == null) {
       return undefined;
     }
-    if (typeof current === 'object' && '__val__' in current) {
-      current = current.__val__;
-    }
+    // Recursively unwrap references at each level
+    current = unwrapRefValue(current);
     if (typeof current !== 'object') {
       return current;
     }
     current = current[part];
   }
-  return current;
+  // Unwrap the final result as well
+  return unwrapRefValue(current);
 };
 
 export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
@@ -141,7 +175,7 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
   });
 
   return allFields
-    .filter(field => field.name !== 'inputs.self')
+    .filter(field => !field.name.startsWith('inputs.self'))
     .reduce((acc, field) => {
       if (!acc.some(f => f.name === field.name)) {
         acc.push(field);
@@ -245,18 +279,18 @@ export const mapCallsToDatasetRows = (
         return undefined;
       }
 
-      // Handle __ref__/__val__ pattern during value resolution
-      if (
-        typeof current === 'object' &&
-        '__ref__' in current &&
-        '__val__' in current
-      ) {
-        current = current.__val__;
+      // Handle __ref__/__val__ pattern during value resolution using unwrapRefValue
+      current = unwrapRefValue(current);
+
+      if (typeof current !== 'object' || current === null) {
+        return current;
       }
 
       current = current[part];
     }
-    return current;
+
+    // Unwrap final value as well
+    return unwrapRefValue(current);
   };
 
   return selectedCalls.map(call => {
