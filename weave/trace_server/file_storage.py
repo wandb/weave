@@ -137,8 +137,10 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
 class S3StorageClient(FileStorageClient):
     """AWS S3 storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(self, credentials: AWSCredentials):
+    def __init__(self, base_uri: FileStorageURI, credentials: AWSCredentials):
         """Initialize S3 client with credentials and default timeout configuration."""
+        assert isinstance(base_uri, S3FileStorageURI)
+        super().__init__(base_uri)
         config = Config(
             connect_timeout=DEFAULT_CONNECT_TIMEOUT,
             read_timeout=DEFAULT_READ_TIMEOUT,
@@ -173,8 +175,10 @@ class S3StorageClient(FileStorageClient):
 class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(self, credentials: GCPCredentials):
+    def __init__(self, base_uri: FileStorageURI, credentials: GCPCredentials):
         """Initialize GCS client with credentials and default timeout configuration."""
+        assert isinstance(base_uri, GCSFileStorageURI)
+        super().__init__(base_uri)
         self.client = storage.Client(
             credentials=credentials,
         )
@@ -204,9 +208,13 @@ class AzureStorageClient(FileStorageClient):
     """Azure Blob Storage implementation supporting both connection string and account credentials."""
 
     def __init__(
-        self, credentials: Union[AzureConnectionCredentials, AzureAccountCredentials]
+        self,
+        base_uri: FileStorageURI,
+        credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
     ):
         """Initialize Azure client with either connection string or account credentials."""
+        assert isinstance(base_uri, AzureFileStorageURI)
+        super().__init__(base_uri)
         self.credentials = credentials
 
     def _get_client(self, account: str) -> BlobServiceClient:
