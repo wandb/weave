@@ -253,13 +253,13 @@ export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
 export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
   size: 'small',
   icon: 'type-number-alt' as const,
-  heading: 'No annotation fields',
-  description: 'Create fields in the UI or Python.',
+  heading: 'Create an annotation field',
+  description: 'Create structured fields for gathering feedback on traces and evaluations.',
   moreInformation: (
     <>
       Learn more about labeling with{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
-        human annotations
+        annotations
       </TargetBlank>
       .
     </>
@@ -269,9 +269,9 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
 export const EMPTY_PROPS_FEEDBACK: EmptyProps = {
   size: 'small',
   icon: 'add-reaction' as const,
-  heading: 'No feedback yet',
+  heading: 'Add your first feedback',
   description:
-    'You can provide feedback directly within the Weave UI or through the API.',
+    'Provide feedback on traces and evaluations directly within the UI or using the API.',
   moreInformation: (
     <>
       Learn how to{' '}

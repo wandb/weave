@@ -186,7 +186,7 @@ export const FeedbackSidebar = ({
         </div>
       ) : (
         <div className="flex h-full flex-col items-center justify-center">
-          <div className="mx-8 mt-[38px] flex flex-col items-center gap-16">
+          <div className="mx-8 mt-[41px] flex flex-col items-center gap-16">
             <Empty {...EMPTY_PROPS_ANNOTATIONS} />
             <Button
               onClick={() => setIsNewAnnotationDrawerOpen(true)}
