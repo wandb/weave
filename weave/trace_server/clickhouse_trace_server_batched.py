@@ -40,6 +40,9 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -227,6 +230,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
         traces_data = [
             ResourceSpans.from_proto(span) for span in req.traces.resource_spans
         ]
