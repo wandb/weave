@@ -1,4 +1,19 @@
+"""
+Query optimization framework for call queries.
+
+Optimizes complex queries on call data before expensive database aggregation.
+Optimizations are conservative - only reducing datasets, never expanding them.
+
+Key strategies:
+1. String optimization - Uses LIKE patterns for string fields
+2. ID-based optimization - Uses UUIDv7 timestamp information for datetime filtering
+
+Optimization SQL is applied before GROUP BY, reducing memory usage and
+improving performance for complex conditions.
+"""
+
 import uuid
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, Union
 
 from pydantic import BaseModel
@@ -17,6 +32,7 @@ if TYPE_CHECKING:
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+DATETIME_FIELDS_TO_OPTIMIZE = {"started_at", "ended_at"}
 
 DATETIME_OPTIMIZATION_BUFFER = 60 * 1_000  # 60 seconds
 
@@ -25,12 +41,46 @@ def _field_requires_null_check(field: str) -> bool:
     return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
-class QueryOptimizationProcessor:
+def _can_optimize_string_field(field: str) -> bool:
+    """Returns whether a field can be optimized for string search."""
+    return field in STRING_FIELDS_TO_OPTIMIZE
+
+
+def _can_optimize_datetime_field(field: str) -> bool:
+    """Returns whether a field can be optimized for datetime filtering."""
+    return field in DATETIME_FIELDS_TO_OPTIMIZE
+
+
+class QueryOptimizationProcessor(ABC):
+    """
+    Abstract base class for query optimization processors.
+
+    This class defines the interface for optimization processors that convert
+    query operations into optimized SQL conditions. Subclasses should implement
+    specific optimization strategies for different types of operations.
+    """
+
     def __init__(self, pb: "ParamBuilder", table_alias: str):
+        """
+        Initialize the optimization processor.
+
+        Args:
+            pb: Parameter builder for managing SQL parameters
+            table_alias: The table alias to use in SQL conditions
+        """
         self.pb = pb
         self.table_alias = table_alias
 
     def process_operand(self, operand: tsi_query.Operand) -> Optional[str]:
+        """
+        Process an operand and convert it to an optimized SQL condition if possible.
+
+        Args:
+            operand: The operand to process
+
+        Returns:
+            An SQL condition string or None if optimization is not possible
+        """
         # Can never hit leaf operations before optimizations, always return None
         if isinstance(operand, tsi_query.LiteralOperation):
             return None
@@ -41,6 +91,7 @@ class QueryOptimizationProcessor:
         return apply_processor(self, operand)
 
     def process_and(self, operation: tsi_query.AndOperation) -> Optional[str]:
+        """Process AND operations into optimized SQL."""
         conditions = []
         for op in operation.and_:
             result = self.process_operand(op)
@@ -52,6 +103,12 @@ class QueryOptimizationProcessor:
         return None
 
     def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
+        """
+        Process OR operations into optimized SQL.
+
+        Note: If any condition in an OR cannot be optimized, the entire OR
+        cannot be optimized, so we return None.
+        """
         conditions = []
         for op in operation.or_:
             result = self.process_operand(op)
@@ -67,54 +124,141 @@ class QueryOptimizationProcessor:
         return None
 
     def process_not(self, operation: tsi_query.NotOperation) -> Optional[str]:
+        """Process NOT operations into optimized SQL."""
         result = self.process_operand(operation.not_[0])
         if result is None:
             return None
         return f"NOT ({result})"
 
+    @abstractmethod
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
-        return None
+        """Process equality operation."""
+        pass
 
+    @abstractmethod
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
-        return None
+        """Process contains operation."""
+        pass
 
+    @abstractmethod
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
-        return None
+        """Process in operation."""
+        pass
 
+    @abstractmethod
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
-        return None
+        """Process greater than operation."""
+        pass
 
+    @abstractmethod
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
-        return None
+        """Process greater than or equal operation."""
+        pass
 
     def finalize_sql(self, result: Optional[str]) -> Optional[str]:
-        """Final step to make valid SQL for the calls query."""
+        """
+        Final step to make valid SQL for the calls query.
+
+        This method can be overridden by subclasses to apply additional
+        transformations to the final SQL condition.
+
+        Args:
+            result: The SQL condition to finalize
+
+        Returns:
+            The finalized SQL condition or None if no condition
+        """
         if result:
             return f"AND {result}"
         return None
 
 
 class StringOptimizationProcessor(QueryOptimizationProcessor):
+    """
+    Optimization processor for string operations.
+
+    This processor creates LIKE-based SQL conditions to optimize queries
+    on string fields before aggregation, reducing memory pressure.
+    """
+
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+        """
+        Process equality operation on string fields.
+
+        Creates SQL condition using LIKE patterns for strings in JSON fields.
+        """
         return _create_like_optimized_eq_condition(operation, self.pb, self.table_alias)
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+        """
+        Process contains operation on string fields.
+
+        Creates SQL condition using LIKE patterns for substrings in JSON fields.
+        """
         return _create_like_optimized_contains_condition(
             operation, self.pb, self.table_alias
         )
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+        """
+        Process IN operation on string fields.
+
+        Creates SQL conditions using LIKE patterns for multiple string values.
+        """
         return _create_like_optimized_in_condition(operation, self.pb, self.table_alias)
+
+    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+        """Not implemented for string optimization."""
+        return None
+
+    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+        """Not implemented for string optimization."""
+        return None
 
 
 class IdOptimizationProcessor(QueryOptimizationProcessor):
+    """
+    Optimization processor for ID-based datetime operations.
+
+    This processor creates SQL conditions that filter based on UUIDv7 timestamp
+    information embedded in IDs, which can significantly reduce the dataset before
+    doing more complex operations after aggregation.
+    """
+
+    def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+        """Not implemented for ID-based optimization."""
+        return None
+
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+        """Not implemented for ID-based optimization."""
+        return None
+
+    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+        """Not implemented for ID-based optimization."""
+        return None
+
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+        """
+        Process GT operation on datetime fields using UUIDv7 timestamp optimization.
+
+        Creates SQL condition that filters IDs based on their embedded timestamps.
+        """
         return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+        """
+        Process GTE operation on datetime fields using UUIDv7 timestamp optimization.
+
+        Creates SQL condition that filters IDs based on their embedded timestamps.
+        """
         return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
 
     def finalize_sql(self, result: Optional[str]) -> Optional[str]:
+        """
+        Finalizes the SQL by adding a condition to handle non-UUIDv7 IDs.
+
+        This ensures that OTEL 8-byte IDs are properly included in the results.
+        """
         if result:
             with_otel_id_filter = _add_otel_id_filter(self.table_alias, result)
             return super().finalize_sql(with_otel_id_filter)
@@ -207,29 +351,52 @@ def _create_like_condition(
         return f"{field_name} LIKE {_param_slot(param_name, 'String')}"
 
 
+def _extract_field_and_literal(
+    operation: Union[
+        tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation
+    ],
+) -> tuple[Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]]:
+    """Extract field and literal operands from a binary operation.
+
+    Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
+    """
+    ops = (
+        operation.eq_
+        if hasattr(operation, "eq_")
+        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
+    )
+
+    if len(ops) != 2:
+        return None, None
+
+    field_operand = None
+    literal_operand = None
+
+    if isinstance(ops[0], tsi_query.GetFieldOperator):
+        field_operand = ops[0]
+        literal_operand = ops[1]
+    elif isinstance(ops[1], tsi_query.GetFieldOperator):
+        field_operand = ops[1]
+        literal_operand = ops[0]
+
+    if not isinstance(literal_operand, tsi_query.LiteralOperation):
+        return None, None
+
+    return field_operand, literal_operand
+
+
 def _create_like_optimized_eq_condition(
     operation: tsi_query.EqOperation,
     pb: "ParamBuilder",
     table_alias: str,
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for equality operations."""
-    # Check both sides for field and literal
-    field_operand = None
-    literal_operand = None
-
-    if isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
-        field_operand = operation.eq_[0]
-        literal_operand = operation.eq_[1]
-    elif isinstance(operation.eq_[1], tsi_query.GetFieldOperator):
-        field_operand = operation.eq_[1]
-        literal_operand = operation.eq_[0]
-    else:
+    field_operand, literal_operand = _extract_field_and_literal(operation)
+    if field_operand is None or literal_operand is None:
         return None
 
     # Return if literal isn't a string
-    if not isinstance(literal_operand, tsi_query.LiteralOperation) or not isinstance(
-        literal_operand.literal_, str
-    ):
+    if not isinstance(literal_operand.literal_, str):
         return None
 
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -239,7 +406,7 @@ def _create_like_optimized_eq_condition(
     field = get_field_by_name(field_operand.get_field_).field
     literal_value = literal_operand.literal_
 
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
+    if not _can_optimize_string_field(field):
         return None
 
     if not literal_value:
@@ -283,7 +450,7 @@ def _create_like_optimized_contains_condition(
         # Empty string is not a valid value for LIKE optimization
         return None
 
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
+    if not _can_optimize_string_field(field):
         return None
 
     case_insensitive = operation.contains_.case_insensitive or False
@@ -319,7 +486,7 @@ def _create_like_optimized_in_condition(
     )
 
     field = get_field_by_name(operation.in_[0].get_field_).field
-    if field not in STRING_FIELDS_TO_OPTIMIZE:
+    if not _can_optimize_string_field(field):
         return None
 
     # Create OR conditions for each value
@@ -395,36 +562,12 @@ def _create_datetime_optimization_sql(
     We include a buffer time (DATETIME_OPTIMIZATION_BUFFER) to ensure we don't
     miss records due to slight timing differences.
     """
-    # Check both sides for field and literal
-    field_operand = None
-    literal_operand = None
-
-    field1 = (
-        operation.gt_[0]
-        if isinstance(operation, tsi_query.GtOperation)
-        else operation.gte_[0]
-    )
-    field2 = (
-        operation.gt_[1]
-        if isinstance(operation, tsi_query.GtOperation)
-        else operation.gte_[1]
-    )
-
-    if isinstance(field1, tsi_query.GetFieldOperator) and isinstance(
-        field2, tsi_query.LiteralOperation
-    ):
-        field_operand = field1
-        literal_operand = field2
-    elif isinstance(field2, tsi_query.GetFieldOperator) and isinstance(
-        field1, tsi_query.LiteralOperation
-    ):
-        field_operand = field2
-        literal_operand = field1
-    else:
+    field_operand, literal_operand = _extract_field_and_literal(operation)
+    if field_operand is None or literal_operand is None:
         return None
 
     field_name = field_operand.get_field_
-    if field_name not in ("started_at", "ended_at"):
+    if not _can_optimize_datetime_field(field_name):
         return None
 
     literal_value = literal_operand.literal_
