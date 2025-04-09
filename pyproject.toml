@@ -46,7 +46,6 @@ dependencies = [
   "gql[aiohttp,requests]",            # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",               # Used by scorers for field validation
   "diskcache==5.6.3",                 # Used for data caching
-  "opentelemetry-proto>=1.12.0",      # Used for OTEL trace support
 
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -72,6 +71,8 @@ trace_server = [
   "google-cloud-storage>=2.7.0",
   # LLM Support
   "litellm>=1.36.1",
+  # OTEL trace support
+  "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17"
 ]

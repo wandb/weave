@@ -3,9 +3,6 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -229,7 +226,8 @@ class TableSchemaForInsert(BaseModel):
 class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
-    traces: ExportTraceServiceRequest
+    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
+    traces: Any
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
