@@ -217,7 +217,7 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
 MAX_FILTER_LENGTH = 1000
 
 
-def assert_length_less_than_max(
+def assert_parameter_length_less_than_max(
     param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH
 ) -> None:
     if arr_len > max_length:

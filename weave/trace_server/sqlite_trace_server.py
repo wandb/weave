@@ -30,7 +30,7 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
-    assert_length_less_than_max,
+    assert_parameter_length_less_than_max,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
@@ -266,7 +266,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         filter = req.filter
         if filter:
             if filter.op_names:
-                assert_length_less_than_max("op_names", len(filter.op_names))
+                assert_parameter_length_less_than_max("op_names", len(filter.op_names))
                 or_conditions: list[str] = []
 
                 non_wildcarded_names: list[str] = []
@@ -289,27 +289,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
             if filter.input_refs:
-                assert_length_less_than_max("input_refs", len(filter.input_refs))
+                assert_parameter_length_less_than_max(
+                    "input_refs", len(filter.input_refs)
+                )
                 or_conditions = []
                 for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_refs:
-                assert_length_less_than_max("output_refs", len(filter.output_refs))
+                assert_parameter_length_less_than_max(
+                    "output_refs", len(filter.output_refs)
+                )
                 or_conditions = []
                 for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
-                assert_length_less_than_max("parent_ids", len(filter.parent_ids))
+                assert_parameter_length_less_than_max(
+                    "parent_ids", len(filter.parent_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
-                assert_length_less_than_max("trace_ids", len(filter.trace_ids))
+                assert_parameter_length_less_than_max(
+                    "trace_ids", len(filter.trace_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
-                assert_length_less_than_max("call_ids", len(filter.call_ids))
+                assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
                 in_expr = ", ".join(f"'{x}'" for x in filter.call_ids)
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
