@@ -366,7 +366,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # If we are returning a summary object, make sure that all fields
             # required to compute the summary are in the columns
             if "summary" in columns or req.include_costs:
-                columns += ["ended_at", "op_name", "exception", "display_name"]
+                columns += ["ended_at", "exception", "display_name"]
 
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
