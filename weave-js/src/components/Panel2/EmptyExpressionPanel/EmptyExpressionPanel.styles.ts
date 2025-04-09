@@ -6,8 +6,8 @@ import {Icon} from '../../Icon';
 const COLORS = {
   teal: '#13a9ba',
   text: {
-    dark: '#333',
-    medium: '#666',
+    primary: '#2B3038',
+    secondary: '#565C66',
   },
   border: '#e1e1e1',
   hover: '#f8f8f8',
@@ -21,13 +21,14 @@ const SPACING = {
   xs: '2px',
   sm: '4px',
   md: '8px',
-  lg: '12px',
+  lg: '10px',
   xl: '16px',
   xxl: '24px',
 };
 
 const FONTS = {
   code: 'Inconsolata',
+  normal: 'Source Sans Pro',
   sizes: {
     xs: '0.75em',
     sm: '0.8em',
@@ -42,13 +43,13 @@ const flexCenter = css`
 `;
 
 const cardBase = css`
-  padding: ${SPACING.xl};
+  padding: ${SPACING.md} ${SPACING.lg};
   border-radius: 8px;
   border: 1px solid ${COLORS.border};
   background-color: #ffffff;
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
-  width: min(100%, 300px);
+  width: 100%;
   margin: 0 auto;
   position: relative;
 `;
@@ -66,10 +67,12 @@ export const Container = styled.div`
 `;
 
 export const HeaderSection = styled.div`
+  font-family: Source Sans Pro;
+  font-size: 14px;
   padding-top: ${SPACING.lg};
   text-align: center;
   flex-shrink: 0;
-  padding-bottom: ${SPACING.xs};
+  padding-bottom: ${SPACING.lg};
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -80,15 +83,13 @@ export const HeaderSection = styled.div`
 `;
 
 export const Title = styled.p`
-  font-size: ${FONTS.sizes.md};
-  font-weight: 650;
-  color: ${COLORS.text.dark};
+  font-weight: 600;
+  color: ${COLORS.text.primary};
   margin: ${SPACING.md} 0;
 `;
 
 export const Subtitle = styled.p`
-  font-size: ${FONTS.sizes.xs};
-  color: ${COLORS.text.dark};
+  color: ${COLORS.text.secondary};
   margin: 0;
 `;
 
@@ -142,30 +143,28 @@ export const DynamicScrollContainer = styled(ScrollableContainer)<{
 
 export const CardGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: ${SPACING.lg};
+  gap: 8px;
   width: 100%;
   box-sizing: border-box;
-  margin-top: ${SPACING.lg};
-  padding-bottom: ${SPACING.xxl};
-  padding-top: ${SPACING.sm};
+  margin-top: ${SPACING.md};
+  padding-bottom: ${SPACING.md};
+  padding-top: ${SPACING.xs};
   height: fit-content;
   overflow: visible;
-  justify-items: center;
-  align-items: start;
+  justify-items: stretch;
+  align-items: stretch;
 `;
 
 export const Card = styled.div`
   ${cardBase}
   display: flex;
   flex-direction: column;
-  justify-content: start;
+  justify-content: space-between;
   align-items: flex-start;
-  align-content: center;
   cursor: pointer;
   z-index: 1;
   transform-origin: center center;
-  margin-top: ${SPACING.xs};
+  height: 100%;
 
   &:hover {
     border-color: ${COLORS.teal};
@@ -180,8 +179,10 @@ export const CardTitleContainer = styled.div`
 `;
 
 export const CardTitle = styled.div`
+  font-family: Source Sans Pro;
   margin: 0;
-  font-size: ${FONTS.sizes.xs};
+  color: ${COLORS.text.primary};
+  font-size: 14px;
   font-weight: 400;
   text-align: center;
 `;
@@ -194,8 +195,8 @@ export const CardSubtitle = styled.span`
 export const ExpressionWrapper = styled.div`
   display: flex;
   align-items: baseline;
-  color: ${COLORS.text.medium};
-  font-size: ${FONTS.sizes.sm};
+  color: ${COLORS.text.secondary};
+  font-size: 14px;
   line-height: 1;
   flex-wrap: wrap;
 
@@ -259,7 +260,7 @@ export const StyledDropdownWrapper = styled.div`
       max-height: 120px;
 
       > .item {
-        font-size: ${FONTS.sizes.md};
+        font-size: 14px;
         padding: ${SPACING.md} ${SPACING.lg} !important;
         border-bottom: 1px solid #f0f0f0;
         color: ${STRING_COLOR} !important;
@@ -308,4 +309,9 @@ export const SearchIcon = styled(Icon)`
   height: 50%;
   width: 50%;
   flex: none;
+`;
+
+export const CardIcon = styled(Icon)`
+  margin-right: 8px;
+  color: ${COLORS.text.secondary};
 `;

@@ -97,7 +97,7 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
       onClick={() => setDropdownOpen(true)}
       onMouseLeave={() => setDropdownOpen(false)}>
       <S.CardTitleContainer>
-        <Icon name={IconNames.Table} />
+        <S.CardIcon name={IconNames.Table} />
         <S.CardTitle>View logged table</S.CardTitle>
       </S.CardTitleContainer>
       <S.CardSubtitle>

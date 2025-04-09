@@ -9,7 +9,7 @@ import {
 } from '@wandb/weave/core';
 import React, {useLayoutEffect, useMemo, useRef, useState} from 'react';
 
-import {Icon, IconName, IconNames} from '../../Icon';
+import {IconName, IconNames} from '../../Icon';
 import {usePanelContext} from '../PanelContext';
 import {inputType} from '../PanelExpression/common';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -52,7 +52,7 @@ const BASIC_CARD_ACTIONS: CardAction[] = [
     title: 'View run history',
     expressionText: runHistoryExpressionText,
     outputNodeFn: inputNode => runHistory(inputNode),
-    icon: IconNames.BookDictionary,
+    icon: IconNames.List,
   },
 ];
 
@@ -83,6 +83,18 @@ export const EmptyExpressionPanel: React.FC<
   });
   const [shouldScroll, setShouldScroll] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [gridColumns, setGridColumns] = useState(1);
+
+  // Update grid columns based on container width
+  const updateGridColumns = (width: number) => {
+    if (width >= 600) {
+      setGridColumns(3);
+    } else if (width >= 400) {
+      setGridColumns(2);
+    } else {
+      setGridColumns(1);
+    }
+  };
 
   useLayoutEffect(() => {
     const resizeObserver = new ResizeObserver(() => {
@@ -105,6 +117,10 @@ export const EmptyExpressionPanel: React.FC<
           setHeaderDimensions({
             height: totalHeaderHeight,
           });
+
+          // Get and update container width
+          const width = containerRef.current.clientWidth;
+          updateGridColumns(width);
 
           const containerHeight = containerRef.current.clientHeight;
           setShouldScroll(containerHeight - totalHeaderHeight < 300);
@@ -135,6 +151,10 @@ export const EmptyExpressionPanel: React.FC<
     }
 
     if (containerRef.current) {
+      // Initial width measurement
+      const width = containerRef.current.clientWidth;
+      updateGridColumns(width);
+
       resizeObserver.observe(containerRef.current);
     }
 
@@ -179,8 +199,9 @@ export const EmptyExpressionPanel: React.FC<
   return (
     <S.Container ref={containerRef}>
       <S.HeaderSection ref={headerRef}>
-        <S.SearchIconContainer className={`my-8 rounded-full bg-[#A9EDF2]`}>
-          <S.SearchIcon name={IconNames.Search} className={`text-[#13a9ba]`} />
+        <S.SearchIconContainer
+          className={`my-8 rounded-full bg-[rgba(169,237,242,0.48)]`}>
+          <S.SearchIcon name={IconNames.Search} className={`text-[#038194]`} />
         </S.SearchIconContainer>
         <S.Title>START WITH AN EXPRESSION</S.Title>
         <S.Subtitle>
@@ -194,7 +215,8 @@ export const EmptyExpressionPanel: React.FC<
         headerHeight={headerDimensions.height}
         shouldScroll={shouldScroll}
         isInitialized={isInitialized}>
-        <S.CardGrid>
+        <S.CardGrid
+          style={{gridTemplateColumns: `repeat(${gridColumns}, 1fr)`}}>
           <PickCard updateExp={updateExp} stack={stack} />
           {BASIC_CARD_ACTIONS.map(action => (
             <S.Card
@@ -203,7 +225,7 @@ export const EmptyExpressionPanel: React.FC<
               role="button"
               aria-label={`Select ${action.title}`}>
               <S.CardTitleContainer>
-                <Icon name={action.icon} />
+                <S.CardIcon name={action.icon} />
                 <S.CardTitle>{action.title}</S.CardTitle>
               </S.CardTitleContainer>
 
