@@ -392,6 +392,12 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)
 
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        req.wb_user_id = self._user_id
+        return super().completions_create(req)
+
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():
