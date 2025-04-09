@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 from typing import Callable
 
 import weave
@@ -15,6 +16,9 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
 
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
+        op_name = op_kwargs.get("name", "")
+        print(f"op_name: {op_name}")
+
         op = weave.op(fn, **op_kwargs)
         return op
 
@@ -91,23 +95,8 @@ def get_mcp_client_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.client.session"),
-            "ClientSession.list_tools",
-            mcp_client_wrapper(list_tools_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.client.session"),
             "ClientSession.read_resource",
             mcp_client_wrapper(read_resource_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.client.session"),
-            "ClientSession.list_resources",
-            mcp_client_wrapper(list_resources_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.client.session"),
-            "ClientSession.list_prompts",
-            mcp_client_wrapper(list_prompts_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("mcp.client.session"),
@@ -115,6 +104,32 @@ def get_mcp_client_patcher(
             mcp_client_wrapper(get_prompt_settings),
         ),
     ]
+
+    trace_list_operations = os.environ.get("MCP_TRACE_LIST_OPERATIONS", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    if trace_list_operations:
+        patchers.extend(
+            [
+                SymbolPatcher(
+                    lambda: importlib.import_module("mcp.client.session"),
+                    "ClientSession.list_tools",
+                    mcp_client_wrapper(list_tools_settings),
+                ),
+                SymbolPatcher(
+                    lambda: importlib.import_module("mcp.client.session"),
+                    "ClientSession.list_resources",
+                    mcp_client_wrapper(list_resources_settings),
+                ),
+                SymbolPatcher(
+                    lambda: importlib.import_module("mcp.client.session"),
+                    "ClientSession.list_prompts",
+                    mcp_client_wrapper(list_prompts_settings),
+                ),
+            ]
+        )
 
     _mcp_client_patcher = MultiPatcher(patchers)
 
