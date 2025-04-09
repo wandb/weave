@@ -1,13 +1,12 @@
 import {Box} from '@mui/material';
 import {Popover} from '@mui/material';
-import EmojiPicker, {EmojiClickData} from 'emoji-picker-react';
+import EmojiPicker from 'emoji-picker-react';
 import _ from 'lodash';
 import React, {useEffect, useMemo} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Alert} from '../../../../Alert';
 import {Button} from '../../../../Button';
-import {TextField} from '../../../../Form/TextField';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
 import {Empty} from '../pages/common/Empty';
@@ -177,7 +176,7 @@ export const FeedbackGrid = ({
                 }}>
                 {!showFullPicker && (
                   <WeaveEmojiPicker
-                    onEmojiClick={(emojiData) => onAddEmoji(emojiData.emoji)}
+                    onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
                     reactionsDefaultOpen={true}
                     reactions={[
@@ -191,7 +190,7 @@ export const FeedbackGrid = ({
                 )}
                 {showFullPicker && (
                   <EmojiPicker
-                    onEmojiClick={(emojiData) => onAddEmoji(emojiData.emoji)}
+                    onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
                     previewConfig={{
                       defaultEmoji: '1f44d',

@@ -254,7 +254,8 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
   size: 'small',
   icon: 'type-number-alt' as const,
   heading: 'Create an annotation field',
-  description: 'Create structured fields for gathering feedback on traces and evaluations.',
+  description:
+    'Create structured fields for gathering feedback on traces and evaluations.',
   moreInformation: (
     <>
       Learn more about labeling with{' '}
