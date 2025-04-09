@@ -80,6 +80,7 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageClient,
     FileStorageReadError,
     FileStorageWriteError,
     get_storage_client_from_env,
@@ -87,7 +88,6 @@ from weave.trace_server.file_storage import (
     read_from_bucket,
     store_in_bucket,
 )
-from weave.trace_server.file_storage_client import FileStorageClient
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import (
