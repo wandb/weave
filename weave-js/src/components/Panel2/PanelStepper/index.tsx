@@ -1,6 +1,4 @@
-import {useWeaveContext} from '@wandb/weave/context';
 import {
-  constBoolean,
   constFunction,
   constNumber,
   constString,
