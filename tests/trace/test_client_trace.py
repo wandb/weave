@@ -3624,3 +3624,43 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     assert child_call.storage_size_bytes is not None
     # Child should not have total size
     assert child_call.total_storage_size_bytes is None
+
+
+def test_calls_hydrated(client):
+    nested = {"hi": {"there": {"foo": "bar"}}}
+    nested_ref = weave.publish(nested)
+
+    @weave.op
+    def nest(input_ref: str):
+        my_obj = {
+            "woahhhh": input_ref,
+        }
+        ref = weave.publish(my_obj)
+        return ref
+
+    nest(nested_ref)
+    nest(nested_ref)
+    nest(nested_ref)
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["inputs", "output", "output.woahhhh"],
+                expand_columns=[
+                    "inputs",
+                    "inputs.input_ref",
+                    "output",
+                    "output.woahhhh",
+                ],
+            )
+        )
+    )
+
+    assert len(calls) == 3
+    assert calls[0].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[0].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
