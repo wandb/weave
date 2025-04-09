@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -81,34 +80,25 @@ def validate_scorer_name(name: str) -> None:
 
 
 class ImperativeScoreLogger(BaseModel):
-    prediction_id: ID
-    score: ScoreType
-    metadata: dict | None
+    """This class provides an imperative interface for logging scores.
 
+    Note that logging scores is async!
+    """
 
-class ImperativePredictionLogger(BaseModel):
-    model_id: ID
+    # model_id: ID
     inputs: dict
     output: Any
-    hack_reference_to_predict_and_score: Call
-    hack_reference_to_evaluate: Call
+    predict_and_score_call: Call
+    evaluate_call: Call
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def log_score(
+    async def log_score(
         self,
         scorer_name: str,
         score: ScoreType,
         metadata: dict | None = None,
-    ) -> ImperativeScoreLogger:
-        return asyncio.run(self.alog_score(scorer_name, score, metadata))
-
-    async def alog_score(
-        self,
-        scorer_name: str,
-        score: ScoreType,
-        metadata: dict | None = None,
-    ) -> ImperativeScoreLogger:
+    ) -> None:
         # Define the scorer class dynamically
         validate_scorer_name(scorer_name)
         cls_name = scorer_name.replace(".", "_")
@@ -125,25 +115,32 @@ class ImperativePredictionLogger(BaseModel):
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
-            [
-                self.hack_reference_to_evaluate,
-                self.hack_reference_to_predict_and_score,
-            ]
+            [self.evaluate_call, self.predict_and_score_call]
         ):
             with set_current_score(score):
-                await self.hack_reference_to_predict_and_score.apply_scorer(
-                    scorer_instance
-                )
-
-        return ImperativeScoreLogger(
-            prediction_id="123",
-            score=score,
-            metadata=metadata,
-        )
+                await self.predict_and_score_call.apply_scorer(scorer_instance)
 
 
 class ImperativeEvaluationLogger(BaseModel):
-    model_id: ID = ""
+    """This class provides an imperative interface for logging evaluations.
+
+    An evaluation is started automatically when the first prediction is logged
+    using the `log_prediction` method, and finished when the `log_summary` method
+    is called.
+
+    Each time you log a prediction, you will get back an `ImperativePredictionLogger`
+    object.  You can use this object to log scores and metadata for that specific
+    prediction (see that class for more details).
+
+    Example:
+        ```python
+        ev = ImperativeEvaluationLogger()
+        pred = ev.log_prediction(inputs, output)
+        await pred.log_score(scorer_name, score)
+        ev.log_summary(summary)
+        ```
+    """
+
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
@@ -156,7 +153,7 @@ class ImperativeEvaluationLogger(BaseModel):
     )
     _starting_stack: list[Call] = PrivateAttr(default_factory=list)
 
-    def log_prediction(self, inputs: dict, output: Any) -> ImperativePredictionLogger:
+    def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
         if not self._eval_started:
             self._eval_started = True
 
@@ -225,12 +222,11 @@ class ImperativeEvaluationLogger(BaseModel):
         model_output = predict_and_score_call.output.get("model_output")
 
         assert self._evaluate_call is not None
-        return ImperativePredictionLogger(
-            model_id="123",
+        return ImperativeScoreLogger(
             inputs=inputs,
             output=model_output,
-            hack_reference_to_predict_and_score=predict_and_score_call,
-            hack_reference_to_evaluate=self._evaluate_call,
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=self._evaluate_call,
         )
 
     def log_summary(self, summary: dict) -> None:
