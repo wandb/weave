@@ -75,3 +75,8 @@ export function convertBytes(result: any) {
   }
   return `${result}B`;
 }
+
+export function getJsonPayloadSize(json: any): number {
+  const jsonString = JSON.stringify(json);
+  return new Blob([jsonString]).size;
+}
