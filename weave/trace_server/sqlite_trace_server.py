@@ -11,6 +11,9 @@ from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -28,6 +31,7 @@ from weave.trace_server.feedback import (
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
@@ -1361,7 +1365,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CompletionsCreateRes()
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise ValueError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
 
         traces_data = [
             ResourceSpans.from_proto(span) for span in req.traces.resource_spans
