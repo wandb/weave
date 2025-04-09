@@ -1,6 +1,6 @@
 # MCP + Weave Integration Example
 
-This example demonstrates a comprehensive integration between the Model Context Protocol (MCP) and Weave for tracing. It showcases how to instrument both the client and server components to capture detailed traces of their interactions.
+This example demonstrates an integration between the Model Context Protocol (MCP) and Weave for tracing. It showcases how to instrument both the client and server components to capture detailed traces of their interactions.
 
 ## Features
 
@@ -12,26 +12,34 @@ This example demonstrates:
 
 ## Files
 
-- `example_server.py`: A demo MCP server with various tools, resources, and prompts
-- `example_client.py`: A client that connects to the server and provides a command-line interface to interact with all server capabilities
+- `example_server.py`: A demo MCP server with various tools, resources, and prompts built using `FastMCP`.
+- `example_client.py`: A client that connects to the server and provides a command-line interface to interact with all server capabilities.
 
 ## Setup
 
-1. Add OPENAI_API_KEY in an `.env` file.
+1. Clone the repository and set up the environment:
+
+```bash
+git clone https://github.com/wandb/weave
+cd weave
+uv venv
+source .venv/bin/activate
+uv sync
+```
+
+2. Add `OPENAI_API_KEY` in an `.env` file.
 
 ```bash
 touch examples/mcp_demo/.env
 ```
 
-2. Install the required dependencies:
+3. Install the required dependencies:
 
 ```bash
 uv pip install -e ".[mcp]"
 ```
 
-3. No API keys are required for running this example
-
-## Running the Example
+4. Run the example
 
 ```bash
 uv run --no-refresh --frozen --no-sync --only-group "" --extra mcp examples/mcp_demo/example_client.py examples/mcp_demo/example_server.py
