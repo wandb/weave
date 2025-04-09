@@ -26,14 +26,13 @@ export const EditableContainer = styled.div<{
   ${props =>
     !props.noBox &&
     css`
-      border: 1px solid;
       flex-grow: 1;
       border-color: ${(innerProps: {isInvalid?: boolean}) =>
         innerProps.isInvalid ? globals.error : '#bbb'};
       border-radius: 4px;
       padding: 6px 8px;
       min-width: 200px;
-      border: 1px solid ${globals.MOON_400};
+      border: 1px solid ${globals.MOON_250};
       border-radius: 4px;
       box-sizing: border-box;
 
