@@ -116,7 +116,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                   border: 'none',
                   minHeight: '2rem',
                   marginBottom: '2px',
-                  borderBottom: '1px solid lightgray',
+                  borderBottom: '0px solid lightgray',
                   borderRadius: '0px',
                   boxShadow: 'none',
                   padding: '5px',
@@ -139,7 +139,6 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                                 exprString: weave.expToString(expr),
                               });
                             }}
-                            noBox
                             onMount={onMount}
                           />
                         </PanelContextProvider>

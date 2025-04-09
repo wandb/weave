@@ -1,3 +1,10 @@
+import {
+  MOON_400,
+  MOON_600,
+  TEAL_350,
+  TEAL_600,
+} from '@wandb/weave/common/css/color.styles';
+import {IconEnterReturn} from '@wandb/weave/components/Icon';
 import {makeEventRecorder} from '@wandb/weave/components/Panel2/panellib/libanalytics';
 import {ID} from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
@@ -228,6 +235,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             onKeyDown={keyDownHandler}
             onBlur={onBlur}
             onFocus={onFocus}
+            placeholder="Enter query expression"
             decorate={decorate}
             renderLeaf={leafProps => <Leaf {...leafProps} />}
             style={{overflowWrap: 'anywhere'}}
@@ -251,7 +259,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
                   ev.preventDefault();
                 }}
                 onClick={applyPendingExpr}>
-                Run {isBusy ? '⧗' : '⏎'}
+                {isBusy ? '⧗' : '⏎'}
               </S.ApplyButton>
             </Ref>
           )}
@@ -276,5 +284,9 @@ export const focusEditor = (editor: Editor): void => {
 
 const Container = styled.div`
   width: 100%;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 `;
 Container.displayName = 'S.Container';

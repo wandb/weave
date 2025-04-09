@@ -33,6 +33,19 @@ export const EditableContainer = styled.div<{
       border-radius: 4px;
       padding: 6px 8px;
       min-width: 200px;
+      border: 1px solid ${globals.MOON_400};
+      border-radius: 4px;
+      box-sizing: border-box;
+
+      &:hover {
+        border-color: ${globals.TEAL_350};
+      }
+
+      &:focus-within {
+        border-color: ${globals.TEAL_350};
+        outline: 2px solid ${globals.TEAL_350};
+        outline-offset: -2px;
+      }
     `}
 `;
 EditableContainer.displayName = 'S.EditableContainer';
@@ -105,11 +118,29 @@ WeaveEditable.displayName = 'S.WeaveEditable';
 
 export const ApplyButton = styled(Button)`
   display: none;
-  position: absolute;
   font-size: 13px !important;
   line-height: 20px !important;
-  padding: 0px 4px !important;
+  padding: 0px !important;
   height: 20px;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  width: 28px !important;
+
+  &:disabled {
+    color: ${globals.MOON_400} !important;
+    background-color: transparent !important;
+    opacity: 0.5 !important;
+  }
+
+  &:not(:disabled) {
+    color: ${globals.TEAL_350} !important;
+  }
+
+  &:hover:not(:disabled) {
+    background-color: transparent !important;
+    color: ${globals.TEAL_400} !important;
+  }
 `;
 ApplyButton.displayName = 'S.ApplyButton';
 
