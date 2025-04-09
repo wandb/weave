@@ -8,6 +8,7 @@ import {
   GridSortModel,
   useGridApiContext,
   useGridSelector,
+  GridFilterItem,
 } from '@mui/x-data-grid-pro';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
@@ -23,7 +24,7 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {Dispatch, FC, SetStateAction, useRef, useState, useCallback} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
@@ -36,6 +37,8 @@ import {
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
+import {getNextFilterId} from '../../filters/filterUtils';
+import {upsertFilter} from '../../filters/common';
 
 const MAX_EXPORT = 10_000;
 
@@ -538,6 +541,62 @@ export const RefreshButton: FC<{
         tooltip="Refresh"
         icon="reload-refresh"
       />
+    </Box>
+  );
+};
+
+export const FilterSelectedButton: FC<{
+  selectedCalls: string[];
+  filterModel: GridFilterModel;
+  setFilterModel: (newModel: GridFilterModel) => void;
+  disabled?: boolean;
+  clearSelectedCalls?: () => void;
+}> = ({selectedCalls, filterModel, setFilterModel, disabled, clearSelectedCalls}) => {
+  const onFilterSelected = useCallback(() => {
+    if (selectedCalls.length === 0) {
+      return;
+    }
+
+    const newFilter =
+      selectedCalls.length === 1
+        ? {
+            id: getNextFilterId(filterModel.items),
+            field: 'id',
+            operator: '(string): equals',
+            value: selectedCalls[0],
+          }
+        : {
+            id: getNextFilterId(filterModel.items),
+            field: 'id',
+            operator: '(string): in',
+            value: selectedCalls,
+          };
+    
+    const newModel = upsertFilter(
+      filterModel,
+      newFilter,
+      (f: GridFilterItem) => f.field === 'id'
+    );
+    setFilterModel(newModel);
+    clearSelectedCalls?.();
+  }, [selectedCalls, filterModel, setFilterModel, clearSelectedCalls]);
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant="ghost"
+        size="medium"
+        disabled={disabled || selectedCalls.length === 0}
+        onClick={onFilterSelected}
+        tooltip="Filter table to show only selected rows"
+        icon="filter-alt">
+        Filter selected
+      </Button>
     </Box>
   );
 };
