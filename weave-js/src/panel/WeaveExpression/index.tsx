@@ -211,7 +211,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
         initialValue={slateValue}
         onChange={onChangeResetSuggestion}>
         <S.EditableContainer
-          data-dd-action-name="click on expression"
+          data-dd-action-name="query expression"
           ref={containerRef}
           data-test="expression-editor-container"
           data-test-ee-id={editorId}
