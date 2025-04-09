@@ -1,10 +1,3 @@
-import {
-  MOON_400,
-  MOON_600,
-  TEAL_350,
-  TEAL_600,
-} from '@wandb/weave/common/css/color.styles';
-import {IconEnterReturn} from '@wandb/weave/components/Icon';
 import {makeEventRecorder} from '@wandb/weave/components/Panel2/panellib/libanalytics';
 import {ID} from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
