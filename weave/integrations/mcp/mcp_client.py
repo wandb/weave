@@ -85,6 +85,30 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
                 return op(*args, **kwargs)
 
             return wrapped_read_resource
+        elif op_name.endswith("get_prompt"):
+
+            def wrapped_get_prompt(*args: Any, **kwargs: Any) -> Any:
+                prompt_name = None
+
+                if len(args) >= 2:
+                    prompt_name = args[1]
+                elif "name" in kwargs:
+                    prompt_name = kwargs["name"]
+
+                if prompt_name:
+                    base_name = op_name or "mcp.client.session.ClientSession.get_prompt"
+                    new_op_name = f"{base_name}.{prompt_name}"
+                    new_settings = settings.model_copy(
+                        update={"name": new_op_name, "call_display_name": prompt_name}
+                    )
+                    new_op_kwargs = new_settings.model_dump()
+                    op = weave.op(fn, **new_op_kwargs)
+                    return op(*args, **kwargs)
+
+                op = weave.op(fn, **op_kwargs)
+                return op(*args, **kwargs)
+
+            return wrapped_get_prompt
         else:
             # For other methods, use the standard wrapper
             op = weave.op(fn, **op_kwargs)
