@@ -284,7 +284,7 @@ const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 const datetimeFilterCacheKey = (
   entity: string,
   project: string,
-  filter: CallFilter
+  filter: WFHighLevelCallFilter
 ) => {
   // hash the filter
   const filterHash = simpleHash(JSON.stringify(filter));
@@ -294,7 +294,7 @@ const datetimeFilterCacheKey = (
 export const useMakeInitialDatetimeFilter = (
   entity: string,
   project: string,
-  filter: CallFilter,
+  highLevelFilter: WFHighLevelCallFilter,
   skip: boolean
 ): {initialDatetimeFilter: GridFilterModel} => {
   // Fire off 2 stats queries, one for the # of calls in the last 7 days
@@ -312,11 +312,14 @@ export const useMakeInitialDatetimeFilter = (
     return makeRawDateFilter(7);
   }, []);
 
-  const key = datetimeFilterCacheKey(entity, project, filter);
+  const key = datetimeFilterCacheKey(entity, project, highLevelFilter);
   const cachedFilter = useMemo(
     () => getCachedByKeyWithExpiry(key, CACHE_EXPIRY_MS),
     [key]
   );
+  const filter: CallFilter = useMemo(() => {
+    return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
+  }, [highLevelFilter]);
 
   const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
     skip: skip || cachedFilter != null,
