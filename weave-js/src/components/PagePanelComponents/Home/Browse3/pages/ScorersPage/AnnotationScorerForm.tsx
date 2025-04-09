@@ -10,7 +10,10 @@ import {ScorerFormProps} from './ScorerForms';
 import {ZSForm} from './ZodSchemaForm';
 
 const AnnotationScorerFormSchema = z.object({
-  Name: z.string().min(1).describe('Annotation field name, shown in the interface.'),
+  Name: z
+    .string()
+    .min(1)
+    .describe('Annotation field name, shown in the interface.'),
   Description: z
     .string()
     .optional()
@@ -39,7 +42,7 @@ const AnnotationScorerFormSchema = z.object({
         'Select options': z.array(z.string()).min(1),
       }),
     ])
-    .describe('The format of the annotation field\'s input.'),
+    .describe("The format of the annotation field's input."),
 });
 
 const DEFAULT_STATE = {
