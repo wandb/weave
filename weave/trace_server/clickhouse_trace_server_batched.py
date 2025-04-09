@@ -81,7 +81,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.file_storage import (
     FileStorageWriteError,
-    _get_storage_client,
+    get_storage_client_for_uri,
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
@@ -105,7 +105,6 @@ from weave.trace_server.objects_query_builder import (
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.storage_client_manager import StorageClientManager
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -215,7 +214,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._storage_client: Optional[FileStorageClient] = None
+        self._file_storage_client: Optional[FileStorageClient] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -231,9 +230,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     @property
-    def storage_client(self) -> FileStorageClient:
-        if self._storage_client is not None:
-            return self._storage_client
+    def file_storage_client(self) -> Optional[FileStorageClient]:
+        if self._file_storage_client is not None:
+            return self._file_storage_client
         file_storage_uri = wf_env.wf_file_storage_uri()
         if file_storage_uri is None:
             return None
@@ -242,8 +241,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception(f"Error parsing file storage URI: {e}")
             return None
-        self._storage_client = _get_storage_client(parsed_uri)
-        return self._storage_client
+        if parsed_uri.has_path():
+            raise ValueError(
+                f"Supplied file storage uri contains path components: {file_storage_uri}"
+            )
+        self._file_storage_client = get_storage_client_for_uri(parsed_uri)
+        return self._file_storage_client
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         traces_data = [
@@ -1344,11 +1347,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
+        file_storage_enabled = self._file_storage_write_enabled_for_project(req.project_id)
+        client = self.file_storage_client
 
-        if base_file_storage_uri is not None:
+        if client is not None and file_storage_enabled:
             try:
-                self._file_create_bucket(req, digest, base_file_storage_uri)
+                self._file_create_bucket(req, digest, client)
             except FileStorageWriteError as e:
                 self._file_create_clickhouse(req, digest)
         else:
@@ -1390,14 +1394,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
+        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
-        target_file_storage_uri = base_file_storage_uri.with_path(
-            # It is entirely compatible with the design to support chunking on the
-            # bucket side. Just need to add a `/CHUNK` suffix to the key.
-            key_for_project_digest(req.project_id, digest)
-        )
-        store_in_bucket(target_file_storage_uri, req.content)
+        store_in_bucket(client, key_for_project_digest(req.project_id, digest), req.content)
         self._insert(
             "files",
             data=[
@@ -1424,8 +1423,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-
-    def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
+    def _file_storage_write_enabled_for_project(self, project_id: str) -> bool:
         """
         Get the base storage URI for a project.
 
@@ -1436,27 +1434,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         the project or a context variable. Leaving this method here for clarity
         and future extensibility.
         """
-        file_storage_uri_str = wf_env.wf_file_storage_uri()
-        if not file_storage_uri_str:
-            return None
-
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
-            return None
+            return False
 
         universally_enabled = (
             len(project_allow_list) == 1 and project_allow_list[0] == "*"
         )
 
         if not universally_enabled and project_id not in project_allow_list:
-            return None
+            return False
 
-        res = FileStorageURI.parse_uri_str(file_storage_uri_str)
-        if res.has_path():
-            raise ValueError(
-                f"Supplied file storage uri contains path components: {file_storage_uri_str}"
-            )
-        return res
+        return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest

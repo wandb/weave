@@ -43,6 +43,27 @@ RETRY_MAX_WAIT = 10  # seconds
 # Publicly exposed methods:
 
 
+class FileStorageClient:
+    """Abstract base class defining the interface for cloud storage operations.
+    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage."""
+
+    base_uri: FileStorageURI
+
+    def __init__(self, base_uri: FileStorageURI):
+        assert isinstance(base_uri, FileStorageURI)
+        self.base_uri = base_uri
+
+    @abstractmethod
+    def store(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data at the specified URI location in cloud storage."""
+        pass
+
+    @abstractmethod
+    def read(self, uri: FileStorageURI) -> bytes:
+        """Read data from the specified URI location in cloud storage."""
+        pass
+
+
 class FileStorageWriteError(Exception):
     """Exception for failed file writes."""
 
@@ -55,28 +76,28 @@ class FileStorageReadError(Exception):
     pass
 
 
-def store_in_bucket(file_storage_uri: FileStorageURI, data: bytes) -> None:
+def store_in_bucket(client: FileStorageClient, path: str, data: bytes) -> None:
     """Store a file in a storage bucket."""
-    client = _get_storage_client(file_storage_uri)
     try:
-        return client.store(file_storage_uri, data)
+        target_file_storage_uri = client.base_uri.with_path(path)
+        return client.store(target_file_storage_uri, data)
     except Exception as e:
-        logger.exception("Failed to store file at %s: %s", file_storage_uri, str(e))
+        logger.exception("Failed to store file at %s: %s", target_file_storage_uri, str(e))
         raise FileStorageWriteError(
             f"Failed to store file at {file_storage_uri}: {str(e)}"
         ) from e
 
 
-def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
-    """Read a file from a storage bucket."""
-    client = _get_storage_client(file_storage_uri)
-    try:
-        return client.read(file_storage_uri)
-    except Exception as e:
-        logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
-        raise FileStorageReadError(
-            f"Failed to read file from {file_storage_uri}: {str(e)}"
-        ) from e
+# def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
+#     """Read a file from a storage bucket."""
+#     client = get_storage_client_for_uri(file_storage_uri)
+#     try:
+#         return client.read(file_storage_uri)
+#     except Exception as e:
+#         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
+#         raise FileStorageReadError(
+#             f"Failed to read file from {file_storage_uri}: {str(e)}"
+#         ) from e
 
 
 ### Everything below here is interal
@@ -108,20 +129,6 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
     )
 
 
-class FileStorageClient(ABC):
-    """Abstract base class defining the interface for cloud storage operations.
-    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage."""
-
-    @abstractmethod
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data at the specified URI location in cloud storage."""
-        pass
-
-    @abstractmethod
-    def read(self, uri: FileStorageURI) -> bytes:
-        """Read data from the specified URI location in cloud storage."""
-        pass
-
 
 class S3StorageClient(FileStorageClient):
     """AWS S3 storage implementation with retry logic and configurable timeouts."""
@@ -144,11 +151,13 @@ class S3StorageClient(FileStorageClient):
     @create_retry_decorator("s3_storage")
     def store(self, uri: S3FileStorageURI, data: bytes) -> None:
         """Store data in S3 bucket with automatic retries on failure."""
+        assert isinstance(uri, S3FileStorageURI)
         self.client.put_object(Bucket=uri.bucket, Key=uri.path, Body=data)
 
     @create_retry_decorator("s3_read")
     def read(self, uri: S3FileStorageURI) -> bytes:
         """Read data from S3 bucket with automatic retries on failure."""
+        assert isinstance(uri, S3FileStorageURI)
         response = self.client.get_object(Bucket=uri.bucket, Key=uri.path)
         return response["Body"].read()
 
@@ -165,6 +174,7 @@ class GCSStorageClient(FileStorageClient):
     @create_retry_decorator("gcs_storage")
     def store(self, uri: GCSFileStorageURI, data: bytes) -> None:
         """Store data in GCS bucket with automatic retries on failure."""
+        assert isinstance(uri, GCSFileStorageURI)
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
         blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT)
@@ -172,6 +182,7 @@ class GCSStorageClient(FileStorageClient):
     @create_retry_decorator("gcs_read")
     def read(self, uri: GCSFileStorageURI) -> bytes:
         """Read data from GCS bucket with automatic retries on failure."""
+        assert isinstance(uri, GCSFileStorageURI)
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
         return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT)
@@ -211,6 +222,7 @@ class AzureStorageClient(FileStorageClient):
     @create_retry_decorator("azure_storage")
     def store(self, uri: AzureFileStorageURI, data: bytes) -> None:
         """Store data in Azure container with automatic retries on failure."""
+        assert isinstance(uri, AzureFileStorageURI)
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
@@ -219,6 +231,7 @@ class AzureStorageClient(FileStorageClient):
     @create_retry_decorator("azure_read")
     def read(self, uri: AzureFileStorageURI) -> bytes:
         """Read data from Azure container with automatic retries on failure."""
+        assert isinstance(uri, AzureFileStorageURI)
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
@@ -226,7 +239,7 @@ class AzureStorageClient(FileStorageClient):
         return stream.readall()
 
 
-def _get_storage_client(uri: FileStorageURI) -> FileStorageClient:
+def get_storage_client_for_uri(uri: FileStorageURI) -> FileStorageClient:
     """Factory method that returns appropriate storage client based on URI type.
     Supports S3, GCS, and Azure storage URIs."""
     if isinstance(uri, S3FileStorageURI):
