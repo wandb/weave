@@ -5,7 +5,6 @@ import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import getConfig from '@wandb/weave/config';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -32,8 +31,8 @@ const EmptyWithSettingsButton: React.FC<{
   entity: string;
   project: string;
   isTeamAdmin: boolean;
-}> = ({entity, project, isTeamAdmin}) => {
-  const {urlPrefixed} = getConfig();
+  onConfigureProvider: () => void;
+}> = ({entity, project, isTeamAdmin, onConfigureProvider}) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const emptyProps = isTeamAdmin
@@ -47,42 +46,25 @@ const EmptyWithSettingsButton: React.FC<{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '24px',
+          gap: '16px',
         }}>
         <Empty {...emptyProps} />
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-          }}>
-          <Box sx={{display: 'flex', gap: '8px'}}>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                window.open(
-                  urlPrefixed(`/${entity}/${project}/overview/providers`)
-                );
-              }}
-              size="medium">
-              View project providers
-            </Button>
-            {isTeamAdmin && (
-              <Button
-                variant="primary"
-                onClick={() => setIsDrawerOpen(true)}
-                icon="key-admin"
-                size="medium">
-                Configure provider
-              </Button>
-            )}
-          </Box>
-        </Box>
+        {isTeamAdmin && (
+          <Button
+            variant="primary"
+            onClick={() => setIsDrawerOpen(true)}
+            icon="key-admin"
+            size="medium">
+            Configure provider
+          </Button>
+        )}
       </Box>
       <ProviderConfigDrawer
         open={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
+        onClose={() => {
+          onConfigureProvider();
+          setIsDrawerOpen(false);
+        }}
         entity={entity}
       />
     </>
@@ -111,8 +93,11 @@ export const PlaygroundChat = ({
   isOpenInPlayground = false,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const {result: configuredProviders, loading: configuredProvidersLoading} =
-    useConfiguredProviders(entity);
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entity);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -204,6 +189,9 @@ export const PlaygroundChat = ({
                 entity={entity}
                 project={project}
                 isTeamAdmin={isTeamAdmin}
+                onConfigureProvider={() => {
+                  refetchConfiguredProviders();
+                }}
               />
             </Box>
             <Box
@@ -219,6 +207,9 @@ export const PlaygroundChat = ({
                 entity={entity}
                 project={project}
                 isTeamAdmin={isTeamAdmin}
+                onConfigureProvider={() => {
+                  refetchConfiguredProviders();
+                }}
               />
             </Box>
           </Box>
@@ -314,6 +305,9 @@ export const PlaygroundChat = ({
                   entity={entity}
                   project={project}
                   isTeamAdmin={isTeamAdmin}
+                  onConfigureProvider={() => {
+                    refetchConfiguredProviders();
+                  }}
                 />
               </Box>
               <Box

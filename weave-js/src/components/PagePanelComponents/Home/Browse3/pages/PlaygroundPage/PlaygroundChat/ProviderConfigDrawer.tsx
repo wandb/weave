@@ -36,7 +36,9 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
 }) => {
   const [selectedProvider, setSelectedProvider] =
     useState<(typeof LLM_PROVIDERS)[number]>(defaultProvider);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKeys, setApiKeys] = useState<string[]>(
+    LLM_PROVIDER_SECRETS[defaultProvider]?.map(secret => '') || ['']
+  );
   const insertSecret = useInsertSecret();
 
   const providerOptions = LLM_PROVIDERS.map(provider => ({
@@ -45,34 +47,43 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
   }));
 
   const handleSave = async () => {
-    const secretName = LLM_PROVIDER_SECRETS[selectedProvider]?.[0];
-    if (!secretName) {
+    const secretNames = LLM_PROVIDER_SECRETS[selectedProvider];
+    if (!secretNames) {
       console.error('No secret name found for provider:', selectedProvider);
       return;
     }
-    try {
-      await insertSecret({
-        variables: {
-          entityName: entity,
-          secretName,
-          secretValue: apiKey,
-        },
-      });
-      toast('Provider secret saved successfully');
-      onClose();
-      setApiKey('');
-    } catch (error) {
-      console.error('Error saving secret:', error);
-      toast('Error saving secret', {
-        type: 'error',
-      });
-    }
+    secretNames.forEach(async (secretName, index) => {
+      try {
+        await insertSecret({
+          variables: {
+            entityName: entity,
+            secretName,
+            secretValue: apiKeys[index],
+          },
+        });
+        toast('Provider secret saved successfully');
+        onClose();
+        setApiKeys([]);
+      } catch (error) {
+        console.error('Error saving secret:', error);
+        toast('Error saving secret', {
+          type: 'error',
+        });
+      }
+    });
   };
 
   const getSecretKeyLabel = (provider: Provider) => {
     const secretName = LLM_PROVIDER_SECRETS[provider]?.[0];
     if (!secretName) {
       return 'This key will be saved securely as a team secret.';
+    }
+    if (LLM_PROVIDER_SECRETS[provider]?.length > 1) {
+      return `These keys will be saved securely as team secrets named ${LLM_PROVIDER_SECRETS[
+        provider
+      ]
+        ?.map(secret => `"${secret}"`)
+        .join(', ')}, and will be available for your entire team.`;
     }
     return `This key will be saved securely as a team secret named ${secretName}, and will be available for your entire team.`;
   };
@@ -103,7 +114,15 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
                 value={providerOptions.find(
                   opt => opt.value === selectedProvider
                 )}
-                onChange={option => option && setSelectedProvider(option.value)}
+                onChange={option => {
+                  if (option) {
+                    setSelectedProvider(option.value);
+                    setApiKeys(
+                      LLM_PROVIDER_SECRETS[option.value]?.map(secret => '') ||
+                        []
+                    );
+                  }
+                }}
                 options={providerOptions}
               />
             </Box>
@@ -111,17 +130,31 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
             <Box>
               <Box sx={{fontWeight: 600, fontSize: '16px'}}>
                 {LLM_PROVIDER_LABELS[selectedProvider]} API key
+                {apiKeys.length > 1 && 's'}
               </Box>
               <Box
                 sx={{marginBottom: '8px', color: MOON_500, fontSize: '14px'}}>
                 {getSecretKeyLabel(selectedProvider)}
               </Box>
-              <TextField
-                value={apiKey}
-                onChange={setApiKey}
-                placeholder="Enter API key"
-                type="password"
-              />
+              <Box sx={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                {apiKeys.map((apiKey, index) => (
+                  <Box key={index}>
+                    <Box sx={{fontWeight: 400, fontSize: '14px', mb: '4px'}}>
+                      {LLM_PROVIDER_SECRETS[selectedProvider]?.[index]}
+                    </Box>
+                    <TextField
+                      value={apiKey}
+                      onChange={value => {
+                        const newApiKeys = [...apiKeys];
+                        newApiKeys[index] = value;
+                        setApiKeys(newApiKeys);
+                      }}
+                      placeholder="Enter API key"
+                      type="password"
+                    />
+                  </Box>
+                ))}
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -149,7 +182,7 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!apiKey}
+              disabled={!apiKeys.every(key => key.trim() !== '')}
               variant="primary"
               style={{flex: 1}}
               twWrapperStyles={{flex: 1}}>
@@ -169,9 +202,9 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
       headerContent={
         <Box
           sx={{
-            padding: '24px',
+            padding: '16px 20px',
             borderBottom: `1px solid ${MOON_200}`,
-            fontSize: '32px',
+            fontSize: '20px',
             fontWeight: 600,
           }}>
           Configure an LLM provider

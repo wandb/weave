@@ -1,6 +1,6 @@
 import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {useBaseObjectInstances} from '../../wfReactInterface/objectClassQuery';
@@ -24,6 +24,7 @@ interface LLMDropdownProps {
   entity: string;
   project: string;
   isTeamAdmin: boolean;
+  onConfigureProvider: () => void;
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({
@@ -32,6 +33,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   entity,
   project,
   isTeamAdmin,
+  onConfigureProvider,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
@@ -133,6 +135,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   // Combine enabled and disabled options
   // Add a divider option before the add provider option
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
     ...disabledOptions,
@@ -147,6 +150,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
+    refetchConfiguredProviders();
   };
 
   const handleConfigureProvider = (provider: string) => {
@@ -158,7 +162,32 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     setConfigDrawerOpen(false);
     setSelectedProvider(null);
     refetchConfiguredProviders();
-  }, [refetchConfiguredProviders]);
+    onConfigureProvider();
+  }, [refetchConfiguredProviders, onConfigureProvider]);
+
+  const isValueAvailable = allOptions.find(
+    option =>
+      'llms' in option && option.llms?.some(llm => llm && llm.value === value)
+  );
+
+  useEffect(() => {
+    if (!isValueAvailable && !configuredProvidersLoading) {
+      for (const option of allOptions) {
+        for (const llm of option.llms) {
+          if (llm && llm.value && llm.max_tokens) {
+            onChange(llm.value, llm.max_tokens);
+            break;
+          }
+        }
+      }
+    }
+  }, [
+    isValueAvailable,
+    allOptions,
+    onChange,
+    value,
+    configuredProvidersLoading,
+  ]);
 
   return (
     <Box sx={{width: '300px'}}>
