@@ -496,6 +496,8 @@ def exp_raw_data(commit_hash: str):
                 "height": 128,
                 "width": 128,
                 "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {"box_set_1": None, "box_set_2": None},
+                "masks": {"mask_set_1": None},
                 "caption": "This is a caption",
             },
         },
