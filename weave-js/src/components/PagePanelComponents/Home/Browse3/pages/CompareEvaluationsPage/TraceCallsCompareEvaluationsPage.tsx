@@ -128,23 +128,12 @@ export const SummarizeCallsSection: React.FC<{
   };
 
   return (
-    <VerticalBox
-      sx={{
-        height: '100%',
-        width: '100%',
-        gridGap: '0px',
-      }}>
+    <VerticalBox>
       {/* Main content area */}
-      <Box
-        sx={{
-          flex: 1,
-          overflow: 'auto',
-          borderBottom: '1px solid #e0e0e0',
-        }}>
+      <Box>
         {/* Output section */}
         <Box
           sx={{
-            borderBottom: '1px solid #e0e0e0',
             display: 'table',
             width: '100%',
           }}>
@@ -162,7 +151,6 @@ export const SummarizeCallsSection: React.FC<{
                 padding: '8px 16px',
                 borderRight: '1px solid #e0e0e0',
                 borderBottom: '1px solid #e0e0e0',
-                alignItems: 'center',
               }}>
               Metric
             </Box>
@@ -171,7 +159,6 @@ export const SummarizeCallsSection: React.FC<{
                 key={evalId}
                 sx={{
                   display: 'table-cell',
-                  width: `calc((100% - 200px) / ${evaluationIds.length})`,
                   padding: '8px 16px',
                   borderRight:
                     colIndex < evaluationIds.length - 1
@@ -194,15 +181,9 @@ export const SummarizeCallsSection: React.FC<{
                       borderRadius: '50%',
                       bgcolor: state.summary.evaluationCalls[evalId].color,
                       marginRight: '8px',
-                      flexShrink: 0,
                     }}
                   />
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                    }}>
+                  <Box>
                     <span>
                       {state.summary.evaluationCalls[evalId].name || 'model'}
                     </span>
