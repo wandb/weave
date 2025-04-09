@@ -340,33 +340,7 @@ class ConventionType(Enum):
     OPENTELEMETRY = "gen_ai"
     CUSTOM = "custom"
 
-
-class AbstractAttributes(ABC):
-    _attributes: dict[str, Any] = field(default_factory=dict)
-
-    @abstractmethod
-    def __getitem__(self, key: str) -> Any: ...
-
-    @abstractmethod
-    def __setitem__(self, key: str, value: Any) -> None: ...
-
-    @abstractmethod
-    def get(self, key: str, default: Any = None) -> Any: ...
-
-    @abstractmethod
-    def get_attribute_value(self, key: str) -> Any: ...
-
-    @abstractmethod
-    def get_weave_inputs(self) -> dict[str, Any]: ...
-
-    @abstractmethod
-    def get_weave_outputs(self) -> Any: ...
-
-    @abstractmethod
-    def get_weave_usage(self) -> LLMUsageSchema: ...
-
-
-class Attributes(AbstractAttributes):
+class Attributes:
     _attributes: dict[str, Any] = field(default_factory=dict)
 
     def __init__(self, _attributes: dict[str, Any] = {}) -> None:
@@ -384,20 +358,20 @@ class Attributes(AbstractAttributes):
     def get_attribute_value(self, key: str) -> Any:
         return get_attribute(self._attributes, key)
 
-    def get_weave_usage(self) -> LLMUsageSchema:
-        raise NotImplementedError("get_weave_usage is not implemented")
+    @abstractmethod
+    def get_weave_inputs(self) -> dict[str, Any]: ...
 
-    def get_weave_summary(self) -> SummaryInsertMap:
-        raise NotImplementedError("get_weave_summary is not implemented")
+    @abstractmethod
+    def get_weave_outputs(self) -> Any: ...
 
-    def get_weave_inputs(self) -> Any:
-        raise NotImplementedError("get_weave_inputs is not implemented")
+    @abstractmethod
+    def get_weave_usage(self) -> LLMUsageSchema: ...
 
-    def get_weave_outputs(self) -> Any:
-        raise NotImplementedError("get_weave_outputs is not implemented")
+    @abstractmethod
+    def get_weave_summary(self) -> SummaryInsertMap: ...
 
-    def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any:
-        raise NotImplementedError("get_weave_attributes is not implemented")
+    @abstractmethod
+    def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any: ...
 
 
 # If we don't have any conventions to follow, just dump everything to attributes
