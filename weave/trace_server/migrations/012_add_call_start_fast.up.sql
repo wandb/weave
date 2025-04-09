@@ -9,7 +9,7 @@ CREATE TABLE call_start_fast (
   
   parent_id String DEFAULT ''
 ) ENGINE = MergeTree
-ORDER BY (project_id, op_name, trace_id, parent_id, id, started_at);
+ORDER BY (project_id, op_name, trace_id, parent_id, started_at, id);
 
 DROP VIEW IF EXISTS call_start_fast_view;
 CREATE MATERIALIZED VIEW call_start_fast_view TO call_start_fast AS
@@ -22,4 +22,4 @@ SELECT
    COALESCE(parent_id, '') as parent_id
 FROM call_parts
 WHERE started_at is not NULL
-ORDER BY (project_id, op_name, trace_id, parent_id, id, started_at);
+ORDER BY (project_id, op_name, trace_id, parent_id, started_at, id);
