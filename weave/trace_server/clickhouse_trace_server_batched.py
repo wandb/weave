@@ -2185,58 +2185,12 @@ def _ensure_datetimes_have_tz_strict(
     return res
 
 
-def _nullable_dict_dump_to_dict(
-    val: Optional[str],
-) -> Optional[dict[str, Any]]:
-    return _dict_dump_to_dict(val) if val else None
-
-
 def _nullable_any_dump_to_any(
     val: Optional[str],
 ) -> Optional[Any]:
     return _any_dump_to_any(val) if val else None
 
 
-def _raw_call_dict_to_ch_call(
-    call: dict[str, Any],
-) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
-
-
-def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
-    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
-    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
-    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
-    display_name = empty_str_to_none(ch_call.display_name)
-    return tsi.CallSchema(
-        project_id=ch_call.project_id,
-        id=ch_call.id,
-        trace_id=ch_call.trace_id,
-        parent_id=ch_call.parent_id,
-        op_name=ch_call.op_name,
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
-        output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_fields(
-            summary=summary or {},
-            op_name=ch_call.op_name,
-            started_at=started_at,
-            ended_at=ended_at,
-            exception=ch_call.exception,
-            display_name=display_name,
-        ),
-        exception=ch_call.exception,
-        wb_run_id=ch_call.wb_run_id,
-        wb_user_id=ch_call.wb_user_id,
-        display_name=display_name,
-        storage_size_bytes=ch_call.storage_size_bytes,
-        total_storage_size_bytes=ch_call.total_storage_size_bytes,
-    )
-
-
-# Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
