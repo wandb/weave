@@ -25,12 +25,12 @@ def _field_requires_null_check(field: str) -> bool:
     return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
-class QueryOptimizationVisitor:
+class QueryOptimizationProcessor:
     def __init__(self, pb: "ParamBuilder", table_alias: str):
         self.pb = pb
         self.table_alias = table_alias
 
-    def visit_operand(self, operand: tsi_query.Operand) -> Optional[str]:
+    def process_operand(self, operand: tsi_query.Operand) -> Optional[str]:
         # Can never hit leaf operations before optimizations, always return None
         if isinstance(operand, tsi_query.LiteralOperation):
             return None
@@ -38,12 +38,12 @@ class QueryOptimizationVisitor:
             return None
         elif isinstance(operand, tsi_query.ConvertOperation):
             return None
-        return apply_visitor(self, operand)
+        return apply_processor(self, operand)
 
-    def visit_and(self, operation: tsi_query.AndOperation) -> Optional[str]:
+    def process_and(self, operation: tsi_query.AndOperation) -> Optional[str]:
         conditions = []
         for op in operation.and_:
-            result = self.visit_operand(op)
+            result = self.process_operand(op)
             if result:
                 conditions.append(result)
 
@@ -51,10 +51,10 @@ class QueryOptimizationVisitor:
             return "(" + " AND ".join(conditions) + ")"
         return None
 
-    def visit_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
+    def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
         conditions = []
         for op in operation.or_:
-            result = self.visit_operand(op)
+            result = self.process_operand(op)
             if result is None:
                 # If any or condition can't be optimized, return
                 # TODO: this should return the non optimized,
@@ -66,25 +66,25 @@ class QueryOptimizationVisitor:
             return "(" + " OR ".join(conditions) + ")"
         return None
 
-    def visit_not(self, operation: tsi_query.NotOperation) -> Optional[str]:
-        result = self.visit_operand(operation.not_[0])
+    def process_not(self, operation: tsi_query.NotOperation) -> Optional[str]:
+        result = self.process_operand(operation.not_[0])
         if result is None:
             return None
         return f"NOT ({result})"
 
-    def visit_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+    def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         return None
 
-    def visit_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
         return None
 
-    def visit_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         return None
 
-    def visit_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
         return None
 
-    def visit_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         return None
 
     def finalize_sql(self, result: Optional[str]) -> Optional[str]:
@@ -94,24 +94,24 @@ class QueryOptimizationVisitor:
         return None
 
 
-class StringOptimizationVisitor(QueryOptimizationVisitor):
-    def visit_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+class StringOptimizationProcessor(QueryOptimizationProcessor):
+    def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         return _create_like_optimized_eq_condition(operation, self.pb, self.table_alias)
 
-    def visit_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
         return _create_like_optimized_contains_condition(
             operation, self.pb, self.table_alias
         )
 
-    def visit_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         return _create_like_optimized_in_condition(operation, self.pb, self.table_alias)
 
 
-class IdOptimizationVisitor(QueryOptimizationVisitor):
-    def visit_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+class IdOptimizationProcessor(QueryOptimizationProcessor):
+    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
         return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
 
-    def visit_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
 
     def finalize_sql(self, result: Optional[str]) -> Optional[str]:
@@ -121,25 +121,25 @@ class IdOptimizationVisitor(QueryOptimizationVisitor):
         return None
 
 
-def apply_visitor(
-    visitor: QueryOptimizationVisitor, operation: tsi_query.Operation
+def apply_processor(
+    processor: QueryOptimizationProcessor, operation: tsi_query.Operation
 ) -> Optional[str]:
     if isinstance(operation, tsi_query.AndOperation):
-        return visitor.visit_and(operation)
+        return processor.process_and(operation)
     elif isinstance(operation, tsi_query.OrOperation):
-        return visitor.visit_or(operation)
+        return processor.process_or(operation)
     elif isinstance(operation, tsi_query.NotOperation):
-        return visitor.visit_not(operation)
+        return processor.process_not(operation)
     elif isinstance(operation, tsi_query.EqOperation):
-        return visitor.visit_eq(operation)
+        return processor.process_eq(operation)
     elif isinstance(operation, tsi_query.ContainsOperation):
-        return visitor.visit_contains(operation)
+        return processor.process_contains(operation)
     elif isinstance(operation, tsi_query.InOperation):
-        return visitor.visit_in(operation)
+        return processor.process_in(operation)
     elif isinstance(operation, tsi_query.GtOperation):
-        return visitor.visit_gt(operation)
+        return processor.process_gt(operation)
     elif isinstance(operation, tsi_query.GteOperation):
-        return visitor.visit_gte(operation)
+        return processor.process_gte(operation)
     return None
 
 
@@ -174,14 +174,14 @@ def process_query_to_optimization_sql(
     and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
 
     # Apply string optimization
-    string_visitor = StringOptimizationVisitor(param_builder, table_alias)
-    string_result = apply_visitor(string_visitor, and_operation)
-    string_result_sql = string_visitor.finalize_sql(string_result)
+    string_processor = StringOptimizationProcessor(param_builder, table_alias)
+    string_result = apply_processor(string_processor, and_operation)
+    string_result_sql = string_processor.finalize_sql(string_result)
 
     # Apply ID optimization
-    id_visitor = IdOptimizationVisitor(param_builder, table_alias)
-    id_result = apply_visitor(id_visitor, and_operation)
-    id_result_sql = id_visitor.finalize_sql(id_result)
+    id_processor = IdOptimizationProcessor(param_builder, table_alias)
+    id_result = apply_processor(id_processor, and_operation)
+    id_result_sql = id_processor.finalize_sql(id_result)
 
     return OptimizationConditions(
         str_filter_opt_sql=string_result_sql,
