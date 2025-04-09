@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 from typing import Any, Callable
 
 import weave
@@ -35,16 +36,15 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
                 base_name = settings.name or ""
 
                 # Set the op name to mcp.server.fastmcp.FastMCP.tool.<TOOL_NAME>
-                op_name = f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
-                
+                op_name = (
+                    f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
+                )
+
                 # Use just the function name as the display name
                 display_name = weave_op_name if weave_op_name != "" else base_name
 
                 settings_copy = settings.model_copy(
-                    update={
-                        "name": op_name,
-                        "call_display_name": display_name
-                    }
+                    update={"name": op_name, "call_display_name": display_name}
                 )
 
                 weave_wrapped = weave.op(fn, **settings_copy.model_dump())
@@ -73,9 +73,6 @@ def get_mcp_server_patcher(
         return _mcp_server_patcher
 
     base = settings.op_settings
-    
-    # Check if list operations should be traced
-    # trace_list_operations = getattr(settings, "trace_list_operations", False)
 
     # Settings for core methods
     call_tool_settings = base.model_copy(
@@ -158,20 +155,28 @@ def get_mcp_server_patcher(
             decorator_wrapper(prompt_decorator_settings),
         ),
     ]
-    
-    # Only add list_* operations if opted in
-    patchers.extend([
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.server.fastmcp"),
-            "FastMCP.list_tools",
-            mcp_server_wrapper(list_tools_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("mcp.server.fastmcp"),
-            "FastMCP.list_resources",
-            mcp_server_wrapper(list_resources_settings),
-        ),
-    ])
+
+    # Only add list_* operations if opted in via environment variable
+    trace_list_operations = os.environ.get("MCP_TRACE_LIST_OPERATIONS", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    if trace_list_operations:
+        patchers.extend(
+            [
+                SymbolPatcher(
+                    lambda: importlib.import_module("mcp.server.fastmcp"),
+                    "FastMCP.list_tools",
+                    mcp_server_wrapper(list_tools_settings),
+                ),
+                SymbolPatcher(
+                    lambda: importlib.import_module("mcp.server.fastmcp"),
+                    "FastMCP.list_resources",
+                    mcp_server_wrapper(list_resources_settings),
+                ),
+            ]
+        )
 
     _mcp_server_patcher = MultiPatcher(patchers)
 
