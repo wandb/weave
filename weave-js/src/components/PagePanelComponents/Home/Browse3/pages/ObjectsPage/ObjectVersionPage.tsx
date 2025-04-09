@@ -3,7 +3,6 @@ import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
-import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
@@ -31,7 +30,6 @@ import {
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
-  SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
@@ -527,65 +525,6 @@ const ObjectVersionPageInner: React.FC<{
   );
 };
 
-const ObjectVersionProducingCallsItem: React.FC<{
-  producingCalls: CallSchema[];
-  refUri: string;
-}> = props => {
-  if (props.producingCalls.length === 1) {
-    const call = props.producingCalls[0];
-    const {opVersionRef, spanName} = call;
-    if (opVersionRef == null) {
-      return <>{spanName}</>;
-    }
-    return (
-      <CallLink
-        entityName={call.entity}
-        projectName={call.project}
-        opName={spanName}
-        callId={call.callId}
-        variant="secondary"
-      />
-    );
-  }
-  return (
-    <GroupedCalls
-      calls={props.producingCalls}
-      partialFilter={{
-        outputObjectVersionRefs: [props.refUri],
-      }}
-    />
-  );
-};
-const ObjectVersionConsumingCallsItem: React.FC<{
-  consumingCalls: CallSchema[];
-  refUri: string;
-}> = props => {
-  if (props.consumingCalls.length === 1) {
-    const call = props.consumingCalls[0];
-    const {opVersionRef, spanName} = call;
-    if (opVersionRef == null) {
-      return <>{spanName}</>;
-    }
-    return (
-      <CallLink
-        entityName={call.entity}
-        projectName={call.project}
-        opName={spanName}
-        callId={call.callId}
-        variant="secondary"
-      />
-    );
-  }
-  return (
-    <GroupedCalls
-      calls={props.consumingCalls}
-      partialFilter={{
-        inputObjectVersionRefs: [props.refUri],
-      }}
-    />
-  );
-};
-
 const GroupedCalls: React.FC<{
   calls: CallSchema[];
   partialFilter?: WFHighLevelCallFilter;
@@ -628,7 +567,11 @@ const GroupedCalls: React.FC<{
           <table className="w-full text-[14px]">
             <tbody className="divide-y divide-[#E0E0E0]">
               {Object.entries(callGroups).map(([key, val]) => (
-                <CallGroupRow key={key} val={val} partialFilter={partialFilter} />
+                <CallGroupRow
+                  key={key}
+                  val={val}
+                  partialFilter={partialFilter}
+                />
               ))}
             </tbody>
           </table>
@@ -647,14 +590,14 @@ const CallGroupRow: React.FC<{
 }> = ({val, partialFilter}) => {
   const {useOpVersion} = useWFHooks();
   const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
-  
+
   if (opVersion.loading || opVersion.result == null) {
     return null;
   }
 
   return (
     <tr>
-      <td className="p-[8px] border-r border-[#E0E0E0] align-center bg-moon-50">
+      <td className="whitespace-nowrap align-center border-r border-[#E0E0E0] bg-moon-50 p-[8px]">
         <OpVersionLink
           entityName={opVersion.result.entity}
           projectName={opVersion.result.project}
@@ -664,18 +607,18 @@ const CallGroupRow: React.FC<{
           variant="secondary"
         />
       </td>
-      <td className="p-[8px] align-center w-full">
-          <CallsLink
-            entity={opVersion.result.entity}
-            project={opVersion.result.project}
-            callCount={val.calls.length}
-            filter={{
-              opVersionRefs: [val.opVersionRef],
-              ...(partialFilter ?? {}),
-            }}
-            neverPeek
-            variant="secondary"
-          />
+      <td className="align-center w-full p-[8px]">
+        <CallsLink
+          entity={opVersion.result.entity}
+          project={opVersion.result.project}
+          callCount={val.calls.length}
+          filter={{
+            opVersionRefs: [val.opVersionRef],
+            ...(partialFilter ?? {}),
+          }}
+          neverPeek
+          variant="secondary"
+        />
       </td>
     </tr>
   );
