@@ -1427,16 +1427,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
-        """
-        Get the base storage URI for a project.
-
-        Currently this is quite simple as it uses the default storage bucket
-        for the entire client (most typically configured via environment variable).
-
-        However, in the near future, this might be something that is driven by
-        the project or a context variable. Leaving this method here for clarity
-        and future extensibility.
-        """
+        """Determine if we should use file storage for a project."""
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
             return False
