@@ -282,25 +282,6 @@ def get_attribute(data: dict[str, Any], key: str) -> Any:
     return _get_value_from_nested_dict(data, key)
 
 
-def pop_attribute(data: dict[str, Any], key: str) -> Any:
-    """
-    Pop the value of a nested attribute from either a nested or flattened dictionary.
-
-    Args:
-        data: dictionary to get value from
-        key: Dot-separated key to get
-
-    Returns:
-        The value at the specified key or None if not found
-    """
-    # Check if it's a flat dictionary
-    if key in data:
-        return data.pop(key)
-
-    # Try to get from nested structure
-    return _get_value_from_nested_dict(data, key)
-
-
 def unflatten_key_values(
     key_values: Iterable[KeyValue],
 ) -> dict[str, Any]:
