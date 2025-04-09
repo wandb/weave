@@ -249,33 +249,34 @@ const convertHighLevelFilterToLowLevelFilter = (
 
 const getFeedbackMerged = (calls: CallSchema[]) => {
   // for each call, reduce all feedback to the latest feedback of each type
-  return calls.map(c => {
-    if (!c.traceCall?.summary?.weave?.feedback) {
-      return c;
-    }
-    const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
-      (acc: Record<string, any>, curr: Record<string, any>) => {
-        // keep most recent feedback of each type
-        if (acc[curr.feedback_type]?.created_at > curr.created_at) {
-          return acc;
-        }
-        acc[curr.feedback_type] = curr;
-        return acc;
-      },
-      {}
-    );
-    c.traceCall = {
-      ...c.traceCall,
-      summary: {
-        ...c.traceCall.summary,
-        weave: {
-          ...c.traceCall.summary.weave,
-          feedback,
-        },
-      },
-    };
-    return c;
-  });
+  // return calls.map(c => {
+  //   if (!c.traceCall?.summary?.weave?.feedback) {
+  //     return c;
+  //   }
+  //   const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
+  //     (acc: Record<string, any>, curr: Record<string, any>) => {
+  //       // keep most recent feedback of each type
+  //       if (acc[curr.feedback_type]?.created_at > curr.created_at) {
+  //         return acc;
+  //       }
+  //       acc[curr.feedback_type] = curr;
+  //       return acc;
+  //     },
+  //     {}
+  //   );
+  //   c.traceCall = {
+  //     ...c.traceCall,
+  //     summary: {
+  //       ...c.traceCall.summary,
+  //       weave: {
+  //         ...c.traceCall.summary.weave,
+  //         feedback,
+  //       },
+  //     },
+  //   };
+  //   return c;
+  // });
+  return calls;
 };
 
 const CACHE_KEY_PREFIX = 'weave_datetime_filter_';

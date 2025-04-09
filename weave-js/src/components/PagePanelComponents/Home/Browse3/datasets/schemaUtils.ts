@@ -21,7 +21,11 @@ export const inferType = (value: any): string => {
   return typeof value;
 };
 
-export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
+export const flattenObject = (
+  obj: any,
+  prefix = '',
+  specialPaths: string[] = []
+): SchemaField[] => {
   let fields: SchemaField[] = [];
 
   // Return empty array for null or undefined inputs
@@ -29,13 +33,32 @@ export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
     return fields;
   }
 
+  // Check if current path should be treated as a special path
+  if (specialPaths.includes(prefix)) {
+    return [
+      {
+        name: prefix,
+        type: 'object',
+      },
+    ];
+  }
+
   // Special handling for __ref__ and __val__ pattern
   if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
-    return flattenObject(obj.__val__, prefix);
+    return flattenObject(obj.__val__, prefix, specialPaths);
   }
 
   for (const [key, value] of Object.entries(obj)) {
     const newKey = prefix ? `${prefix}.${key}` : key;
+
+    // Check if this is a special path that should be preserved as a whole object
+    if (specialPaths.includes(newKey)) {
+      fields.push({
+        name: newKey,
+        type: 'object',
+      });
+      continue;
+    }
 
     if (
       value !== null &&
@@ -43,7 +66,7 @@ export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
       !Array.isArray(value) &&
       !(value instanceof Date)
     ) {
-      fields = [...fields, ...flattenObject(value, newKey)];
+      fields = [...fields, ...flattenObject(value, newKey, specialPaths)];
     } else {
       fields.push({
         name: newKey,
@@ -90,6 +113,13 @@ export interface FieldMapping {
   targetField: string;
 }
 
+// Prefixes of fields that should be excluded from schema extraction
+export const EXCLUDED_FIELD_PREFIXES = [
+  'inputs.self',
+  'summary.weave.costs',
+  'summary.usage',
+];
+
 /**
  * Get a nested value from an object using a path array
  * @param obj The object to extract value from
@@ -115,6 +145,8 @@ export const getNestedValue = (obj: any, path: string[]): any => {
 
 export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
   const allFields: SchemaField[] = [];
+  // Paths that should be treated as single objects instead of expanded
+  const specialPaths = ['summary.weave.feedback'];
 
   if (!calls || !Array.isArray(calls)) {
     return allFields;
@@ -127,7 +159,7 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
     }
 
     if (call.val.inputs) {
-      allFields.push(...flattenObject(call.val.inputs, 'inputs'));
+      allFields.push(...flattenObject(call.val.inputs, 'inputs', specialPaths));
     }
 
     const output = call.val.output;
@@ -135,19 +167,35 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
       if (typeof output === 'string') {
         allFields.push({name: 'output', type: 'string'});
       } else {
-        allFields.push(...flattenObject(output, 'output'));
+        allFields.push(...flattenObject(output, 'output', specialPaths));
       }
+    }
+
+    // Add summary fields including feedback
+    if (call.val.summary) {
+      allFields.push(
+        ...flattenObject(call.val.summary, 'summary', specialPaths)
+      );
     }
   });
 
-  return allFields
-    .filter(field => field.name !== 'inputs.self')
-    .reduce((acc, field) => {
-      if (!acc.some(f => f.name === field.name)) {
-        acc.push(field);
-      }
+  // Filter out excluded prefixes and deduplicate fields
+  return allFields.reduce((acc, field) => {
+    // Skip fields with excluded prefixes
+    if (
+      EXCLUDED_FIELD_PREFIXES.some(
+        prefix => field.name === prefix || field.name.startsWith(prefix + '.')
+      )
+    ) {
       return acc;
-    }, [] as SchemaField[]);
+    }
+
+    // Deduplicate fields
+    if (!acc.some(f => f.name === field.name)) {
+      acc.push(field);
+    }
+    return acc;
+  }, [] as SchemaField[]);
 };
 
 /**
@@ -235,8 +283,27 @@ export const suggestMappings = (
 export const mapCallsToDatasetRows = (
   selectedCalls: CallData[],
   fieldMappings: FieldMapping[]
-) => {
+): Array<{___weave: {id: string; isNew: boolean}; [key: string]: any}> => {
   const resolveValue = (obj: any, path: string): any => {
+    // Special handling for feedback as a whole object
+    if (path === 'summary.weave.feedback') {
+      const feedback = obj?.summary?.weave?.feedback;
+      if (!feedback) return undefined;
+
+      // If it's already in the expected format, return it
+      if (Array.isArray(feedback) && feedback.length > 0) {
+        return feedback;
+      }
+
+      // If it's a direct object (likely containing wandb reactions), return it as is
+      if (typeof feedback === 'object') {
+        return feedback;
+      }
+
+      return undefined;
+    }
+
+    // Handle nested paths by splitting on dots
     const parts = path.split('.');
     let current = obj;
 
@@ -244,47 +311,33 @@ export const mapCallsToDatasetRows = (
       if (current == null) {
         return undefined;
       }
-
-      // Handle __ref__/__val__ pattern during value resolution
-      if (
-        typeof current === 'object' &&
-        '__ref__' in current &&
-        '__val__' in current
-      ) {
+      if (typeof current === 'object' && '__val__' in current) {
         current = current.__val__;
       }
-
+      if (typeof current !== 'object') {
+        return current;
+      }
       current = current[part];
     }
     return current;
   };
 
   return selectedCalls.map(call => {
-    const row: Record<string, any> = {};
-
-    fieldMappings.forEach(mapping => {
-      const inputs = call.val.inputs || {};
-      const output = call.val.output;
-
-      let sourceValue: any;
-      if (mapping.sourceField === 'output' && typeof output === 'string') {
-        sourceValue = output;
-      } else {
-        sourceValue = resolveValue({inputs, output}, mapping.sourceField);
-      }
-
-      if (sourceValue !== undefined) {
-        row[mapping.targetField] = sourceValue;
-      }
-    });
-
-    return {
+    const row: {___weave: {id: string; isNew: boolean}; [key: string]: any} = {
       ___weave: {
         id: call.digest,
         isNew: true,
       },
-      ...row,
     };
+
+    fieldMappings.forEach(mapping => {
+      const value = resolveValue(call.val, mapping.sourceField);
+      if (value !== undefined) {
+        row[mapping.targetField] = value;
+      }
+    });
+
+    return row;
   });
 };
 
@@ -458,4 +511,54 @@ export const suggestFieldMappings = (
   });
 
   return newMappings;
+};
+
+export interface FieldPreview {
+  [key: string]: any;
+}
+
+export const getFieldPreviews = (
+  sourceSchema: SchemaField[],
+  selectedCalls: CallData[]
+): Map<string, FieldPreview[]> => {
+  const previews = new Map<string, FieldPreview[]>();
+
+  sourceSchema.forEach(field => {
+    const fieldData = selectedCalls.map(call => {
+      let value: any;
+      if (field.name.startsWith('inputs.')) {
+        const path = field.name.slice(7).split('.');
+        value = getNestedValue(call.val.inputs, path);
+      } else if (field.name.startsWith('output.')) {
+        if (typeof call.val.output === 'object' && call.val.output !== null) {
+          const path = field.name.slice(7).split('.');
+          value = getNestedValue(call.val.output, path);
+        } else {
+          value = call.val.output;
+        }
+      } else if (field.name.startsWith('summary.')) {
+        const path = field.name.slice(8).split('.');
+        value = getNestedValue(call.val.summary, path);
+      } else if (field.name.startsWith('feedback.')) {
+        const path = field.name.slice(9).split('.');
+        // Handle array of feedback items
+        if (
+          call.val.summary?.weave?.feedback &&
+          call.val.summary.weave.feedback.length > 0
+        ) {
+          value = call.val.summary.weave.feedback.map((fb: any) =>
+            getNestedValue(fb, path)
+          );
+        } else {
+          value = undefined;
+        }
+      } else {
+        const path = field.name.split('.');
+        value = getNestedValue(call.val, path);
+      }
+      return {[field.name]: value};
+    });
+    previews.set(field.name, fieldData);
+  });
+  return previews;
 };
