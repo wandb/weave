@@ -21,7 +21,8 @@ def user_model():
     return func
 
 
-def test_basic_evaluation(client, user_dataset, user_model):
+@pytest.mark.asyncio
+async def test_basic_evaluation(client, user_dataset, user_model):
     ev = ImperativeEvaluationLogger()
 
     model_outputs = []
@@ -32,10 +33,10 @@ def test_basic_evaluation(client, user_dataset, user_model):
         pred = ev.log_prediction(inputs=row, output=model_output)
 
         score1_results.append(score1_result := model_output > 2)
-        pred.log_score(scorer_name="greater_than_2_scorer", score=score1_result)
+        await pred.log_score(scorer_name="greater_than_2_scorer", score=score1_result)
 
         score2_results.append(score2_result := model_output > 2)
-        pred.log_score(scorer_name="greater_than_4_scorer", score=score2_result)
+        await pred.log_score(scorer_name="greater_than_4_scorer", score=score2_result)
 
     ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
