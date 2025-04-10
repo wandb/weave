@@ -1,3 +1,5 @@
+from typing import Any
+
 from langfair.metrics.toxicity import ToxicityMetrics
 from pydantic import Field, PrivateAttr
 
@@ -46,7 +48,7 @@ class ToxicityScorer(weave.Scorer):
 
     _tox_metric_object: ToxicityMetrics = PrivateAttr()
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._tox_metric_object = ToxicityMetrics(
             classifiers=[self.classifiers],

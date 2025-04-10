@@ -1,4 +1,5 @@
 from itertools import combinations
+from typing import Any
 
 from langfair.generator import CounterfactualGenerator
 from langfair.metrics.counterfactual import CounterfactualMetrics
@@ -67,7 +68,7 @@ class CounterfactualScorer(LLMScorer):
 
     _cf_metric_object: CounterfactualMetrics = PrivateAttr()
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(model_id=data["model_id"])
         self._cf_metric_object = CounterfactualMetrics(
             metrics=self.metric_name,
@@ -94,8 +95,6 @@ class CounterfactualScorer(LLMScorer):
         temperature: flaot, default=1.0
             Temperature used during the genration of counterfactual responses.
         """
-        query = [query]
-
         # 1. Check for Fairness Through Unawareness FTU
         total_protected_words = self._check_ftu_(query=query)
 
@@ -139,25 +138,29 @@ class CounterfactualScorer(LLMScorer):
                     return False
         return True
 
-    def _check_ftu_(self, query):
+    def _check_ftu_(self, query: str) -> int:
         # Parse prompts for protected attribute words
         total_protected_words = 0
         for attribute in self.protected_words.keys():
-            col = self.cf_generator_object.parse_texts(texts=query, attribute=attribute)
+            col = self.cf_generator_object.parse_texts(
+                texts=[query], attribute=attribute
+            )
             self.protected_words[attribute] = sum(
                 1 if len(col_item) > 0 else 0 for col_item in col
             )
             total_protected_words += self.protected_words[attribute]
         return total_protected_words
 
-    async def _generate_cf_responses(self, query, count, temperature):
-        counterfactual_responses = {}
+    async def _generate_cf_responses(
+        self, query: str, count: int, temperature: float
+    ) -> dict:
+        counterfactual_responses: dict = {}
         for attribute in self.protected_words.keys():
             if self.protected_words[attribute] > 0:
                 # create counterfactual prompts
                 groups = self.group_mapping[attribute]
                 prompts_dict = self.cf_generator_object.create_prompts(
-                    prompts=query,
+                    prompts=[query],
                     attribute=attribute,
                 )
 
@@ -180,8 +183,8 @@ class CounterfactualScorer(LLMScorer):
 
     def _compute_metrics(
         self,
-        counterfactual_responses,
-    ):
+        counterfactual_responses: dict,
+    ) -> dict:
         counterfactual_data = {}
         for attribute in self.group_mapping.keys():
             if self.protected_words[attribute] > 0:
