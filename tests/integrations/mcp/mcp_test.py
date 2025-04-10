@@ -133,3 +133,59 @@ def test_mcp_client(client: WeaveClient) -> None:
     assert (
         "Please review this code" in prompt_text
     ), "Expected prompt to contain 'Please review this code'"
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_mcp_server(client: WeaveClient) -> None:
+    fastmcp = mcp_server()
+    
+    result = asyncio.run(fastmcp.call_tool("add", {"a": 1, "b": 2}))
+    resource = asyncio.run(fastmcp.read_resource("greeting://cw"))
+    prompt = asyncio.run(fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"}))
+
+    assert result[0].text == str(3)
+    assert resource[0].content == "Hello, cw!"
+    assert prompt.messages[0].content.text == "Please review this code:\\n\\nprint('Hello, world!')"
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 3
+
+    flattened_calls = flatten_calls(calls)
+    print(len(flattened_calls))
+    
+    call_0, _ = flattened_calls[0]
+    assert call_0._display_name == "FastMCP.call_tool"
+    inputs = call_0.inputs
+    assert inputs["name"] == "add"
+    assert inputs["arguments"]["a"] == 1
+    assert inputs["arguments"]["b"] == 2
+    assert call_0.started_at < call_0.ended_at
+
+    outputs = call_0.output[0]
+    assert outputs._class_name == "TextContent"
+    assert outputs.text == "3"   
+
+    call_1, _ = flattened_calls[1]
+    assert call_1._display_name == "add"
+    assert call_1.started_at < call_1.ended_at
+    
+    call_2, _ = flattened_calls[2]
+    assert call_2._display_name == "FastMCP.read_resource"
+    assert call_2.inputs["uri"] == "greeting://cw"
+    assert call_2.output[0].content == "Hello, cw!"
+    assert call_2.started_at < call_2.ended_at
+
+    call_3, _ = flattened_calls[3]
+    assert call_3._display_name == "get_greeting"
+    assert call_3.started_at < call_3.ended_at
+
+    call_4, _ = flattened_calls[4]
+    print(call_4)
+    assert call_4._display_name == "review_code"
+    assert call_4.inputs["code"] == "print('Hello, world!')"
+    assert call_4.output == "Please review this code:\\n\\nprint('Hello, world!')"
+    assert call_4.started_at < call_4.ended_at
