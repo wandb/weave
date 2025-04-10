@@ -22,7 +22,6 @@ import {
   getOperatorOptions,
   isValuelessOperator,
   UNFILTERABLE_FIELDS,
-  upsertFilter,
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';

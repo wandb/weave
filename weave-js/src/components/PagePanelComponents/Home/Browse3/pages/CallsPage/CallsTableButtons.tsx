@@ -1,5 +1,6 @@
 import {Box, Popover} from '@mui/material';
 import {
+  GridFilterItem,
   GridFilterModel,
   gridPageCountSelector,
   gridPageSelector,
@@ -8,7 +9,6 @@ import {
   GridSortModel,
   useGridApiContext,
   useGridSelector,
-  GridFilterItem,
 } from '@mui/x-data-grid-pro';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
@@ -24,10 +24,19 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState, useCallback} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
+import {upsertFilter} from '../../filters/common';
+import {getNextFilterId} from '../../filters/filterUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -37,8 +46,6 @@ import {
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
-import {getNextFilterId} from '../../filters/filterUtils';
-import {upsertFilter} from '../../filters/common';
 
 const MAX_EXPORT = 10_000;
 
@@ -551,7 +558,13 @@ export const FilterSelectedButton: FC<{
   setFilterModel: (newModel: GridFilterModel) => void;
   disabled?: boolean;
   clearSelectedCalls?: () => void;
-}> = ({selectedCalls, filterModel, setFilterModel, disabled, clearSelectedCalls}) => {
+}> = ({
+  selectedCalls,
+  filterModel,
+  setFilterModel,
+  disabled,
+  clearSelectedCalls,
+}) => {
   const onFilterSelected = useCallback(() => {
     if (selectedCalls.length === 0) {
       return;
@@ -571,7 +584,7 @@ export const FilterSelectedButton: FC<{
             operator: '(string): in',
             value: selectedCalls,
           };
-    
+
     const newModel = upsertFilter(
       filterModel,
       newFilter,
