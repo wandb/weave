@@ -58,6 +58,23 @@ def _can_optimize_datetime_field(field: str) -> bool:
     return field in DATETIME_FIELDS_TO_OPTIMIZE
 
 
+def process_conditions_to_fallback_sql(
+    operand: tsi_query.Operand, pb: "ParamBuilder", table_alias: str
+) -> str:
+    """Processes a condition and converts it to an un-optimized SQL string."""
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        process_query_to_conditions,
+        combine_conditions,
+    )
+
+    and_condition = tsi_query.Query.model_validate({"$expr": {"$and": [operand]}})
+    unoptimized_condition = process_query_to_conditions(
+        and_condition, pb, table_alias, use_agg_fn=False
+    )
+    sql_str = combine_conditions(unoptimized_condition.conditions, "AND")
+    return sql_str
+
+
 class QueryOptimizationProcessor(ABC):
     """
     Abstract base class for query optimization processors.
@@ -98,6 +115,13 @@ class QueryOptimizationProcessor(ABC):
             result = self.process_operand(op)
             if result:
                 conditions.append(result)
+            else:
+                unoptimized_fallback_sql = process_conditions_to_fallback_sql(
+                    op,
+                    self.pb,
+                    self.table_alias,
+                )
+                conditions.append(unoptimized_fallback_sql)
 
         if conditions:
             return "(" + " AND ".join(conditions) + ")"
@@ -113,12 +137,15 @@ class QueryOptimizationProcessor(ABC):
         conditions = []
         for op in operation.or_:
             result = self.process_operand(op)
-            if result is None:
-                # If any or condition can't be optimized, return
-                # TODO: this should return the non optimized,
-                # non aggreagated condition when available
-                return None
-            conditions.append(result)
+            if result:
+                conditions.append(result)
+            else:
+                unoptimized_fallback_sql = process_conditions_to_fallback_sql(
+                    op,
+                    self.pb,
+                    self.table_alias,
+                )
+                conditions.append(unoptimized_fallback_sql)
 
         if conditions:
             return "(" + " OR ".join(conditions) + ")"
