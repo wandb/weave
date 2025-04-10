@@ -40,6 +40,9 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -227,6 +230,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
         traces_data = [
             ResourceSpans.from_proto(span) for span in req.traces.resource_spans
         ]
@@ -362,6 +369,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in columns or req.include_costs:
+                columns += ["ended_at", "exception", "display_name"]
+
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
@@ -499,13 +512,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 continue
 
             with self.with_new_client():
+                # Filter out non-unique refs
+                unique_ref_map = {}
+                for ref in refs_to_resolve.values():
+                    if ref.uri() not in unique_ref_map:
+                        unique_ref_map[ref.uri()] = ref
+
+                # Fetch values only for the unique refs
                 vals = self._refs_read_batch_within_project(
-                    project_id, list(refs_to_resolve.values()), ref_cache
+                    project_id, list(unique_ref_map.values()), ref_cache
                 )
-            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
-                if isinstance(val, dict) and "_ref" not in val:
-                    val["_ref"] = ref.uri()
-                set_nested_key(calls[i], col, val)
+
+                # update the ref map with the fetched values
+                ref_val_map = {}
+                for ref, val in zip(unique_ref_map.values(), vals):
+                    ref_val_map[ref.uri()] = val
+
+                # Replace the refs with values and add ref key
+                for (i, col), ref in refs_to_resolve.items():
+                    # Look up the value using the ref's URI
+                    val = ref_val_map.get(ref.uri())
+                    if val is not None:
+                        if isinstance(val, dict) and "_ref" not in val:
+                            val["_ref"] = ref.uri()
+                        set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -2168,58 +2198,12 @@ def _ensure_datetimes_have_tz_strict(
     return res
 
 
-def _nullable_dict_dump_to_dict(
-    val: Optional[str],
-) -> Optional[dict[str, Any]]:
-    return _dict_dump_to_dict(val) if val else None
-
-
 def _nullable_any_dump_to_any(
     val: Optional[str],
 ) -> Optional[Any]:
     return _any_dump_to_any(val) if val else None
 
 
-def _raw_call_dict_to_ch_call(
-    call: dict[str, Any],
-) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
-
-
-def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
-    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
-    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
-    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
-    display_name = empty_str_to_none(ch_call.display_name)
-    return tsi.CallSchema(
-        project_id=ch_call.project_id,
-        id=ch_call.id,
-        trace_id=ch_call.trace_id,
-        parent_id=ch_call.parent_id,
-        op_name=ch_call.op_name,
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
-        output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_fields(
-            summary=summary or {},
-            op_name=ch_call.op_name,
-            started_at=started_at,
-            ended_at=ended_at,
-            exception=ch_call.exception,
-            display_name=display_name,
-        ),
-        exception=ch_call.exception,
-        wb_run_id=ch_call.wb_run_id,
-        wb_user_id=ch_call.wb_user_id,
-        display_name=display_name,
-        storage_size_bytes=ch_call.storage_size_bytes,
-        total_storage_size_bytes=ch_call.total_storage_size_bytes,
-    )
-
-
-# Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))

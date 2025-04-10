@@ -44,6 +44,7 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
+from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -1056,6 +1057,8 @@ def process_calls_filter_to_conditions(
     conditions: list[str] = []
 
     if filter.op_names:
+        assert_parameter_length_less_than_max("op_names", len(filter.op_names))
+
         # We will build up (0 or 1) + N conditions for the op_version_refs
         # If there are any non-wildcarded names, then we at least have an IN condition
         # If there are any wildcarded names, then we have a LIKE condition for each
@@ -1085,26 +1088,31 @@ def process_calls_filter_to_conditions(
             conditions.append(combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
+        assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
             f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
+        assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
             f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
+        assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.trace_ids:
+        assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
         conditions.append(
             f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
+        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )

@@ -112,6 +112,7 @@ export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
   'wb_run_id',
+  'attributes.otel_span',
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
@@ -362,6 +363,8 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
+  // TODO: Despite the name, this has changed to be slightly more sophisticated,
+  //       where it may replace or toggle a filter off. We should consider renaming.
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
@@ -376,6 +379,44 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+
+          // Check if there is an exact match for field, operator, and value in filterModel.items
+          // If an exact match exists, remove it instead of adding a duplicate.
+          const existingFullMatchIndex = filterModel.items.findIndex(
+            item =>
+              item.field === field &&
+              item.operator === op &&
+              JSON.stringify(item.value) === JSON.stringify(value)
+          );
+          if (existingFullMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems.splice(existingFullMatchIndex, 1);
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // Check if there is a match for field and operator in filterModel.items
+          // If a match exists, update the value instead of adding a new filter
+          const existingFieldOpMatchIndex = filterModel.items.findIndex(
+            item => item.field === field && item.operator === op
+          );
+          if (existingFieldOpMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems[existingFieldOpMatchIndex] = {
+              ...newItems[existingFieldOpMatchIndex],
+              value,
+            };
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // There is no match, add a new filter.
           const newModel = {
             ...filterModel,
             items: [
@@ -662,23 +703,6 @@ export const CallsTable: FC<{
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
 
-  // Replace the state and effect with a single memo
-  const selectedCallObjects = useMemo(() => {
-    if (!callsResult) {
-      return [];
-    }
-    return callsResult
-      .filter(
-        call =>
-          call?.traceCall?.id != null &&
-          selectedCalls.includes(call.traceCall.id)
-      )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
-  }, [callsResult, selectedCalls]);
-
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
     ? (newModel: GridColumnVisibilityModel) => {
@@ -837,7 +861,7 @@ export const CallsTable: FC<{
                       project={project}
                       open={addToDatasetModalOpen}
                       onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCalls={selectedCallObjects}
+                      selectedCallIds={selectedCalls}
                     />
                   </div>
                   <div className="flex-none">

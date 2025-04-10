@@ -11,6 +11,9 @@ from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -28,8 +31,10 @@ from weave.trace_server.feedback import (
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    assert_parameter_length_less_than_max,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
@@ -265,6 +270,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         filter = req.filter
         if filter:
             if filter.op_names:
+                assert_parameter_length_less_than_max("op_names", len(filter.op_names))
                 or_conditions: list[str] = []
 
                 non_wildcarded_names: list[str] = []
@@ -287,22 +293,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
             if filter.input_refs:
+                assert_parameter_length_less_than_max(
+                    "input_refs", len(filter.input_refs)
+                )
                 or_conditions = []
                 for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_refs:
+                assert_parameter_length_less_than_max(
+                    "output_refs", len(filter.output_refs)
+                )
                 or_conditions = []
                 for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
+                assert_parameter_length_less_than_max(
+                    "parent_ids", len(filter.parent_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
+                assert_parameter_length_less_than_max(
+                    "trace_ids", len(filter.trace_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
+                assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
                 in_expr = ", ".join(f"'{x}'" for x in filter.call_ids)
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
@@ -410,6 +429,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
+            if "summary" in simple_columns or req.include_costs:
+                simple_columns += ["ended_at", "exception", "display_name"]
+
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
             select_columns += [
@@ -1346,7 +1368,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CompletionsCreateRes()
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
 
         traces_data = [
             ResourceSpans.from_proto(span) for span in req.traces.resource_spans
