@@ -1,5 +1,6 @@
 import {computePosition, flip, offset, shift} from '@floating-ui/react';
 import {useIsMounted} from '@wandb/weave/common/util/hooks';
+import {makeEventRecorder} from '@wandb/weave/components/Panel2/panellib/libanalytics';
 import {
   AutosuggestResult,
   Parser,
@@ -25,6 +26,7 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
+const recordEvent = makeEventRecorder('Expression');
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -154,6 +156,7 @@ export const useWeaveExpressionState = (
   const onFocus = React.useCallback(() => {
     setIsFocused(true);
     propsOnFocus?.();
+    recordEvent('EDITOR_FOCUS');
   }, [setIsFocused, propsOnFocus]);
 
   // Internal state should never be reinstantiated, but props will change

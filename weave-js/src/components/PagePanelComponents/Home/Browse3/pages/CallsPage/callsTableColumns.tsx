@@ -47,7 +47,7 @@ import {
 } from '../CallPage/cost';
 import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
-import {StatusChip} from '../common/StatusChip';
+import {STATUS_TO_FILTER, StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -340,10 +340,19 @@ function buildCallsTableColumns(
         return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
+        const valueStatus = traceCallStatusCode(cellParams.row);
+        const valueFilter = STATUS_TO_FILTER[valueStatus];
         return (
-          <div style={{margin: 'auto'}}>
-            <StatusChip value={traceCallStatusCode(cellParams.row)} iconOnly />
-          </div>
+          <CellFilterWrapper
+            onAddFilter={onAddFilter}
+            field="summary.weave.status"
+            rowId={cellParams.id.toString()}
+            operation={'(string): in'}
+            value={valueFilter}>
+            <div style={{margin: 'auto'}}>
+              <StatusChip value={valueStatus} iconOnly />
+            </div>
+          </CellFilterWrapper>
         );
       },
     },

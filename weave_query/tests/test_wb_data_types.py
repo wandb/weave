@@ -253,10 +253,6 @@ def make_wb_image(use_middle=False, use_pixels=False):
 
 
 def make_table():
-    image_with_caption = wandb.Image(
-        make_wb_image(False, False),
-        caption="This is a caption",
-    )
     return wandb.Table(
         columns=["label", "image"],
         data=[
@@ -264,7 +260,7 @@ def make_table():
             ["b", make_wb_image(False, True)],
             ["c", make_wb_image(True, False)],
             ["d", make_wb_image(True, True)],
-            ["e", image_with_caption],
+            ["e", wandb.Image(make_np_image(), caption="This is a caption")],
         ],
     )
 
@@ -500,8 +496,8 @@ def exp_raw_data(commit_hash: str):
                 "height": 128,
                 "width": 128,
                 "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
-                "boxes": {"box_set_1": None, "box_set_2": None},  # not copied
-                "masks": {"mask_set_1": None},  # not copied
+                "boxes": {"box_set_1": None, "box_set_2": None},
+                "masks": {"mask_set_1": None},
                 "caption": "This is a caption",
             },
         },
