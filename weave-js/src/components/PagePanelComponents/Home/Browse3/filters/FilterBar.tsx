@@ -48,6 +48,8 @@ type FilterBarProps = {
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
   return (
     filter.field === undefined ||
+    // Empty string is never valid
+    filter.value === '' ||
     (filter.value === undefined && !isValuelessOperator(filter.operator))
   );
 };
@@ -175,20 +177,20 @@ export const FilterBar = ({
     [localFilterModel]
   );
 
-  const debouncedSetFilterModel = useMemo(
-    () =>
-      _.debounce(
-        (newModel: GridFilterModel) => setFilterModel(newModel),
-        DEBOUNCE_MS
-      ),
+  // Only send complete filters to the parent component
+  const applyCompletedFilters = useCallback(
+    (model: GridFilterModel) => {
+      const completeFilters = model.items.filter(
+        item => !isFilterIncomplete(item)
+      );
+      setFilterModel({...model, items: completeFilters});
+    },
     [setFilterModel]
   );
-  const updateLocalAndDebouncedFilterModel = useCallback(
-    (newModel: GridFilterModel) => {
-      setLocalFilterModel(newModel);
-      debouncedSetFilterModel(newModel);
-    },
-    [debouncedSetFilterModel]
+
+  const debouncedSetFilterModel = useMemo(
+    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
+    [applyCompletedFilters]
   );
 
   const onUpdateFilter = useCallback(
@@ -201,7 +203,11 @@ export const FilterBar = ({
 
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
-        updateLocalAndDebouncedFilterModel(newModel);
+        setLocalFilterModel(newModel);
+        // Only trigger debounced update if the filter is complete
+        if (!isFilterIncomplete(item)) {
+          debouncedSetFilterModel(newModel);
+        }
         return;
       }
 
@@ -211,9 +217,13 @@ export const FilterBar = ({
         ...oldItems.slice(index + 1),
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
-      updateLocalAndDebouncedFilterModel(newItemsModel);
+      setLocalFilterModel(newItemsModel);
+      // Only trigger debounced update if the filter is complete
+      if (!isFilterIncomplete(item)) {
+        debouncedSetFilterModel(newItemsModel);
+      }
     },
-    [localFilterModel, updateLocalAndDebouncedFilterModel]
+    [localFilterModel, debouncedSetFilterModel]
   );
 
   const onRemoveFilter = useCallback(
@@ -221,7 +231,12 @@ export const FilterBar = ({
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
-      setFilterModel(newModel);
+
+      // Apply filter removal immediately since this is a deliberate user action
+      const completeFilterItems = items.filter(
+        item => !isFilterIncomplete(item)
+      );
+      setFilterModel({...localFilterModel, items: completeFilterItems});
 
       // Clear active edit if removed
       if (activeEditId === filterId) {
@@ -251,7 +266,16 @@ export const FilterBar = ({
       newFilter,
       f => f.field === 'id'
     );
-    setFilterModel(newModel);
+
+    // Apply filter immediately (won't be incomplete)
+    setLocalFilterModel(newModel);
+
+    // Use the consistent filter application
+    const completeFilters = newModel.items.filter(
+      item => !isFilterIncomplete(item)
+    );
+    setFilterModel({...newModel, items: completeFilters});
+
     clearSelectedCalls();
     setAnchorEl(null);
 
