@@ -1,11 +1,10 @@
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import _, {property} from 'lodash';
+import _ from 'lodash';
 import React from 'react';
 import {Input} from 'semantic-ui-react';
 
-import clamp from '../../util/clamp';
 import {Button} from '../../../components/Button';
-import {TextField} from '../../../components/Form/TextField';
+import clamp from '../../util/clamp';
 
 interface NumberInputProps {
   className?: string;
