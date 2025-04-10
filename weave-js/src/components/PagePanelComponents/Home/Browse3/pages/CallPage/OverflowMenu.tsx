@@ -76,10 +76,7 @@ export const OverflowMenu: FC<{
         project={selectedCalls[0]?.project ?? ''}
         open={addToDatasetModalOpen}
         onClose={() => setAddToDatasetModalOpen(false)}
-        selectedCalls={selectedCalls.map(call => ({
-          digest: call.callId,
-          val: call.traceCall!,
-        }))}
+        selectedCallIds={selectedCalls.map(call => call.callId)}
       />
       <PopupDropdown
         sections={menuOptions}

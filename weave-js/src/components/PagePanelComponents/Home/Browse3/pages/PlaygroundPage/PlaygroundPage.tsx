@@ -155,6 +155,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           project={props.project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
+          isOpenInPlayground={!!call.result}
         />
       )}
       {settingsTab !== null && (

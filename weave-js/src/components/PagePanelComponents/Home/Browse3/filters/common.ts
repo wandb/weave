@@ -33,7 +33,6 @@ export type FilterId = number | string | undefined;
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
   'feedback',
-  'summary.weave.status',
   'summary.weave.latency_ms',
   'summary.weave.trace_name',
   'tokens',
@@ -49,6 +48,7 @@ export type ColumnInfo = {
 
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
+  'summary.weave.status': 'Status',
   started_at: 'Called',
   wb_user_id: 'User',
 };
@@ -262,14 +262,9 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
   if ('status' === fieldType) {
     return [
       {
-        value: 'is',
-        label: 'is',
-        group: 'boolean',
-      },
-      {
-        value: 'is not',
-        label: 'is not',
-        group: 'boolean',
+        value: '(string): in',
+        label: 'in',
+        group: 'string',
       },
     ];
   }

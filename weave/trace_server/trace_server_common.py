@@ -212,3 +212,15 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
         return (True, int(digest[1:]))
     except ValueError:
         return (False, -1)
+
+
+MAX_FILTER_LENGTH = 1000
+
+
+def assert_parameter_length_less_than_max(
+    param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH
+) -> None:
+    if arr_len > max_length:
+        raise ValueError(
+            f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
+        )
