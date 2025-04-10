@@ -36,13 +36,13 @@ requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
-  "wandb>=0.17.1", 
+  "wandb>=0.17.1",
   "packaging>=21.0",                  # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",          # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",                    # For emoji shortcode support in Feedback
   "uuid-utils>=0.9.0",                # Used for ID generation - remove once python's built-in uuid supports UUIDv7
   "numpy>1.21.0",                     # Used in box.py and scorer.py (should be made optional)
-  "rich",                             # Used for special formatting of tables (should be made optional) 
+  "rich",                             # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",            # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",               # Used by scorers for field validation
   "diskcache==5.6.3",                 # Used for data caching
@@ -84,7 +84,8 @@ docs = ["playwright", "lazydocs", "nbformat", "nbconvert", "weave[trace_server]"
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
-crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
+# Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
+crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=2.6.3", "litellm<=1.61.6"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
