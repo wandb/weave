@@ -83,8 +83,8 @@ from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
     FileStorageWriteError,
-    get_storage_client_from_env,
     key_for_project_digest,
+    maybe_get_storage_client_from_env,
     read_from_bucket,
     store_in_bucket,
 )
@@ -234,7 +234,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def file_storage_client(self) -> Optional[FileStorageClient]:
         if self._file_storage_client is not None:
             return self._file_storage_client
-        self._file_storage_client = get_storage_client_from_env()
+        self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
