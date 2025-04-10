@@ -1,11 +1,8 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+import tempfile
+import os
 
-import httpx
 import pytest
-from openai.types.chat.chat_completion import ChatCompletion, Choice
-from openai.types.chat.chat_completion_message import ChatCompletionMessage
-from pydantic import AnyUrl, BaseModel
 
 from weave.integrations.integration_utilities import (
     flatten_calls,
@@ -14,298 +11,74 @@ from weave.integrations.integration_utilities import (
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
-try:
-    from mcp.server.fastmcp import FastMCP
-    from mcp.types import TextContent
-except ImportError:
-    pytest.skip("mcp not installed", allow_module_level=True)
+from mcp.server.fastmcp import FastMCP
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
+def mcp_server():
+    mcp = FastMCP("Demo")
 
-class MockStdioTransport:
-    """Mock stdio transport for testing MCP server."""
-
-    def __init__(self):
-        self.stdin = asyncio.Queue()
-        self.stdout = asyncio.Queue()
-
-    async def read(self):
-        return await self.stdin.get()
-
-    async def write(self, data):
-        await self.stdout.put(data)
-
-
-class MockMCPClient:
-    """Mock MCP client for testing."""
-
-    def __init__(self):
-        self.transport = MockStdioTransport()
-        self.session = MagicMock()
-        self.tools_called = []
-        self.resources_accessed = []
-        self.tool_handlers = {}
-        self.resource_handlers = {}
-
-    async def connect_to_server(self, server):
-        """Connect to the mocked server."""
-        self.server = server
-
-        # Store all tool and resource handlers for direct access
-        self.tool_handlers = {}
-        self.resource_handlers = {}
-
-        # Need to await these methods as they're coroutines
-        tools_response = await server.list_tools()
-        resources_response = await server.list_resources()
-        prompts_response = await server.list_prompts()
-
-        # Mock the session methods to return these responses
-        self.session.list_tools = AsyncMock(return_value=tools_response)
-        self.session.list_resources = AsyncMock(return_value=resources_response)
-        self.session.list_prompts = AsyncMock(return_value=prompts_response)
-
-        return True
-
-    async def list_tools(self):
-        """List available tools."""
-        return await self.session.list_tools()
-
-    async def call_tool(self, tool_name, **kwargs):
-        """Call a tool on the server."""
-        self.tools_called.append((tool_name, kwargs))
-
-        # In FastMCP we need to use server.call_tool
-        result = await self.server.call_tool(name=tool_name, arguments=kwargs)
-
-        # Format primitive responses as TextContent objects for consistency
-        if isinstance(result, (str, int, float, bool)):
-            return [TextContent(type="text", text=str(result))]
-        return result
-
-    async def read_resource(self, uri):
-        """Read a resource from the server."""
-        self.resources_accessed.append(uri)
-
-        # Use server.read_resource with the URI
-        try:
-            # Use AnyUrl to match what the real client would do
-            result = await self.server.read_resource(AnyUrl(uri))
-        except Exception as e:
-            raise ValueError(f"Unknown resource URI: {uri}")
-        else:
-            return result
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-async def test_mcp_fastmcp(client: WeaveClient) -> None:
-    """Test the MCP FastMCP server implementation and verify patching."""
-    # Create a mock FastMCP server
-    mcp = FastMCP("Test")
-
-    # Add an addition tool
     @mcp.tool()
     def add(a: int, b: int) -> int:
-        """Add two numbers"""
         return a + b
-
-    # Add a dynamic greeting resource
+    
     @mcp.resource("greeting://{name}")
     def get_greeting(name: str) -> str:
-        """Get a personalized greeting"""
         return f"Hello, {name}!"
+    
+    @mcp.prompt()
+    def review_code(code: str) -> str:
+        return f"Please review this code:\\n\\n{code}"
+    
+    return mcp
 
-    @mcp.resource("config://app")
-    def get_config() -> str:
-        """Static configuration data"""
-        return "App configuration here"
 
-    @mcp.resource("users://{user_id}/profile")
-    def get_user_profile(user_id: str) -> str:
-        """Dynamic user data"""
-        return f"Profile data for user {user_id}"
+async def run_client():
+    """Run the client and connect to the MCP server"""
+    # Configure the server parameters
+    server_params = StdioServerParameters(
+        command="python",  # Executable
+        args=["-c", "from integrations.mcp.mcp_test import mcp_server; mcp_server().run()"],  # Optional command line arguments
+        env=None,  # Optional environment variables
+    )
 
-    @mcp.tool()
-    def calculate_bmi(weight_kg: float, height_m: float) -> float:
-        """Calculate BMI given weight in kg and height in meters"""
-        return weight_kg / (height_m**2)
+    # Connect to the server using stdio
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            # Initialize the connection
+            print("Initializing connection...")
+            await session.initialize()
+            print("Connection initialized successfully!")
 
-    # Mock the fetch_weather function to avoid external API calls
-    @mcp.tool()
-    async def fetch_weather(city: str) -> str:
-        """Fetch current weather for a city (mocked)"""
-        return f"Weather forecast for {city}: Sunny, 25°C"
+            # List available tools
+            tools = await session.list_tools()
+            print(f"Available tools: {[tool.name for tool in tools.tools]}")
 
-    # Mock OpenAI responses
-    class MockOpenAI:
-        def __init__(self, *args, **kwargs):
-            pass
+            # List resources
+            resources = await session.list_resources()
+            print(f"Available resources: {[resource.name for resource in resources.resources]}")
 
-        class chat:
-            @staticmethod
-            def completions():
-                pass
+            # List prompts
+            prompts = await session.list_prompts()
+            print(f"Available prompts: {[prompt.name for prompt in prompts.prompts]}")
 
-            @classmethod
-            def create(cls, *args, **kwargs):
-                mock_completion = MagicMock(spec=ChatCompletion)
-                mock_choice = MagicMock(spec=Choice)
-                mock_message = MagicMock(spec=ChatCompletionMessage)
-                mock_message.content = "Mocked weather report"
-                mock_choice.message = mock_message
-                mock_completion.choices = [mock_choice]
-                return mock_completion
+            # Call the add tool
+            result = await session.call_tool("add", arguments={"a": 1, "b": 2})
+            print(f"Result of add(1, 2): {result}")
 
-        class beta:
-            class chat:
-                class completions:
-                    @staticmethod
-                    def parse(*args, **kwargs):
-                        mock_completion = MagicMock(spec=ChatCompletion)
-                        mock_choice = MagicMock(spec=Choice)
-                        mock_message = MagicMock()
+            # Get a resource    
+            resource = await session.read_resource("greeting://cw")
+            print(f"Resource: {resource}")
 
-                        class StationNameResponse(BaseModel):
-                            station_name: str = "Mocked Station"
+            # Generate a prompt
+            prompt = await session.get_prompt("review_code", arguments={"code": "print('Hello, world!')"})
+            print(f"Prompt: {prompt}")
 
-                        mock_message.parsed = StationNameResponse()
-                        mock_choice.message = mock_message
-                        mock_completion.choices = [mock_choice]
-                        return mock_completion
 
-    # Create a client to test with
-    mock_client = MockMCPClient()
-
-    # Test connecting to the server
-    await mock_client.connect_to_server(mcp)
-
-    # Test tool calls
-    with patch.object(
-        mcp, "call_tool", return_value=[TextContent(type="text", text="8")]
-    ):
-        add_result = await mock_client.call_tool("add", a=5, b=3)
-        assert isinstance(add_result, list) and len(add_result) > 0
-        assert hasattr(add_result[0], "text")
-        assert add_result[0].text == "8"
-
-    with patch.object(
-        mcp, "call_tool", return_value=[TextContent(type="text", text="22.86")]
-    ):
-        bmi_result = await mock_client.call_tool(
-            "calculate_bmi", weight_kg=70.0, height_m=1.75
-        )
-        assert isinstance(bmi_result, list) and len(bmi_result) > 0
-        assert hasattr(bmi_result[0], "text")
-        assert float(bmi_result[0].text) == pytest.approx(22.86, 0.01)
-
-    # Test resources
-    with patch.object(
-        mcp,
-        "read_resource",
-        return_value=[TextContent(type="text", text="Hello, Alice!")],
-    ):
-        greeting = await mock_client.read_resource("greeting://Alice")
-        assert isinstance(greeting, list) and len(greeting) > 0
-        assert hasattr(greeting[0], "text")
-        assert greeting[0].text == "Hello, Alice!"
-
-    with patch.object(
-        mcp,
-        "read_resource",
-        return_value=[TextContent(type="text", text="App configuration here")],
-    ):
-        config = await mock_client.read_resource("config://app")
-        assert isinstance(config, list) and len(config) > 0
-        assert hasattr(config[0], "text")
-        assert config[0].text == "App configuration here"
-
-    with patch.object(
-        mcp,
-        "read_resource",
-        return_value=[TextContent(type="text", text="Profile data for user 12345")],
-    ):
-        user_profile = await mock_client.read_resource("users://12345/profile")
-        assert isinstance(user_profile, list) and len(user_profile) > 0
-        assert hasattr(user_profile[0], "text")
-        assert user_profile[0].text == "Profile data for user 12345"
-
-    # Test async weather tool with mocked external dependencies
-    with patch("openai.OpenAI", MockOpenAI):
-        with patch.object(httpx, "AsyncClient") as mock_http_client:
-            mock_response = MagicMock()
-            mock_response.json.return_value = {
-                "features": [
-                    {"properties": {"name": "Mocked Station"}, "id": "station/123"}
-                ]
-            }
-            mock_http_client.return_value.__aenter__.return_value.get.return_value = (
-                mock_response
-            )
-
-            with patch.object(
-                mcp,
-                "call_tool",
-                return_value=[
-                    TextContent(
-                        type="text", text="Weather forecast for New York: Sunny, 25°C"
-                    )
-                ],
-            ):
-                weather_result = await mock_client.call_tool(
-                    "fetch_weather", city="New York"
-                )
-                assert isinstance(weather_result, list) and len(weather_result) > 0
-                assert hasattr(weather_result[0], "text")
-                assert "Weather forecast for New York" in weather_result[0].text
-
-    # Verify the calls were traced by examining the trace data
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-
-    # Check for patched MCP server calls
-    call_names = flattened_calls_to_names(flattened_calls)
-
-    # There should be multiple traced calls from our testing
-    assert len(call_names) > 0
-
-    # Verify that our mcp.server operations are being traced
-    server_calls = [name for name, _ in call_names if "mcp.server" in name]
-    assert len(server_calls) > 0
-
-    # Verify that tool and resource operations were traced
-    expected_operations = [
-        "mcp.server.fastmcp.FastMCP.list_tools",
-        "mcp.server.fastmcp.FastMCP.list_resources",
-        "mcp.server.fastmcp.FastMCP.list_prompts",
-        "mcp.server.fastmcp.FastMCP.call_tool",
-        "mcp.server.fastmcp.FastMCP.read_resource",
-    ]
-
-    # Check that at least some of the expected operations were traced
-    found_operations = set()
-    for call_name, _ in call_names:
-        for expected_op in expected_operations:
-            if expected_op in call_name:
-                found_operations.add(expected_op)
-
-    # Assert that we found at least some of the expected operations
-    assert (
-        len(found_operations) > 0
-    ), f"Expected to find some of {expected_operations} in {call_names}"
-
-    # Ensure all expected tools were called
-    called_tools = [tool_name for tool_name, _ in mock_client.tools_called]
-    assert "add" in called_tools
-    assert "calculate_bmi" in called_tools
-
-    # Verify resource access
-    assert "greeting://Alice" in mock_client.resources_accessed
-    assert "config://app" in mock_client.resources_accessed
-    assert "users://12345/profile" in mock_client.resources_accessed
+def main():
+    """Main entry point"""
+    
+    asyncio.run(run_client())
 
 
 @pytest.mark.skip_clickhouse_client
@@ -313,6 +86,43 @@ async def test_mcp_fastmcp(client: WeaveClient) -> None:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_mcp_fastmcp_sync(client: WeaveClient) -> None:
-    """Run the async test in a synchronous context."""
-    asyncio.run(test_mcp_fastmcp(client))
+def test_mcp_client(client: WeaveClient) -> None:
+    main()
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 3
+
+    flattened_calls = flatten_calls(calls)
+    print("flattened_calls", flattened_calls)
+    flattened_call_names = flattened_calls_to_names(flattened_calls)
+    print("flattened_call_names", flattened_call_names)
+    
+    # Extract just the call names from the tuples (name, index)
+    call_names = [name for name, _ in flattened_call_names]
+    
+    # Assert the expected call methods are present
+    expected_call_names = [
+        "mcp.client.session.ClientSession.call_tool.add",
+        "mcp.client.session.ClientSession.read_resource",
+        "mcp.client.session.ClientSession.get_prompt.review_code"
+    ]
+    
+    for name in expected_call_names:
+        assert any(name in call_name for call_name in call_names), f"Expected call {name} not found in calls"
+    
+    # Assert data within the calls
+    call_tool_call = next(call for call, _ in flattened_calls if "call_tool.add" in call.op_name)
+    print("call_tool_call", call_tool_call)
+    
+    # Access WeaveObject properties directly using attribute notation
+    # The output appears to be another WeaveObject that wraps the data
+    text_content = call_tool_call.output.content[0].text
+    assert text_content == '3', "Expected add(1, 2) to return 3"
+    
+    resource_call = next(call for call, _ in flattened_calls if "read_resource" in call.op_name)
+    text_content = resource_call.output.contents[0].text
+    assert text_content == 'Hello, cw!', "Expected greeting to be 'Hello, cw!'"
+    
+    prompt_call = next(call for call, _ in flattened_calls if "get_prompt.review_code" in call.op_name)
+    prompt_text = prompt_call.output.messages[0].content.text
+    assert "Please review this code" in prompt_text, "Expected prompt to contain 'Please review this code'"
