@@ -1,0 +1,882 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      host:
+      - raw.githubusercontent.com
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - max-age=300
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Length:
+      - '18506'
+      Content-Security-Policy:
+      - default-src 'none'; style-src 'unsafe-inline'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Cross-Origin-Resource-Policy:
+      - cross-origin
+      Date:
+      - Mon, 24 Mar 2025 05:55:07 GMT
+      ETag:
+      - W/"17e7a912b0c222535b10a527d5db451f6102c0cd41246e1eae49cb556dc9e318"
+      Expires:
+      - Mon, 24 Mar 2025 06:00:07 GMT
+      Source-Age:
+      - '74'
+      Strict-Transport-Security:
+      - max-age=31536000
+      Vary:
+      - Authorization,Accept-Encoding,Origin
+      Via:
+      - 1.1 varnish
+      X-Cache:
+      - HIT
+      X-Cache-Hits:
+      - '1'
+      X-Content-Type-Options:
+      - nosniff
+      X-Fastly-Request-ID:
+      - 57cf4682b558b59302a5aee5926934184837f4b4
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - DC51:08DA:2D7D9C:7E078E:67E0A7CF
+      X-Served-By:
+      - cache-ccu830046-CCU
+      X-Timer:
+      - S1742795708.818426,VS0,VE1
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools:\n- web_search: Performs a duckduckgo web search based on your
+      query (think a Google search) then returns the top search results.\n    Takes
+      inputs: {''query'': {''type'': ''string'', ''description'': ''The search query
+      to perform.''}}\n    Returns an output of type: string\n- final_answer: Provides
+      a final answer to the given problem.\n    Takes inputs: {''answer'': {''type'':
+      ''any'', ''description'': ''The final answer to the problem''}}\n    Returns
+      an output of type: any\n\nHere are the rules you should always follow to solve
+      your task:\n1. Always provide a ''Thought:'' sequence, and a ''Code:\\n```py''
+      sequence ending with ''```<end_code>'' sequence, else you will fail.\n2. Use
+      only variables that you have defined!\n3. Always use the right arguments for
+      the tools. DO NOT pass the arguments as a dict as in ''answer = wiki({''query'':
+      \"What is the place where James Bond lives?\"})'', but use the arguments directly
+      as in ''answer = wiki(query=\"What is the place where James Bond lives?\")''.\n4.
+      Take care to not chain too many sequential tool calls in the same code block,
+      especially when the output format is unpredictable. For instance, a call to
+      search has an unpredictable return format, so do not have another tool call
+      that depends on its output in the same block: rather output results with print()
+      to use them in the next block.\n5. Call a tool only when needed, and never re-do
+      a tool call that you previously did with the exact same parameters.\n6. Don''t
+      name any new variable with the same name as a tool: for instance don''t name
+      a variable ''final_answer''.\n7. Never create any notional variables in our
+      code, as having these in your logs will derail you from the true variables.\n8.
+      You can use imports in your code, but only from the following list of modules:
+      [''collections'', ''datetime'', ''itertools'', ''math'', ''queue'', ''random'',
+      ''re'', ''stat'', ''statistics'', ''time'', ''unicodedata'']\n9. The state persists
+      between code executions: so if in one step you''ve created variables or imported
+      modules, these will all persist.\n10. Don''t give up! You''re in charge of solving
+      the task, not providing directions to solve it.\n\nNow Begin! If you solve the
+      task correctly, you will receive a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]}],"model":"gpt-4o","stop":["<end_code>","Observation:","Calling
+      tools:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '9012'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.67.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.67.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.13.2
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//dFRNj9s2EL37Vwx4SgB7ofV6vwzk0BRps4DbQ7ApisaBTZMjiS3FYciR
+        FSXY/16QclbaJHsRRD7Om/dmOPw6AxBGizUIVUtWjbeL12/+Wt102OHf+k73Wr1Z/rlqu4t/Npdf
+        fluKeYqgw7+o+FvUmaLGW2RDboBVQMmYWM+vV8vr28vr4iYDDWm0KazyvFjRYlksV4viZlFcnQJr
+        MgqjWMOHGQDA1/xNEp3Gz2INxfzbToMxygrF+vEQgAhk046QMZrI0rGYj6Aix+iy6vua2qrmNdwT
+        VMjANQIbtghU5kWHBy8rBDlg0aMypUEN799t5nAHnbEWHKIGJvAYSgoNyBQGEWVQ9RyOJhqeks1B
+        Og34mYNU05RtNK6Ct/d/bMDLkBeMqnbmU4vxDN5Sh0cMc1BtCOjY9klALY8I5GyfifYdHnZD4j0w
+        kQV5lMbKg0UoKUBADgaPiVpLlsB1SAWY6E2ZTrYiy8Bw6E9ICkockzqop8XKlRpcpGVljuiGQmH6
+        41zsZ3Q2pqoZHDGUyKoGCdoEVAwUvs9WBmoyy/t3mzPYuq3bIEOD4AOp1IpU3ogIpgTpes7Ka7S+
+        bC3EmroIrR9ZRu8gD9SmjpiYuRP1r6RxvXX7/d73W3fq4M64kuAVjC5efGox9K+24nVrrE4JJfyO
+        7pe7xXAFk6qWqZFsFESm0IOxto0cJCeHhnHdSacPZ9Jsxcut88E4fjHN9zKrmF7kgGUbZZoj11o7
+        AaRzxDLNYR6hjyfk4XFoLFU+0CF+FypK40ysdwFlJJcGJDJ5kdGHGcDHPJztk3kTPlDjecf0H+Z0
+        y+LqYiAU43swwuerqxPKxNJO4pbF7fwnlDuNLI2NkwkXSqoa9TTn6ubRhGy1oRErZhPvP0r6Gf3g
+        37hqwvIs/QgohZ5R73xAbdRT2+OxgOnNfO7YY62zYBExHI3CHRsMqR8aS9na4TkTsY+Mza40rsKQ
+        L0w6UvrdbaEvLtT5pV6J2cPsfwAAAP//AwDKQa6u3AUAAA==
+    headers:
+      CF-RAY:
+      - 9253eaf9bb363ab7-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Mar 2025 05:55:10 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=4D4lGQEjJNJyBAAlubL2Wu.NUFJOIzFg6WLxdc.QKSI-1742795710-1.0.1.1-6lX32.mI0G43TTPXTi9hr07frGDPWxSstKN83NSmDBnoMfuptKFbi93IHbTv2aNgCvowQGXDUQAm_dwS._PoOlkH9kCKuWYv3vhoFsGnJ.U;
+        path=/; expires=Mon, 24-Mar-25 06:25:10 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=GU1rkUgl7i0OsROimsRGJsvz78biCfqpiMgcTzfbACI-1742795710599-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1887'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '149997850'
+      x-ratelimit-reset-requests:
+      - 1ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_1babda518040d06bca10d282ea00d622
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "{\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You
+      are an expert assistant who can solve any task using code blobs. You will be
+      given a task to solve as best you can.\\nTo do so, you have been given access
+      to a list of tools: these tools are basically Python functions which you can
+      call with code.\\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of 'Thought:', 'Code:', and 'Observation:' sequences.\\n\\nAt
+      each step, in the 'Thought:' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\\nThen in the 'Code:'
+      sequence, you should write the code in simple Python. The code sequence must
+      end with '<end_code>' sequence.\\nDuring each intermediate step, you can use
+      'print()' to save whatever important information you will then need.\\nThese
+      print outputs will then appear in the 'Observation:' field, which will be available
+      as input for the next step.\\nIn the end you have to return a final answer using
+      the `final_answer` tool.\\n\\nHere are a few examples using notional tools:\\n---\\nTask:
+      \\\"Generate an image of the oldest person in this document.\\\"\\n\\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\\nCode:\\n```py\\nanswer = document_qa(document=document,
+      question=\\\"Who is the oldest person mentioned?\\\")\\nprint(answer)\\n```<end_code>\\nObservation:
+      \\\"The oldest person in the document is John Doe, a 55 year old lumberjack
+      living in Newfoundland.\\\"\\n\\nThought: I will now generate an image showcasing
+      the oldest person.\\nCode:\\n```py\\nimage = image_generator(\\\"A portrait
+      of John Doe, a 55-year-old man living in Canada.\\\")\\nfinal_answer(image)\\n```<end_code>\\n\\n---\\nTask:
+      \\\"What is the result of the following operation: 5 + 3 + 1294.678?\\\"\\n\\nThought:
+      I will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\\nCode:\\n```py\\nresult = 5
+      + 3 + 1294.678\\nfinal_answer(result)\\n```<end_code>\\n\\n---\\nTask:\\n\\\"Answer
+      the question in the variable `question` about the image stored in the variable
+      `image`. The question is in French.\\nYou have been provided with these additional
+      arguments, that you can access using the keys as variables in your python code:\\n{'question':
+      'Quel est l'animal sur l'image?', 'image': 'path/to/image.jpg'}\\\"\\n\\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\\nCode:\\n```py\\ntranslated_question
+      = translator(question=question, src_lang=\\\"French\\\", tgt_lang=\\\"English\\\")\\nprint(f\\\"The
+      translated question is {translated_question}.\\\")\\nanswer = image_qa(image=image,
+      question=translated_question)\\nfinal_answer(f\\\"The answer is {answer}\\\")\\n```<end_code>\\n\\n---\\nTask:\\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\\nWhat does he say was
+      the consequence of Einstein learning too much math on his creativity, in one
+      word?\\n\\nThought: I need to find and read the 1979 interview of Stanislaus
+      Ulam with Martin Sherwin.\\nCode:\\n```py\\npages = search(query=\\\"1979 interview
+      Stanislaus Ulam Martin Sherwin physicists Einstein\\\")\\nprint(pages)\\n```<end_code>\\nObservation:\\nNo
+      result found for query \\\"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\\\".\\n\\nThought: The query was maybe too restrictive and did not
+      find any results. Let's try again with a broader query.\\nCode:\\n```py\\npages
+      = search(query=\\\"1979 interview Stanislaus Ulam\\\")\\nprint(pages)\\n```<end_code>\\nObservation:\\nFound
+      6 pages:\\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\\n\\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\\n\\n(truncated)\\n\\nThought:
+      I will read the first 2 pages to know more.\\nCode:\\n```py\\nfor url in [\\\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\\\",
+      \\\"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\\\"]:\\n
+      \   whole_page = visit_webpage(url)\\n    print(whole_page)\\n    print(\\\"\\\\n\\\"
+      + \\\"=\\\"*80 + \\\"\\\\n\\\")  # Print separator between pages\\n```<end_code>\\nObservation:\\nManhattan
+      Project Locations:\\nLos Alamos, NM\\nStanislaus Ulam was a Polish-American
+      mathematician. He worked on the Manhattan Project at Los Alamos and later helped
+      design the hydrogen bomb. In this interview, he discusses his work at\\n(truncated)\\n\\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \\\"He learned too much mathematics and sort of diminished, it
+      seems to me personally, it seems to me his purely physics creativity.\\\" Let's
+      answer in one word.\\nCode:\\n```py\\nfinal_answer(\\\"diminished\\\")\\n```<end_code>\\n\\n---\\nTask:
+      \\\"Which city has the highest population: Guangzhou or Shanghai?\\\"\\n\\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\\nCode:\\n```py\\nfor city
+      in [\\\"Guangzhou\\\", \\\"Shanghai\\\"]:\\n    print(f\\\"Population {city}:\\\",
+      search(f\\\"{city} population\\\")\\n```<end_code>\\nObservation:\\nPopulation
+      Guangzhou: ['Guangzhou has a population of 15 million inhabitants as of 2021.']\\nPopulation
+      Shanghai: '26 million (2019)'\\n\\nThought: Now I know that Shanghai has the
+      highest population.\\nCode:\\n```py\\nfinal_answer(\\\"Shanghai\\\")\\n```<end_code>\\n\\n---\\nTask:
+      \\\"What is the current age of the pope, raised to the power 0.36?\\\"\\n\\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\\nCode:\\n```py\\npope_age_wiki = wiki(query=\\\"current pope
+      age\\\")\\nprint(\\\"Pope age as per wikipedia:\\\", pope_age_wiki)\\npope_age_search
+      = web_search(query=\\\"current pope age\\\")\\nprint(\\\"Pope age as per google
+      search:\\\", pope_age_search)\\n```<end_code>\\nObservation:\\nPope age: \\\"The
+      pope Francis is currently 88 years old.\\\"\\n\\nThought: I know that the pope
+      is 88 years old. Let's compute the result using python code.\\nCode:\\n```py\\npope_current_age
+      = 88 ** 0.36\\nfinal_answer(pope_current_age)\\n```<end_code>\\n\\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools:\\n- web_search: Performs a duckduckgo web search based on your
+      query (think a Google search) then returns the top search results.\\n    Takes
+      inputs: {'query': {'type': 'string', 'description': 'The search query to perform.'}}\\n
+      \   Returns an output of type: string\\n- final_answer: Provides a final answer
+      to the given problem.\\n    Takes inputs: {'answer': {'type': 'any', 'description':
+      'The final answer to the problem'}}\\n    Returns an output of type: any\\n\\nHere
+      are the rules you should always follow to solve your task:\\n1. Always provide
+      a 'Thought:' sequence, and a 'Code:\\\\n```py' sequence ending with '```<end_code>'
+      sequence, else you will fail.\\n2. Use only variables that you have defined!\\n3.
+      Always use the right arguments for the tools. DO NOT pass the arguments as a
+      dict as in 'answer = wiki({'query': \\\"What is the place where James Bond lives?\\\"})',
+      but use the arguments directly as in 'answer = wiki(query=\\\"What is the place
+      where James Bond lives?\\\")'.\\n4. Take care to not chain too many sequential
+      tool calls in the same code block, especially when the output format is unpredictable.
+      For instance, a call to search has an unpredictable return format, so do not
+      have another tool call that depends on its output in the same block: rather
+      output results with print() to use them in the next block.\\n5. Call a tool
+      only when needed, and never re-do a tool call that you previously did with the
+      exact same parameters.\\n6. Don't name any new variable with the same name as
+      a tool: for instance don't name a variable 'final_answer'.\\n7. Never create
+      any notional variables in our code, as having these in your logs will derail
+      you from the true variables.\\n8. You can use imports in your code, but only
+      from the following list of modules: ['collections', 'datetime', 'itertools',
+      'math', 'queue', 'random', 're', 'stat', 'statistics', 'time', 'unicodedata']\\n9.
+      The state persists between code executions: so if in one step you've created
+      variables or imported modules, these will all persist.\\n10. Don't give up!
+      You're in charge of solving the task, not providing directions to solve it.\\n\\nNow
+      Begin! If you solve the task correctly, you will receive a reward of $1,000,000.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
+      task:\\nGet me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Thought:
+      To get the title of the webpage at the specified URL, I will need to perform
+      a web search, visit the webpage, and extract the title using HTML parsing techniques.
+      However, currently, I have only the `web_search` tool available for retrieving
+      data through web searches. I will start by searching for the specific title
+      of the page using the given URL, even though the `web_search` tool might not
+      fetch a direct or specific title from the URL. \\n\\nLet me proceed and see
+      if anything helpful shows up from the web search about this URL.\\n\\nCode:\\n```py\\nwebpage_info
+      = web_search(query=\\\"Building a GenAI-assisted automatic story illustrator
+      site:wandb.ai\\\")\\nprint(webpage_info)\\n```<end_code>\"},{\"type\":\"text\",\"text\":\"Calling
+      tools:\\n[{'id': 'call_1', 'type': 'function', 'function': {'name': 'python_interpreter',
+      'arguments': 'webpage_info = web_search(query=\\\"Building a GenAI-assisted
+      automatic story illustrator site:wandb.ai\\\")\\\\nprint(webpage_info)'}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call
+      id: call_1\\nObservation:\\nExecution logs:\\n## Search Results\\n\\n[Building
+      a GenAI-assisted automatic story illustrator](https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-Automatic-Story-Illustrator--Vmlldzo5MTYxNTkw)\\nRecent
+      advances in diffusion models have enabled text-to-image generation models to
+      achieve drastic improvements. Open-source text-to-image generation models such
+      as FLUX from Black Forest Labs, Stable Diffusion 3 from StabilityAI, and PixArt-\u03A3
+      not only demonstrate higher quality of generated images but also improve factors
+      such as spatial consistency in the images and the ability to follow ...\\n\\n[story-illustration
+      Reports - Weights & Biases](https://wandb.ai/geekyrakshit/story-illustration/reportlist)\\nBuilding
+      a GenAI-assisted Automatic Story Illustrator. Building a model-agnostic GenAI
+      workflow that can automatically illustrate short stories using LLMs and Diffusion
+      models. 0. geekyrakshit. 2024-08-27. 3 minutes ago.\\n\\n[ImageNet Articles
+      & Tutorials by Weights & Biases - W&B](https://wandb.ai/fully-connected/imagenet?page=2)\\nBuilding
+      a GenAI-assisted automatic story illustrator. Soumik Rakshit. Sep 5. Articles,
+      GenAI, Image Generation, Tutorial, Intermediate. Building a system of record
+      for ML. Abraham Leal. Sep 10. Articles, W&B Features, W&B Meta, Sweeps, Experiment,
+      Tutorial ... GenAI, LLM, Video, Tutorial, Framework / Integration. Getting started
+      fine-tuning ...\\n\\n[Soumik Rakshit - Machine Learning Portfolio in Weights
+      & Biases - W&B](https://wandb.ai/geekyrakshit)\\nA comprehensive guide to building
+      an object detection workflow using Ultralytics YOLOv8 and Weights & Biases.
+      4554 views. ... Building a GenAI-assisted automatic story illustrator. Until
+      September 27th Weights & Biases users can illustrate their own stories for free
+      using Flux and GPT-4. 1350 views.\\n\\n[Tutorial Articles & Tutorials by Weights
+      & Biases - W&B](https://wandb.ai/fully-connected/blog/tutorial)\\nFind Tutorial
+      articles & tutorials from leading machine learning practitioners. Fully Connected:
+      An ML community from Weights & Biases.\\n\\n[Tutorial: Model-Based Evaluation
+      of RAG applications](https://weave-docs.wandb.ai/tutorial-rag/)\\nOptional:
+      Defining a Scorer class . In some applications we want to create custom evaluation
+      classes - where for example a standardized LLMJudge class should be created
+      with specific parameters (e.g. chat model, prompt), specific scoring of each
+      row, and specific calculation of an aggregate score. In order to do that Weave
+      defines a list of ready-to-use Scorer classes and also makes it easy to ...\\n\\n[Llama
+      3.2-Vision for multi-modal RAG in financial services](https://wandb.ai/geekyrakshit/finance_multi_modal_rag/reports/Llama-3-2-Vision-for-multi-modal-RAG-in-financial-services--Vmlldzo5NTIyODkw)\\nBuilding
+      a GenAI-assisted automatic story illustrator. Until September 27th Weights &
+      Biases users can illustrate their own stories for free using Flux and GPT-4.
+      ... Included in the course are code notebooks and Cohere credits to build and
+      experiment with your own RAG systems. ...\\n\\n[Image Generation Articles &
+      Tutorials by Weights & Biases - W&B](https://wandb.ai/fully-connected/blog/image-generation)\\nDALL-E,
+      Articles, GenAI, Tables, Plots, Experiment, Image Generation, Large Models,
+      Computer Vision DALL\xB7E Mini - Generate Images From Any Text Prompt Boris
+      Dayma , Pedro Cuenca\\n\\n[DALL\xB7E Mini - Generate Images From Any Text Prompt](https://wandb.ai/dalle-mini/dalle-mini/reports/DALL-E-mini-Generate-images-from-any-text-prompt--VmlldzoyMDE4NDAy)\\nCraiyon
+      (previously DALL\xB7E mini) is an AI model that can generate images from any
+      prompt you give. The model is still training and keeps improving over time.\\n\\n[GenAI
+      Accelerator - Weights & Biases](https://wandb.ai/site/genai-accelerator/master-class)\\nThe
+      GenAI Accelerator master class is an interactive program designed to help your
+      organization learn how to build LLM-powered applications. Expert AI leaders
+      from Weights & Biases\u2014who built the AI platform used by the world's foundation
+      model builders such as OpenAI and Meta\u2014guide you through GenAI workshops
+      tailored for your business.\\nLast output from code snippet:\\nNone\"}]}],\"model\":\"gpt-4o\",\"stop\":[\"<end_code>\",\"Observation:\",\"Calling
+      tools:\"]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '14300'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=4D4lGQEjJNJyBAAlubL2Wu.NUFJOIzFg6WLxdc.QKSI-1742795710-1.0.1.1-6lX32.mI0G43TTPXTi9hr07frGDPWxSstKN83NSmDBnoMfuptKFbi93IHbTv2aNgCvowQGXDUQAm_dwS._PoOlkH9kCKuWYv3vhoFsGnJ.U;
+        _cfuvid=GU1rkUgl7i0OsROimsRGJsvz78biCfqpiMgcTzfbACI-1742795710599-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.67.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.67.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.13.2
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//nFRNbxMxEL3nV4x8AaSkylebNjeKACFVIEHhQqqtY89mp/Xalme2Iar6
+        39F6kyYBeuGykv3mvXljP+9jD0CRVXNQptJi6ugGl+9/TC/Hd/Fe1mk8ar5NvrB3JJ/PXJlq1W8Z
+        YXmHRnasExPq6FAo+A42CbVgqzqaTcezi9PZaJSBOlh0LW0VZTANg/FwPB0MzwfDsy2xCmSQ1Rx+
+        9gAAHvO3tegt/lJzGPZ3OzUy6xWq+XMRgErBtTtKMxOL9qL6e9AEL+iz6+sqNKtK5vAhhRqkQljj
+        Ehh1MhUk5MYJ94EEGLFmkEpLrhIShxDKvIh6hUAMju7RbUACLBEW6rIhZ8mvQMNH9G8/DTozaEE3
+        EmotZIAlpA2Qcw1L0hLSyULBdUW87bDWDAljPkW3Aa7C2gP53PbYJZQhddsRDZWEFr5/verDuiJT
+        7ayRt2S0IOdKE1JCI53/3O9k4Rf+CuUVQ8MI0hohX4bUug2+HS2m8EAWs0BJXjvQnteYMvVdsDhf
+        +Nvb27hZ+AwXHfz6P89jod5kvcP7S1g2rNv4+Ma5A0B7HyQ7zcm52SJPz1lxYRVTWPIfVFWSJ66K
+        hJqDb3PBEqLK6FMP4CZnsjmKmYop1FEKCfeY203Gp7NOUO2fwR4+3yZWSRDtDmiTyY52pFhYFE2O
+        D3KtjDYV2j13PJqdPc+gG0thjw17B6P/7ehf8t345FcHKi/K7wFjMAraIia0ZI6n3pclbP8UL5U9
+        H3U2rBjTAxkshDC112Gx1I3rHrHiDQvWRUl+hSkm6l5yGYuLoZ1MzOjUTlXvqfcbAAD//wMA3Tk3
+        XdIEAAA=
+    headers:
+      CF-RAY:
+      - 9253eb0eac863ab7-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Mar 2025 05:55:13 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1133'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '50000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '49999'
+      x-ratelimit-remaining-tokens:
+      - '149996574'
+      x-ratelimit-reset-requests:
+      - 1ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_a362d634251c7c2a9183b2c868397db8
+    status:
+      code: 200
+      message: OK
+version: 1
