@@ -140,9 +140,6 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MAX_FLUSH_COUNT = 10000
-MAX_FLUSH_AGE = 15
-
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 1000
