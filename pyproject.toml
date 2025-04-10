@@ -101,6 +101,7 @@ langchain = [
   "pysqlite3",
   "opentelemetry-exporter-otlp",
 ]
+langfair = ["langfair>=0.3.1"]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
