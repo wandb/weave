@@ -89,6 +89,7 @@ import {
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
   ExportSelector,
+  FilterSelectedButton,
   PaginationButtons,
   RefreshButton,
 } from './CallsTableButtons';
@@ -875,6 +876,17 @@ export const CallsTable: FC<{
                       selectedCallIds={selectedCalls}
                     />
                   </div>
+                  {setFilterModel && (
+                    <div className="flex-none">
+                      <FilterSelectedButton
+                        selectedCalls={selectedCalls}
+                        filterModel={filterModel ?? DEFAULT_FILTER_CALLS}
+                        setFilterModel={setFilterModel}
+                        disabled={selectedCalls.length === 0}
+                        clearSelectedCalls={clearSelectedCalls}
+                      />
+                    </div>
+                  )}
                   <div className="flex-none">
                     <BulkDeleteButton
                       onClick={() => setDeleteConfirmModalOpen(true)}

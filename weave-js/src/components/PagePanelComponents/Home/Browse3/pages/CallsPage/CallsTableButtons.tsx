@@ -1,5 +1,6 @@
 import {Box, Popover} from '@mui/material';
 import {
+  GridFilterItem,
   GridFilterModel,
   gridPageCountSelector,
   gridPageSelector,
@@ -23,10 +24,19 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
+import {upsertFilter} from '../../filters/common';
+import {getNextFilterId} from '../../filters/filterUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -538,6 +548,68 @@ export const RefreshButton: FC<{
         tooltip="Refresh"
         icon="reload-refresh"
       />
+    </Box>
+  );
+};
+
+export const FilterSelectedButton: FC<{
+  selectedCalls: string[];
+  filterModel: GridFilterModel;
+  setFilterModel: (newModel: GridFilterModel) => void;
+  disabled?: boolean;
+  clearSelectedCalls?: () => void;
+}> = ({
+  selectedCalls,
+  filterModel,
+  setFilterModel,
+  disabled,
+  clearSelectedCalls,
+}) => {
+  const onFilterSelected = useCallback(() => {
+    if (selectedCalls.length === 0) {
+      return;
+    }
+
+    const newFilter =
+      selectedCalls.length === 1
+        ? {
+            id: getNextFilterId(filterModel.items),
+            field: 'id',
+            operator: '(string): equals',
+            value: selectedCalls[0],
+          }
+        : {
+            id: getNextFilterId(filterModel.items),
+            field: 'id',
+            operator: '(string): in',
+            value: selectedCalls,
+          };
+
+    const newModel = upsertFilter(
+      filterModel,
+      newFilter,
+      (f: GridFilterItem) => f.field === 'id'
+    );
+    setFilterModel(newModel);
+    clearSelectedCalls?.();
+  }, [selectedCalls, filterModel, setFilterModel, clearSelectedCalls]);
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant="ghost"
+        size="medium"
+        disabled={disabled || selectedCalls.length === 0}
+        onClick={onFilterSelected}
+        tooltip="Filter table to show only selected rows"
+        icon="filter-alt">
+        Filter selected
+      </Button>
     </Box>
   );
 };
