@@ -67,6 +67,7 @@ export const ObjectVersionsTable: React.FC<{
   onRowClick?: (objectVersion: ObjectVersionSchema) => void;
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
+  customColumns?: GridColDef[];
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
   const {selectedVersions, setSelectedVersions} = props;
@@ -244,6 +245,10 @@ export const ObjectVersionsTable: React.FC<{
       groups = groupingModel;
     }
 
+    if (props.customColumns) {
+      cols.push(...props.customColumns);
+    }
+
     if (!props.hideCategoryColumn) {
       cols.push(
         basicField('baseObjectClass', 'Category', {
@@ -392,6 +397,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   objectTitle?: string;
   hideCategoryColumn?: boolean;
   hideCreatedAtColumn?: boolean;
+  customColumns?: GridColDef[];
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
@@ -420,7 +426,7 @@ export const FilterableObjectVersionsTable: React.FC<{
       latestOnly: effectivelyLatestOnly,
     },
     undefined,
-    effectivelyLatestOnly // metadata only when getting latest
+    false //effectivelyLatestOnly // metadata only when getting latest
   );
 
   if (filteredObjectVersions.loading) {
@@ -472,6 +478,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         hideCreatedAtColumn={props.hideCreatedAtColumn}
         selectedVersions={props.selectedVersions}
         setSelectedVersions={props.setSelectedVersions}
+        customColumns={props.customColumns}
       />
     </FilterLayoutTemplate>
   );

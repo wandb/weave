@@ -299,7 +299,7 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
-const SimpleTabView: FC<{
+export const SimpleTabView: FC<{
   headerContent: ReactNode;
   tabs: Array<{
     label: string;

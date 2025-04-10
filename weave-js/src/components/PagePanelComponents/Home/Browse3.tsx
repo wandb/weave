@@ -1,5 +1,5 @@
 import {ApolloProvider} from '@apollo/client';
-import {Box, Drawer} from '@mui/material';
+import {Box, Drawer } from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
@@ -91,7 +91,10 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
-import {useDrawerResize} from './useDrawerResize';
+import { useDrawerResize } from './useDrawerResize';
+import * as Tabs from '@wandb/weave/components/Tabs';
+import { Tailwind } from '../../Tailwind';
+import { MonitorsPage } from './Browse3/pages/MonitorsPage/MonitorsPage';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -439,8 +442,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
+        <Route path={`${projectRoot}/:tab(traces|calls)`}>
           <CallsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/evaluations/:tab(evals|monitors)`}>
+          <EvaluationsPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
@@ -752,12 +758,59 @@ const CallPageBinding = () => {
   );
 };
 
+const EvaluationsPageBinding = () => {
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  const tabs: Record<string, {label: string, content: React.ReactNode}> = {
+    evals: {
+      label: 'Evals',
+      content: <CallsPageBinding />,
+    },
+    monitors: {
+      label: 'Monitors',
+      content: <MonitorsPageBinding />,
+    },
+  };
+
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+
+  const navigateToTab = useCallback((clickedTab: string) => {
+    history.push(`/${entity}/${project}/weave/evaluations/${clickedTab}`);
+  }, [entity, project]);
+
+  return <><Tabs.Root
+    value={tab}
+    onValueChange={navigateToTab}
+    className='mx-16 mt-12'>
+    <Tabs.List className='border-b-0'>
+      {Object.entries(tabs).map(([key, tab]) => (
+        <Tabs.Trigger value={key} className='text-lg border-b-4' key={key}>
+          {tab.label}
+        </Tabs.Trigger>
+      ))}
+    </Tabs.List>
+  </Tabs.Root>
+  <Tailwind>
+
+    <Box className='pt-8'>
+      <ErrorBoundary>{tabs[tab].content}</ErrorBoundary>
+    </Box>
+  </Tailwind>
+  </>;
+};
+
+const MonitorsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+
+  return <MonitorsPage entity={entity} project={project} />;
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
+    if (tab === 'evals') {
       return {
         frozen: true,
         opVersionRefs: [
