@@ -26,10 +26,11 @@ export const SmallRefLoaded = ({
   error,
   noLink = false,
 }: SmallRefLoadedProps) => {
+  console.log(error);
   const content = (
     <div
       className={classNames(
-        'flex items-center gap-4 font-semibold text-moon-700',
+        'flex h-full items-center gap-4 font-semibold text-moon-700',
         {
           'cursor-pointer hover:text-teal-500': !error && !noLink,
           'line-through': error,
@@ -38,7 +39,7 @@ export const SmallRefLoaded = ({
       )}>
       <SmallRefIcon icon={icon} />
       {label && (
-        <div className="h-[22px] min-w-0 flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
+        <div className="min-w-0 flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
           {label}
         </div>
       )}
