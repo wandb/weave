@@ -91,9 +91,9 @@ otlp_exporter = OTLPSpanExporter(endpoint="https://api.wandb.ai/otel/v1/traces")
 # Your additional configurations depend on your environment
 ```
 
-### Use OpenTelemetry's `OpenAIInstrumentor`
+### Use OpenLLMetry's `OpenAIInstrumentor`
 
-The following code sample uses OpenTelemetry's `OpenAIInstrumentor` to automatically export OTEL Traces:
+The following code sample uses OpenLLMetry's `OpenAIInstrumentor` to automatically export OTEL Traces:
 
 ```python
 import os
@@ -134,6 +134,14 @@ if __name__ == "__main__":
     main()
 ```
 
+To use this code sample, run the following commands in your terminal:
+
+```bash
+uv init
+uv add dotenv openai opentelemetry-api opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai opentelemetry-sdk
+uv run script.py
+```
+
 ### Use OpenInference's `OpenAIInstrumentor`
 
 The following code sample uses OpenInference's `OpenAIInstrumentor` to automatically export OTEL Traces:
@@ -172,4 +180,12 @@ def main():
             print(content, end="")
 if __name__ == "__main__":
     main()
+```
+
+To use this code sample, run the following commands in your terminal:
+
+```bash
+uv init
+uv add dotenv openai openinference-instrumentation-openai openinference-semantic-conventions opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai
+uv run script.py
 ```
