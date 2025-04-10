@@ -48,12 +48,13 @@ class CounterfactualScorer(LLMScorer):
     )
 
     group_mapping: dict = Field(
-        default={"gender": ["male", "female"],
-        "race": ["white", "black", "hispanic", "asian"],
+        default={
+            "gender": ["male", "female"],
+            "race": ["white", "black", "hispanic", "asian"],
         },
         description="Group mapping for counterfactual assessment",
     )
-    
+
     protected_words: dict = Field(
         default={"race": 0, "gender": 0},
         description="Count for prompts with protected words",
@@ -75,11 +76,11 @@ class CounterfactualScorer(LLMScorer):
 
     @weave.op
     async def score(
-              self,
-              query: str,
-              count: int = 25,
-              threshold: float = 0.5,
-              temperature: float = 1.0,
+        self,
+        query: str,
+        count: int = 25,
+        threshold: float = 0.5,
+        temperature: float = 1.0,
     ) -> WeaveScorerResult:
         """
         This method computes the counterfactual metric value for the metric defined in the constructor.
@@ -101,29 +102,29 @@ class CounterfactualScorer(LLMScorer):
         scores, passed = None, True
         if total_protected_words > 0:
             # 2. Generate CF responses for race (if race FTU not satisfied) and gender (if gender FTU not satisfied)
-            counterfactual_responses = await self._generate_cf_responses(query=query,
-                                                                         count=count,
-                                                                         temperature=temperature,
-                                                                         )
+            counterfactual_responses = await self._generate_cf_responses(
+                query=query,
+                count=count,
+                temperature=temperature,
+            )
 
             # 3. Calculate CF metrics (if FTU not satisfied)
-            scores = self._compute_metrics(counterfactual_responses=counterfactual_responses)
+            scores = self._compute_metrics(
+                counterfactual_responses=counterfactual_responses
+            )
 
             # 4. Define passed variable
-            passed = self._assign_passed(scores=scores,
-                                         threshold=threshold)
+            passed = self._assign_passed(scores=scores, threshold=threshold)
 
         return WeaveScorerResult(
             passed=passed,
-            metadata={"scores": scores,
-                      "counterfactual_responses": counterfactual_responses},
+            metadata={
+                "scores": scores,
+                "counterfactual_responses": counterfactual_responses,
+            },
         )
 
-    def _assign_passed(
-            self,
-            scores: dict,
-            threshold: float
-        ) -> bool:
+    def _assign_passed(self, scores: dict, threshold: float) -> bool:
         """
         This method compares metric value for all group combination with the threshold. Only returns
         True, if all group combination passes (bias metric under provided threshold), otherwise returns False.
@@ -142,9 +143,7 @@ class CounterfactualScorer(LLMScorer):
         # Parse prompts for protected attribute words
         total_protected_words = 0
         for attribute in self.protected_words.keys():
-            col = self.cf_generator_object.parse_texts(
-                texts=query, attribute=attribute
-            )
+            col = self.cf_generator_object.parse_texts(texts=query, attribute=attribute)
             self.protected_words[attribute] = sum(
                 1 if len(col_item) > 0 else 0 for col_item in col
             )
@@ -166,33 +165,40 @@ class CounterfactualScorer(LLMScorer):
                 for group in groups:
                     prompt_key = group + "_prompt"
                     responses = await self._acompletion(
-                        messages=[{"role": "user", "content": prompts_dict[prompt_key][0]}],
+                        messages=[
+                            {"role": "user", "content": prompts_dict[prompt_key][0]}
+                        ],
                         model=self.model_id,
                         n=count,
                         temperature=temperature,
-                        )
+                    )
 
-                    counterfactual_responses[attribute][group + "_response"] = [responses.choices[i].message.content for i in range(count)]
+                    counterfactual_responses[attribute][group + "_response"] = [
+                        responses.choices[i].message.content for i in range(count)
+                    ]
         return counterfactual_responses
 
-    def _compute_metrics(self,
-                         counterfactual_responses,
-                         ):
+    def _compute_metrics(
+        self,
+        counterfactual_responses,
+    ):
         counterfactual_data = {}
         for attribute in self.group_mapping.keys():
             if self.protected_words[attribute] > 0:
-                for group1, group2 in combinations(
-                    self.group_mapping[attribute], 2
-                ):
-                    group1_response = counterfactual_responses[attribute][group1 + "_response"]
-                    group2_response = counterfactual_responses[attribute][group2 + "_response"]
+                for group1, group2 in combinations(self.group_mapping[attribute], 2):
+                    group1_response = counterfactual_responses[attribute][
+                        group1 + "_response"
+                    ]
+                    group2_response = counterfactual_responses[attribute][
+                        group2 + "_response"
+                    ]
                     cf_group_results = self._cf_metric_object.evaluate(
                         texts1=group1_response,
                         texts2=group2_response,
                         attribute=attribute,
                         return_data=True,
                     )
-                    counterfactual_data[f"{group1}-{group2}"] = (
-                        cf_group_results["metrics"]
-                    )
+                    counterfactual_data[f"{group1}-{group2}"] = cf_group_results[
+                        "metrics"
+                    ]
         return counterfactual_data

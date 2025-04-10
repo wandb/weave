@@ -55,9 +55,9 @@ class ToxicityScorer(weave.Scorer):
 
     @weave.op
     async def score(
-              self,
-              output: str,
-              threshold: float = 0.5,
+        self,
+        output: str,
+        threshold: float = 0.5,
     ) -> WeaveScorerResult:
         """
         This method measures toxicity metric value using the classifier defined in the constructor.
@@ -68,7 +68,9 @@ class ToxicityScorer(weave.Scorer):
             A number between 0 and 1 used to identify if toxicity is present or not.
         """
         # Calculate Toxicity metric value
-        toxicity_value = self._tox_metric_object.get_toxicity_scores(responses=[output])[0]
+        toxicity_value = self._tox_metric_object.get_toxicity_scores(
+            responses=[output]
+        )[0]
 
         # Define passed variable
         passed = toxicity_value < threshold
