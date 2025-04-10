@@ -40,6 +40,9 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -80,8 +83,11 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageClient,
+    FileStorageReadError,
     FileStorageWriteError,
     key_for_project_digest,
+    maybe_get_storage_client_from_env,
     read_from_bucket,
     store_in_bucket,
 )
@@ -212,6 +218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._file_storage_client: Optional[FileStorageClient] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -226,7 +233,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             use_async_insert=use_async_insert,
         )
 
+    @property
+    def file_storage_client(self) -> Optional[FileStorageClient]:
+        if self._file_storage_client is not None:
+            return self._file_storage_client
+        self._file_storage_client = maybe_get_storage_client_from_env()
+        return self._file_storage_client
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
         traces_data = [
             ResourceSpans.from_proto(span) for span in req.traces.resource_spans
         ]
@@ -362,6 +380,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in columns or req.include_costs:
+                columns += ["ended_at", "exception", "display_name"]
+
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
@@ -1325,11 +1349,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
+        use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
+        client = self.file_storage_client
 
-        if base_file_storage_uri is not None:
+        if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, base_file_storage_uri)
+                self._file_create_bucket(req, digest, client)
             except FileStorageWriteError as e:
                 self._file_create_clickhouse(req, digest)
         else:
@@ -1371,14 +1396,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
+        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
-        target_file_storage_uri = base_file_storage_uri.with_path(
-            # It is entirely compatible with the design to support chunking on the
-            # bucket side. Just need to add a `/CHUNK` suffix to the key.
-            key_for_project_digest(req.project_id, digest)
+        target_file_storage_uri = store_in_bucket(
+            client, key_for_project_digest(req.project_id, digest), req.content
         )
-        store_in_bucket(target_file_storage_uri, req.content)
         self._insert(
             "files",
             data=[
@@ -1405,38 +1427,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-    def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
-        """
-        Get the base storage URI for a project.
-
-        Currently this is quite simple as it uses the default storage bucket
-        for the entire client (most typically configured via environment variable).
-
-        However, in the near future, this might be something that is driven by
-        the project or a context variable. Leaving this method here for clarity
-        and future extensibility.
-        """
-        file_storage_uri_str = wf_env.wf_file_storage_uri()
-        if not file_storage_uri_str:
-            return None
-
+    def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
+        """Determine if we should use file storage for a project."""
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
-            return None
+            return False
 
         universally_enabled = (
             len(project_allow_list) == 1 and project_allow_list[0] == "*"
         )
 
         if not universally_enabled and project_id not in project_allow_list:
-            return None
+            return False
 
-        res = FileStorageURI.parse_uri_str(file_storage_uri_str)
-        if res.has_path():
-            raise ValueError(
-                f"Supplied file storage uri contains path components: {file_storage_uri_str}"
-            )
-        return res
+        return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
@@ -1475,7 +1479,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                bytes += read_from_bucket(file_storage_uri)
+                client = self.file_storage_client
+                if client is None:
+                    raise FileStorageReadError("File storage client is not configured")
+                bytes += read_from_bucket(client, file_storage_uri)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
@@ -2185,58 +2192,12 @@ def _ensure_datetimes_have_tz_strict(
     return res
 
 
-def _nullable_dict_dump_to_dict(
-    val: Optional[str],
-) -> Optional[dict[str, Any]]:
-    return _dict_dump_to_dict(val) if val else None
-
-
 def _nullable_any_dump_to_any(
     val: Optional[str],
 ) -> Optional[Any]:
     return _any_dump_to_any(val) if val else None
 
 
-def _raw_call_dict_to_ch_call(
-    call: dict[str, Any],
-) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
-
-
-def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
-    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
-    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
-    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
-    display_name = empty_str_to_none(ch_call.display_name)
-    return tsi.CallSchema(
-        project_id=ch_call.project_id,
-        id=ch_call.id,
-        trace_id=ch_call.trace_id,
-        parent_id=ch_call.parent_id,
-        op_name=ch_call.op_name,
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
-        output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_fields(
-            summary=summary or {},
-            op_name=ch_call.op_name,
-            started_at=started_at,
-            ended_at=ended_at,
-            exception=ch_call.exception,
-            display_name=display_name,
-        ),
-        exception=ch_call.exception,
-        wb_run_id=ch_call.wb_run_id,
-        wb_user_id=ch_call.wb_user_id,
-        display_name=display_name,
-        storage_size_bytes=ch_call.storage_size_bytes,
-        total_storage_size_bytes=ch_call.total_storage_size_bytes,
-    )
-
-
-# Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))

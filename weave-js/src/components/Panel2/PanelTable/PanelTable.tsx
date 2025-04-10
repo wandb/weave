@@ -1200,8 +1200,16 @@ const PanelTableInner: React.FC<
         variant="secondary"
         size="small"
         data-test="table-filter-button"
+        data-dd-action-name={`${
+          filterOpen ? 'close' : 'open'
+        } query filter button`}
         icon="filter-alt"
         onClick={() => {
+          if (filterOpen) {
+            recordEvent('CLOSE_FILTER');
+          } else {
+            recordEvent('OPEN_FILTER');
+          }
           setFilterOpen(!filterOpen);
         }}
         tooltip="Filter"
@@ -1237,7 +1245,8 @@ const PanelTableInner: React.FC<
   return (
     <GrowToParent
       data-test-weave-id="table"
-      data-test-row-count={unpinnedData.length}>
+      data-test-row-count={unpinnedData.length}
+      data-dd-action-name="query panel table">
       {filterOpen && (
         <PanelContextProvider newVars={preFilterFrame}>
           <ControlFilter

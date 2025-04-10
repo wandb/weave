@@ -363,6 +363,8 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
+  // TODO: Despite the name, this has changed to be slightly more sophisticated,
+  //       where it may replace or toggle a filter off. We should consider renaming.
   const onAddFilter: OnAddFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
@@ -377,6 +379,44 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+
+          // Check if there is an exact match for field, operator, and value in filterModel.items
+          // If an exact match exists, remove it instead of adding a duplicate.
+          const existingFullMatchIndex = filterModel.items.findIndex(
+            item =>
+              item.field === field &&
+              item.operator === op &&
+              JSON.stringify(item.value) === JSON.stringify(value)
+          );
+          if (existingFullMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems.splice(existingFullMatchIndex, 1);
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // Check if there is a match for field and operator in filterModel.items
+          // If a match exists, update the value instead of adding a new filter
+          const existingFieldOpMatchIndex = filterModel.items.findIndex(
+            item => item.field === field && item.operator === op
+          );
+          if (existingFieldOpMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems[existingFieldOpMatchIndex] = {
+              ...newItems[existingFieldOpMatchIndex],
+              value,
+            };
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // There is no match, add a new filter.
           const newModel = {
             ...filterModel,
             items: [
