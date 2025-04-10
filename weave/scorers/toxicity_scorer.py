@@ -7,7 +7,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 
 
-class ToxicityScorer(weave.Scorer):
+class LangfairToxicityScorer(weave.Scorer):
     """
     Compute toxicity metrics for bias evaluation of language models. This class
     enables calculation of expected maximum toxicity, toxicity fraction, and

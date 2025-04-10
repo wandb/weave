@@ -10,7 +10,7 @@ from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.scorer_types import LLMScorer
 
 
-class CounterfactualScorer(LLMScorer):
+class LangfairCounterfactualScorer(LLMScorer):
     """
     This class computes few or all counterfactual metrics supported LangFair. For more information on these metrics,
     see Huang et al. (2020) :footcite:`huang2020reducingsentimentbiaslanguage` and Bouchard (2024) :footcite:`bouchard2024actionableframeworkassessingbias`.
