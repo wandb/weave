@@ -398,6 +398,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   hideCategoryColumn?: boolean;
   hideCreatedAtColumn?: boolean;
   customColumns?: GridColDef[];
+  metadataOnly?: boolean;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
@@ -426,7 +427,7 @@ export const FilterableObjectVersionsTable: React.FC<{
       latestOnly: effectivelyLatestOnly,
     },
     undefined,
-    false //effectivelyLatestOnly // metadata only when getting latest
+    props.metadataOnly ?? effectivelyLatestOnly // metadata only when getting latest
   );
 
   if (filteredObjectVersions.loading) {
