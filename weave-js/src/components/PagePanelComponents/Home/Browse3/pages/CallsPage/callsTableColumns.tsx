@@ -11,6 +11,7 @@ import {
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
+import {convertBytes} from '@wandb/weave/util';
 import React, {
   FC,
   useCallback,
@@ -82,7 +83,10 @@ export const useCallsTableColumns = (
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  costsLoading: boolean = false,
+  includeTotalStorageSizeBytes: boolean = false,
+  storageSizeResults: Map<string, number> | null = null,
+  storageSizeLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -159,7 +163,13 @@ export const useCallsTableColumns = (
         userDefinedColumnWidths,
         allowedColumnPatterns,
         onAddFilter,
-        costsLoading
+        costsLoading,
+        includeTotalStorageSizeBytes
+          ? {
+              storageSizeResults,
+              storageSizeLoading,
+            }
+          : null
       ),
     [
       entity,
@@ -177,6 +187,9 @@ export const useCallsTableColumns = (
       allowedColumnPatterns,
       onAddFilter,
       costsLoading,
+      includeTotalStorageSizeBytes,
+      storageSizeResults,
+      storageSizeLoading,
     ]
   );
 
@@ -237,7 +250,11 @@ function buildCallsTableColumns(
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  costsLoading: boolean = false,
+  storageSizeInfo: {
+    storageSizeResults: Map<string, number> | null;
+    storageSizeLoading: boolean;
+  } | null = null
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -670,6 +687,31 @@ function buildCallsTableColumns(
       return monthRoundedTime(traceCallLatencyS(cellParams.row));
     },
   });
+
+  if (storageSizeInfo) {
+    cols.push({
+      field: 'total_storage_size_bytes',
+      headerName: 'Trace Size',
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      align: 'right',
+      headerAlign: 'right',
+      // filtering and sorting are expensive for this column, hence disabled
+      filterable: false,
+      sortable: false,
+      renderCell: cellParams => {
+        if (storageSizeInfo.storageSizeLoading) {
+          return <LoadingDots />;
+        }
+        const storageSize =
+          storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;
+        return (
+          <div>{storageSize !== null ? convertBytes(storageSize) : ''}</div>
+        );
+      },
+    });
+  }
 
   cols.push({
     field: 'wb_run_id',
