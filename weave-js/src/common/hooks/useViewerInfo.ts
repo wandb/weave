@@ -17,11 +17,6 @@ const VIEWER_QUERY = gql`
           node {
             id
             name
-            members {
-              id
-              username
-              role
-            }
           }
         }
       }
@@ -35,7 +30,6 @@ export type UserInfo = {
   username: string;
   teams: string[];
   admin: boolean;
-  roles: {[team: string]: string};
 };
 export type MaybeUserInfo = UserInfo | null;
 
@@ -75,16 +69,6 @@ export const useViewerInfo = (): UserInfoResponse => {
       const {id, username} = userInfo;
       const teamEdges = userInfo?.teams?.edges ?? [];
       const teams = teamEdges.map((edge: any) => edge.node.name).sort();
-      const roles: {[team: string]: string} = {};
-      teamEdges.forEach((edge: any) => {
-        const teamName = edge.node.name;
-        const userMember = edge.node.members.find(
-          (member: any) => member.username === username
-        );
-        if (userMember) {
-          roles[teamName] = userMember.role;
-        }
-      });
       setResponse({
         loading: false,
         userInfo: {
@@ -92,7 +76,6 @@ export const useViewerInfo = (): UserInfoResponse => {
           username,
           teams,
           admin: userInfo.admin,
-          roles,
         },
       });
     });
