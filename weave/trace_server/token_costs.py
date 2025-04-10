@@ -70,10 +70,6 @@ def get_calls_merged_columns() -> list[Column]:
     return columns
 
 
-def calls_merged_table(table_alias: str) -> Table:
-    return Table(table_alias, get_calls_merged_columns())
-
-
 # SELECT
 #     *,
 #     Extracted Usage Fields
