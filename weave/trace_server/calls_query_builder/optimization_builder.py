@@ -1,8 +1,9 @@
 """
 Query optimization framework for call queries.
 
-Optimizes complex queries on call data before expensive database aggregation.
-Optimizations are conservative - only reducing datasets, never expanding them.
+Optimizes complex queries on call data before expensive database aggregation (groupby).
+Optimizations should be conservative, not guaranteed to full filter down but should
+   be a superset of results.
 
 Key strategies:
 1. String optimization - Uses LIKE patterns for string fields
@@ -38,6 +39,12 @@ DATETIME_OPTIMIZATION_BUFFER = 60 * 1_000  # 60 seconds
 
 
 def _field_requires_null_check(field: str) -> bool:
+    """Returns whether a string is a start or end field
+
+    Start and end fields require appending a NULL to all conditional
+    checks when operating on the calls_merged table, as unmerged
+    call starts and ends can be valid results without inputs/output
+    """
     return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
@@ -57,17 +64,10 @@ class QueryOptimizationProcessor(ABC):
 
     This class defines the interface for optimization processors that convert
     query operations into optimized SQL conditions. Subclasses should implement
-    specific optimization strategies for different types of operations.
+    specific strategies for different types of data or operations.
     """
 
     def __init__(self, pb: "ParamBuilder", table_alias: str):
-        """
-        Initialize the optimization processor.
-
-        Args:
-            pb: Parameter builder for managing SQL parameters
-            table_alias: The table alias to use in SQL conditions
-        """
         self.pb = pb
         self.table_alias = table_alias
 
@@ -75,13 +75,14 @@ class QueryOptimizationProcessor(ABC):
         """
         Process an operand and convert it to an optimized SQL condition if possible.
 
+        Ignores leaf operations like Literal, GetField, and Convert.
+
         Args:
             operand: The operand to process
 
         Returns:
-            An SQL condition string or None if optimization is not possible
+            SQL condition string or None if optimization is not possible
         """
-        # Can never hit leaf operations before optimizations, always return None
         if isinstance(operand, tsi_query.LiteralOperation):
             return None
         elif isinstance(operand, tsi_query.GetFieldOperator):
