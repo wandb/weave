@@ -37,7 +37,7 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
-    _param_slot,
+    param_slot,
     safely_format_sql,
 )
 from weave.trace_server.errors import InvalidFieldError
@@ -213,7 +213,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     ) -> str:
         inner = super().as_sql(pb, "feedback")
         param_name = pb.add_param(self.feedback_type)
-        res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res
@@ -304,7 +304,7 @@ def json_dump_field_as_sql(
         path_str = "'$'"
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
-            path_str = _param_slot(param_name, "String")
+            path_str = param_slot(param_name, "String")
         val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
         return clickhouse_cast(val, cast)
     else:
@@ -313,7 +313,7 @@ def json_dump_field_as_sql(
         path_parts = []
         if extra_path:
             for part in extra_path:
-                path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+                path_parts.append(", " + param_slot(pb.add_param(part), "String"))
         safe_path = "".join(path_parts)
         return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
 
@@ -746,18 +746,18 @@ class CallsQuery(BaseModel):
         # Special Optimization
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask_sql = f"AND (calls_merged.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
         feedback_where_sql = ""
         if needs_feedback:
             feedback_where_sql = (
-                f" AND calls_merged.project_id = {_param_slot(project_param, 'String')}"
+                f" AND calls_merged.project_id = {param_slot(project_param, 'String')}"
             )
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         storage_size_sql = ""
@@ -767,7 +767,7 @@ class CallsQuery(BaseModel):
                 id,
                 sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
             FROM calls_merged_stats
-            WHERE project_id = {_param_slot(project_param, "String")}
+            WHERE project_id = {param_slot(project_param, "String")}
             GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
             on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
@@ -779,7 +779,7 @@ class CallsQuery(BaseModel):
                 trace_id,
                 sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
             FROM calls_merged_stats
-            WHERE project_id = {_param_slot(project_param, "String")}
+            WHERE project_id = {param_slot(project_param, "String")}
             GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
@@ -790,7 +790,7 @@ class CallsQuery(BaseModel):
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
+        WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
@@ -876,9 +876,9 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
 
     return f"""CASE
-        WHEN {exception_sql} IS NOT NULL THEN {_param_slot(error_param, "String")}
-        WHEN {ended_to_sql} IS NULL THEN {_param_slot(running_param, "String")}
-        ELSE {_param_slot(success_param, "String")}
+        WHEN {exception_sql} IS NOT NULL THEN {param_slot(error_param, "String")}
+        WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
+        ELSE {param_slot(success_param, "String")}
     END"""
 
 
@@ -1006,7 +1006,7 @@ def process_query_to_conditions(
 
     def process_operand(operand: "tsi_query.Operand") -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
+            return param_slot(
                 param_builder.add_param(operand.literal_),  # type: ignore
                 python_value_to_ch_type(operand.literal_),
             )
@@ -1076,13 +1076,13 @@ def process_calls_filter_to_conditions(
 
         if non_wildcarded_names:
             or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
             )
 
         for name in wildcarded_names:
             like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
             or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} LIKE {param_slot(param_builder.add_param(like_name), 'String')}"
             )
 
         if or_conditions:
@@ -1091,31 +1091,31 @@ def process_calls_filter_to_conditions(
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.trace_ids:
         assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
         conditions.append(
-            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
-            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.trace_roots_only:
@@ -1125,12 +1125,12 @@ def process_calls_filter_to_conditions(
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
 
     return conditions

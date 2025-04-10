@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Optional, Union
 from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder.utils import (
-    _param_slot,
+    param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
 
@@ -346,10 +346,10 @@ def _create_like_condition(
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())
-        return f"lower({field_name}) LIKE {_param_slot(param_name, 'String')}"
+        return f"lower({field_name}) LIKE {param_slot(param_name, 'String')}"
     else:
         param_name = pb.add_param(like_pattern)
-        return f"{field_name} LIKE {_param_slot(param_name, 'String')}"
+        return f"{field_name} LIKE {param_slot(param_name, 'String')}"
 
 
 def _extract_field_and_literal(
@@ -589,4 +589,4 @@ def _create_datetime_optimization_sql(
 
     # Add the condition
     param_name = pb.add_param(fake_uuid)
-    return f"({table_alias}.id > {_param_slot(param_name, 'String')})"
+    return f"({table_alias}.id > {param_slot(param_name, 'String')})"

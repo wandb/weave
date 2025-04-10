@@ -3,7 +3,7 @@ import logging
 import sqlparse
 
 
-def _param_slot(param_name: str, param_type: str) -> str:
+def param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
 
