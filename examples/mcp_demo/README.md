@@ -42,7 +42,7 @@ uv pip install -e ".[mcp]"
 4. Run the example
 
 ```bash
-uv run --no-refresh --frozen --no-sync --only-group "" --extra mcp examples/mcp_demo/example_client.py examples/mcp_demo/example_server.py
+python examples/mcp_demo/example_client.py examples/mcp_demo/example_server.py
 ```
 
 ## Using the Interactive Client
