@@ -1,7 +1,12 @@
+import pytest
 import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder import CallsQuery, HardCodedFilter
+from weave.trace_server.calls_query_builder import (
+    AggregatedDataSizeField,
+    CallsQuery,
+    HardCodedFilter,
+)
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 
@@ -282,14 +287,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_2:String}
-        AND
-            (calls_merged.id IN filtered_calls)
-        AND
-            (((calls_merged.inputs_dump LIKE {pb_7:String}
-            OR calls_merged.inputs_dump IS NULL))
-        AND
-            ((calls_merged.inputs_dump LIKE {pb_8:String}
-            OR calls_merged.inputs_dump IS NULL)))
+        AND (calls_merged.id IN filtered_calls)
+        AND ((calls_merged.inputs_dump LIKE {pb_7:String} OR calls_merged.inputs_dump IS NULL)
+            AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}))
@@ -793,8 +793,7 @@ def test_calls_query_with_predicate_filters() -> None:
         AND
             (calls_merged.id IN filtered_calls)
         AND
-            (calls_merged.inputs_dump LIKE {pb_4:String}
-            OR calls_merged.inputs_dump IS NULL)
+            ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}
@@ -950,10 +949,9 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
-        AND
-            (calls_merged.id IN filtered_calls)
-        AND (((calls_merged.inputs_dump LIKE {pb_6:String} OR calls_merged.inputs_dump IS NULL))
-        AND ((calls_merged.output_dump LIKE {pb_7:String} OR calls_merged.output_dump IS NULL)))
+        AND (calls_merged.id IN filtered_calls)
+        AND ((calls_merged.inputs_dump LIKE {pb_6:String} OR calls_merged.inputs_dump IS NULL)
+            AND (calls_merged.output_dump LIKE {pb_7:String} OR calls_merged.output_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
@@ -975,7 +973,7 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
 
 
 def test_calls_query_with_or_between_start_and_end_fields() -> None:
-    """Test that we don't create predicate filters when there's an OR between start and end fields."""
+    """Test that we create predicate filters when there's an OR between start and end fields."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
@@ -1008,8 +1006,9 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        WHERE
-            calls_merged.project_id = {pb_4:String}
+        WHERE calls_merged.project_id = {pb_6:String}
+            AND (((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
+                OR (calls_merged.output_dump LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
@@ -1023,7 +1022,9 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             "pb_1": "hello",
             "pb_2": '$."result"',
             "pb_3": "success",
-            "pb_4": "project",
+            "pb_4": '%"hello"%',
+            "pb_5": '%"success"%',
+            "pb_6": "project",
         },
     )
 
@@ -1053,19 +1054,23 @@ def test_calls_query_with_complex_heavy_filters() -> None:
                             {"$literal": 5},
                         ]
                     },
-                    # Multiple conditions on outputs
                     {
-                        "$eq": [
-                            {"$getField": "output.result.status"},
-                            {"$literal": "success"},
+                        # Multiple conditions in nested OR
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {"$getField": "output.result.status"},
+                                    {"$literal": "success"},
+                                ]
+                            },
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.param.message"},
+                                    "substr": {"$literal": "completed"},
+                                    "case_insensitive": True,
+                                }
+                            },
                         ]
-                    },
-                    {
-                        "$contains": {
-                            "input": {"$getField": "output.result.message"},
-                            "substr": {"$literal": "completed"},
-                            "case_insensitive": True,
-                        }
                     },
                     # Light condition
                     {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]},
@@ -1096,21 +1101,18 @@ def test_calls_query_with_complex_heavy_filters() -> None:
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
-        AND
-            (calls_merged.id IN filtered_calls)
-        AND (((calls_merged.inputs_dump LIKE {pb_10:String} OR calls_merged.inputs_dump IS NULL))
-        AND (((JSON_VALUE(calls_merged.inputs_dump, {pb_4:String}) > {pb_5:UInt64}) OR calls_merged.inputs_dump IS NULL))
-        AND ((calls_merged.output_dump LIKE {pb_11:String} OR calls_merged.output_dump IS NULL))
-        AND ((lower(calls_merged.output_dump) LIKE {pb_12:String} OR calls_merged.output_dump IS NULL)))
+          AND (calls_merged.id IN filtered_calls)
+          AND (
+            (calls_merged.inputs_dump LIKE {pb_10:String} OR calls_merged.inputs_dump IS NULL)
+            AND ((calls_merged.output_dump LIKE {pb_11:String} OR calls_merged.output_dump IS NULL)
+                OR (lower(calls_merged.inputs_dump) LIKE {pb_12:String} OR calls_merged.inputs_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
             AND
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) > {pb_5:UInt64}))
-            AND
-            ((JSON_VALUE(any(calls_merged.output_dump), {pb_6:String}) = {pb_7:String}))
-            AND
-            (positionCaseInsensitive(JSON_VALUE(any(calls_merged.output_dump), {pb_8:String}), {pb_9:String}) > 0)
+            AND (((JSON_VALUE(any(calls_merged.output_dump), {pb_6:String}) = {pb_7:String})
+              OR positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), {pb_9:String}) > 0))
         )
         """,
         {
@@ -1122,7 +1124,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             "pb_5": 5,
             "pb_6": '$."result"."status"',
             "pb_7": "success",
-            "pb_8": '$."result"."message"',
+            "pb_8": '$."param"."message"',
             "pb_9": "completed",
             "pb_10": '%"hello"%',
             "pb_11": '%"success"%',
@@ -1155,7 +1157,7 @@ def test_calls_query_with_like_optimization() -> None:
         WHERE
             calls_merged.project_id = {pb_3:String}
         AND
-            (calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)
+            ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
@@ -1197,7 +1199,7 @@ def test_calls_query_with_like_optimization_contains() -> None:
         WHERE
             calls_merged.project_id = {pb_3:String}
         AND
-            (lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)
+            ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             (positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), {pb_1:String}) > 0)
@@ -1238,9 +1240,8 @@ def test_query_with_json_value_in_condition() -> None:
         WHERE
             calls_merged.project_id = {pb_5:String}
         AND
-            ((calls_merged.inputs_dump LIKE {pb_3:String}
-             OR calls_merged.inputs_dump LIKE {pb_4:String})
-             OR calls_merged.inputs_dump IS NULL)
+            (((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump LIKE {pb_4:String})
+                OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) IN ({pb_1:String},{pb_2:String})))
@@ -1331,13 +1332,10 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             calls_merged.project_id = {pb_1:String}
         AND
             (calls_merged.id IN filtered_calls)
-        AND (((calls_merged.attributes_dump LIKE {pb_9:String}
-               OR calls_merged.attributes_dump IS NULL))
-             AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
-                   OR calls_merged.inputs_dump IS NULL))
-             AND (((calls_merged.attributes_dump LIKE {pb_11:String}
-                    OR calls_merged.attributes_dump LIKE {pb_12:String})
-                   OR calls_merged.attributes_dump IS NULL)))
+            AND ((calls_merged.attributes_dump LIKE {pb_9:String} OR calls_merged.attributes_dump IS NULL)
+            AND (lower(calls_merged.inputs_dump) LIKE {pb_10:String} OR calls_merged.inputs_dump IS NULL)
+            AND ((calls_merged.attributes_dump LIKE {pb_11:String} OR calls_merged.attributes_dump LIKE {pb_12:String})
+                OR calls_merged.attributes_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.attributes_dump), {pb_2:String}) = {pb_3:String}))
@@ -1365,17 +1363,21 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
     )
 
 
-def test_calls_query_filter_by_empty_str() -> None:
+def test_calls_query_with_unoptimizable_or_condition() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
     cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": "hello"}]},
+                    {"$gt": [{"$getField": "inputs.param.number"}, {"$literal": 10}]},
+                ]
+            }
         )
     )
-    # Empty string is not a valid value for LIKE optimization, this test is to ensure that
-    # the query builder uses the JSON_VALUE function in the WHERE.
+
     assert_sql(
         cq,
         """
@@ -1384,10 +1386,45 @@ def test_calls_query_filter_by_empty_str() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            calls_merged.project_id = {pb_2:String}
-        AND
-            ((JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}) = {pb_1:String})
-             OR calls_merged.inputs_dump IS NULL)
+            calls_merged.project_id = {pb_5:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((
+            (JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
+            OR (JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) > {pb_3:UInt64})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."param"."number"',
+            "pb_3": 10,
+            "pb_4": '%"hello"%',
+            "pb_5": "project",
+        },
+    )
+
+
+def test_calls_query_filter_by_empty_string() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
+        )
+    )
+    # Empty string is not a valid value for LIKE optimization, this test ensures we do
+    # not try to optimize
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
@@ -1560,3 +1597,126 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         """,
         {"pb_0": "my_model", "pb_1": "project"},
     )
+
+
+def test_storage_size_fields():
+    """Test querying with storage size fields"""
+    cq = CallsQuery(project_id="test/project", include_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id,
+           any(storage_size_tbl.storage_size_bytes) AS storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN
+        (SELECT id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) as storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY id) as storage_size_tbl on calls_merged.id = storage_size_tbl.id
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": "test/project"},
+    )
+
+
+def test_total_storage_size():
+    """Test querying with total storage size"""
+    cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("total_storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            CASE
+                WHEN any(calls_merged.parent_id) IS NULL
+                THEN any(rolled_up_cms.total_storage_size_bytes)
+                ELSE NULL
+            END AS total_storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN (SELECT
+            trace_id,
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY trace_id) as rolled_up_cms
+        on calls_merged.trace_id = rolled_up_cms.trace_id
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": "test/project"},
+    )
+
+
+def test_aggregated_data_size_field():
+    """Test the AggregatedDataSizeField class"""
+    field = AggregatedDataSizeField(
+        field="total_storage_size_bytes", join_table_name="rolled_up_cms"
+    )
+    pb = ParamBuilder()
+
+    # Test SQL generation
+    sql = field.as_select_sql(pb, "calls_merged")
+    assert "CASE" in sql
+    assert "parent_id" in sql
+    assert "rolled_up_cms.total_storage_size_bytes" in sql
+
+
+def test_filter_length_validation():
+    """Test that filter length validation works"""
+    pb = ParamBuilder()
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"op_names": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
+    )
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)

@@ -297,17 +297,19 @@ def _create_call(
     )
 
 
-def _should_skip_tracing(op: Op) -> bool:
+def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
     if weave_client_context.get_weave_client() is None:
         log_once(logger.warn, UNINITIALIZED_MSG)
         return True
-    if not op._tracing_enabled:
-        return True
     if not get_tracing_enabled():
         return True
     return False
+
+
+def should_skip_tracing_for_op(op: Op) -> bool:
+    return not op._tracing_enabled
 
 
 def _should_sample_traces(op: Op) -> bool:
@@ -320,17 +322,17 @@ def _should_sample_traces(op: Op) -> bool:
     return False
 
 
-def _placeholder_call() -> Call:
+def placeholder_call() -> Call:
     # Import here to avoid circular dependency
-    from weave.trace.weave_client import Call
+    from weave.trace.weave_client import NoOpCall
 
-    return Call(
-        _op_name="",
-        trace_id="",
-        project_id="",
-        parent_id=None,
-        inputs={},
-    )
+    return NoOpCall()
+
+
+def is_placeholder_call(call: Call) -> bool:
+    from weave.trace.weave_client import NoOpCall
+
+    return isinstance(call, NoOpCall)
 
 
 def _call_sync_func(
@@ -341,10 +343,10 @@ def _call_sync_func(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if _should_skip_tracing(op):
+    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = func(*args, **kwargs)
         call.output = res
         return res, call
@@ -429,10 +431,10 @@ async def _call_async_func(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if _should_skip_tracing(op):
+    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = await func(*args, **kwargs)
         call.output = res
         return res, call

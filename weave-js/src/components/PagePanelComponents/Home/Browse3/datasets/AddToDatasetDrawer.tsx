@@ -1,5 +1,5 @@
 import {Box, Typography} from '@mui/material';
-import React, {useCallback, useEffect} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {toast} from 'react-toastify';
 
 import {maybePluralize} from '../../../../../core/util/string';
@@ -8,6 +8,7 @@ import {WaveLoader} from '../../../../Loaders/WaveLoader';
 import {useWeaveflowRouteContext} from '../context';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
+import {useClientSideCallRefExpansion} from '../pages/wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {
   ACTION_TYPES,
   DatasetDrawerProvider,
@@ -26,7 +27,7 @@ interface AddToDatasetDrawerProps {
   project: string;
   open: boolean;
   onClose: () => void;
-  selectedCalls: CallData[];
+  selectedCallIds: string[];
 }
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
@@ -34,7 +35,7 @@ const typographyStyle = {fontFamily: 'Source Sans Pro'};
 export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = props => {
   return (
     <DatasetDrawerProvider
-      selectedCalls={props.selectedCalls}
+      selectedCallIds={props.selectedCallIds}
       onClose={props.onClose}
       entity={props.entity}
       project={props.project}>
@@ -48,7 +49,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   onClose,
   entity,
   project,
-  selectedCalls,
+  selectedCallIds,
 }) => {
   const {
     state,
@@ -61,6 +62,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     resetDrawerState,
     isNextDisabled,
     editorContext,
+    processRowsForEditor,
   } = useDatasetDrawer();
 
   const {
@@ -79,11 +81,83 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   } = state;
 
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useRootObjectVersions, useTableUpdate, useObjCreate, useTableCreate} =
-    useWFHooks();
+  const {
+    useRootObjectVersions,
+    useTableUpdate,
+    useObjCreate,
+    useTableCreate,
+    useCalls,
+  } = useWFHooks();
   const tableUpdate = useTableUpdate();
   const objCreate = useObjCreate();
   const tableCreate = useTableCreate();
+
+  // Fetch call data using the selectedCallIds
+  const callsData = useCalls(
+    entity,
+    project,
+    {callIds: selectedCallIds},
+    selectedCallIds.length // limit to fetch all selected calls
+  );
+
+  // Recursively expand all refs in inputs and output
+  const expandRefColumns = useMemo(() => new Set(['inputs', 'output']), []);
+
+  // Use the enhanced useClientSideCallRefExpansion hook with recursiveUnwrap option,
+  // but only for inputs.* fields
+  const {expandedCalls, isExpanding} = useClientSideCallRefExpansion(
+    callsData,
+    expandRefColumns,
+    {expansionDepth: 1, expandAttr: true}
+  );
+
+  const isDataLoading = useMemo(() => {
+    const hasCallData =
+      !callsData.loading && callsData.result && callsData.result.length > 0;
+
+    if (hasCallData && expandedCalls.length === 0 && !isExpanding) {
+      return false;
+    }
+
+    return callsData.loading || isExpanding;
+  }, [callsData.loading, callsData.result, expandedCalls.length, isExpanding]);
+
+  // Transform fetched call data into the format expected by the drawer
+  const selectedCalls: CallData[] = useMemo(() => {
+    if (
+      !callsData.loading &&
+      callsData.result &&
+      callsData.result.length > 0 &&
+      expandedCalls.length === 0 &&
+      !isExpanding
+    ) {
+      return callsData.result
+        .filter(call => call?.traceCall != null)
+        .map(call => ({
+          digest: call.traceCall!.id,
+          val: call.traceCall!,
+        }));
+    }
+
+    // Normal case - use expanded calls when they're available
+    if (isDataLoading || expandedCalls.length === 0) {
+      return [];
+    }
+
+    // All references are already expanded by the useClientSideCallRefExpansion hook
+    return expandedCalls
+      .filter(call => call != null)
+      .map(call => ({
+        digest: call.id,
+        val: call,
+      }));
+  }, [
+    isDataLoading,
+    expandedCalls,
+    callsData.loading,
+    callsData.result,
+    isExpanding,
+  ]);
 
   // Access edit context methods through the drawer context's editorContext property
   const {getRowsNoMeta, convertEditsToTableUpdateSpec, resetEditState} =
@@ -120,6 +194,14 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
       });
     }
   }, [selectedCalls, dispatch]);
+
+  // Process rows when moving to step 2
+  useEffect(() => {
+    // Only process rows when we've loaded calls and we're on step 2
+    if (selectedCalls.length > 0 && currentStep === 2) {
+      processRowsForEditor(selectedCalls);
+    }
+  }, [selectedCalls, currentStep, processRowsForEditor]);
 
   const projectId = `${entity}/${project}`;
 
@@ -171,7 +253,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
       toast(
         <DatasetPublishToast
           message={`${maybePluralize(
-            selectedCalls.length,
+            selectedCallIds.length,
             'example'
           )} added to dataset`}
           url={result.url}
@@ -206,7 +288,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     projectId,
     entity,
     project,
-    selectedCalls.length,
+    selectedCallIds.length,
     getRowsNoMeta,
     tableCreate,
     objCreate,
@@ -358,7 +440,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
                   fontWeight: 600,
                   fontSize: '1.25rem',
                 }}>
-                Add example{selectedCalls.length !== 1 ? 's' : ''} to dataset
+                Add example{selectedCallIds.length !== 1 ? 's' : ''} to dataset
               </Typography>
             </Box>
             <Box sx={{display: 'flex', gap: 1}}>
@@ -402,7 +484,20 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
                 </Typography>
               </Box>
             )}
-            {renderStepContent()}
+            {isDataLoading ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  flex: 1,
+                  minHeight: '300px',
+                }}>
+                <WaveLoader size="huge" />
+              </Box>
+            ) : (
+              renderStepContent()
+            )}
           </Box>
           <Box
             sx={{

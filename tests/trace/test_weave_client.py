@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import json
 import platform
+import re
 import sys
 import time
 import uuid
@@ -21,6 +22,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
+from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -1995,6 +1997,298 @@ def test_repeated_flushing(client):
     assert client._has_pending_jobs() == False
 
 
+def test_calls_query_filter_by_strings(client):
+    """Test string filter optimization with nested queries."""
+    test_id = str(uuid.uuid4())
+
+    @weave.op()
+    def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
+        return {
+            "test_id": test_id,
+            "name": name,
+            "tags": tags,
+            "value": value,
+            "active": active,
+        }
+
+    @weave.op
+    def dummy_op():
+        return {"woooo": "test"}
+
+    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, "True")
+    test_op(test_id, "beta_test", ["backend", "api"], 200, "False")
+    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, "True")
+    test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
+    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
+
+    for i in range(10):
+        dummy_op()
+
+    # Flush to ensure all calls are persisted
+    client.flush()
+
+    # Basic filter - should return all 5 calls
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5
+
+    # Filter with string contains - should return 5 calls (name contains "test")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "test"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5  # All names contain "test"
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with string contains - should return 1 call (name contains "alpha")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "alpha"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 100
+
+    # Filter with string in - should return 2 calls (tags contains "api")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.name"},
+                            [
+                                {"$literal": "delta_test"},
+                                {"$literal": "gamma_test"},
+                            ],
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with boolean - should return 3 calls (active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with OR - should return 4 calls (name contains "alpha" or "beta" or value > 300)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$or": [
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "alpha"},
+                                }
+                            },
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "beta"},
+                                }
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "300"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    # name has alpha or beta or value > 300
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 4
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Complex nested filter - should return exactly 1 call (name contains "epsilon" and active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "epsilon"},
+                        }
+                    },
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "epsilon_test"
+    assert calls[0].output["name"] == "epsilon_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 500
+
+    # Extremely complex nested filter with multiple levels of nesting
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # Condition 1: Must match the test_id
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    # Condition 2: Name must contain "alpha" and be active, OR contain "delta" and be inactive
+                    {
+                        "$or": [
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "alpha"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {"$literal": "True"},
+                                        ]
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "delta"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {
+                                                "$literal": "False"
+                                            },  # should filter out beta
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                    # Condition 3: Value must be >= 400, OR active must be true
+                    {
+                        "$or": [
+                            {
+                                "$gte": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "400"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.active"},
+                                    {"$literal": "True"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+
+    # Test breakdown:
+    # 1. We create a complex query with multiple conditions:
+    #    - Condition 1: name must be "alpha_test" AND value must be >= 100
+    #    - Condition 2: name must be "beta_test" AND value must be < 200
+    #    - Condition 3: name must be "delta_test" AND (value >= 400 OR active must be true)
+    # 2. The query uses $and to combine these three conditions, meaning all must be satisfied
+    # 3. We expect exactly 2 calls to match:
+    #    - One with name "alpha_test" (matching condition 1)
+    #    - One with name "delta_test" (matching condition 3)
+    # 4. The test verifies both the count and the specific names of the matching calls
+
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[1].inputs["name"] == "delta_test"
+    assert calls[1].output["name"] == "delta_test"
+    for call in calls:
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+
 def test_calls_query_sort_by_status(client):
     """Test that sort_by summary.weave.status works with get_calls."""
     # Use a unique test ID to identify these calls
@@ -2389,3 +2683,84 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
     # Verify they all have the same op_name
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
+
+
+async def test_tracing_enabled_context(client):
+    """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
+    from weave.trace.weave_client import Call
+
+    @weave.op()
+    def test_op():
+        return "test"
+
+    # Test create_call with tracing enabled
+    call = await client.create_call(test_op, {})
+    assert isinstance(call, Call)
+    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert len(list(client.get_calls())) == 1  # Verify only one call was created
+
+    # Test create_call with tracing disabled
+    with tracing_disabled():
+        call = client.create_call(test_op, {})
+        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
+        assert (
+            len(list(client.get_calls())) == 1
+        )  # Verify no additional calls were created
+
+    # Test finish_call with tracing disabled
+    with tracing_disabled():
+        client.finish_call(call)  # Should not raise any error
+
+
+def test_calls_query_hardcoded_filter_length_validation(client):
+    @weave.op
+    def test():
+        return {"foo": "bar"}
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'call_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"call_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'op_names' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"op_names": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'input_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"input_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'output_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"output_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'parent_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"parent_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'trace_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]

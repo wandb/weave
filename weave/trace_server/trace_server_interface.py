@@ -3,7 +3,12 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+)
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -118,6 +123,12 @@ class CallSchema(BaseModel):
 
     deleted_at: Optional[datetime.datetime] = None
 
+    # Size of metadata storage for this call
+    storage_size_bytes: Optional[int] = None
+
+    # Total size of metadata storage for the entire trace
+    total_storage_size_bytes: Optional[int] = None
+
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -212,6 +223,28 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
+class OtelExportReq(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    project_id: str
+    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
+    traces: Any
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ExportTracePartialSuccess(BaseModel):
+    rejected_spans: int
+    error_message: str
+
+
+# Spec requires that the response be of type Export<signal>ServiceResponse
+# https://opentelemetry.io/docs/specs/otlp/
+class OtelExportRes(BaseModel):
+    partial_success: Optional[ExportTracePartialSuccess] = Field(
+        default=None,
+        description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
+    )
+
+
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
 
@@ -251,6 +284,8 @@ class CallReadReq(BaseModel):
     project_id: str
     id: str
     include_costs: Optional[bool] = False
+    include_storage_size: Optional[bool] = False
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
@@ -351,6 +386,16 @@ class CallsQueryReq(BaseModel):
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include feedback for each call.",
+    )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the storage size for a call.",
+    )
+    include_total_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the total storage size for a trace.",
     )
 
     # TODO: type this with call schema columns, following the same rules as
@@ -923,6 +968,9 @@ class TraceServerInterface(Protocol):
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    # OTEL API
+    def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

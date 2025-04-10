@@ -101,6 +101,7 @@ const sidebars: SidebarsConfig = {
             "guides/core-types/datasets",
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
+            "guides/evaluation/weave_local_scorers",
           ]
         },
       ],
@@ -190,6 +191,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/dspy",
             "guides/integrations/instructor",
             "guides/integrations/crewai",
+            "guides/integrations/smolagents",
           ],
         },
       ],
