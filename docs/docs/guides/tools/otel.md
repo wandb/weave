@@ -19,7 +19,7 @@ Once ingested, trace data can be used to visualize, compare, and correlate with 
 6. Try an example use case.
 
 ## API endpoint details
-- **URL**: `https://api.wandb.ai/otel/v1/traces`
+- **URL**: `https://trace.wandb.ai/otel/v1/traces`
 - **Method**: `POST`
 - **Content-Type**: `application/x-protobuf`
 - **Body**: A serialized `ExportTraceServiceRequest` protobuf
@@ -63,7 +63,7 @@ To use this script, replace `ExampleCorp/AwesomeProject` and `YOUR_WANDB_API_KEY
 ```python
 import base64
 
-WANDB_BASE_URL = 'https://api.wandb.ai'
+WANDB_BASE_URL = 'https://trace.wandb.ai'
 PROJECT_ID = "ExampleCorp/AwesomeProject"
 WANDB_PASSWORD = "YOUR_WANDB_API_KEY"
 
@@ -86,7 +86,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 import os
 
 os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = "Authorization=Basic <ENCODED>,project_id=ExampleCorp/AwesomeProject"
-otlp_exporter = OTLPSpanExporter(endpoint="https://api.wandb.ai/otel/v1/traces")
+otlp_exporter = OTLPSpanExporter(endpoint="https://trace.wandb.ai/otel/v1/traces")
 
 # Your additional configurations depend on your environment
 ```
@@ -134,12 +134,12 @@ if __name__ == "__main__":
     main()
 ```
 
-To use this code sample, run the following commands in your terminal:
+To use this code sample, Ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py:
 
 ```bash
 uv init
 uv add dotenv openai opentelemetry-api opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai opentelemetry-sdk
-uv run script.py
+uv run main.py
 ```
 
 ### Use OpenInference's `OpenAIInstrumentor`
@@ -182,10 +182,10 @@ if __name__ == "__main__":
     main()
 ```
 
-To use this code sample, run the following commands in your terminal:
+To use this code sample, Ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py
 
 ```bash
 uv init
 uv add dotenv openai openinference-instrumentation-openai openinference-semantic-conventions opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai
-uv run script.py
+uv run main.py
 ```
