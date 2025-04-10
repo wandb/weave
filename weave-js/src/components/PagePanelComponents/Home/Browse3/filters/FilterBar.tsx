@@ -231,19 +231,14 @@ export const FilterBar = ({
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
-
-      // Apply filter removal immediately since this is a deliberate user action
-      const completeFilterItems = items.filter(
-        item => !isFilterIncomplete(item)
-      );
-      setFilterModel({...localFilterModel, items: completeFilterItems});
+      applyCompletedFilters(newModel);
 
       // Clear active edit if removed
       if (activeEditId === filterId) {
         setActiveEditId(null);
       }
     },
-    [localFilterModel, setFilterModel, activeEditId]
+    [localFilterModel, applyCompletedFilters, activeEditId]
   );
 
   const onSetSelected = useCallback(() => {
@@ -269,19 +264,19 @@ export const FilterBar = ({
 
     // Apply filter immediately (won't be incomplete)
     setLocalFilterModel(newModel);
-
-    // Use the consistent filter application
-    const completeFilters = newModel.items.filter(
-      item => !isFilterIncomplete(item)
-    );
-    setFilterModel({...newModel, items: completeFilters});
+    applyCompletedFilters(newModel);
 
     clearSelectedCalls();
     setAnchorEl(null);
 
     // Clear active edit when popover is closed
     setActiveEditId(null);
-  }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
+  }, [
+    localFilterModel,
+    applyCompletedFilters,
+    selectedCalls,
+    clearSelectedCalls,
+  ]);
 
   const onFilterTagClick = useCallback((filterId: FilterId) => {
     setActiveEditId(filterId);
