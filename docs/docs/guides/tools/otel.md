@@ -134,7 +134,7 @@ if __name__ == "__main__":
     main()
 ```
 
-To use this code sample, Ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py:
+To use this code sample, ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py:
 
 ```bash
 uv init
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     main()
 ```
 
-To use this code sample, Ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py
+To use this code sample, ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py
 
 ```bash
 uv init
