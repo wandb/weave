@@ -13,23 +13,27 @@ This page describes how to use W&B Weave with the Google Vertex AI API and the G
 You can use Weave to evaluate, monitor, and iterate on your Google GenAI applications. Weave automatically captures traces for the:
 
 1. [Google Vertex AI API](https://cloud.google.com/vertex-ai/docs), which provides access to Google’s Gemini models and [various partner models](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models).
-2. [Google Gemini API](https://ai.google.dev/gemini-api/docs/quickstart?lang=python), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.
+2. [Google GenAI SDK](https://github.com/googleapis/python-genai), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.
 
 ## Get started
 
-Weave will automatically capture traces for [Gemini API SDK](https://ai.google.dev/gemini-api/docs/quickstart?lang=python). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
+Weave will automatically capture traces for [Google GenAI SDK](https://github.com/googleapis/python-genai). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
 ```python
 import os
-import google.generativeai as genai
+from google import genai
 import weave
 
-weave.init(project_name="google-ai-studio-test")
+weave.init(project_name="google-genai")
 
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-model = genai.GenerativeModel("gemini-1.5-flash")
-response = model.generate_content("Write a story about an AI and magic")
+google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY"))
+response = google_client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents="What's the capital of France?",
+)
 ```
+
+[![dspy_trace.png](imgs/google-genai-trace.png)](https://wandb.ai/geekyrakshit/google-genai/weave/traces)
 
 Weave will also automatically capture traces for [Vertex APIs](https://cloud.google.com/vertexai/docs). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
@@ -56,20 +60,19 @@ In the example below, we have the function `recommend_places_to_visit` which is 
 
 ```python
 import os
-import google.generativeai as genai
+from google import genai
 import weave
 
-weave.init(project_name="google_ai_studio-test")
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+weave.init(project_name="google-genai")
+google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY"))
 
 
 @weave.op()
 def recommend_places_to_visit(city: str, model: str = "gemini-1.5-flash"):
-    model = genai.GenerativeModel(
-        model_name=model,
-        system_instruction="You are a helpful assistant meant to suggest all budget-friendly places to visit in a city",
+    response = google_client.models.generate_content(
+        model=model,
+        contents="You are a helpful assistant meant to suggest all budget-friendly places to visit in a city",
     )
-    response = model.generate_content(city)
     return response.text
 
 
@@ -77,6 +80,8 @@ recommend_places_to_visit("New York")
 recommend_places_to_visit("Paris")
 recommend_places_to_visit("Kolkata")
 ```
+
+[![dspy_trace.png](imgs/google-genai-ops.png)](https://wandb.ai/geekyrakshit/google-genai/weave/traces)
 
 ## Create a `Model` for easier experimentation
 
@@ -88,8 +93,11 @@ In the example below, you can experiment with `CityVisitRecommender`. Every time
 
 ```python
 import os
-import google.generativeai as genai
+from google import genai
 import weave
+
+weave.init(project_name="google-genai")
+google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY"))
 
 
 class CityVisitRecommender(weave.Model):
@@ -97,27 +105,15 @@ class CityVisitRecommender(weave.Model):
 
     @weave.op()
     def predict(self, city: str) -> str:
-        model = genai.GenerativeModel(
-            model_name=self.model,
-            system_instruction="You are a helpful assistant meant to suggest all budget-friendly places to visit in a city",
+        response = google_client.models.generate_content(
+            model=self.model,
+            contents="You are a helpful assistant meant to suggest all budget-friendly places to visit in a city",
         )
-        response = model.generate_content(city)
         return response.text
 
 
-weave.init(project_name="google_ai_studio-test")
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 city_recommender = CityVisitRecommender(model="gemini-1.5-flash")
 print(city_recommender.predict("New York"))
 print(city_recommender.predict("San Francisco"))
 print(city_recommender.predict("Los Angeles"))
 ```
-
-### Serving a Weave Model
-
-Given a weave reference to any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it. You can serve your model by using the following command in the terminal:
-
-```shell
-weave serve weave:///your_entity/project-name/YourModel:<hash>
-```
-
