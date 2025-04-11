@@ -739,19 +739,30 @@ const CallPageBinding = () => {
   const initialShowFeedback = getOptionalBoolean(query, SHOW_FEEDBACK_PARAM);
 
   // Memoize the URL updater to avoid recreating the provider on every render
-  const setShowFeedbackInUrl = useCallback((showFeedback: boolean | undefined) => {
-    history.push(
-      currentRouter.callUIUrl(
-        entity,
-        project,
-        '',
-        rootCallId,
-        descendentCallId,
-        hideTraceTree,
-        showFeedback
-      )
-    );
-  }, [currentRouter, entity, project, rootCallId, descendentCallId, hideTraceTree, history]);
+  const setShowFeedbackInUrl = useCallback(
+    (showFeedback: boolean | undefined) => {
+      history.push(
+        currentRouter.callUIUrl(
+          entity,
+          project,
+          '',
+          rootCallId,
+          descendentCallId,
+          hideTraceTree,
+          showFeedback
+        )
+      );
+    },
+    [
+      currentRouter,
+      entity,
+      project,
+      rootCallId,
+      descendentCallId,
+      hideTraceTree,
+      history,
+    ]
+  );
 
   return (
     <FeedbackProvider
