@@ -1,10 +1,13 @@
 import base64
+import logging
 from typing import Optional, TypedDict, Union
 
 from google.oauth2.credentials import Credentials as GCPCredentials
 from typing_extensions import NotRequired
 
 from weave.trace_server import environment
+
+logger = logging.getLogger(__name__)
 
 
 class AWSCredentials(TypedDict):
@@ -29,7 +32,7 @@ class AzureAccountCredentials(TypedDict):
     account_url: NotRequired[Optional[str]]
 
 
-def get_aws_credentials() -> AWSCredentials:
+def get_aws_credentials() -> Optional[AWSCredentials]:
     """Retrieves AWS credentials from environment variables.
 
     Required env vars:
@@ -48,7 +51,7 @@ def get_aws_credentials() -> AWSCredentials:
     secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
     session_token = environment.wf_storage_bucket_aws_session_token()
     if access_key_id is None or secret_access_key is None:
-        raise ValueError("AWS credentials not set")
+        return None
 
     creds = AWSCredentials(
         access_key_id=access_key_id,
