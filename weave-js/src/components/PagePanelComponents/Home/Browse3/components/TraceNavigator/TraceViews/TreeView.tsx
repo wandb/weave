@@ -1,8 +1,14 @@
+import {Popover} from '@mui/material';
 import {MOON_900, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {DraggableGrow, DraggableHandle} from '@wandb/weave/components/DraggablePopups';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import * as Switch from '@wandb/weave/components/Switch';
+import {IconOnlyPill, Pill} from '@wandb/weave/components/Tag/Pill';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {maybePluralize} from '@wandb/weave/core/util/string';
 import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
@@ -39,6 +45,11 @@ interface TreeNodeProps {
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
   searchQuery?: string;
+  visibleColumns: {
+    tokens: boolean;
+    cost: boolean;
+    duration: boolean;
+  };
 }
 
 const TreeNode: React.FC<TreeNodeProps> = ({
@@ -50,6 +61,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onToggleExpand,
   deemphasizeCallIds,
   searchQuery,
+  visibleColumns,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
@@ -150,34 +162,42 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
-            <div className="flex items-center gap-2 text-right">
-              {cost !== undefined && (
+            <div className="flex items-center gap-4 text-right">
+              {tokens !== undefined && visibleColumns.tokens && (
+                <TraceStat
+                  label={tokens}
+                  tooltip={
+                    <div className="text-white-800">
+                      <span style={{fontWeight: 600}}>Estimated tokens</span>
+                      {tokenToolTipContent}
+                    </div>
+                  }
+                  className="justify-end text-xs text-moon-400 min-w-[40px]"
+                />
+              )}
+              {cost !== undefined && visibleColumns.cost && (
                 <TraceStat
                   label={cost}
                   tooltip={
                     <div className="text-white-800">
                       {costToolTipContent}
-                      {tokens && (
-                        <>
-                          <br />
-                          <span style={{fontWeight: 600}}>
-                            Estimated tokens
-                          </span>
-                        </>
-                      )}
-                      {tokens && tokenToolTipContent}
                     </div>
                   }
-                  className="text-xs text-moon-400"
+                  className="justify-end text-xs text-moon-400 min-w-[40px]"
                 />
               )}
-              {duration !== null && (
+              {duration !== null && visibleColumns.duration && (
                 <span className="min-w-[32px] text-moon-400">
                   {formatDuration(duration)}
                 </span>
               )}
             </div>
-            <StatusChip value={statusCode} iconOnly />
+            {statusCode !== 'SUCCESS' ? (
+              <StatusChip value={statusCode} iconOnly />
+            ) : (
+              // Else show placeholder
+              <div className="w-[22px]" />
+            )}
           </div>
         </div>
       </div>
@@ -190,6 +210,12 @@ interface TreeViewHeaderProps {
   onSearchChange: (value: string) => void;
   strictSearch: boolean;
   onToggleStrictSearch: () => void;
+  visibleColumns: {
+    tokens: boolean;
+    cost: boolean;
+    duration: boolean;
+  };
+  onToggleColumnVisibility: (column: keyof TreeViewHeaderProps['visibleColumns']) => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
@@ -197,7 +223,24 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   onSearchChange,
   strictSearch,
   onToggleStrictSearch,
+  visibleColumns,
+  onToggleColumnVisibility,
 }) => {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(anchorEl ? null : buttonRef.current);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+  const open = Boolean(anchorEl);
+  const columnLabels: Record<keyof typeof visibleColumns, string> = {
+    tokens: 'Token Usage',
+    cost: 'Cost',
+    duration: 'Duration'
+  };
+
   return (
     <div className="flex items-center p-8 text-sm">
       <TextField
@@ -232,6 +275,70 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
           )
         }
       />
+      <div ref={buttonRef} className="ml-4">
+        <Button
+          variant="ghost"
+          icon="column"
+          tooltip="Manage fields"
+          onClick={handleClick}
+        />
+      </div>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        onClose={handleClose}
+        slotProps={{
+          paper: {
+            sx: {
+              overflow: 'visible',
+            },
+          },
+        }}
+        TransitionComponent={DraggableGrow}>
+        <Tailwind>
+          <div className="min-w-[150px] p-12">
+            <DraggableHandle>
+              <div className="flex items-center pb-8">
+                <div className="flex-auto font-semibold">
+                  Manage fields
+                </div>
+              </div>
+            </DraggableHandle>
+            <div className="max-h-[300px] overflow-auto">
+              {Object.entries(visibleColumns).map(([column, isVisible]) => {
+                const idSwitch = `toggle-vis_${column}`;
+                const columnKey = column as keyof typeof visibleColumns;
+                return (
+                  <div key={column}>
+                    <div className="flex items-center py-2">
+                      <Switch.Root
+                        id={idSwitch}
+                        size="small"
+                        checked={isVisible}
+                        onCheckedChange={() => onToggleColumnVisibility(columnKey)}>
+                        <Switch.Thumb size="small" checked={isVisible} />
+                      </Switch.Root>
+                      <label
+                        htmlFor={idSwitch}
+                        className="ml-6 cursor-pointer">
+                        {columnLabels[columnKey]}
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Tailwind>
+      </Popover>
     </div>
   );
 };
@@ -239,6 +346,18 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
   const [strictSearch, setStrictSearch] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    tokens: false,
+    cost: false,
+    duration: true,
+  });
+
+  const handleToggleColumnVisibility = (column: keyof typeof visibleColumns) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [column]: !prev[column],
+    }));
+  };
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     // First find direct matches
@@ -329,6 +448,8 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         onSearchChange={setSearchQuery}
         strictSearch={strictSearch}
         onToggleStrictSearch={() => setStrictSearch(!strictSearch)}
+        visibleColumns={visibleColumns}
+        onToggleColumnVisibility={handleToggleColumnVisibility}
       />
       <div className="flex-1 overflow-hidden">
         <TreeView
@@ -336,6 +457,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           filterCallIds={filteredCallIds}
           deemphasizeCallIds={deemphasizeCallIds}
           searchQuery={searchQuery}
+          visibleColumns={visibleColumns}
         />
       </div>
       <TraceScrubber
@@ -352,6 +474,11 @@ export const TreeView: React.FC<
     filterCallIds?: string[];
     deemphasizeCallIds?: string[];
     searchQuery?: string;
+    visibleColumns: {
+      tokens: boolean;
+      cost: boolean;
+      duration: boolean;
+    };
   }
 > = ({
   traceTreeFlat,
@@ -361,6 +488,7 @@ export const TreeView: React.FC<
   deemphasizeCallIds,
   setRootCallId,
   searchQuery,
+  visibleColumns,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
@@ -459,6 +587,7 @@ export const TreeView: React.FC<
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
         searchQuery={searchQuery}
+        visibleColumns={visibleColumns}
       />
     );
   };
