@@ -114,6 +114,7 @@ def test_mcp_client(client: WeaveClient) -> None:
     call_tool_call = next(
         call for call, _ in flattened_calls if "call_tool.add" in call.op_name
     )
+    print("call_tool_call", call_tool_call)
 
     # outputs
     text_content = call_tool_call.output.content[0].text
@@ -159,6 +160,7 @@ def test_mcp_server(client: WeaveClient) -> None:
     assert len(calls) == 3
 
     flattened_calls = flatten_calls(calls)
+    print(len(flattened_calls))
 
     call_0, _ = flattened_calls[0]
     assert call_0._display_name == "FastMCP.call_tool"
@@ -187,6 +189,7 @@ def test_mcp_server(client: WeaveClient) -> None:
     assert call_3.started_at < call_3.ended_at
 
     call_4, _ = flattened_calls[4]
+    print(call_4)
     assert call_4._display_name == "review_code"
     assert call_4.inputs["code"] == "print('Hello, world!')"
     assert call_4.output == "Please review this code:\\n\\nprint('Hello, world!')"
