@@ -13,8 +13,10 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
+import contextlib
 import datetime
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from typing import TYPE_CHECKING, Optional, Union
 
 from pydantic import BaseModel
@@ -34,6 +36,38 @@ START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
+
+DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
+
+
+# Context for tracking if we're in a NOT operation
+class OptimizationContext:
+    # Track NOT nesting depth
+    _not_depth = 0
+
+    @classmethod
+    @contextlib.contextmanager
+    def not_context(cls) -> Generator[None, None, None]:
+        """Context manager for NOT operations.
+
+        Properly handles nested NOT operations by tracking depth.
+        In boolean logic:
+        - NOT(expr) flips the result
+        - NOT(NOT(expr)) is equivalent to expr
+        - NOT(NOT(NOT(expr))) is equivalent to NOT(expr)
+
+        So we only apply special handling when nesting depth is odd.
+        """
+        cls._not_depth += 1
+        try:
+            yield
+        finally:
+            cls._not_depth -= 1
+
+    @classmethod
+    def is_in_not_context(cls) -> bool:
+        """Check if we're in a NOT context with odd nesting depth."""
+        return cls._not_depth % 2 == 1
 
 
 def _field_requires_null_check(field: str) -> bool:
@@ -128,7 +162,12 @@ class QueryOptimizationProcessor(ABC):
 
     def process_not(self, operation: tsi_query.NotOperation) -> Optional[str]:
         """Process NOT operations into optimized SQL."""
-        result = self.process_operand(operation.not_[0])
+        if len(operation.not_) != 1:
+            return None
+
+        with OptimizationContext.not_context():
+            result = self.process_operand(operation.not_[0])
+
         if result is None:
             return None
         return f"NOT ({result})"
@@ -525,7 +564,12 @@ def _create_datetime_optimization_sql(
     table_alias: str,
     op_str: str,
 ) -> Optional[str]:
-    """Creates SQL for datetime optimization using indexed sortable_datetime column."""
+    """Creates SQL for datetime optimization using indexed sortable_datetime column.
+
+    Applies a buffer to the timestamp to make the filter more permissive:
+    - For normal context: Subtracts buffer from timestamp
+    - For NOT context: Adds buffer to timestamp
+    """
     field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
         return None
@@ -541,6 +585,16 @@ def _create_datetime_optimization_sql(
 
     # convert timestamp to datetime_str
     timestamp = int(literal_value)
+
+    # Apply buffer in appropriate direction based on context
+    buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
+    if OptimizationContext.is_in_not_context():
+        # For NOT context, add buffer to make filter more permissive
+        timestamp += buffer_seconds
+    else:
+        # For normal context, subtract buffer to make filter more permissive
+        timestamp -= buffer_seconds
+
     datetime_str = _timestamp_to_datetime_str(timestamp)
 
     param_name = pb.add_param(datetime_str)

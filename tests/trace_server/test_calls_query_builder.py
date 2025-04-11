@@ -1710,7 +1710,7 @@ def test_datetime_optimization_simple() -> None:
         {
             "pb_0": 1709251200,
             "pb_2": "project",
-            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-02-29 23:55:00.000000",
         },
     )
 
@@ -1753,7 +1753,7 @@ def test_datetime_optimization_not_operation() -> None:
         {
             "pb_0": 1709251200,
             "pb_2": "project",
-            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 00:05:00.000000",
         },
     )
 
@@ -1842,8 +1842,8 @@ def test_datetime_optimization_multiple_conditions() -> None:
             "pb_0": 1709251200,
             "pb_1": 1709337600,
             "pb_4": "project",
-            "pb_2": "2024-03-01 00:00:00.000000",
-            "pb_3": "2024-03-02 00:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:05:00.000000",
         },
     )
 
@@ -1955,7 +1955,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         """,
         {
             "pb_0": 1709251200,
-            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-02-29 23:55:00.000000",
             "pb_2": "project",
             "pb_3": "wandb.runnable.my_op",
             "pb_4": '$."output"."expected"',
