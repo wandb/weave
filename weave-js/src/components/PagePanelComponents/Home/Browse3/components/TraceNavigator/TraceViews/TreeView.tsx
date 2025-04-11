@@ -1,14 +1,16 @@
 import {Popover} from '@mui/material';
 import {MOON_900, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
-import {DraggableGrow, DraggableHandle} from '@wandb/weave/components/DraggablePopups';
+import {
+  DraggableGrow,
+  DraggableHandle,
+} from '@wandb/weave/components/DraggablePopups';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import * as Switch from '@wandb/weave/components/Switch';
-import {IconOnlyPill, Pill} from '@wandb/weave/components/Tag/Pill';
+import {IconOnlyPill} from '@wandb/weave/components/Tag/Pill';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import {maybePluralize} from '@wandb/weave/core/util/string';
 import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
@@ -22,6 +24,12 @@ import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
+import {
+  AGENT_OP_NAMES,
+  COMPLETION_OP_NAMES,
+  IMAGE_OP_NAMES,
+  TOOL_OP_NAMES,
+} from './operationNames';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -172,18 +180,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                       {tokenToolTipContent}
                     </div>
                   }
-                  className="justify-end text-xs text-moon-400 min-w-[40px]"
+                  className="min-w-[40px] justify-end text-xs text-moon-400"
                 />
               )}
               {cost !== undefined && visibleColumns.cost && (
                 <TraceStat
                   label={cost}
                   tooltip={
-                    <div className="text-white-800">
-                      {costToolTipContent}
-                    </div>
+                    <div className="text-white-800">{costToolTipContent}</div>
                   }
-                  className="justify-end text-xs text-moon-400 min-w-[40px]"
+                  className="min-w-[40px] justify-end text-xs text-moon-400"
                 />
               )}
               {duration !== null && visibleColumns.duration && (
@@ -194,8 +200,24 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             </div>
             {statusCode !== 'SUCCESS' ? (
               <StatusChip value={statusCode} iconOnly />
+            ) : COMPLETION_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="forum-chat-bubble" color="magenta" />
+            ) : TOOL_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="code-alt" color="purple" />
+            ) : IMAGE_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="photo" color="purple" />
+            ) : AGENT_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="robot-service-member" color="blue" />
             ) : (
-              // Else show placeholder
+              // Else show spacer placeholder
               <div className="w-[22px]" />
             )}
           </div>
@@ -215,7 +237,9 @@ interface TreeViewHeaderProps {
     cost: boolean;
     duration: boolean;
   };
-  onToggleColumnVisibility: (column: keyof TreeViewHeaderProps['visibleColumns']) => void;
+  onToggleColumnVisibility: (
+    column: keyof TreeViewHeaderProps['visibleColumns']
+  ) => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
@@ -238,7 +262,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   const columnLabels: Record<keyof typeof visibleColumns, string> = {
     tokens: 'Token Usage',
     cost: 'Cost',
-    duration: 'Duration'
+    duration: 'Duration',
   };
 
   return (
@@ -307,9 +331,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
           <div className="min-w-[150px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
-                <div className="flex-auto font-semibold">
-                  Manage fields
-                </div>
+                <div className="flex-auto font-semibold">Manage fields</div>
               </div>
             </DraggableHandle>
             <div className="max-h-[300px] overflow-auto">
@@ -323,17 +345,17 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
                         id={idSwitch}
                         size="small"
                         checked={isVisible}
-                        onCheckedChange={() => onToggleColumnVisibility(columnKey)}>
+                        onCheckedChange={() =>
+                          onToggleColumnVisibility(columnKey)
+                        }>
                         <Switch.Thumb size="small" checked={isVisible} />
                       </Switch.Root>
-                      <label
-                        htmlFor={idSwitch}
-                        className="ml-6 cursor-pointer">
+                      <label htmlFor={idSwitch} className="ml-6 cursor-pointer">
                         {columnLabels[columnKey]}
                       </label>
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
@@ -352,7 +374,9 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
     duration: true,
   });
 
-  const handleToggleColumnVisibility = (column: keyof typeof visibleColumns) => {
+  const handleToggleColumnVisibility = (
+    column: keyof typeof visibleColumns
+  ) => {
     setVisibleColumns(prev => ({
       ...prev,
       [column]: !prev[column],
