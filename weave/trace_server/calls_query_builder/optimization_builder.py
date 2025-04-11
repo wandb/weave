@@ -553,9 +553,9 @@ def _create_like_optimized_in_condition(
 
 def _timestamp_to_datetime_str(timestamp: int) -> str:
     """Converts a timestamp to a datetime string."""
-    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.UTC).strftime(
-        "%Y-%m-%d %H:%M:%S.%f"
-    )
+    return datetime.datetime.fromtimestamp(
+        timestamp, tz=datetime.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def _create_datetime_optimization_sql(
