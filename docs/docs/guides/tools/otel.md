@@ -14,7 +14,7 @@ Standard Weights & Biases authentication is used. You must have write permission
 
 ## Required Headers
 - `project_id: <your_entity>/<your_project_name>`
-- `Authorization=Basic <Base64 Encoding of api:$WANDB_API_KEY>
+- `Authorization=Basic <Base64 Encoding of api:$WANDB_API_KEY>`
 
 ## Examples:
 
