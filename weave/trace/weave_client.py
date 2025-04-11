@@ -351,7 +351,7 @@ def _make_calls_iterator(
         )
         if limit_override is not None:
             offset = offset_override or 0
-            return min(limit_override, response.count - offset)
+            return min(limit_override, max(0, response.count - offset))
         if offset_override is not None:
             return response.count - offset_override
         return response.count
