@@ -198,6 +198,9 @@ class PaginatedIterator(Generic[T, R]):
         if self.limit is not None and index >= self.limit + (self.offset or 0):
             raise IndexError(f"Index {index} out of range")
 
+        if self.offset is not None:
+            index += self.offset
+
         page_index = index // self.page_size
         page_offset = index % self.page_size
 
@@ -321,12 +324,18 @@ def _make_calls_iterator(
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        # Add the global offset to the page offset
+        # This ensures the offset is applied only once
+        effective_offset = offset
+        if offset_override is not None:
+            effective_offset += offset_override
+
         return list(
             server.calls_query_stream(
                 CallsQueryReq(
                     project_id=project_id,
                     filter=filter,
-                    offset=offset,
+                    offset=effective_offset,
                     limit=limit,
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -358,7 +367,7 @@ def _make_calls_iterator(
         transform_func=transform_func,
         size_func=size_func,
         limit=limit_override,
-        offset=offset_override,
+        offset=None,  # Set offset to None since we handle it in fetch_func
         page_size=page_size,
     )
 
