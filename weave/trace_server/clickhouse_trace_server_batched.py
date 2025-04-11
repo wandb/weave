@@ -391,6 +391,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
 
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_total_storage_size:
+            columns.append("total_storage_size_bytes")
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             summary_columns = ["summary", "summary_dump"]
@@ -398,12 +404,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
-
-        if req.include_storage_size:
-            columns.append("storage_size_bytes")
-
-        if req.include_total_storage_size:
-            columns.append("total_storage_size_bytes")
 
         for col in columns:
             cq.add_field(col)

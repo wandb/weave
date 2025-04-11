@@ -397,7 +397,13 @@ def final_call_select_with_cost(
     ]
 
     ranked_price_table = Table(
-        price_table_alias, [*get_calls_merged_columns(), *usage_with_costs_fields]
+        price_table_alias,
+        [
+            *get_calls_merged_columns(),
+            Column(name="storage_size_bytes", type="float"),
+            Column(name="total_storage_size_bytes", type="float"),
+            *usage_with_costs_fields,
+        ],
     )
 
     final_query = (
