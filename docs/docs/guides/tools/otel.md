@@ -3,14 +3,14 @@
 ## Overview
 Weave supports ingestion of OpenTelemetry compatible trace data through a dedicated endpoint. This endpoint allows you to send OTLP (OpenTelemetry Protocol) formatted trace data directly to your Weave project.
 
-## Endpoint Details
+## Endpoint details
 
 **Path**: `/otel/v1/traces`
 **Method**: POST
 **Content-Type**: `application/x-protobuf`
 
 ## Authentication
-Standard Weights & Biases authentication is used. You must have write permissions to the project where you're sending trace data.
+Standard W&B authentication is used. You must have write permissions to the project where you're sending trace data.
 
 ## Required Headers
 - `project_id: <your_entity>/<your_project_name>`
@@ -18,17 +18,17 @@ Standard Weights & Biases authentication is used. You must have write permission
 
 ## Examples:
 
-In the below examples there are a few fields you must modify before the code will run:
-1. WANDB_API_KEY: Obtain this from https://wandb.ai/authorize
-2. Entity: You can only log traces to project under an entity you have access to. You can find your entity name by visiting https://wandb.ai/home and checking the Teams field in the left sidebar
+You must modify the following fields before you can run the code samples below:
+1. `WANDB_API_KEY`: You can get this from [https://wandb.ai/authorize](https://wandb.ai/authorize).
+2. Entity: You can only log traces to the project under an entity that you have access to. You can find your entity name by visiting your W&N dashboard at [https://wandb.ai/home], and checking the **Teams** field in the left sidebar.
 3. Project Name: Choose a fun name!
-4. OPENAI_API_KEY: Obtain this from your OPENAI dashboard
+4. `OPENAI_API_KEY`: You can obtain this from the [OpenAI dashboard](https://platform.openai.com/api-keys).
 
 ### OpenInference Instrumentation:
 
 This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/Arize-ai/openinference
 
-First install the required dependencies:
+First, install the required dependencies:
 
 ```bash
 pip install openai openinference-instrumentation-openai opentelemetry-exporter-otlp-proto-http
@@ -100,7 +100,7 @@ python openinference_example.py
 
 ### OpenLLMetry Instrumentation:
 
-This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/traceloop/openllmetry/tree/main/packages
+The following example shows how to use the OpenAI instrumentation. Additional examples are available at [https://github.com/traceloop/openllmetry/tree/main/packages](https://github.com/traceloop/openllmetry/tree/main/packages).
 
 First install the required dependencies:
 
@@ -259,4 +259,4 @@ Finally, once you have set the fields specified above to their correct values, r
 python opentelemetry_example.py
 ```
 
-The attribute prefixes `gen_ai` and `openinference` are used to determine which convention, if any, to interpret the trace as. If neither key is detected then all attributes will be visible in the trace view. The full span will always be available in the side panel when you select a trace.
+The attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all attributes are visible in the trace view. The full span is available in the side panel when you select a trace.
