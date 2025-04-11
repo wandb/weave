@@ -1,6 +1,6 @@
 import {Box} from '@mui/material';
 import {Popover} from '@mui/material';
-import EmojiPicker from 'emoji-picker-react';
+import EmojiPicker, {SkinTonePickerLocation} from 'emoji-picker-react';
 import _ from 'lodash';
 import React, {useEffect, useMemo} from 'react';
 
@@ -179,6 +179,7 @@ export const FeedbackGrid = ({
                     onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
                     reactionsDefaultOpen={true}
+                    skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
                     reactions={[
                       '1f44d', // thumbs up
                       '1f44e', // thumbs down
@@ -192,6 +193,7 @@ export const FeedbackGrid = ({
                   <EmojiPicker
                     onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
+                    skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
                     previewConfig={{
                       defaultEmoji: '1f44d',
                       defaultCaption: 'Hover for emoji name',
