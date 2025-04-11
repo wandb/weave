@@ -147,7 +147,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tools/otel"],
         },
       ],
     },
