@@ -15,7 +15,6 @@ import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
 import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotationFieldDrawer';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -57,11 +56,6 @@ export const FeedbackSidebar = ({
     project,
     weaveRef: callID,
   });
-
-  const getTsClient = useGetTraceServerClientContext();
-  useEffect(() => {
-    return getTsClient().registerOnFeedbackListener(callID, query.refetch);
-  }, [callID, query.refetch, getTsClient]);
 
   const save = async () => {
     setIsSaving(true);
