@@ -180,8 +180,6 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("page_size must be greater than 0")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
-        if offset is not None and offset < 0:
-            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
@@ -361,6 +359,9 @@ def _make_calls_iterator(
         if offset_override is not None:
             return response.count - offset_override
         return response.count
+
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
 
     return PaginatedIterator(
         fetch_func,
