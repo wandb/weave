@@ -156,7 +156,7 @@ export const ReactionsLoaded = ({
   // Was trying the approach in https://github.com/mui/material-ui/issues/10595)
   // So instead we have two emoji picker components and choose one or the other
   // to render.
-  const [showFullPicker, setShowFullPicker] = useState(false);
+  const [showCompleteEmojiPicker, setShowCompleteEmojiPicker] = useState(false);
 
   return (
     <Tailwind style={wrapperStyles}>
@@ -198,7 +198,13 @@ export const ReactionsLoaded = ({
                   id={idReactions}
                   open={isOpenReactions}
                   anchorEl={anchorElReactions}
-                  onClose={() => setAnchorElReactions(null)}
+                  onClose={() => {
+                    setAnchorElReactions(null);
+                    // Requires 100ms to complete animation before changing state to minimal-picker
+                    setTimeout(() => {
+                      setShowCompleteEmojiPicker(false);
+                    }, 100);
+                  }}
                   anchorOrigin={{
                     vertical: 'bottom',
                     horizontal: 'left',
@@ -211,7 +217,7 @@ export const ReactionsLoaded = ({
                       },
                     },
                   }}>
-                  {!showFullPicker && (
+                  {!showCompleteEmojiPicker && (
                     <WeaveEmojiPicker
                       onEmojiClick={onEmojiClick}
                       skinTonesDisabled={true}
@@ -222,11 +228,11 @@ export const ReactionsLoaded = ({
                         '1f44e', // thumbs down
                       ]}
                       onPlusButtonClick={() => {
-                        setShowFullPicker(true);
+                        setShowCompleteEmojiPicker(true);
                       }}
                     />
                   )}
-                  {showFullPicker && (
+                  {showCompleteEmojiPicker && (
                     <EmojiPicker
                       onEmojiClick={onEmojiClick}
                       skinTonesDisabled={true}

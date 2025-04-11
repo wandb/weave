@@ -37,10 +37,12 @@ export const FeedbackGrid = ({
   onOpenFeedbackSidebar,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
+  const [showThumbsEmojiPicker, setShowThumbsEmojiPicker] =
+    React.useState(false);
   const [showNoteInput, setShowNoteInput] = React.useState(false);
   const [note, setNote] = React.useState('');
-  const [showFullPicker, setShowFullPicker] = React.useState(false);
+  const [showCompleteEmojiPicker, setShowCompleteEmojiPicker] =
+    React.useState(false);
   const emojiButtonRef = React.useRef<HTMLButtonElement>(null);
   const noteButtonRef = React.useRef<HTMLButtonElement>(null);
 
@@ -105,7 +107,7 @@ export const FeedbackGrid = ({
       payload: {emoji},
     };
     getTsClient().feedbackCreate(req);
-    setShowEmojiPicker(false);
+    setShowThumbsEmojiPicker(false);
   };
 
   const onAddNote = () => {
@@ -155,13 +157,19 @@ export const FeedbackGrid = ({
                 ref={emojiButtonRef}
                 variant="secondary"
                 icon="add-reaction"
-                onClick={() => setShowEmojiPicker(true)}>
+                onClick={() => setShowThumbsEmojiPicker(true)}>
                 Reaction
               </Button>
               <Popover
-                open={showEmojiPicker}
+                open={showThumbsEmojiPicker}
                 anchorEl={emojiButtonRef.current}
-                onClose={() => setShowEmojiPicker(false)}
+                onClose={() => {
+                  setShowThumbsEmojiPicker(false);
+                  // Requires 100ms to complete animation before changing state to minimal-picker
+                  setTimeout(() => {
+                    setShowCompleteEmojiPicker(false);
+                  }, 100);
+                }}
                 anchorOrigin={{
                   vertical: 'bottom',
                   horizontal: 'left',
@@ -174,7 +182,7 @@ export const FeedbackGrid = ({
                     },
                   },
                 }}>
-                {!showFullPicker && (
+                {!showCompleteEmojiPicker && (
                   <WeaveEmojiPicker
                     onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
@@ -185,11 +193,11 @@ export const FeedbackGrid = ({
                       '1f44e', // thumbs down
                     ]}
                     onPlusButtonClick={() => {
-                      setShowFullPicker(true);
+                      setShowCompleteEmojiPicker(true);
                     }}
                   />
                 )}
-                {showFullPicker && (
+                {showCompleteEmojiPicker && (
                   <EmojiPicker
                     onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
                     skinTonesDisabled={true}
