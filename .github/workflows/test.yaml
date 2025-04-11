@@ -254,6 +254,7 @@ jobs:
             "openai",
             "vertexai",
             "pandas-test",
+            "mcp",
           ]
       fail-fast: false
     services:

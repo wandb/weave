@@ -2195,6 +2195,28 @@ def test_call_query_stream_columns(client):
     assert calls[0].attributes == {}
     assert calls[0].inputs == {"a": 0, "b": 0}
 
+    # now get summary
+    calls2 = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+    calls2 = list(calls2)
+    assert len(calls2) == 2
+    # assert derived summary fields are included when getting summary
+    assert calls2[0].summary["weave"]["status"] == "success"
+    assert isinstance(calls2[0].summary["weave"]["latency_ms"], int)
+    assert calls2[0].summary["weave"]["trace_name"] == "calculate"
+    # this means other fields on the call should be set
+    assert calls2[0].started_at is not None
+    assert calls2[0].ended_at is not None
+    assert calls2[0].op_name is not None
+    # but not other big fields
+    assert calls2[0].attributes == {}
+    assert calls2[0].inputs == {}
+    assert calls2[0].output is None
+
 
 def test_call_query_stream_columns_with_costs(client):
     if client_is_sqlite(client):
@@ -2225,6 +2247,11 @@ def test_call_query_stream_columns_with_costs(client):
     assert len(calls) == 2
     assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
+
+    # also assert that derived summary fields are included when getting costs
+    assert calls[0].summary["weave"]["status"] == "success"
+    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
     # Test that costs are returned if we include the summary_dump field
@@ -3624,3 +3651,43 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     assert child_call.storage_size_bytes is not None
     # Child should not have total size
     assert child_call.total_storage_size_bytes is None
+
+
+def test_calls_hydrated(client):
+    nested = {"hi": {"there": {"foo": "bar"}}}
+    nested_ref = weave.publish(nested)
+
+    @weave.op
+    def nest(input_ref: str):
+        my_obj = {
+            "woahhhh": input_ref,
+        }
+        ref = weave.publish(my_obj)
+        return ref
+
+    nest(nested_ref)
+    nest(nested_ref)
+    nest(nested_ref)
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["inputs", "output", "output.woahhhh"],
+                expand_columns=[
+                    "inputs",
+                    "inputs.input_ref",
+                    "output",
+                    "output.woahhhh",
+                ],
+            )
+        )
+    )
+
+    assert len(calls) == 3
+    assert calls[0].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[0].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
