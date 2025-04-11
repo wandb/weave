@@ -148,6 +148,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
             )
         )
     )
+
     assert_sql(
         cq,
         """
