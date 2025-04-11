@@ -538,7 +538,10 @@ def test_get_calls_limit_offset(client):
 
 
 def test_get_calls_page_size_with_offset(client):
-    batch_size = 3
+    for i in range(20):
+        client.create_call("x", {"a": i})
+
+    batch_size = 5
     batch_num = 0
     all_call_ids = []
     all_values = []
@@ -563,9 +566,8 @@ def test_get_calls_page_size_with_offset(client):
         all_values.extend(values)
         batch_num += 1
 
-    assert len(all_call_ids) == 10
-    assert all_call_ids == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    assert all_values == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert len(all_call_ids) == 20
+    assert all_values == list(range(20))
 
 
 def test_calls_delete(client):
