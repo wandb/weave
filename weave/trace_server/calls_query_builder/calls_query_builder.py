@@ -802,11 +802,8 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
-<<<<<<< HEAD:weave/trace_server/calls_query_builder/calls_query_builder.py
         {sortable_datetime_sql}
-=======
         {op_name_sql}
->>>>>>> master:weave/trace_server/calls_query_builder.py
         {str_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
