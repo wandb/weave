@@ -32,7 +32,6 @@ export const Reactions = ({
 }: ReactionsProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
-  const {showFeedback, setShowFeedback} = useContext(FeedbackContext);
 
   const parsedRef = parseRef(weaveRef);
   if (parsedRef.scheme !== 'weave') {
@@ -112,8 +111,6 @@ export const Reactions = ({
       readonly={isReadonly}
       forceVisible={forceVisible ?? false}
       twWrapperStyles={twWrapperStyles}
-      showFeedback={showFeedback}
-      onToggleFeedback={() => setShowFeedback(!showFeedback)}
     />
   );
 };
