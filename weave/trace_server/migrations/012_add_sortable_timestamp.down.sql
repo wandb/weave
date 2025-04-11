@@ -18,10 +18,9 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
         anySimpleState(deleted_at) as deleted_at,
-        argMaxState(display_name, call_parts.created_at) as display_name,
+        argMaxState(display_name, call_parts.created_at) as display_name
         -- Remove sortable_datetime --
     FROM call_parts
     GROUP BY project_id,
         id;
-
 ALTER TABLE calls_merged DROP COLUMN sortable_datetime;
