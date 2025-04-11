@@ -13,15 +13,14 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
-import contextlib
 import datetime
 from abc import ABC, abstractmethod
-from collections.abc import Generator
 from typing import TYPE_CHECKING, Optional, Union
 
 from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder.utils import (
+    NotContext,
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
@@ -38,36 +37,6 @@ STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
 
 DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
-
-
-# Context for tracking if we're in a NOT operation
-class OptimizationContext:
-    # Track NOT nesting depth
-    _not_depth = 0
-
-    @classmethod
-    @contextlib.contextmanager
-    def not_context(cls) -> Generator[None, None, None]:
-        """Context manager for NOT operations.
-
-        Properly handles nested NOT operations by tracking depth.
-        In boolean logic:
-        - NOT(expr) flips the result
-        - NOT(NOT(expr)) is equivalent to expr
-        - NOT(NOT(NOT(expr))) is equivalent to NOT(expr)
-
-        So we only apply special handling when nesting depth is odd.
-        """
-        cls._not_depth += 1
-        try:
-            yield
-        finally:
-            cls._not_depth -= 1
-
-    @classmethod
-    def is_in_not_context(cls) -> bool:
-        """Check if we're in a NOT context with odd nesting depth."""
-        return cls._not_depth % 2 == 1
 
 
 def _field_requires_null_check(field: str) -> bool:
@@ -165,7 +134,7 @@ class QueryOptimizationProcessor(ABC):
         if len(operation.not_) != 1:
             return None
 
-        with OptimizationContext.not_context():
+        with NotContext.not_context():
             result = self.process_operand(operation.not_[0])
 
         if result is None:
@@ -588,7 +557,7 @@ def _create_datetime_optimization_sql(
 
     # Apply buffer in appropriate direction based on context
     buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
-    if OptimizationContext.is_in_not_context():
+    if NotContext.is_in_not_context():
         # For NOT context, add buffer to make filter more permissive
         timestamp += buffer_seconds
     else:
