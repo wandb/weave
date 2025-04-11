@@ -90,7 +90,16 @@
     }
     .ui.form {
         width: 100%;
-        max-width: 800px;
+        max-width: none;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        
+        .field {
+            width: 100%;
+            display: flex;
+        }
+        
         textarea {
             padding: 4px 8px;
             margin: -4px -8px;
@@ -103,6 +112,10 @@
             color: @fieldFontColor;
             line-height: @fieldLineHeight;
             opacity: @fieldFontOpacity;
+            width: 100%;
+            flex: 1;
+            resize: both;
+            
             &:focus {
                 color: @fieldFontColor;
             }
