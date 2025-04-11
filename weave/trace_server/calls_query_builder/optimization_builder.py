@@ -246,7 +246,9 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
-        return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, ">"
+        )
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         """
@@ -254,7 +256,9 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
-        return _create_datetime_optimization_sql(operation, self.pb, self.table_alias)
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, ">="
+        )
 
 
 def apply_processor(
@@ -508,10 +512,18 @@ def _create_like_optimized_in_condition(
     return or_sql
 
 
+def _timestamp_to_datetime_str(timestamp: int) -> str:
+    """Converts a timestamp to a datetime string."""
+    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.UTC).strftime(
+        "%Y-%m-%d %H:%M:%S.%f"
+    )
+
+
 def _create_datetime_optimization_sql(
     operation: Union[tsi_query.GtOperation, tsi_query.GteOperation],
     pb: "ParamBuilder",
     table_alias: str,
+    op_str: str,
 ) -> Optional[str]:
     """Creates SQL for datetime optimization using indexed sortable_datetime column."""
     field_operand, literal_operand = _extract_field_and_literal(operation)
@@ -528,7 +540,10 @@ def _create_datetime_optimization_sql(
         return None
 
     # convert timestamp to datetime_str
-    datetime_str = datetime.datetime.fromtimestamp(literal_value, tz=datetime.UTC)
+    timestamp = int(literal_value)
+    datetime_str = _timestamp_to_datetime_str(timestamp)
 
     param_name = pb.add_param(datetime_str)
-    return f"({table_alias}.sortable_datetime > {param_slot(param_name, 'String')})"
+    return (
+        f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
+    )

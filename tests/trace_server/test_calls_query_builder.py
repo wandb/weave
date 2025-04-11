@@ -1699,8 +1699,7 @@ def test_datetime_optimization_simple() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
-            AND (calls_merged.id <= 'ffffffffffffffff'
-            OR ((calls_merged.id > {pb_1:String})))
+            AND (calls_merged.sortable_datetime > {pb_1:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.started_at) > {pb_0:UInt64}))
@@ -1711,7 +1710,7 @@ def test_datetime_optimization_simple() -> None:
         {
             "pb_0": 1709251200,
             "pb_2": "project",
-            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+            "pb_1": "2024-03-01 00:00:00.000000",
         },
     )
 
@@ -1725,7 +1724,7 @@ def test_datetime_optimization_not_operation() -> None:
             {
                 "$not": [
                     {
-                        "$gt": [
+                        "$gte": [
                             {"$getField": "started_at"},
                             {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
                         ]
@@ -1743,11 +1742,10 @@ def test_datetime_optimization_not_operation() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
-            AND (calls_merged.id <= 'ffffffffffffffff'
-            OR (NOT ((calls_merged.id > {pb_1:String}))))
+            AND (NOT (calls_merged.sortable_datetime >= {pb_1:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
-            (NOT ((any(calls_merged.started_at) > {pb_0:UInt64}))))
+            (NOT ((any(calls_merged.started_at) >= {pb_0:UInt64}))))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1755,7 +1753,7 @@ def test_datetime_optimization_not_operation() -> None:
         {
             "pb_0": 1709251200,
             "pb_2": "project",
-            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+            "pb_1": "2024-03-01 00:00:00.000000",
         },
     )
 
@@ -1777,9 +1775,15 @@ def test_datetime_optimization_multiple_conditions() -> None:
                                 ]
                             },
                             {
-                                "$gt": [
-                                    {"$getField": "started_at"},
-                                    {"$literal": 1709337600},  # 2024-03-02 00:00:00 UTC
+                                "$not": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "started_at"},
+                                            {
+                                                "$literal": 1709337600
+                                            },  # 2024-03-02 00:00:00 UTC
+                                        ]
+                                    }
                                 ]
                             },
                         ]
@@ -1822,15 +1826,11 @@ def test_datetime_optimization_multiple_conditions() -> None:
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_4:String}
-            AND (calls_merged.id <= 'ffffffffffffffff'
-            OR ((calls_merged.id > {pb_2:String})
-                AND (calls_merged.id > {pb_3:String})
-                AND ((calls_merged.id > {pb_2:String})
-                    OR ((calls_merged.id > {pb_2:String})
-                        AND (calls_merged.id > {pb_3:String})))))
+            AND (calls_merged.sortable_datetime > {pb_2:String}
+            AND NOT (calls_merged.sortable_datetime > {pb_3:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
-            AND ((any(calls_merged.started_at) > {pb_1:UInt64}))
+            AND ((NOT ((any(calls_merged.started_at) > {pb_1:UInt64}))))
             AND (((any(calls_merged.ended_at) > {pb_0:UInt64})
                 OR ((any(calls_merged.ended_at) >= {pb_0:UInt64})
                     AND (any(calls_merged.ended_at) > {pb_1:UInt64}))))
@@ -1842,8 +1842,8 @@ def test_datetime_optimization_multiple_conditions() -> None:
             "pb_0": 1709251200,
             "pb_1": 1709337600,
             "pb_4": "project",
-            "pb_2": "018df74e-99a0-7000-8000-000000000000",
-            "pb_3": "018dfc74-f5a0-7000-8000-000000000000",
+            "pb_2": "2024-03-01 00:00:00.000000",
+            "pb_3": "2024-03-02 00:00:00.000000",
         },
     )
 
@@ -1934,8 +1934,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             (SELECT calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_2:String}
-                AND (calls_merged.id <= 'ffffffffffffffff'
-                    OR ((calls_merged.id > {pb_1:String})))
+                AND (calls_merged.sortable_datetime > {pb_1:String})
             GROUP BY (calls_merged.project_id,
                         calls_merged.id)
             HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
@@ -1956,7 +1955,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         """,
         {
             "pb_0": 1709251200,
-            "pb_1": "018df74e-99a0-7000-8000-000000000000",
+            "pb_1": "2024-03-01 00:00:00.000000",
             "pb_2": "project",
             "pb_3": "wandb.runnable.my_op",
             "pb_4": '$."output"."expected"',
