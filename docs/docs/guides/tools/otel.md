@@ -174,9 +174,9 @@ python openllmetry_example.py
 
 ### Without Instrumentation
 
-If you would prefer to use the OTEL directly instead of an instrumentation package you may do so. Attributes will be parsed according to the OpenTelemetry semantic conventions: https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/
+If you prefer to use the OTEL directly instead of an instrumentation package, you may do so. Attributes will be parsed according to the OpenTelemetry semantic conventions described at [https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
 
-First install the required dependencies:
+First, install the required dependencies:
 
 ```bash
 pip install openai opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp-proto-http
