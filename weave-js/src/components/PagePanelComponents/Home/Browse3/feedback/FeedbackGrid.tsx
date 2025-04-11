@@ -2,13 +2,14 @@ import {Box} from '@mui/material';
 import {Popover} from '@mui/material';
 import EmojiPicker, {SkinTonePickerLocation} from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useEffect, useMemo} from 'react';
+import React, {useContext, useEffect, useMemo} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Alert} from '../../../../Alert';
 import {Button} from '../../../../Button';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
+import {FeedbackContext} from '../context';
 import {Empty} from '../pages/common/Empty';
 import {EMPTY_PROPS_FEEDBACK} from '../pages/common/EmptyContent';
 import {useWFHooks} from '../pages/wfReactInterface/context';
@@ -26,7 +27,6 @@ type FeedbackGridProps = {
   project: string;
   weaveRef: string;
   objectType?: string;
-  onOpenFeedbackSidebar?: () => void;
 };
 
 export const FeedbackGrid = ({
@@ -34,7 +34,6 @@ export const FeedbackGrid = ({
   project,
   weaveRef,
   objectType,
-  onOpenFeedbackSidebar,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [showThumbsEmojiPicker, setShowThumbsEmojiPicker] =
@@ -45,6 +44,7 @@ export const FeedbackGrid = ({
     React.useState(false);
   const emojiButtonRef = React.useRef<HTMLButtonElement>(null);
   const noteButtonRef = React.useRef<HTMLButtonElement>(null);
+  const {setShowFeedback} = useContext(FeedbackContext);
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -239,7 +239,7 @@ export const FeedbackGrid = ({
             <Button
               variant="secondary"
               icon="marker"
-              onClick={onOpenFeedbackSidebar}>
+              onClick={() => setShowFeedback(true)}>
               Annotation
             </Button>
           </div>

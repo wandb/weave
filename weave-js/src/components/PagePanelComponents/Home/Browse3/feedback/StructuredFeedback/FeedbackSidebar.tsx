@@ -7,10 +7,10 @@ import {Loading} from '@wandb/weave/components/Loading';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
+import {FeedbackContext, useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
 import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotationFieldDrawer';
@@ -23,14 +23,12 @@ type FeedbackSidebarProps = {
   callID: string;
   entity: string;
   project: string;
-  onClose?: () => void;
 };
 
 export const FeedbackSidebar = ({
   callID,
   entity,
   project,
-  onClose,
 }: FeedbackSidebarProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isNewAnnotationDrawerOpen, setIsNewAnnotationDrawerOpen] =
@@ -44,6 +42,7 @@ export const FeedbackSidebar = ({
   });
   const history = useHistory();
   const {baseRouter} = useWeaveflowRouteContext();
+  const {setShowFeedback} = useContext(FeedbackContext);
 
   const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
     entity,
@@ -136,15 +135,13 @@ export const FeedbackSidebar = ({
               />
             }
           />
-          {onClose && (
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              size="small"
-              icon="close"
-              aria-label="Close feedback sidebar"
-            />
-          )}
+          <Button
+            onClick={() => setShowFeedback(false)}
+            variant="ghost"
+            size="small"
+            icon="close"
+            aria-label="Close feedback sidebar"
+          />
         </div>
       </div>
       <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />

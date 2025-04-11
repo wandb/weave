@@ -6,7 +6,7 @@ import EmojiPicker, {
   SkinTonePickerLocation,
 } from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useRef, useState} from 'react';
+import React, {useRef, useState, useContext} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 
@@ -14,6 +14,7 @@ import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip as WeaveTooltip} from '../../../../Tooltip';
+import {FeedbackContext} from '../context';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {EmojiButton} from './EmojiButton';
 import {Notes} from './Notes';
@@ -42,8 +43,6 @@ type ReactionsLoadedProps = {
   readonly: boolean;
   forceVisible: boolean;
   twWrapperStyles: React.CSSProperties;
-  showFeedback?: boolean;
-  onToggleFeedback?: () => void;
 };
 
 export const ReactionsLoaded = ({
@@ -55,10 +54,9 @@ export const ReactionsLoaded = ({
   readonly,
   forceVisible,
   twWrapperStyles,
-  showFeedback,
-  onToggleFeedback,
 }: ReactionsLoadedProps) => {
   const [isMouseOver, setIsMouseOver] = useState(false);
+  const {showFeedback, setShowFeedback} = useContext(FeedbackContext);
   const groupedByType = _.groupBy(reactions, r => r.feedback_type);
   const emojis = groupedByType['wandb.reaction.1'] ?? [];
   const notes = groupedByType['wandb.note.1'] ?? [];
@@ -200,7 +198,6 @@ export const ReactionsLoaded = ({
                   anchorEl={anchorElReactions}
                   onClose={() => {
                     setAnchorElReactions(null);
-                    // Requires 100ms to complete animation before changing state to minimal-picker
                     setTimeout(() => {
                       setShowCompleteEmojiPicker(false);
                     }, 100);
@@ -258,20 +255,18 @@ export const ReactionsLoaded = ({
                 </Button>
               </StyledTooltip>
             )}
-            {onToggleFeedback && (
-              <WeaveTooltip
-                content={`${showFeedback ? 'Hide' : 'Show'} annotation sidebar`}
-                trigger={
-                  <Button
-                    icon="marker"
-                    variant="ghost"
-                    size="small"
-                    active={showFeedback ?? false}
-                    onClick={onToggleFeedback}
-                  />
-                }
-              />
-            )}
+            <WeaveTooltip
+              content={`${showFeedback ? 'Hide' : 'Show'} annotation sidebar`}
+              trigger={
+                <Button
+                  icon="marker"
+                  variant="ghost"
+                  size="small"
+                  active={showFeedback}
+                  onClick={() => setShowFeedback(!showFeedback)}
+                />
+              }
+            />
             <Popover
               id={idNotes}
               open={isOpenNotes}

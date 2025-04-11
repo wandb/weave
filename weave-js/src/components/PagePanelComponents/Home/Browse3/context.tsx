@@ -803,6 +803,18 @@ export const WeaveHeaderExtrasContext = createContext<{
   renderExtras: () => null,
 });
 
+export const FeedbackContext = createContext<{
+  showFeedback?: boolean;
+  setShowFeedback: (showFeedback: boolean | undefined) => void;
+}>({
+  showFeedback: undefined,
+  setShowFeedback: () => {},
+});
+
+export const useFeedbackContext = () => {
+  return useContext(FeedbackContext);
+};
+
 type HeaderExtra = {node: ReactNode; order?: number};
 
 export const WeaveHeaderExtrasProvider = ({
@@ -848,5 +860,33 @@ export const WeaveHeaderExtrasProvider = ({
       value={{extras, addExtra, removeExtra, renderExtras}}>
       {children}
     </WeaveHeaderExtrasContext.Provider>
+  );
+};
+
+export const FeedbackProvider = ({
+  children,
+  initialShowFeedback,
+  setShowFeedbackInUrl,
+}: {
+  children: ReactNode;
+  initialShowFeedback?: boolean;
+  setShowFeedbackInUrl: (showFeedback: boolean | undefined) => void;
+}) => {
+  const [showFeedback, setShowFeedbackState] = useState<boolean | undefined>(
+    initialShowFeedback
+  );
+
+  const setShowFeedback = useCallback(
+    (value: boolean | undefined) => {
+      setShowFeedbackState(value);
+      setShowFeedbackInUrl(value);
+    },
+    [setShowFeedbackInUrl]
+  );
+
+  return (
+    <FeedbackContext.Provider value={{showFeedback, setShowFeedback}}>
+      {children}
+    </FeedbackContext.Provider>
   );
 };

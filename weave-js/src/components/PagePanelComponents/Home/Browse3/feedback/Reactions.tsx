@@ -1,7 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
+import {FeedbackContext} from '../context';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {
@@ -19,10 +20,6 @@ type ReactionsProps = {
   forceVisible?: boolean;
 
   twWrapperStyles?: React.CSSProperties;
-
-  // Controls for the feedback sidebar
-  showFeedback?: boolean;
-  onToggleFeedback?: () => void;
 };
 
 const SORT_BY: SortBy[] = [{field: 'created_at', direction: 'asc'}];
@@ -32,11 +29,10 @@ export const Reactions = ({
   readonly = false,
   forceVisible,
   twWrapperStyles = {},
-  showFeedback,
-  onToggleFeedback,
 }: ReactionsProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
+  const {showFeedback, setShowFeedback} = useContext(FeedbackContext);
 
   const parsedRef = parseRef(weaveRef);
   if (parsedRef.scheme !== 'weave') {
@@ -117,7 +113,7 @@ export const Reactions = ({
       forceVisible={forceVisible ?? false}
       twWrapperStyles={twWrapperStyles}
       showFeedback={showFeedback}
-      onToggleFeedback={onToggleFeedback}
+      onToggleFeedback={() => setShowFeedback(!showFeedback)}
     />
   );
 };

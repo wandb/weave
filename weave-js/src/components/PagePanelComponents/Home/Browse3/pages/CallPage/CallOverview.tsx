@@ -1,8 +1,9 @@
-import React, {SyntheticEvent} from 'react';
+import React, {SyntheticEvent, useContext} from 'react';
 import styled from 'styled-components';
 
 import EditableField from '../../../../../../common/components/EditableField';
 import {makeRefCall} from '../../../../../../util/refs';
+import {FeedbackContext} from '../../context';
 import {Reactions} from '../../feedback/Reactions';
 import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
@@ -41,9 +42,7 @@ OverflowBin.displayName = 'S.OverflowBin';
 
 export const CallOverview: React.FC<{
   call: CallSchema;
-  showFeedback?: boolean;
-  onToggleFeedback?: () => void;
-}> = ({call, showFeedback, onToggleFeedback}) => {
+}> = ({call}) => {
   const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
@@ -62,8 +61,6 @@ export const CallOverview: React.FC<{
           <Reactions
             weaveRef={refCall}
             forceVisible={true}
-            showFeedback={showFeedback}
-            onToggleFeedback={onToggleFeedback}
           />
         </div>
         <OverflowBin>
