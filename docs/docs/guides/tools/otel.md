@@ -26,6 +26,8 @@ In the below examples there are a few fields you must modify before the code wil
 
 ### OpenInference Instrumentation:
 
+This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/Arize-ai/openinference
+
 First install the required dependencies:
 
 ```bash
@@ -96,9 +98,9 @@ Finally, once you have set the fields specified above to their correct values, r
 python openinference_example.py
 ```
 
-This example showed how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/Arize-ai/openinference
-
 ### OpenLLMetry Instrumentation:
+
+This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/traceloop/openllmetry/tree/main/packages
 
 First install the required dependencies:
 
@@ -169,8 +171,6 @@ Finally, once you have set the fields specified above to their correct values, r
 ```bash
 python openllmetry_example.py
 ```
-
-This example showed how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/traceloop/openllmetry/tree/main/packages
 
 ### Without Instrumentation
 
