@@ -1,8 +1,6 @@
 -- Create non-nullable Datetime field in the call_merged table
 ALTER TABLE calls_merged 
     ADD COLUMN sortable_datetime Datetime(6) MATERIALIZED coalesce(started_at, ended_at, NOW());
--- Matialize the column
-ALTER TABLE calls_merged MATERIALIZE COLUMN sortable_datetime;
 
 -- Add the column to the materialized view 
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -28,6 +26,9 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     FROM call_parts
     GROUP BY project_id,
         id;
+
+-- Matialize the column
+ALTER TABLE calls_merged MATERIALIZE COLUMN sortable_datetime;
 
 -- Add minmax index  on the new column
 ALTER TABLE calls_merged ADD INDEX idx_sortable_datetime (sortable_datetime) TYPE minmax GRANULARITY 1;
