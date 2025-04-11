@@ -538,6 +538,39 @@ def test_get_calls_limit_offset(client):
         assert call.inputs["a"] == 7 + i
 
 
+def test_get_calls_page_size_with_offset(client):
+    for i in range(20):
+        client.create_call("x", {"a": i})
+
+    batch_size = 5
+    batch_num = 0
+    all_call_ids = []
+    all_values = []
+
+    while True:
+        call_batch = client.get_calls(
+            limit=batch_size,
+            offset=batch_num * batch_size,
+            page_size=2,
+        )
+
+        # Convert to list to force fetch
+        call_batch_list = list(call_batch)
+        if not call_batch_list:
+            break
+
+        # Store call IDs
+        batch_call_ids = [call.id for call in call_batch_list]
+        all_call_ids.extend(batch_call_ids)
+
+        values = [call.inputs["a"] for call in call_batch_list]
+        all_values.extend(values)
+        batch_num += 1
+
+    assert len(all_call_ids) == 20
+    assert all_values == list(range(20))
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)

@@ -709,6 +709,12 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
+        op_name_sql = process_op_name_filter_to_conditions(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
         optimization_conditions = process_query_to_optimization_sql(
             self.query_conditions,
             pb,
@@ -796,7 +802,11 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+<<<<<<< HEAD:weave/trace_server/calls_query_builder/calls_query_builder.py
         {sortable_datetime_sql}
+=======
+        {op_name_sql}
+>>>>>>> master:weave/trace_server/calls_query_builder.py
         {str_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
@@ -1051,44 +1061,67 @@ def process_query_to_conditions(
     )
 
 
+def process_op_name_filter_to_conditions(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the op_name and returns a sql string if there are any op_names."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
+        return ""
+
+    op_names = hardcoded_filter.filter.op_names
+
+    assert_parameter_length_less_than_max("op_names", len(op_names))
+
+    # We will build up (0 or 1) + N conditions for the op_version_refs
+    # If there are any non-wildcarded names, then we at least have an IN condition
+    # If there are any wildcarded names, then we have a LIKE condition for each
+    or_conditions: list[str] = []
+    non_wildcarded_names: list[str] = []
+    wildcarded_names: list[str] = []
+
+    op_field = get_field_by_name("op_name")
+    if not isinstance(op_field, CallsMergedAggField):
+        raise TypeError("op_name is not an aggregate field")
+
+    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    for name in op_names:
+        if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+            wildcarded_names.append(name)
+        else:
+            non_wildcarded_names.append(name)
+
+    if non_wildcarded_names:
+        or_conditions.append(
+            f"{op_field_sql} IN {param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+        )
+
+    for name in wildcarded_names:
+        like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+        or_conditions.append(
+            f"{op_field_sql} LIKE {param_slot(param_builder.add_param(like_name), 'String')}"
+        )
+
+    if not or_conditions:
+        return ""
+
+    # Account for unmerged call parts by including null op_name (call ends)
+    or_conditions += [f"{op_field_sql} IS NULL"]
+
+    return " AND " + combine_conditions(or_conditions, "OR")
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> list[str]:
-    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
+    """Converts a CallsFilter to a list of conditions for a clickhouse query.
+
+    Excludes the op_name, which is handled separately.
+    """
     conditions: list[str] = []
-
-    if filter.op_names:
-        assert_parameter_length_less_than_max("op_names", len(filter.op_names))
-
-        # We will build up (0 or 1) + N conditions for the op_version_refs
-        # If there are any non-wildcarded names, then we at least have an IN condition
-        # If there are any wildcarded names, then we have a LIKE condition for each
-
-        or_conditions: list[str] = []
-
-        non_wildcarded_names: list[str] = []
-        wildcarded_names: list[str] = []
-        for name in filter.op_names:
-            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_names.append(name)
-            else:
-                non_wildcarded_names.append(name)
-
-        if non_wildcarded_names:
-            or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-            )
-
-        for name in wildcarded_names:
-            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} LIKE {param_slot(param_builder.add_param(like_name), 'String')}"
-            )
-
-        if or_conditions:
-            conditions.append(combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
