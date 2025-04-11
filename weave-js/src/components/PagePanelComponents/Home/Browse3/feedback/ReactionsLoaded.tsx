@@ -6,7 +6,7 @@ import EmojiPicker, {
   SkinTonePickerLocation,
 } from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useRef, useState, useContext} from 'react';
+import React, {useContext, useRef, useState} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 

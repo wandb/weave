@@ -9,7 +9,11 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
-import {FeedbackContext, FeedbackProvider, WeaveflowPeekContext} from '../../context';
+import {
+  FeedbackContext,
+  FeedbackProvider,
+  WeaveflowPeekContext,
+} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
@@ -80,10 +84,9 @@ export const CallPage: FC<CallPageProps> = props => {
       return <NotFoundPanel title="Call not found" />;
     } else {
       return (
-        <FeedbackProvider 
-          initialShowFeedback={showFeedback} 
-          setShowFeedbackInUrl={setShowFeedback}
-        >
+        <FeedbackProvider
+          initialShowFeedback={showFeedback}
+          setShowFeedbackInUrl={setShowFeedback}>
           <CallPageInnerVertical
             {...props}
             focusedCallId={descendentCallId}
@@ -98,10 +101,9 @@ export const CallPage: FC<CallPageProps> = props => {
       return <CenteredAnimatedLoader />;
     } else {
       return (
-        <FeedbackProvider 
-          initialShowFeedback={showFeedback} 
-          setShowFeedbackInUrl={setShowFeedback}
-        >
+        <FeedbackProvider
+          initialShowFeedback={showFeedback}
+          setShowFeedbackInUrl={setShowFeedback}>
           <CallPageInnerVertical
             {...props}
             focusedCallId={descendentCallId}
@@ -115,7 +117,6 @@ export const CallPage: FC<CallPageProps> = props => {
 };
 
 const useCallTabs = (call: CallSchema) => {
-  const {setShowFeedback} = useContext(FeedbackContext);
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -253,7 +254,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   callIsStale,
   rootCallId,
 }) => {
-  const {showFeedback, setShowFeedback} = useContext(FeedbackContext);
+  const {showFeedback} = useContext(FeedbackContext);
   useViewTraceEvent(focusedCall);
 
   const hideTraceTreeDefault = isEvaluateOp(focusedCall.spanName);
@@ -332,11 +333,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
           </div>
         </Tailwind>
       }
-      headerContent={
-        <CallOverview
-          call={focusedCall}
-        />
-      }
+      headerContent={<CallOverview call={focusedCall} />}
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>

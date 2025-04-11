@@ -1,9 +1,8 @@
-import React, {SyntheticEvent, useContext} from 'react';
+import React, {SyntheticEvent} from 'react';
 import styled from 'styled-components';
 
 import EditableField from '../../../../../../common/components/EditableField';
 import {makeRefCall} from '../../../../../../util/refs';
-import {FeedbackContext} from '../../context';
 import {Reactions} from '../../feedback/Reactions';
 import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
@@ -58,10 +57,7 @@ export const CallOverview: React.FC<{
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
         <div>
-          <Reactions
-            weaveRef={refCall}
-            forceVisible={true}
-          />
+          <Reactions weaveRef={refCall} forceVisible={true} />
         </div>
         <OverflowBin>
           <OverflowMenu
