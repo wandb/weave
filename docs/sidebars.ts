@@ -56,6 +56,7 @@ const sidebars: SidebarsConfig = {
               label: "Compare Traces",
               id: "guides/tools/comparison",
             },
+            "guides/tracking/trace-tree"
           ]
         },
         {
