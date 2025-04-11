@@ -13,7 +13,6 @@ import {WeaveflowPeekContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
-import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -284,11 +283,6 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
     }
   }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
 
-  const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
-    focusedCall.entity,
-    focusedCall.project
-  );
-
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
@@ -335,12 +329,9 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
             <FeedbackSidebar
-              humanAnnotationSpecs={humanAnnotationSpecs}
-              specsLoading={specsLoading}
               callID={focusedCallId}
               entity={focusedCall.entity}
               project={focusedCall.project}
-              onReloadSpecs={refetch}
               onClose={() => setShowFeedback(false)}
             />
           </div>

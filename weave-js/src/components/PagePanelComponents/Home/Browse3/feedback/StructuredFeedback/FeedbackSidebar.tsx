@@ -17,24 +17,19 @@ import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotat
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
+import {useHumanAnnotationSpecs} from './tsHumanFeedback';
 
 type FeedbackSidebarProps = {
-  humanAnnotationSpecs: tsHumanAnnotationSpec[];
-  specsLoading: boolean;
   callID: string;
   entity: string;
   project: string;
-  onReloadSpecs?: () => void;
   onClose?: () => void;
 };
 
 export const FeedbackSidebar = ({
-  humanAnnotationSpecs,
-  specsLoading,
   callID,
   entity,
   project,
-  onReloadSpecs,
   onClose,
 }: FeedbackSidebarProps) => {
   const [isSaving, setIsSaving] = useState(false);
@@ -49,6 +44,11 @@ export const FeedbackSidebar = ({
   });
   const history = useHistory();
   const {baseRouter} = useWeaveflowRouteContext();
+
+  const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
+    entity,
+    project
+  );
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -198,11 +198,11 @@ export const FeedbackSidebar = ({
         onClose={() => {
           setIsNewAnnotationDrawerOpen(false);
           query.refetch();
-          onReloadSpecs?.();
+          refetch();
         }}
         onSave={() => {
           query.refetch();
-          onReloadSpecs?.();
+          refetch();
         }}
       />
     </div>
