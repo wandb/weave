@@ -198,9 +198,6 @@ class PaginatedIterator(Generic[T, R]):
         if self.limit is not None and index >= self.limit + (self.offset or 0):
             raise IndexError(f"Index {index} out of range")
 
-        if self.offset is not None:
-            index += self.offset
-
         page_index = index // self.page_size
         page_offset = index % self.page_size
 
