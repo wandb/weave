@@ -1,4 +1,4 @@
-# Weave OpenTelemetry (OTEL) Trace API
+# Send OpenTelemetry Traces to Weave
 
 ## Overview
 Weave supports ingestion of OpenTelemetry compatible trace data through a dedicated endpoint. This endpoint allows you to send OTLP (OpenTelemetry Protocol) formatted trace data directly to your Weave project.
@@ -230,14 +230,14 @@ tracer.start_span('name=standard-span')
 def my_function():
     with tracer.start_as_current_span("outer_span") as outer_span:
         client = openai.OpenAI()
-        input_att = {"role": "user", "content": "Write a haiku."}
+        input_messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
         # This will only appear in the side panel
         outer_span.set_attribute("input.value", json.dumps(input_att))
         # This follows conventions and will appear in the dashboard
         outer_span.set_attribute("gen_ai.system", 'openai')
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "Write a haiku."}],
+            messages=input_messages,
             max_tokens=20,
             stream=True,
             stream_options={"include_usage": True},
