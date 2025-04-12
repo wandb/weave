@@ -396,26 +396,24 @@ class OpenInferenceAttributes(Attributes):
         return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
 
     def get_weave_outputs(self) -> Any:
-        outputs: dict[str, Any] = (
-            self.get_attribute_value(oi.SpanAttributes.LLM_OUTPUT_MESSAGES) or {}
-        )
-        result = {}
-        for k, v in outputs.items():
-            if k.isdigit() and isinstance(v, dict):
-                for key in v.keys():
-                    result[key + f"_{k}"] = v[key]
-        return to_json_serializable(result)
+        return {
+            "value": self.get_attribute_value(
+                oi.SpanAttributes.OUTPUT_VALUE
+            ),
+            "mime_type": self.get_attribute_value(
+                oi.SpanAttributes.OUTPUT_MIME_TYPE
+            ),
+        }
 
     def get_weave_inputs(self) -> Any:
-        inputs: dict[str, Any] = (
-            self.get_attribute_value(oi.SpanAttributes.LLM_INPUT_MESSAGES) or {}
-        )
-        result = {}
-        for k, v in inputs.items():
-            if k.isdigit() and isinstance(v, dict):
-                for key in v.keys():
-                    result[key + f"_{k}"] = v[key]
-        return to_json_serializable(result)
+        return {
+            "value": self.get_attribute_value(
+                oi.SpanAttributes.INPUT_VALUE
+            ),
+            "mime_type": self.get_attribute_value(
+                oi.SpanAttributes.INPUT_MIME_TYPE
+            ),
+        }
 
     def get_weave_attributes(
         self, extra: Optional[dict[str, Any]] = None
