@@ -374,7 +374,6 @@ class GenericAttributes(Attributes):
     def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any:
         result = self._attributes.copy()
         result.update(extra or {})
-        result["convention"] = "Unknown"
         return result
 
 
@@ -431,7 +430,6 @@ class OpenInferenceAttributes(Attributes):
             "provider": str(provider) if provider else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "convention": 'OpenInference',
         }
 
         if invocation_parameters:
@@ -493,7 +491,6 @@ class OpenTelemetryAttributes(Attributes):
             "max_tokens": int(max_tokens) if max_tokens else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
-            "convention": 'OpenTelemetry',
         }
 
         if extra:
