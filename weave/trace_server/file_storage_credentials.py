@@ -1,5 +1,4 @@
 import base64
-import logging
 from typing import Optional, TypedDict, Union
 
 from google.oauth2.credentials import Credentials as GCPCredentials
@@ -7,16 +6,15 @@ from typing_extensions import NotRequired
 
 from weave.trace_server import environment
 
-logger = logging.getLogger(__name__)
-
 
 class AWSCredentials(TypedDict):
     """AWS authentication credentials for S3 access.
     The session_token is optional and only required for temporary credentials."""
 
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: NotRequired[Optional[str]]
+    secret_access_key: NotRequired[Optional[str]]
     session_token: NotRequired[Optional[str]]
+    kms_key: NotRequired[Optional[str]]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -32,7 +30,7 @@ class AzureAccountCredentials(TypedDict):
     account_url: NotRequired[Optional[str]]
 
 
-def get_aws_credentials() -> Optional[AWSCredentials]:
+def get_aws_credentials() -> AWSCredentials:
     """Retrieves AWS credentials from environment variables.
 
     Required env vars:
@@ -50,16 +48,14 @@ def get_aws_credentials() -> Optional[AWSCredentials]:
     access_key_id = environment.wf_storage_bucket_aws_access_key_id()
     secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
     session_token = environment.wf_storage_bucket_aws_session_token()
-    if access_key_id is None or secret_access_key is None:
-        return None
+    kms_key = environment.wf_storage_bucket_aws_kms_key()
 
-    creds = AWSCredentials(
+    return AWSCredentials(
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
+        session_token=session_token,
+        kms_key=kms_key,
     )
-    if session_token is not None:
-        creds["session_token"] = session_token
-    return creds
 
 
 def get_gcp_credentials() -> GCPCredentials:
