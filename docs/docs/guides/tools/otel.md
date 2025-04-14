@@ -180,6 +180,7 @@ First, install the required dependencies:
 
 ```bash
 pip install openai opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp-proto-http
+```
 
 ```python
 import json
@@ -227,7 +228,7 @@ tracer.start_span('name=standard-span')
 def my_function():
     with tracer.start_as_current_span("outer_span") as outer_span:
         client = openai.OpenAI()
-        input_messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
+        input_messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}]
         # This will only appear in the side panel
         outer_span.set_attribute("input.value", json.dumps(input_messages))
         # This follows conventions and will appear in the dashboard
