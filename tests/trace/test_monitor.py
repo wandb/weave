@@ -13,10 +13,20 @@ def test_init_pass():
         scorers=[],
         call_filter={
             "op_names": [],
-            "query": {},
         },
     )
     assert monitor.sampling_rate == 0.5
+
+
+def test_default_sampling_rate():
+    monitor = Monitor(
+        name="test_monitor",
+        scorers=[],
+        call_filter={
+            "op_names": [],
+        },
+    )
+    assert monitor.sampling_rate == 1
 
 
 def test_out_of_range_sampling_rate():
@@ -27,7 +37,6 @@ def test_out_of_range_sampling_rate():
             scorers=[],
             call_filter={
                 "op_names": [],
-                "query": {},
             },
         )
 
@@ -40,21 +49,7 @@ def test_missing_op_names():
             name="test_monitor",
             sampling_rate=0.5,
             scorers=[],
-            call_filter={
-                "query": {},
-            },
-        )
-
-
-def test_missing_query():
-    with pytest.raises(ValidationError, match="call_filter must contain a query key"):
-        Monitor(
-            name="test_monitor",
-            sampling_rate=0.5,
-            scorers=[],
-            call_filter={
-                "op_names": [],
-            },
+            call_filter={},
         )
 
 
@@ -103,7 +98,6 @@ def test_activate(client: weave_client.WeaveClient):
         scorers=[],
         call_filter={
             "op_names": [],
-            "query": {},
         },
     )
     publish(monitor)
