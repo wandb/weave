@@ -228,6 +228,7 @@ export interface TraceObjSchema<
   base_object_class?: OBC;
   val: T;
   wb_user_id?: string;
+  size_bytes?: number;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {
