@@ -220,7 +220,7 @@ const OverlayCanvas = styled.canvas`
 interface SegmentationCanvasProps {
   segmentation: ImageData;
   classState: Record<string, ClassState>;
-  classOverlay: Record<string, Controls.OverlayClassState>;
+  classOverlay: Partial<Record<string, Controls.OverlayClassState>>;
 }
 
 /**
