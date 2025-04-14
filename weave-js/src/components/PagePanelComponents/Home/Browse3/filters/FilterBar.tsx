@@ -222,9 +222,6 @@ export const FilterBar = ({
       // Only trigger debounced update if the filter is complete
       if (!isFilterIncomplete(item)) {
         debouncedSetFilterModel(newItemsModel);
-      } else if (item.value === '') {
-        // Edge case for when we remove the filter
-        applyCompletedFilters(newItemsModel);
       }
     },
     [localFilterModel, debouncedSetFilterModel, applyCompletedFilters]
