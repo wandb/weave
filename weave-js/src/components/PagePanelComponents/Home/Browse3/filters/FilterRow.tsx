@@ -63,7 +63,8 @@ export const FilterRow = ({
   };
 
   const isOperatorDisabled =
-    isWeaveRef(item.value) || ['id', 'user'].includes(getFieldType(item.field));
+    isWeaveRef(item.value) ||
+    ['id', 'user', 'monitor'].includes(getFieldType(item.field));
 
   return (
     <>

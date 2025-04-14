@@ -19,6 +19,7 @@ import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
+import {SelectMonitor} from './SelectMonitor';
 
 type SelectValueProps = {
   entity: string;
@@ -57,6 +58,20 @@ export const SelectValue = ({
   }
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
+  }
+  if (fieldType === 'monitor') {
+    console.log(value);
+    return (
+      <SelectMonitor
+        entity={entity}
+        project={project}
+        value={value}
+        onChange={value => {
+          console.log('onChange', value);
+          onSetValue(value);
+        }}
+      />
+    );
   }
   if (fieldType === 'datetime') {
     // For date range, only show active state for the last filter

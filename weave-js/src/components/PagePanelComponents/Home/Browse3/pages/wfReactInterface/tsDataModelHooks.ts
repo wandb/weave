@@ -52,6 +52,7 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
+import {SortBy} from './traceServerClientTypes';
 
 export const projectIdFromParts = ({
   entity,
@@ -1045,7 +1046,8 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean; noAutoRefresh?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean},
+  sortBy?: SortBy[]
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1075,6 +1077,7 @@ const useRootObjectVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: sortBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;

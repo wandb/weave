@@ -178,6 +178,10 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
             return CallsMergedFeedbackPayloadField(
                 field="runnable_ref", feedback_type=feedback_type, extra_path=[]
             )
+        elif extra_path[0] == "trigger_ref":
+            return CallsMergedFeedbackPayloadField(
+                field="trigger_ref", feedback_type=feedback_type, extra_path=[]
+            )
         raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:
@@ -190,8 +194,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
-        param_name = pb.add_param(self.feedback_type)
-        res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        if self.feedback_type == "*":
+            res = f"any({inner})"
+        else:
+            param_name = pb.add_param(self.feedback_type)
+            res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res

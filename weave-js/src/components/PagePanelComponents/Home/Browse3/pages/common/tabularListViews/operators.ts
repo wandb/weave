@@ -19,7 +19,10 @@ export const operationConverter = (
         },
       ],
     };
-  } else if (item.operator === '(string): contains') {
+  } else if (
+    item.operator === '(string): contains' ||
+    item.operator === '(string): by'
+  ) {
     return {
       $contains: {
         input: {$getField: item.field},
