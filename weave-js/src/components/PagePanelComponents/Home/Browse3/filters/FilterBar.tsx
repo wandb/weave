@@ -26,12 +26,15 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
@@ -45,11 +48,15 @@ type FilterBarProps = {
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
   return (
     filter.field === undefined ||
+    // Empty string is never valid
+    filter.value === '' ||
     (filter.value === undefined && !isValuelessOperator(filter.operator))
   );
 };
 
 export const FilterBar = ({
+  entity,
+  project,
   filterModel,
   setFilterModel,
   columnInfo,
@@ -64,6 +71,7 @@ export const FilterBar = ({
   // local filter model is used to avoid triggering a re-render of the trace
   // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
+  const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
   useEffect(() => {
     setLocalFilterModel(filterModel);
   }, [filterModel]);
@@ -158,7 +166,7 @@ export const FilterBar = ({
         items: [
           ...localFilterModel.items,
           {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },
@@ -169,20 +177,20 @@ export const FilterBar = ({
     [localFilterModel]
   );
 
-  const debouncedSetFilterModel = useMemo(
-    () =>
-      _.debounce(
-        (newModel: GridFilterModel) => setFilterModel(newModel),
-        DEBOUNCE_MS
-      ),
+  // Only send complete filters to the parent component
+  const applyCompletedFilters = useCallback(
+    (model: GridFilterModel) => {
+      const completeFilters = model.items.filter(
+        item => !isFilterIncomplete(item)
+      );
+      setFilterModel({...model, items: completeFilters});
+    },
     [setFilterModel]
   );
-  const updateLocalAndDebouncedFilterModel = useCallback(
-    (newModel: GridFilterModel) => {
-      setLocalFilterModel(newModel);
-      debouncedSetFilterModel(newModel);
-    },
-    [debouncedSetFilterModel]
+
+  const debouncedSetFilterModel = useMemo(
+    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
+    [applyCompletedFilters]
   );
 
   const onUpdateFilter = useCallback(
@@ -190,9 +198,16 @@ export const FilterBar = ({
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
+      // Set this filter as active edit, highlighting filter bar children in teal
+      setActiveEditId(item.id);
+
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
-        updateLocalAndDebouncedFilterModel(newModel);
+        setLocalFilterModel(newModel);
+        // Only trigger debounced update if the filter is complete
+        if (!isFilterIncomplete(item)) {
+          debouncedSetFilterModel(newModel);
+        }
         return;
       }
 
@@ -202,9 +217,13 @@ export const FilterBar = ({
         ...oldItems.slice(index + 1),
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
-      updateLocalAndDebouncedFilterModel(newItemsModel);
+      setLocalFilterModel(newItemsModel);
+      // Only trigger debounced update if the filter is complete
+      if (!isFilterIncomplete(item)) {
+        debouncedSetFilterModel(newItemsModel);
+      }
     },
-    [localFilterModel, updateLocalAndDebouncedFilterModel]
+    [localFilterModel, debouncedSetFilterModel]
   );
 
   const onRemoveFilter = useCallback(
@@ -212,22 +231,27 @@ export const FilterBar = ({
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
-      setFilterModel(newModel);
+      applyCompletedFilters(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterId) {
+        setActiveEditId(null);
+      }
     },
-    [localFilterModel, setFilterModel]
+    [localFilterModel, applyCompletedFilters, activeEditId]
   );
 
   const onSetSelected = useCallback(() => {
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: localFilterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
@@ -237,10 +261,27 @@ export const FilterBar = ({
       newFilter,
       f => f.field === 'id'
     );
-    setFilterModel(newModel);
+
+    // Apply filter immediately (won't be incomplete)
+    setLocalFilterModel(newModel);
+    applyCompletedFilters(newModel);
+
     clearSelectedCalls();
     setAnchorEl(null);
-  }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
+
+    // Clear active edit when popover is closed
+    setActiveEditId(null);
+  }, [
+    localFilterModel,
+    applyCompletedFilters,
+    selectedCalls,
+    clearSelectedCalls,
+  ]);
+
+  const onFilterTagClick = useCallback((filterId: FilterId) => {
+    setActiveEditId(filterId);
+    setAnchorEl(refBar.current);
+  }, []);
 
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
@@ -253,24 +294,42 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  // Determine if we should show a border based on whether there are active filters
+  const hasBorder = completeItems.length > 0;
+
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
+  }, [completeItems, activeEditId]);
+
   return (
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+          hasBorder
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-700 dark:hover:border-teal-300 dark:hover:ring-teal-300'
+            : ''
+        } ${
+          !hasBorder
+            ? 'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400'
+            : ''
+        }`}
         onClick={onClick}>
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none">
+        <div ref={refLabel} className="select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
+              onClick={() => onFilterTagClick(f.id)}
             />
           ))}
         </VariableChildrenDisplay>
@@ -295,7 +354,10 @@ export const FilterBar = ({
             },
           },
         }}
-        onClose={() => setAnchorEl(null)}
+        onClose={() => {
+          setAnchorEl(null);
+          setActiveEditId(null); // Clear active edit when popover is closed
+        }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="p-12">
@@ -313,16 +375,21 @@ export const FilterBar = ({
               {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
+                  entity={entity}
+                  project={project}
                   item={item}
                   options={options}
                   onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
+                  activeEditId={activeEditId}
                 />
               ))}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
+                entity={entity}
+                project={project}
                 item={{
                   id: undefined,
                   field: '',
@@ -333,6 +400,7 @@ export const FilterBar = ({
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
+                activeEditId={activeEditId}
               />
             )}
             <div className="mt-8 flex items-center">

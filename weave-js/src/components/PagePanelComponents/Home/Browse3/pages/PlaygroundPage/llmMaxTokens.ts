@@ -1,3 +1,5 @@
+import levenshtein from 'js-levenshtein';
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
@@ -105,6 +107,16 @@ export const LLM_MAX_TOKENS = {
   'o3-mini-2025-01-31': {
     provider: 'openai',
     max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview-2025-02-27': {
+    provider: 'openai',
+    max_tokens: 16384,
     supports_function_calling: true,
   },
 
@@ -280,12 +292,37 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Groq models
-  'groq/gemma-7b-it': {
+  'groq/deepseek-r1-distill-llama-70b': {
+    provider: 'groq',
+    max_tokens: 131072,
+    supports_function_calling: false,
+  },
+  'groq/llama-3.3-70b-versatile': {
     provider: 'groq',
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'groq/gemma2-9b-it': {
+  'groq/llama-3.3-70b-specdec': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: false,
+  },
+  'groq/llama-3.2-1b-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-3b-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-11b-vision-preview': {
+    provider: 'groq',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'groq/llama-3.2-90b-vision-preview': {
     provider: 'groq',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -305,14 +342,9 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'groq/llama3-groq-8b-8192-tool-use-preview': {
+  'groq/gemma2-9b-it': {
     provider: 'groq',
     max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'groq/mixtral-8x7b-32768': {
-    provider: 'groq',
-    max_tokens: 32768,
     supports_function_calling: true,
   },
 
@@ -464,6 +496,36 @@ export const LLM_MAX_TOKENS = {
   },
 
   // xAI models
+  'xai/grok-3-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-fast-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-fast-latest': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-fast-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-fast-latest': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
   'xai/grok-beta': {
     max_tokens: 131072,
     provider: 'xai',
@@ -484,7 +546,21 @@ export const LLM_MAX_TOKENS = {
     provider: 'xai',
     supports_function_calling: true,
   },
+
+  // DeepSeek models
+  'deepseek/deepseek-reasoner': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'deepseek/deepseek-chat': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
 };
+
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4o-mini-2024-07-18';
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
@@ -492,15 +568,20 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-export const LLM_PROVIDERS = [
-  'openai',
-  'anthropic',
-  'azure',
-  'gemini',
-  'groq',
-  'bedrock',
-  'xai',
-];
+export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
+  openai: ['OPENAI_API_KEY'],
+  anthropic: ['ANTHROPIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
+  xai: ['XAI_API_KEY'],
+  bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
+  azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
+  groq: ['GROQ_API_KEY'],
+  deepseek: ['DEEPSEEK_API_KEY'],
+};
+
+export const LLM_PROVIDERS = Object.keys(LLM_PROVIDER_SECRETS) as Array<
+  keyof typeof LLM_PROVIDER_SECRETS
+>;
 
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
@@ -513,4 +594,42 @@ export const LLM_PROVIDER_LABELS: Record<
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
+  deepseek: 'DeepSeek',
+};
+
+// Example usage:
+// findMaxTokensByModelName('gpt-4') // returns 4096
+// findMaxTokensByModelName('gpt-4-turbo') // returns 4096
+// findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
+// findMaxTokensByModelName('completely-unknown-model') // returns 4096
+export const findMaxTokensByModelName = (modelName: string): number => {
+  // Default to a reasonable max_tokens value if no close match is found
+  const DEFAULT_MAX_TOKENS = 4096;
+
+  // If the model name is an exact match, return its max_tokens
+  if (modelName in LLM_MAX_TOKENS) {
+    return LLM_MAX_TOKENS[modelName as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Find the closest match using Levenshtein distance
+  let closestMatch = '';
+  let minDistance = Infinity;
+
+  Object.keys(LLM_MAX_TOKENS).forEach(key => {
+    const distance = levenshtein(modelName.toLowerCase(), key.toLowerCase());
+
+    // Update closest match if this distance is smaller
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestMatch = key;
+    }
+  });
+
+  // If we found a reasonably close match (distance less than half the length of the model name)
+  if (minDistance < modelName.length / 2) {
+    return LLM_MAX_TOKENS[closestMatch as LLMMaxTokensKey].max_tokens;
+  }
+
+  // Return default if no close match found
+  return DEFAULT_MAX_TOKENS;
 };

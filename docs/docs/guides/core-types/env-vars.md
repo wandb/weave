@@ -30,6 +30,10 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 | `WEAVE_USE_SERVER_CACHE` | `bool` | `false` | Enables server response caching. When enabled, responses from the server are cached to disk to improve performance for repeated queries. |
 | `WEAVE_SERVER_CACHE_SIZE_LIMIT` | `int` | `1000000000` | Sets the maximum size limit for the server cache in bytes. When the cache reaches this size, older entries are automatically removed to make space for new ones. Important: the underlying implementation uses SQLite which has a Write Ahead Log (WAL) that will grow to 4MB regardless of this setting. This WAL will be removed when the program exits. |
 | `WEAVE_SERVER_CACHE_DIR` | `str` | `None` | Specifies the directory where cache files should be stored. If not set, a temporary directory is used. |
+| `WEAVE_MAX_CALLS_QUEUE_SIZE` | `int` | `100000` | Sets the maximum size of the calls queue.  Defaults to 100_000.  Setting a value of 0 means the queue can grow unbounded. |
+| `WEAVE_RETRY_MAX_ATTEMPTS` | `int` | `3` | Sets the maximum number of retry attempts for failed requests. |
+| `WEAVE_RETRY_MAX_INTERVAL` | `float` | `300.0` | Sets the maximum interval between retry attempts in seconds. |
+| `WANDB_BASE_URL` | `string` | `None` | Sets the Weave host URL. Equivalent to entering the host URL when prompted by `wandb.login()`. You can specify `WANDB_BASE_URL` and `WANDB_API_KEY` before using `weave.init()` to automatically log into and authenticate to Weave. |
 
 :::note
 All boolean environment variables accept the following values (case-insensitive):

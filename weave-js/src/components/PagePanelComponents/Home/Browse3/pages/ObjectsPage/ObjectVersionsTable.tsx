@@ -14,7 +14,6 @@ import {ErrorPanel} from '../../../../../ErrorPanel';
 import {Loading} from '../../../../../Loading';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
 import {Empty} from '../common/Empty';
@@ -162,6 +161,9 @@ export const ObjectVersionsTable: React.FC<{
       // with the dynamic fields added below.
       basicField('weave__object_version_link', props.objectTitle ?? 'Object', {
         hideable: false,
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.objectId;
+        },
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
           const obj: ObjectVersionSchema = cellParams.row.obj;
@@ -244,7 +246,7 @@ export const ObjectVersionsTable: React.FC<{
     if (!props.hideCategoryColumn) {
       cols.push(
         basicField('baseObjectClass', 'Category', {
-          width: 120,
+          width: 132,
           display: 'flex',
           valueGetter: (unused: any, row: any) => {
             return row.obj.baseObjectClass;
@@ -282,8 +284,8 @@ export const ObjectVersionsTable: React.FC<{
 
     if (!props.hideCreatedAtColumn) {
       cols.push(
-        basicField('createdAtMs', 'Created', {
-          width: 100,
+        basicField('createdAtMs', 'Last updated', {
+          width: 130,
           valueGetter: (unused: any, row: any) => {
             return row.obj.createdAtMs;
           },
@@ -396,7 +398,6 @@ export const FilterableObjectVersionsTable: React.FC<{
   setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
   const {useRootObjectVersions} = useWFHooks();
-  const {baseRouter} = useWeaveflowRouteContext();
 
   const effectiveFilter = useMemo(() => {
     return {...props.initialFilter, ...props.frozenFilter};
@@ -452,14 +453,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   }
 
   return (
-    <FilterLayoutTemplate
-      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
-      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={baseRouter.objectVersionsUIUrl(
-        props.entity,
-        props.project,
-        effectiveFilter
-      )}>
+    <FilterLayoutTemplate>
       <ObjectVersionsTable
         objectVersions={objectVersions}
         objectTitle={props.objectTitle}

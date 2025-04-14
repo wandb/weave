@@ -176,8 +176,8 @@ const useCall = (
   const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
@@ -232,7 +232,7 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }
@@ -253,6 +253,7 @@ const useCallsNoExpansion = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -287,6 +288,9 @@ const useCallsNoExpansion = (
       columns,
       include_costs: opts?.includeCosts,
       include_feedback: opts?.includeFeedback,
+      ...(opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -299,18 +303,27 @@ const useCallsNoExpansion = (
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
     opts?.skip,
     opts?.includeCosts,
     opts?.includeFeedback,
-    getTsClient,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter.opVersionRefs,
+    deepFilter.inputObjectVersionRefs,
+    deepFilter.outputObjectVersionRefs,
+    deepFilter.parentIds,
+    deepFilter.traceId,
+    deepFilter.callIds,
+    deepFilter.traceRootsOnly,
+    deepFilter.runIds,
+    deepFilter.userIds,
+    limit,
     offset,
     sortBy,
     query,
     columns,
+    getTsClient,
   ]);
 
   // register doFetch as a callback after deletion
@@ -397,6 +410,7 @@ const useCalls = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
@@ -793,6 +807,7 @@ const useOpVersions = (
   filter: OpVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
+  orderBy?: traceServerTypes.SortBy[],
   opts?: {skip?: boolean}
 ): LoadableWithError<OpVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -805,6 +820,7 @@ const useOpVersions = (
     result: null,
   });
   const deepFilter = useDeepMemo(filter);
+  const deepOrderBy = useDeepMemo(orderBy);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -822,6 +838,7 @@ const useOpVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: deepOrderBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -845,6 +862,7 @@ const useOpVersions = (
     project,
     limit,
     metadataOnly,
+    deepOrderBy,
   ]);
 
   useEffect(() => {
@@ -878,6 +896,7 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionHash: obj.digest,
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -1911,22 +1930,24 @@ export const privateRefToSimpleName = (ref: string) => {
   }
 };
 
+export const parseSpanName = (opName: string) => {
+  if (
+    opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    opName.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return opVersionRefOpName(opName);
+  }
+  if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+    return privateRefToSimpleName(opName);
+  }
+  return opName;
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  const parseSpanName = (opName: string) => {
-    if (
-      opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      opName.startsWith(WEAVE_REF_PREFIX)
-    ) {
-      return opVersionRefOpName(opName);
-    }
-    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
-      return privateRefToSimpleName(opName);
-    }
-    return opName;
-  };
+
   return {
     entity,
     project,
@@ -1946,6 +1967,7 @@ export const traceCallToUICallSchema = (
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
     traceCall,
+    totalStorageSizeBytes: traceCall.total_storage_size_bytes ?? null,
   };
 };
 

@@ -18,11 +18,11 @@ Use the **Per page** control at the bottom-right of the Traces page to adjust th
 
 If you prefer a manual approach, you can modify the `pageSize` query parameter in your query URL to a value less than the maximum of `100`.
 
-## Server Response Caching
+## Server response caching
 
 Weave provides server response caching to improve performance when making repeated queries or working with limited network bandwidth. While currently disabled by default, this feature is expected to become the default behavior in a future release.
 
-### When to Use Caching
+### When to use caching
 
 Server response caching is particularly beneficial when:
 
@@ -33,7 +33,7 @@ Server response caching is particularly beneficial when:
 
 This feature is especially useful when running repeated evaluations on a dataset, as it allows caching the dataset between runs.
 
-### How to Enable Caching
+### How to enable caching
 
 To enable caching, you can set the following environment variables:
 
@@ -48,7 +48,7 @@ export WEAVE_SERVER_CACHE_SIZE_LIMIT=1000000000
 export WEAVE_SERVER_CACHE_DIR=/path/to/cache
 ```
 
-### Caching Behavior
+### Caching behavior
 
 Technically, this feature will cache idempotent requests against the server. Specifically, we cache:
 
@@ -58,7 +58,7 @@ Technically, this feature will cache idempotent requests against the server. Spe
 - `refs_read_batch`
 - `file_content_read`
 
-### Cache Size and Storage Details
+### Cache size and storage details
 
 The cache size is controlled by `WEAVE_SERVER_CACHE_SIZE_LIMIT` (in bytes). The actual disk space used consists of three components:
 
@@ -75,6 +75,31 @@ For example, with the a 5MB cache limit:
 
 - While running: ~9MB maximum
 - After exit: ~5MB maximum
+
+## Trace data is truncated
+
+Sometimes, large trace data is partially cut off in the Weave UI. This problem occurs because default trace output is a raw, custom Python object that Weave doesn’t know how to serialize.
+
+To ensure that large trace data isn't cut off, define a dictionary of strings to return all trace data. 
+
+```python
+import weave
+
+class MyObj:
+    def __init__(self, x: int):
+        self.x = x
+
+    def __repr__(self):
+        return f"MyObj(x={self.x})"
+
+    def to_dict(self):
+        return {"x": self.x}
+
+@weave.op()
+def make_my_obj():
+    x = "s" * 10_000
+    return MyObj(x)
+```
 
 ## Long eval clean up times
 
@@ -105,4 +130,16 @@ This can also be set programmatically using the `settings` argument to `weave.in
 
 ```python
 client = weave.init("fast-upload", settings={"client_parallelism": 100})
+```
+
+## OS errors
+
+### `[Errno 24]: Too many open files`
+
+This error occurs when the number of open files exceeds the limit set by your operating system. In Weave, this may happen because you're working with large image datasets. Weave uses `PIL` for image processing, which keeps file descriptors open for the duration of the program.
+
+To resolve this issue, increase the system limit for open files to `65,536` using `ulimit`:
+
+```bash
+ulimit -n 65536
 ```

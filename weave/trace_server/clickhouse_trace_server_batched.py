@@ -35,10 +35,14 @@ from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
+import ddtrace
 import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
@@ -78,8 +82,21 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.file_storage import (
+    FileStorageClient,
+    FileStorageReadError,
+    FileStorageWriteError,
+    key_for_project_digest,
+    maybe_get_storage_client_from_env,
+    read_from_bucket,
+    store_in_bucket,
+)
+from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
-from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.llm_completion import (
+    get_custom_provider_info,
+    lite_llm_completion,
+)
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
@@ -89,6 +106,7 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -121,9 +139,6 @@ from weave.trace_server.trace_server_interface_util import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-MAX_FLUSH_COUNT = 10000
-MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
@@ -171,8 +186,10 @@ ObjRefListType = list[ri.InternalObjectRef]
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
+    or DEFAULT_MAX_MEMORY_USAGE
 }
 
 
@@ -198,6 +215,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._file_storage_client: Optional[FileStorageClient] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -212,6 +230,40 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             use_async_insert=use_async_insert,
         )
 
+    @property
+    def file_storage_client(self) -> Optional[FileStorageClient]:
+        if self._file_storage_client is not None:
+            return self._file_storage_client
+        self._file_storage_client = maybe_get_storage_client_from_env()
+        return self._file_storage_client
+
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
+        traces_data = [
+            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
+        ]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
+        # TODO: Actually populate the error fields if call_start_batch fails
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        return tsi.OtelExportRes()
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
@@ -222,6 +274,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._call_batch = []
             self._flush_immediately = True
+
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        with self.call_batch():
+            res = []
+            for item in req.batch:
+                if item.mode == "start":
+                    res.append(self.call_start(item.req))
+                elif item.mode == "end":
+                    res.append(self.call_end(item.req))
+                else:
+                    raise ValueError("Invalid mode")
+        return tsi.CallCreateBatchRes(res=res)
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -262,6 +326,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ),
                 limit=1,
                 include_costs=req.include_costs,
+                include_storage_size=req.include_storage_size,
+                include_total_storage_size=req.include_total_storage_size,
             )
         )
         try:
@@ -301,13 +367,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
-            project_id=req.project_id, include_costs=req.include_costs or False
+            project_id=req.project_id,
+            include_costs=req.include_costs or False,
+            include_storage_size=req.include_storage_size or False,
+            include_total_storage_size=req.include_total_storage_size or False,
         )
         columns = all_call_select_columns
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in columns or req.include_costs:
+                columns += ["ended_at", "exception", "display_name"]
+
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
@@ -323,6 +398,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
+
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_total_storage_size:
+            columns.append("total_storage_size_bytes")
+
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -379,6 +461,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for call in call_dicts:
                 yield tsi.CallSchema.model_validate(call)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
     ) -> None:
@@ -413,6 +496,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 refs_to_resolve[(i, col)] = ref
         return refs_to_resolve
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
     def _expand_call_refs(
         self,
         project_id: str,
@@ -436,14 +520,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 continue
 
             with self.with_new_client():
-                vals = self._refs_read_batch_within_project(
-                    project_id, list(refs_to_resolve.values()), ref_cache
-                )
-            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
-                if isinstance(val, dict) and "_ref" not in val:
-                    val["_ref"] = ref.uri()
-                set_nested_key(calls[i], col, val)
+                # Filter out non-unique refs
+                unique_ref_map = {}
+                for ref in refs_to_resolve.values():
+                    if ref.uri() not in unique_ref_map:
+                        unique_ref_map[ref.uri()] = ref
 
+                # Fetch values only for the unique refs
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(unique_ref_map.values()), ref_cache
+                )
+
+                # update the ref map with the fetched values
+                ref_val_map = {}
+                for ref, val in zip(unique_ref_map.values(), vals):
+                    ref_val_map[ref.uri()] = val
+
+                # Replace the refs with values and add ref key
+                for (i, col), ref in refs_to_resolve.items():
+                    # Look up the value using the ref's URI
+                    val = ref_val_map.get(ref.uri())
+                    if val is not None:
+                        if isinstance(val, dict) and "_ref" not in val:
+                            val["_ref"] = ref.uri()
+                        set_nested_key(calls[i], col, val)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -451,7 +553,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # get all parents
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.calls_delete.count": str(
+                        len(req.call_ids)
+                    )
+                }
+            )
+
+        # get the requested calls to delete
         parents = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
@@ -459,26 +570,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
-                    # request minimal columns
                     columns=["id", "parent_id"],
                 )
             )
         )
+        parent_trace_ids = [p.trace_id for p in parents]
 
-        # get all calls with trace_ids matching parents
+        # get first 10k calls with trace_ids matching parents
         all_calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi.CallsFilter(
-                        trace_ids=[p.trace_id for p in parents],
-                    ),
-                    # request minimal columns
+                    filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
                     columns=["id", "parent_id"],
+                    limit=10_000,
                 )
             )
         )
-
         all_descendants = find_call_descendants(
             root_ids=req.call_ids,
             all_calls=all_calls,
@@ -870,6 +978,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         yield from rows
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._table_query_stream")
     def _table_query_stream(
         self,
         project_id: str,
@@ -963,6 +1072,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.RefsReadBatchRes(vals=vals)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
         self,
         parsed_refs: ObjRefListType,
@@ -992,6 +1102,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Return the final data payload
         return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._refs_read_batch_within_project"
+    )
     def _refs_read_batch_within_project(
         self,
         project_id_scope: str,
@@ -1233,6 +1346,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
+        use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
+        client = self.file_storage_client
+
+        if client is not None and use_file_storage:
+            try:
+                self._file_create_bucket(req, digest, client)
+            except FileStorageWriteError as e:
+                self._file_create_clickhouse(req, digest)
+        else:
+            self._file_create_clickhouse(req, digest)
+        return tsi.FileCreateRes(digest=digest)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
+    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
@@ -1247,6 +1374,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     len(chunks),
                     req.name,
                     chunk,
+                    len(chunk),
+                    None,
                 )
                 for i, chunk in enumerate(chunks)
             ],
@@ -1257,15 +1386,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "n_chunks",
                 "name",
                 "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
             ],
         )
-        return tsi.FileCreateRes(digest=digest)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
+    def _file_create_bucket(
+        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
+    ) -> None:
+        target_file_storage_uri = store_in_bucket(
+            client, key_for_project_digest(req.project_id, digest), req.content
+        )
+        self._insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    0,
+                    1,
+                    req.name,
+                    b"",
+                    len(req.content),
+                    target_file_storage_uri.to_uri_str(),
+                )
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
+            ],
+        )
+
+    def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
+        """Determine if we should use file storage for a project."""
+        project_allow_list = wf_env.wf_file_storage_project_allow_list()
+        if project_allow_list is None:
+            return False
+
+        universally_enabled = (
+            len(project_allow_list) == 1 and project_allow_list[0] == "*"
+        )
+
+        if not universally_enabled and project_id not in project_allow_list:
+            return False
+
+        return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
-            SELECT n_chunks, val_bytes
+            SELECT n_chunks, val_bytes, file_storage_uri
             FROM (
                 SELECT *
                 FROM (
@@ -1282,10 +1460,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             column_formats={"val_bytes": "bytes"},
         )
         n_chunks = query_result.result_rows[0][0]
-        chunks = [r[1] for r in query_result.result_rows]
-        if len(chunks) != n_chunks:
+        result_rows = list(query_result.result_rows)
+
+        if len(result_rows) != n_chunks:
             raise ValueError("Missing chunks")
-        return tsi.FileContentReadRes(content=b"".join(chunks))
+
+        # There are 2 cases:
+        # 1: file_storage_uri_str is not none (storing in file store)
+        # 2: file_storage_uri_str is None (storing directly in clickhouse)
+        bytes = b""
+
+        for result_row in result_rows:
+            chunk_file_storage_uri_str = result_row[2]
+            if chunk_file_storage_uri_str:
+                file_storage_uri = FileStorageURI.parse_uri_str(
+                    chunk_file_storage_uri_str
+                )
+                client = self.file_storage_client
+                if client is None:
+                    raise FileStorageReadError("File storage client is not configured")
+                bytes += read_from_bucket(client, file_storage_uri)
+            else:
+                chunk_bytes = result_row[1]
+                bytes += chunk_bytes
+
+        return tsi.FileContentReadRes(content=bytes)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
@@ -1506,32 +1705,95 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # Required fields
         model_name = req.inputs.model
+        api_key = None
+        provider = None
+
+        # Custom model fields
+        base_url: Optional[str] = None
+        extra_headers: dict[str, str] = {}
+        return_type: Optional[str] = None
+
+        # For custom and standard models, we fetch the fields differently
+        #  1. Standard models: All of the information comes from the model_to_provider_info_map
+        #  2. Custom models: We fetch the provider object and provider model object
+
+        # First we try to see if the model name is a custom model
         model_info = self._model_to_provider_info_map.get(model_name)
-        if not model_info:
-            raise InvalidRequest(f"No model info found for model {model_name}")
-        secret_fetcher = _secret_fetcher_context.get()
-        if not secret_fetcher:
-            raise InvalidRequest(
-                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+
+        if model_info:
+            # Handle standard model case
+            # 1. We get the model info from the map
+            # 2. We fetch the API key, with the secret fetcher
+            # 3. We set the provider, to the litellm provider
+            # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
+
+            secret_name = model_info.get("api_key_name")
+            if not secret_name:
+                raise InvalidRequest(f"No secret name found for model {model_name}")
+
+            secret_fetcher = _secret_fetcher_context.get()
+            if not secret_fetcher:
+                raise InvalidRequest(
+                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
+                )
+
+            api_key = (
+                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
             )
-        secret_name = model_info.get("api_key_name")
-        if not secret_name:
-            raise InvalidRequest(f"No secret name found for model {model_name}")
-        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        provider = model_info.get("litellm_provider")
-        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
-            raise MissingLLMApiKeyError(
-                f"No API key {secret_name} found for model {model_name}",
-                api_key_name=secret_name,
+            provider = model_info.get("litellm_provider", "openai")
+
+            # We fetch bedrock credentials, in lite_llm_completion, later
+            if not api_key and provider != "bedrock" and provider != "bedrock_converse":
+                raise MissingLLMApiKeyError(
+                    f"No API key {secret_name} found for model {model_name}",
+                    api_key_name=secret_name,
+                )
+
+        else:
+            # If we don't have model info, we assume it is a custom model
+            # Handle custom provider case
+            # We fetch the provider object and provider model object
+            try:
+                custom_provider_info = get_custom_provider_info(
+                    project_id=req.project_id,
+                    model_name=model_name,
+                    obj_read_func=self.obj_read,
+                )
+
+                base_url = custom_provider_info.base_url
+                api_key = custom_provider_info.api_key
+                extra_headers = custom_provider_info.extra_headers
+                return_type = custom_provider_info.return_type
+                actual_model_name = custom_provider_info.actual_model_name
+
+            except Exception as e:
+                return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+            # Always use "custom" as the provider for litellm
+            provider = "custom"
+            # Update the model name for the API call
+            # If the model name is ollama, we need to add the ollama/ prefix
+            req.inputs.model = (
+                "ollama/" + actual_model_name
+                if "ollama" in model_name
+                else actual_model_name
             )
 
+        # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
+
+        # Make the API call
         res = lite_llm_completion(
-            api_key,
-            req.inputs,
-            provider,
+            api_key=api_key,
+            inputs=req.inputs,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
         )
+
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
@@ -1554,7 +1816,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             summary={},
         )
         if "usage" in res.response:
-            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+            end.summary["usage"] = {model_name: res.response["usage"]}
 
         if "error" in res.response:
             end.exception = res.response["error"]
@@ -1619,12 +1881,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
         if batch:
             settings = {}
             if self._use_async_insert:
                 settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
             self._insert(
                 "call_parts",
                 data=batch,
@@ -1684,6 +1958,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
     def _query_stream(
         self,
         query: str,
@@ -1698,36 +1973,65 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         summary = None
         parameters = _process_parameters(parameters)
-        with self.ch_client.query_rows_stream(
-            query,
-            parameters=parameters,
-            column_formats=column_formats,
-            use_none=True,
-            settings=settings,
-        ) as stream:
-            if isinstance(stream.source, QueryResult):
-                summary = stream.source.summary
-            logger.info(
-                "clickhouse_stream_query",
+        try:
+            with self.ch_client.query_rows_stream(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            ) as stream:
+                if isinstance(stream.source, QueryResult):
+                    summary = stream.source.summary
+                logger.info(
+                    "clickhouse_stream_query",
+                    extra={
+                        "query": query,
+                        "parameters": parameters,
+                        "summary": summary,
+                    },
+                )
+                yield from stream
+        except Exception as e:
+            logger.exception(
+                "clickhouse_stream_query_error",
                 extra={
+                    "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
-                    "summary": summary,
                 },
             )
-            yield from stream
+            raise
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
         self,
         query: str,
         parameters: dict[str, Any],
         column_formats: Optional[dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
+        try:
+            res = self.ch_client.query(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            )
+        except Exception as e:
+            logger.exception(
+                "clickhouse_query_error",
+                extra={"error_str": str(e), "query": query, "parameters": parameters},
+            )
+            raise
+
         logger.info(
             "clickhouse_query",
             extra={
@@ -1738,6 +2042,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return res
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(
         self,
         table: str,
@@ -1764,6 +2069,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             raise
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
         row = []
@@ -1773,6 +2079,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
             self._insert_call_batch(self._call_batch)
@@ -1783,6 +2090,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self._call_batch = []
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """
         Iterate through the batch and replace large values with placeholders.
@@ -1881,56 +2189,12 @@ def _ensure_datetimes_have_tz_strict(
     return res
 
 
-def _nullable_dict_dump_to_dict(
-    val: Optional[str],
-) -> Optional[dict[str, Any]]:
-    return _dict_dump_to_dict(val) if val else None
-
-
 def _nullable_any_dump_to_any(
     val: Optional[str],
 ) -> Optional[Any]:
     return _any_dump_to_any(val) if val else None
 
 
-def _raw_call_dict_to_ch_call(
-    call: dict[str, Any],
-) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
-
-
-def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
-    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
-    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
-    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
-    display_name = empty_str_to_none(ch_call.display_name)
-    return tsi.CallSchema(
-        project_id=ch_call.project_id,
-        id=ch_call.id,
-        trace_id=ch_call.trace_id,
-        parent_id=ch_call.parent_id,
-        op_name=ch_call.op_name,
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
-        output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_fields(
-            summary=summary or {},
-            op_name=ch_call.op_name,
-            started_at=started_at,
-            ended_at=ended_at,
-            exception=ch_call.exception,
-            display_name=display_name,
-        ),
-        exception=ch_call.exception,
-        wb_run_id=ch_call.wb_run_id,
-        wb_user_id=ch_call.wb_user_id,
-        display_name=display_name,
-    )
-
-
-# Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
@@ -1959,6 +2223,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
+        "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
+        "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
     }
 
 
@@ -2066,10 +2332,22 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
+@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
+    if root_span := ddtrace.tracer.current_span():
+        root_span.set_tags(
+            {
+                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                    len(root_ids)
+                ),
+                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                    len(all_calls)
+                ),
+            }
+        )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:

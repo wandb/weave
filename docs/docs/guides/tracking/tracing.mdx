@@ -6,7 +6,7 @@ import TracingCallsFilterImage from '@site/static/img/screenshots/calls_filter.p
 import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
 
 
-# Calls
+# Tracing Basics
 
 <DesktopWindow 
   images={[
@@ -33,12 +33,16 @@ Calls are similar to spans in the [OpenTelemetry](https://opentelemetry.io) data
 
 There are three main ways to create Calls in Weave:
 
-### 1. Automatic Tracking of LLM Libraries
+### 1. Automatic tracking of LLM libraries
 
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
     Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
+
+    :::tip 
+    You can control Weave's default tracking behavior [using the `autopatch_settings` argument in `weave.init`](#configure-autopatching).
+    :::
 
     ```python showLineNumbers
     import weave
@@ -93,9 +97,7 @@ There are three main ways to create Calls in Weave:
   </TabItem>
 </Tabs>
 
-
-
-### 2. Decorating/Wrapping Functions
+### 2. Decorating and wrapping functions
 
 However, often LLM applications have additional logic (such as pre/post processing, prompts, etc.) that you want to track.
 
@@ -177,7 +179,7 @@ However, often LLM applications have additional logic (such as pre/post processi
 </Tabs>
 
 
-#### Getting a handle to the Call object during execution
+#### Getting a handle to the call object during execution
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
@@ -226,7 +228,7 @@ However, often LLM applications have additional logic (such as pre/post processi
 
 
 
-#### Call Display Name
+#### Call display name
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
@@ -351,7 +353,7 @@ However, often LLM applications have additional logic (such as pre/post processi
   </TabItem>
 </Tabs>
 
-### 3. Manual Call Tracking
+### 3. Manual Call tracking
 
 You can also manually create Calls using the API directly.
 
@@ -483,7 +485,7 @@ All of these mutations can be performed from the UI by navigating to the call de
 
 ![Update Call in Web App](../../../static/img/call_edit_screenshot.png)
 
-### Set Display Name
+### Set display name
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
@@ -523,7 +525,7 @@ All of these mutations can be performed from the UI by navigating to the call de
     </TabItem>
 </Tabs>
 
-### Add Feedback 
+### Add feedback 
 
 Please see the [Feedback Documentation](./feedback.md) for more details.
 
@@ -531,7 +533,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To delete a call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
+    To delete a Call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
 
     ```python showLineNumbers
     import weave
@@ -569,7 +571,45 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     </TabItem>
 </Tabs>
 
-## Querying & Exporting Calls
+### Delete multiple Calls
+
+<Tabs groupId="client-layer">
+    <TabItem value="python_sdk" label="Python">
+    To delete batches of Calls using the Python API, pass a list of Call IDs to `delete_calls()`.
+
+    :::important
+    - The maximum amount of Calls that can be deleted is `1000`.
+    - Deleting a Call also deletes all of its children.
+    :::
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("my-project")
+
+    # Get all calls from client 
+    all_calls = client.get_calls()
+
+    # Get list of first 1000 Call objects
+    first_1000_calls = all_calls[:1000]
+
+    # Get list of first 1000 Call IDs
+    first_1000_calls_ids = [c.id for c in first_1000_calls]
+
+    # Delete first 1000 Call objects by ID
+    client.delete_calls(call_ids=first_1000_calls_ids)
+    ```
+
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+    </TabItem>
+</Tabs>
+
+## Querying and exporting Calls
 
 <DesktopWindow 
   images={[
@@ -592,7 +632,7 @@ The easiest way to get started is to construct a view in the UI, then learn more
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To fetch calls using the Python API, you can use the [`client.calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-calls) method:
+    To fetch calls using the Python API, you can use the [`client.get_calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-get_calls) method:
 
     ```python
     import weave
@@ -604,24 +644,6 @@ The easiest way to get started is to construct a view in the UI, then learn more
     calls = client.get_calls(filter=...)
     ```
 
-    :::info[Notice: Evolving APIs]
-    Currently, it is easier to use the lower-level [`calls_query_stream`](../../reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server#method-calls_query_stream) API as it is more flexible and powerful.
-    In the near future, we will move all functionality to the above client API.
-
-    ```python
-    import weave
-
-    # Initialize the client
-    client = weave.init("your-project-name")
-
-    calls = client.server.calls_query_stream({
-        "project_id": "",
-        "filter": {},
-        "query": {},
-        "sort_by": [],
-    })
-    ```
-    :::
     </TabItem>
     <TabItem value="typescript" label="TypeScript">
     To fetch calls using the TypeScript API, you can use the [`client.getCalls`](../../reference/typescript-sdk/weave/classes/WeaveClient#getcalls) method.
@@ -695,12 +717,12 @@ The easiest way to get started is to construct a view in the UI, then learn more
     </TabItem>
 </Tabs>
 
-{/* ## Compare Calls
+{/* ## Compare calls
 
 :::info[Comming Soon]
 ::: */}
 
-### Call Schema
+### Call schema
 
 Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
 
@@ -743,15 +765,60 @@ Calculated Fields:
 
 You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
 
+## Configure autopatching
+
+By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
+You can control this behavior using the `autopatch_settings` argument in `weave.init`.
+
+### Disable all autopatching
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"disable_autopatch": True})
+```
+
+### Disable a specific integration
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"openai": {"enabled": False}})
+```
+
+### Post-process inputs and outputs 
+
+You can also customize how post-process inputs and outputs (e.g. for PII data) are handled during autopatching:
+
+```python showLineNumbers
+def redact_inputs(inputs: dict) -> dict:
+    if "email" in inputs:
+        inputs["email"] = "[REDACTED]"
+    return inputs
+
+weave.init(
+    ...,
+    autopatch_settings={
+        "openai": {
+            "op_settings": {
+                "postprocess_inputs": redact_inputs,
+            }
+        }
+    }
+)
+```
+
+For more details, see [How to use Weave with PII data](../../reference/gen_notebooks/pii.md).
+
 ## FAQs
+
+### How do I stop large traces from being truncated?
+
+For more information, see [Trace data is truncated](../troubleshooting.md#trace-data-is-truncated) in the [Troubleshooting guide](../troubleshooting.md).
 
 ### How do I disable tracing?
 
-**Environment Variable:**
+#### Environment variable
 
 In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_DISABLED=true`.
 
-**Client Initialization:**
+#### Client initialization
 
 Sometimes, you may want to conditionally enable tracing for a specific initialization based on some condition. In this case, you can initialize the client with the `disabled` flag in init settings.
 
@@ -762,7 +829,7 @@ import weave
 client = weave.init(..., settings={"disabled": True})
 ```
 
-**Context Manager:**
+#### Context manager
 
 Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be imported from `weave.trace.context.call_context`.
 
@@ -780,7 +847,7 @@ with set_tracing_enabled(False):
     my_op()
 ```
 
-### How do I capture information about a call?
+### How do I capture information about a Call?
 
 Typically you would call an op directly:
 

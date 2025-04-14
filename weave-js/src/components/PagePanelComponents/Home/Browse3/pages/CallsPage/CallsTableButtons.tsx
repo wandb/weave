@@ -436,9 +436,8 @@ export const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"
@@ -460,11 +459,11 @@ export const CompareTracesTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
+      icon="chart-scatterplot"
       tooltip={tooltipText}>
       Compare
     </Button>
@@ -514,8 +513,9 @@ export const BulkAddToDatasetButton: FC<{
       onClick={handleClick}
       disabled={disabled}
       tooltip="Add selected rows to a dataset"
-      icon="table"
-    />
+      icon="table">
+      Add to dataset
+    </Button>
   );
 };
 
@@ -531,7 +531,7 @@ export const RefreshButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant="outline"
+        variant="ghost"
         size="medium"
         onClick={onClick}
         disabled={disabled}
@@ -578,7 +578,7 @@ function makeCodeText(
   includeFeedback: boolean,
   includeCosts: boolean
 ) {
-  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {

@@ -17,19 +17,25 @@ import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';
 
 type FilterRowProps = {
+  entity: string;
+  project: string;
   item: GridFilterItem;
   options: SelectFieldOption[];
   onAddFilter: (field: string) => void;
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
+  activeEditId?: FilterId | null;
 };
 
 export const FilterRow = ({
+  entity,
+  project,
   item,
   options,
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
+  activeEditId,
 }: FilterRowProps) => {
   const onSelectField = (field: string) => {
     if (item.id == null) {
@@ -57,7 +63,8 @@ export const FilterRow = ({
   };
 
   const isOperatorDisabled =
-    isWeaveRef(item.value) || ['id', 'user'].includes(getFieldType(item.field));
+    isWeaveRef(item.value) ||
+    ['id', 'status', 'user'].includes(getFieldType(item.field));
 
   return (
     <>
@@ -81,19 +88,23 @@ export const FilterRow = ({
       <div className="flex items-center">
         {item.field && (
           <SelectValue
+            entity={entity}
+            project={project}
             field={item.field}
             operator={item.operator}
             value={item.value}
             onSetValue={onSetValue}
+            activeEditId={activeEditId}
+            itemId={item.id}
           />
         )}
       </div>
-      <div className="flex items-center justify-center">
+      <div className="mb-0 flex items-center justify-center">
         {item.id != null && (
           <Button
             size="small"
             variant="ghost"
-            icon="delete"
+            icon="close"
             tooltip="Remove this filter"
             onClick={() => onRemoveFilter(item.id)}
           />

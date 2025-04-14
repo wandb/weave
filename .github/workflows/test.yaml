@@ -231,18 +231,19 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "trace_server",
             "anthropic",
             "bedrock",
             "cerebras",
             "cohere",
+            "crewai",
             "dspy",
             "groq",
             "huggingface",
             "google_ai_studio",
+            "google_genai",
             "instructor",
             "langchain",
             "litellm",
@@ -252,8 +253,8 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "scorers",
             "pandas-test",
+            "mcp",
           ]
       fail-fast: false
     services:
@@ -275,6 +276,10 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-start-period=10s
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - "10000:10000"
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         env:
@@ -307,6 +312,7 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "weave_client and not skip_clickhouse_client" \
@@ -324,6 +330,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
