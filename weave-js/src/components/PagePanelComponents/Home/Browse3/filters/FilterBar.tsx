@@ -72,9 +72,25 @@ export const FilterBar = ({
   // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
   const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
+
+  // Keep track of incomplete filters that should be preserved during state sync
+  const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
+    []
+  );
+
+  // Merge the parent filter model with our incomplete filters
   useEffect(() => {
-    setLocalFilterModel(filterModel);
-  }, [filterModel]);
+    const newItems = [...filterModel.items];
+
+    // Add incomplete filters that aren't in the parent model
+    incompleteFilters.forEach(incompleteFilter => {
+      if (!newItems.some(item => item.id === incompleteFilter.id)) {
+        newItems.push(incompleteFilter);
+      }
+    });
+
+    setLocalFilterModel({...filterModel, items: newItems});
+  }, [filterModel, incompleteFilters]);
 
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : refBar.current);
@@ -154,7 +170,9 @@ export const FilterBar = ({
   });
 
   const onRemoveAll = () => {
-    setFilterModel({items: []});
+    const emptyModel = {items: []};
+    setLocalFilterModel(emptyModel);
+    setFilterModel(emptyModel);
     setAnchorEl(null);
   };
 
@@ -184,6 +202,7 @@ export const FilterBar = ({
         item => !isFilterIncomplete(item)
       );
       setFilterModel({...model, items: completeFilters});
+      setIncompleteFilters(model.items.filter(isFilterIncomplete));
     },
     [setFilterModel]
   );
@@ -205,10 +224,7 @@ export const FilterBar = ({
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
         setLocalFilterModel(newModel);
-        // Only trigger debounced update if the filter is complete
-        if (!isFilterIncomplete(item)) {
-          debouncedSetFilterModel(newModel);
-        }
+        debouncedSetFilterModel(newModel);
         return;
       }
 
@@ -219,10 +235,7 @@ export const FilterBar = ({
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
       setLocalFilterModel(newItemsModel);
-      // Only trigger debounced update if the filter is complete
-      if (!isFilterIncomplete(item)) {
-        debouncedSetFilterModel(newItemsModel);
-      }
+      debouncedSetFilterModel(newItemsModel);
     },
     [localFilterModel, debouncedSetFilterModel]
   );
