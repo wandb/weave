@@ -1054,6 +1054,7 @@ export const convertTraceServerObjectVersionToSchema = <
     versionIndex: obj.version_index,
     val: obj.val,
     userId: obj.wb_user_id,
+    sizeBytes: obj.size_bytes,
   };
 };
 

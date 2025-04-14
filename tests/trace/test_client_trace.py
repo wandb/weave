@@ -3691,3 +3691,45 @@ def test_calls_hydrated(client):
     assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
     assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+
+
+def test_obj_query_with_storage_size_clickhouse(client):
+    """Test querying objects with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create a test object with some data to ensure it has size
+    dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
+    weave.publish(dataset)
+
+    print(dataset)
+
+    # Query the object with storage size included
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            include_storage_size=True,
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Verify that storage size is present
+    assert queried_obj.size_bytes is not None
+    assert queried_obj.size_bytes == 270  # Should have some size due to the test data
+
+    # Query without storage size (default behavior)
+    res_without_size = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res_without_size.objs) == 1
+    queried_obj_without_size = res_without_size.objs[0]
+
+    # Verify that storage size is not included when not requested
+    assert queried_obj_without_size.size_bytes is None

@@ -115,6 +115,7 @@ export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   createdAtMs: number;
   val: T;
   userId?: string;
+  sizeBytes?: number;
 };
 
 export type ObjectVersionFilter = {
