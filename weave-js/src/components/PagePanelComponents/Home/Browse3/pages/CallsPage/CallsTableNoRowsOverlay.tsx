@@ -26,6 +26,7 @@ type CallsTableNoRowsOverlayProps = {
   filterModelResolved: GridFilterModel;
   clearFilters?: () => void;
   setFilterModel?: (model: GridFilterModel) => void;
+  isFilterAdjusting?: boolean;
 };
 
 export const CallsTableNoRowsOverlay: React.FC<
@@ -40,9 +41,11 @@ export const CallsTableNoRowsOverlay: React.FC<
   filterModelResolved,
   clearFilters,
   setFilterModel,
+  isFilterAdjusting,
 }) => {
   const {opLoading, opCreatedAt} = useCallsTableNoRowsOpLookup(entity, project);
-  if (callsLoading || opLoading) {
+
+  if (callsLoading || opLoading || isFilterAdjusting) {
     return null;
   }
 

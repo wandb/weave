@@ -83,6 +83,7 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
+import {useFilterAdjusting} from './CallsPage';
 import {
   BulkAddToDatasetButton,
   BulkDeleteButton,
@@ -214,6 +215,9 @@ export const CallsTable: FC<{
     () => getEffectiveFilter(filter, frozenFilter),
     [filter, frozenFilter]
   );
+
+  // Get the isFilterAdjusting state from context instead of local state
+  const contextIsFilterAdjusting = useFilterAdjusting();
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
@@ -995,7 +999,7 @@ export const CallsTable: FC<{
         // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
-        loading={callsLoading}
+        loading={callsLoading || contextIsFilterAdjusting}
         rows={tableData}
         // initialState={initialState}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}
@@ -1052,6 +1056,7 @@ export const CallsTable: FC<{
               filterModelResolved={filterModelResolved}
               clearFilters={clearFilters}
               setFilterModel={setFilterModel}
+              isFilterAdjusting={contextIsFilterAdjusting}
             />
           ),
           columnMenu: CallsCustomColumnMenu,
