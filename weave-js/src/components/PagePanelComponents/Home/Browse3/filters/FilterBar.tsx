@@ -30,7 +30,7 @@ import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
-const DEBOUNCE_MS = 700;
+const DEBOUNCE_MS = 1_000;
 
 type FilterBarProps = {
   entity: string;
