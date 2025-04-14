@@ -194,6 +194,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - xai/grok-2-1212
 - xai/grok-2
 - xai/grok-2-latest
+- xai/grok-3
 
 ### Deepseek
 
