@@ -107,6 +107,13 @@ logLevel: information
 keeper:
   enabled: true
 
+## @param extraEnvVars Array with extra environment variables to add to ClickHouse nodes
+##
+extraEnvVars:
+  - name: S3_ENDPOINT
+    value: "https://s3.us-east-1.amazonaws.com/bucketname/$(CLICKHOUSE_REPLICA_ID)"
+
+
 ## @param defaultConfigurationOverrides [string] Default configuration overrides (evaluated as a template)
 defaultConfigurationOverrides: |
   <clickhouse>
@@ -205,9 +212,7 @@ defaultConfigurationOverrides: |
       <disks>
         <s3_disk>
           <type>s3</type>
-          <!-- MODIFY THE BUCKET NAME -->
-          <endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
-          <!-- MODIFY THE BUCKET NAME -->
+          <endpoint from_env="S3_ENDPOINT"></endpoint>
 
           <!-- AVOID USE CREDENTIALS CHECK THE RECOMMENDATION -->
           <access_key_id>xxx</access_key_id>
@@ -245,6 +250,20 @@ zookeeper:
   enabled: false
 ```
 
+### S3 endpoint configuration
+
+The bucket endpoint must be set as an environment variable to ensure each ClickHouse replica read and writes data in it's folder in the bucket.
+
+```
+extraEnvVars:
+  - name: S3_ENDPOINT
+    value: "https://s3.us-east-1.amazonaws.com/bucketname/$(CLICKHOUSE_REPLICA_ID)"
+```
+
+:::important
+Do not remove the `$(CLICKHOUSE_REPLICA_ID)` from the bucket endpoint configuration. It will ensure each ClickHouse replica is writing and reading data from it's folder in the bucket.
+:::
+
 ### Provide S3 credentials
 
 You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having ClickHouse fetch the data from environment variables or an EC2 instance.
@@ -255,7 +274,7 @@ Directly include the credentials in the storage configuration:
 
 ```plaintext
 <type>s3</type>
-<endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
+<endpoint from_env="S3_ENDPOINT"></endpoint>
 <access_key_id>xxx</access_key_id>
 <secret_access_key>xxx</secret_access_key>
 ```
@@ -339,6 +358,7 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
             user: <username>
             database: wandb_weave
             # `replicated` must be set to `true` if replicating data across multiple nodes
+            # This is in preview, use the env var `WF_CLICKHOUSE_REPLICATED`
             replicated: true
 
           weave-trace:
@@ -346,8 +366,20 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
         [...]
         weave-trace:
           install: true
+          extraEnv:
+            WF_CLICKHOUSE_REPLICATED: "true"
         [...]
     ```
+
+:::important
+When using more than one replica (W&B recommend a least 3 replicas), ensure to have the following environment variable set for Weave Traces.
+```
+extraEnv:
+  WF_CLICKHOUSE_REPLICATED: "true"
+```
+This has the same effect of `replicated: true` which in preview.
+:::
+
 
 3. Set the `clusterName` in `values.yaml` to `weave_cluster`. If it is not, the database migration will fail.  
 
@@ -361,7 +393,8 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
         password: <password>
         user: <username>
         database: wandb_weave
-        # This option must be true if replicating data across multiple nodes
+        # `replicated` must be set to `true` if replicating data across multiple nodes
+        # This is in preview, use the env var `WF_CLICKHOUSE_REPLICATED`
         replicated: true
 
       weave-trace:
@@ -370,6 +403,7 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
     weave-trace:
       install: true
       extraEnv:
+        WF_CLICKHOUSE_REPLICATED: "true"
         WF_CLICKHOUSE_REPLICATED_CLUSTER: "different_cluster_name"
     [...]
     ```
@@ -423,6 +457,8 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
 
         weave-trace:
           install: true
+          extraEnv:
+            WF_CLICKHOUSE_REPLICATED: "true"
     ```
 
 4. With the Custom Resource (CR) prepared, apply the new configuration:
