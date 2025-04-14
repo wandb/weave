@@ -4,6 +4,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useReducer,
 } from 'react';
 
@@ -16,8 +17,8 @@ import {FieldConfig} from './NewDatasetSchemaStep';
 import {
   CallData,
   createProcessedRowsMap,
+  createTargetSchema,
   FieldMapping,
-  inferSchema,
   mapCallsToDatasetRows,
   suggestFieldMappings,
 } from './schemaUtils';
@@ -84,7 +85,7 @@ export interface DatasetDrawerState {
 export type DatasetDrawerAction =
   | {
       type: typeof ACTION_TYPES.SET_CURRENT_STEP;
-      payload: {step: number; setAddedRows?: (rows: Map<string, any>) => void};
+      payload: {step: number};
     }
   | {type: typeof ACTION_TYPES.SET_DATASETS; payload: ObjectVersionSchema[]}
   | {
@@ -110,7 +111,6 @@ export type DatasetDrawerAction =
       type: typeof ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR;
       payload?: {
         selectedCalls: CallData[];
-        setAddedRows?: (rows: Map<string, any>) => void;
       };
     }
   | {type: typeof ACTION_TYPES.SET_USER_MODIFIED_MAPPINGS; payload: boolean};
@@ -164,14 +164,12 @@ function handleTransitionToStep1(
  * @param state - Current state of the dataset drawer
  * @param newStep - The step number to transition to
  * @param currentStep - The current step number
- * @param setAddedRows - Optional callback to update rows in the editor
  * @returns Updated state after the step transition
  */
 function handleStepTransition(
   state: DatasetDrawerState,
   newStep: number,
-  currentStep: number,
-  setAddedRows?: (rows: Map<string, any>) => void
+  currentStep: number
 ): DatasetDrawerState {
   // Handle step transition from 1 to 2 specifically
   if (currentStep === 1 && newStep === 2) {
@@ -203,10 +201,10 @@ function datasetDrawerReducer(
       // Extract parameters from the action payload
       const newStep = action.payload.step;
       const currentStep = state.currentStep;
-      const setAddedRows = action.payload.setAddedRows;
 
-      // Use the helper function to handle the step transition
-      return handleStepTransition(state, newStep, currentStep, setAddedRows);
+      // No longer storing setAddedRows in the action payload
+      // Just return the state transition without calling setAddedRows directly
+      return handleStepTransition(state, newStep, currentStep);
     }
 
     case ACTION_TYPES.SET_DATASETS:
@@ -274,7 +272,7 @@ function datasetDrawerReducer(
       const mappings = suggestFieldMappings(
         state.sourceSchema,
         action.payload,
-        state.selectedDataset ? state.fieldMappings : []
+        state.fieldMappings
       );
 
       return {
@@ -311,7 +309,7 @@ function datasetDrawerReducer(
         return state;
       }
 
-      const {selectedCalls, setAddedRows} = action.payload;
+      const {selectedCalls} = action.payload;
       const isNewDataset = state.selectedDataset === null;
 
       try {
@@ -344,11 +342,7 @@ function datasetDrawerReducer(
           state.datasetObject
         );
 
-        // Update the editor with the processed rows
-        if (setAddedRows) {
-          setAddedRows(processedRowsMap);
-        }
-
+        // We don't set the rows directly here anymore - return the processed rows in state
         return {
           ...state,
           processedRows: processedRowsMap,
@@ -463,14 +457,22 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
 
   const [state, dispatch] = useReducer(wrappedReducer, initialState);
 
+  // Effect to update editor rows when processedRows changes
+  // This solves the setState-during-render problem by moving the state update to an effect
+  useEffect(() => {
+    if (state.processedRows.size > 0 && !state.addedRowsDirty) {
+      setAddedRows(state.processedRows);
+    }
+  }, [state.processedRows, state.addedRowsDirty, setAddedRows]);
+
   // Memoized action dispatchers
   const setCurrentStep = useCallback(
     (step: number) =>
       dispatch({
         type: ACTION_TYPES.SET_CURRENT_STEP,
-        payload: {step, setAddedRows: step === 2 ? setAddedRows : undefined},
+        payload: {step},
       }),
-    [setAddedRows]
+    []
   );
 
   const handleDatasetSelect = useCallback(
@@ -506,7 +508,7 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
 
       // If rows data is provided, infer the target schema
       if (rowsData && rowsData.length > 0) {
-        const inferredSchema = inferSchema(rowsData.map(row => row.val));
+        const inferredSchema = createTargetSchema(rowsData.map(row => row.val));
 
         // Setting the target schema will also trigger field mapping suggestions
         // in the reducer's SET_TARGET_SCHEMA case
@@ -671,11 +673,10 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
         type: ACTION_TYPES.PROCESS_ROWS_FOR_EDITOR,
         payload: {
           selectedCalls,
-          setAddedRows,
         },
       });
     },
-    [dispatch, setAddedRows]
+    [dispatch]
   );
 
   // Add reset edit state - now uses both contexts
