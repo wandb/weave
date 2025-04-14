@@ -224,7 +224,7 @@ export const FilterBar = ({
         debouncedSetFilterModel(newItemsModel);
       }
     },
-    [localFilterModel, debouncedSetFilterModel, applyCompletedFilters]
+    [localFilterModel, debouncedSetFilterModel]
   );
 
   const onRemoveFilter = useCallback(
