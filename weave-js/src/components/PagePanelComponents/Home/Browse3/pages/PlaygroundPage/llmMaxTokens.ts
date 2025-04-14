@@ -496,6 +496,36 @@ export const LLM_MAX_TOKENS = {
   },
 
   // xAI models
+  'xai/grok-3-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-fast-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-fast-latest': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-fast-beta': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
+  'xai/grok-3-mini-fast-latest': {
+    provider: 'xai',
+    max_tokens: 131072,
+    supports_function_calling: true,
+  },
   'xai/grok-beta': {
     max_tokens: 131072,
     provider: 'xai',
