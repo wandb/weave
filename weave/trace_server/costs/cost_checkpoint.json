@@ -6754,5 +6754,53 @@
       "output": 4.4e-06,
       "created_at": "2025-04-14 09:41:48"
     }
+  ],
+  "gpt-4.1": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
+    }
   ]
 }
