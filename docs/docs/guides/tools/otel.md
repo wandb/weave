@@ -182,6 +182,8 @@ First, install the required dependencies:
 pip install openai opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp-proto-http
 ```
 
+Next, paste the following code into a python file such as `opentelemetry_example.py`
+
 ```python
 import json
 import base64
