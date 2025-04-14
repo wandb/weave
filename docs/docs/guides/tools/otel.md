@@ -1,173 +1,82 @@
-# Send OpenTelemetry Traces to Weave 
+# Send OpenTelemetry Traces to Weave
 
 ## Overview
-You can use the OTEL Trace API to send OpenTelemetry-compatible trace data to Weave. This allows you to integrate observability from any OTEL-instrumented application—like GenAI apps, backend services, or external APIs—into Weave's ecosystem.
+Weave supports ingestion of OpenTelemetry compatible trace data through a dedicated endpoint. This endpoint allows you to send OTLP (OpenTelemetry Protocol) formatted trace data directly to your Weave project.
 
-Once ingested, trace data can be used to visualize, compare, and correlate with other Weave data.
+## Endpoint details
 
-**Use Cases:**
-- Monitor OpenAI calls alongside frontend or backend performance
-- Trace long-running chains and identify bottlenecks
-- Compare traces across deployments or versions
+**Path**: `/otel/v1/traces`
+**Method**: POST
+**Content-Type**: `application/x-protobuf`
 
-## Get started
-1. Get your API key from [wandb.ai/authorize](https://wandb.ai/authorize).
-2. Define your `project_id` and OTEL endpoint.
-3. Ensure that you have write access to the project.
-4. Review the [API endpoint details](#api-endpoint-details).
-5. Generate the [required authorization headers](#generate-authorization-headers) and set up your OTLP HTTP exporter using the provided values.
-6. Try an example use case.
+## Authentication
+Standard W&B authentication is used. You must have write permissions to the project where you're sending trace data.
 
-## API endpoint details
-- **URL**: `https://trace.wandb.ai/otel/v1/traces`
-- **Method**: `POST`
-- **Content-Type**: `application/x-protobuf`
-- **Body**: A serialized `ExportTraceServiceRequest` protobuf
-
-### Required headers
-
-:::tip
-You can generate the required authorization headers using [this script](#generate-authorization-headers).
-:::
-
-- `content-type: application/x-protobuf`
+## Required Headers
 - `project_id: <your_entity>/<your_project_name>`
 - `Authorization=Basic <Base64 Encoding of api:$WANDB_API_KEY>`
 
-### Optional headers
-- `content-encoding: gzip` or `deflate` (for compressed data)
+## Examples:
 
-### Response
-If successful, the endpoint returns `200 OK` with an empty `ExportTraceServiceResponse` body.
+You must modify the following fields before you can run the code samples below:
+1. `WANDB_API_KEY`: You can get this from [https://wandb.ai/authorize](https://wandb.ai/authorize).
+2. Entity: You can only log traces to the project under an entity that you have access to. You can find your entity name by visiting your W&N dashboard at [https://wandb.ai/home], and checking the **Teams** field in the left sidebar.
+3. Project Name: Choose a fun name!
+4. `OPENAI_API_KEY`: You can obtain this from the [OpenAI dashboard](https://platform.openai.com/api-keys).
 
-### Error codes
-- `401 Unauthorized` – Invalid or missing API key. Ensure you are using a valid API key.
-- `403 Forbidden` – You don’t have permission to write to the project. Ensure your API key has write access.
-- `400 Bad Request` – Headers are missing or the data format is invalid. Ensure that you've included [required headers](#required-headers) and that your data is correctly formatted.
+### OpenInference Instrumentation:
 
-## Limitations
-- All traces in a single request must belong to the same project
-- Maximum request size is defined by your server configuration.
+This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/Arize-ai/openinference
 
-## Generate authorization headers 
+First, install the required dependencies:
 
-The following Python script generates the headers for performing trace exports to the `AwesomeProject` under the `ExampleCorp` entity. 
+```bash
+pip install openai openinference-instrumentation-openai opentelemetry-exporter-otlp-proto-http
+```
 
-The recommended usage for this script is as follows:
-1. Run the script once to generate the authorization headers.
-2. Store the definitions in a secure place.
-3. Load into your project environment.
-
-To use this script, replace `ExampleCorp/AwesomeProject` and `YOUR_WANDB_API_KEY` with your actual W&B project name and API key.
+Next, paste the following code into a python file such as `openinference_example.py`
 
 ```python
 import base64
-
-WANDB_BASE_URL = 'https://trace.wandb.ai'
-PROJECT_ID = "ExampleCorp/AwesomeProject"
-WANDB_PASSWORD = "YOUR_WANDB_API_KEY"
-
-AUTH = base64.b64encode(f"api:{WANDB_PASSWORD}".encode()).decode()
-
-HEADER_DEFINITION = f"OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Basic {AUTH},project_id={PROJECT_ID}\""
-ENDPOINT_DEFINITION = f"OTEL_EXPORTER_OTLP_ENDPOINT=\"{WANDB_BASE_URL}/otel/v1/traces\""
-
-print(f"Place the following in your .env file:\n{HEADER_DEFINITION}\n{ENDPOINT_DEFINITION}")
-```
-
-## Example usage
-
-### Create a basic OTLP exporter
-
-The following code sample configures the OTLP exporter to send traces to Weave. Additional SDK configuration depends on your OpenTelemetry usage and environment. 
-
-```python
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-import os
-
-os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = "Authorization=Basic <ENCODED>,project_id=ExampleCorp/AwesomeProject"
-otlp_exporter = OTLPSpanExporter(endpoint="https://trace.wandb.ai/otel/v1/traces")
-
-# Your additional configurations depend on your environment
-```
-
-### Use OpenLLMetry's `OpenAIInstrumentor`
-
-The following code sample uses OpenLLMetry's `OpenAIInstrumentor` to automatically export OTEL Traces:
-
-```python
-import os
 import openai
-from dotenv import load_dotenv
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-from opentelemetry.instrumentation.openai import OpenAIInstrumentor
-
-load_dotenv()
-
-tracer_provider = trace_sdk.TracerProvider()
-# Export spans to the OTLP endpoint
-tracer_provider.add_span_processor(SimpleSpanProcessor(
-    OTLPSpanExporter(os.environ['OTEL_EXPORTER_OTLP_ENDPOINT'])
-))
-# Optionally, log the spans to console.
-tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-# Set up the instrumentation for OpenAI
-OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-
-def main():
-    client = openai.OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
-        max_tokens=20,
-        stream=True,
-        stream_options={"include_usage": True},
-    )
-    for chunk in response:
-        if chunk.choices and (content := chunk.choices[0].delta.content):
-            print(content, end="")
-
-if __name__ == "__main__":
-    main()
-```
-
-To use this code sample, ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py:
-
-```bash
-uv init
-uv add dotenv openai opentelemetry-api opentelemetry-exporter-otlp opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai opentelemetry-sdk
-uv run main.py
-```
-
-### Use OpenInference's `OpenAIInstrumentor`
-
-The following code sample uses OpenInference's `OpenAIInstrumentor` to automatically export OTEL Traces:
-
-```python
-import os
-import openai
-from dotenv import load_dotenv
 from openinference.instrumentation.openai import OpenAIInstrumentor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
-load_dotenv()
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "<your-entity>/<your-project>"
 
-endpoint = os.environ['OTEL_EXPORTER_OTLP_ENDPOINT']
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = "<your-wandb-api-key>"
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
 
 tracer_provider = trace_sdk.TracerProvider()
-tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint)))
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
 # Optionally, print the spans to the console.
 tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 
 OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
 
 def main():
-    client = openai.OpenAI()
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
@@ -178,14 +87,173 @@ def main():
     for chunk in response:
         if chunk.choices and (content := chunk.choices[0].delta.content):
             print(content, end="")
+
 if __name__ == "__main__":
     main()
 ```
 
-To use this code sample, ensure that you followed the above instructions to set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` in your .env file. Then run the following commands in your terminal and paste the code into main.py
+Finally, once you have set the fields specified above to their correct values, run the code:
 
 ```bash
-uv init
-uv add dotenv openai openinference-instrumentation-openai openinference-semantic-conventions opentelemetry-exporter-otlp-proto-http opentelemetry-instrumentation-openai
-uv run main.py
+python openinference_example.py
 ```
+
+### OpenLLMetry Instrumentation:
+
+The following example shows how to use the OpenAI instrumentation. Additional examples are available at [https://github.com/traceloop/openllmetry/tree/main/packages](https://github.com/traceloop/openllmetry/tree/main/packages).
+
+First install the required dependencies:
+
+```bash
+pip install openai opentelemetry-instrumentation-openai opentelemetry-exporter-otlp-proto-http
+```
+
+Next, paste the following code into a python file such as `openllmetry_example.py`. Note that this is the same code as above, except the `OpenAIInstrumentor` is imported from `opentelemetry.instrumentation.openai` instead of `openinference.instrumentation.openai`
+
+```python
+import base64
+import openai
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "<your-entity>/<your-project>"
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = "<your-wandb-api-key>"
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+tracer_provider = trace_sdk.TracerProvider()
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+# Optionally, print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+def main():
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
+        max_tokens=20,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in response:
+        if chunk.choices and (content := chunk.choices[0].delta.content):
+            print(content, end="")
+
+if __name__ == "__main__":
+    main()
+```
+
+Finally, once you have set the fields specified above to their correct values, run the code:
+
+```bash
+python openllmetry_example.py
+```
+
+### Without Instrumentation
+
+If you would prefer to use OTEL directly instead of an instrumentation package, you may do so. Attributes will be parsed according to the OpenTelemetry semantic conventions described at [https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
+
+First, install the required dependencies:
+
+```bash
+pip install openai opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp-proto-http
+
+```python
+import json
+import base64
+import openai
+from opentelemetry import trace
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "<your-entity>/<your-project>"
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = "<your-wandb-api-key>"
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+tracer_provider = trace_sdk.TracerProvider()
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+# Optionally, print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+trace.set_tracer_provider(tracer_provider)
+# Creates a tracer from the global tracer provider
+tracer = trace.get_tracer(__name__)
+tracer.start_span('name=standard-span')
+
+def my_function():
+    with tracer.start_as_current_span("outer_span") as outer_span:
+        client = openai.OpenAI()
+        input_messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
+        # This will only appear in the side panel
+        outer_span.set_attribute("input.value", json.dumps(input_att))
+        # This follows conventions and will appear in the dashboard
+        outer_span.set_attribute("gen_ai.system", 'openai')
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=input_messages,
+            max_tokens=20,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        out = ""
+        for chunk in response:
+            if chunk.choices and (content := chunk.choices[0].delta.content):
+                out += content
+        # This will only appear in the side panel
+        outer_span.set_attribute("output.value", json.dumps({"content": out}))
+
+if __name__ == "__main__":
+    my_function()
+```
+
+Finally, once you have set the fields specified above to their correct values, run the code:
+
+```bash
+python opentelemetry_example.py
+```
+
+The attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all attributes are visible in the trace view. The full span is available in the side panel when you select a trace.

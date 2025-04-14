@@ -180,8 +180,6 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("page_size must be greater than 0")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
-        if offset is not None and offset < 0:
-            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
@@ -324,12 +322,18 @@ def _make_calls_iterator(
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        # Add the global offset to the page offset
+        # This ensures the offset is applied only once
+        effective_offset = offset
+        if offset_override is not None:
+            effective_offset += offset_override
+
         return list(
             server.calls_query_stream(
                 CallsQueryReq(
                     project_id=project_id,
                     filter=filter,
-                    offset=offset,
+                    offset=effective_offset,
                     limit=limit,
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -356,12 +360,15 @@ def _make_calls_iterator(
             return response.count - offset_override
         return response.count
 
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
+
     return PaginatedIterator(
         fetch_func,
         transform_func=transform_func,
         size_func=size_func,
         limit=limit_override,
-        offset=offset_override,
+        offset=None,  # Set offset to None since we handle it in fetch_func
         page_size=page_size,
     )
 

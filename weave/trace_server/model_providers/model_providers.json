@@ -347,6 +347,18 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-4o-realtime-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4o-realtime-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-4o-realtime-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-4o-realtime-preview-2024-10-01": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -667,6 +679,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/mistral-large-latest": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/ministral-3b": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -788,6 +804,30 @@
     "api_key_name": "XAI_API_KEY"
   },
   "xai/grok-2-vision": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-fast-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-fast-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-fast-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-fast-latest": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },

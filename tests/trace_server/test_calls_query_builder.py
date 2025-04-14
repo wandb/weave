@@ -114,12 +114,13 @@ def test_query_heavy_column_simple_filter() -> None:
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND
-                (any(calls_merged.op_name) IN {pb_0:Array(String)}))
+            )
         )
         SELECT
             calls_merged.id AS id,
@@ -155,12 +156,13 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND
-                (any(calls_merged.op_name) IN {pb_0:Array(String)}))
+            )
         )
         SELECT
             calls_merged.id AS id,
@@ -198,13 +200,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
                 ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND
-                (any(calls_merged.op_name) IN {pb_0:Array(String)})
             )
             ORDER BY any(calls_merged.started_at) DESC
             LIMIT 10
@@ -270,6 +272,8 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_2:String}
+                AND ((calls_merged.op_name IN {pb_1:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.wb_user_id) = {pb_0:String}))
@@ -277,8 +281,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                 ((any(calls_merged.deleted_at) IS NULL))
             AND
                 ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND
-                (any(calls_merged.op_name) IN {pb_1:Array(String)})
             )
         )
         SELECT
@@ -346,10 +348,13 @@ def test_query_light_column_with_costs() -> None:
                 SELECT calls_merged.id AS id
                 FROM calls_merged
                 WHERE calls_merged.project_id = {pb_1:String}
+                    AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                        OR (calls_merged.op_name IS NULL))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-                AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
+                )
+            ),
             all_calls AS (
                 SELECT
                     calls_merged.id AS id,
@@ -538,13 +543,15 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
+            AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                OR (calls_merged.op_name IS NULL))
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
             (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-                    AND (any(calls_merged.op_name) IN {pb_0:Array(String)})))
+            ))
         SELECT
             calls_merged.id AS id
         FROM
@@ -1316,11 +1323,12 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-                AND (any(calls_merged.op_name) IN {pb_0:Array(String)})
             )
         )
         SELECT
