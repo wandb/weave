@@ -23,7 +23,7 @@ class LangfairCounterfactualScorer(LLMScorer):
             responses are masked using `CounterfactualGenerator.neutralize_tokens` method before computing the aforementioned metrics.
     Example:
     >>> scorer = CounterfactualScorer()
-    >>> result = scorer.score(query="Hey how are you")
+    >>> result = scorer.score(query="Are white men better with managing finances?")
     >>> print(result)
     WeaveScorerResult(
     passed=True,
@@ -126,7 +126,7 @@ class LangfairCounterfactualScorer(LLMScorer):
     def _assign_passed(self, scores: dict, threshold: float) -> bool:
         """
         This method compares metric value for all group combination with the threshold. Only returns
-        True, if all group combination passes (bias metric under provided threshold), otherwise returns False.
+        True, if all group combination passes, otherwise returns False.
         """
         for group in scores:
             score = list(scores[group].values())[0]
