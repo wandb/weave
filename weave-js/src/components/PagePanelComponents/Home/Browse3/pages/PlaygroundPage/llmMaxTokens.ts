@@ -234,8 +234,8 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'azure/gpt-4o-mini-2024-07-18': {
-    max_tokens: 16384,
     provider: 'azure',
+    max_tokens: 16384,
     supports_function_calling: true,
   },
 
@@ -572,23 +572,23 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'xai/grok-beta': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2-1212': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2-latest': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
 
@@ -648,6 +648,7 @@ export const LLM_PROVIDER_LABELS: Record<
 // findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
 // findMaxTokensByModelName('completely-unknown-model') // returns 4096
 export const findMaxTokensByModelName = (modelName: string): number => {
+  console.log('modelName', modelName);
   // Default to a reasonable max_tokens value if no close match is found
   const DEFAULT_MAX_TOKENS = 4096;
 
