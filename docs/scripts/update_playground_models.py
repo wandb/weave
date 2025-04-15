@@ -4,9 +4,9 @@
 
 # This is fully vibe coded, but it correctly updates the markdown file.
 
+import os
 import re
 from collections import defaultdict
-import os
 
 # Define paths relative to the script location
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -140,7 +140,7 @@ def format_markdown(sorted_grouped_models):
 def update_markdown_file(md_filepath, new_content):
     """Reads the markdown file, replaces the content between markers, and writes back."""
     try:
-        with open(md_filepath, "r", encoding="utf-8") as f:
+        with open(md_filepath, encoding="utf-8") as f:
             md_content = f.read()
     except FileNotFoundError:
         print(f"Error: Markdown file not found at {md_filepath}")
@@ -166,7 +166,7 @@ def update_markdown_file(md_filepath, new_content):
 
     # Ensure the new content ends with a newline if it's not empty,
     # and is properly placed between the markers with surrounding newlines.
-    replacement_content = f"\\1{new_content}\\3" if new_content else f"\\1\\3"
+    replacement_content = f"\\1{new_content}\\3" if new_content else "\\1\\3"
 
     new_md_content, num_replacements = pattern.subn(replacement_content, md_content)
 
@@ -192,7 +192,7 @@ def update_markdown_file(md_filepath, new_content):
         with open(md_filepath, "w", encoding="utf-8") as f:
             f.write(new_md_content)
         print(f"Successfully updated model list in {md_filepath}")
-    except IOError as e:
+    except OSError as e:
         print(f"Error writing updated content to {md_filepath}: {e}")
     # print("DEBUG: File writing is currently commented out for debugging.")
 
@@ -203,12 +203,12 @@ def update_markdown_file(md_filepath, new_content):
 def main():
     print(f"Reading TypeScript file: {TS_FILE_PATH}")
     try:
-        with open(TS_FILE_PATH, "r", encoding="utf-8") as f:
+        with open(TS_FILE_PATH, encoding="utf-8") as f:
             ts_content = f.read()
     except FileNotFoundError:
         print(f"Error: TypeScript file not found at {TS_FILE_PATH}")
         return
-    except IOError as e:
+    except OSError as e:
         print(f"Error reading TypeScript file: {e}")
         return
 
