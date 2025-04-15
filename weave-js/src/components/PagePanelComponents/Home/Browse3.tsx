@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {debounce} from 'lodash';
 import React, {
   FC,
   useCallback,
@@ -37,8 +38,10 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  PATH_PARAM,
+  DESCENDENT_CALL_ID_PARAM,
+  HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
+  SHOW_FEEDBACK_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -57,14 +60,20 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
+  filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
+import {WFHighLevelCallFilter} from './Browse3/pages/CallsPage/callsTableFilter';
+import {
+  DEFAULT_FILTER_CALLS,
+  useMakeInitialDatetimeFilter,
+} from './Browse3/pages/CallsPage/callsTableQuery';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
@@ -409,10 +418,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(datasets)`}>
+          <DatasetsPageBinding />
         </Route>
         {/* OPS */}
         <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
@@ -612,18 +624,135 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
+const getOptionalBoolean = (
+  dict: Record<string, string>,
+  key: string
+): boolean | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value === '1';
+};
+
+const getOptionalString = (
+  dict: Record<string, string>,
+  key: string
+): string | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value;
+};
+
+const useURLBackedCallPageState = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+  const [rootCallId, setRootCallId] = useState(params.itemName);
+  useEffect(() => {
+    setRootCallId(params.itemName);
+  }, [params.itemName]);
+
+  const [descendentCallId, setDescendentCallId] = useState<string | undefined>(
+    getOptionalString(query, DESCENDENT_CALL_ID_PARAM)
+  );
+  useEffect(() => {
+    setDescendentCallId(getOptionalString(query, DESCENDENT_CALL_ID_PARAM));
+  }, [query]);
+
+  const [showFeedback, setShowFeedback] = useState<boolean | undefined>(
+    getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
+  );
+  useEffect(() => {
+    setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
+  }, [query]);
+
+  const [hideTraceTree, setHideTraceTree] = useState<boolean | undefined>(
+    getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
+  );
+  useEffect(() => {
+    setHideTraceTree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
+  }, [query]);
+
+  const debouncedHistoryPush = useMemo(() => {
+    return debounce((path: string) => {
+      if (history.location.pathname + history.location.search !== path) {
+        history.push(path);
+      }
+    }, 500);
+  }, [history]);
+
+  useEffect(() => {
+    debouncedHistoryPush(
+      currentRouter.callUIUrl(
+        params.entity,
+        params.project,
+        '',
+        rootCallId,
+        descendentCallId,
+        hideTraceTree,
+        showFeedback
+      )
+    );
+    return () => {
+      debouncedHistoryPush.cancel();
+    };
+  }, [
+    currentRouter,
+    debouncedHistoryPush,
+    params.entity,
+    params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+  ]);
+
+  return {
+    entity: params.entity,
+    project: params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  };
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
-  const params = useParamsDecoded<Browse3TabItemParams>();
-  const query = useURLSearchParamsDict();
+  const {
+    entity,
+    project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  } = useURLBackedCallPageState();
 
   return (
     <CallPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
-      path={query[PATH_PARAM]}
+      entity={entity}
+      project={project}
+      rootCallId={rootCallId}
+      setRootCallId={setRootCallId}
+      focusedCallId={descendentCallId}
+      setFocusedCallId={setDescendentCallId}
+      hideTraceTree={hideTraceTree}
+      setHideTraceTree={setHideTraceTree}
+      showFeedback={showFeedback}
+      setShowFeedback={setShowFeedback}
     />
   );
 };
@@ -632,8 +761,9 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
+  const isEvaluationsTab = tab === 'evaluations';
+  const initialFilter: WFHighLevelCallFilter = useMemo(() => {
+    if (isEvaluationsTab) {
       return {
         frozen: true,
         opVersionRefs: [
@@ -655,9 +785,17 @@ const CallsPageBinding = () => {
       console.log(e);
       return {};
     }
-  }, [query.filter, entity, project, tab]);
+  }, [query.filter, entity, project, isEvaluationsTab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
+
+  const {initialDatetimeFilter} = useMakeInitialDatetimeFilter(
+    entity,
+    project,
+    initialFilter,
+    isEvaluationsTab
+  );
+
   const onFilterUpdate = useCallback(
     filter => {
       history.push(routerContext.callsUIUrl(entity, project, filter));
@@ -692,14 +830,31 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  // Track if the user has explicitly removed the date filter
+  const hasRemovedDateFilter = useRef(false);
+
+  // Only show the date filter if not evals and we haven't explicitly removed it
+  const defaultFilter =
+    isEvaluationsTab || hasRemovedDateFilter.current
+      ? DEFAULT_FILTER_CALLS
+      : initialDatetimeFilter;
+
   const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
-    [query.filters]
+    () => getValidFilterModel(query.filters, defaultFilter),
+    [query.filters, defaultFilter]
   );
+
   const setFilterModel = (newModel: GridFilterModel) => {
+    // If there was a date filter and now there isn't, mark it as explicitly removed
+    // so we don't add it back on subsequent navigations
+    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
+    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
+      hasRemovedDateFilter.current = true;
+    }
+
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
-      newQuery.delete('filters');
+      newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));
     }
@@ -799,6 +954,41 @@ const ObjectVersionsPageBinding = () => {
   );
   return (
     <ObjectVersionsPage
+      entity={entity}
+      project={project}
+      initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
+    />
+  );
+};
+
+// New DatasetsPageBinding component for the dedicated datasets page
+const DatasetsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(routerContext.objectVersionsUIUrl(entity, project, filter));
+    },
+    [history, entity, project, routerContext]
+  );
+
+  return (
+    <DatasetsPage
       entity={entity}
       project={project}
       initialFilter={filters}

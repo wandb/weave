@@ -611,10 +611,15 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
       ];
     }
 
-    // Only paginated tables are supported for run history tables stepper
     results = results.filter(r => {
+      // Only paginated tables are supported for run history tables stepper
       if (r.key.startsWith('run-history-tables-stepper')) {
         return r.key === 'run-history-tables-stepper.row.table';
+      }
+
+      // Only paginated plots are supported for run history plots stepper
+      if (r.key.startsWith('run-history-plots-stepper')) {
+        return r.key === 'run-history-plots-stepper.row.plot';
       }
       return true;
     });

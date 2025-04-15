@@ -4,9 +4,9 @@ import importlib
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
@@ -91,7 +91,7 @@ def make_wrapper(settings: OpSettings) -> Callable:
     def litellm_wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: litellm_accumulator,
             should_accumulate=should_use_accumulator,

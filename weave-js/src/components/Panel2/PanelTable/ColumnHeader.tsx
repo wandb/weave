@@ -1,5 +1,6 @@
 import {CSSProperties} from '@material-ui/core/styles/withStyles';
-import {WBMenuOption, WBPopupMenuTrigger} from '@wandb/ui';
+import {WBMenuOption} from '@wandb/ui';
+import {OptionRenderer} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
@@ -8,6 +9,7 @@ import {
   canGroupType,
   canSortType,
   constFunction,
+  dereferenceAllVars,
   EditingNode,
   isListLike,
   isVoidNode,
@@ -21,6 +23,8 @@ import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
+import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
@@ -34,7 +38,7 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
-import {stripTag} from './util';
+import {defineColumnName, stripTag} from './util';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -49,7 +53,7 @@ const makeMenuItemDivider = (value: string) => {
         style={{
           marginRight: 12,
           marginLeft: 12,
-          borderBottom: '1px solid #888',
+          borderBottom: '1px solid #d3d3d3',
         }}
       />
     ),
@@ -64,7 +68,7 @@ const makeSortingMenuItems = (
   const colSortState = tableState.sort.find(
     sort => sort.columnId === colId
   )?.dir;
-  const menuItems: WBMenuOption[] = [makeMenuItemDivider('sort-div')];
+  const menuItems: WBMenuOption[] = [];
   if (colSortState !== 'asc') {
     menuItems.push({
       value: 'sort-asc',
@@ -157,6 +161,7 @@ export const ColumnHeader: React.FC<{
   const {columnFormat} = useContext(WeaveFormatContext);
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [workingSelectFunction, setWorkingSelectFunction] =
     useState<EditingNode>(propsSelectFunction);
@@ -323,13 +328,34 @@ export const ColumnHeader: React.FC<{
       : columnTypeForGroupByChecks;
   }
 
+  const isUsedInFilter = useMemo(() => {
+    const currentFilter = tableState.preFilterFunction;
+    if (isVoidNode(currentFilter)) {
+      return false;
+    }
+    const {usedStack} = dereferenceAllVars(currentFilter, stack);
+    return !!usedStack.find(
+      d => d.name === defineColumnName(tableState, colId)
+    );
+  }, [colId, stack, tableState]);
+
   const columnMenuItems: WBMenuOption[] = useMemo(() => {
     let menuItems: WBMenuOption[] = [];
     menuItems.push({
       value: 'settings',
-      name: 'Column settings',
+      name: 'Edit cell expression',
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
+    });
+    menuItems.push(makeMenuItemDivider('expression-div'));
+    menuItems.push({
+      value: 'pin',
+      name: isPinned ? 'Unpin column' : 'Pin column',
+      icon: 'pin',
+      onSelect: () => {
+        recordEvent('PIN_COLUMN');
+        setColumnPinState(!isPinned);
+      },
     });
     if (
       !isGroupCol &&
@@ -420,43 +446,74 @@ export const ColumnHeader: React.FC<{
             updateTableState(newTableState);
           },
         },
-        makeMenuItemDivider('pin-div'),
-        {
-          value: 'pin',
-          name: isPinned ? 'Unpin' : 'Pin',
-          icon: 'pin',
-          onSelect: () => {
-            recordEvent('PIN_COLUMN');
-            setColumnPinState(!isPinned);
-          },
-        },
-        makeMenuItemDivider('remove-div'),
         {
           value: 'remove',
-          name: 'Remove',
+          name: 'Remove column',
           icon: 'delete',
+          disabled: isUsedInFilter,
           onSelect: () => {
             const newTableState = Table.removeColumn(tableState, colId);
             recordEvent('REMOVE_COLUMN');
             updateTableState(newTableState);
           },
+          render: ({hovered, selected}) => {
+            return isUsedInFilter ? (
+              <Item data-test="remove-column" hovered={hovered}>
+                <ItemIcon
+                  style={{color: '#888', marginRight: '8px', marginLeft: 0}}
+                  name="delete"
+                />
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    color: '#888',
+                  }}>
+                  <span style={{fontSize: 12}}>Remove column</span>
+                  <sub style={{fontSize: 10}}>
+                    (Cannot remove column when used in a filter)
+                  </sub>
+                </div>
+              </Item>
+            ) : (
+              <Item
+                style={{justifyContent: 'flex-start'}}
+                data-test="remove-column"
+                hovered={hovered}>
+                <ItemIcon
+                  style={{marginRight: '8px', marginLeft: 0}}
+                  name="delete"
+                />
+                Remove column
+              </Item>
+            );
+          },
         },
         {
           value: 'remove-all-right',
-          name: 'Remove all right',
+          name: 'Remove to the right',
           icon: 'next',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToRight(tableState, colId);
+            const newTableState = Table.removeColumnsToRight(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_RIGHT');
             updateTableState(newTableState);
           },
         },
         {
           value: 'remove-all-left',
-          name: 'Remove all left',
+          name: 'Remove to the left',
           icon: 'previous',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToLeft(tableState, colId);
+            const newTableState = Table.removeColumnsToLeft(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_LEFT');
             updateTableState(newTableState);
           },
@@ -482,6 +539,7 @@ export const ColumnHeader: React.FC<{
     isPinned,
     setColumnPinState,
     isGroupCountColumn,
+    isUsedInFilter,
   ]);
 
   const colIsSorted =
@@ -515,6 +573,12 @@ export const ColumnHeader: React.FC<{
       ? {zIndex: 1, flexDirection: 'row-reverse'}
       : {flexDirection: 'row'};
 
+  // Used as a condition to change the background color of a column whose
+  // action menu is open
+  const handleOpenChange = (open: boolean) => {
+    setMenuOpen(open);
+  };
+
   return (
     <S.ColumnHeader
       data-test="column-header"
@@ -522,6 +586,7 @@ export const ColumnHeader: React.FC<{
         textAlign: columnFormat?.textAlign ?? 'center',
         flexDirection:
           columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
+        ...(menuOpen && {backgroundColor: 'rgba(0, 0, 0, 0.04)'}),
       }}>
       {simpleTable ? (
         workingColumnName !== '' ? (
@@ -689,47 +754,61 @@ export const ColumnHeader: React.FC<{
         />
       )}
       {!simpleTable && (
-        <WBPopupMenuTrigger options={columnMenuItems}>
-          {({anchorRef, setOpen, open}) => (
-            <S.ColumnActionContainer
-              className="column-controls"
-              style={columnActionContainerStyle}>
-              <S.ColumnAction>
-                {isPinned && (
-                  <PinnedIndicator unpin={() => setColumnPinState(false)} />
-                )}
-                {isGroupCol && (
-                  <S.ControlIcon
-                    name="group-runs"
-                    onClick={e => {
-                      recordEvent('REMOVE_COLUMN_GROUPING');
-                      doUngroup();
-                    }}
+        <WBPopupMenuTrigger
+          options={columnMenuItems}
+          theme="light"
+          menuBackgroundColor="white"
+          optionRenderer={ColumnMenuOptionRenderer}
+          direction={
+            columnFormat?.textAlign === 'right' ? 'bottom right' : 'bottom left'
+          }>
+          {({anchorRef, setOpen, open}) => {
+            // Update menuOpen state only when the open state changes
+            if (menuOpen !== open) {
+              handleOpenChange(open);
+            }
+
+            return (
+              <S.ColumnActionContainer
+                className="column-controls"
+                style={columnActionContainerStyle}>
+                <S.ColumnAction>
+                  {isPinned && (
+                    <PinnedIndicator unpin={() => setColumnPinState(false)} />
+                  )}
+                  {isGroupCol && (
+                    <S.ControlIcon
+                      name="group-runs"
+                      onClick={e => {
+                        recordEvent('REMOVE_COLUMN_GROUPING');
+                        doUngroup();
+                      }}
+                    />
+                  )}
+                </S.ColumnAction>
+                <S.ColumnAction>
+                  {colIsSorted && (
+                    <SortStateToggle
+                      {...{
+                        tableState,
+                        colId,
+                        updateTableState,
+                      }}
+                    />
+                  )}
+                </S.ColumnAction>
+                <S.ColumnAction>
+                  <S.EllipsisIcon
+                    ref={anchorRef}
+                    data-test="column-options"
+                    name="overflow"
+                    className="column-actions-trigger"
+                    onClick={() => setOpen(o => !o)}
                   />
-                )}
-              </S.ColumnAction>
-              <S.ColumnAction>
-                {colIsSorted && (
-                  <SortStateToggle
-                    {...{
-                      tableState,
-                      colId,
-                      updateTableState,
-                    }}
-                  />
-                )}
-              </S.ColumnAction>
-              <S.ColumnAction>
-                <S.EllipsisIcon
-                  ref={anchorRef}
-                  data-test="column-options"
-                  name="overflow"
-                  className="column-actions-trigger"
-                  onClick={() => setOpen(o => !o)}
-                />
-              </S.ColumnAction>
-            </S.ColumnActionContainer>
-          )}
+                </S.ColumnAction>
+              </S.ColumnActionContainer>
+            );
+          }}
         </WBPopupMenuTrigger>
       )}
     </S.ColumnHeader>
@@ -784,3 +863,20 @@ const PinnedIndicator: React.FC<{
     />
   );
 };
+
+const ColumnMenuOptionRenderer: OptionRenderer = ({
+  option,
+  hovered,
+  selected,
+}) => (
+  <Item
+    data-test={option['data-test']}
+    hovered={hovered}
+    style={{justifyContent: 'flex-start'}}>
+    <ItemIcon
+      style={{marginRight: '8px', marginLeft: 0}}
+      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
+    />
+    {option.name ?? option.value}
+  </Item>
+);

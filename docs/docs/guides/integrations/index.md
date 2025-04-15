@@ -14,8 +14,9 @@ LLM providers are the vendors that offer access to large language models for gen
 - **[Anthropic](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
 - **[Cohere](/guides/integrations/cohere)**
-- **[Google Gemini](/guides/integrations/google-gemini)**
+- **[Google](/guides/integrations/google)**
 - **[Groq](/guides/integrations/groq)**
+- **[Hugging Face Hub](/guides/integrations/huggingface)**
 - **[LiteLLM](/guides/integrations/litellm)**
 - **[Microsoft Azure](/guides/integrations/azure)**
 - **[MistralAI](/guides/integrations/mistral)**
@@ -30,10 +31,12 @@ LLM providers are the vendors that offer access to large language models for gen
 
 Frameworks help orchestrate the actual execution pipelines in AI applications. They provide tools and abstractions for building complex workflows. Weave integrates with these frameworks to trace the entire pipeline:
 
+- **[OpenAI Agents SDK](/guides/integrations/openai_agents)**
 - **[LangChain](/guides/integrations/langchain)**
 - **[LlamaIndex](/guides/integrations/llamaindex)**
 - **[DSPy](/guides/integrations/dspy)**
-
-
+- **[Instructor](/guides/integrations/instructor)**
+- **[CrewAI](/guides/integrations/crewai)**
+- **[Smolagents](/guides/integrations/smolagents)**
 
 Choose an integration from the lists above to learn more about how to use Weave with your preferred LLM provider or framework. Whether you're directly accessing LLM APIs or building complex pipelines with orchestration frameworks, Weave provides the tools to trace and analyze your AI applications effectively.

@@ -1,12 +1,11 @@
 import asyncio
 from typing import Literal
 
-from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-from weave.scorers.llm_scorer import LLMScorer
+from weave.scorers.scorer_types import LLMScorer
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.
@@ -111,13 +110,19 @@ class SummarizationScorer(LLMScorer):
     summarization_evaluation_prompt: str = DEFAULT_SUMMARIZATION_EVALUATION_USER_PROMPT
     entity_density_threshold: float = 0.08
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 1024
+    temperature: float = Field(
+        default=0.7,
+        description="Controls randomness in the LLM's responses (0.0 to 1.0)",
+    )
+    max_tokens: int = Field(
+        default=1024,
+        description="Maximum number of tokens allowed in the LLM's response",
+    )
 
     @weave.op
     async def _extract_entities(self, text: str) -> list[str]:
         """Use an LLM to extract unique entities from the provided text."""
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.extraction_system_prompt},
                 {"role": "user", "content": self.extraction_prompt.format(text=text)},
@@ -138,7 +143,7 @@ class SummarizationScorer(LLMScorer):
         self, input: str, summary: str
     ) -> SummarizationEvaluationResponse:
         """Evaluate the quality of a summary using an LLM."""
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {
                     "role": "system",

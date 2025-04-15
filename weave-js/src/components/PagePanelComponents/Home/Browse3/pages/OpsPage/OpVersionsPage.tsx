@@ -109,6 +109,9 @@ export const FilterableOpVersionsTable: React.FC<{
   const columns: GridColDef[] = [
     basicField('op', 'Op', {
       hideable: false,
+      valueGetter: (unused: any, row: any) => {
+        return row.obj.opId;
+      },
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
         const obj: OpVersionSchema = cellParams.row.obj;
@@ -156,8 +159,8 @@ export const FilterableOpVersionsTable: React.FC<{
         ]
       : []),
 
-    basicField('createdAtMs', 'Created', {
-      width: 100,
+    basicField('createdAtMs', 'Last updated', {
+      width: 130,
       renderCell: cellParams => {
         const createdAtMs = cellParams.value;
         return <Timestamp value={createdAtMs / 1000} format="relative" />;

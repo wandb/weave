@@ -6,7 +6,7 @@
 [![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
 )](https://github.com/wandb/weave)
 
-Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/)!
+Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
 ---
 
@@ -24,7 +24,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ## Documentation
 
-Our documentation site can be found [here](https://wandb.me/weave)
+Our documentation site can be found [here](https://wandb.me/weave).
 
 ## Installation
 ```

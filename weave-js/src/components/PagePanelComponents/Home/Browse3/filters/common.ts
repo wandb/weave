@@ -24,6 +24,7 @@ import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
 } from '../pages/wfReactInterface/constants';
+import {Query} from '../pages/wfReactInterface/traceServerClientInterface/query';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -31,13 +32,13 @@ export type FilterId = number | string | undefined;
 // These are columns we won't allow the user to filter on.
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
-  'op_name',
   'feedback',
-  'status',
+  'summary.weave.latency_ms',
+  'summary.weave.trace_name',
   'tokens',
   'cost',
-  'latency',
   'wb_user_id', // Option+Click works
+  'wb_run_id', // Option+Click works
 ];
 
 export type ColumnInfo = {
@@ -47,6 +48,7 @@ export type ColumnInfo = {
 
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
+  'summary.weave.status': 'Status',
   started_at: 'Called',
   wb_user_id: 'User',
 };
@@ -202,6 +204,10 @@ export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
 };
 
+export const isDateOperator = (operator: string) => {
+  return operator.startsWith('(date):');
+};
+
 export const getOperatorLabel = (operatorValue: string): string => {
   const label = operatorLabels[operatorValue];
   if (label) {
@@ -256,14 +262,9 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
   if ('status' === fieldType) {
     return [
       {
-        value: 'is',
-        label: 'is',
-        group: 'boolean',
-      },
-      {
-        value: 'is not',
-        label: 'is not',
-        group: 'boolean',
+        value: '(string): in',
+        label: 'in',
+        group: 'string',
       },
     ];
   }
@@ -307,7 +308,7 @@ const ArtifactRefStringSymbol = Symbol('ArtifactRefString');
 export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
 export type ArtifactRefString = string & {[ArtifactRefStringSymbol]: never};
 
-const isRefPrefixedString = (value: any): boolean => {
+export const isRefPrefixedString = (value: any): boolean => {
   if (typeof value !== 'string') {
     return false;
   }
@@ -382,4 +383,52 @@ export const upsertFilter = (
 export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
+};
+
+export const makeRawDateFilter = (
+  days: number,
+  field: string = 'started_at'
+): Query => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  return {
+    $expr: {
+      $gt: [{$getField: field}, {$literal: d.getTime() / 1000}],
+    },
+  };
+};
+
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
+  };
+};
+
+export const makeMonthFilter = (): GridFilterItem => {
+  // Get last month
+  const curMonth = new Date().getMonth();
+  // Number of days in the previous month
+  const prevMonthDays = new Date(
+    new Date().getFullYear(),
+    curMonth,
+    0
+  ).getDate();
+  return makeDateFilter(prevMonthDays);
 };

@@ -1,12 +1,38 @@
-import React from 'react';
+import {Box} from '@mui/material';
+import React, {useState} from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {Button} from '../../../../../Button';
+import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
+const NewDatasetButton: React.FC = () => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}>
+        New dataset
+      </Button>
+      <CreateDatasetDrawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSaveDataset={() => {
+          setIsDrawerOpen(false);
+          // Refresh the page or update the list as needed
+        }}
+      />
+    </>
+  );
+};
+
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
-  heading: 'No traces yet',
+  heading: 'Create your first trace',
   description:
     'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
   moreInformation: (
@@ -20,13 +46,20 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         following our quickstart guide
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };
 
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
-  heading: 'No evaluations yet',
+  heading: 'Create your first evaluation',
   description: 'Use evaluations to track the performance of your application.',
   moreInformation: (
     <>
@@ -39,6 +72,13 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
         set up an evaluation pipeline
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TargetBlank>
+      </Box>
     </>
   ),
 };
@@ -116,9 +156,9 @@ export const EMPTY_PROPS_MODEL: EmptyProps = {
 
 export const EMPTY_PROPS_DATASETS: EmptyProps = {
   icon: 'table' as const,
-  heading: 'No datasets yet',
+  heading: 'Create your first dataset',
   description:
-    'You can use datasets to collect difficult examples to use within evaluations of your app.',
+    'Use datasets to collect difficult examples to use within evaluations of your app.',
   moreInformation: (
     <>
       Learn{' '}
@@ -130,6 +170,9 @@ export const EMPTY_PROPS_DATASETS: EmptyProps = {
         use datasets within an evaluation pipeline
       </TargetBlank>{' '}
       .
+      <Box sx={{mt: 2}}>
+        <NewDatasetButton />
+      </Box>
     </>
   ),
 };
@@ -221,4 +264,17 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
       .
     </>
   ),
+};
+
+export const EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'Get started with the LLM playground',
+  description: 'Configure an LLM provider to start using the playground',
+  moreInformation: <></>,
+};
+
+export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
+  ...EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
+  description:
+    'Contact a team admin to configure an LLM provider to start using the playground',
 };

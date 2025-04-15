@@ -11,24 +11,80 @@ const CATEGORY_SECTION_HEADER_MIXIN: SidebarItemCategoryBase = {
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
     {
-      label: "👋 Getting Started",
+      label: "👋 Introduction",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         "introduction",
         {
           type: "doc",
-          label: "Trace LLMs",
+          label: "Quickstart: Track LLM Calls",
           id: "quickstart",
         },
+      ],
+    },
+    {
+      label: "🔄 Iteration",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      
+      items: [
         {
           type: "doc",
-          label: "Trace Applications",
+          label: "Track Application Logic",
           id: "tutorial-tracing_2",
         },
-        "tutorial-weave_models",
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Tracing & Debugging",
+          items: [
+            {
+              type: "doc",
+              label: "Tracing Overview",
+              id: "guides/tracking/tracing",
+            },
+            "guides/tracking/costs",
+            {
+              type: "doc",
+              label: "Logging Media",
+              id: "guides/core-types/media",
+            },
+            "guides/tools/playground",
+            "guides/integrations/index",
+            {
+              type: "doc",
+              label: "Compare Traces",
+              id: "guides/tools/comparison",
+            },
+            "guides/tracking/trace-tree"
+          ]
+        },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: true,
+          label: "Version Control for Models & Prompts",
+          items: [
+            {
+              type: "doc",
+              label: "App Versioning",
+              id: "tutorial-weave_models",
+            },
+            "guides/core-types/models",
+            "guides/core-types/prompts",
+            "guides/tracking/objects",
+            "guides/tracking/ops",
+          ]
+        },
+      ],
+    },
+    {
+      label: "📊 Evaluation",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      items: [
         {
           type: "doc",
-          label: "Build an Evaluation",
+          label: "Build an Evaluation Pipeline",
           id: "tutorial-eval",
         },
         {
@@ -36,49 +92,63 @@ const sidebars: SidebarsConfig = {
           label: "Evaluate a RAG App",
           id: "tutorial-rag",
         },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Evaluations",
+          items: [
+            "guides/core-types/evaluations",
+            "guides/core-types/datasets",
+            "guides/evaluation/scorers",
+            "guides/evaluation/builtin_scorers",
+            "guides/evaluation/weave_local_scorers",
+          ]
+        },
       ],
     },
     {
-      label: "🤖 Product Walkthrough",
+      label: "🚀 Productionization",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         {
           type: "category",
           collapsible: true,
           collapsed: false,
-          label: "LLM Application Tracing",
-          link: { type: "doc", id: "guides/tracking/index" },
+          label: "Collect Feedback & Examples",
           items: [
-            "guides/tracking/tracing",
-            "guides/tracking/ops",
-            "guides/tracking/objects",
-          ],
+            "guides/tracking/feedback",
+            "guides/tracking/redact-pii",
+          ]
         },
         {
           type: "category",
           collapsible: true,
           collapsed: false,
-          label: "Evaluation",
-          link: { type: "doc", id: "guides/core-types/evaluations" },
-          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors", "guides/evaluation/builtin_scorers"],
+          label: "Online Evaluation",
+              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
+              items: [
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-guardrails",
+                  label: "Guardrails",
+                  autoAddBaseUrl: true,
+                },
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors",
+                  label: "Monitors",
+                  autoAddBaseUrl: true,
+                }
+              ],
         },
-        "guides/core-types/prompts",
-        "guides/core-types/models",
-        "guides/core-types/datasets",
-        "guides/tracking/feedback",
-        "guides/tracking/costs",
-        "guides/tools/comparison",
-        "guides/tools/playground",
-        "guides/core-types/media",
-        "guides/core-types/env-vars",
-        "guides/troubleshooting",
         {
           type: "category",
           collapsible: true,
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tools/otel"],
         },
       ],
     },
@@ -97,8 +167,9 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
-            "guides/integrations/google-gemini",
+            "guides/integrations/google",
             "guides/integrations/groq",
+            "guides/integrations/huggingface",
             "guides/integrations/litellm",
             "guides/integrations/azure",
             "guides/integrations/mistral",
@@ -115,11 +186,13 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Frameworks",
           items: [
-            ,
+            "guides/integrations/openai_agents",
             "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
             "guides/integrations/instructor",
+            "guides/integrations/crewai",
+            "guides/integrations/smolagents",
           ],
         },
       ],
@@ -136,6 +209,15 @@ const sidebars: SidebarsConfig = {
           type: "doc",
           id: "guides/platform/weave-self-managed",
         }
+      ],
+    },
+    {
+      label: "🛠️ Tools & Resources",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      items: [
+        "guides/core-types/env-vars",
+        "guides/troubleshooting",
+        "guides/tracking/faqs",
       ],
     },
   ],
