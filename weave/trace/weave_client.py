@@ -474,6 +474,7 @@ def map_to_refs(obj: Any) -> Any:
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         from weave.flow.obj import Object
+
         if isinstance(obj, Object):
             obj_record = pydantic_object_record(obj)
             return obj_record.map_values(map_to_refs)
