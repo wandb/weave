@@ -1,3 +1,46 @@
+"""
+Currently 3 storage backends are supported:
+- AWS S3
+- Google Cloud Storage
+- Azure Blob Storage
+
+Each of these can be configured at the application layer, or at the environment layer.
+
+Common configuration options:
+- `WF_FILE_STORAGE_URI`: sets the default storage backend to use. looks like `s3://my-bucket` or `gs://my-bucket` or `az://my-account/my-container`.
+- `WF_FILE_STORAGE_PROJECT_ALLOW_LIST`: a list of project ids that are allowed to use the default storage bucket (at write time). Value of '*' allows all projects.
+
+AWS S3 specific configuration options:
+- `WF_FILE_STORAGE_AWS_REGION`: the region for the aws account.
+- `WF_FILE_STORAGE_AWS_KMS_KEY`: the kms key to use for encryption.
+- If connecting to a local bucket:
+    - `WF_FILE_STORAGE_AWS_ACCESS_KEY_ID`: the access key id for the aws account.
+    - `WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY`: the secret access key for the aws account.
+    - `WF_FILE_STORAGE_AWS_SESSION_TOKEN`: (optional) the session token for the aws account.
+- If connecting to a remote bucket:
+    - Configure the running instance to have it's account permissions set to access the bucket. The
+    instance should automatically assume the role of the running user.
+
+GCS specific configuration options:
+- If connecting to a local bucket:
+    - `WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64`: the base64 encoded json string for the gcp service account key.
+- If connecting to a remote bucket:
+    - Configure the running instance to have it's account permissions set to access the bucket. The
+    instance should automatically assume the role of the running user.
+
+Azure specific configuration options:
+There are two ways to authenticate with Azure Blob Storage:
+1. Connection string (simple)
+2. Account and key (more complex)
+
+1. Connection string:
+    - `WF_FILE_STORAGE_AZURE_CONNECTION_STRING`: the connection string for the azure account.
+
+2. Account and key:
+    - `WF_FILE_STORAGE_AZURE_ACCESS_KEY`: the access key for the azure account.
+    - `WF_FILE_STORAGE_AZURE_ACCOUNT_URL`: (optional) the account url for the azure account - defaults to `https://<account>.blob.core.windows.net/`
+"""
+
 import logging
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Union, cast
@@ -249,7 +292,7 @@ class AzureStorageClient(FileStorageClient):
                 account_url = f"https://{account}.blob.core.windows.net/"
             return BlobServiceClient(
                 account_url=account_url,
-                credential=account_creds["credential"],
+                credential=account_creds["access_key"],
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )

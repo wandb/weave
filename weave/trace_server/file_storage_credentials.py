@@ -27,7 +27,7 @@ class AzureConnectionCredentials(TypedDict):
 class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
-    credential: str
+    access_key: str
     account_url: NotRequired[Optional[str]]
 
 
@@ -98,7 +98,7 @@ def get_azure_credentials() -> (
 
     Required env vars (one of):
         - WF_FILE_STORAGE_AZURE_CONNECTION_STRING
-        - WF_FILE_STORAGE_AZURE_CREDENTIAL_B64 (base64 encoded)
+        - WF_FILE_STORAGE_AZURE_ACCESS_KEY
 
     Returns:
         Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars
@@ -109,9 +109,8 @@ def get_azure_credentials() -> (
     connection_string = environment.wf_storage_bucket_azure_connection_string()
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
-    b64_credential = environment.wf_storage_bucket_azure_credential()
-    if b64_credential is None:
+    access_key = environment.wf_storage_bucket_access_key()
+    if access_key is None:
         raise ValueError("Azure credentials not set")
-    credential = base64.b64decode(b64_credential).decode("utf-8")
     account_url = environment.wf_storage_bucket_azure_account_url()
-    return AzureAccountCredentials(credential=credential, account_url=account_url)
+    return AzureAccountCredentials(access_key=access_key, account_url=account_url)

@@ -65,7 +65,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": "test-credential",
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "test-credential",
         },
     ):
         with pytest.raises(ValueError, match="Incorrect padding"):
@@ -73,9 +73,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
-                b"test-credential"
-            ).decode(),
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "test-credential",
         },
     ):
         creds = get_azure_credentials()
@@ -87,9 +85,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
-                b"test-credential"
-            ).decode(),
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "test-credential",
             "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "some_account_url",
         },
     ):
