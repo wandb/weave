@@ -407,18 +407,29 @@ def get_weave_outputs(events: list[dict[str, Any]], attributes: dict[str, Any]) 
     return {}
 
 def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
-    def get_opentelemetry_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
-        max_tokens = get_attribute(attributes, ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS)
-        system = get_attribute(attributes, ot.SpanAttributes.LLM_SYSTEM)
-        kind = get_attribute(attributes, ot.SpanAttributes.TRACELOOP_SPAN_KIND)
-        model = get_attribute(attributes, ot.SpanAttributes.LLM_RESPONSE_MODEL)
+    field_types = {
+        'max_tokens': lambda x: int(x),
+        'default': lambda x: str(x)
+    }
 
+    def get_opentelemetry_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
         results = {
-            "system": str(system) if system else None,
-            "max_tokens": int(max_tokens) if max_tokens else None,
-            "kind": str(kind) if kind else None,
-            "model": str(model) if model else None,
+            'max_tokens': get_attribute(attributes, ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS),
+            'system': get_attribute(attributes, ot.SpanAttributes.LLM_SYSTEM),
+            'kind': get_attribute(attributes, ot.SpanAttributes.TRACELOOP_SPAN_KIND),
+            'model': get_attribute(attributes, ot.SpanAttributes.LLM_RESPONSE_MODEL),
         }
+
+        filtered = list(filter(lambda item: item[1] is not None, results.items()))
+
+        if len(filtered) == 0:
+            return None
+        for key, value in results.items():
+            if value is not None:
+                # Check if the field type is defined in field_types
+                field_type = field_types.get(key, field_types['default'])
+                results[key] = field_type(value)
+
         return to_json_serializable(results)
 
     def get_openinference_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
@@ -436,7 +447,9 @@ def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any
 
         for key, value in results.items():
             if value is not None:
-                results[key] = str(value)
+                # Check if the field type is defined in field_types
+                field_type = field_types.get(key, field_types['default'])
+                results[key] = field_type(value)
 
         invocation_parameters = get_attribute(attributes, oi.SpanAttributes.LLM_INVOCATION_PARAMETERS)
         if invocation_parameters:

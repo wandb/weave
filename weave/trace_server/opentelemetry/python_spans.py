@@ -282,7 +282,6 @@ class Span:
         usage = get_weave_usage(events, self.attributes) or {}
         inputs = get_weave_inputs(events, self.attributes) or {}
         outputs = get_weave_outputs(events, self.attributes) or {}
-        print(get_weave_attributes(events, self.attributes))
         attributes = get_weave_attributes(events, self.attributes) or {}
         summary_insert_map = tsi.SummaryInsertMap(usage={'usage': usage})
 
