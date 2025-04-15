@@ -23,15 +23,14 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.attributes import (
-    Attributes,
-    AttributesFactory,
-    GenericAttributes,
-    OpenInferenceAttributes,
-    OpenTelemetryAttributes,
     convert_numeric_keys_to_list,
     expand_attributes,
     flatten_attributes,
     get_attribute,
+    get_weave_attributes,
+    get_weave_inputs,
+    get_weave_outputs,
+    get_weave_usage,
     to_json_serializable,
     unflatten_key_values,
 )
@@ -156,22 +155,21 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert call.id == decoded_span
     assert call.trace_id == decoded_trace
 
-    call_attributes = Attributes(_attributes=call.attributes)
     for kv in export_span.attributes:
         key = kv.key
         value = kv.value
         if value.HasField("string_value"):
-            assert call_attributes.get_attribute_value(key) == value.string_value
+            assert get_attribute(call.attributes, key) == value.string_value
         elif value.HasField("int_value"):
-            assert call_attributes.get_attribute_value(key) == value.int_value
+            assert get_attribute(call.attributes, key) == value.int_value
         elif value.HasField("double_value"):
-            assert call_attributes.get_attribute_value(key) == value.double_value
+            assert get_attribute(call.attributes, key) == value.double_value
         elif value.HasField("bool_value"):
-            assert call_attributes.get_attribute_value(key) == value.bool_value
+            assert get_attribute(call.attributes, key) == value.bool_value
         elif value.HasField("array_value"):
             # Handle array values
             array_values = [v.string_value for v in value.array_value.values]
-            assert call_attributes.get_attribute_value(key) == array_values
+            assert get_attribute(call.attributes, key) == array_values
 
     # Verify call deletion using client provided ID works
     client.server.calls_delete(
@@ -206,13 +204,13 @@ class TestPythonSpans:
         assert py_span.status.message == pb_span.status.message
 
         # Verify attributes were correctly converted
-        assert py_span.attributes.get_attribute_value("test.attribute") == "test_value"
-        assert py_span.attributes.get_attribute_value("test.number") == 42
+        assert get_attribute(py_span.attributes, "test.attribute") == "test_value"
+        assert get_attribute(py_span.attributes, "test.number") == 42
         assert (
-            py_span.attributes.get_attribute_value("test.nested.value")
+            get_attribute(py_span.attributes, "test.nested.value")
             == "nested_test_value"
         )
-        array_value = py_span.attributes.get_attribute_value("test.array")
+        array_value = get_attribute(py_span.attributes, "test.array")
         assert isinstance(array_value, list)
         assert len(array_value) == 2
         assert array_value[0] == "value1"
@@ -411,11 +409,9 @@ class TestSemanticConventionParsing:
             ),
         }
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
         # Test get_weave_attributes
-        extracted = oi_attrs.get_weave_attributes()
+        extracted = get_weave_attributes([], attributes)
+        print(extracted)
         assert extracted["system"] == "This is a system prompt"
         assert extracted["provider"] == "test-provider"
         assert extracted["model"] == "test-model"
@@ -434,11 +430,8 @@ class TestSemanticConventionParsing:
             OISpanAttr.INPUT_MIME_TYPE: "text/plain",
         }
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
         # Test get_weave_inputs with text input
-        inputs = oi_attrs.get_weave_inputs()
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": "What is machine learning?",
             "mime_type": "text/plain",
@@ -456,8 +449,7 @@ class TestSemanticConventionParsing:
             OISpanAttr.INPUT_VALUE: json_input,
             OISpanAttr.INPUT_MIME_TYPE: "application/json",
         }
-        oi_attrs = OpenInferenceAttributes(attributes)
-        inputs = oi_attrs.get_weave_inputs()
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": {
                 "messages": [
@@ -479,11 +471,8 @@ class TestSemanticConventionParsing:
             OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
         }
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
         # Test get_weave_outputs with text output
-        outputs = oi_attrs.get_weave_outputs()
+        outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "value": "Machine learning is a field of AI...",
             "mime_type": "text/plain",
@@ -501,8 +490,7 @@ class TestSemanticConventionParsing:
             OISpanAttr.OUTPUT_VALUE: json_output,
             OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
         }
-        oi_attrs = OpenInferenceAttributes(attributes)
-        outputs = oi_attrs.get_weave_outputs()
+        outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "value": {
                 "response": {
@@ -525,11 +513,8 @@ class TestSemanticConventionParsing:
             OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
         }
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
         # Test get_weave_usage
-        usage = oi_attrs.get_weave_usage()
+        usage = get_weave_usage([], attributes)
         assert usage.get("prompt_tokens") == 10
         assert usage.get("completion_tokens") == 20
         assert usage.get("total_tokens") == 30
@@ -547,11 +532,8 @@ class TestSemanticConventionParsing:
             OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
         }
 
-        # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
-
         # Test get_weave_attributes
-        extracted = ot_attrs.get_weave_attributes()
+        extracted = get_weave_attributes([], attributes)
         assert extracted["system"] == "You are a helpful assistant"
         assert extracted["max_tokens"] == 150
         assert extracted["kind"] == "llm"
@@ -568,11 +550,8 @@ class TestSemanticConventionParsing:
             OTSpanAttr.LLM_PROMPTS: prompts,
         }
 
-        # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
-
         # Test get_weave_inputs
-        inputs = ot_attrs.get_weave_inputs()
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "prompt": [
                 {"role": "user", "content": "Tell me about quantum computing"}
@@ -588,8 +567,7 @@ class TestSemanticConventionParsing:
             "gen_ai": True,
             OTSpanAttr.LLM_PROMPTS: prompts_multiple,
         }
-        ot_attrs = OpenTelemetryAttributes(attributes)
-        inputs = ot_attrs.get_weave_inputs()
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "prompt": [
                 {"role": "system", "content": "You are an expert in quantum physics"},
@@ -614,10 +592,9 @@ class TestSemanticConventionParsing:
         }
 
         # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
 
         # Test get_weave_outputs
-        outputs = ot_attrs.get_weave_outputs()
+        outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "completion": [
                 {
@@ -640,31 +617,8 @@ class TestSemanticConventionParsing:
         }
 
         # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
+        usage = get_weave_usage([], attributes) or {}
 
-        # Test get_weave_usage
-        usage = ot_attrs.get_weave_usage()
         assert usage.get("prompt_tokens") == 15
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
-
-    def test_attributes_factory(self):
-        """Test the AttributesFactory for creating the correct attributes object."""
-        factory = AttributesFactory()
-
-        # Test OpenInference detection
-        oi_key_value = KeyValue(key="openinference", value=AnyValue(bool_value=True))
-        oi_attrs = factory.from_proto([oi_key_value])
-        assert isinstance(oi_attrs, OpenInferenceAttributes)
-
-        # Test OpenTelemetry detection
-        ot_key_value = KeyValue(key="gen_ai", value=AnyValue(bool_value=True))
-        ot_attrs = factory.from_proto([ot_key_value])
-        assert isinstance(ot_attrs, OpenTelemetryAttributes)
-
-        # Test generic attributes (no specific convention)
-        generic_key_value = KeyValue(
-            key="some_key", value=AnyValue(string_value="some_value")
-        )
-        generic_attrs = factory.from_proto([generic_key_value])
-        assert isinstance(generic_attrs, GenericAttributes)

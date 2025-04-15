@@ -1,17 +1,15 @@
 import json
-from abc import abstractmethod
 from collections.abc import Iterable
-from dataclasses import field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Union
 from uuid import UUID
 
 import openinference.semconv.trace as oi
 import opentelemetry.semconv_ai as ot
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
-from weave.trace_server.trace_server_interface import LLMUsageSchema, SummaryInsertMap
+from weave.trace_server.trace_server_interface import LLMUsageSchema
 
 
 def to_json_serializable(value: Any) -> Any:
@@ -316,198 +314,215 @@ def unflatten_key_values(
     return expand_attributes(iterator, json_attributes=[])
 
 
-class ConventionType(Enum):
-    OPENINFERENCE = "openinference"
-    OPENTELEMETRY = "gen_ai"
-    CUSTOM = "custom"
+# Generalize for events as well
+def get_weave_inputs(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
 
+    def get_opentelemetry_inputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
+        prompts = get_attribute(attributes, ot.SpanAttributes.LLM_PROMPTS)
 
-class Attributes:
-    _attributes: dict[str, Any] = field(default_factory=dict)
+        if not prompts:
+            return None
 
-    def __init__(self, _attributes: dict[str, Any] = {}) -> None:
-        self._attributes = _attributes
-
-    def __getitem__(self, key: str) -> Any:
-        return self._attributes.__getitem__(key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        return self._attributes.__setitem__(key, value)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._attributes.get(key, default)
-
-    def get_attribute_value(self, key: str) -> Any:
-        return get_attribute(self._attributes, key)
-
-    @abstractmethod
-    def get_weave_inputs(self) -> dict[str, Any]: ...
-
-    @abstractmethod
-    def get_weave_outputs(self) -> Any: ...
-
-    @abstractmethod
-    def get_weave_usage(self) -> LLMUsageSchema: ...
-
-    @abstractmethod
-    def get_weave_summary(self) -> SummaryInsertMap: ...
-
-    @abstractmethod
-    def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any: ...
-
-
-# If we don't have any conventions to follow, just dump everything to attributes
-# Later we may add support for user defined conventions through headers
-class GenericAttributes(Attributes):
-    def get_weave_usage(self) -> LLMUsageSchema:
-        return {}
-
-    def get_weave_summary(self) -> SummaryInsertMap:
-        return {}
-
-    def get_weave_inputs(self) -> Any:
-        return {}
-
-    def get_weave_outputs(self) -> Any:
-        return {}
-
-    def get_weave_attributes(self, extra: Optional[dict[str, Any]] = None) -> Any:
-        result = self._attributes.copy()
-        result.update(extra or {})
-        return result
-
-
-class OpenInferenceAttributes(Attributes):
-    def get_weave_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.get_attribute_value(
-            oi.SpanAttributes.LLM_TOKEN_COUNT_PROMPT
-        )
-        completion_tokens = self.get_attribute_value(
-            oi.SpanAttributes.LLM_TOKEN_COUNT_COMPLETION
-        )
-        total_tokens = self.get_attribute_value(oi.SpanAttributes.LLM_TOKEN_COUNT_TOTAL)
-        return LLMUsageSchema(
-            prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
-            completion_tokens=int(completion_tokens) if completion_tokens else None,
-            total_tokens=int(total_tokens) if total_tokens else None,
-        )
-
-    def get_weave_summary(self) -> SummaryInsertMap:
-        return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
-
-    def get_weave_outputs(self) -> Any:
-        outputs = {
-            "value": self.get_attribute_value(oi.SpanAttributes.OUTPUT_VALUE),
-            "mime_type": self.get_attribute_value(oi.SpanAttributes.OUTPUT_MIME_TYPE),
-        }
-        if outputs.get("mime_type") == "application/json" and outputs.get("value"):
-            outputs["value"] = json.loads(str(outputs.get("value")))
-        return outputs
-
-    def get_weave_inputs(self) -> Any:
-        inputs = {
-            "value": self.get_attribute_value(oi.SpanAttributes.INPUT_VALUE),
-            "mime_type": self.get_attribute_value(oi.SpanAttributes.INPUT_MIME_TYPE),
-        }
-        if inputs.get("mime_type") == "application/json" and inputs.get("value"):
-            inputs["value"] = json.loads(str(inputs.get("value")))
-        return inputs
-
-    def get_weave_attributes(
-        self, extra: Optional[dict[str, Any]] = None
-    ) -> dict[str, Any]:
-        system = self.get_attribute_value(oi.SpanAttributes.LLM_SYSTEM)
-        provider = self.get_attribute_value(oi.SpanAttributes.LLM_PROVIDER)
-        invocation_parameters = self.get_attribute_value(
-            oi.SpanAttributes.LLM_INVOCATION_PARAMETERS
-        )
-        kind = self.get_attribute_value(oi.SpanAttributes.OPENINFERENCE_SPAN_KIND)
-        model = self.get_attribute_value(oi.SpanAttributes.LLM_MODEL_NAME)
-        attributes = {
-            "system": str(system) if system else None,
-            "provider": str(provider) if provider else None,
-            "kind": str(kind) if kind else None,
-            "model": str(model) if model else None,
-        }
-
-        if invocation_parameters:
-            try:
-                js = json.loads(invocation_parameters)
-                for k, v in js.items():
-                    attributes[k] = str(v)
-            except json.JSONDecodeError:
-                raise ValueError(f"Invalid JSON string: {invocation_parameters}")
-
-        if extra:
-            attributes.update(extra)
-
-        return to_json_serializable(attributes)
-
-
-class OpenTelemetryAttributes(Attributes):
-    def get_weave_usage(self) -> LLMUsageSchema:
-        prompt_tokens = self.get_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_PROMPT_TOKENS
-        )
-        completion_tokens = self.get_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_COMPLETION_TOKENS
-        )
-        total_tokens = self.get_attribute_value(
-            ot.SpanAttributes.LLM_USAGE_TOTAL_TOKENS
-        )
-        return LLMUsageSchema(
-            prompt_tokens=int(prompt_tokens) if prompt_tokens else None,
-            completion_tokens=int(completion_tokens) if completion_tokens else None,
-            total_tokens=int(total_tokens) if total_tokens else None,
-        )
-
-    def get_weave_summary(self) -> SummaryInsertMap:
-        return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
-
-    def get_weave_outputs(self) -> Any:
-        # Do convert numeric to list, nested under completion key
-        outputs: dict[str, Any] = {
-            "completion": convert_numeric_keys_to_list(
-                self.get_attribute_value(ot.SpanAttributes.LLM_COMPLETIONS) or {}
-            )
-        }
-        return to_json_serializable(outputs)
-
-    def get_weave_inputs(self) -> Any:
         # Do convert numeric to list, nested under prompt key
         inputs: dict[str, Any] = {
-            "prompt": convert_numeric_keys_to_list(
-                self.get_attribute_value(ot.SpanAttributes.LLM_PROMPTS) or {}
-            )
+            "prompt": convert_numeric_keys_to_list(prompts)
         }
         return to_json_serializable(inputs)
 
-    def get_weave_attributes(
-        self, extra: Optional[dict[str, Any]] = None
-    ) -> dict[str, Any]:
-        max_tokens = self.get_attribute_value(ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS)
-        system = self.get_attribute_value(ot.SpanAttributes.LLM_SYSTEM)
-        kind = self.get_attribute_value(ot.SpanAttributes.TRACELOOP_SPAN_KIND)
-        model = self.get_attribute_value(ot.SpanAttributes.LLM_RESPONSE_MODEL)
+    def get_openinference_inputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
+        results = {
+            'value': get_attribute(attributes, "input.value"),
+            'mime_type': get_attribute(attributes, "input.mime_type")
+        }
 
-        attributes = {
+        filtered = list(filter(lambda item: item[1] is not None, results.items()))
+
+        if len(filtered) == 0:
+            return None
+
+        if results['mime_type'] == "application/json" and results['value']:
+            try:
+                results['value'] = json.loads(str(results['value']))
+            except:
+                # Sometimes the mime_type may be json but the value is not in real world examples
+                pass
+
+        return results
+
+    extractors = [
+        get_opentelemetry_inputs,
+        get_openinference_inputs,
+    ]
+
+    for extractor in extractors:
+        inputs = extractor(events, attributes)
+        if inputs:
+            return inputs
+
+    return {}
+
+def get_weave_outputs(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
+
+    def get_opentelemetry_outputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
+        completions = get_attribute(attributes, ot.SpanAttributes.LLM_COMPLETIONS)
+        if not completions:
+            return None
+
+        # Do convert numeric to list, nested under completion key
+        outputs: dict[str, Any] = {
+            "completion": convert_numeric_keys_to_list(completions)
+        }
+        return to_json_serializable(outputs)
+
+    def get_openinference_outputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
+        results = {
+            'value': get_attribute(attributes, "output.value"),
+            'mime_type': get_attribute(attributes, "output.mime_type")
+        }
+
+        filtered = list(filter(lambda item: item[1] is not None, results.items()))
+
+        if len(filtered) == 0:
+            return None
+
+        if results['mime_type'] == "application/json" and results['value']:
+            try:
+                results['value'] = json.loads(str(results['value']))
+            except:
+                # Sometimes the mime_type may be json but the value is not in real world examples
+                pass
+
+        return results
+
+    extractors = [
+        get_opentelemetry_outputs,
+        get_openinference_outputs,
+    ]
+
+    for extractor in extractors:
+        outputs = extractor(events, attributes)
+        if outputs:
+            return outputs
+
+    return {}
+
+def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
+    def get_opentelemetry_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
+        max_tokens = get_attribute(attributes, ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS)
+        system = get_attribute(attributes, ot.SpanAttributes.LLM_SYSTEM)
+        kind = get_attribute(attributes, ot.SpanAttributes.TRACELOOP_SPAN_KIND)
+        model = get_attribute(attributes, ot.SpanAttributes.LLM_RESPONSE_MODEL)
+
+        results = {
             "system": str(system) if system else None,
             "max_tokens": int(max_tokens) if max_tokens else None,
             "kind": str(kind) if kind else None,
             "model": str(model) if model else None,
         }
+        return to_json_serializable(results)
 
-        if extra:
-            attributes.update(extra)
+    def get_openinference_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
+        results = {
+            'system': get_attribute(attributes, oi.SpanAttributes.LLM_SYSTEM),
+            'provider': get_attribute(attributes, oi.SpanAttributes.LLM_PROVIDER),
+            'kind': get_attribute(attributes, oi.SpanAttributes.OPENINFERENCE_SPAN_KIND),
+            'model': get_attribute(attributes, oi.SpanAttributes.LLM_MODEL_NAME)
+        }
 
-        return to_json_serializable(attributes)
+        filtered = list(filter(lambda item: item[1] is not None, results.items()))
+
+        if len(filtered) == 0:
+            return None
+
+        for key, value in results.items():
+            if value is not None:
+                results[key] = str(value)
+
+        invocation_parameters = get_attribute(attributes, oi.SpanAttributes.LLM_INVOCATION_PARAMETERS)
+        if invocation_parameters:
+            try:
+                js = json.loads(invocation_parameters)
+                for k, v in js.items():
+                    results[k] = str(v)
+            except json.JSONDecodeError:
+                raise ValueError(f"Invalid JSON string: {invocation_parameters}")
+
+        return to_json_serializable(results)
+
+    extractors = [
+        get_opentelemetry_attributes,
+        get_openinference_attributes,
+    ]
+
+    for extractor in extractors:
+        result = extractor(events, attributes)
+        if result:
+            return result
+    return {}
+
+def get_weave_usage(events: list[dict[str, Any]], attributes: dict[str, Any]) -> LLMUsageSchema:
+    def get_openinferance_usage(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
+        results = {
+            'prompt_tokens': get_attribute(attributes, 'llm.token_count.prompt'),
+            'completion_tokens': get_attribute(attributes, 'llm.token_count.completion'),
+            'total_tokens': get_attribute(attributes, 'llm.token_count.total')
+        }
+
+        filtered = list(filter(lambda item: item[1] is not None, results.items()))
+        if len(filtered) == 0:
+            return None
+
+        for key, value in results.items():
+            if value is not None:
+                results[key] = int(value)
+
+        return results
+
+    def get_opentelemetry_usage(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
+        results = {
+            'prompt_tokens': get_attribute(attributes, 'gen_ai.usage.prompt_tokens'),
+            'completion_tokens': get_attribute(attributes, 'gen_ai.usage.completion_tokens'),
+            'total_tokens': get_attribute(attributes, 'llm.usage.total_tokens')
+        }
+
+        if len(list(filter(lambda item: item[1] is not None, results.items()))) == 0:
+            return None
+
+        for key, value in results.items():
+            if value is not None:
+                results[key] = int(value)
+
+        return results
+
+    extractors = [
+        get_openinferance_usage,
+        get_opentelemetry_usage,
+    ]
+
+    for extractor in extractors:
+        usage = extractor(events, attributes)
+        if usage:
+            prompt_tokens = usage.get('prompt_tokens')
+            input_tokens = usage.get('input_tokens')
+            completion_tokens = usage.get('completion_tokens')
+            output_tokens = usage.get('output_tokens')
+            requests = usage.get('requests')
+            total_tokens = usage.get('total_tokens')
 
 
-class AttributesFactory:
-    def from_proto(self, key_values: Iterable[KeyValue]) -> "Attributes":
-        expanded = unflatten_key_values(key_values)
-        if get_attribute(expanded, ConventionType.OPENINFERENCE.value):
-            return OpenInferenceAttributes(expanded)
-        elif get_attribute(expanded, ConventionType.OPENTELEMETRY.value):
-            return OpenTelemetryAttributes(expanded)
-        return GenericAttributes(expanded)
+            if not total_tokens:
+                if prompt_tokens and completion_tokens:
+                    total_tokens = prompt_tokens + completion_tokens
+                elif input_tokens and output_tokens:
+                    total_tokens = input_tokens + output_tokens
+
+            return LLMUsageSchema(
+                prompt_tokens = prompt_tokens if prompt_tokens else None,
+                completion_tokens = completion_tokens if completion_tokens else None,
+                total_tokens = total_tokens if total_tokens else None,
+                output_tokens = output_tokens if output_tokens else None,
+                requests = requests if requests else None,
+                input_tokens = input_tokens if input_tokens else None,
+            )
+
+    return {}

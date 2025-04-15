@@ -32,8 +32,10 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace_server import trace_server_interface as tsi
 
 from .attributes import (
-    Attributes,
-    AttributesFactory,
+    get_weave_usage,
+    get_weave_inputs,
+    get_weave_outputs,
+    get_weave_attributes,
     to_json_serializable,
     unflatten_key_values,
 )
@@ -123,6 +125,14 @@ class Event:
             dropped_attributes_count=proto_event.dropped_attributes_count,
         )
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "timestamp": self.datetime,
+            "attributes": self.attributes,
+            "dropped_attributes_count": self.dropped_attributes_count,
+        }
+
 
 @dataclass
 class Link:
@@ -180,7 +190,7 @@ class Span:
     span_id: str
     start_time_unix_nano: int
     end_time_unix_nano: int
-    attributes: Attributes
+    attributes: dict[str, Any] = field(default_factory=dict)
     kind: SpanKind = SpanKind.UNSPECIFIED
     parent_id: Optional[str] = None
     trace_state: str = ""
@@ -233,7 +243,7 @@ class Span:
             parent_id=parent_id,
             trace_state=proto_span.trace_state,
             flags=proto_span.flags,
-            attributes=AttributesFactory().from_proto(key_values=proto_span.attributes),
+            attributes=unflatten_key_values(proto_span.attributes),
             dropped_attributes_count=proto_span.dropped_attributes_count,
             events=[Event.from_proto(e) for e in proto_span.events],
             dropped_events_count=proto_span.dropped_events_count,
@@ -258,7 +268,7 @@ class Span:
                 "start_time": self.start_time,
                 "end_time": self.end_time,
                 "status": self.status.as_dict(),
-                "attributes": self.attributes._attributes,
+                "attributes": self.attributes,
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
@@ -268,14 +278,25 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        summary_insert_map = self.attributes.get_weave_summary()
-        inputs = self.attributes.get_weave_inputs()
-        outputs = self.attributes.get_weave_outputs()
-        attributes = self.attributes.get_weave_attributes(
-            extra={"otel_span": self.as_dict()}
-        )
+        events = list(map(lambda e: e.as_dict(), self.events))
+        usage = get_weave_usage(events, self.attributes) or {}
+        inputs = get_weave_inputs(events, self.attributes) or {}
+        outputs = get_weave_outputs(events, self.attributes) or {}
+        print(get_weave_attributes(events, self.attributes))
+        attributes = get_weave_attributes(events, self.attributes) or {}
+        summary_insert_map = tsi.SummaryInsertMap(usage={'usage': usage})
 
-        # Options: set
+        has_attributes = len(attributes) > 0
+        has_inputs = len(inputs) > 0
+        has_outputs = len(outputs) > 0
+        has_usage = len(usage) > 0
+
+        # We failed to load any of the Weave attributes, dump all attributes
+        if not has_attributes and not has_inputs and not has_outputs and not has_usage:
+            attributes = to_json_serializable(self.attributes)
+
+        attributes['otel_span'] = self.as_dict()
+
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
