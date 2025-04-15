@@ -482,7 +482,9 @@ def map_to_refs(obj: Any) -> Any:
         return obj.ref
     elif isinstance(obj, WeaveTable):
         return obj.ref
-    elif isinstance(obj, list):
+    elif isinstance_namedtuple(obj):
+        return {k: map_to_refs(v) for k, v in obj._asdict().items()}
+    elif isinstance(obj, (list, tuple)):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
