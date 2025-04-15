@@ -9,7 +9,7 @@ from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
-
+from weave.trace.object_record import ObjectRecord
 
 @register_object
 class Monitor(Object):
@@ -80,6 +80,35 @@ class Monitor(Object):
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):
-                field_values[field_name] = getattr(obj, field_name)
+                field_obj = getattr(obj, field_name)
+
+                if field_name == "query":
+                    field_obj = Query(**_obj_rec_to_query_dict(field_obj._val))
+
+                field_values[field_name] = field_obj
 
         return cls(**field_values)
+
+def _obj_rec_to_query_dict(obj: ObjectRecord) -> dict:
+    def _treat_value(v):
+        if isinstance(v, ObjectRecord):
+            return _obj_rec_to_query_dict(v)
+        elif isinstance(v, list):
+            return [_treat_value(i) for i in v]
+        elif isinstance(v, dict):
+            return {k: _treat_value(v) for k, v in v.items()}
+        else:
+            return v
+
+    def _snake_to_camel(snake_str):
+        components = snake_str.split("_")
+        return components[0] + "".join(x.title() for x in components[1:])
+
+    def _treat_key(k) -> str:
+        return f"${_snake_to_camel(k[:-1])}"
+
+    return {
+        _treat_key(k): _treat_value(v)
+        for k, v in obj.__dict__.items()
+        if k != "_class_name" and k != "_bases"
+    }
