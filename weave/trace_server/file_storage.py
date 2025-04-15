@@ -147,10 +147,14 @@ class S3StorageClient(FileStorageClient):
             retries={"max_attempts": 0},
         )
         credential_params = {}
-        credential_params["aws_access_key_id"] = credentials["access_key_id"]
-        credential_params["aws_secret_access_key"] = credentials["secret_access_key"]
-        credential_params["aws_session_token"] = credentials["session_token"]
-        credential_params["aws_kms_key"] = credentials["kms_key"]
+        credential_params["aws_access_key_id"] = credentials.get("access_key_id")
+        credential_params["aws_secret_access_key"] = credentials.get(
+            "secret_access_key"
+        )
+        credential_params["aws_session_token"] = credentials.get("session_token")
+        credential_params["region_name"] = credentials.get("region")
+        # Store KMS key as an instance variable for use in operations
+        self.kms_key = credentials.get("kms_key")
         self.client = boto3.client(
             "s3",
             **credential_params,
@@ -163,7 +167,15 @@ class S3StorageClient(FileStorageClient):
         assert isinstance(uri, S3FileStorageURI) and uri.to_uri_str().startswith(
             self.base_uri.to_uri_str()
         )
-        self.client.put_object(Bucket=uri.bucket, Key=uri.path, Body=data)
+        # Use KMS key for encryption if available
+        put_object_params = {"Bucket": uri.bucket, "Key": uri.path, "Body": data}
+
+        # Add ServerSideEncryption with KMS if KMS key is provided
+        if self.kms_key:
+            put_object_params["ServerSideEncryption"] = "aws:kms"
+            put_object_params["SSEKMSKeyId"] = self.kms_key
+
+        self.client.put_object(**put_object_params)
 
     @create_retry_decorator("s3_read")
     def read(self, uri: S3FileStorageURI) -> bytes:

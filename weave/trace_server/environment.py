@@ -90,6 +90,11 @@ def wf_storage_bucket_aws_kms_key() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_AWS_KMS_KEY")
 
 
+def wf_storage_bucket_aws_region() -> Optional[str]:
+    """The AWS region."""
+    return os.environ.get("WF_FILE_STORAGE_AWS_REGION")
+
+
 def wf_storage_bucket_azure_connection_string() -> Optional[str]:
     """The Azure connection string."""
     return os.environ.get("WF_FILE_STORAGE_AZURE_CONNECTION_STRING")

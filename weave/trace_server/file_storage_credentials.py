@@ -15,6 +15,7 @@ class AWSCredentials(TypedDict):
     secret_access_key: NotRequired[Optional[str]]
     session_token: NotRequired[Optional[str]]
     kms_key: NotRequired[Optional[str]]
+    region: NotRequired[Optional[str]]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -49,12 +50,14 @@ def get_aws_credentials() -> AWSCredentials:
     secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
     session_token = environment.wf_storage_bucket_aws_session_token()
     kms_key = environment.wf_storage_bucket_aws_kms_key()
+    region = environment.wf_storage_bucket_aws_region()
 
     return AWSCredentials(
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
         session_token=session_token,
         kms_key=kms_key,
+        region=region,
     )
 
 
