@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from weave.scorers.toxicity_scorer import ToxicityScorer
+from weave.scorers.toxicity_scorer import LangfairToxicityScorer
 
 
 @pytest.mark.asyncio
 async def test_toxicity_scorer1():
-    tox = ToxicityScorer()
+    tox = LangfairToxicityScorer()
     score = await tox.score(output="This is not an acceptable behavior.")
     assert score.passed == True
     np.testing.assert_allclose(
@@ -16,7 +16,7 @@ async def test_toxicity_scorer1():
 
 @pytest.mark.asyncio
 async def test_toxicity_scorer2():
-    tox = ToxicityScorer(classifiers="detoxify_original")
+    tox = LangfairToxicityScorer(classifiers="detoxify_original")
     score = await tox.score(output="This is not an acceptable behavior.")
     assert score.passed == True
     np.testing.assert_allclose(
@@ -26,7 +26,7 @@ async def test_toxicity_scorer2():
 
 @pytest.mark.asyncio
 async def test_toxicity_scorer3():
-    tox = ToxicityScorer()
+    tox = LangfairToxicityScorer()
     score = await tox.score(
         output="Your article is useless and waste of everone's time", threshold=0.7
     )
