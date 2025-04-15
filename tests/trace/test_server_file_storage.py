@@ -80,7 +80,7 @@ class TestS3Storage:
             os.environ,
             {
                 "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
-                "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+                "WF_FILE_STORAGE_AWS_ACCESS_KEY": "test-secret",
                 "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
                 "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
             },

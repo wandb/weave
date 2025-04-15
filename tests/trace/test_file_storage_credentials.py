@@ -17,15 +17,19 @@ def test_get_aws_credentials():
         os.environ,
         {
             "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
-            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY": "test-secret",
             "WF_FILE_STORAGE_AWS_SESSION_TOKEN": "test-token",
+            "WF_FILE_STORAGE_AWS_REGION": "us-east-1",
+            "WF_FILE_STORAGE_AWS_KMS_KEY": "test-kms-key",
         },
     ):
         creds = get_aws_credentials()
         assert creds == {
             "access_key_id": "test-key",
-            "secret_access_key": "test-secret",
+            "access_key": "test-secret",
             "session_token": "test-token",
+            "region": "us-east-1",
+            "kms_key": "test-kms-key",
         }
 
     # Test with required credentials only (no session token)
@@ -33,13 +37,16 @@ def test_get_aws_credentials():
         os.environ,
         {
             "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
-            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY": "test-secret",
         },
     ):
         creds = get_aws_credentials()
         assert creds == {
             "access_key_id": "test-key",
-            "secret_access_key": "test-secret",
+            "access_key": "test-secret",
+            "session_token": None,
+            "region": None,
+            "kms_key": None,
         }
 
     # Test with missing required credentials

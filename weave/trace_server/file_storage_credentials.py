@@ -36,7 +36,7 @@ def get_aws_credentials() -> AWSCredentials:
 
     Required env vars:
         - WF_FILE_STORAGE_AWS_ACCESS_KEY_ID
-        - WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY
+        - WF_FILE_STORAGE_AWS_ACCESS_KEY
     Optional env vars:
         - WF_FILE_STORAGE_AWS_SESSION_TOKEN
 
@@ -47,7 +47,7 @@ def get_aws_credentials() -> AWSCredentials:
         ValueError: If required credentials are not set
     """
     access_key_id = environment.wf_storage_bucket_aws_access_key_id()
-    secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
+    secret_access_key = environment.wf_storage_bucket_aws_access_key()
     session_token = environment.wf_storage_bucket_aws_session_token()
     kms_key = environment.wf_storage_bucket_aws_kms_key()
     region = environment.wf_storage_bucket_aws_region()
@@ -111,6 +111,6 @@ def get_azure_credentials() -> (
         return AzureConnectionCredentials(connection_string=connection_string)
     access_key = environment.wf_storage_bucket_access_key()
     if access_key is None:
-        raise ValueError("Azure credentials not set")
+        raise ValueError("Azure access key not set")
     account_url = environment.wf_storage_bucket_azure_account_url()
     return AzureAccountCredentials(access_key=access_key, account_url=account_url)
