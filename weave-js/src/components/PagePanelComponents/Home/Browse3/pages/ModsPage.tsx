@@ -18,67 +18,31 @@ import {Link} from 'react-router-dom';
 import {SimplePageLayout} from './common/SimplePageLayout';
 
 type Mod = {
-  id: string;
   name: string;
   description: string;
+  version: string;
+  classifiers: string[];
   secrets: string[];
 };
 
-type ModCategoryType = 'Guardrails' | 'Analysis' | 'Demos';
-
 type ModCategories = {
-  [key in ModCategoryType]: Mod[];
+  [key: string]: Mod[];
 };
 
-const modCats: ModCategories = {
-  Guardrails: [
-    {
-      id: 'guardrails-playground',
-      name: 'Guardrails Playground',
-      description:
-        'Test different types of guardrails for your LLM application',
-      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
-    },
-  ],
-  Analysis: [
-    {
-      id: 'embedding-classifier',
-      name: 'Embedding Classifier',
-      description:
-        'Classify your traces by embedding them and have an LLM label the clusters',
-      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
-    },
-    {
-      id: 'dashboard',
-      name: 'Cost Dashboard',
-      description: 'A dashboard showing your project LLM costs over time',
-      secrets: ['WANDB_API_KEY'],
-    },
-  ],
-  Demos: [
-    {
-      id: 'demo',
-      name: 'Welcome',
-      description: 'A simple welcome mod',
-      secrets: ['WANDB_API_KEY'],
-    },
-    {
-      id: 'openui',
-      name: 'OpenUI',
-      description: 'Generate UIs from images or text descriptions',
-      secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
-    },
-    {
-      id: 'together_ft',
-      name: 'Together Fine-Tuning',
-      description: 'Fine-tune a model with together.ai',
-      secrets: ['WANDB_API_KEY', 'TOGETHER_API_KEY'],
-    },
-  ],
+// Default empty categories to avoid undefined errors before data loads
+const defaultModCats: ModCategories = {
+  Guardrails: [],
+  Analysis: [],
+  Demos: [],
 };
+
+// To keep things simple we just fetch from github
+// TODO: switch to https://modsctl.wandb.tools/mods.json once we wire the url through
+const MOD_MANIFEST_URL =
+  'https://raw.githubusercontent.com/wandb/weave-mods/refs/heads/main/featured-mods.json';
 
 const ModCategory: React.FC<{
-  category: ModCategoryType;
+  category: string;
   mods: Mod[];
   entity: string;
   project: string;
@@ -114,14 +78,14 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
   return (
     <Grid container spacing={2} sx={{padding: '1em'}}>
       {mods.map(mod => (
-        <Grid size={3} key={mod.id}>
+        <Grid size={3} key={mod.name}>
           <Card variant="outlined" sx={{height: 180}}>
             <CardContent>
               <h5 style={{fontWeight: 600, fontSize: '1.15rem'}}>{mod.name}</h5>
               <p>{mod.description}</p>
             </CardContent>
             <CardActions>
-              {mod.id === 'gist' && (
+              {mod.name === 'gist' && (
                 <TextField
                   size="small"
                   id="gist"
@@ -134,7 +98,7 @@ const ModCards: React.FC<{mods: Mod[]; entity: string; project: string}> = ({
               <Button
                 component={Link}
                 to={`/${entity}/${project}/weave/mods/${encodeURIComponent(
-                  mod.id
+                  mod.name
                 )}?purl=${purl}&checkSecrets=true`}
                 size="small">
                 Run
@@ -164,36 +128,41 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
 
   const setupIframeAuth = useCallback(
     (iframe: HTMLIFrameElement) => {
-      let baseUrl = window.WEAVE_CONFIG.WANDB_BASE_URL;
-      if (baseUrl === '') {
-        baseUrl = window.location.origin;
-      }
       const authListener = (event: MessageEvent) => {
         if (!event.data.type || !event.data.type.startsWith('MOD_AUTH_')) {
           return;
         }
-        // Verify message origin
-        if (event.origin !== baseUrl) {
-          console.warn(
-            'invalid origin (expected %s, got %s)',
-            baseUrl,
-            event.origin
-          );
-          return;
-        }
+
         switch (event.data.type) {
           case 'MOD_AUTH_RESET':
-            history.goBack();
+            history.push(`/${entity}/${project}/weave/mods`);
             break;
           case 'MOD_AUTH_READY':
             // Bridge page loaded, trigger auth
+            console.log('initiating auth from ModsPage', event.origin);
             iframe.contentWindow?.postMessage(
               {type: 'MOD_AUTH_START'},
               event.origin
             );
             break;
           case 'MOD_AUTH_COMPLETE':
-            iframe.src = `https://${event.data.modDomain}`;
+            // Check if modDomain and originHostname share the same base domain.
+            // This is important to prevent a mod from redirecting the iframe
+            // to a malicious site.
+            const getBaseDomain = (domain?: string) => {
+              const parts = (domain || '').split('.');
+              return parts.length > 2 ? parts.slice(1).join('.') : domain;
+            };
+
+            const modBaseDomain = getBaseDomain(event.data.modDomain);
+            const originBaseDomain = getBaseDomain(event.origin);
+            console.log('auth completed, loading: ', event.data.modDomain);
+            // enforce: modsctl.wandb.tools -> xxxxx.wandb.tools
+            if (modBaseDomain === originBaseDomain) {
+              iframe.src = `https://${event.data.modDomain}`;
+            } else {
+              console.error('invalid auth event');
+            }
             break;
           case 'MOD_AUTH_ERROR':
             console.error(event.data.error);
@@ -360,10 +329,33 @@ export const ModsPage: React.FC<{
   const searchParams = new URLSearchParams(window.location.search);
   const checkSecrets = searchParams.get('checkSecrets');
   const purl = searchParams.get('purl');
+  const [modCats, setModCats] = useState<ModCategories>(defaultModCats);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchModCats = async () => {
+      try {
+        const response = await fetch(MOD_MANIFEST_URL);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch mods: ${response.status}`);
+        }
+        const data = await response.json();
+        setModCats(data);
+      } catch (error) {
+        console.error('Error fetching mod categories:', error);
+        // Keep default categories on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModCats();
+  }, []);
+
   const mod = itemName
     ? Object.values(modCats)
         .flat()
-        .find(m => m.id === itemName)
+        .find((m: Mod) => m.id === itemName)
     : undefined;
   const secrets = mod?.secrets ?? [];
 
@@ -387,24 +379,33 @@ export const ModsPage: React.FC<{
                 paddingTop: '1em',
                 flexDirection: 'column',
               }}>
-              <ModCategory
-                entity={entity}
-                project={project}
-                category="Guardrails"
-                mods={modCats.Guardrails}
-              />
-              <ModCategory
-                entity={entity}
-                project={project}
-                category="Analysis"
-                mods={modCats.Analysis}
-              />
-              <ModCategory
-                entity={entity}
-                project={project}
-                category="Demos"
-                mods={modCats.Demos}
-              />
+              {loading ? (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: '2em',
+                  }}>
+                  Loading mods...
+                </Box>
+              ) : (
+                <>
+                  {Object.entries(modCats)
+                    .filter(([_, mods]) => mods && mods.length > 0)
+                    .sort(
+                      ([_A, modsA], [_B, modsB]) => modsA.length - modsB.length
+                    )
+                    .map(([category, mods]) => (
+                      <ModCategory
+                        key={category}
+                        entity={entity}
+                        project={project}
+                        category={category}
+                        mods={mods}
+                      />
+                    ))}
+                </>
+              )}
               {checkSecrets && (
                 <SecretSettings
                   entity={entity}
