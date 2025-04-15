@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import Field
 from typing_extensions import Self
@@ -6,10 +6,11 @@ from typing_extensions import Self
 from weave.flow.casting import Scorer
 from weave.flow.obj import Object
 from weave.trace.api import ObjectRef, publish
+from weave.trace.object_record import ObjectRecord
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
-from weave.trace.object_record import ObjectRecord
+
 
 @register_object
 class Monitor(Object):
@@ -89,8 +90,9 @@ class Monitor(Object):
 
         return cls(**field_values)
 
+
 def _obj_rec_to_query_dict(obj: ObjectRecord) -> dict:
-    def _treat_value(v):
+    def _treat_value(v: Any) -> Any:
         if isinstance(v, ObjectRecord):
             return _obj_rec_to_query_dict(v)
         elif isinstance(v, list):
@@ -100,11 +102,11 @@ def _obj_rec_to_query_dict(obj: ObjectRecord) -> dict:
         else:
             return v
 
-    def _snake_to_camel(snake_str):
+    def _snake_to_camel(snake_str: str) -> str:
         components = snake_str.split("_")
         return components[0] + "".join(x.title() for x in components[1:])
 
-    def _treat_key(k) -> str:
+    def _treat_key(k: str) -> str:
         return f"${_snake_to_camel(k[:-1])}"
 
     return {
