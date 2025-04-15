@@ -1144,7 +1144,7 @@ def process_trace_id_filter_to_conditions(
     else:
         return ""
 
-    return f"({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
