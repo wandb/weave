@@ -85,7 +85,7 @@ class Monitor(Object):
 
                 # Special-casing the query field to convert
                 # a WeaveObject(ObjectRecord(...)) to a Query
-                if field_name == "query":
+                if field_name == "query" and field_obj is not None:
                     field_obj = Query(**_obj_rec_to_query_dict(field_obj._val))
 
                 field_values[field_name] = field_obj
