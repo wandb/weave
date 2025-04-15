@@ -267,7 +267,7 @@ def maybe_get_storage_client_from_env() -> Optional[FileStorageClient]:
     """Factory method that returns appropriate storage client based on URI type.
     Supports S3, GCS, and Azure storage URIs."""
     file_storage_uri = wf_file_storage_uri()
-    if file_storage_uri is None or file_storage_uri == "":
+    if not file_storage_uri:
         return None
     try:
         parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
