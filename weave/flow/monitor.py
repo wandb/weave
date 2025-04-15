@@ -83,6 +83,8 @@ class Monitor(Object):
             if hasattr(obj, field_name):
                 field_obj = getattr(obj, field_name)
 
+                # Special-casing the query field to convert
+                # a WeaveObject(ObjectRecord(...)) to a Query
                 if field_name == "query":
                     field_obj = Query(**_obj_rec_to_query_dict(field_obj._val))
 
@@ -92,6 +94,8 @@ class Monitor(Object):
 
 
 def _obj_rec_to_query_dict(obj: ObjectRecord) -> dict:
+    """Converts an ObjectRecord to a dictionary that can be used to create a Query."""
+
     def _treat_value(v: Any) -> Any:
         if isinstance(v, ObjectRecord):
             return _obj_rec_to_query_dict(v)
