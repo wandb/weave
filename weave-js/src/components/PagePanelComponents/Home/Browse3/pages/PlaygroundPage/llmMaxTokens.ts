@@ -4,49 +4,59 @@ import levenshtein from 'js-levenshtein';
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
 export const LLM_MAX_TOKENS = {
-  'gpt-4o-mini': {
+  'gpt-4.1-mini-2025-04-14': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.1-mini': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.1-2025-04-14': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.1': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.1-nano-2025-04-14': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.1-nano': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview-2025-02-27': {
     provider: 'openai',
     max_tokens: 16384,
     supports_function_calling: true,
   },
-  'gpt-3.5-turbo-0125': {
+  'gpt-4.5-preview': {
     provider: 'openai',
-    max_tokens: 4096,
+    max_tokens: 16384,
     supports_function_calling: true,
   },
-  'gpt-3.5-turbo-1106': {
+  'o3-mini-2025-01-31': {
     provider: 'openai',
-    max_tokens: 4096,
+    max_tokens: 100000,
     supports_function_calling: true,
   },
-  'gpt-4-1106-preview': {
+  'o3-mini': {
     provider: 'openai',
-    max_tokens: 4096,
+    max_tokens: 100000,
     supports_function_calling: true,
   },
-  'gpt-4-32k-0314': {
+  'gpt-4o-mini': {
     provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: false,
-  },
-  'gpt-4-turbo-2024-04-09': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-turbo-preview': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-turbo': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4': {
-    provider: 'openai',
-    max_tokens: 4096,
+    max_tokens: 16384,
     supports_function_calling: true,
   },
   'gpt-4o-2024-05-13': {
@@ -99,24 +109,44 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
-  'o3-mini': {
+  'gpt-4-1106-preview': {
     provider: 'openai',
-    max_tokens: 100000,
+    max_tokens: 4096,
     supports_function_calling: true,
   },
-  'o3-mini-2025-01-31': {
+  'gpt-4-32k-0314': {
     provider: 'openai',
-    max_tokens: 100000,
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'gpt-4-turbo-2024-04-09': {
+    provider: 'openai',
+    max_tokens: 4096,
     supports_function_calling: true,
   },
-  'gpt-4.5-preview': {
+  'gpt-4-turbo-preview': {
     provider: 'openai',
-    max_tokens: 16384,
+    max_tokens: 4096,
     supports_function_calling: true,
   },
-  'gpt-4.5-preview-2025-02-27': {
+  'gpt-4-turbo': {
     provider: 'openai',
-    max_tokens: 16384,
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-3.5-turbo-0125': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-3.5-turbo-1106': {
+    provider: 'openai',
+    max_tokens: 4096,
     supports_function_calling: true,
   },
 
@@ -560,7 +590,7 @@ export const LLM_MAX_TOKENS = {
   },
 };
 
-export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4o-mini-2024-07-18';
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4.1-mini-2025-04-14';
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
