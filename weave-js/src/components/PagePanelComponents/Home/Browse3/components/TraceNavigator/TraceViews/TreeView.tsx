@@ -198,14 +198,18 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 </span>
               )}
             </div>
-            {(statusCode === 'ERROR' || statusCode === 'UNSET') ? (
+            {statusCode === 'ERROR' || statusCode === 'UNSET' ? (
               <StatusChip value={statusCode} iconOnly />
             ) : statusCode === 'DESCENDANT_ERROR' && !isExpanded ? (
               <Tooltip
-                content={<span>This call succeeded, but one or more descendants failed.</span>}
+                content={
+                  <span>
+                    This call succeeded, but one or more descendants failed.
+                  </span>
+                }
                 trigger={
-                  <div className="flex items-center justify-center w-[22px] h-[22px]">
-                    <div className="w-[5px] h-[5px] bg-red-550 rounded-full" />
+                  <div className="flex h-[22px] w-[22px] items-center justify-center">
+                    <div className="h-[5px] w-[5px] rounded-full bg-red-550" />
                   </div>
                 }
               />
