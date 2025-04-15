@@ -243,6 +243,12 @@ class TestPythonSpans:
         assert "array" in start_call.attributes["test"]
         assert start_call.attributes["test"]["array"] == ["value1", "value2"]
 
+        # Verify otel_span is included in attributes
+        assert "otel_span" in start_call.attributes
+        assert start_call.attributes["otel_span"]["name"] == py_span.name
+        assert start_call.attributes["otel_span"]["context"]["trace_id"] == py_span.trace_id
+        assert start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
+
         # Verify end call
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
         assert end_call.project_id == "test_project"
@@ -421,62 +427,90 @@ class TestSemanticConventionParsing:
         """Test extracting inputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference input messages
-        input_messages = {"0": {"role": "user", "content": "What is machine learning?"}}
+        # Create attribute dictionary with OpenInference input value and mime type
         attributes = {
             "openinference": True,
-            OISpanAttr.LLM_INPUT_MESSAGES: input_messages,
+            OISpanAttr.INPUT_VALUE: "What is machine learning?",
+            OISpanAttr.INPUT_MIME_TYPE: "text/plain",
         }
 
         # Create OpenInference attributes object
         oi_attrs = OpenInferenceAttributes(attributes)
 
-        # Test get_weave_inputs
+        # Test get_weave_inputs with text input
         inputs = oi_attrs.get_weave_inputs()
-        assert inputs == {"role_0": "user", "content_0": "What is machine learning?"}
-
-        # Test with multiple messages
-        input_messages_multiple = {
-            "0": {"role": "system", "content": "You are an assistant"},
-            "1": {"role": "user", "content": "What is machine learning?"},
+        assert inputs == {
+            "value": "What is machine learning?",
+            "mime_type": "text/plain",
         }
+
+        # Test with JSON input
+        json_input = json.dumps({
+            "messages": [
+                {"role": "system", "content": "You are an assistant"},
+                {"role": "user", "content": "What is machine learning?"},
+            ]
+        })
         attributes = {
             "openinference": True,
-            OISpanAttr.LLM_INPUT_MESSAGES: input_messages_multiple,
+            OISpanAttr.INPUT_VALUE: json_input,
+            OISpanAttr.INPUT_MIME_TYPE: "application/json",
         }
         oi_attrs = OpenInferenceAttributes(attributes)
         inputs = oi_attrs.get_weave_inputs()
         assert inputs == {
-            "role_0": "system",
-            "content_0": "You are an assistant",
-            "role_1": "user",
-            "content_1": "What is machine learning?",
+            "value": {
+                "messages": [
+                    {"role": "system", "content": "You are an assistant"},
+                    {"role": "user", "content": "What is machine learning?"},
+                ]
+            },
+            "mime_type": "application/json",
         }
 
     def test_openinference_outputs_extraction(self):
         """Test extracting outputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference output messages
-        output_messages = {
-            "0": {
-                "role": "assistant",
-                "content": "Machine learning is a field of AI...",
-            }
-        }
+        # Create attribute dictionary with OpenInference output value and mime type
         attributes = {
             "openinference": True,
-            OISpanAttr.LLM_OUTPUT_MESSAGES: output_messages,
+            OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
+            OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
         }
 
         # Create OpenInference attributes object
         oi_attrs = OpenInferenceAttributes(attributes)
 
-        # Test get_weave_outputs
+        # Test get_weave_outputs with text output
         outputs = oi_attrs.get_weave_outputs()
         assert outputs == {
-            "role_0": "assistant",
-            "content_0": "Machine learning is a field of AI...",
+            "value": "Machine learning is a field of AI...",
+            "mime_type": "text/plain",
+        }
+
+        # Test with JSON output
+        json_output = json.dumps({
+            "response": {
+                "role": "assistant",
+                "content": "Machine learning is a field of AI...",
+            }
+        })
+        attributes = {
+            "openinference": True,
+            OISpanAttr.OUTPUT_VALUE: json_output,
+            OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
+        }
+        oi_attrs = OpenInferenceAttributes(attributes)
+        outputs = oi_attrs.get_weave_outputs()
+        assert outputs == {
+            "value": {
+                "response": {
+                    "role": "assistant",
+                    "content": "Machine learning is a field of AI...",
+                }
+            },
+            "mime_type": "application/json",
         }
 
     def test_openinference_usage_extraction(self):
@@ -540,7 +574,9 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs
         inputs = ot_attrs.get_weave_inputs()
         assert inputs == {
-            "0": {"role": "user", "content": "Tell me about quantum computing"}
+            "prompt": [
+                {"role": "user", "content": "Tell me about quantum computing"}
+            ]
         }
 
         # Test with multiple prompts
@@ -554,7 +590,12 @@ class TestSemanticConventionParsing:
         }
         ot_attrs = OpenTelemetryAttributes(attributes)
         inputs = ot_attrs.get_weave_inputs()
-        assert inputs == prompts_multiple
+        assert inputs == {
+            "prompt": [
+                {"role": "system", "content": "You are an expert in quantum physics"},
+                {"role": "user", "content": "Tell me about quantum computing"},
+            ]
+        }
 
     def test_opentelemetry_outputs_extraction(self):
         """Test extracting outputs from OpenTelemetry attributes."""
@@ -578,10 +619,12 @@ class TestSemanticConventionParsing:
         # Test get_weave_outputs
         outputs = ot_attrs.get_weave_outputs()
         assert outputs == {
-            "0": {
-                "role": "assistant",
-                "content": "Quantum computing uses quantum mechanics...",
-            }
+            "completion": [
+                {
+                    "role": "assistant",
+                    "content": "Quantum computing uses quantum mechanics...",
+                }
+            ]
         }
 
     def test_opentelemetry_usage_extraction(self):
