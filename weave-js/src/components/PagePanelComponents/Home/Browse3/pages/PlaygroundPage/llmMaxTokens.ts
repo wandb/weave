@@ -240,6 +240,51 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Gemini models
+  'gemini/gemini-2.5-pro-preview-03-25': {
+    provider: 'gemini',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-pro-exp-02-05': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-001': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp-01-21': {
+    provider: 'gemini',
+    max_tokens: 65536,
+    supports_function_calling: false,
+  },
+  'gemini/gemini-2.0-flash': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-lite': {
+    provider: 'gemini',
+    max_tokens: 1048576,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-lite-preview-02-05': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
     max_tokens: 8192,
@@ -256,11 +301,6 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'gemini/gemini-1.5-flash-8b-exp-0924': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-1.5-flash-exp-0827': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -285,37 +325,12 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'gemini/gemini-1.5-pro-exp-0801': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-1.5-pro-exp-0827': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
   'gemini/gemini-1.5-pro-latest': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
   },
   'gemini/gemini-1.5-pro': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-pro': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-2.0-flash-exp': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-2.0-flash-thinking-exp': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
