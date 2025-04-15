@@ -715,6 +715,12 @@ class CallsQuery(BaseModel):
             table_alias,
         )
 
+        trace_id_sql = process_trace_id_filter_to_conditions(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
         optimization_conditions = process_query_to_optimization_sql(
             self.query_conditions,
             pb,
@@ -804,6 +810,7 @@ class CallsQuery(BaseModel):
         {id_subquery_sql}
         {sortable_datetime_sql}
         {op_name_sql}
+        {trace_id_sql}
         {str_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
@@ -1109,6 +1116,37 @@ def process_op_name_filter_to_conditions(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
+def process_trace_id_filter_to_conditions(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_ids = hardcoded_filter.filter.trace_ids
+
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one trace_id, use an equality condition for performance
+    if len(trace_ids) == 1:
+        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    elif len(trace_ids) > 1:
+        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f"({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
@@ -1136,12 +1174,6 @@ def process_calls_filter_to_conditions(
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-
-    if filter.trace_ids:
-        assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
-        conditions.append(
-            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
