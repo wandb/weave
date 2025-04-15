@@ -464,16 +464,17 @@ def _get_direct_ref(obj: Any) -> Ref | None:
     return getattr(obj, "ref", None)
 
 
-def map_to_refs(obj: Any, root: bool = True) -> Any:
+def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
     if ref := _get_direct_ref(obj):
         return ref
 
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(lambda v: map_to_refs(v, False))
+        return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-        if root:
+        from weave.flow.obj import Object
+        if isinstance(obj, Object):
             obj_record = pydantic_object_record(obj)
             return obj_record.map_values(map_to_refs)
         else:

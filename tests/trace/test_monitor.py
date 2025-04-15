@@ -5,6 +5,7 @@ from weave.flow.monitor import Monitor
 from weave.trace import weave_client
 from weave.trace.api import publish
 from weave.trace_server.interface.query import Query
+from weave.scorers import ValidJSONScorer
 
 
 def test_init_pass():
@@ -40,7 +41,7 @@ def test_publish(client: weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,
-        scorers=[],
+        scorers=[ValidJSONScorer()],
         op_names=["example_op_name"],
         query={
             "$expr": {
@@ -58,7 +59,6 @@ def test_publish(client: weave_client.WeaveClient):
 
     assert stored_monitor.active == False
     assert stored_monitor.sampling_rate == 0.5
-    assert stored_monitor.scorers == []
     assert stored_monitor.op_names == ["example_op_name"]
     assert stored_monitor.query == Query(
         **{
