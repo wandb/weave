@@ -51,7 +51,9 @@ view.set_columns("id", "op_name")
 Use `.add_column()` to add one or more new columns to the view. Specify one or more columns to be added.
 
 ```python
-view.add_column("started_at", "Created")
+# Add a column with the field specifier and label "Created"
+view.add_column("Created")
+# Optionally, you can add a second argument to specify a different label name for the new column. By default, the field specifier is use for the label.
 ```
 
 ### Sort columns
@@ -71,9 +73,6 @@ Use `.filter_op()` to filter the `SavedView` to only include calls where that sp
 view.filter_op("Evaluation.predict_and_score")
 ```
 
-:::tip
-`.filter_op()` is a shortcut for filtering by operation name. It ensures the correct URI format is used automatically. Alternatively, you can achieve the same result with `.add_filter("op_name", "equals", <operation_name>)`.
-:::
 
 ### Filter by operator and condition
 
@@ -88,7 +87,7 @@ view.add_filter("output.model_latency", ">=", 5)
 | Operator | Description | Example |
 |----------|-------------|---------|
 | `"contains"` | Checks if a string contains a substring. | `view.add_filter("output.status", "contains", "error")` |
-| `"equals"` | Checks if a string is exactly equal to a given value. | `view.add_filter("user.name", "equals", "Alice")` |
+| `"equals"` | Checks if a string is exactly equal to a given value. | `view.add_filter("input.category", "equals", "Alice")` |
 | `"in"` | Checks if a string is in a list of values. | `view.add_filter("category", "in", ["A", "B", "C"])` |
 | `"="` | Checks if a number is equal to a value. | `view.add_filter("output.score", "=", 80)` |
 | `"≠", "!="` | Checks if a number is not equal to a value. | `view.add_filter("metrics.loss", "!=", 0.5)` |

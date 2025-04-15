@@ -66,7 +66,7 @@ result, call = generate_text.call(input)  # Now you can use the call object with
 :::tip Why Use `.call()`?
 The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
 
-For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing#getting-a-handle-to-the-call-object-during-execution).
+For more details about Call objects, see the [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ## Getting Started with Scorers
