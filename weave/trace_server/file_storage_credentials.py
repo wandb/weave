@@ -63,7 +63,7 @@ def get_aws_credentials() -> AWSCredentials:
     )
 
 
-def get_gcp_credentials() -> GCPCredentials:
+def get_gcp_credentials() -> Optional[GCPCredentials]:
     """Retrieves GCP service account credentials from environment variables.
 
     Required env vars:
@@ -81,9 +81,7 @@ def get_gcp_credentials() -> GCPCredentials:
 
     creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()
     if not creds_json_b64:
-        raise ValueError(
-            "No GCP credentials found. Set WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64 environment variable."
-        )
+        return None
 
     try:
         creds_dict = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))

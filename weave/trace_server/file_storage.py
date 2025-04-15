@@ -233,7 +233,9 @@ class S3StorageClient(FileStorageClient):
 class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(self, base_uri: FileStorageURI, credentials: GCPCredentials):
+    def __init__(
+        self, base_uri: FileStorageURI, credentials: Optional[GCPCredentials] = None
+    ):
         """Initialize GCS client with credentials and default timeout configuration."""
         assert isinstance(base_uri, GCSFileStorageURI)
         super().__init__(base_uri)

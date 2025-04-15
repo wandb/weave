@@ -131,11 +131,6 @@ def test_get_gcp_credentials():
             get_gcp_credentials()
             mock_creds.from_service_account_info.assert_called_once()
 
-    # Test with missing credentials
-    with mock.patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="No GCP credentials found"):
-            get_gcp_credentials()
-
     # Test with invalid JSON
     with mock.patch.dict(
         os.environ,
