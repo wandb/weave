@@ -149,7 +149,7 @@ export default class EditableField extends React.Component<
   render() {
     const className = `editable-field ${this.props.className || ''} ${
       this.props.type === 'url' ? 'url' : ''
-    } ${this.props.readOnly ? 'read-only' : ''} ${this.state.editing ? 'is-editing' : ''}`;
+    } ${this.props.readOnly ? 'read-only' : ''}`;
     const fieldClassName = `field-content${
       this.state.currentValue ? '' : ' placeholder'
     }`;
@@ -162,7 +162,7 @@ export default class EditableField extends React.Component<
     if (this.state.editing) {
       if (this.props.multiline) {
         fieldComponent = (
-          <Form className="full-width-form">
+          <Form>
             <Form.TextArea
               autoFocus
               rows="2"
@@ -174,7 +174,6 @@ export default class EditableField extends React.Component<
               placeholder={this.props.placeholder}
               onBlur={this.stopEditing}
               control={TextareaAutosize}
-              className="full-width-textarea"
             />
           </Form>
         );
@@ -257,7 +256,7 @@ export default class EditableField extends React.Component<
 
     return (
       <div
-        className={`${className}`}
+        className={className}
         onClick={
           this.state.editing
             ? e => {
