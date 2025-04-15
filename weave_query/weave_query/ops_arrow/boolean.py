@@ -142,3 +142,29 @@ def awl_cond(cases, results):
         types.union(*result_typed_dict.property_types.values())
     )
     return ArrowWeaveList(result_array, result_object_type, cases._artifact)
+
+
+@op(
+    name="ArrowWeaveListBoolean-all",
+    input_type=unary_input_type,
+    output_type=types.Boolean(),
+)
+def boolean_all(self):
+    array = self._arrow_data_asarray_no_tags()
+    if len(array) == 0:
+        return True
+    array = pc.fill_null(array, True)
+    return pc.all(array).as_py()
+
+
+@op(
+    name="ArrowWeaveListBoolean-any",
+    input_type=unary_input_type,
+    output_type=types.Boolean(),
+)
+def boolean_any(self):
+    array = self._arrow_data_asarray_no_tags()
+    if len(array) == 0:
+        return False
+    array = pc.fill_null(array, False)
+    return pc.any(array).as_py()

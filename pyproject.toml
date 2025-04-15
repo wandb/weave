@@ -37,15 +37,15 @@ dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
   "wandb>=0.17.1",
-  "packaging>=21.0",         # For version parsing in integrations
-  "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "emoji>=2.12.1",           # For emoji shortcode support in Feedback
-  "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
-  "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
-  "rich",                    # Used for special formatting of tables (should be made optional)
-  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
-  "jsonschema>=4.23.0",      # Used by scorers for field validation
-  "diskcache==5.6.3",        # Used for data caching
+  "packaging>=21.0",                  # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0",          # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "emoji>=2.12.1",                    # For emoji shortcode support in Feedback
+  "uuid-utils>=0.9.0",                # Used for ID generation - remove once python's built-in uuid supports UUIDv7
+  "numpy>1.21.0",                     # Used in box.py and scorer.py (should be made optional)
+  "rich",                             # Used for special formatting of tables (should be made optional)
+  "gql[aiohttp,requests]",            # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",               # Used by scorers for field validation
+  "diskcache==5.6.3",                 # Used for data caching
 
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -71,8 +71,10 @@ trace_server = [
   "google-cloud-storage>=2.7.0",
   # LLM Support
   "litellm>=1.36.1",
-   # OTEL tracing support
+  # OTEL trace support
   "opentelemetry-proto>=1.12.0",
+  "opentelemetry-semantic-conventions-ai>=0.4.3",
+  "openinference-semantic-conventions>=0.1.17"
 ]
 trace_server_tests = [
   # BYOB - S3
@@ -82,7 +84,8 @@ docs = ["playwright", "lazydocs", "nbformat", "nbconvert", "weave[trace_server]"
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
-crewai = ["crewai>=0.100.1", "crewai-tools>=0.38.0"]
+# Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
+crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=2.6.3", "litellm<=1.61.6"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
@@ -115,8 +118,7 @@ scorers = [
   "litellm>=1.58",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
-  # Pin until transformers releases https://github.com/huggingface/transformers/pull/37337
-  "transformers>=4.48.2,<4.51.0",
+  "transformers>=4.51.1",
   "torch>=2.4.1",
   "sentencepiece>=0.2.0",
   "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
@@ -129,6 +131,7 @@ openai_agents = ["openai-agents>=0.0.4"]
 pandas-test = ["pandas>=2.2.3"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]
 modal = ["modal", "python-dotenv"]
+mcp = ["mcp[cli]>=1.6.0"]
 vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
@@ -280,7 +283,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.42-dev0"
+current_version = "0.51.43-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

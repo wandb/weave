@@ -2617,6 +2617,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "openrouter",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "openrouter/openai/gpt-4o-2024-05-13": [
@@ -5971,6 +5977,12 @@
       "input": 0.0,
       "output": 0.0,
       "created_at": "2025-02-24 11:54:56"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "openrouter/google/gemini-2.0-flash-001": [
@@ -6403,6 +6415,12 @@
       "input": 0.0,
       "output": 0.0,
       "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "azure_ai/Phi-4-multimodal-instruct": [
@@ -6411,6 +6429,12 @@
       "input": 0.0,
       "output": 0.0,
       "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 8e-08,
+      "output": 0.00032,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "gemini/gemini-2.0-pro-exp-02-05": [
@@ -6523,6 +6547,12 @@
       "input": 0.0,
       "output": 0.0,
       "created_at": "2025-04-04 09:04:12"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "gemini-2.0-flash": [
@@ -6595,6 +6625,182 @@
       "input": 1.00002e-06,
       "output": 2.99999e-06,
       "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "watsonx/ibm/granite-3-8b-instruct": [
+    {
+      "provider": "watsonx",
+      "input": 0.0002,
+      "output": 0.0002,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/us/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/eu/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure_ai/mistral-large-latest": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-beta": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-fast-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-fast-latest": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-beta": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-fast-beta": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-fast-latest": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gemini-2.0-flash-lite-001": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-03-25": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "mistralai/mistral-small-3.1-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "openrouter/openai/o3-mini": [
+    {
+      "provider": "openrouter",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "openrouter/openai/o3-mini-high": [
+    {
+      "provider": "openrouter",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gpt-4.1": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
     }
   ]
 }
