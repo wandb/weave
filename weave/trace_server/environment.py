@@ -75,9 +75,9 @@ def wf_storage_bucket_aws_access_key_id() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_AWS_ACCESS_KEY_ID")
 
 
-def wf_storage_bucket_aws_access_key() -> Optional[str]:
+def wf_storage_bucket_aws_secret_access_key() -> Optional[str]:
     """The AWS secret access key."""
-    return os.environ.get("WF_FILE_STORAGE_AWS_ACCESS_KEY")
+    return os.environ.get("WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY")
 
 
 def wf_storage_bucket_aws_session_token() -> Optional[str]:
@@ -100,7 +100,7 @@ def wf_storage_bucket_azure_connection_string() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_AZURE_CONNECTION_STRING")
 
 
-def wf_storage_bucket_access_key() -> Optional[str]:
+def wf_storage_bucket_azure_access_key() -> Optional[str]:
     """The Azure credential."""
     return os.environ.get("WF_FILE_STORAGE_AZURE_ACCESS_KEY")
 

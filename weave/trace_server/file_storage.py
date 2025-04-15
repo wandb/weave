@@ -15,7 +15,7 @@ AWS S3 specific configuration options:
 - `WF_FILE_STORAGE_AWS_KMS_KEY`: the kms key to use for encryption.
 - If connecting to a local bucket:
     - `WF_FILE_STORAGE_AWS_ACCESS_KEY_ID`: the access key id for the aws account.
-    - `WF_FILE_STORAGE_AWS_ACCESS_KEY`: the secret access key for the aws account.
+    - `WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY`: the secret access key for the aws account.
     - `WF_FILE_STORAGE_AWS_SESSION_TOKEN`: (optional) the session token for the aws account.
 - If connecting to a remote bucket:
     - Configure the running instance to have it's account permissions set to access the bucket. The
