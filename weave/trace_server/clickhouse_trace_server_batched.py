@@ -251,10 +251,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for scope_spans in resource_spans.scope_spans:
                 for span in scope_spans.spans:
                     start_call, end_call = span.to_call(req.project_id)
-                    calls.extend([
-                        self.call_start(tsi.CallStartReq(start=start_call)),
-                        self.call_end(tsi.CallEndReq(end=end_call))
-                    ])
+                    calls.extend(
+                        [
+                            self.call_start(tsi.CallStartReq(start=start_call)),
+                            self.call_end(tsi.CallEndReq(end=end_call)),
+                        ]
+                    )
         return tsi.OtelExportRes()
 
     @contextmanager

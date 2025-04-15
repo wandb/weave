@@ -396,24 +396,22 @@ class OpenInferenceAttributes(Attributes):
         return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
 
     def get_weave_outputs(self) -> Any:
-        return {
-            "value": self.get_attribute_value(
-                oi.SpanAttributes.OUTPUT_VALUE
-            ),
-            "mime_type": self.get_attribute_value(
-                oi.SpanAttributes.OUTPUT_MIME_TYPE
-            ),
+        outputs = {
+            "value": self.get_attribute_value(oi.SpanAttributes.OUTPUT_VALUE),
+            "mime_type": self.get_attribute_value(oi.SpanAttributes.OUTPUT_MIME_TYPE),
         }
+        if outputs.get("mime_type") == "application/json" and outputs.get("value"):
+            outputs["value"] = json.loads(str(outputs.get("value")))
+        return outputs
 
     def get_weave_inputs(self) -> Any:
-        return {
-            "value": self.get_attribute_value(
-                oi.SpanAttributes.INPUT_VALUE
-            ),
-            "mime_type": self.get_attribute_value(
-                oi.SpanAttributes.INPUT_MIME_TYPE
-            ),
+        inputs = {
+            "value": self.get_attribute_value(oi.SpanAttributes.INPUT_VALUE),
+            "mime_type": self.get_attribute_value(oi.SpanAttributes.INPUT_MIME_TYPE),
         }
+        if inputs.get("mime_type") == "application/json" and inputs.get("value"):
+            inputs["value"] = json.loads(str(inputs.get("value")))
+        return inputs
 
     def get_weave_attributes(
         self, extra: Optional[dict[str, Any]] = None
@@ -467,15 +465,21 @@ class OpenTelemetryAttributes(Attributes):
         return SummaryInsertMap(usage={"usage": self.get_weave_usage()})
 
     def get_weave_outputs(self) -> Any:
-        outputs: dict[str, Any] = (
-            self.get_attribute_value(ot.SpanAttributes.LLM_COMPLETIONS) or {}
-        )
+        # Do convert numeric to list, nested under completion key
+        outputs: dict[str, Any] = {
+            "completion": convert_numeric_keys_to_list(
+                self.get_attribute_value(ot.SpanAttributes.LLM_COMPLETIONS) or {}
+            )
+        }
         return to_json_serializable(outputs)
 
     def get_weave_inputs(self) -> Any:
-        inputs: dict[str, Any] = (
-            self.get_attribute_value(ot.SpanAttributes.LLM_PROMPTS) or {}
-        )
+        # Do convert numeric to list, nested under prompt key
+        inputs: dict[str, Any] = {
+            "prompt": convert_numeric_keys_to_list(
+                self.get_attribute_value(ot.SpanAttributes.LLM_PROMPTS) or {}
+            )
+        }
         return to_json_serializable(inputs)
 
     def get_weave_attributes(
