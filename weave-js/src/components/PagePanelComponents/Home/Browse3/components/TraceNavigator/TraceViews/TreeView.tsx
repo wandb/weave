@@ -203,7 +203,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             ) : COMPLETION_OP_NAMES.some(opName =>
                 node.call.op_name?.toLowerCase().includes(opName)
               ) ? (
-              <IconOnlyPill icon="forum-chat-bubble" color="magenta" />
+              <IconOnlyPill icon="forum-chat-bubble" color="purple" />
             ) : TOOL_OP_NAMES.some(opName =>
                 node.call.op_name?.toLowerCase().includes(opName)
               ) ? (
