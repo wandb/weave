@@ -234,12 +234,57 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'azure/gpt-4o-mini-2024-07-18': {
-    max_tokens: 16384,
     provider: 'azure',
+    max_tokens: 16384,
     supports_function_calling: true,
   },
 
   // Gemini models
+  'gemini/gemini-2.5-pro-preview-03-25': {
+    provider: 'gemini',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-pro-exp-02-05': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-001': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp-01-21': {
+    provider: 'gemini',
+    max_tokens: 65536,
+    supports_function_calling: false,
+  },
+  'gemini/gemini-2.0-flash': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-lite': {
+    provider: 'gemini',
+    max_tokens: 1048576,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-lite-preview-02-05': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
     max_tokens: 8192,
@@ -256,11 +301,6 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'gemini/gemini-1.5-flash-8b-exp-0924': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-1.5-flash-exp-0827': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -285,37 +325,12 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'gemini/gemini-1.5-pro-exp-0801': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-1.5-pro-exp-0827': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
   'gemini/gemini-1.5-pro-latest': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
   },
   'gemini/gemini-1.5-pro': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-pro': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-2.0-flash-exp': {
-    provider: 'gemini',
-    max_tokens: 8192,
-    supports_function_calling: true,
-  },
-  'gemini/gemini-2.0-flash-thinking-exp': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -557,23 +572,23 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'xai/grok-beta': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2-1212': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
   'xai/grok-2-latest': {
-    max_tokens: 131072,
     provider: 'xai',
+    max_tokens: 131072,
     supports_function_calling: true,
   },
 
@@ -633,6 +648,7 @@ export const LLM_PROVIDER_LABELS: Record<
 // findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
 // findMaxTokensByModelName('completely-unknown-model') // returns 4096
 export const findMaxTokensByModelName = (modelName: string): number => {
+  console.log('modelName', modelName);
   // Default to a reasonable max_tokens value if no close match is found
   const DEFAULT_MAX_TOKENS = 4096;
 
