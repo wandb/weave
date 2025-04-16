@@ -76,7 +76,7 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
             # Dynamically create the class if the user only provides a name
             cls_name = _validate_class_name(cls_name)
             cls = type(cls_name, (type_,), {})
-            return cls()
+            return cast(T, cls())
         return value
 
     return _convert_to_cls_inner
