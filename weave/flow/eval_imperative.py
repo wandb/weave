@@ -14,7 +14,6 @@ from pydantic import (
     ConfigDict,
     Field,
     PrivateAttr,
-    model_validator,
     validate_call,
 )
 
@@ -223,16 +222,6 @@ class ImperativeEvaluationLogger(BaseModel):
             scorers=[],
         )
     )
-
-    @model_validator(mode="after")
-    def _validate_model(self) -> ImperativeEvaluationLogger:
-        if isinstance(self.model, str):
-            # Convert string to a model instance
-            # Create a dynamic model class with the string as the name
-            model_name = self.model
-            DynamicModel = type(model_name, (Model,), {})
-            self.model = DynamicModel()
-        return self
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
         # similar to how we dynamically create the scorer class, we will
