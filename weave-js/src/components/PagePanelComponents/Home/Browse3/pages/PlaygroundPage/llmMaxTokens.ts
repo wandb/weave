@@ -34,16 +34,27 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 32768,
     supports_function_calling: true,
   },
-  'gpt-4.5-preview-2025-02-27': {
+  'o4-mini-2025-04-16': {
     provider: 'openai',
-    max_tokens: 16384,
+    max_tokens: 100000,
     supports_function_calling: true,
   },
-  'gpt-4.5-preview': {
+  'o4-mini': {
     provider: 'openai',
-    max_tokens: 16384,
+    max_tokens: 100000,
     supports_function_calling: true,
   },
+  'o3-2025-04-16': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  o3: {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+
   'o3-mini-2025-01-31': {
     provider: 'openai',
     max_tokens: 100000,
@@ -52,6 +63,16 @@ export const LLM_MAX_TOKENS = {
   'o3-mini': {
     provider: 'openai',
     max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview-2025-02-27': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4.5-preview': {
+    provider: 'openai',
+    max_tokens: 16384,
     supports_function_calling: true,
   },
   'gpt-4o-mini': {
@@ -648,7 +669,6 @@ export const LLM_PROVIDER_LABELS: Record<
 // findMaxTokensByModelName('claude-3') // returns closest Claude-3 model's max_tokens
 // findMaxTokensByModelName('completely-unknown-model') // returns 4096
 export const findMaxTokensByModelName = (modelName: string): number => {
-  console.log('modelName', modelName);
   // Default to a reasonable max_tokens value if no close match is found
   const DEFAULT_MAX_TOKENS = 4096;
 
