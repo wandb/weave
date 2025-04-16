@@ -172,32 +172,87 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
             <div className="flex items-center gap-4 text-right">
-              {tokens !== undefined && visibleColumns.tokens && (
-                <TraceStat
-                  label={tokens}
-                  tooltip={
-                    <div className="text-white-800">
-                      <span style={{fontWeight: 600}}>Estimated tokens</span>
-                      {tokenToolTipContent}
+              {/* Overflow tooltip for non-visible metrics */}
+              {((tokens !== undefined && !visibleColumns.tokens) ||
+                (cost !== undefined && !visibleColumns.cost) ||
+                (duration !== null && !visibleColumns.duration)) && (
+                <Tooltip
+                  content={
+                    <div className="flex flex-col gap-[8px]">
+                      {tokens !== undefined && !visibleColumns.tokens && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Token usage</p>
+                          <p>{tokens}</p>
+                        </div>
+                      )}
+                      {cost !== undefined && !visibleColumns.cost && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Estimated cost</p>
+                          <p>{cost}</p>
+                        </div>
+                      )}
+                      {duration !== null && !visibleColumns.duration && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Duration</p>
+                          <p>{formatDuration(duration)}</p>
+                        </div>
+                      )}
                     </div>
                   }
-                  className="min-w-[40px] justify-end text-xs text-moon-400"
-                />
-              )}
-              {cost !== undefined && visibleColumns.cost && (
-                <TraceStat
-                  label={cost}
-                  tooltip={
-                    <div className="text-white-800">{costToolTipContent}</div>
+                  trigger={
+                    <div className="cursor-pointer">
+                      <Icon name="overflow-horizontal" size="small" className="text-moon-400" />
+                    </div>
                   }
-                  className="min-w-[40px] justify-end text-xs text-moon-400"
                 />
               )}
-              {duration !== null && visibleColumns.duration && (
-                <span className="min-w-[32px] text-moon-400">
-                  {formatDuration(duration)}
-                </span>
-              )}
+
+              {/* Visible metrics */}
+              <div className="flex items-center gap-4">
+                {visibleColumns.tokens && (
+                  tokens !== undefined ? (
+                    <TraceStat
+                      label={tokens}
+                      tooltip={
+                        <div className="text-white-800">
+                          <span style={{fontWeight: 600}}>Estimated tokens</span>
+                          {tokenToolTipContent}
+                        </div>
+                      }
+                      className="min-w-[36px] px-0 justify-end text-xs text-moon-400"
+                    />
+                  ) : (
+                    <span className="min-w-[36px] px-0 text-xs text-transparent">-</span>
+                  )
+                )}
+                {visibleColumns.cost && (
+                  cost !== undefined ? (
+                    <TraceStat
+                      label={cost}
+                      tooltip={
+                        <div className="text-white-800">{costToolTipContent}</div>
+                      }
+                      className="min-w-[46px] px-0 justify-end text-xs text-moon-400 ml-[4px]"
+                    />
+                  ) : (
+                    <span className="min-w-[46px] px-0 text-xs text-transparent ml-[4px]">-</span>
+                  )
+                )}
+                {visibleColumns.duration && (
+                  duration !== null ? (
+                    <div className="flex items-center gap-1">
+                      <span className="min-w-[36px] px-0 text-moon-400">
+                        {formatDuration(duration)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span className="min-w-[36px] px-0 text-transparent">-</span>
+                    </div>
+                  )
+                )}
+              </div>
+
             </div>
             {statusCode === 'ERROR' || statusCode === 'UNSET' ? (
               <StatusChip value={statusCode} iconOnly />
