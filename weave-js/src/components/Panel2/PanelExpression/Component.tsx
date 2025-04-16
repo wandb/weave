@@ -1,6 +1,6 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {Icon, Menu, Popup} from 'semantic-ui-react';
-import {Editor} from 'slate';
+import {Editor, Transforms} from 'slate';
 import {ThemeProvider} from 'styled-components';
 
 import {WeaveActionContextProvider} from '../../../actions';
@@ -41,16 +41,68 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
   } = state;
   const weave = useWeaveContext();
   const enableFullScreen = useWeaveFeaturesContext().fullscreenMode;
+  const editorRef = useRef<Editor>();
 
   const {updateConfig} = props;
   const onMount = React.useCallback(
     (editor: Editor) => {
+      editorRef.current = editor;
       if (state.config.autoFocus) {
         focusEditor(editor);
         updateConfig({autoFocus: false});
       }
     },
     [updateConfig, state.config.autoFocus]
+  );
+
+  // Function to directly insert text into the WeaveExpression editor
+  // with optional cursor positioning
+  const insertTextIntoEditor = React.useCallback(
+    (
+      text: string,
+      options?: {
+        // Position cursor at specific index from the start of the inserted text
+        // Negative values count from the end
+        offset?: number;
+        // Select a range of text (useful for placeholder replacement)
+      }
+    ) => {
+      if (!editorRef.current) return;
+
+      const editor = editorRef.current;
+
+      // Focus the editor first
+      focusEditor(editor);
+
+      // Insert the text at the current selection
+      Transforms.insertText(editor, text, {at: []});
+
+      // Position cursor if options are provided
+      if (options) {
+        // Get the current editor text
+        const editorText = Editor.string(editor, []);
+
+        if (options.offset !== undefined) {
+          // Calculate position relative to end of inserted text
+          const currentPosition = Editor.point(editor, [], {edge: 'end'});
+          const newPosition = {...currentPosition};
+
+          // Calculate new offset
+          let offset = options.offset;
+          if (offset < 0) {
+            // Negative offset means count from end
+            offset = text.length + offset;
+          }
+
+          // Move cursor to that position
+          Transforms.select(editor, {
+            anchor: {path: [], offset},
+            focus: {path: [], offset},
+          });
+        }
+      }
+    },
+    []
   );
 
   const actions = React.useMemo(
@@ -213,6 +265,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                     updateExp={updateExp}
                     inputNode={props.input}
                     newVars={newVars}
+                    insertTextIntoEditor={insertTextIntoEditor}
                   />
                 )}
               </>

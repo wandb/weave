@@ -21,7 +21,7 @@ const SPACING = {
   xs: '2px',
   sm: '4px',
   md: '8px',
-  lg: '10px',
+  lg: '12px',
   xl: '16px',
   xxl: '24px',
 };
@@ -43,13 +43,13 @@ const flexCenter = css`
 `;
 
 const cardBase = css`
-  padding: ${SPACING.md} ${SPACING.lg};
+  padding: ${SPACING.xl};
   border-radius: 8px;
   border: 1px solid ${COLORS.border};
   background-color: #ffffff;
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
-  width: 100%;
+  width: min(100%, 300px);
   margin: 0 auto;
   position: relative;
 `;
@@ -72,7 +72,7 @@ export const HeaderSection = styled.div`
   padding-top: ${SPACING.lg};
   text-align: center;
   flex-shrink: 0;
-  padding-bottom: ${SPACING.lg};
+  padding-bottom: ${SPACING.xs};
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -146,9 +146,9 @@ export const CardGrid = styled.div`
   gap: 8px;
   width: 100%;
   box-sizing: border-box;
-  margin-top: ${SPACING.md};
-  padding-bottom: ${SPACING.md};
-  padding-top: ${SPACING.xs};
+  margin-top: ${SPACING.lg};
+  padding-bottom: ${SPACING.xxl};
+  padding-top: ${SPACING.sm};
   height: fit-content;
   overflow: visible;
   justify-items: stretch;
@@ -164,6 +164,7 @@ export const Card = styled.div`
   cursor: pointer;
   z-index: 1;
   transform-origin: center center;
+  margin-top: ${SPACING.xs};
   height: 100%;
 
   &:hover {
@@ -309,9 +310,4 @@ export const SearchIcon = styled(Icon)`
   height: 50%;
   width: 50%;
   flex: none;
-`;
-
-export const CardIcon = styled(Icon)`
-  margin-right: 8px;
-  color: ${COLORS.text.secondary};
 `;

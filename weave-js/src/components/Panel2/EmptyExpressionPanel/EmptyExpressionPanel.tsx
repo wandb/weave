@@ -9,7 +9,7 @@ import {
 } from '@wandb/weave/core';
 import React, {useLayoutEffect, useMemo, useRef, useState} from 'react';
 
-import {IconName, IconNames} from '../../Icon';
+import {Icon, IconName, IconNames} from '../../Icon';
 import {usePanelContext} from '../PanelContext';
 import {inputType} from '../PanelExpression/common';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -30,6 +30,9 @@ type CardAction = {
   outputNodeFn: (inputNode: Node) => EditingNode;
   icon: IconName;
   expressionText: ExpressionTextItem[];
+  cursorPos?: {
+    offset?: number;
+  };
 };
 
 const BASIC_CARD_ACTIONS: CardAction[] = [
@@ -46,6 +49,9 @@ const BASIC_CARD_ACTIONS: CardAction[] = [
     expressionText: runSummaryExpressionText,
     outputNodeFn: inputNode => runSummary(inputNode),
     icon: IconNames.Table,
+    cursorPos: {
+      offset: -1,
+    },
   },
   {
     id: 'RUN_HISTORY_TABLE',
@@ -60,6 +66,12 @@ interface EmptyExpressionPanelProps {
   updateExp: (newExp: EditingNode) => void;
   inputNode: NodeOrVoidNode<typeof inputType>;
   newVars: {[key: string]: Node<'any'>};
+  insertTextIntoEditor?: (
+    text: string,
+    options?: {
+      offset?: number;
+    }
+  ) => void;
 }
 
 interface ExpressionTextItem {
@@ -70,7 +82,7 @@ interface ExpressionTextItem {
 export const EmptyExpressionPanel: React.FC<
   EmptyExpressionPanelProps
 > = props => {
-  const {updateExp, inputNode, newVars} = props;
+  const {updateExp, inputNode, newVars, insertTextIntoEditor} = props;
   const panelContext = usePanelContext();
   const stack = useMemo(() => {
     return pushFrame(panelContext.stack, newVars);
@@ -185,9 +197,25 @@ export const EmptyExpressionPanel: React.FC<
       return;
     }
 
-    updateExp(
-      action.outputNodeFn(varNode(runsValFromStack.value.type, 'runs'))
-    );
+    if (insertTextIntoEditor) {
+      // If we have insertTextIntoEditor, use it to insert the expression text
+      const expressionText = action.expressionText
+        .map(item => item.text)
+        .join('');
+
+      // Use the action's cursorPos property if available
+      if (action.cursorPos) {
+        insertTextIntoEditor(expressionText, action.cursorPos);
+      } else {
+        // Default behavior: place cursor at the end
+        insertTextIntoEditor(expressionText);
+      }
+    } else {
+      // Otherwise use the node-based approach
+      updateExp(
+        action.outputNodeFn(varNode(runsValFromStack.value.type, 'runs'))
+      );
+    }
 
     recordEvent('SELECT_SHORTCUT', {name: action.title});
   };
@@ -217,7 +245,11 @@ export const EmptyExpressionPanel: React.FC<
         isInitialized={isInitialized}>
         <S.CardGrid
           style={{gridTemplateColumns: `repeat(${gridColumns}, 1fr)`}}>
-          <PickCard updateExp={updateExp} stack={stack} />
+          <PickCard
+            updateExp={updateExp}
+            stack={stack}
+            insertTextIntoEditor={insertTextIntoEditor}
+          />
           {BASIC_CARD_ACTIONS.map(action => (
             <S.Card
               key={action.id}
@@ -225,7 +257,10 @@ export const EmptyExpressionPanel: React.FC<
               role="button"
               aria-label={`Select ${action.title}`}>
               <S.CardTitleContainer>
-                <S.CardIcon name={action.icon} />
+                <Icon
+                  name={action.icon}
+                  style={{marginRight: '8px', color: '#565C66'}}
+                />
                 <S.CardTitle>{action.title}</S.CardTitle>
               </S.CardTitleContainer>
 

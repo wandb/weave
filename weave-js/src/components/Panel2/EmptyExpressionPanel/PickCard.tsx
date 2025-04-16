@@ -25,9 +25,19 @@ const recordEvent = makeEventRecorder('EmptyPanelShortcut');
 interface PickCardProps {
   updateExp: (newExp: EditingNode) => void;
   stack: Stack;
+  insertTextIntoEditor?: (
+    text: string,
+    options?: {
+      offset?: number;
+    }
+  ) => void;
 }
 
-export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
+export const PickCard: React.FC<PickCardProps> = ({
+  updateExp,
+  stack,
+  insertTextIntoEditor,
+}) => {
   const [tableKeys, setTableKeys] = useState<string[]>([]);
   const [selectedKey, setSelectedKey] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -69,10 +79,23 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
       return;
     }
 
+    // If we have insertTextIntoEditor, use it directly
+    if (insertTextIntoEditor) {
+      const expressionText = `runs.summary["${key}"]`;
+
+      // Insert text and position cursor inside the brackets after the key
+      insertTextIntoEditor(expressionText, {
+        // Position cursor right at the end of the entire expression
+        offset: -1,
+      });
+
+      recordEvent('RUN_TABLE');
+      return;
+    }
+
+    // Otherwise use the original node-based approach
     const inputNode = varNode(runsValFromStack.value.type, 'runs');
-
     const res = await weave.refineNode(runSummary(inputNode), stack);
-
     const keyAccessNode = opPick({
       obj: res,
       key: constString(key),
@@ -80,7 +103,6 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
 
     await weave.refineEditingNode(keyAccessNode, stack);
     updateExp(keyAccessNode);
-
     recordEvent('RUN_TABLE');
   };
 
@@ -97,7 +119,10 @@ export const PickCard: React.FC<PickCardProps> = ({updateExp, stack}) => {
       onClick={() => setDropdownOpen(true)}
       onMouseLeave={() => setDropdownOpen(false)}>
       <S.CardTitleContainer>
-        <S.CardIcon name={IconNames.Table} />
+        <Icon
+          name={IconNames.Table}
+          style={{marginRight: '8px', color: '#565C66'}}
+        />
         <S.CardTitle>View logged table</S.CardTitle>
       </S.CardTitleContainer>
       <S.CardSubtitle>
