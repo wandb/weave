@@ -38,7 +38,7 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
-    def unwrap(self) -> dict[str, Any]:
+    def unwrap_one_level(self) -> dict[str, Any]:
         return {
             k: v
             for k, v in self.__dict__.items()

@@ -92,9 +92,9 @@ def make_mutation(
 
 def unwrap(val: Any) -> Any:
     if isinstance(val, Traceable):
-        return unwrap(val.unwrap())
+        return val.unwrap()
     elif isinstance(val, ObjectRecord):
-        return unwrap(val.unwrap())
+        return unwrap(val.unwrap_one_level())
     elif isinstance(val, dict):
         return {k: unwrap(v) for k, v in val.items()}
     elif isinstance(val, list):
