@@ -298,13 +298,6 @@ class Span:
         has_inputs = len(inputs) > 0
         has_outputs = len(outputs) > 0
         has_usage = len(usage) > 0
-        print(
-            f"has_attributes: {has_attributes}, has_inputs: {has_inputs}, has_outputs: {has_outputs}, has_usage: {has_usage}"
-        )
-        print(attributes)
-        print(inputs)
-        print(outputs)
-        print(usage)
 
         # We failed to load any of the Weave attributes, dump all attributes
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:

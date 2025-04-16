@@ -412,8 +412,6 @@ class SpanEvent(dict):
 def parse_weave_values(
     attributes: dict[str, Any], key_mapping: dict[str, list[str]]
 ) -> dict[str, Any]:
-    for key in attributes:
-        print(key, attributes[key])
     result = {}
     for key, attribute_key_list in key_mapping.items():
         for attribute_key in attribute_key_list:
@@ -431,7 +429,6 @@ def parse_weave_values(
 
 def get_weave_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     value = parse_weave_values(attributes, ATTRIBUTE_KEYS)
-    print("Weave attributes:", value)
     return value
 
 
