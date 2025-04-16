@@ -221,10 +221,14 @@ class ImperativeEvaluationLogger(BaseModel):
         ```
     """
 
-    model: Annotated[Model | str, BeforeValidator(_cast_to_cls(Model))] = Field(
-        default_factory=Model,
-        description="A metadata-only Model used for comparisons",
-    )
+    model: Annotated[
+        Model | str,
+        BeforeValidator(_cast_to_cls(Model)),
+        Field(
+            default_factory=Model,
+            description="A metadata-only Model used for comparisons",
+        ),
+    ]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
