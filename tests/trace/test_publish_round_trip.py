@@ -41,3 +41,18 @@ def test_publish_round_trip_register_object_nested(client) -> None:
     assert isinstance(outer_gotten.inner, Inner)
     assert outer_gotten.inner.name == "test"
     assert outer == outer_gotten
+
+
+def test_round_trip_unwrap(client) -> None:
+    data = {
+        "a": 1,
+        "b": [
+            {
+                "c": 2,
+                "d": 3,
+            }
+        ],
+    }
+    ref = weave.publish(data)
+    gotten = ref.get()
+    assert gotten.unwrap() == data

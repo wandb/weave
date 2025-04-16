@@ -73,7 +73,6 @@ def pydantic_model_fields(
 
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    # these ks are by property, but should be by alias
     fields = pydantic_model_fields(obj)
     return {
         field.alias or k: getattr(obj, k)
