@@ -149,9 +149,7 @@ def convert_numeric_keys_to_list(
     return obj
 
 
-def expand_attributes(
-    kv: Iterable[tuple[str, Any]], json_attributes: list[str] = []
-) -> dict[str, Any]:
+def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
     """
     Expand a flattened JSON attributes file into a nested Python dictionary.
 
@@ -169,12 +167,8 @@ def expand_attributes(
 
     # Process each key-value pair
     for flat_key, value in kv:
-        # Check if the value should be parsed as JSON
-        should_parse_as_json = any(
-            flat_key.endswith(attr) or flat_key == attr for attr in json_attributes
-        )
-
-        if should_parse_as_json and isinstance(value, str):
+        # Weave expects JSON strings to be loaded to display properly, so just try and load every string as json
+        if isinstance(value, str) and (value.startswith("[") or value.startswith("{")):
             try:
                 value = json.loads(value)
             except json.JSONDecodeError:
@@ -307,7 +301,7 @@ def unflatten_key_values(
         }
     """
     iterator = ((kv.key, resolve_pb_any_value(kv.value)) for kv in key_values)
-    return expand_attributes(iterator, json_attributes=[])
+    return expand_attributes(iterator)
 
 
 def try_parse_json(value: Any) -> Any:
@@ -385,10 +379,6 @@ ATTRIBUTE_KEYS = {
 }
 
 KEY_HANDLERS = {
-    "input.value": try_parse_json,
-    "output.value": try_parse_json,
-    "gen_ai.request": try_parse_json,
-    "llm.invocation_parameters": try_parse_json,
     "gen_ai.prompt": convert_numeric_keys_to_list,
     "gen_ai.completion": convert_numeric_keys_to_list,
     "gen_ai.usage.prompt_tokens": try_parse_int,

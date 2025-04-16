@@ -292,12 +292,12 @@ class Span:
             total_tokens=usage.get("total_tokens"),
             requests=usage.get("requests"),
         )
-        model = attributes.get('model')
+        model = attributes.get("model")
         if not model:
-            model_parameters = attributes.get('model_parameters')
+            model_parameters = attributes.get("model_parameters")
             if model_parameters:
-                model = model_parameters.get('model')
-        usage_key = model or 'usage'
+                model = model_parameters.get("model")
+        usage_key = model or "usage"
         summary_insert_map = tsi.SummaryInsertMap(usage={usage_key: llm_usage})
 
         has_attributes = len(attributes) > 0
