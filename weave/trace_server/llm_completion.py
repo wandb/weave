@@ -37,6 +37,9 @@ def lite_llm_completion(
     # XAI models don't support response_format
     elif provider == "xai":
         inputs.response_format = None
+        if "grok-3-mini" in inputs.model:
+            inputs.presence_penalty = None
+            inputs.frequency_penalty = None
     elif provider == "azure" or provider == "azure_ai":
         azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
