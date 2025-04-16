@@ -30,10 +30,16 @@ import logging
 import re
 from typing import Callable, Literal, Optional, cast
 
-import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.optimization_builder import (
+    process_query_to_optimization_sql,
+)
+from weave.trace_server.calls_query_builder.utils import (
+    param_slot,
+    safely_format_sql,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -44,6 +50,7 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
+from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -85,6 +92,21 @@ class CallsMergedAggField(CallsMergedField):
         if not use_agg_fn:
             return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
+
+
+class AggFieldWithTableOverrides(CallsMergedAggField):
+    # This is useful if you know the field must come from a predetemined table alias.
+
+    table_name: str
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        return super().as_sql(pb, self.table_name, cast, use_agg_fn)
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
@@ -191,7 +213,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     ) -> str:
         inner = super().as_sql(pb, "feedback")
         param_name = pb.add_param(self.feedback_type)
-        res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res
@@ -201,6 +223,36 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         raise NotImplementedError(
             "Feedback fields cannot be selected directly, yet - implement me!"
         )
+
+
+class AggregatedDataSizeField(CallsMergedField):
+    join_table_name: str
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # This field is not supposed to be called yet. For now, we just take the parent class's
+        # implementation. Consider re-implementation for future use.
+        return super().as_sql(pb, table_alias, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        # It doesn't make sense for a non-root call to have a total storage size,
+        # even if a value could be computed.
+        conditional_field = f"""
+        CASE
+            WHEN any({table_alias}.parent_id) IS NULL
+            THEN any({self.join_table_name}.total_storage_size_bytes)
+            ELSE NULL
+        END
+        """
+
+        return f"{conditional_field} AS {self.field}"
 
 
 class QueryBuilderDynamicField(QueryBuilderField):
@@ -252,7 +304,7 @@ def json_dump_field_as_sql(
         path_str = "'$'"
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
-            path_str = _param_slot(param_name, "String")
+            path_str = param_slot(param_name, "String")
         val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
         return clickhouse_cast(val, cast)
     else:
@@ -261,7 +313,7 @@ def json_dump_field_as_sql(
         path_parts = []
         if extra_path:
             for part in extra_path:
-                path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+                path_parts.append(", " + param_slot(pb.add_param(part), "String"))
         safe_path = "".join(path_parts)
         return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
 
@@ -371,6 +423,8 @@ class CallsQuery(BaseModel):
     limit: Optional[int] = None
     offset: Optional[int] = None
     include_costs: bool = False
+    include_storage_size: bool = False
+    include_total_storage_size: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
@@ -557,6 +611,8 @@ class CallsQuery(BaseModel):
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
+        # Additionally: This condition is also REQUIRED for proper functioning
+        # when using the op_name and trace_id pre-group by optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -569,7 +625,11 @@ class CallsQuery(BaseModel):
 
         # If so, build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
-        outer_query = CallsQuery(project_id=self.project_id)
+        outer_query = CallsQuery(
+            project_id=self.project_id,
+            include_storage_size=self.include_storage_size,
+            include_total_storage_size=self.include_total_storage_size,
+        )
 
         # Select Fields:
         filter_query.add_field("id")
@@ -621,7 +681,7 @@ class CallsQuery(BaseModel):
             {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
             """
 
-        return _safely_format_sql(raw_sql)
+        return safely_format_sql(raw_sql, logger)
 
     def _as_sql_base_format(
         self,
@@ -646,15 +706,36 @@ class CallsQuery(BaseModel):
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
-        call_parts_predicate_filters_sql = ""
         if len(having_conditions_sql) > 0:
             having_filter_sql = "HAVING " + combine_conditions(
                 having_conditions_sql, "AND"
             )
 
-        call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
-            pb, table_alias, self.query_conditions
+        # The op_name, trace_id conditions REQUIRE conditioning on the started_at
+        # field after grouping in the HAVING clause. These filters can remove
+        # call starts before grouping, creating orphan call ends. By conditioning
+        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start.
+        op_name_sql = process_op_name_filter_to_conditions(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
         )
+        trace_id_sql = process_trace_id_filter_to_conditions(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
+        optimization_conditions = process_query_to_optimization_sql(
+            self.query_conditions,
+            pb,
+            table_alias,
+        )
+        sortable_datetime_sql = (
+            optimization_conditions.sortable_datetime_filters_sql or ""
+        )
+        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -685,29 +766,58 @@ class CallsQuery(BaseModel):
         # Special Optimization
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask_sql = f"AND (calls_merged.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
         feedback_where_sql = ""
         if needs_feedback:
             feedback_where_sql = (
-                f" AND calls_merged.project_id = {_param_slot(project_param, 'String')}"
+                f" AND calls_merged.project_id = {param_slot(project_param, 'String')}"
             )
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            """
+
+        storage_size_sql = ""
+        if self.include_storage_size:
+            storage_size_sql = f"""
+            LEFT JOIN (SELECT
+                id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {param_slot(project_param, "String")}
+            GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
+            on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            """
+
+        total_storage_size_sql = ""
+        if self.include_total_storage_size:
+            total_storage_size_sql = f"""
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {param_slot(project_param, "String")}
+            GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
+            on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
+        {storage_size_sql}
+        {total_storage_size_sql}
+        WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
-        {call_parts_predicate_filters_sql}
+        {sortable_datetime_sql}
+        {op_name_sql}
+        {trace_id_sql}
+        {str_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -715,8 +825,11 @@ class CallsQuery(BaseModel):
         {offset_sql}
         """
 
-        return _safely_format_sql(raw_sql)
+        return safely_format_sql(raw_sql, logger)
 
+
+STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
+ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
 
 ALLOWED_CALL_FIELDS = {
     "project_id": CallsMergedField(field="project_id"),
@@ -737,10 +850,16 @@ ALLOWED_CALL_FIELDS = {
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
+    "storage_size_bytes": AggFieldWithTableOverrides(
+        field="storage_size_bytes",
+        agg_fn="any",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_storage_size_bytes": AggregatedDataSizeField(
+        field="total_storage_size_bytes",
+        join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
+    ),
 }
-
-START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
-END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -779,9 +898,9 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
 
     return f"""CASE
-        WHEN {exception_sql} IS NOT NULL THEN {_param_slot(error_param, "String")}
-        WHEN {ended_to_sql} IS NULL THEN {_param_slot(running_param, "String")}
-        ELSE {_param_slot(success_param, "String")}
+        WHEN {exception_sql} IS NOT NULL THEN {param_slot(error_param, "String")}
+        WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
+        ELSE {param_slot(success_param, "String")}
     END"""
 
 
@@ -909,7 +1028,7 @@ def process_query_to_conditions(
 
     def process_operand(operand: "tsi_query.Operand") -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
+            return param_slot(
                 param_builder.add_param(operand.literal_),  # type: ignore
                 python_value_to_ch_type(operand.literal_),
             )
@@ -952,66 +1071,121 @@ def process_query_to_conditions(
     )
 
 
+def process_op_name_filter_to_conditions(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the op_name and returns a sql string if there are any op_names."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
+        return ""
+
+    op_names = hardcoded_filter.filter.op_names
+
+    assert_parameter_length_less_than_max("op_names", len(op_names))
+
+    # We will build up (0 or 1) + N conditions for the op_version_refs
+    # If there are any non-wildcarded names, then we at least have an IN condition
+    # If there are any wildcarded names, then we have a LIKE condition for each
+    or_conditions: list[str] = []
+    non_wildcarded_names: list[str] = []
+    wildcarded_names: list[str] = []
+
+    op_field = get_field_by_name("op_name")
+    if not isinstance(op_field, CallsMergedAggField):
+        raise TypeError("op_name is not an aggregate field")
+
+    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    for name in op_names:
+        if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+            wildcarded_names.append(name)
+        else:
+            non_wildcarded_names.append(name)
+
+    if non_wildcarded_names:
+        or_conditions.append(
+            f"{op_field_sql} IN {param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+        )
+
+    for name in wildcarded_names:
+        like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+        or_conditions.append(
+            f"{op_field_sql} LIKE {param_slot(param_builder.add_param(like_name), 'String')}"
+        )
+
+    if not or_conditions:
+        return ""
+
+    # Account for unmerged call parts by including null op_name (call ends)
+    or_conditions += [f"{op_field_sql} IS NULL"]
+
+    return " AND " + combine_conditions(or_conditions, "OR")
+
+
+def process_trace_id_filter_to_conditions(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_ids = hardcoded_filter.filter.trace_ids
+
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one trace_id, use an equality condition for performance
+    if len(trace_ids) == 1:
+        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    elif len(trace_ids) > 1:
+        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> list[str]:
-    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
+    """Converts a CallsFilter to a list of conditions for a clickhouse query.
+
+    Excludes the op_name, which is handled separately.
+    """
     conditions: list[str] = []
 
-    if filter.op_names:
-        # We will build up (0 or 1) + N conditions for the op_version_refs
-        # If there are any non-wildcarded names, then we at least have an IN condition
-        # If there are any wildcarded names, then we have a LIKE condition for each
-
-        or_conditions: list[str] = []
-
-        non_wildcarded_names: list[str] = []
-        wildcarded_names: list[str] = []
-        for name in filter.op_names:
-            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_names.append(name)
-            else:
-                non_wildcarded_names.append(name)
-
-        if non_wildcarded_names:
-            or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-            )
-
-        for name in wildcarded_names:
-            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
-            )
-
-        if or_conditions:
-            conditions.append(combine_conditions(or_conditions, "OR"))
-
     if filter.input_refs:
+        assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
+        assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
+        assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-
-    if filter.trace_ids:
-        conditions.append(
-            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
+        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
-            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.trace_roots_only:
@@ -1021,263 +1195,12 @@ def process_calls_filter_to_conditions(
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
 
     return conditions
-
-
-def make_call_parts_predicate_filters_sql(
-    pb: ParamBuilder, table_alias: str, conditions: list[Condition]
-) -> str:
-    """Makes the SQL for the predicate filters for the call parts.
-
-    This function creates SQL conditions that can be applied before the GROUP BY
-    to filter out rows that definitely won't match the heavy conditions. These
-    conditions MUST be identical or less restrictive than the conditions in the
-    `conditions` list which will appear in HAVING after group by.
-
-    For fields that may only exist in start or end parts, we add special handling
-    to avoid filtering out rows where the field is NULL (as they might be part of
-    a valid call when combined with other parts).
-
-    Returns an empty string if:
-    1. There are no heavy conditions
-    2. There are OR operations between start-only and end-only fields
-        TODO: support OR conditions between start and end fields
-
-    Performance note: This optimization is critical for queries with heavy fields,
-    as it can significantly reduce peak memory by filtering before aggregation.
-    """
-    heavy_conditions = [
-        cond for cond in conditions if cond.is_heavy() and not cond.is_feedback()
-    ]
-    if not heavy_conditions:
-        return ""
-
-    predicate_conditions = []
-    for condition in heavy_conditions:
-        # Get the fields used in this condition once
-        consumed_fields = condition._get_consumed_fields()
-        field_names = [field.field for field in consumed_fields]
-
-        # Categorize fields by type
-        start_only_fields = [f for f in field_names if f in START_ONLY_CALL_FIELDS]
-        end_only_fields = [f for f in field_names if f in END_ONLY_CALL_FIELDS]
-
-        # Early return for OR operations that mix start and end fields
-        if (
-            start_only_fields
-            and end_only_fields
-            and hasattr(condition, "operand")
-            and isinstance(condition.operand, tsi_query.OrOperation)
-        ):
-            # TODO: support OR conditions between start and end fields
-            return ""
-
-        # Check if this condition can use the LIKE optimization, only applies to string fields
-        # on dynamic json columns
-        like_optimized_condition = try_create_like_optimized_condition(
-            condition, pb, table_alias
-        )
-        if like_optimized_condition:
-            condition_sql = like_optimized_condition
-        else:
-            # Process the condition to create a predicate filter, using non-aggregate fields
-            condition_sql = process_query_to_conditions(
-                tsi_query.Query.model_validate(
-                    {"$expr": {"$and": [condition.operand]}}
-                ),
-                pb,
-                table_alias,
-                use_agg_fn=False,
-            ).conditions[0]
-
-        # Build NULL allowances for start-only fields
-        if start_only_fields:
-            null_conditions = [
-                f"{table_alias}.{field} IS NULL" for field in set(start_only_fields)
-            ]
-            if null_conditions:
-                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
-
-        # Build NULL allowances for end-only fields
-        if end_only_fields:
-            null_conditions = [
-                f"{table_alias}.{field} IS NULL" for field in set(end_only_fields)
-            ]
-            if null_conditions:
-                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
-
-        predicate_conditions.append(condition_sql)
-
-    if predicate_conditions:
-        return "AND " + combine_conditions(predicate_conditions, "AND")
-
-    return ""
-
-
-def try_create_like_optimized_condition(
-    condition: Condition, pb: ParamBuilder, table_alias: str
-) -> Optional[str]:
-    """
-    Attempts to create a LIKE-optimized condition for simple string operations on JSON fields.
-    Supports equality checks, contains operations, and in operations.
-    Returns None if the optimization cannot be applied.
-    """
-    # Handle different operation types
-    if isinstance(condition.operand, tsi_query.EqOperation):
-        return _create_like_optimized_eq_condition(
-            condition.operand, condition, pb, table_alias
-        )
-    elif isinstance(condition.operand, tsi_query.ContainsOperation):
-        return _create_like_optimized_contains_condition(
-            condition.operand, condition, pb, table_alias
-        )
-    elif isinstance(condition.operand, tsi_query.InOperation):
-        return _create_like_optimized_in_condition(
-            condition.operand, condition, pb, table_alias
-        )
-
-    return None
-
-
-def _create_like_condition(
-    field: str,
-    like_pattern: str,
-    pb: ParamBuilder,
-    table_alias: str,
-    case_insensitive: bool = False,
-) -> str:
-    """Creates a LIKE condition for a JSON field with NULL handling for start/end-only fields."""
-    field_name = f"{table_alias}.{field}"
-
-    if case_insensitive:
-        param_name = pb.add_param(like_pattern.lower())
-        like_condition = f"lower({field_name}) LIKE {_param_slot(param_name, 'String')}"
-    else:
-        param_name = pb.add_param(like_pattern)
-        like_condition = f"{field_name} LIKE {_param_slot(param_name, 'String')}"
-
-    return like_condition
-
-
-def _create_like_optimized_eq_condition(
-    operation: tsi_query.EqOperation,
-    condition: Condition,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for equality operations."""
-    # Check if the left side is a GetField operation on a JSON field
-    if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
-        return None
-
-    # Return if right-side isn't a string literal
-    if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
-        operation.eq_[1].literal_, str
-    ):
-        return None
-
-    field = get_field_by_name(operation.eq_[0].get_field_).field
-    literal_value = operation.eq_[1].literal_
-
-    if not literal_value:
-        # Empty string is not a valid value for LIKE optimization
-        return None
-
-    # Boolean literals are not wrapped in quotes in JSON payloads
-    if literal_value in ("true", "false"):
-        like_pattern = f"%{literal_value}%"
-    else:
-        like_pattern = f'%"{literal_value}"%'
-
-    return _create_like_condition(field, like_pattern, pb, table_alias)
-
-
-def _create_like_optimized_contains_condition(
-    operation: tsi_query.ContainsOperation,
-    condition: Condition,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for contains operations."""
-    # Check if the input is a GetField operation on a JSON field
-    if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
-        return None
-    # Return if substr isn't a string literal
-    if not isinstance(
-        operation.contains_.substr, tsi_query.LiteralOperation
-    ) or not isinstance(operation.contains_.substr.literal_, str):
-        return None
-
-    field = get_field_by_name(operation.contains_.input.get_field_).field
-    substr_value = operation.contains_.substr.literal_
-    if not substr_value:
-        # Empty string is not a valid value for LIKE optimization
-        return None
-    case_insensitive = operation.contains_.case_insensitive or False
-    like_pattern = f'%"%{substr_value}%"%'
-
-    return _create_like_condition(
-        field, like_pattern, pb, table_alias, case_insensitive
-    )
-
-
-def _create_like_optimized_in_condition(
-    operation: tsi_query.InOperation,
-    condition: Condition,
-    pb: ParamBuilder,
-    table_alias: str,
-) -> Optional[str]:
-    """Creates a LIKE-optimized condition for in operations."""
-    # Check if the left side is a GetField operation on a JSON field
-    if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
-        return None
-    # Return if right-side isn't non-empty list
-    if (
-        len(operation.in_) != 2
-        or not isinstance(operation.in_[1], list)
-        or len(operation.in_[1]) == 0
-    ):
-        return None
-
-    field = get_field_by_name(operation.in_[0].get_field_).field
-
-    # Create OR conditions for each value
-    like_conditions: list[str] = []
-
-    for value_operand in operation.in_[1]:
-        if (
-            not isinstance(value_operand, tsi_query.LiteralOperation)
-            or not isinstance(value_operand.literal_, str)
-            or not value_operand.literal_
-        ):
-            return None
-
-        like_pattern = f'%"{value_operand.literal_}"%'
-        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-        like_conditions.append(like_condition)
-
-    return "(" + " OR ".join(like_conditions) + ")"
-
-
-def _param_slot(param_name: str, param_type: str) -> str:
-    """Helper function to create a parameter slot for a clickhouse query."""
-    return f"{{{param_name}:{param_type}}}"
-
-
-def _safely_format_sql(
-    sql: str,
-) -> str:
-    """Safely format a SQL string with parameters."""
-    try:
-        return sqlparse.format(sql, reindent=True)
-    except:
-        logger.info(f"Failed to format SQL: {sql}")
-        return sql

@@ -1,7 +1,9 @@
 import asyncio
 import dataclasses
+import datetime
 import json
 import platform
+import re
 import sys
 import time
 import uuid
@@ -36,6 +38,7 @@ from weave.trace.serialization.serializer import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -533,6 +536,39 @@ def test_get_calls_limit_offset(client):
     calls = client.get_calls(offset=5)
     for i, call in enumerate(calls[2:]):
         assert call.inputs["a"] == 7 + i
+
+
+def test_get_calls_page_size_with_offset(client):
+    for i in range(20):
+        client.create_call("x", {"a": i})
+
+    batch_size = 5
+    batch_num = 0
+    all_call_ids = []
+    all_values = []
+
+    while True:
+        call_batch = client.get_calls(
+            limit=batch_size,
+            offset=batch_num * batch_size,
+            page_size=2,
+        )
+
+        # Convert to list to force fetch
+        call_batch_list = list(call_batch)
+        if not call_batch_list:
+            break
+
+        # Store call IDs
+        batch_call_ids = [call.id for call in call_batch_list]
+        all_call_ids.extend(batch_call_ids)
+
+        values = [call.inputs["a"] for call in call_batch_list]
+        all_values.extend(values)
+        batch_num += 1
+
+    assert len(all_call_ids) == 20
+    assert all_values == list(range(20))
 
 
 def test_calls_delete(client):
@@ -1995,6 +2031,298 @@ def test_repeated_flushing(client):
     assert client._has_pending_jobs() == False
 
 
+def test_calls_query_filter_by_strings(client):
+    """Test string filter optimization with nested queries."""
+    test_id = str(uuid.uuid4())
+
+    @weave.op()
+    def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
+        return {
+            "test_id": test_id,
+            "name": name,
+            "tags": tags,
+            "value": value,
+            "active": active,
+        }
+
+    @weave.op
+    def dummy_op():
+        return {"woooo": "test"}
+
+    test_op(test_id, "alpha_test", ["frontend", "ui"], 100, "True")
+    test_op(test_id, "beta_test", ["backend", "api"], 200, "False")
+    test_op(test_id, "gamma_test", ["frontend", "mobile"], 300, "True")
+    test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
+    test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
+
+    for i in range(10):
+        dummy_op()
+
+    # Flush to ensure all calls are persisted
+    client.flush()
+
+    # Basic filter - should return all 5 calls
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5
+
+    # Filter with string contains - should return 5 calls (name contains "test")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "test"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 5  # All names contain "test"
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with string contains - should return 1 call (name contains "alpha")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "alpha"},
+                        }
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 100
+
+    # Filter with string in - should return 2 calls (tags contains "api")
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$in": [
+                            {"$getField": "inputs.name"},
+                            [
+                                {"$literal": "delta_test"},
+                                {"$literal": "gamma_test"},
+                            ],
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with boolean - should return 3 calls (active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Filter with OR - should return 4 calls (name contains "alpha" or "beta" or value > 300)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$or": [
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "alpha"},
+                                }
+                            },
+                            {
+                                "$contains": {
+                                    "input": {"$getField": "inputs.name"},
+                                    "substr": {"$literal": "beta"},
+                                }
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "300"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    # name has alpha or beta or value > 300
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 4
+    for call in calls:
+        assert "test" in call.inputs["name"]
+        assert "test" in call.output["name"]
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+    # Complex nested filter - should return exactly 1 call (name contains "epsilon" and active is true)
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.name"},
+                            "substr": {"$literal": "epsilon"},
+                        }
+                    },
+                    {"$eq": [{"$getField": "inputs.active"}, {"$literal": "True"}]},
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].inputs["name"] == "epsilon_test"
+    assert calls[0].output["name"] == "epsilon_test"
+    assert calls[0].inputs["test_id"] == test_id
+    assert calls[0].output["test_id"] == test_id
+    assert calls[0].inputs["value"] == 500
+
+    # Extremely complex nested filter with multiple levels of nesting
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # Condition 1: Must match the test_id
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    # Condition 2: Name must contain "alpha" and be active, OR contain "delta" and be inactive
+                    {
+                        "$or": [
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "alpha"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {"$literal": "True"},
+                                        ]
+                                    },
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {
+                                        "$contains": {
+                                            "input": {"$getField": "inputs.name"},
+                                            "substr": {"$literal": "delta"},
+                                        }
+                                    },
+                                    {
+                                        "$eq": [
+                                            {"$getField": "inputs.active"},
+                                            {
+                                                "$literal": "False"
+                                            },  # should filter out beta
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                    # Condition 3: Value must be >= 400, OR active must be true
+                    {
+                        "$or": [
+                            {
+                                "$gte": [
+                                    {"$getField": "inputs.value"},
+                                    {"$literal": "400"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.active"},
+                                    {"$literal": "True"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+
+    # Test breakdown:
+    # 1. We create a complex query with multiple conditions:
+    #    - Condition 1: name must be "alpha_test" AND value must be >= 100
+    #    - Condition 2: name must be "beta_test" AND value must be < 200
+    #    - Condition 3: name must be "delta_test" AND (value >= 400 OR active must be true)
+    # 2. The query uses $and to combine these three conditions, meaning all must be satisfied
+    # 3. We expect exactly 2 calls to match:
+    #    - One with name "alpha_test" (matching condition 1)
+    #    - One with name "delta_test" (matching condition 3)
+    # 4. The test verifies both the count and the specific names of the matching calls
+
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 2
+    assert calls[0].inputs["name"] == "alpha_test"
+    assert calls[0].output["name"] == "alpha_test"
+    assert calls[1].inputs["name"] == "delta_test"
+    assert calls[1].output["name"] == "delta_test"
+    for call in calls:
+        assert call.inputs["test_id"] == test_id
+        assert call.output["test_id"] == test_id
+        assert call.inputs["value"] > 0
+
+
 def test_calls_query_sort_by_status(client):
     """Test that sort_by summary.weave.status works with get_calls."""
     # Use a unique test ID to identify these calls
@@ -2389,3 +2717,562 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
     # Verify they all have the same op_name
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
+
+
+async def test_tracing_enabled_context(client):
+    """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
+    from weave.trace.weave_client import Call
+
+    @weave.op()
+    def test_op():
+        return "test"
+
+    # Test create_call with tracing enabled
+    call = await client.create_call(test_op, {})
+    assert isinstance(call, Call)
+    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert len(list(client.get_calls())) == 1  # Verify only one call was created
+
+    # Test create_call with tracing disabled
+    with tracing_disabled():
+        call = client.create_call(test_op, {})
+        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
+        assert (
+            len(list(client.get_calls())) == 1
+        )  # Verify no additional calls were created
+
+    # Test finish_call with tracing disabled
+    with tracing_disabled():
+        client.finish_call(call)  # Should not raise any error
+
+
+def test_calls_query_hardcoded_filter_length_validation(client):
+    @weave.op
+    def test():
+        return {"foo": "bar"}
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'call_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"call_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'op_names' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"op_names": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'input_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"input_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'output_refs' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"output_refs": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'parent_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"parent_ids": ["11111"] * 1001})[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Parameter: 'trace_ids' request length is greater than max length (1000). Actual length: 1001"
+        ),
+    ):
+        calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
+
+
+def test_calls_query_datetime_optimization_with_gt_operation(client):
+    """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
+    if client_is_sqlite(client):
+        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
+        # correctly in sqlite
+        return
+
+    # Use a unique test ID to identify these calls
+    test_id = generate_id()
+
+    # Create calls with different timestamps
+    # Call 1: Start at t=0, end at t=1
+    call1 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)  # Ensure different timestamps
+    client.finish_call(call1, "result1")
+
+    # Call 2: Start at t=1, end at t=2
+    time.sleep(0.1)  # Ensure different timestamps
+    call2 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call2, "result2")
+
+    # Call 3: Start at t=2, end at t=3
+    time.sleep(0.1)  # Ensure different timestamps
+    call3 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call3, "result3")
+
+    # Call 4: Start at t=3, end at t=4
+    time.sleep(0.1)  # Ensure different timestamps
+    call4 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.1)
+    client.finish_call(call4, "result4")
+
+    # Flush to make sure all calls are committed
+    client.flush()
+
+    # Get all calls to determine their actual timestamps
+    base_query = {
+        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
+    }
+    all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
+    assert len(all_calls) == 4
+
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test GT operation on started_at
+    # Query for calls started after call2's timestamp
+    gt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                ]
+            }
+        }
+    )
+    gt_calls = list(client.get_calls(query=gt_query))
+    assert len(gt_calls) == 2  # Should get call3 and call4
+    gt_call_ids = {call.id for call in gt_calls}
+    assert gt_call_ids == {call3.id, call4.id}
+
+    # Test GT operation on ended_at
+    # Query for calls that ended after call2's end timestamp
+    gt_ended_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call2.ended_at.timestamp()},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    gt_ended_calls = list(client.get_calls(query=gt_ended_query))
+    assert len(gt_ended_calls) == 2  # Should get call3 and call4
+    gt_ended_call_ids = {call.id for call in gt_ended_calls}
+    assert gt_ended_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp between call2 and call3
+    mid_timestamp = (call2_ts + call3_ts) / 2
+    mid_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": mid_timestamp}]},
+                ]
+            }
+        }
+    )
+    mid_calls = list(client.get_calls(query=mid_query))
+    assert len(mid_calls) == 2  # Should get call3 and call4
+    mid_call_ids = {call.id for call in mid_calls}
+    assert mid_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp after all calls
+    future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
+    future_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": future_timestamp},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    future_calls = list(client.get_calls(query=future_query))
+    assert len(future_calls) == 0  # Should get no calls
+
+    # Test date range query with additional conditions
+    date_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    date_range_calls = list(client.get_calls(query=date_range_query))
+    assert len(date_range_calls) == 2  # Should get call3 and call4
+    date_range_call_ids = {call.id for call in date_range_calls}
+    assert date_range_call_ids == {call3.id, call4.id}
+
+    # Test date range query with ended_at field
+    ended_at_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    ended_at_range_calls = list(client.get_calls(query=ended_at_range_query))
+    assert len(ended_at_range_calls) == 2  # Should get call2 and call3
+    ended_at_range_call_ids = {call.id for call in ended_at_range_calls}
+    assert ended_at_range_call_ids == {call2.id, call3.id}
+
+    # Deeply nested datetime query
+    nested_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # greated than or equal to call 1
+                    {"$gte": [{"$getField": "started_at"}, {"$literal": call1_ts}]},
+                    # not greater than call 4
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "$or": [
+                            # or greater than call 2 and not greater than call 4
+                            {
+                                "$and": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$eq": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call4_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                            # or greater than call 2 and not greater than call 3
+                            {
+                                "$and": [
+                                    {
+                                        "$gte": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$gt": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call3_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 2
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == call2.id
+    assert call_ids[1] == call3.id
+
+
+def _make_call(client, _id):
+    trace_id = "trace" + "0" * (32 - len("trace"))
+    parent_id = "wo" + "0" * (16 - len("wo"))
+    call_res = client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=_id,
+                op_name="explicit_log_with_custom_ids",
+                display_name=f"call_{_id}",
+                trace_id=trace_id,
+                started_at=datetime.datetime.now(),
+                parent_id=None,
+                inputs={"test_id": _id},
+                attributes={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=call_res.id,
+                ended_at=datetime.datetime.now(),
+                outputs={"hello": "world"},
+                summary={"number": "1"},
+            )
+        )
+    )
+
+
+def test_calls_query_with_non_uuidv7_ids(client):
+    """Test that calls query works with non-uuidv7 ids."""
+    if client_is_sqlite(client):
+        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
+        # correctly in sqlite
+        return
+
+    # Create a call with an 8 byte hex id
+    non_uuidv7_id1 = "1111111111111111"
+    non_uuidv7_id2 = "2222222222222222"
+    non_uuidv7_id3 = "3333333333333333"
+    non_uuidv7_id4 = "4444444444444444"
+
+    # Create calls with timestamps
+    call1 = _make_call(client, non_uuidv7_id1)
+    time.sleep(0.1)
+
+    call2 = _make_call(client, non_uuidv7_id2)
+    time.sleep(0.1)
+
+    call3 = _make_call(client, non_uuidv7_id3)
+    time.sleep(0.1)
+
+    call4 = _make_call(client, non_uuidv7_id4)
+    time.sleep(0.1)
+
+    client.flush()
+
+    all_calls = list(client.get_calls())
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test basic filtering with $eq
+    query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].id == non_uuidv7_id1
+
+    # Test filtering with $gt (greater than)
+    query = {
+        "$expr": {
+            "$gt": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test filtering with $gte (greater than or equal)
+    query = {
+        "$expr": {
+            "$gte": [
+                {"$getField": "started_at"},
+                {"$literal": call2_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test nested filtering with mixed operators
+    nested_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "$eq": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                    ]
+                }
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 2
+    assert calls[0].id == non_uuidv7_id3
+    assert calls[1].id == non_uuidv7_id4
+
+    # Add UUIDv7 calls and test mixed filtering
+    uuidv7_calls = []
+    for i in range(4):
+        time.sleep(0.1)
+        call = client.create_call("x", {"test_id": f"uuidv7_{i}", "special": "true"})
+        client.finish_call(call, "result")
+        uuidv7_calls.append(call)
+
+    client.flush()
+
+    # Test filtering with  mixed ID types
+    mixed_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$gt": [
+                        {"$getField": "started_at"},
+                        {"$literal": call2_ts},
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 6
+    # call3, call4, uuidv7_calls[1], uuidv7_calls[2], uuidv7_calls[3], uuidv7_calls[4]
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id3
+    assert call_ids[1] == non_uuidv7_id4
+    assert call_ids[2] == uuidv7_calls[0].id
+    assert call_ids[3] == uuidv7_calls[1].id
+    assert call_ids[4] == uuidv7_calls[2].id
+    assert call_ids[5] == uuidv7_calls[3].id
+
+    # test filtering nested, with bad or, and mixed ids
+    now = datetime.datetime.now().timestamp()
+    mixed_query = {
+        "$expr": {
+            "$or": [
+                {
+                    "$or": [
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call2_ts},
+                            ]
+                        },
+                        # all hex id calls satisfy this
+                        {
+                            "$eq": [
+                                {"$getField": "summary.number"},
+                                {"$literal": "1"},
+                            ]
+                        },
+                    ]
+                },
+                # all uuidv7 calls satisfy this
+                {
+                    "$and": [
+                        {
+                            "$not": [
+                                {
+                                    "$gt": [
+                                        {"$getField": "started_at"},
+                                        {"$literal": now},
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.special"},
+                                {"$literal": "true"},
+                            ]
+                        },
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 8
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id1
+    assert call_ids[1] == non_uuidv7_id2
+    assert call_ids[2] == non_uuidv7_id3
+    assert call_ids[3] == non_uuidv7_id4
+    assert call_ids[4] == uuidv7_calls[0].id
+    assert call_ids[5] == uuidv7_calls[1].id
+    assert call_ids[6] == uuidv7_calls[2].id
+    assert call_ids[7] == uuidv7_calls[3].id

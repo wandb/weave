@@ -152,6 +152,7 @@ export const useOpVersionOptions = (
     },
     undefined,
     true, // metadataOnly
+    undefined,
     {
       skip: !currentOpId,
     }

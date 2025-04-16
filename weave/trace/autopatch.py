@@ -49,6 +49,7 @@ class AutopatchSettings(BaseModel):
     instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    mcp: IntegrationSettings = Field(default_factory=IntegrationSettings)
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai_agents: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -85,6 +86,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     )
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
@@ -93,6 +95,8 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
+    get_mcp_server_patcher(settings.mcp).attempt_patch()
+    get_mcp_client_patcher(settings.mcp).attempt_patch()
     get_litellm_patcher(settings.litellm).attempt_patch()
     get_anthropic_patcher(settings.anthropic).attempt_patch()
     get_groq_patcher(settings.groq).attempt_patch()
@@ -136,6 +140,7 @@ def reset_autopatch() -> None:
     )
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
@@ -144,6 +149,8 @@ def reset_autopatch() -> None:
 
     get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()
+    get_mcp_server_patcher().undo_patch()
+    get_mcp_client_patcher().undo_patch()
     get_litellm_patcher().undo_patch()
     get_anthropic_patcher().undo_patch()
     get_groq_patcher().undo_patch()

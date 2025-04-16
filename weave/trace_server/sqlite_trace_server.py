@@ -11,6 +11,9 @@ from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+)
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -28,8 +31,10 @@ from weave.trace_server.feedback import (
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    assert_parameter_length_less_than_max,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
@@ -46,10 +51,6 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
-
-MAX_FLUSH_COUNT = 10000
-MAX_FLUSH_AGE = 15
-
 
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
@@ -265,6 +266,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         filter = req.filter
         if filter:
             if filter.op_names:
+                assert_parameter_length_less_than_max("op_names", len(filter.op_names))
                 or_conditions: list[str] = []
 
                 non_wildcarded_names: list[str] = []
@@ -287,22 +289,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
             if filter.input_refs:
+                assert_parameter_length_less_than_max(
+                    "input_refs", len(filter.input_refs)
+                )
                 or_conditions = []
                 for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_refs:
+                assert_parameter_length_less_than_max(
+                    "output_refs", len(filter.output_refs)
+                )
                 or_conditions = []
                 for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
+                assert_parameter_length_less_than_max(
+                    "parent_ids", len(filter.parent_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
+                assert_parameter_length_less_than_max(
+                    "trace_ids", len(filter.trace_ids)
+                )
                 in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
+                assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
                 in_expr = ", ".join(f"'{x}'" for x in filter.call_ids)
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
@@ -321,9 +336,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     rhs_part = process_operand(operation.and_[1])
                     cond = f"({lhs_part} AND {rhs_part})"
                 elif isinstance(operation, tsi_query.OrOperation):
-                    lhs_part = process_operand(operation.or_[0])
-                    rhs_part = process_operand(operation.or_[1])
-                    cond = f"({lhs_part} OR {rhs_part})"
+                    if len(operation.or_) == 0:
+                        raise ValueError("Empty OR operation")
+                    elif len(operation.or_) == 1:
+                        return process_operand(operation.or_[0])
+                    parts = [process_operand(op) for op in operation.or_]
+                    cond = f"({' OR '.join(parts)})"
                 elif isinstance(operation, tsi_query.NotOperation):
                     operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
@@ -399,16 +417,52 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conds.append(filter_cond)
 
         required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
-        select_columns = list(tsi.CallSchema.model_fields.keys())
+        select_columns = [
+            key
+            for key in tsi.CallSchema.model_fields.keys()
+            if key not in ["storage_size_bytes", "total_storage_size_bytes"]
+        ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
+            if "summary" in simple_columns or req.include_costs:
+                simple_columns += ["ended_at", "exception", "display_name"]
+
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
             select_columns += [
                 rcol for rcol in required_columns if rcol not in select_columns
             ]
-        query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+
+        select_columns_names = [*select_columns]
+
+        if req.include_storage_size:
+            select_columns.append(
+                "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
+            )
+            select_columns_names.append("storage_size_bytes")
+
+        join_clause = ""
+        if req.include_total_storage_size:
+            select_columns.append(
+                """
+                CASE
+                    WHEN calls.parent_id IS NULL THEN trace_stats.total_storage_size_bytes
+                    ELSE NULL
+                END
+            """
+            )
+            select_columns_names.append("total_storage_size_bytes")
+
+            join_clause += """
+                LEFT JOIN (SELECT
+                    calls.trace_id as tid,
+                    sum(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0)) as total_storage_size_bytes
+                FROM calls
+                GROUP BY calls.trace_id) as trace_stats ON trace_stats.tid=calls.trace_id
+            """
+
+        query = f"SELECT {', '.join(select_columns)} FROM calls {join_clause} WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -516,7 +570,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchall()
         calls = []
         for row in query_result:
-            call_dict = dict(zip(select_columns, row))
+            call_dict = dict(zip(select_columns_names, row))
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
@@ -1308,6 +1362,34 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CompletionsCreateRes:
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
         return tsi.CompletionsCreateRes()
+
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        if not isinstance(req.traces, ExportTraceServiceRequest):
+            raise TypeError(
+                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
+            )
+
+        traces_data = [
+            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
+        ]
+
+        calls = []
+        for resource_spans in traces_data:
+            for scope_spans in resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
+        res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        # Return the empty ExportTraceServiceResponse as per the OTLP spec
+        return tsi.OtelExportRes()
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

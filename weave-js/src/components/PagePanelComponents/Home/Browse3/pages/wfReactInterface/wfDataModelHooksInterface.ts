@@ -49,6 +49,7 @@ export type CallSchema = CallKey & {
   userId: string | null;
   runId: string | null;
   traceCall?: traceServerClientTypes.TraceCallSchema; // this will eventually be the entire call schema
+  totalStorageSizeBytes?: number | null;
 };
 
 export type CallFilter = {
@@ -183,6 +184,7 @@ export type WFDataModelHooksInterface = {
       refetchOnDelete?: boolean;
       includeCosts?: boolean;
       includeFeedback?: boolean;
+      includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
@@ -233,6 +235,7 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
+    orderBy?: traceServerClientTypes.SortBy[],
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (

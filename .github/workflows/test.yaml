@@ -238,7 +238,7 @@ jobs:
             "bedrock",
             "cerebras",
             "cohere",
-            # "crewai",
+            "crewai",
             "dspy",
             "groq",
             "huggingface",
@@ -253,8 +253,8 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "scorers",
             "pandas-test",
+            "mcp",
           ]
       fail-fast: false
     services:

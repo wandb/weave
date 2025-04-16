@@ -12,7 +12,7 @@ import NumberInput from './NumberInput';
 export interface SliderInputProps {
   min: number;
   max: number;
-  step: number;
+  step: number | 'any';
   value?: number;
   // if true, only input will be displayed, with slider appearing in a hover popup
   sliderInPopup?: boolean;
@@ -29,6 +29,7 @@ export interface SliderInputProps {
     [key: string]: SliderKeyboardOperation;
   };
   onChange(value: number): void;
+  useStepperPlusMinus?: boolean;
 }
 
 export const INPUT_SLIDER_CLASS = 'input__slider';
@@ -51,6 +52,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     strideLength,
     keyboardBindings,
     onChange,
+    useStepperPlusMinus = false,
   }) => {
     const [sliderValue, setSliderValue] = React.useState(value ?? 0);
 
@@ -194,6 +196,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
           value={value}
           ticks={ticks}
           onChange={update}
+          useStepperPlusMinus={useStepperPlusMinus}
         />
       );
     };
