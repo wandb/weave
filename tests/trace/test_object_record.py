@@ -10,7 +10,7 @@ class MyClass(BaseModel):
 
 
 def test_pydantic_asdict_one_level():
-    my_class = MyClass(name="John", age=30, secret="secret")
+    my_class = MyClass(name="John", age_alias=30, secret="secret")
     assert pydantic_asdict_one_level(my_class) == {
         "name": "John",
         "age_alias": 30,
