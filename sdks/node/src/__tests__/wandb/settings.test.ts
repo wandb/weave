@@ -14,7 +14,10 @@ describe('Settings', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Create a fresh env object without WANDB_API_KEY
     process.env = { ...originalEnv };
+    delete process.env.WANDB_API_KEY;
+    delete process.env.WANDB_BASE_URL;
 
     // Mock os.homedir
     (os.homedir as jest.Mock).mockReturnValue('/home/user');
@@ -34,6 +37,7 @@ describe('Settings', () => {
     });
 
     test('returns API key from netrc when environment variable is not set', () => {
+      delete process.env.WANDB_API_KEY;  // Ensure env var is not set
       const mockNetrc = {
         entries: new Map([
           ['api.wandb.ai', {password: 'netrc-api-key'}]
@@ -45,6 +49,7 @@ describe('Settings', () => {
     });
 
     test('throws error when no API key is found', () => {
+      delete process.env.WANDB_API_KEY;  // Ensure env var is not set
       const mockNetrc = {
         entries: new Map(),
       };
@@ -54,6 +59,7 @@ describe('Settings', () => {
     });
 
     test('handles netrc read errors gracefully', () => {
+      delete process.env.WANDB_API_KEY;  // Ensure env var is not set
       (Netrc as jest.Mock).mockImplementation(() => {
         throw new Error('Cannot read netrc file');
       });
@@ -78,6 +84,7 @@ describe('Settings', () => {
     });
 
     test('reads base URL from config file', () => {
+      delete process.env.WANDB_BASE_URL;  // Ensure env var is not set
       const mockConfig = `
 [default]
 wandb_base_url = https://custom.wandb.ai
@@ -91,6 +98,7 @@ wandb_base_url = https://custom.wandb.ai
     });
 
     test('falls back to default host when no custom URL is configured', () => {
+      delete process.env.WANDB_BASE_URL;  // Ensure env var is not set
       (fs.existsSync as jest.Mock).mockReturnValue(false);
       process.env.WANDB_API_KEY = 'test-api-key';
 
@@ -100,11 +108,12 @@ wandb_base_url = https://custom.wandb.ai
         baseUrl: 'https://api.wandb.ai',
         traceBaseUrl: 'https://trace.wandb.ai',
         resolvedHost: 'api.wandb.ai',
-        domain: "wandb.ai",
+        domain: 'wandb.ai',
       });
     });
 
     test('handles config file read errors gracefully', () => {
+      delete process.env.WANDB_BASE_URL;  // Ensure env var is not set
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockImplementation(() => {
         throw new Error('Cannot read config file');
