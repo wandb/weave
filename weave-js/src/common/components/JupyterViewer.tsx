@@ -281,7 +281,6 @@ export const JupyterCell: React.FC<{
                   },
                 });
                 editor.addCommand(
-                  // tslint:disable-next-line:no-bitwise
                   monaco.KeyMod.Shift | monaco.KeyCode.Enter,
                   _ => runCode && runCode(sourceAsArray(cell.source).join(''))
                 );
