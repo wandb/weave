@@ -71,6 +71,17 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
 
 
+def wf_clickhouse_max_execution_time() -> Optional[int]:
+    """The maximum execution time for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError:
+        return None
+
+
 # BYOB Settings
 
 
