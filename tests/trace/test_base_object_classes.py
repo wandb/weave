@@ -128,6 +128,31 @@ def test_pythonic_creation(client: WeaveClient):
     )
 
 
+def test_save_modified_object(client: WeaveClient):
+    """Test that saving an object a second time after modification results in a new ref digest
+    and that fetching the object results in the modified object."""
+    nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
+    top_obj = base_objects.TestOnlyExample(
+        primitive=1,
+        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_object=weave.publish(nested_obj).uri(),
+    )
+    ref = weave.publish(top_obj)
+
+    # Modify the object and save it again
+    top_obj.primitive += 1
+    top_obj.nested_base_model.a += 1
+    ref2 = weave.publish(top_obj)
+
+    # We should have a new digest
+    assert ref2.digest != ref.digest
+    top_obj_gotten = weave.ref(ref2.uri()).get()
+    assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
+    # Fetched object should reflect the modified value, not the original.
+    assert top_obj_gotten.primitive == 2
+    assert top_obj_gotten.nested_base_model.a == 3
+
+
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
     nested_obj_id = "TestOnlyNestedBaseObject"
