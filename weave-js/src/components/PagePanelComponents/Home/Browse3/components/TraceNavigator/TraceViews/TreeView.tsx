@@ -11,6 +11,7 @@ import * as Switch from '@wandb/weave/components/Switch';
 import {IconOnlyPill} from '@wandb/weave/components/Tag/Pill';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
@@ -273,7 +274,7 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   };
   const open = Boolean(anchorEl);
   const columnLabels: Record<keyof typeof visibleColumns, string> = {
-    tokens: 'Token Usage',
+    tokens: 'Token usage',
     cost: 'Cost',
     duration: 'Duration',
   };
@@ -381,19 +382,19 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
   const [strictSearch, setStrictSearch] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState({
+  const [visibleColumns, setVisibleColumns] = useLocalStorage('traceViewVisibleColumns', {
     tokens: false,
     cost: false,
-    duration: true,
+    duration: false,
   });
 
   const handleToggleColumnVisibility = (
     column: keyof typeof visibleColumns
   ) => {
-    setVisibleColumns(prev => ({
-      ...prev,
-      [column]: !prev[column],
-    }));
+    setVisibleColumns({
+      ...visibleColumns,
+      [column]: !visibleColumns[column],
+    });
   };
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
