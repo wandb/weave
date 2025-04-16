@@ -66,7 +66,9 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
         offset?: number;
       }
     ) => {
-      if (!editorRef.current) return;
+      if (!editorRef.current) {
+        return;
+      }
 
       const editor = editorRef.current;
 
