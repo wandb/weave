@@ -23,6 +23,7 @@ from weave.flow.model import Model
 from weave.flow.scorer import Scorer
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.op import Op
 from weave.trace.weave_client import Call
 
 T = TypeVar("T")
@@ -37,6 +38,9 @@ logger = logging.getLogger(__name__)
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
 current_score: ContextVar[ScoreType | None] = ContextVar("current_score", default=None)
 current_summary: ContextVar[dict | None] = ContextVar("current_summary", default=None)
+current_predict_call: ContextVar[Call | None] = ContextVar(
+    "current_predict_call", default=None
+)
 
 
 @contextmanager
@@ -65,6 +69,16 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         yield
     finally:
         current_summary.reset(token)
+
+
+@contextmanager
+def _set_current_predict_call(call: Call) -> Iterator[None]:
+    """Set the current predict call in a thread-safe way using context variables."""
+    token = current_predict_call.set(call)
+    try:
+        yield
+    finally:
+        current_predict_call.reset(token)
 
 
 def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
@@ -131,6 +145,7 @@ class ImperativeScoreLogger(BaseModel):
     output: Any
     predict_and_score_call: Call
     evaluate_call: Call
+    predict_call: Call
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -141,13 +156,13 @@ class ImperativeScoreLogger(BaseModel):
         If called from within an existing event loop, use _alog_score instead.
         """
         try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # If there is no running loop, run the method synchronously
             asyncio.run(self._alog_score(scorer, score))
-        except RuntimeError as e:
-            if "This event loop is already running" in str(e):
-                raise RuntimeError(
-                    "Cannot call log_score from an async context. Use _alog_score instead."
-                ) from e
-            raise
+        else:
+            # If there is a running loop, run the method asynchronously
+            loop.create_task(self._alog_score(scorer, score))
 
     @validate_call
     async def _alog_score(
@@ -167,7 +182,7 @@ class ImperativeScoreLogger(BaseModel):
         scorer = cast(Scorer, scorer)
 
         @weave.op(name=scorer.name)
-        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
+        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
             # return score
             return cast(ScoreType, current_score.get())
@@ -179,7 +194,7 @@ class ImperativeScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                await self.predict_and_score_call.apply_scorer(scorer)
+                await self.predict_call.apply_scorer(scorer)
 
 
 class ImperativeEvaluationLogger(BaseModel):
@@ -234,7 +249,7 @@ class ImperativeEvaluationLogger(BaseModel):
             # objects that "look right" to our object saving system.
 
             # --- Setup the model object ---
-            @weave.op
+            @weave.op(name="Model.predict")
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
@@ -245,16 +260,20 @@ class ImperativeEvaluationLogger(BaseModel):
             @weave.op(name="Evaluation.evaluate")
             def evaluate(self: Evaluation, model: Model) -> None: ...
 
-            @weave.op
-            def predict_and_score(self: Evaluation, model: Model, inputs: dict) -> dict:
-                model_output = model.get_infer_method()(inputs)
+            @weave.op(name="Evaluation.predict_and_score")
+            def predict_and_score(
+                self: Evaluation, model: Model, example: dict
+            ) -> dict:
+                predict_method = cast(Op, model.get_infer_method())
+                model_output, predict_call = predict_method.call(model, example)
+                current_predict_call.set(predict_call)
                 return {
                     "model_output": model_output,
                     "scores": {},
                     "model_latency": None,
                 }
 
-            @weave.op
+            @weave.op(name="Evaluation.summarize")
             def summarize(self: Evaluation) -> dict:
                 return cast(dict, current_summary.get())
 
@@ -290,12 +309,18 @@ class ImperativeEvaluationLogger(BaseModel):
         # Get the model output from the call result
         model_output = predict_and_score_call.output.get("model_output")
 
+        # Get the predict_call from the context variable
+        predict_call = current_predict_call.get()
+        if predict_call is None:
+            raise ValueError("predict_call should not be None")
+
         assert self._evaluate_call is not None
         return ImperativeScoreLogger(
             inputs=inputs,
             output=model_output,
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
+            predict_call=predict_call,
         )
 
     def log_summary(self, summary: dict) -> None:
