@@ -340,6 +340,7 @@ def _call_sync_func(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
@@ -379,6 +380,9 @@ def _call_sync_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -428,6 +432,7 @@ async def _call_async_func(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
@@ -465,6 +470,9 @@ async def _call_async_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -514,6 +522,7 @@ def call(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
     """
@@ -538,6 +547,7 @@ def call(
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
+            __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
     else:
@@ -546,6 +556,7 @@ def call(
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
+            __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
 

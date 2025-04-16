@@ -47,6 +47,8 @@ def test_basic_evaluation(
         score2_results.append(score2_result := model_output > 2)
         pred.log_score(scorer="greater_than_4_scorer", score=score2_result)
 
+        pred.finish()
+
     ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
     client.flush()
@@ -77,7 +79,7 @@ def test_basic_evaluation(
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
         assert predict_call.inputs["self"]._class_name == "Model"
-        assert predict_call.inputs["example"] == inputs
+        assert predict_call.inputs["inputs"] == inputs
         assert predict_call.output == outputs
 
         feedbacks = list(predict_call.feedback)
@@ -86,19 +88,19 @@ def test_basic_evaluation(
         assert feedbacks[1].feedback_type == "wandb.runnable.greater_than_4_scorer"
 
         scorer1_call = calls[predict_index + 2]
-        assert op_name_from_call(scorer1_call) == "score"
-        assert scorer1_call.inputs["output"]["model_output"] == outputs
-        assert scorer1_call.inputs["inputs"]["example"] == inputs
+        assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
+        assert scorer1_call.inputs["output"] == outputs
+        assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
-        assert op_name_from_call(scorer2_call) == "score"
-        assert scorer2_call.inputs["output"]["model_output"] == outputs
-        assert scorer2_call.inputs["inputs"]["example"] == inputs
+        assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
+        assert scorer2_call.inputs["output"] == outputs
+        assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
     summarize_call = calls[13]
-    assert op_name_from_call(summarize_call) == "summarize"
+    assert op_name_from_call(summarize_call) == "Evaluation.summarize"
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {"avg_score": 1.0, "total_examples": 3}
 
@@ -138,6 +140,8 @@ def test_evaluation_with_custom_models_and_scorers(
             score3_result = model_output > 6
             pred.log_score(scorer=scorer3, score=score3_result)
 
+            pred.finish()
+
         ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
     def make_assertions():
@@ -158,18 +162,15 @@ def test_evaluation_with_custom_models_and_scorers(
             filter=ObjectVersionFilter(base_object_classes=["Scorer"])
         )
         assert len(scorers) == 3
-        # replacing the score method triggers a version bump.
+        # The patching we do on Scorers triggers a version bump.
         # Since we always do this, the min version will always be 1
         assert scorers[0].object_id == "gt2_scorer"
         assert scorers[0].version_index == 1
 
         assert scorers[1].object_id == "gt4_scorer"
         assert scorers[1].version_index == 1
-
-        # in the text case, we generate the scorer from scratch and there is no
-        # replacement step.  Therefore the version index will start at 0
         assert scorers[2].object_id == "gt6_scorer"
-        assert scorers[2].version_index == 0
+        assert scorers[2].version_index == 1
 
     # Run each evaluation once.
     # This creates 3 different model versions and 2 different scorer versions

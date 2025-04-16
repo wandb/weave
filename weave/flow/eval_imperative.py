@@ -41,6 +41,9 @@ current_summary: ContextVar[dict | None] = ContextVar("current_summary", default
 current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
+current_predict_and_score_call: ContextVar[Call | None] = ContextVar(
+    "current_predict_and_score_call", default=None
+)
 
 
 @contextmanager
@@ -71,16 +74,6 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
-@contextmanager
-def _set_current_predict_call(call: Call) -> Iterator[None]:
-    """Set the current predict call in a thread-safe way using context variables."""
-    token = current_predict_call.set(call)
-    try:
-        yield
-    finally:
-        current_predict_call.reset(token)
-
-
 def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
     def _convert_to_cls_inner(value: str | T) -> T:
         if isinstance(value, str):
@@ -88,18 +81,27 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
 
             # Dynamically create the class if the user only provides a name
             cls_name = _validate_class_name(cls_name)
-            cls = type(cls_name, (type_,), {})
+
+            pydantic_config_dict = {
+                "__annotations__": {"name": str},
+                "name": cls_name,
+            }
+
+            cls = type(cls_name, (type_,), pydantic_config_dict)
             return cast(T, cls())
 
         elif isinstance(value, dict):
             attributes = value
 
             # Dynamically create the class with attributes from the dict)
+            cls_name = f"Dynamic{type_.__name__}"
+            if "name" not in attributes:
+                attributes["name"] = cls_name
+
             pydantic_config_dict = {
                 "__annotations__": dict.fromkeys(attributes, Any),
                 **attributes,
             }
-            cls_name = f"Dynamic{type_.__name__}"
             cls = type(cls_name, (type_,), pydantic_config_dict)
             return cast(T, cls())
 
@@ -141,13 +143,31 @@ class ImperativeScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
     # model_id: ID
-    inputs: dict
-    output: Any
     predict_and_score_call: Call
     evaluate_call: Call
     predict_call: Call
 
+    _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def finish(self, *, scores: dict[str, ScoreType] | None = None) -> None:
+        if scores is None:
+            scores = self._captured_scores
+
+        call = current_predict_and_score_call.get()
+        if call is None:
+            raise ValueError("predict_and_score_call should not be None")
+
+        wc = require_weave_client()
+        wc.finish_call(
+            call,
+            output={
+                "model_output": self.predict_call.output,
+                "scores": scores,
+                "model_latency": None,
+            },
+        )
 
     def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
@@ -195,6 +215,8 @@ class ImperativeScoreLogger(BaseModel):
         ):
             with _set_current_score(score):
                 await self.predict_call.apply_scorer(scorer)
+
+        self._captured_scores[scorer.name] = score
 
 
 class ImperativeEvaluationLogger(BaseModel):
@@ -303,11 +325,12 @@ class ImperativeEvaluationLogger(BaseModel):
         # Make the prediction call
         with _set_current_output(output):
             _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
-                self._pseudo_evaluation, self.model, inputs
+                self._pseudo_evaluation,
+                self.model,
+                inputs,
+                __require_explicit_finish=True,
             )
-
-        # Get the model output from the call result
-        model_output = predict_and_score_call.output.get("model_output")
+            current_predict_and_score_call.set(predict_and_score_call)
 
         # Get the predict_call from the context variable
         predict_call = current_predict_call.get()
@@ -316,8 +339,6 @@ class ImperativeEvaluationLogger(BaseModel):
 
         assert self._evaluate_call is not None
         return ImperativeScoreLogger(
-            inputs=inputs,
-            output=model_output,
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
