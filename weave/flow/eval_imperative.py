@@ -167,7 +167,7 @@ class ImperativeScoreLogger(BaseModel):
         scorer = cast(Scorer, scorer)
 
         @weave.op(name=scorer.name)
-        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
+        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
             # return score
             return cast(ScoreType, current_score.get())
