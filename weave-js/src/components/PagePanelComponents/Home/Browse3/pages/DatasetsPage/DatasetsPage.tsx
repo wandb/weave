@@ -78,49 +78,23 @@ export const DatasetsPage: React.FC<{
     setIsCreateDrawerOpen(false);
   };
 
-  const handleSaveDataset = async (dataset: any) => {
-    // Log the dataset being saved for debugging purposes
-    console.log('Saving dataset:', dataset);
-
-    // Check if this is a publish action
-    const isPublish = dataset.publishNow === true;
-
+  const handleSaveDataset = async (name: string, rows: any[]) => {
     setIsCreatingDataset(true);
     try {
-      // Parse the rows from string back to array if they are provided as a string
-      const rows =
-        typeof dataset.rows === 'string'
-          ? JSON.parse(dataset.rows)
-          : dataset.rows;
-
       // Create the dataset using the actual API function
       const result = await createNewDataset({
         projectId: `${entity}/${project}`,
         entity,
         project,
-        datasetName: dataset.name,
+        datasetName: name,
         rows,
         tableCreate,
         objCreate,
         router,
       });
-
-      // If this is a publish action, we could add additional logic here
-      // This would require backend support for publishing datasets
-      if (isPublish) {
-        console.log('Publishing dataset:', dataset.name);
-        // Here you would call an API to mark the dataset as published
-        // For now, we'll just log and show different toast messaging
-      }
-
-      // Show success message with link to the new dataset
       toast(
         <DatasetPublishToast
-          message={
-            isPublish
-              ? 'Dataset published successfully!'
-              : 'Dataset created successfully!'
-          }
+          message={'Dataset created successfully!'}
           url={result.url}
         />,
         {
@@ -133,14 +107,9 @@ export const DatasetsPage: React.FC<{
       );
     } catch (error: any) {
       console.error('Failed to create dataset:', error);
-      toast.error(
-        `Failed to ${isPublish ? 'publish' : 'create'} dataset: ${
-          error.message
-        }`
-      );
+      toast.error(`Failed to create dataset: ${error.message}`);
     } finally {
       setIsCreatingDataset(false);
-      // Close the drawer
       handleCloseDrawer();
     }
   };
