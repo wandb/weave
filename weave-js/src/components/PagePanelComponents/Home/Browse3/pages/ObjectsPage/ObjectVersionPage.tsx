@@ -34,6 +34,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
+import {StorageSizeSection} from '../common/StorageSizeSection';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
@@ -139,7 +140,10 @@ const ObjectVersionPageInner: React.FC<{
       objectIds: [objectName],
     },
     undefined,
-    true
+    true,
+    {
+      includeStorageSize: true,
+    }
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
@@ -214,6 +218,27 @@ const ObjectVersionPageInner: React.FC<{
   const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
+
+  const [currentVersionSizeBytes, allVersionsSizeBytes, shouldShowAllVersions] =
+    useMemo(() => {
+      if (objectVersions.loading || !objectVersions.result) {
+        return [undefined, undefined, false];
+      }
+      const currentVersion = objectVersions.result.find(
+        v => v.versionIndex === objectVersionIndex
+      );
+
+      // tslint:disable-next-line:no-shadowed-variable
+      const allVersionsSizeBytes = objectVersions.result!.reduce(
+        (acc, v) => acc + (v.sizeBytes ?? 0),
+        0
+      );
+      return [
+        currentVersion?.sizeBytes,
+        allVersionsSizeBytes,
+        objectVersions.result!.length > 1,
+      ];
+    }, [objectVersions, objectVersionIndex]);
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
@@ -291,6 +316,12 @@ const ObjectVersionPageInner: React.FC<{
                 <UserLink userId={objectVersion.userId} includeName />
               </div>
             )}
+            <StorageSizeSection
+              isLoading={objectVersions.loading}
+              shouldShowAllVersions={shouldShowAllVersions}
+              currentVersionBytes={currentVersionSizeBytes}
+              allVersionsSizeBytes={allVersionsSizeBytes}
+            />
             {isScorer && (
               <div className="block">
                 <p className="text-moon-500">Scores</p>

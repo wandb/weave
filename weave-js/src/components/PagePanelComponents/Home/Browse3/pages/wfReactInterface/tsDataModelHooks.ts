@@ -1064,7 +1064,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean; noAutoRefresh?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean; includeStorageSize?: boolean}
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1094,6 +1094,7 @@ const useRootObjectVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -1117,6 +1118,7 @@ const useRootObjectVersions = (
     project,
     limit,
     metadataOnly,
+    opts?.includeStorageSize,
   ]);
 
   useEffect(() => {
@@ -1600,15 +1602,17 @@ const useTableRowsQuery = (
 const useTableQueryStats = (
   entity: string,
   project: string,
-  digest: string,
-  opts?: {skip?: boolean}
-): Loadable<traceServerTypes.TraceTableQueryStatsRes> => {
+  digests: string[],
+  opts?: {skip?: boolean; includeStorageSize?: boolean}
+): Loadable<traceServerTypes.TraceTableQueryStatsBatchRes> => {
   const getTsClient = useGetTraceServerClientContext();
   const [statsRes, setStatsRes] =
-    useState<traceServerTypes.TraceTableQueryStatsRes | null>(null);
+    useState<traceServerTypes.TraceTableQueryStatsBatchRes | null>(null);
   const loadingRef = useRef(false);
 
   const projectId = projectIdFromParts({entity, project});
+
+  const digestsDeep = useDeepMemo(digests);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -1617,13 +1621,14 @@ const useTableQueryStats = (
     setStatsRes(null);
     loadingRef.current = true;
 
-    const req: traceServerTypes.TraceTableQueryStatsReq = {
+    const req: traceServerTypes.TraceTableQueryStatsBatchReq = {
       project_id: projectId,
-      digest,
+      digests: digestsDeep,
+      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : {}),
     };
 
     getTsClient()
-      .tableQueryStats(req)
+      .tableQueryStatsBatch(req)
       .then(res => {
         loadingRef.current = false;
         setStatsRes(res);
@@ -1633,7 +1638,13 @@ const useTableQueryStats = (
         console.error('Error fetching table query stats:', err);
         setStatsRes(null);
       });
-  }, [getTsClient, projectId, digest, opts?.skip]);
+  }, [
+    getTsClient,
+    projectId,
+    digestsDeep,
+    opts?.skip,
+    opts?.includeStorageSize,
+  ]);
 
   useEffect(() => {
     doFetch();

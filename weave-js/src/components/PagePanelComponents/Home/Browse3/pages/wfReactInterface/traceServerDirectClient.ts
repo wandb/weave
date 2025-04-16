@@ -54,8 +54,8 @@ import {
   TraceRefsReadBatchRes,
   TraceTableQueryReq,
   TraceTableQueryRes,
-  TraceTableQueryStatsReq,
-  TraceTableQueryStatsRes,
+  TraceTableQueryStatsBatchReq,
+  TraceTableQueryStatsBatchRes,
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
@@ -287,13 +287,13 @@ export class DirectTraceServerClient {
     );
   }
 
-  public tableQueryStats(
-    req: TraceTableQueryStatsReq
-  ): Promise<TraceTableQueryStatsRes> {
-    return this.makeRequest<TraceTableQueryStatsReq, TraceTableQueryStatsRes>(
-      '/table/query_stats',
-      req
-    );
+  public tableQueryStatsBatch(
+    req: TraceTableQueryStatsBatchReq
+  ): Promise<TraceTableQueryStatsBatchRes> {
+    return this.makeRequest<
+      TraceTableQueryStatsBatchReq,
+      TraceTableQueryStatsBatchRes
+    >('/table/query_stats_batch', req);
   }
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
