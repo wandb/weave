@@ -201,7 +201,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                   }
                   trigger={
                     <div className="cursor-pointer">
-                      <Icon name="overflow-horizontal" size="small" className="text-moon-400" />
+                      <Icon
+                        name="overflow-horizontal"
+                        size="small"
+                        className="text-moon-400"
+                      />
                     </div>
                   }
                 />
@@ -209,37 +213,43 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
               {/* Visible metrics */}
               <div className="flex items-center gap-4">
-                {visibleColumns.tokens && (
-                  tokens !== undefined ? (
+                {visibleColumns.tokens &&
+                  (tokens !== undefined ? (
                     <TraceStat
                       label={tokens}
                       tooltip={
                         <div className="text-white-800">
-                          <span style={{fontWeight: 600}}>Estimated tokens</span>
+                          <span style={{fontWeight: 600}}>
+                            Estimated tokens
+                          </span>
                           {tokenToolTipContent}
                         </div>
                       }
-                      className="min-w-[36px] px-0 justify-end text-xs text-moon-400"
+                      className="min-w-[36px] justify-end px-0 text-xs text-moon-400"
                     />
                   ) : (
-                    <span className="min-w-[36px] px-0 text-xs text-transparent">-</span>
-                  )
-                )}
-                {visibleColumns.cost && (
-                  cost !== undefined ? (
+                    <span className="min-w-[36px] px-0 text-xs text-transparent">
+                      -
+                    </span>
+                  ))}
+                {visibleColumns.cost &&
+                  (cost !== undefined ? (
                     <TraceStat
                       label={cost}
                       tooltip={
-                        <div className="text-white-800">{costToolTipContent}</div>
+                        <div className="text-white-800">
+                          {costToolTipContent}
+                        </div>
                       }
-                      className="min-w-[46px] px-0 justify-end text-xs text-moon-400 ml-[4px]"
+                      className="ml-[4px] min-w-[46px] justify-end px-0 text-xs text-moon-400"
                     />
                   ) : (
-                    <span className="min-w-[46px] px-0 text-xs text-transparent ml-[4px]">-</span>
-                  )
-                )}
-                {visibleColumns.duration && (
-                  duration !== null ? (
+                    <span className="ml-[4px] min-w-[46px] px-0 text-xs text-transparent">
+                      -
+                    </span>
+                  ))}
+                {visibleColumns.duration &&
+                  (duration !== null ? (
                     <div className="flex items-center gap-1">
                       <span className="min-w-[36px] px-0 text-moon-400">
                         {formatDuration(duration)}
@@ -247,12 +257,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                     </div>
                   ) : (
                     <div className="flex items-center gap-1">
-                      <span className="min-w-[36px] px-0 text-transparent">-</span>
+                      <span className="min-w-[36px] px-0 text-transparent">
+                        -
+                      </span>
                     </div>
-                  )
-                )}
+                  ))}
               </div>
-
             </div>
             {statusCode === 'ERROR' || statusCode === 'UNSET' ? (
               <StatusChip value={statusCode} iconOnly />
@@ -437,11 +447,14 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
   const [strictSearch, setStrictSearch] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useLocalStorage('traceViewVisibleColumns', {
-    tokens: false,
-    cost: false,
-    duration: false,
-  });
+  const [visibleColumns, setVisibleColumns] = useLocalStorage(
+    'traceViewVisibleColumns',
+    {
+      tokens: false,
+      cost: false,
+      duration: false,
+    }
+  );
 
   const handleToggleColumnVisibility = (
     column: keyof typeof visibleColumns
