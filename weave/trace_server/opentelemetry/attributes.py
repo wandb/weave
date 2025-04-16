@@ -448,33 +448,13 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
     return usage
 
-
-def get_weave_inputs_from_events(events: list[SpanEvent]) -> dict[str, Any] | None:
-    events = list(filter(lambda e: e["name"] == "gen_ai.content.prompt", events))
-    return None
-
-
-def get_weave_output_from_events(events: list[SpanEvent]) -> dict[str, Any] | None:
-    for event in filter(lambda e: e["name"] == "gen_ai.content.completion", events):
-        attributes = event["attributes"]
-        if "gen_ai.completion" in attributes:
-            return attributes["gen_ai.completion"]
-    if len(events) > 0:
-        attributes = events[0]["attributes"]
-        if "gen_ai.completion" in attributes:
-            return attributes["gen_ai.completion"]
-    return None
-
-
 def get_weave_inputs(
-    events: list[SpanEvent], attributes: dict[str, Any]
+    _: list[SpanEvent], attributes: dict[str, Any]
 ) -> dict[str, Any]:
-    event_inputs = get_weave_inputs_from_events(events)
-    return event_inputs or parse_weave_values(attributes, INPUT_KEYS)
+    return parse_weave_values(attributes, INPUT_KEYS)
 
 
 def get_weave_outputs(
-    events: list[SpanEvent], attributes: dict[str, Any]
+    _: list[SpanEvent], attributes: dict[str, Any]
 ) -> dict[str, Any]:
-    event_outputs = get_weave_output_from_events(events)
-    return event_outputs or parse_weave_values(attributes, OUTPUT_KEYS)
+    return parse_weave_values(attributes, OUTPUT_KEYS)
