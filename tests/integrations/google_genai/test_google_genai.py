@@ -34,11 +34,11 @@ def test_content_generation_sync(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.Models.generate_content"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -61,11 +61,11 @@ async def test_content_generation_async(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.AsyncModels.generate_content"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -96,11 +96,11 @@ def test_content_generation_sync_stream(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.Models.generate_content_stream"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -131,11 +131,11 @@ async def test_content_generation_async_stream(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.AsyncModels.generate_content_stream"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -168,11 +168,11 @@ You are able to generate high-quality code in the Python programming language.""
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.chats.Chat.send_message"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -202,11 +202,11 @@ You are able to generate high-quality code in the Python programming language.""
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.chats.AsyncChat.send_message"
     assert call.output is not None
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
@@ -257,11 +257,11 @@ def test_function_calling(client):
         .lower()
         == "paris"
     )
-    assert call.output.usageMetadata.candidateTokenCount > 0
+    assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidateTokenCount
+        == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
 
