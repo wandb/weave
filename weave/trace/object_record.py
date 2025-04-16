@@ -63,7 +63,7 @@ PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
 
 def pydantic_model_fields(
     obj: PydanticBaseModelGeneral,
-) -> dict[str, pydantic.FieldInfo]:
+) -> dict[str, pydantic.fields.FieldInfo]:
     if isinstance(obj, pydantic.BaseModel):
         return obj.model_fields
     elif isinstance(obj, pydantic.v1.BaseModel):
@@ -75,7 +75,11 @@ def pydantic_model_fields(
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
     # these ks are by property, but should be by alias
     fields = pydantic_model_fields(obj)
-    return {field.alias or k: getattr(obj, k) for k, field in fields.items()}
+    return {
+        field.alias or k: getattr(obj, k)
+        for k, field in fields.items()
+        if not field.exclude
+    }
 
 
 def class_all_bases_names(cls: type) -> list[str]:
