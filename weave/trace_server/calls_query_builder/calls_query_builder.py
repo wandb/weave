@@ -611,6 +611,8 @@ class CallsQuery(BaseModel):
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
+        # Additionally: This condition is also REQUIRED for proper functioning
+        # when using the op_name and trace_id pre-group by optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -709,12 +711,16 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
+        # The op_name, trace_id conditions REQUIRE conditioning on the started_at
+        # field after grouping in the HAVING clause. These filters can remove
+        # call starts before grouping, creating orphan call ends. By conditioning
+        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_conditions(
             self.hardcoded_filter,
             pb,
             table_alias,
         )
-
         trace_id_sql = process_trace_id_filter_to_conditions(
             self.hardcoded_filter,
             pb,
