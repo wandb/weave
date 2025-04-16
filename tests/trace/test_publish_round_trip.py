@@ -32,7 +32,7 @@ def test_publish_round_trip_register_object_nested(client) -> None:
 
         @classmethod
         def from_obj(cls, obj):
-            return cls.model_validate(obj.unwrap(), from_attributes=True)
+            return cls.model_validate(obj.unwrap())
 
     outer = Outer(inner=Inner(name="test"))
     outer_ref = weave.publish(outer)
