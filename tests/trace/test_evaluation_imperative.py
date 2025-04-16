@@ -66,33 +66,35 @@ def test_basic_evaluation(
         predict_index = 1 + i * 4
 
         predict_and_score_call = calls[predict_index]
-        assert op_name_from_call(predict_and_score_call) == "predict_and_score"
+        assert (
+            op_name_from_call(predict_and_score_call) == "Evaluation.predict_and_score"
+        )
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
-        assert predict_and_score_call.inputs["inputs"] == inputs
+        assert predict_and_score_call.inputs["example"] == inputs
         assert predict_and_score_call.output["model_output"] == outputs
 
-        feedbacks = list(predict_and_score_call.feedback)
+        predict_call = calls[predict_index + 1]
+        assert op_name_from_call(predict_call) == "Model.predict"
+        assert predict_call.inputs["self"]._class_name == "Model"
+        assert predict_call.inputs["example"] == inputs
+        assert predict_call.output == outputs
+
+        feedbacks = list(predict_call.feedback)
         assert len(feedbacks) == 2
         assert feedbacks[0].feedback_type == "wandb.runnable.greater_than_2_scorer"
         assert feedbacks[1].feedback_type == "wandb.runnable.greater_than_4_scorer"
 
-        predict_call = calls[predict_index + 1]
-        assert op_name_from_call(predict_call) == "predict"
-        assert predict_call.inputs["self"]._class_name == "Model"
-        assert predict_call.inputs["inputs"] == inputs
-        assert predict_call.output == outputs
-
         scorer1_call = calls[predict_index + 2]
         assert op_name_from_call(scorer1_call) == "score"
         assert scorer1_call.inputs["output"]["model_output"] == outputs
-        assert scorer1_call.inputs["inputs"]["inputs"] == inputs
+        assert scorer1_call.inputs["inputs"]["example"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
         assert op_name_from_call(scorer2_call) == "score"
         assert scorer2_call.inputs["output"]["model_output"] == outputs
-        assert scorer2_call.inputs["inputs"]["inputs"] == inputs
+        assert scorer2_call.inputs["inputs"]["example"] == inputs
         assert scorer2_call.output == score2
 
     summarize_call = calls[13]
