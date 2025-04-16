@@ -42,9 +42,7 @@ from weave.trace.interface_query_builder import (
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
-    dataclass_asdict_one_level,
     dataclass_object_record,
-    pydantic_asdict_one_level,
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
@@ -91,9 +89,6 @@ from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.builtin_object_classes.base_object_def import (
-    BaseObject,
-)
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
@@ -448,11 +443,11 @@ def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-        obj_as_dict = pydantic_asdict_one_level(obj)
-        return {k: map_to_refs(v) for k, v in obj_as_dict.items()}
+        obj_record = pydantic_object_record(obj)
+        return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
-        obj_as_dict = dataclass_asdict_one_level(obj)
-        return {k: map_to_refs(v) for k, v in obj_as_dict.items()}
+        obj_record = dataclass_object_record(obj)
+        return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
     elif isinstance(obj, WeaveTable):
@@ -1780,7 +1775,7 @@ class WeaveClient:
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
         # and save them, and then save the object itself.
-        if isinstance(obj, (Object, BaseObject)):
+        if isinstance(obj, Object):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -1790,9 +1785,6 @@ class WeaveClient:
             # but that might have unintended consequences. As a result, we break the
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
-
-        # Note: we should also have a condition for `Objectifyable` and save that
-        # similar to how we save `Object` and `BaseObject` above.
 
         # Case 2: Op:
         # Here we save the op itself.
