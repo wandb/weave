@@ -1791,6 +1791,9 @@ class WeaveClient:
             # typical pattern and explicitly set the ref here.
             set_ref(obj, ref)
 
+        # Note: we should also have a condition for `Objectifyable` and save that
+        # similar to how we save `Object` and `BaseObject` above.
+
         # Case 2: Op:
         # Here we save the op itself.
         elif is_op(obj):
