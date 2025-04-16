@@ -1,11 +1,19 @@
+from typing import Callable, TypedDict
+
 import pytest
 
-from weave import ImperativeEvaluationLogger
+from weave import ImperativeEvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
+from weave.trace_server.trace_server_interface import ObjectVersionFilter
+
+
+class ExampleRow(TypedDict):
+    a: int
+    b: int
 
 
 @pytest.fixture
-def user_dataset():
+def user_dataset() -> list[ExampleRow]:
     return [
         {"a": 1, "b": 2},
         {"a": 2, "b": 3},
@@ -21,7 +29,9 @@ def user_model():
     return func
 
 
-def test_basic_evaluation(client, user_dataset, user_model):
+def test_basic_evaluation(
+    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+):
     ev = ImperativeEvaluationLogger()
 
     model_outputs = []
@@ -32,10 +42,10 @@ def test_basic_evaluation(client, user_dataset, user_model):
         pred = ev.log_prediction(inputs=row, output=model_output)
 
         score1_results.append(score1_result := model_output > 2)
-        pred.log_score(scorer_name="greater_than_2_scorer", score=score1_result)
+        pred.log_score(scorer="greater_than_2_scorer", score=score1_result)
 
         score2_results.append(score2_result := model_output > 2)
-        pred.log_score(scorer_name="greater_than_4_scorer", score=score2_result)
+        pred.log_score(scorer="greater_than_4_scorer", score=score2_result)
 
     ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
@@ -89,3 +99,123 @@ def test_basic_evaluation(client, user_dataset, user_model):
     assert op_name_from_call(summarize_call) == "summarize"
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {"avg_score": 1.0, "total_examples": 3}
+
+
+def test_evaluation_with_custom_models_and_scorers(
+    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+):
+    class MyModel(Model):
+        a: int
+        b: str
+
+    class MyScorer(Scorer):
+        c: int
+
+    model1 = MyModel(a=1, b="two")
+    model2 = MyModel(a=2, b="three")
+    model3 = "string_model"
+
+    ev1 = ImperativeEvaluationLogger(model=model1)
+    ev2 = ImperativeEvaluationLogger(model=model2)
+    ev3 = ImperativeEvaluationLogger(model=model3)
+
+    scorer1 = MyScorer(name="gt2_scorer", c=2)
+    scorer2 = "gt4_scorer"
+
+    def run_evaluation(ev: ImperativeEvaluationLogger):
+        for row in user_dataset:
+            model_output = user_model(row["a"], row["b"])
+            pred = ev.log_prediction(inputs=row, output=model_output)
+            score1_result = model_output > 2
+            pred.log_score(scorer=scorer1, score=score1_result)
+
+            score2_result = model_output > 4
+            pred.log_score(scorer=scorer2, score=score2_result)
+
+        ev.log_summary({"avg_score": 1.0, "total_examples": 3})
+
+    def make_assertions():
+        client.flush()
+
+        models = client._objects(
+            filter=ObjectVersionFilter(base_object_classes=["Model"])
+        )
+        assert len(models) == 3
+        assert models[0].object_id == "MyModel"
+        assert models[0].version_index == 0
+        assert models[1].object_id == "MyModel"
+        assert models[1].version_index == 1
+        assert models[2].object_id == "string_model"
+        assert models[2].version_index == 0
+
+        scorers = client._objects(
+            filter=ObjectVersionFilter(base_object_classes=["Scorer"])
+        )
+        assert len(scorers) == 2
+        # replacing the score method triggers a version bump.
+        # Since we always do this, the min version will always be 1
+        assert scorers[0].object_id == "gt2_scorer"
+        assert scorers[0].version_index == 1
+
+        # in the text case, we generate the scorer from scratch and there is no
+        # replacement step.  Therefore the version index will start at 0
+        assert scorers[1].object_id == "gt4_scorer"
+        assert scorers[1].version_index == 0
+
+    # Run each evaluation once.
+    # This creates 3 different model versions and 2 different scorer versions
+    for ev in [ev1, ev2, ev3]:
+        run_evaluation(ev)
+
+    make_assertions()
+
+    # Run the evaluations again.
+    # Since the models and scorers already exist, there should be no new versions created
+    for ev in [ev1, ev2, ev3]:
+        run_evaluation(ev)
+
+    make_assertions()
+
+    # Run a new evaluation using the same scorers, but different models
+    model4 = "new_string_model"
+    ev4 = ImperativeEvaluationLogger(model=model4)
+
+    for row in user_dataset:
+        model_output = user_model(row["a"], row["b"])
+        pred = ev4.log_prediction(inputs=row, output=model_output)
+        score1_result = model_output > 2
+        pred.log_score(scorer=scorer1, score=score1_result)
+
+        score2_result = model_output > 4
+        pred.log_score(scorer=scorer2, score=score2_result)
+
+    models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
+    assert len(models) == 4
+    assert models[3].object_id == "new_string_model"
+    assert models[3].version_index == 0
+
+    # No change to scorers
+    scorers = client._objects(
+        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
+    )
+    assert len(scorers) == 2
+
+    # Run a new evaluation using the same models, but different scorers
+    scorer3 = MyScorer(name="gt6_scorer", c=6)
+
+    for row in user_dataset:
+        model_output = user_model(row["a"], row["b"])
+        pred = ev3.log_prediction(inputs=row, output=model_output)
+        score3_result = model_output > 6
+        pred.log_score(scorer=scorer3, score=score3_result)
+
+    # No change to models
+    models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
+    assert len(models) == 4
+
+    scorers = client._objects(
+        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
+    )
+    assert len(scorers) == 3
+    assert scorers[2].object_id == "gt6_scorer"
+    assert scorers[2].version_index == 1

@@ -119,23 +119,23 @@ class ImperativeScoreLogger(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def log_score(self, scorer_name: str, score: ScoreType) -> None:
+    def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
 
         This is a convenience method for when you don't want to use async/await.
-        If called from within an existing event loop, use alog_score instead.
+        If called from within an existing event loop, use _alog_score instead.
         """
         try:
-            asyncio.run(self.alog_score(scorer_name, score))
+            asyncio.run(self._alog_score(scorer, score))
         except RuntimeError as e:
             if "This event loop is already running" in str(e):
                 raise RuntimeError(
-                    "Cannot call log_score from an async context. Use alog_score instead."
+                    "Cannot call log_score from an async context. Use _alog_score instead."
                 ) from e
             raise
 
     @validate_call
-    async def alog_score(
+    async def _alog_score(
         self,
         scorer: Annotated[
             Scorer | str,
@@ -147,19 +147,13 @@ class ImperativeScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        def make_score_method() -> Callable[[Scorer, Any, Any], ScoreType]:
-            """This func is created just to avoid name collision between the
-            score method name and the score value the user passes in."""
+        @weave.op(name=scorer.name)
+        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
+            # TODO: can't use score here because it will cause version mismatch
+            # return score
+            return cast(ScoreType, current_score.get())
 
-            @weave.op(name=scorer.name)
-            def score(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
-                # TODO: can't use score here because it will cause version mismatch
-                # return score
-                return cast(ScoreType, current_score.get())
-
-            return score
-
-        scorer.__dict__["score"] = MethodType(make_score_method(), scorer)
+        scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
@@ -184,7 +178,7 @@ class ImperativeEvaluationLogger(BaseModel):
         ```python
         ev = ImperativeEvaluationLogger()
         pred = ev.log_prediction(inputs, output)
-        await pred.log_score(scorer_name, score)
+        pred.log_score(scorer_name, score)
         ev.log_summary(summary)
         ```
     """
