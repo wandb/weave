@@ -6,7 +6,6 @@ from typing import Any, Union
 from uuid import UUID
 
 import openinference.semconv.trace as oi
-import opentelemetry.semconv_ai as ot
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server.trace_server_interface import LLMUsageSchema
@@ -318,14 +317,14 @@ def unflatten_key_values(
 def get_weave_inputs(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
 
     def get_opentelemetry_inputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
-        prompts = get_attribute(attributes, ot.SpanAttributes.LLM_PROMPTS)
+        prompts = get_attribute(attributes, 'gen_ai.prompt')
 
         if not prompts:
             return None
 
         # Do convert numeric to list, nested under prompt key
         inputs: dict[str, Any] = {
-            "prompt": convert_numeric_keys_to_list(prompts)
+            "prompts": convert_numeric_keys_to_list(prompts)
         }
         return to_json_serializable(inputs)
 
@@ -354,23 +353,24 @@ def get_weave_inputs(events: list[dict[str, Any]], attributes: dict[str, Any]) -
         get_openinference_inputs,
     ]
 
+    result = {}
     for extractor in extractors:
         inputs = extractor(events, attributes)
         if inputs:
-            return inputs
+            result.update(inputs)
 
-    return {}
+    return result
 
 def get_weave_outputs(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
 
     def get_opentelemetry_outputs(_: list[dict[str, Any]], attributes: dict[str, Any]) -> Any:
-        completions = get_attribute(attributes, ot.SpanAttributes.LLM_COMPLETIONS)
+        completions = get_attribute(attributes, "gen_ai.completion")
         if not completions:
             return None
 
         # Do convert numeric to list, nested under completion key
         outputs: dict[str, Any] = {
-            "completion": convert_numeric_keys_to_list(completions)
+            "completions": convert_numeric_keys_to_list(completions)
         }
         return to_json_serializable(outputs)
 
@@ -399,12 +399,13 @@ def get_weave_outputs(events: list[dict[str, Any]], attributes: dict[str, Any]) 
         get_openinference_outputs,
     ]
 
+    result = {}
     for extractor in extractors:
         outputs = extractor(events, attributes)
         if outputs:
-            return outputs
+            result.update(outputs)
 
-    return {}
+    return result
 
 def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any]:
     field_types = {
@@ -414,10 +415,10 @@ def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any
 
     def get_opentelemetry_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
         results = {
-            'max_tokens': get_attribute(attributes, ot.SpanAttributes.LLM_REQUEST_MAX_TOKENS),
-            'system': get_attribute(attributes, ot.SpanAttributes.LLM_SYSTEM),
-            'kind': get_attribute(attributes, ot.SpanAttributes.TRACELOOP_SPAN_KIND),
-            'model': get_attribute(attributes, ot.SpanAttributes.LLM_RESPONSE_MODEL),
+            'max_tokens': get_attribute(attributes, 'gen_ai.request.max_tokens'),
+            'system': get_attribute(attributes, 'gen_ai.system'),
+            'kind': get_attribute(attributes, 'traceloop.span.kind'),
+            'model': get_attribute(attributes, 'gen_ai.response.model'),
         }
 
         filtered = list(filter(lambda item: item[1] is not None, results.items()))
@@ -434,10 +435,10 @@ def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any
 
     def get_openinference_attributes(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
         results = {
-            'system': get_attribute(attributes, oi.SpanAttributes.LLM_SYSTEM),
-            'provider': get_attribute(attributes, oi.SpanAttributes.LLM_PROVIDER),
-            'kind': get_attribute(attributes, oi.SpanAttributes.OPENINFERENCE_SPAN_KIND),
-            'model': get_attribute(attributes, oi.SpanAttributes.LLM_MODEL_NAME)
+            'system': get_attribute(attributes, 'llm.system'),
+            'provider': get_attribute(attributes, 'llm.provider'),
+            'kind': get_attribute(attributes, 'openinference.span.kind'),
+            'model': get_attribute(attributes, 'llm.model_name')
         }
 
         filtered = list(filter(lambda item: item[1] is not None, results.items()))
@@ -467,11 +468,12 @@ def get_weave_attributes(events: list[dict[str, Any]], attributes: dict[str, Any
         get_openinference_attributes,
     ]
 
+    result = {}
     for extractor in extractors:
-        result = extractor(events, attributes)
-        if result:
-            return result
-    return {}
+        weave_attributes = extractor(events, attributes)
+        if weave_attributes:
+            result.update(weave_attributes)
+    return result
 
 def get_weave_usage(events: list[dict[str, Any]], attributes: dict[str, Any]) -> LLMUsageSchema:
     def get_openinferance_usage(_: list[dict[str, Any]], attributes: dict[str, Any]) -> dict[str, Any] | None:
