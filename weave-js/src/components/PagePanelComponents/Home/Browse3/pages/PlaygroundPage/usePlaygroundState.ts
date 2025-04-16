@@ -6,7 +6,11 @@ import {
   hasStringProp,
   isAnthropicCompletionFormat,
 } from '../ChatView/hooks';
-import {LLM_MAX_TOKENS_KEYS, LLMMaxTokensKey} from './llmMaxTokens';
+import {
+  DEFAULT_LLM_MODEL,
+  LLM_MAX_TOKENS_KEYS,
+  LLMMaxTokensKey,
+} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -21,8 +25,6 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   role: 'system',
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
-
-const DEFAULT_MODEL = 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey;
 
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
@@ -42,7 +44,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   presencePenalty: 0,
   nTimes: 1,
   maxTokensLimit: 16384,
-  model: DEFAULT_MODEL,
+  model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
 };
 
@@ -155,7 +157,7 @@ export const usePlaygroundState = () => {
             ) as LLMMaxTokensKey;
           }
           if (newState.model === undefined) {
-            newState.model = DEFAULT_MODEL;
+            newState.model = DEFAULT_LLM_MODEL;
           }
         }
         return [newState];

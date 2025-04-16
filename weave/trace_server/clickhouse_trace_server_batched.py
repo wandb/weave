@@ -49,7 +49,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.calls_query_builder import (
+from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     OrderField,
@@ -1426,6 +1426,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
         """Determine if we should use file storage for a project."""
+        # Check if we should use file storage based on the ramp percentage
+        ramp_pct = wf_env.wf_file_storage_project_ramp_pct()
+        if ramp_pct is not None:
+            # If the hash value is less than the ramp percentage, use file storage
+            project_hash_value = _string_to_int_in_range(project_id, 100)
+            if project_hash_value < ramp_pct:
+                return True
+
+        # Check if we should use file storage based on the allow list
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
             return False
@@ -2371,3 +2380,18 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
+
+
+def _string_to_int_in_range(input_string: str, range_max: int) -> int:
+    """Convert a string to a deterministic integer within a specified range.
+
+    Args:
+        input_string: The string to convert to an integer
+        range_max: The maximum allowed value (exclusive)
+
+    Returns:
+        int: A deterministic integer value between 0 and range_max
+    """
+    hash_obj = hashlib.md5(input_string.encode())
+    hash_int = int(hash_obj.hexdigest(), 16)
+    return hash_int % range_max

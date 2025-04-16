@@ -2,7 +2,7 @@ import pytest
 import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder import (
+from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
@@ -1682,6 +1682,297 @@ def test_aggregated_data_size_field():
     assert "CASE" in sql
     assert "parent_id" in sql
     assert "rolled_up_cms.total_storage_size_bytes" in sql
+
+
+def test_datetime_optimization_simple() -> None:
+    """Test basic datetime optimization with a single timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field based on the UUIDv7 timestamp
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.sortable_datetime > {pb_1:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) > {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "2024-02-29 23:55:00.000000",
+        },
+    )
+
+
+def test_datetime_optimization_not_operation() -> None:
+    """Test datetime optimization with a NOT operation."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.NotOperation.model_validate(
+            {
+                "$not": [
+                    {
+                        "$gte": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+
+    # The optimization should add a condition on the ID field with reversed comparison
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (NOT (calls_merged.sortable_datetime >= {pb_1:String}))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((
+            (NOT ((any(calls_merged.started_at) >= {pb_0:UInt64}))))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "2024-03-01 00:05:00.000000",
+        },
+    )
+
+
+def test_datetime_optimization_multiple_conditions() -> None:
+    """Test datetime optimization with multiple timestamp conditions."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$and": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                                ]
+                            },
+                            {
+                                "$not": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "started_at"},
+                                            {
+                                                "$literal": 1709337600
+                                            },  # 2024-03-02 00:00:00 UTC
+                                        ]
+                                    }
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$getField": "ended_at"},
+                                    {"$literal": 1709251200},
+                                ]
+                            },
+                            {
+                                "$and": [
+                                    {
+                                        "$gte": [
+                                            {"$getField": "ended_at"},
+                                            {"$literal": 1709251200},
+                                        ]
+                                    },
+                                    {
+                                        "$gt": [
+                                            {"$getField": "ended_at"},
+                                            {"$literal": 1709337600},
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (calls_merged.sortable_datetime > {pb_2:String}
+            AND NOT (calls_merged.sortable_datetime > {pb_3:String}))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
+            AND ((NOT ((any(calls_merged.started_at) > {pb_1:UInt64}))))
+            AND (((any(calls_merged.ended_at) > {pb_0:UInt64})
+                OR ((any(calls_merged.ended_at) >= {pb_0:UInt64})
+                    AND (any(calls_merged.ended_at) > {pb_1:UInt64}))))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_1": 1709337600,
+            "pb_4": "project",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:05:00.000000",
+        },
+    )
+
+
+def test_datetime_optimization_invalid_field() -> None:
+    """Test that datetime optimization is not applied for non-timestamp fields."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "wb_user_id"},
+                    {"$literal": 1709251200},
+                ]
+            }
+        )
+    )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": "2025-03-01 00:00:00 UTC"},
+                ]
+            }
+        )
+    )
+
+    # The optimization should not be applied since wb_user_id is not a timestamp field
+    # and '2025-03-01 00:00:00 UTC' isn't a timestamp
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.wb_user_id) > {pb_0:UInt64}))
+            AND ((any(calls_merged.started_at) > {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
+    )
+
+
+def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gt": [
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                            },
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
+                            },
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},
+                        ]
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.message"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+            (SELECT calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_2:String}
+                AND (calls_merged.sortable_datetime > {pb_1:String})
+            GROUP BY (calls_merged.project_id,
+                        calls_merged.id)
+            HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
+                    AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.id IN filtered_calls)
+            AND ((calls_merged.inputs_dump LIKE {pb_8:String}
+                OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_4:String}) > JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_5:String})))
+            AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) = {pb_7:String})))
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_1": "2024-02-29 23:55:00.000000",
+            "pb_2": "project",
+            "pb_3": "wandb.runnable.my_op",
+            "pb_4": '$."output"."expected"',
+            "pb_5": '$."output"."found"',
+            "pb_6": '$."message"',
+            "pb_7": "hello",
+            "pb_8": '%"hello"%',
+        },
+    )
 
 
 def test_filter_length_validation():
