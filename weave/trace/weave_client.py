@@ -58,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -423,37 +424,6 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> ObjectRef | None:
-    return getattr(obj, "ref", None)
-
-
-def remove_ref(obj: Any) -> None:
-    if get_ref(obj) is not None:
-        if "ref" in obj.__dict__:  # for methods
-            obj.__dict__["ref"] = None
-        else:
-            obj.ref = None
-
-
-def set_ref(obj: Any, ref: Ref | None) -> None:
-    """Try to set the ref on "any" object.
-
-    We use increasingly complex methods to try to set the ref
-    to support different kinds of objects. This will still
-    fail for python primitives, but those can't be traced anyway.
-    """
-    try:
-        obj.ref = ref
-    except:
-        try:
-            setattr(obj, "ref", ref)
-        except:
-            try:
-                obj.__dict__["ref"] = ref
-            except:
-                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
-
-
 def _get_direct_ref(obj: Any) -> Ref | None:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -461,7 +431,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
         # the "container ref", ie a ref to the root object that the WeaveTable
         # is within, with extra pointing to the table.
         return obj.table_ref
-    return getattr(obj, "ref", None)
+    return get_ref(obj)
 
 
 def map_to_refs(obj: Any) -> Any:
