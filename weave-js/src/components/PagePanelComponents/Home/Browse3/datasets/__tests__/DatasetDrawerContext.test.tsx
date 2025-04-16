@@ -32,7 +32,7 @@ vi.mock('../schemaUtils', () => ({
     return new Map([['call1', {text: 'Sample text'}]]);
   }),
   filterRowsForNewDataset: vi.fn(rows => rows),
-  inferSchema: vi.fn(() => []),
+  createTargetSchema: vi.fn(() => []),
 }));
 
 // Test component to expose context values
