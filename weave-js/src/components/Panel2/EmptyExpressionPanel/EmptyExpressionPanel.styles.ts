@@ -122,8 +122,6 @@ export const DynamicScrollContainer = styled(ScrollableContainer)<{
   overflow-y: ${props => (props.shouldScroll ? 'auto' : 'visible')};
   visibility: ${props => (props.isInitialized ? 'visible' : 'hidden')};
   transition: max-height 0.2s ease-out;
-  padding: 0 ${SPACING.xxl} ${SPACING.xxl};
-  padding-top: ${SPACING.xs};
 `;
 
 export const CardGrid = styled.div`

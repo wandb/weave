@@ -101,14 +101,17 @@ export const EmptyExpressionPanel: React.FC<
   const [isInitialized, setIsInitialized] = useState(false);
   const [gridColumns, setGridColumns] = useState(1);
 
-  // Determine if compact mode is active (1 column)
-  const isCompactMode = gridColumns === 1;
+  // Directly track container width for compact mode determination
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Determine if compact mode is active based on width
+  const isCompactMode = containerWidth < 240;
 
   // Update grid columns based on container width
   const updateGridColumns = useCallback((width: number) => {
-    if (width >= 600) {
+    if (width >= 500) {
       setGridColumns(3);
-    } else if (width >= 400) {
+    } else if (width >= 380) {
       setGridColumns(2);
     } else {
       setGridColumns(1);
@@ -118,6 +121,7 @@ export const EmptyExpressionPanel: React.FC<
   // Update measurements when resizing
   const updateContainerMeasurements = useCallback(
     (width: number) => {
+      setContainerWidth(width);
       updateGridColumns(width);
     },
     [updateGridColumns]
