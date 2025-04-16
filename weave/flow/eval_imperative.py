@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Any, TypedDict, Union, cast
+from typing import Annotated, Any, TypedDict, TypeVar, Union, cast
 
 import uuid_utils as uuid
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
@@ -63,7 +63,21 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
-def _validate_scorer_name(name: str) -> None:
+T = TypeVar("T")
+
+
+def _convert_to_cls(value: str | T, type_: type[T]) -> T:
+    if isinstance(value, str):
+        cls_name = value
+
+        # Dynamically create the class if the user only provides a name
+        cls_name = _validate_class_name(cls_name)
+        cls = type(cls_name, (type_,), {})
+        return cls()
+    return value
+
+
+def _validate_class_name(name: str) -> str:
     """Validate the scorer name to be a valid class name."""
     # Check if name is not empty
     if not name:
@@ -85,6 +99,8 @@ def _validate_scorer_name(name: str) -> None:
 
     if keyword.iskeyword(name):
         raise ValueError(f"Scorer name '{name}' cannot be a Python keyword")
+
+    return name
 
 
 class AttributeConfigDict(TypedDict):
@@ -160,16 +176,14 @@ class ImperativeScoreLogger(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def log_score(
-        self, scorer_name: str, score: ScoreType, metadata: dict | None = None
-    ) -> None:
+    def log_score(self, scorer_name: str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
 
         This is a convenience method for when you don't want to use async/await.
         If called from within an existing event loop, use alog_score instead.
         """
         try:
-            asyncio.run(self.alog_score(scorer_name, score, metadata))
+            asyncio.run(self.alog_score(scorer_name, score))
         except RuntimeError as e:
             if "This event loop is already running" in str(e):
                 raise RuntimeError(
@@ -179,30 +193,31 @@ class ImperativeScoreLogger(BaseModel):
 
     async def alog_score(
         self,
-        scorer_name: str,
+        scorer: Annotated[
+            Scorer | str,
+            _convert_to_cls(Scorer),
+            Field(description="A metadata-only scorer used for comparisons"),
+        ],
         score: ScoreType,
-        metadata: dict | None = None,
     ) -> None:
-        # Define the scorer class dynamically
+        scorer = cast(
+            Scorer, scorer
+        )  # idk why I need this, it should already be casted with annotation
 
-        _validate_scorer_name(scorer_name)
-        DynamicScorer = type(scorer_name, (Scorer,), {})
-        scorer_instance = DynamicScorer()
-
-        @weave.op(name=scorer_name)
-        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> float:
+        @weave.op(name=scorer.name)
+        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
+            # TODO: can't use score here because it will cause version mismatch
             # return score
-            # TODO: can't use score here because it will cause version mismatc
-            return cast(float, current_score.get())
+            return cast(ScoreType, current_score.get())
 
-        scorer_instance.__dict__["score"] = MethodType(score_method, scorer_instance)
+        scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                await self.predict_and_score_call.apply_scorer(scorer_instance)
+                await self.predict_and_score_call.apply_scorer(scorer)
 
 
 class ImperativeEvaluationLogger(BaseModel):
@@ -225,19 +240,14 @@ class ImperativeEvaluationLogger(BaseModel):
         ```
     """
 
-    # weave_model_config: dict | None = Field(
-    #     default=None,
-    #     description="The config for the model to be used in the evaluation."
-    #     "Setting this will create a new subclass of Model with the given config."
-    #     "The class is purely for metadata purposes, and will not affect the eval",
-    # )
-
-    model: str | ImperativeModel = Field(default_factory=ImperativeModel)
+    model: Annotated[Model | str, _convert_to_cls(Model)] = Field(
+        default_factory=ImperativeModel,
+        description="A metadata-only Model used for comparisons",
+    )
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
-    # _pseudo_model: Model = PrivateAttr(default_factory=lambda: Model())
     _pseudo_evaluation: Evaluation = PrivateAttr(
         default_factory=lambda: Evaluation(
             dataset=weave.Dataset(rows=weave.Table([{"": ""}])),
