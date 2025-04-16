@@ -201,7 +201,6 @@ class ImperativeEvaluationLogger(BaseModel):
             scorers=[],
         )
     )
-    _starting_stack: list[Call] = PrivateAttr(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_model(self) -> ImperativeEvaluationLogger:
@@ -257,8 +256,6 @@ class ImperativeEvaluationLogger(BaseModel):
                     "summarize": MethodType(summarize, self._pseudo_evaluation),
                 }
             )
-
-            self._starting_stack = call_context.get_call_stack()
 
             # Create the evaluation call
             wc = require_weave_client()

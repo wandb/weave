@@ -1,7 +1,8 @@
 import hashlib
 import re
 from collections.abc import Iterable
-from typing import Any, Union, cast
+from concurrent.futures import Future
+from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
 from weave.trace.weave_client import Call, CallsIter
@@ -93,7 +94,8 @@ def op_name_from_ref(ref: str) -> str:
 
 
 def op_name_from_call(call: Call) -> str:
-    op_name = cast(str, call._op_name)
+    if isinstance(op_name := call._op_name, Future):
+        op_name = op_name.result()
     return op_name_from_ref(op_name)
 
 
