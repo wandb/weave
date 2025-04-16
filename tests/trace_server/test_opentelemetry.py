@@ -1,4 +1,5 @@
 import json
+from typing import Any
 import uuid
 from binascii import hexlify
 from datetime import datetime
@@ -390,6 +391,9 @@ class TestAttributes:
         assert result == expected
 
 
+def create_attributes(d: dict[str, Any]):
+    return expand_attributes(d.items())
+
 class TestSemanticConventionParsing:
     """Test the semantic convention parsing functionality in attributes.py."""
 
@@ -398,8 +402,7 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference attributes
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.LLM_SYSTEM: "This is a system prompt",
             OISpanAttr.LLM_PROVIDER: "test-provider",
             OISpanAttr.LLM_MODEL_NAME: "test-model",
@@ -407,34 +410,33 @@ class TestSemanticConventionParsing:
             OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
                 {"temperature": 0.7, "max_tokens": 100}
             ),
-        }
+        })
 
         # Test get_weave_attributes
-        extracted = get_weave_attributes([], attributes)
+        extracted = get_weave_attributes(attributes)
         print(extracted)
         assert extracted["system"] == "This is a system prompt"
         assert extracted["provider"] == "test-provider"
         assert extracted["model"] == "test-model"
         assert extracted["kind"] == "llm"
-        assert extracted["temperature"] == "0.7"
-        assert extracted["max_tokens"] == "100"
+        assert extracted["model_parameters"]["max_tokens"] == 100
+        assert extracted["model_parameters"]["temperature"] == 0.7
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference input value and mime type
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.INPUT_VALUE: "What is machine learning?",
             OISpanAttr.INPUT_MIME_TYPE: "text/plain",
-        }
+        })
 
         # Test get_weave_inputs with text input
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": "What is machine learning?",
-            "mime_type": "text/plain",
+            "type": "text/plain",
         }
 
         # Test with JSON input
@@ -444,11 +446,10 @@ class TestSemanticConventionParsing:
                 {"role": "user", "content": "What is machine learning?"},
             ]
         })
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.INPUT_VALUE: json_input,
             OISpanAttr.INPUT_MIME_TYPE: "application/json",
-        }
+        })
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": {
@@ -457,7 +458,7 @@ class TestSemanticConventionParsing:
                     {"role": "user", "content": "What is machine learning?"},
                 ]
             },
-            "mime_type": "application/json",
+            "type": "application/json",
         }
 
     def test_openinference_outputs_extraction(self):
@@ -465,17 +466,16 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference output value and mime type
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
             OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
-        }
+        })
 
         # Test get_weave_outputs with text output
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "value": "Machine learning is a field of AI...",
-            "mime_type": "text/plain",
+            "type": "text/plain",
         }
 
         # Test with JSON output
@@ -485,11 +485,10 @@ class TestSemanticConventionParsing:
                 "content": "Machine learning is a field of AI...",
             }
         })
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.OUTPUT_VALUE: json_output,
             OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
-        }
+        })
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "value": {
@@ -498,7 +497,7 @@ class TestSemanticConventionParsing:
                     "content": "Machine learning is a field of AI...",
                 }
             },
-            "mime_type": "application/json",
+            "type": "application/json",
         }
 
     def test_openinference_usage_extraction(self):
@@ -506,15 +505,14 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference token counts
-        attributes = {
-            "openinference": True,
+        attributes = create_attributes({
             OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
             OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
             OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
-        }
+        })
 
         # Test get_weave_usage
-        usage = get_weave_usage([], attributes)
+        usage = get_weave_usage(attributes)
         assert usage.get("prompt_tokens") == 10
         assert usage.get("completion_tokens") == 20
         assert usage.get("total_tokens") == 30
@@ -524,18 +522,17 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry attributes
-        attributes = {
-            "gen_ai": True,
+        attributes = create_attributes({
             OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
             OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
             OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
             OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
-        }
+        })
 
         # Test get_weave_attributes
-        extracted = get_weave_attributes([], attributes)
+        extracted = get_weave_attributes(attributes)
         assert extracted["system"] == "You are a helpful assistant"
-        assert extracted["max_tokens"] == 150
+        assert extracted["model_parameters"]["max_tokens"] == 150
         assert extracted["kind"] == "llm"
         assert extracted["model"] == "gpt-4"
 
@@ -545,15 +542,14 @@ class TestSemanticConventionParsing:
 
         # Create attribute dictionary with OpenTelemetry prompts
         prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
-        attributes = {
-            "gen_ai": True,
+        attributes = create_attributes({
             OTSpanAttr.LLM_PROMPTS: prompts,
-        }
+        })
 
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "prompt": [
+            'value': [
                 {"role": "user", "content": "Tell me about quantum computing"}
             ]
         }
@@ -563,13 +559,12 @@ class TestSemanticConventionParsing:
             "0": {"role": "system", "content": "You are an expert in quantum physics"},
             "1": {"role": "user", "content": "Tell me about quantum computing"},
         }
-        attributes = {
-            "gen_ai": True,
+        attributes = create_attributes({
             OTSpanAttr.LLM_PROMPTS: prompts_multiple,
-        }
+        })
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "prompt": [
+            "value": [
                 {"role": "system", "content": "You are an expert in quantum physics"},
                 {"role": "user", "content": "Tell me about quantum computing"},
             ]
@@ -586,17 +581,16 @@ class TestSemanticConventionParsing:
                 "content": "Quantum computing uses quantum mechanics...",
             }
         }
-        attributes = {
-            "gen_ai": True,
+        attributes = create_attributes({
             OTSpanAttr.LLM_COMPLETIONS: completions,
-        }
+        })
 
         # Create OpenTelemetry attributes object
 
         # Test get_weave_outputs
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "completion": [
+            "value": [
                 {
                     "role": "assistant",
                     "content": "Quantum computing uses quantum mechanics...",
@@ -609,15 +603,14 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry token usage
-        attributes = {
-            "gen_ai": True,
+        attributes = create_attributes({
             OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
             OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
             OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
-        }
+        })
 
         # Create OpenTelemetry attributes object
-        usage = get_weave_usage([], attributes) or {}
+        usage = get_weave_usage(attributes) or {}
 
         assert usage.get("prompt_tokens") == 15
         assert usage.get("completion_tokens") == 25

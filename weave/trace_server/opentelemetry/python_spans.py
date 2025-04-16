@@ -32,6 +32,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace_server import trace_server_interface as tsi
 
 from .attributes import (
+    SpanEvent,
     get_weave_usage,
     get_weave_inputs,
     get_weave_outputs,
@@ -278,17 +279,30 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        events = list(map(lambda e: e.as_dict(), self.events))
-        usage = get_weave_usage(events, self.attributes) or {}
+        events = list(map(lambda e: SpanEvent(e.as_dict()), self.events))
+        usage = get_weave_usage(self.attributes) or {}
         inputs = get_weave_inputs(events, self.attributes) or {}
         outputs = get_weave_outputs(events, self.attributes) or {}
-        attributes = get_weave_attributes(events, self.attributes) or {}
-        summary_insert_map = tsi.SummaryInsertMap(usage={'usage': usage})
+        attributes = get_weave_attributes(self.attributes) or {}
+        llm_usage = tsi.LLMUsageSchema(
+            input_tokens=usage.get('input_tokens'),
+            output_tokens=usage.get('output_tokens'),
+            completion_tokens=usage.get('completion_tokens'),
+            prompt_tokens=usage.get('prompt_tokens'),
+            total_tokens=usage.get('total_tokens'),
+            requests=usage.get('requests'),
+        )
+        summary_insert_map = tsi.SummaryInsertMap(usage={'usage': llm_usage})
 
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
         has_outputs = len(outputs) > 0
         has_usage = len(usage) > 0
+        print(f"has_attributes: {has_attributes}, has_inputs: {has_inputs}, has_outputs: {has_outputs}, has_usage: {has_usage}")
+        print(attributes)
+        print(inputs)
+        print(outputs)
+        print(usage)
 
         # We failed to load any of the Weave attributes, dump all attributes
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
