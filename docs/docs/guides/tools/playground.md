@@ -182,8 +182,12 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - gpt-4.1
 - gpt-4.1-nano-2025-04-14
 - gpt-4.1-nano
+- o4-mini-2025-04-16
+- o4-mini
 - gpt-4.5-preview-2025-02-27
 - gpt-4.5-preview
+- o3-2025-04-16
+- o3
 - o3-mini-2025-01-31
 - o3-mini
 - gpt-4o-mini
