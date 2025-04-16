@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Any, Union, cast
+from typing import Any, TypedDict, Union, cast
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+import uuid_utils as uuid
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 import weave
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
+from weave.flow.obj import Object
 from weave.flow.scorer import Scorer
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -30,7 +33,7 @@ current_summary: ContextVar[dict | None] = ContextVar("current_summary", default
 
 
 @contextmanager
-def set_current_output(output: Any) -> Iterator[None]:
+def _set_current_output(output: Any) -> Iterator[None]:
     """Set the current output in a thread-safe way using context variables."""
     token = current_output.set(output)
     try:
@@ -40,7 +43,7 @@ def set_current_output(output: Any) -> Iterator[None]:
 
 
 @contextmanager
-def set_current_score(score: ScoreType) -> Iterator[None]:
+def _set_current_score(score: ScoreType) -> Iterator[None]:
     token = current_score.set(score)
     try:
         yield
@@ -49,7 +52,7 @@ def set_current_score(score: ScoreType) -> Iterator[None]:
 
 
 @contextmanager
-def set_current_summary(summary: dict) -> Iterator[None]:
+def _set_current_summary(summary: dict) -> Iterator[None]:
     token = current_summary.set(summary)
     try:
         yield
@@ -57,7 +60,7 @@ def set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
-def validate_scorer_name(name: str) -> None:
+def _validate_scorer_name(name: str) -> None:
     """Validate the scorer name to be a valid class name."""
     # Check if name is not empty
     if not name:
@@ -81,6 +84,51 @@ def validate_scorer_name(name: str) -> None:
         raise ValueError(f"Scorer name '{name}' cannot be a Python keyword")
 
 
+class AttributeConfigDict(TypedDict):
+    type: str
+    value: Any
+
+
+ObjectConfigDict = dict[str, AttributeConfigDict]
+
+
+def dynamically_create_weave_object_class(
+    type_: str = "DynamicObject",
+    id: str = str(uuid.uuid7()),
+    # This dict specifies the attributes of the object
+    config: ObjectConfigDict | None = None,
+) -> type[Object]:
+    if config is None:
+        config = {}
+
+    if "name" not in config:
+        config["name"] = {"type": "str", "value": f"{type_}_{id}"}
+
+    # Construct the type constructor dict for weave.Object
+    annotations = {}
+    pydantic_config_dict = {}
+    for name, config_dict in config.items():
+        annotations[name] = config_dict["type"]
+        pydantic_config_dict[name] = config_dict["value"]
+
+    pydantic_config_dict["__annotations__"] = annotations
+
+    return type(type_, (Object,), pydantic_config_dict)
+
+
+class ImperativeModel(Model):
+    """A variant of Model intended to be used with ImperativeEvaluationLogger.
+
+    It does not require defining a predict method (if defined, it will be
+    overriden anyways)."""
+
+    @weave.op
+    def predict(self, input_data: Any) -> Any:
+        # this function intentionally left blank and will be replaced as part of
+        # the evaluation setup
+        ...
+
+
 class ImperativeScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores.
 
@@ -95,16 +143,40 @@ class ImperativeScoreLogger(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def log_score(
+    _scorer_class_cache: dict = PrivateAttr(default_factory=dict)
+
+    def log_score(
+        self, scorer_name: str, score: ScoreType, metadata: dict | None = None
+    ) -> None:
+        """Log a score synchronously by calling the async method.
+
+        This is a convenience method for when you don't want to use async/await.
+        If called from within an existing event loop, use alog_score instead.
+        """
+        try:
+            asyncio.run(self.alog_score(scorer_name, score, metadata))
+        except RuntimeError as e:
+            if "This event loop is already running" in str(e):
+                raise RuntimeError(
+                    "Cannot call log_score from an async context. Use alog_score instead."
+                ) from e
+            raise
+
+    async def alog_score(
         self,
         scorer_name: str,
         score: ScoreType,
         metadata: dict | None = None,
     ) -> None:
         # Define the scorer class dynamically
-        validate_scorer_name(scorer_name)
-        cls_name = scorer_name.replace(".", "_")
-        DynamicScorer = type(cls_name, (Scorer,), {})
+        if scorer_name not in self._scorer_class_cache:
+            _validate_scorer_name(scorer_name)
+            cls_name = scorer_name.replace(".", "_")
+            DynamicScorer = type(cls_name, (Scorer,), {})
+            self._scorer_class_cache[scorer_name] = DynamicScorer
+        else:
+            DynamicScorer = self._scorer_class_cache[scorer_name]
+
         scorer_instance = DynamicScorer()
 
         @weave.op(name=scorer_name)
@@ -119,7 +191,7 @@ class ImperativeScoreLogger(BaseModel):
         with call_context.set_call_stack(
             [self.evaluate_call, self.predict_and_score_call]
         ):
-            with set_current_score(score):
+            with _set_current_score(score):
                 await self.predict_and_score_call.apply_scorer(scorer_instance)
 
 
@@ -143,10 +215,19 @@ class ImperativeEvaluationLogger(BaseModel):
         ```
     """
 
+    # weave_model_config: dict | None = Field(
+    #     default=None,
+    #     description="The config for the model to be used in the evaluation."
+    #     "Setting this will create a new subclass of Model with the given config."
+    #     "The class is purely for metadata purposes, and will not affect the eval",
+    # )
+
+    model: Model = Field(default_factory=ImperativeModel)
+
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
-    _pseudo_model: Model = PrivateAttr(default_factory=lambda: Model())
+    # _pseudo_model: Model = PrivateAttr(default_factory=lambda: Model())
     _pseudo_evaluation: Evaluation = PrivateAttr(
         default_factory=lambda: Evaluation(
             dataset=weave.Dataset(rows=weave.Table([{"": ""}])),
@@ -156,6 +237,9 @@ class ImperativeEvaluationLogger(BaseModel):
     _starting_stack: list[Call] = PrivateAttr(default_factory=list)
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
+        # similar to how we dynamically create the scorer class, we will
+        # dynamically create the model class
+
         if not self._eval_started:
             self._eval_started = True
 
@@ -168,9 +252,7 @@ class ImperativeEvaluationLogger(BaseModel):
                 # Get the output from the context variable
                 return current_output.get()
 
-            self._pseudo_model.__dict__["predict"] = MethodType(
-                predict, self._pseudo_model
-            )
+            self.model.__dict__["predict"] = MethodType(predict, self.model)
 
             # --- Setup the evaluation object ---
             @weave.op(name="Evaluation.evaluate")
@@ -208,16 +290,16 @@ class ImperativeEvaluationLogger(BaseModel):
                 op=self._pseudo_evaluation.evaluate,
                 inputs={
                     "self": self._pseudo_evaluation,
-                    "model": self._pseudo_model,
+                    "model": self.model,
                 },
             )
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
 
         # Make the prediction call
-        with set_current_output(output):
+        with _set_current_output(output):
             _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
-                self._pseudo_evaluation, self._pseudo_model, inputs
+                self._pseudo_evaluation, self.model, inputs
             )
 
         # Get the model output from the call result
@@ -238,7 +320,7 @@ class ImperativeEvaluationLogger(BaseModel):
         # Call the summarize method with the proper context
         assert self._evaluate_call is not None
         with call_context.set_call_stack([self._evaluate_call]):
-            with set_current_summary(summary):
+            with _set_current_summary(summary):
                 self._pseudo_evaluation.summarize()
 
         # Finish the evaluation call

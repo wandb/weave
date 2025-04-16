@@ -21,8 +21,7 @@ def user_model():
     return func
 
 
-@pytest.mark.asyncio
-async def test_basic_evaluation(client, user_dataset, user_model):
+def test_basic_evaluation(client, user_dataset, user_model):
     ev = ImperativeEvaluationLogger()
 
     model_outputs = []
@@ -33,10 +32,10 @@ async def test_basic_evaluation(client, user_dataset, user_model):
         pred = ev.log_prediction(inputs=row, output=model_output)
 
         score1_results.append(score1_result := model_output > 2)
-        await pred.log_score(scorer_name="greater_than_2_scorer", score=score1_result)
+        pred.log_score(scorer_name="greater_than_2_scorer", score=score1_result)
 
         score2_results.append(score2_result := model_output > 2)
-        await pred.log_score(scorer_name="greater_than_4_scorer", score=score2_result)
+        pred.log_score(scorer_name="greater_than_4_scorer", score=score2_result)
 
     ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
@@ -48,7 +47,7 @@ async def test_basic_evaluation(client, user_dataset, user_model):
     evaluate_call = calls[0]
     assert op_name_from_call(evaluate_call) == "Evaluation.evaluate"
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
-    assert evaluate_call.inputs["model"]._class_name == "Model"
+    assert evaluate_call.inputs["model"]._class_name == "ImperativeModel"
     assert evaluate_call.output == {"avg_score": 1.0, "total_examples": 3}
 
     for i, (inputs, outputs, score1, score2) in enumerate(
@@ -59,7 +58,7 @@ async def test_basic_evaluation(client, user_dataset, user_model):
         predict_and_score_call = calls[predict_index]
         assert op_name_from_call(predict_and_score_call) == "predict_and_score"
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
-        assert predict_and_score_call.inputs["model"]._class_name == "Model"
+        assert predict_and_score_call.inputs["model"]._class_name == "ImperativeModel"
         assert predict_and_score_call.inputs["inputs"] == inputs
         assert predict_and_score_call.output["model_output"] == outputs
 
@@ -70,7 +69,7 @@ async def test_basic_evaluation(client, user_dataset, user_model):
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "predict"
-        assert predict_call.inputs["self"]._class_name == "Model"
+        assert predict_call.inputs["self"]._class_name == "ImperativeModel"
         assert predict_call.inputs["inputs"] == inputs
         assert predict_call.output == outputs
 
