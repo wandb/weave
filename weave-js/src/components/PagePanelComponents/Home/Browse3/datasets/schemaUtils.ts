@@ -21,99 +21,158 @@ export const inferType = (value: any): string => {
   return typeof value;
 };
 
-export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
-  let fields: SchemaField[] = [];
+/**
+ * Re-nests flattened data with dot notation paths into a nested object structure.
+ * @param flatData Object with flattened dot notation paths
+ * @returns Hierarchically nested object
+ */
+export const denestData = (
+  flatData: Record<string, any>
+): Record<string, any> => {
+  const nestedObject: Record<string, any> = {};
+  Object.entries(flatData).forEach(([key, value]) => {
+    const parts = key.split('.');
+    let current = nestedObject;
+
+    // Build the nested structure
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part]) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+
+    // Set the value at the final part
+    const lastPart = parts[parts.length - 1];
+    current[lastPart] = value;
+  });
+
+  return nestedObject;
+};
+
+/**
+ * Extracts only the top-level fields from an object without deep flattening.
+ * Used primarily for source/call schema where we only want the top-level structure.
+ */
+export const extractTopLevelFields = (obj: any, prefix = ''): SchemaField[] => {
+  const fields: SchemaField[] = [];
 
   // Return empty array for null or undefined inputs
   if (obj == null) {
     return fields;
   }
 
+  if (Array.isArray(obj)) {
+    fields.push({
+      name: prefix,
+      type: 'array',
+    });
+    return fields;
+  }
+
   // Special handling for __ref__ and __val__ pattern
   if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
-    return flattenObject(obj.__val__, prefix);
+    if (typeof obj.__val__ === 'object' && !Array.isArray(obj.__val__)) {
+      // For object values, extract its top-level fields
+      return extractTopLevelFields(obj.__val__, prefix);
+    } else {
+      // For primitive or array values, return as is
+      return [{name: prefix, type: inferType(obj.__val__)}];
+    }
   }
 
   for (const [key, value] of Object.entries(obj)) {
     const newKey = prefix ? `${prefix}.${key}` : key;
-
-    if (
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      !(value instanceof Date)
-    ) {
-      fields = [...fields, ...flattenObject(value, newKey)];
-    } else {
-      fields.push({
-        name: newKey,
-        type: inferType(value),
-      });
-    }
+    fields.push({
+      name: newKey,
+      type: inferType(value),
+    });
   }
 
   return fields;
 };
 
-export const inferSchema = (data: any): SchemaField[] => {
+/**
+ * Creates a schema representation of a dataset object by identifying top-level fields
+ * and marking nested paths as objects without expanding them.
+ */
+export const createTargetSchema = (data: any): SchemaField[] => {
   const schemaMap = new Map<string, Set<string>>();
 
-  const addToSchema = (obj: any) => {
-    const flatFields = flattenObject(obj);
-    flatFields.forEach(field => {
-      if (!schemaMap.has(field.name)) {
-        schemaMap.set(field.name, new Set());
-      }
-      schemaMap.get(field.name)?.add(field.type);
-    });
+  const processField = (key: string, value: any) => {
+    // Split the key to get just the top-level part
+    const parts = key.split('.');
+    const topLevelKey = parts[0];
+
+    // Determine the type
+    let type: string;
+    if (parts.length > 1) {
+      // If the key has dots, it's a nested object path
+      type = 'object';
+    } else {
+      // Otherwise use the actual type of the value
+      type = inferType(value);
+    }
+
+    // Add to schema map
+    if (!schemaMap.has(topLevelKey)) {
+      schemaMap.set(topLevelKey, new Set());
+    }
+    schemaMap.get(topLevelKey)?.add(type);
   };
 
+  // Process each item in the dataset
   if (Array.isArray(data)) {
-    data.forEach(item => addToSchema(item));
-  } else {
-    addToSchema(data);
+    data.forEach(item => {
+      if (item && typeof item === 'object') {
+        Object.entries(item).forEach(([key, value]) => {
+          processField(key, value);
+        });
+      }
+    });
+  } else if (data && typeof data === 'object') {
+    Object.entries(data).forEach(([key, value]) => {
+      processField(key, value);
+    });
   }
 
+  // Convert schema map to schema fields
   return Array.from(schemaMap.entries()).map(([name, types]) => ({
     name,
     type: Array.from(types).join(' | '),
   }));
 };
 
-export interface CallData {
-  digest: string;
-  val: TraceCallSchema;
-}
+// Alternative implementation of createTargetSchema that accepts pre-denested data
+export const createTargetSchemaFromDenested = (data: any[]): SchemaField[] => {
+  const schemaMap = new Map<string, Set<string>>();
 
-export interface FieldMapping {
-  sourceField: string;
-  targetField: string;
-}
+  // Process each denested data item
+  data.forEach(item => {
+    // Only process top-level keys
+    if (item && typeof item === 'object') {
+      Object.entries(item).forEach(([key, value]) => {
+        if (!schemaMap.has(key)) {
+          schemaMap.set(key, new Set());
+        }
+        schemaMap.get(key)?.add(inferType(value));
+      });
+    }
+  });
 
-/**
- * Get a nested value from an object using a path array
- * @param obj The object to extract value from
- * @param path Array of property names to traverse
- * @returns The value at the specified path or undefined if path doesn't exist
- */
-export const getNestedValue = (obj: any, path: string[]): any => {
-  let current = obj;
-  for (const part of path) {
-    if (current == null) {
-      return undefined;
-    }
-    if (typeof current === 'object' && '__val__' in current) {
-      current = current.__val__;
-    }
-    if (typeof current !== 'object') {
-      return current;
-    }
-    current = current[part];
-  }
-  return current;
+  // Convert schema map to schema fields
+  return Array.from(schemaMap.entries()).map(([name, types]) => ({
+    name,
+    type: Array.from(types).join(' | '),
+  }));
 };
 
-export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
+/**
+ * Creates a schema representation of call data (source) by only extracting
+ * top-level fields under inputs and output, without deep flattening.
+ */
+export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
   const allFields: SchemaField[] = [];
 
   if (!calls || !Array.isArray(calls)) {
@@ -127,21 +186,35 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
     }
 
     if (call.val.inputs) {
-      allFields.push(...flattenObject(call.val.inputs, 'inputs'));
+      Object.entries(call.val.inputs).forEach(([key, value]) => {
+        allFields.push({
+          name: `inputs.${key}`,
+          type: inferType(value),
+        });
+      });
     }
 
     const output = call.val.output;
     if (output !== undefined) {
-      if (typeof output === 'string') {
-        allFields.push({name: 'output', type: 'string'});
+      if (
+        output !== null &&
+        typeof output === 'object' &&
+        !Array.isArray(output)
+      ) {
+        Object.entries(output).forEach(([key, value]) => {
+          allFields.push({
+            name: `output.${key}`,
+            type: inferType(value),
+          });
+        });
       } else {
-        allFields.push(...flattenObject(output, 'output'));
+        allFields.push({name: 'output', type: inferType(output)});
       }
     }
   });
 
   return allFields
-    .filter(field => field.name !== 'inputs.self')
+    .filter(field => !field.name.startsWith('inputs.self'))
     .reduce((acc, field) => {
       if (!acc.some(f => f.name === field.name)) {
         acc.push(field);
@@ -150,75 +223,77 @@ export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
     }, [] as SchemaField[]);
 };
 
+export interface CallData {
+  digest: string;
+  val: TraceCallSchema;
+}
+
+export interface FieldMapping {
+  sourceField: string;
+  targetField: string;
+}
+
 /**
- * Suggests field mappings between a source schema and target schema, with support for nested paths
- * and existing mappings.
- *
- * The function follows this priority order for suggesting mappings:
- * 1. Keeps all valid existing mappings
- * 2. Exact matches between source and target field names
- * 3. Matches based on the last segment of nested paths (e.g. "inputs.examples.question" matches "question")
- * 4. Falls back to mapping remaining fields to "output" if available
- *
- * For nested path matching:
- * - Source field "inputs.examples.question" will match target field "question"
- * - Only the first source field ending in a given name is mapped (e.g. if both
- *   "inputs.question" and "inputs.examples.question" exist, first one is used)
- *
- * @param sourceSchema - Array of fields available in the source data
- * @param targetSchema - Array of fields required by the target schema
- * @param existingMappings - Array of existing field mappings to preserve if still valid
- * @returns Array of suggested field mappings, including preserved valid existing mappings
+ * Recursively unwraps reference objects with __ref__ and __val__ properties
+ * @param value The value to unwrap
+ * @returns The unwrapped value
  */
-export const suggestMappings = (
-  sourceSchema: SchemaField[],
-  targetSchema: SchemaField[],
-  existingMappings: FieldMapping[]
-): FieldMapping[] => {
-  const sourceNames = new Set(sourceSchema.map(s => s.name));
-  const targetNames = new Set(targetSchema.map(t => t.name));
-  const sourcePathMap = new Map<string, string>();
-  sourceSchema.forEach(source => {
-    const parts = source.name.split('.');
-    const lastPart = parts[parts.length - 1];
-    if (!sourcePathMap.has(lastPart)) {
-      sourcePathMap.set(lastPart, source.name);
-    }
-  });
-  const suggested: FieldMapping[] = existingMappings.filter(
-    m => targetNames.has(m.targetField) && sourceNames.has(m.sourceField)
-  );
-  const mappedTargets = new Set(suggested.map(m => m.targetField));
-  const remainingTargets = targetSchema.filter(
-    target => !mappedTargets.has(target.name)
-  );
-  remainingTargets.forEach(target => {
-    if (sourceNames.has(target.name)) {
-      suggested.push({sourceField: target.name, targetField: target.name});
-      mappedTargets.add(target.name);
-    }
-  });
-  remainingTargets.forEach(target => {
-    if (!mappedTargets.has(target.name)) {
-      const sourcePath = sourcePathMap.get(target.name);
-      if (sourcePath) {
-        suggested.push({sourceField: sourcePath, targetField: target.name});
-        mappedTargets.add(target.name);
-      }
-    }
-  });
-  if (sourceNames.has('output')) {
-    remainingTargets.forEach(target => {
-      if (!mappedTargets.has(target.name)) {
-        suggested.push({sourceField: 'output', targetField: target.name});
-      }
-    });
+export const unwrapRefValue = (value: any): any => {
+  if (!value || typeof value !== 'object') {
+    return value;
   }
-  return suggested;
+
+  // If this is an expanded reference object, return just the __val__ part (recursively unwrapped)
+  if (value.__ref__ && value.__val__) {
+    return unwrapRefValue(value.__val__);
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    return value.map(item => unwrapRefValue(item));
+  }
+
+  // Handle objects
+  const result: {[key: string]: any} = {};
+  for (const key in value) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      result[key] = unwrapRefValue(value[key]);
+    }
+  }
+  return result;
+};
+
+/**
+ * Get a nested value from an object using a path array
+ * @param obj The object to extract value from
+ * @param path Array of property names to traverse
+ * @returns The value at the specified path or undefined if path doesn't exist
+ */
+export const getNestedValue = (obj: any, path: string[]): any => {
+  let current = obj;
+  for (const part of path) {
+    if (current == null) {
+      return undefined;
+    }
+    // Recursively unwrap references at each level
+    current = unwrapRefValue(current);
+    if (typeof current !== 'object') {
+      return current;
+    }
+    current = current[part];
+  }
+  // Unwrap the final result as well
+  return unwrapRefValue(current);
+};
+
+export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
+  return createSourceSchema(calls);
 };
 
 /**
  * Maps an array of call data to dataset rows formatted for MUI DataGrid consumption.
+ * This function flattens nested dictionaries in the output, creating separate entries
+ * with path-based keys for each primitive value or list.
  *
  * @param selectedCalls - Array of call data containing inputs and outputs
  * @param fieldMappings - Array of mappings that define how call data fields map to dataset columns
@@ -230,7 +305,8 @@ export const suggestMappings = (
  *   - id: The digest of the call
  *   - isNew: Flag indicating this is a newly created row
  * - Include mapped values from the call's inputs/outputs based on fieldMappings
- * - Only include fields where the source value is defined
+ * - Dictionary values will be flattened with path-based keys (e.g., "parent.child.value")
+ * - Only primitive values and lists will be included as entries
  */
 export const mapCallsToDatasetRows = (
   selectedCalls: CallData[],
@@ -245,22 +321,60 @@ export const mapCallsToDatasetRows = (
         return undefined;
       }
 
-      // Handle __ref__/__val__ pattern during value resolution
-      if (
-        typeof current === 'object' &&
-        '__ref__' in current &&
-        '__val__' in current
-      ) {
-        current = current.__val__;
+      // Handle __ref__/__val__ pattern during value resolution using unwrapRefValue
+      current = unwrapRefValue(current);
+
+      if (typeof current !== 'object' || current === null) {
+        return current;
       }
 
       current = current[part];
     }
-    return current;
+
+    // Unwrap final value as well
+    return unwrapRefValue(current);
+  };
+
+  // Helper function to flatten nested objects
+  const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+    const result: Record<string, any> = {};
+
+    // Return immediately if value is null or undefined
+    if (obj === null || obj === undefined) {
+      return result;
+    }
+
+    // Unwrap any ref/val pattern
+    obj = unwrapRefValue(obj);
+
+    // If it's a primitive or array, just return it with the prefix
+    if (typeof obj !== 'object' || Array.isArray(obj)) {
+      return prefix ? {[prefix]: obj} : obj;
+    }
+
+    // Process each key in the object
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      const newPrefix = prefix ? `${prefix}.${key}` : key;
+
+      // If it's an object and not an array, recurse and merge results
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value)
+      ) {
+        Object.assign(result, flattenObject(value, newPrefix));
+      } else {
+        // For primitives and arrays, add directly with the constructed key
+        result[newPrefix] = value;
+      }
+    });
+
+    return result;
   };
 
   return selectedCalls.map(call => {
-    const row: Record<string, any> = {};
+    const rowData: Record<string, any> = {};
 
     fieldMappings.forEach(mapping => {
       const inputs = call.val.inputs || {};
@@ -274,7 +388,21 @@ export const mapCallsToDatasetRows = (
       }
 
       if (sourceValue !== undefined) {
-        row[mapping.targetField] = sourceValue;
+        if (
+          typeof sourceValue === 'object' &&
+          sourceValue !== null &&
+          !Array.isArray(sourceValue)
+        ) {
+          // Flatten nested objects into path-based keys
+          const flattenedValues = flattenObject(sourceValue);
+          Object.keys(flattenedValues).forEach(key => {
+            const fullKey = `${mapping.targetField}.${key}`;
+            rowData[fullKey] = flattenedValues[key];
+          });
+        } else {
+          // For primitive values and arrays, add directly
+          rowData[mapping.targetField] = sourceValue;
+        }
       }
     });
 
@@ -283,7 +411,7 @@ export const mapCallsToDatasetRows = (
         id: call.digest,
         isNew: true,
       },
-      ...row,
+      ...rowData,
     };
   });
 };

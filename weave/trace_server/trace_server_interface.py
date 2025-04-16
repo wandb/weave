@@ -3,7 +3,12 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+)
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -216,6 +221,28 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+
+
+class OtelExportReq(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    project_id: str
+    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
+    traces: Any
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ExportTracePartialSuccess(BaseModel):
+    rejected_spans: int
+    error_message: str
+
+
+# Spec requires that the response be of type Export<signal>ServiceResponse
+# https://opentelemetry.io/docs/specs/otlp/
+class OtelExportRes(BaseModel):
+    partial_success: Optional[ExportTracePartialSuccess] = Field(
+        default=None,
+        description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
+    )
 
 
 class CallStartReq(BaseModel):
@@ -941,6 +968,9 @@ class TraceServerInterface(Protocol):
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    # OTEL API
+    def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

@@ -3,6 +3,7 @@ import _ from 'lodash';
 import React from 'react';
 import {Input} from 'semantic-ui-react';
 
+import {Button} from '../../../components/Button';
 import clamp from '../../util/clamp';
 
 interface NumberInputProps {
@@ -18,10 +19,14 @@ interface NumberInputProps {
   stepper?: boolean;
   strideLength?: number;
   ticks?: number[];
+  useStepperPlusMinus?: boolean; // This should be true for any new components that use the NumberInput component
   value?: number;
 }
 
-const NumberInput: React.FC<NumberInputProps> = props => {
+const NumberInput: React.FC<NumberInputProps> = ({
+  useStepperPlusMinus = false,
+  ...props
+}) => {
   const [stringValue, setStringValue] = React.useState(
     props.value == null ? '' : props.value.toString()
   );
@@ -80,6 +85,72 @@ const NumberInput: React.FC<NumberInputProps> = props => {
     [onChange, ticks, stringValue, strideLength, min, max]
   );
 
+  if (props.stepper && useStepperPlusMinus) {
+    return (
+      <div
+        className="number-input-plus-minus flex items-center rounded px-4 outline outline-moon-200"
+        style={props.containerStyle}>
+        <Button
+          icon="remove"
+          onClick={() => shiftValue(-1)}
+          variant="ghost"
+          size="small"
+        />
+        <Input
+          input={{
+            ref: inputRef,
+          }}
+          aria-label={props.label}
+          className={`number-input-plus-minus__input ${props.className || ''}`}
+          disabled={props.disabled}
+          placeholder={props.placeholder}
+          style={{marginRight: 0, ...props.inputStyle}} // the default margin right is 4px but that misaligns the arrow buttons
+          type="number"
+          value={stringValue}
+          onFocus={() => {
+            focusedRef.current = true;
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+            setStateValueToProp();
+          }}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            const direction =
+              e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : null;
+
+            if (direction != null) {
+              shiftValue(direction);
+              e.preventDefault();
+            }
+          }}
+          onChange={e => {
+            const newVal = e.target.value;
+            setStringValue(newVal);
+
+            if (newVal === '') {
+              props.onChange(undefined);
+            } else {
+              const newValFloat = parseFloat(newVal);
+              if (!Number.isNaN(newValFloat) && newValFloat !== props.value) {
+                const newValue = clamp(newValFloat, {
+                  min: props.min,
+                  max: props.max,
+                });
+                props.onChange(newValue);
+              }
+            }
+          }}
+        />
+        <Button
+          icon="add-new"
+          onClick={() => shiftValue(1)}
+          variant="ghost"
+          size="small"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="number-input__container" style={props.containerStyle}>
       <Input
@@ -90,7 +161,7 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         className={`number-input__input ${props.className || ''}`}
         disabled={props.disabled}
         placeholder={props.placeholder}
-        style={props.inputStyle}
+        style={{marginRight: 0, ...props.inputStyle}} // the default margin right is 4px but that misaligns the arrow buttons
         type="number"
         value={stringValue}
         onFocus={() => {
