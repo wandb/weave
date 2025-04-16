@@ -38,11 +38,28 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
+    def unwrap(self) -> dict[str, Any]:
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k
+            not in [
+                "_class_name",
+                "_bases",
+                "map_values",
+                "unwrap",
+                "__repr__",
+                "__eq__",
+            ]
+        }
+
 
 PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
 
 
-def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
+def pydantic_model_fields(
+    obj: PydanticBaseModelGeneral,
+) -> dict[str, pydantic.FieldInfo]:
     if isinstance(obj, pydantic.BaseModel):
         return obj.model_fields
     elif isinstance(obj, pydantic.v1.BaseModel):
@@ -52,7 +69,9 @@ def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
 
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}
+    # these ks are by property, but should be by alias
+    fields = pydantic_model_fields(obj)
+    return {field.alias or k: getattr(obj, k) for k, field in fields.items()}
 
 
 def class_all_bases_names(cls: type) -> list[str]:
