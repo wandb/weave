@@ -448,13 +448,10 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
     return usage
 
-def get_weave_inputs(
-    _: list[SpanEvent], attributes: dict[str, Any]
-) -> dict[str, Any]:
+
+def get_weave_inputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
     return parse_weave_values(attributes, INPUT_KEYS)
 
 
-def get_weave_outputs(
-    _: list[SpanEvent], attributes: dict[str, Any]
-) -> dict[str, Any]:
+def get_weave_outputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
     return parse_weave_values(attributes, OUTPUT_KEYS)
