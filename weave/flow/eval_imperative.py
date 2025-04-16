@@ -6,9 +6,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
-from typing import Annotated, Any, TypedDict, TypeVar, Union, cast
+from typing import Annotated, Any, TypeVar, Union, cast
 
-import uuid_utils as uuid
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -22,16 +21,14 @@ from pydantic import (
 import weave
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
-from weave.flow.obj import Object
 from weave.flow.scorer import Scorer
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 
+T = TypeVar("T")
 ID = str
 ScoreType = Union[float, bool, dict]
-
-NOT_DEFINED = "Not defined for custom scoring"
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +66,6 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         yield
     finally:
         current_summary.reset(token)
-
-
-T = TypeVar("T")
 
 
 def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
@@ -114,38 +108,6 @@ def _validate_class_name(name: str) -> str:
     return name
 
 
-class AttributeConfigDict(TypedDict):
-    type: str
-    value: Any
-
-
-ObjectConfigDict = dict[str, AttributeConfigDict]
-
-
-def dynamically_create_weave_object_class(
-    type_: str = "DynamicObject",
-    id: str = str(uuid.uuid7()),
-    # This dict specifies the attributes of the object
-    config: ObjectConfigDict | None = None,
-) -> type[Object]:
-    if config is None:
-        config = {}
-
-    if "name" not in config:
-        config["name"] = {"type": "str", "value": f"{type_}_{id}"}
-
-    # Construct the type constructor dict for weave.Object
-    annotations = {}
-    pydantic_config_dict = {}
-    for name, config_dict in config.items():
-        annotations[name] = config_dict["type"]
-        pydantic_config_dict[name] = config_dict["value"]
-
-    pydantic_config_dict["__annotations__"] = annotations
-
-    return type(type_, (Object,), pydantic_config_dict)
-
-
 class ImperativeScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
@@ -186,7 +148,7 @@ class ImperativeScoreLogger(BaseModel):
         scorer = cast(Scorer, scorer)
 
         def make_score_method() -> Callable[[Scorer, Any, Any], ScoreType]:
-            """This method is created just to avoid name collision between the
+            """This func is created just to avoid name collision between the
             score method name and the score value the user passes in."""
 
             @weave.op(name=scorer.name)
@@ -284,8 +246,8 @@ class ImperativeEvaluationLogger(BaseModel):
                 model_output = model.get_infer_method()(inputs)
                 return {
                     "model_output": model_output,
-                    "scores": NOT_DEFINED,
-                    "model_latency": NOT_DEFINED,
+                    "scores": {},
+                    "model_latency": None,
                 }
 
             @weave.op
