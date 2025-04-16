@@ -38,8 +38,11 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
-    def unwrap_one_level(self) -> dict[str, Any]:
-        return {
+    def unwrap(self) -> dict[str, Any]:
+        # Nasty import to avoid circular import
+        from weave.trace.vals import unwrap
+
+        unwrapped_one_level = {
             k: v
             for k, v in self.__dict__.items()
             if k
@@ -52,6 +55,7 @@ class ObjectRecord:
                 "__eq__",
             ]
         }
+        return unwrap(unwrapped_one_level)
 
 
 PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
