@@ -177,7 +177,6 @@ jobs:
           yarn install --frozen-lockfile
           yarn generate
           yarn eslint --max-warnings=0
-          yarn tslint
           yarn prettier
           yarn run tsc
           yarn testci
@@ -231,7 +230,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace",
             "trace_server",
             "anthropic",

@@ -14,7 +14,6 @@ export type Subtract<T, K> = Omit<T, keyof K>;
 export type ExcludeNullish<T> = Exclude<T, null | undefined>;
 
 // Get type contained in array
-// tslint:disable-next-line
 export type Unpack<A> = A extends Array<infer E> ? E : A;
 
 export type Class<T> = new (...args: any[]) => T;
