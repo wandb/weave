@@ -203,7 +203,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     tools: tools.length > 0 ? tools : undefined,
   };
 
-  if (state.model.includes('o3')) {
+  if (state.model.includes('o3') || state.model.includes('o4')) {
     const {max_tokens, ...rest} = inputs;
     return {
       ...rest,
