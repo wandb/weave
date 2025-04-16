@@ -1,8 +1,8 @@
 import json
-from typing import Any
 import uuid
 from binascii import hexlify
 from datetime import datetime
+from typing import Any
 from unittest.mock import patch
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -245,8 +245,13 @@ class TestPythonSpans:
         # Verify otel_span is included in attributes
         assert "otel_span" in start_call.attributes
         assert start_call.attributes["otel_span"]["name"] == py_span.name
-        assert start_call.attributes["otel_span"]["context"]["trace_id"] == py_span.trace_id
-        assert start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
+        assert (
+            start_call.attributes["otel_span"]["context"]["trace_id"]
+            == py_span.trace_id
+        )
+        assert (
+            start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
+        )
 
         # Verify end call
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
@@ -394,6 +399,7 @@ class TestAttributes:
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
 
+
 class TestSemanticConventionParsing:
     """Test the semantic convention parsing functionality in attributes.py."""
 
@@ -402,15 +408,17 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference attributes
-        attributes = create_attributes({
-            OISpanAttr.LLM_SYSTEM: "This is a system prompt",
-            OISpanAttr.LLM_PROVIDER: "test-provider",
-            OISpanAttr.LLM_MODEL_NAME: "test-model",
-            OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
-            OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
-                {"temperature": 0.7, "max_tokens": 100}
-            ),
-        })
+        attributes = create_attributes(
+            {
+                OISpanAttr.LLM_SYSTEM: "This is a system prompt",
+                OISpanAttr.LLM_PROVIDER: "test-provider",
+                OISpanAttr.LLM_MODEL_NAME: "test-model",
+                OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
+                OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
+                    {"temperature": 0.7, "max_tokens": 100}
+                ),
+            }
+        )
 
         # Test get_weave_attributes
         extracted = get_weave_attributes(attributes)
@@ -427,10 +435,12 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference input value and mime type
-        attributes = create_attributes({
-            OISpanAttr.INPUT_VALUE: "What is machine learning?",
-            OISpanAttr.INPUT_MIME_TYPE: "text/plain",
-        })
+        attributes = create_attributes(
+            {
+                OISpanAttr.INPUT_VALUE: "What is machine learning?",
+                OISpanAttr.INPUT_MIME_TYPE: "text/plain",
+            }
+        )
 
         # Test get_weave_inputs with text input
         inputs = get_weave_inputs([], attributes)
@@ -440,16 +450,20 @@ class TestSemanticConventionParsing:
         }
 
         # Test with JSON input
-        json_input = json.dumps({
-            "messages": [
-                {"role": "system", "content": "You are an assistant"},
-                {"role": "user", "content": "What is machine learning?"},
-            ]
-        })
-        attributes = create_attributes({
-            OISpanAttr.INPUT_VALUE: json_input,
-            OISpanAttr.INPUT_MIME_TYPE: "application/json",
-        })
+        json_input = json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "You are an assistant"},
+                    {"role": "user", "content": "What is machine learning?"},
+                ]
+            }
+        )
+        attributes = create_attributes(
+            {
+                OISpanAttr.INPUT_VALUE: json_input,
+                OISpanAttr.INPUT_MIME_TYPE: "application/json",
+            }
+        )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": {
@@ -466,10 +480,12 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference output value and mime type
-        attributes = create_attributes({
-            OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
-            OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
-        })
+        attributes = create_attributes(
+            {
+                OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
+                OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
+            }
+        )
 
         # Test get_weave_outputs with text output
         outputs = get_weave_outputs([], attributes)
@@ -479,16 +495,20 @@ class TestSemanticConventionParsing:
         }
 
         # Test with JSON output
-        json_output = json.dumps({
-            "response": {
-                "role": "assistant",
-                "content": "Machine learning is a field of AI...",
+        json_output = json.dumps(
+            {
+                "response": {
+                    "role": "assistant",
+                    "content": "Machine learning is a field of AI...",
+                }
             }
-        })
-        attributes = create_attributes({
-            OISpanAttr.OUTPUT_VALUE: json_output,
-            OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
-        })
+        )
+        attributes = create_attributes(
+            {
+                OISpanAttr.OUTPUT_VALUE: json_output,
+                OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
+            }
+        )
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
             "value": {
@@ -505,11 +525,13 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference token counts
-        attributes = create_attributes({
-            OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
-            OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
-            OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
-        })
+        attributes = create_attributes(
+            {
+                OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
+                OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
+                OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
+            }
+        )
 
         # Test get_weave_usage
         usage = get_weave_usage(attributes)
@@ -522,12 +544,14 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry attributes
-        attributes = create_attributes({
-            OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
-            OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
-            OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
-            OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
-        })
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
+                OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
+                OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
+                OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
+            }
+        )
 
         # Test get_weave_attributes
         extracted = get_weave_attributes(attributes)
@@ -542,16 +566,16 @@ class TestSemanticConventionParsing:
 
         # Create attribute dictionary with OpenTelemetry prompts
         prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
-        attributes = create_attributes({
-            OTSpanAttr.LLM_PROMPTS: prompts,
-        })
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_PROMPTS: prompts,
+            }
+        )
 
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            'value': [
-                {"role": "user", "content": "Tell me about quantum computing"}
-            ]
+            "value": [{"role": "user", "content": "Tell me about quantum computing"}]
         }
 
         # Test with multiple prompts
@@ -559,9 +583,11 @@ class TestSemanticConventionParsing:
             "0": {"role": "system", "content": "You are an expert in quantum physics"},
             "1": {"role": "user", "content": "Tell me about quantum computing"},
         }
-        attributes = create_attributes({
-            OTSpanAttr.LLM_PROMPTS: prompts_multiple,
-        })
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_PROMPTS: prompts_multiple,
+            }
+        )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
             "value": [
@@ -581,9 +607,11 @@ class TestSemanticConventionParsing:
                 "content": "Quantum computing uses quantum mechanics...",
             }
         }
-        attributes = create_attributes({
-            OTSpanAttr.LLM_COMPLETIONS: completions,
-        })
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_COMPLETIONS: completions,
+            }
+        )
 
         # Create OpenTelemetry attributes object
 
@@ -603,11 +631,13 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry token usage
-        attributes = create_attributes({
-            OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
-            OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
-            OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
-        })
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
+                OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
+                OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
+            }
+        )
 
         # Create OpenTelemetry attributes object
         usage = get_weave_usage(attributes) or {}

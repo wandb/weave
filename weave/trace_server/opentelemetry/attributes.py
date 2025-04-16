@@ -2,13 +2,10 @@ import json
 from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
-from typing import Any, TypedDict, Union
+from typing import Any, Union
 from uuid import UUID
 
-import openinference.semconv.trace as oi
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-
-from weave.trace_server.trace_server_interface import LLMUsageSchema
 
 
 def to_json_serializable(value: Any) -> Any:
@@ -315,90 +312,95 @@ def unflatten_key_values(
 
 def try_parse_json(value: Any) -> Any:
     if isinstance(value, str):
-        try: value = json.loads(value)
-        except: pass
+        try:
+            value = json.loads(value)
+        except:
+            pass
     return value
 
+
+def try_parse_int(value: Any) -> Any:
+    try:
+        value = int(value)
+    except:
+        pass
+    return value
+
+
 INPUT_KEYS = {
-    'value': [
-        'weave.input', # Weave
-        'input.value', # OpenInference
-        'gen_ai.prompt', # OpenTelemetry
-        'mlflow.spanInputs', # MLFlow
-        'traceloop.entity.input' # Traceloop
-        'input', # Pydantic - This must execute after checking input.value
+    "value": [
+        "weave.input",  # Weave
+        "input.value",  # OpenInference
+        "gen_ai.prompt",  # OpenTelemetry
+        "mlflow.spanInputs",  # MLFlow
+        "traceloop.entity.input"  # Traceloop
+        "input",  # Pydantic - This must execute after checking input.value
     ],
-    'type': [
-        'input.mime_type', # OpenInference
-        'gen_ai.input.type'
-    ]
+    "type": [
+        "input.mime_type",  # OpenInference
+        "gen_ai.input.type",
+    ],
 }
 
 OUTPUT_KEYS = {
-    'value': [
-        'weave.output', # Weave
-        'output.value', # OpenInference
-        'gen_ai.completion', # OTEL Semconv
-        'mlflow.spanOutputs', # MLFlow
-        'gen_ai.content.completion', # OpenLit
-        'traceloop.entity.output' # Traceloop
-        'output' # Pydantic - This must execute after checking output.value
+    "value": [
+        "weave.output",  # Weave
+        "output.value",  # OpenInference
+        "gen_ai.completion",  # OTEL Semconv
+        "mlflow.spanOutputs",  # MLFlow
+        "gen_ai.content.completion",  # OpenLit
+        "traceloop.entity.output"  # Traceloop
+        "output",  # Pydantic - This must execute after checking output.value
     ],
-    'type': [
-        'output.mime_type', # OpenInference
-        'gen_ai.output.type' # OTEL Semconv
-    ]
+    "type": [
+        "output.mime_type",  # OpenInference
+        "gen_ai.output.type",  # OTEL Semconv
+    ],
 }
 
 USAGE_KEYS = {
-    'prompt_tokens': [
-        'gen_ai.usage.prompt_tokens',
-        'llm.token_count.prompt'
+    "prompt_tokens": ["gen_ai.usage.prompt_tokens", "llm.token_count.prompt"],
+    "completion_tokens": [
+        "gen_ai.usage.completion_tokens",
+        "llm.token_count.completion",
     ],
-    'completion_tokens': [
-        'gen_ai.usage.completion_tokens',
-        'llm.token_count.completion'
-    ],
-    'total_tokens': [
-        'llm.usage.total_tokens',
-        'llm.token_count.total'
-    ]
+    "total_tokens": ["llm.usage.total_tokens", "llm.token_count.total"],
 }
 
 ATTRIBUTE_KEYS = {
-    'system': [
-        'gen_ai.system',
-        'llm.system', # OpenInference
+    "system": [
+        "gen_ai.system",
+        "llm.system",  # OpenInference
     ],
-    'kind': [
-        'weave.span.kind', # Weave
-        'traceloop.span.kind', # Traceloop
-        'openinference.span.kind', # OpenInference
+    "kind": [
+        "weave.span.kind",  # Weave
+        "traceloop.span.kind",  # Traceloop
+        "openinference.span.kind",  # OpenInference
     ],
-    'model': [
-        'llm.model_name',
-        'gen_ai.response.model'
+    "model": ["llm.model_name", "gen_ai.response.model"],
+    "provider": [
+        "llm.provider",
     ],
-    'provider': [
-        'llm.provider',
-    ],
-    'model_parameters': [
-        'gen_ai.request',
-        'llm.invocation_parameters'
-    ]
+    "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
 }
 
 KEY_HANDLERS = {
-    'input.value': try_parse_json,
-    'output.value': try_parse_json,
-    'gen_ai.request': try_parse_json,
-    'llm.invocation_parameters': try_parse_json,
-    'gen_ai.prompt': convert_numeric_keys_to_list,
-    'gen_ai.completion': convert_numeric_keys_to_list,
+    "input.value": try_parse_json,
+    "output.value": try_parse_json,
+    "gen_ai.request": try_parse_json,
+    "llm.invocation_parameters": try_parse_json,
+    "gen_ai.prompt": convert_numeric_keys_to_list,
+    "gen_ai.completion": convert_numeric_keys_to_list,
+    "gen_ai.usage.prompt_tokens": try_parse_int,
 }
 
-for key in USAGE_KEYS['prompt_tokens'] + USAGE_KEYS['completion_tokens'] + USAGE_KEYS['total_tokens']:
-    KEY_HANDLERS[key] = lambda x: int(x)
+for key in (
+    USAGE_KEYS["prompt_tokens"]
+    + USAGE_KEYS["completion_tokens"]
+    + USAGE_KEYS["total_tokens"]
+):
+    KEY_HANDLERS[key] = try_parse_int
+
 
 class SpanEvent(dict):
     name: str
@@ -406,7 +408,10 @@ class SpanEvent(dict):
     attributes: dict[str, Any]
     dropped_attributes_count: int
 
-def parse_weave_values(attributes: dict[str, Any], key_mapping: dict[str, list[str]]) -> dict[str, Any]:
+
+def parse_weave_values(
+    attributes: dict[str, Any], key_mapping: dict[str, list[str]]
+) -> dict[str, Any]:
     for key in attributes:
         print(key, attributes[key])
     result = {}
@@ -423,38 +428,56 @@ def parse_weave_values(attributes: dict[str, Any], key_mapping: dict[str, list[s
                 break
     return result
 
+
 def get_weave_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     value = parse_weave_values(attributes, ATTRIBUTE_KEYS)
     print("Weave attributes:", value)
     return value
 
+
 def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
     usage = parse_weave_values(attributes, USAGE_KEYS)
-    if 'prompt_tokens' in usage and 'completion_tokens' in usage and 'total_tokens' not in usage:
-        usage['total_tokens'] = usage['prompt_tokens'] + usage['completion_tokens']
-    if 'input_tokens' in usage and 'output_tokens' in usage and 'total_tokens' not in usage:
-        usage['total_tokens'] = usage['prompt_tokens'] + usage['completion_tokens']
+    if (
+        "prompt_tokens" in usage
+        and "completion_tokens" in usage
+        and "total_tokens" not in usage
+    ):
+        usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+    if (
+        "input_tokens" in usage
+        and "output_tokens" in usage
+        and "total_tokens" not in usage
+    ):
+        usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
     return usage
 
+
 def get_weave_inputs_from_events(events: list[SpanEvent]) -> dict[str, Any] | None:
-    events = list(filter(lambda e: e['name'] == 'gen_ai.content.prompt', events))
+    events = list(filter(lambda e: e["name"] == "gen_ai.content.prompt", events))
     return None
+
 
 def get_weave_output_from_events(events: list[SpanEvent]) -> dict[str, Any] | None:
-    for event in filter(lambda e: e['name'] == 'gen_ai.content.completion', events):
-        attributes = event['attributes']
-        if 'gen_ai.completion' in attributes:
-            return attributes['gen_ai.completion']
+    for event in filter(lambda e: e["name"] == "gen_ai.content.completion", events):
+        attributes = event["attributes"]
+        if "gen_ai.completion" in attributes:
+            return attributes["gen_ai.completion"]
     if len(events) > 0:
-        attributes = events[0]['attributes']
-        if 'gen_ai.completion' in attributes:
-            return attributes['gen_ai.completion']
+        attributes = events[0]["attributes"]
+        if "gen_ai.completion" in attributes:
+            return attributes["gen_ai.completion"]
     return None
 
-def get_weave_inputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
+
+def get_weave_inputs(
+    events: list[SpanEvent], attributes: dict[str, Any]
+) -> dict[str, Any]:
     event_inputs = get_weave_inputs_from_events(events)
     return event_inputs or parse_weave_values(attributes, INPUT_KEYS)
 
-def get_weave_outputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
+
+def get_weave_outputs(
+    events: list[SpanEvent], attributes: dict[str, Any]
+) -> dict[str, Any]:
     event_outputs = get_weave_output_from_events(events)
     return event_outputs or parse_weave_values(attributes, OUTPUT_KEYS)
