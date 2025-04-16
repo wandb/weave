@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MethodType
 from typing import Annotated, Any, TypedDict, TypeVar, Union, cast
 
 import uuid_utils as uuid
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    model_validator,
+    validate_call,
+)
 
 import weave
 from weave.flow.eval import Evaluation, default_evaluation_display_name
@@ -66,15 +74,18 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
 T = TypeVar("T")
 
 
-def _convert_to_cls(value: str | T, type_: type[T]) -> T:
-    if isinstance(value, str):
-        cls_name = value
+def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
+    def _convert_to_cls_inner(value: str | T) -> T:
+        if isinstance(value, str):
+            cls_name = value
 
-        # Dynamically create the class if the user only provides a name
-        cls_name = _validate_class_name(cls_name)
-        cls = type(cls_name, (type_,), {})
-        return cls()
-    return value
+            # Dynamically create the class if the user only provides a name
+            cls_name = _validate_class_name(cls_name)
+            cls = type(cls_name, (type_,), {})
+            return cls()
+        return value
+
+    return _convert_to_cls_inner
 
 
 def _validate_class_name(name: str) -> str:
@@ -135,36 +146,6 @@ def dynamically_create_weave_object_class(
     return type(type_, (Object,), pydantic_config_dict)
 
 
-class ImperativeModel(Model):
-    """A variant of Model intended to be used with ImperativeEvaluationLogger.
-
-    You can inherit from it and add any relevant attributes for metadata tracking.
-
-    It does not require defining a predict method (if defined, it will be
-    overriden anyways)."""
-
-    @weave.op
-    def predict(self, input_data: Any) -> Any:
-        # this function intentionally left blank and will be replaced as part of
-        # the evaluation setup
-        ...
-
-
-class ImperativeScorer(Model):
-    """A variant of Scorer intended to be used with ImperativeScoreLogger.
-
-    You can inherit from it and add any relevant attributes for metadata tracking.
-
-    It does not require defining a score method (if defined, it will be
-    overriden anyways)."""
-
-    @weave.op
-    def score(self, *, output: Any, **inputs: Any) -> Any:
-        # this function intentionally left blank and will be replaced as part of
-        # the evaluation setup
-        ...
-
-
 class ImperativeScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
@@ -191,18 +172,18 @@ class ImperativeScoreLogger(BaseModel):
                 ) from e
             raise
 
+    @validate_call
     async def alog_score(
         self,
         scorer: Annotated[
             Scorer | str,
-            _convert_to_cls(Scorer),
+            BeforeValidator(_cast_to_cls(Scorer)),
             Field(description="A metadata-only scorer used for comparisons"),
         ],
         score: ScoreType,
     ) -> None:
-        scorer = cast(
-            Scorer, scorer
-        )  # idk why I need this, it should already be casted with annotation
+        # this is safe; pydantic casting is done in validator above
+        scorer = cast(Scorer, scorer)
 
         @weave.op(name=scorer.name)
         def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
@@ -240,8 +221,8 @@ class ImperativeEvaluationLogger(BaseModel):
         ```
     """
 
-    model: Annotated[Model | str, _convert_to_cls(Model)] = Field(
-        default_factory=ImperativeModel,
+    model: Annotated[Model | str, BeforeValidator(_cast_to_cls(Model))] = Field(
+        default_factory=Model,
         description="A metadata-only Model used for comparisons",
     )
 
@@ -262,7 +243,7 @@ class ImperativeEvaluationLogger(BaseModel):
             # Convert string to a model instance
             # Create a dynamic model class with the string as the name
             model_name = self.model
-            DynamicModel = type(model_name, (ImperativeModel,), {})
+            DynamicModel = type(model_name, (Model,), {})
             self.model = DynamicModel()
         return self
 

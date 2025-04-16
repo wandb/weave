@@ -47,7 +47,7 @@ def test_basic_evaluation(client, user_dataset, user_model):
     evaluate_call = calls[0]
     assert op_name_from_call(evaluate_call) == "Evaluation.evaluate"
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
-    assert evaluate_call.inputs["model"]._class_name == "ImperativeModel"
+    assert evaluate_call.inputs["model"]._class_name == "Model"
     assert evaluate_call.output == {"avg_score": 1.0, "total_examples": 3}
 
     for i, (inputs, outputs, score1, score2) in enumerate(
@@ -58,7 +58,7 @@ def test_basic_evaluation(client, user_dataset, user_model):
         predict_and_score_call = calls[predict_index]
         assert op_name_from_call(predict_and_score_call) == "predict_and_score"
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
-        assert predict_and_score_call.inputs["model"]._class_name == "ImperativeModel"
+        assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["inputs"] == inputs
         assert predict_and_score_call.output["model_output"] == outputs
 
@@ -69,7 +69,7 @@ def test_basic_evaluation(client, user_dataset, user_model):
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "predict"
-        assert predict_call.inputs["self"]._class_name == "ImperativeModel"
+        assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
         assert predict_call.output == outputs
 
