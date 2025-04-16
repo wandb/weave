@@ -1,5 +1,3 @@
-/* tslint:disable */
-
 /**
  * This test should only run when testing against the weave python backend. It iterates
  * through all the known TS Ops and evaluates the python compatibility of each one.
