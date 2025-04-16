@@ -87,7 +87,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
       setStringValue(newValue.toString());
       onChange(newValue);
     },
-    [onChange, ticks, stringValue, strideLength, min, max]
+    [onChange, ticks, stringValue, strideLength, min, max, props?.placeholder]
   );
 
   if (props.stepper && useStepperPlusMinus) {
