@@ -74,11 +74,17 @@ def pydantic_model_fields(
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
     fields = pydantic_model_fields(obj)
-    return {
-        field.alias or k: getattr(obj, k)
-        for k, field in fields.items()
-        if not field.exclude
-    }
+    final = {}
+    for prop_name, field in fields.items():
+        use_name = prop_name
+        # This odd check is to support different pydantic versions
+        if hasattr(field, "exclude") and field.exclude:
+            continue
+        # This odd check is to support different pydantic versions
+        if hasattr(field, "alias") and field.alias:
+            use_name = field.alias
+        final[use_name] = getattr(obj, prop_name)
+    return final
 
 
 def class_all_bases_names(cls: type) -> list[str]:
