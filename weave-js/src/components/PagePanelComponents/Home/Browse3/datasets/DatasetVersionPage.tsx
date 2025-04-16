@@ -1,7 +1,9 @@
 import {Box, Tooltip} from '@mui/material';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {useCallback, useState} from 'react';
+import {parseRefMaybe} from '@wandb/weave/react';
+import {sum} from 'lodash';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../Button';
@@ -17,6 +19,7 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
+import {StorageSizeSection} from '../pages/common/StorageSizeSection';
 import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectDeleteButtons';
 import {TabUseDataset} from '../pages/ObjectsPage/Tabs/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
@@ -50,8 +53,13 @@ export const DatasetVersionPage: React.FC<{
     convertEditsToTableUpdateSpec,
   } = useDatasetEditContext();
   const router = useWeaveflowCurrentRouteContext();
-  const {useRootObjectVersions, useRefsData, useTableUpdate, useObjCreate} =
-    useWFHooks();
+  const {
+    useRootObjectVersions,
+    useRefsData,
+    useTableUpdate,
+    useObjCreate,
+    useTableQueryStats,
+  } = useWFHooks();
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -67,7 +75,8 @@ export const DatasetVersionPage: React.FC<{
     projectName,
     {objectIds: [objectName]},
     undefined,
-    true
+    false,
+    {includeStorageSize: true}
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const refUri = objectVersionKeyToRefUri(objectVersion);
@@ -114,6 +123,63 @@ export const DatasetVersionPage: React.FC<{
     entityName,
     projectName,
   ]);
+
+  const tableDigests = useMemo(() => {
+    if (objectVersions.loading || objectVersions.result == null) {
+      return null;
+    }
+    return Array.from(
+      new Set(
+        objectVersions.result.map(v => {
+          const ref = parseRefMaybe(v.val.rows);
+          return ref?.artifactVersion;
+        })
+      )
+    ).filter(Boolean) as string[];
+  }, [objectVersions]);
+
+  const tableStats = useTableQueryStats(
+    entityName,
+    projectName,
+    tableDigests ?? [],
+    {
+      skip: tableDigests == null,
+      includeStorageSize: true,
+    }
+  );
+
+  const [currentVersionSizeBytes, allVersionsSizeBytes, shouldShowAllVersions] =
+    useMemo(() => {
+      if (tableStats.loading || !tableStats.result) {
+        return [undefined, undefined, false];
+      }
+
+      const tableSizeMap = new Map(
+        tableStats.result.tables.map(r => [r.digest, r.storage_size_bytes])
+      );
+
+      const versionSizeMap = new Map(
+        objectVersions.result!.map(({versionIndex, sizeBytes, val}) => {
+          const metadataSizeBytes = sizeBytes ?? 0;
+          const ref = parseRefMaybe(val.rows);
+
+          const tableDataSizeBytes =
+            tableSizeMap.get(ref?.artifactVersion ?? '') ?? 0;
+
+          return [versionIndex, metadataSizeBytes + tableDataSizeBytes];
+        })
+      );
+      // tslint:disable-next-line:no-shadowed-variable
+      const currentVersionSizeBytes = versionSizeMap.get(objectVersionIndex);
+
+      // tslint:disable-next-line:no-shadowed-variable
+      const allVersionsSizeBytes = sum(Array.from(versionSizeMap.values()));
+      return [
+        currentVersionSizeBytes,
+        allVersionsSizeBytes,
+        objectVersions.result!.length > 1,
+      ];
+    }, [objectVersions, objectVersionIndex, tableStats]);
 
   const renderEditingControls = () => {
     const editCountStr = String(Array.from(editedRows.keys()).length);
@@ -232,7 +298,14 @@ export const DatasetVersionPage: React.FC<{
                   <UserLink userId={objectVersion.userId} includeName />
                 </div>
               )}
+              <StorageSizeSection
+                isLoading={tableStats.loading || objectVersions.loading}
+                shouldShowAllVersions={shouldShowAllVersions}
+                currentVersionBytes={currentVersionSizeBytes}
+                allVersionsSizeBytes={allVersionsSizeBytes}
+              />
             </div>
+
             <div className="ml-auto flex-shrink-0">
               {isEditing ? (
                 renderEditingControls()

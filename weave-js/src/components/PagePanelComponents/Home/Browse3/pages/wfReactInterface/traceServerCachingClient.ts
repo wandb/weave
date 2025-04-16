@@ -7,8 +7,8 @@ import {
   TraceObjReadRes,
   TraceTableQueryReq,
   TraceTableQueryRes,
-  TraceTableQueryStatsReq,
-  TraceTableQueryStatsRes,
+  TraceTableQueryStatsBatchReq,
+  TraceTableQueryStatsBatchRes,
 } from './traceServerClientTypes';
 import {DirectTraceServerClient} from './traceServerDirectClient';
 
@@ -43,9 +43,9 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
       getCacheKey: (req: TraceTableQueryReq) => JSON.stringify(req),
     });
 
-    this.addCache('tableQueryStats', {
+    this.addCache('tableQueryStatsBatch', {
       max: 1000,
-      getCacheKey: (req: TraceTableQueryStatsReq) => JSON.stringify(req),
+      getCacheKey: (req: TraceTableQueryStatsBatchReq) => JSON.stringify(req),
     });
   }
 
@@ -96,11 +96,11 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
     return this.withCache('tableQuery', req, () => super.tableQuery(req));
   }
 
-  public override tableQueryStats(
-    req: TraceTableQueryStatsReq
-  ): Promise<TraceTableQueryStatsRes> {
-    return this.withCache('tableQueryStats', req, () =>
-      super.tableQueryStats(req)
+  public override tableQueryStatsBatch(
+    req: TraceTableQueryStatsBatchReq
+  ): Promise<TraceTableQueryStatsBatchRes> {
+    return this.withCache('tableQueryStatsBatch', req, () =>
+      super.tableQueryStatsBatch(req)
     );
   }
 }
