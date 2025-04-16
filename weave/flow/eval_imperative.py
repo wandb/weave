@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -8,7 +9,7 @@ from types import MethodType
 from typing import Any, TypedDict, Union, cast
 
 import uuid_utils as uuid
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 import weave
 from weave.flow.eval import Evaluation, default_evaluation_display_name
@@ -23,6 +24,8 @@ ID = str
 ScoreType = Union[float, bool, dict]
 
 NOT_DEFINED = "Not defined for custom scoring"
+
+logger = logging.getLogger(__name__)
 
 # Context variable to store the current output safely between threads.  This also
 # ensures that only 1 version of the predict method is saved because the code
@@ -119,6 +122,8 @@ def dynamically_create_weave_object_class(
 class ImperativeModel(Model):
     """A variant of Model intended to be used with ImperativeEvaluationLogger.
 
+    You can inherit from it and add any relevant attributes for metadata tracking.
+
     It does not require defining a predict method (if defined, it will be
     overriden anyways)."""
 
@@ -129,11 +134,23 @@ class ImperativeModel(Model):
         ...
 
 
-class ImperativeScoreLogger(BaseModel):
-    """This class provides an imperative interface for logging scores.
+class ImperativeScorer(Model):
+    """A variant of Scorer intended to be used with ImperativeScoreLogger.
 
-    Note that logging scores is async!
-    """
+    You can inherit from it and add any relevant attributes for metadata tracking.
+
+    It does not require defining a score method (if defined, it will be
+    overriden anyways)."""
+
+    @weave.op
+    def score(self, *, output: Any, **inputs: Any) -> Any:
+        # this function intentionally left blank and will be replaced as part of
+        # the evaluation setup
+        ...
+
+
+class ImperativeScoreLogger(BaseModel):
+    """This class provides an imperative interface for logging scores."""
 
     # model_id: ID
     inputs: dict
@@ -142,8 +159,6 @@ class ImperativeScoreLogger(BaseModel):
     evaluate_call: Call
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    _scorer_class_cache: dict = PrivateAttr(default_factory=dict)
 
     def log_score(
         self, scorer_name: str, score: ScoreType, metadata: dict | None = None
@@ -169,14 +184,9 @@ class ImperativeScoreLogger(BaseModel):
         metadata: dict | None = None,
     ) -> None:
         # Define the scorer class dynamically
-        if scorer_name not in self._scorer_class_cache:
-            _validate_scorer_name(scorer_name)
-            cls_name = scorer_name.replace(".", "_")
-            DynamicScorer = type(cls_name, (Scorer,), {})
-            self._scorer_class_cache[scorer_name] = DynamicScorer
-        else:
-            DynamicScorer = self._scorer_class_cache[scorer_name]
 
+        _validate_scorer_name(scorer_name)
+        DynamicScorer = type(scorer_name, (Scorer,), {})
         scorer_instance = DynamicScorer()
 
         @weave.op(name=scorer_name)
@@ -222,7 +232,7 @@ class ImperativeEvaluationLogger(BaseModel):
     #     "The class is purely for metadata purposes, and will not affect the eval",
     # )
 
-    model: Model = Field(default_factory=ImperativeModel)
+    model: str | ImperativeModel = Field(default_factory=ImperativeModel)
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -235,6 +245,16 @@ class ImperativeEvaluationLogger(BaseModel):
         )
     )
     _starting_stack: list[Call] = PrivateAttr(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_model(self) -> ImperativeEvaluationLogger:
+        if isinstance(self.model, str):
+            # Convert string to a model instance
+            # Create a dynamic model class with the string as the name
+            model_name = self.model
+            DynamicModel = type(model_name, (ImperativeModel,), {})
+            self.model = DynamicModel()
+        return self
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
         # similar to how we dynamically create the scorer class, we will
@@ -315,6 +335,7 @@ class ImperativeEvaluationLogger(BaseModel):
 
     def log_summary(self, summary: dict) -> None:
         if self._logged_summary:
+            logger.warn("(NO-OP): Already called summary, returning.")
             return
         self._logged_summary = True
         # Call the summarize method with the proper context
