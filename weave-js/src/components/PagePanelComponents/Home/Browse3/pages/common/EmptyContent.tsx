@@ -1,14 +1,66 @@
 import {Box} from '@mui/material';
 import React, {useState} from 'react';
+import {useParams} from 'react-router-dom';
+import {toast} from 'react-toastify';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
+import {createNewDataset} from '../../datasets/datasetOperations';
+import {DatasetPublishToast} from '../../datasets/DatasetPublishToast';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+  const {entity, project} = useParams<{entity: string; project: string}>();
+  const router = useWeaveflowCurrentRouteContext();
+  const {useObjCreate, useTableCreate} = useWFHooks();
+
+  // Get the create hooks
+  const tableCreate = useTableCreate();
+  const objCreate = useObjCreate();
+
+  const handleSaveDataset = async (name: string, rows: any[]) => {
+    setIsCreatingDataset(true);
+    try {
+      // Create the dataset using the actual API function
+      const result = await createNewDataset({
+        projectId: `${entity}/${project}`,
+        entity,
+        project,
+        datasetName: name,
+        rows,
+        tableCreate,
+        objCreate,
+        router,
+      });
+
+      // Show success message with link to the new dataset
+      toast(
+        <DatasetPublishToast
+          message={'Dataset created successfully!'}
+          url={result.url}
+        />,
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: true,
+        }
+      );
+    } catch (error: any) {
+      console.error('Failed to create dataset:', error);
+      toast.error(`Failed to create dataset: ${error.message}`);
+    } finally {
+      setIsCreatingDataset(false);
+      setIsDrawerOpen(false);
+    }
+  };
 
   return (
     <>
@@ -21,10 +73,8 @@ const NewDatasetButton: React.FC = () => {
       <CreateDatasetDrawer
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onSaveDataset={() => {
-          setIsDrawerOpen(false);
-          // Refresh the page or update the list as needed
-        }}
+        onSaveDataset={handleSaveDataset}
+        isCreating={isCreatingDataset}
       />
     </>
   );
