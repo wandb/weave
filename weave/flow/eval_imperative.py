@@ -77,7 +77,23 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
             cls_name = _validate_class_name(cls_name)
             cls = type(cls_name, (type_,), {})
             return cast(T, cls())
-        return value
+
+        elif isinstance(value, dict):
+            attributes = value
+
+            # Dynamically create the class with attributes from the dict)
+            pydantic_config_dict = {
+                "__annotations__": dict.fromkeys(attributes, Any),
+                **attributes,
+            }
+            cls_name = f"Dynamic{type_.__name__}"
+            cls = type(cls_name, (type_,), pydantic_config_dict)
+            return cast(T, cls())
+
+        elif isinstance(value, type_):
+            return value
+
+        raise TypeError("Unsupported type for casting")
 
     return _convert_to_cls_inner
 
@@ -138,9 +154,13 @@ class ImperativeScoreLogger(BaseModel):
     async def _alog_score(
         self,
         scorer: Annotated[
-            Scorer | str,
+            Scorer | dict | str,
             BeforeValidator(_cast_to_cls(Scorer)),
-            Field(description="A metadata-only scorer used for comparisons"),
+            Field(
+                description="A metadata-only scorer used for comparisons."
+                "Alternatively, you can pass a dict of attributes or just a string"
+                "representing the ID of your scorer."
+            ),
         ],
         score: ScoreType,
     ) -> None:
@@ -184,11 +204,13 @@ class ImperativeEvaluationLogger(BaseModel):
     """
 
     model: Annotated[
-        Model | str,
+        Model | dict | str,
         BeforeValidator(_cast_to_cls(Model)),
         Field(
             default_factory=Model,
-            description="A metadata-only Model used for comparisons",
+            description="A metadata-only Model used for comparisons."
+            "Alternatively, you can pass a dict of attributes or just a string"
+            "representing the ID of your model.",
         ),
     ]
 

@@ -112,7 +112,7 @@ def test_evaluation_with_custom_models_and_scorers(
         c: int
 
     model1 = MyModel(a=1, b="two")
-    model2 = MyModel(a=2, b="three")
+    model2 = {"a": 2, "b": "three"}
     model3 = "string_model"
 
     ev1 = ImperativeEvaluationLogger(model=model1)
@@ -120,7 +120,8 @@ def test_evaluation_with_custom_models_and_scorers(
     ev3 = ImperativeEvaluationLogger(model=model3)
 
     scorer1 = MyScorer(name="gt2_scorer", c=2)
-    scorer2 = "gt4_scorer"
+    scorer2 = {"name": "gt4_scorer", "c": 4}
+    scorer3 = "gt6_scorer"
 
     def run_evaluation(ev: ImperativeEvaluationLogger):
         for row in user_dataset:
@@ -131,6 +132,9 @@ def test_evaluation_with_custom_models_and_scorers(
 
             score2_result = model_output > 4
             pred.log_score(scorer=scorer2, score=score2_result)
+
+            score3_result = model_output > 6
+            pred.log_score(scorer=scorer3, score=score3_result)
 
         ev.log_summary({"avg_score": 1.0, "total_examples": 3})
 
@@ -143,24 +147,27 @@ def test_evaluation_with_custom_models_and_scorers(
         assert len(models) == 3
         assert models[0].object_id == "MyModel"
         assert models[0].version_index == 0
-        assert models[1].object_id == "MyModel"
-        assert models[1].version_index == 1
+        assert models[1].object_id == "DynamicModel"
+        assert models[1].version_index == 0
         assert models[2].object_id == "string_model"
         assert models[2].version_index == 0
 
         scorers = client._objects(
             filter=ObjectVersionFilter(base_object_classes=["Scorer"])
         )
-        assert len(scorers) == 2
+        assert len(scorers) == 3
         # replacing the score method triggers a version bump.
         # Since we always do this, the min version will always be 1
         assert scorers[0].object_id == "gt2_scorer"
         assert scorers[0].version_index == 1
 
+        assert scorers[1].object_id == "gt4_scorer"
+        assert scorers[1].version_index == 1
+
         # in the text case, we generate the scorer from scratch and there is no
         # replacement step.  Therefore the version index will start at 0
-        assert scorers[1].object_id == "gt4_scorer"
-        assert scorers[1].version_index == 0
+        assert scorers[2].object_id == "gt6_scorer"
+        assert scorers[2].version_index == 0
 
     # Run each evaluation once.
     # This creates 3 different model versions and 2 different scorer versions
@@ -198,16 +205,16 @@ def test_evaluation_with_custom_models_and_scorers(
     scorers = client._objects(
         filter=ObjectVersionFilter(base_object_classes=["Scorer"])
     )
-    assert len(scorers) == 2
+    assert len(scorers) == 3
 
     # Run a new evaluation using the same models, but different scorers
-    scorer3 = MyScorer(name="gt6_scorer", c=6)
+    scorer4 = MyScorer(name="gt8_scorer", c=8)
 
     for row in user_dataset:
         model_output = user_model(row["a"], row["b"])
         pred = ev3.log_prediction(inputs=row, output=model_output)
-        score3_result = model_output > 6
-        pred.log_score(scorer=scorer3, score=score3_result)
+        score3_result = model_output > 8
+        pred.log_score(scorer=scorer4, score=score3_result)
 
     # No change to models
     models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
@@ -216,6 +223,6 @@ def test_evaluation_with_custom_models_and_scorers(
     scorers = client._objects(
         filter=ObjectVersionFilter(base_object_classes=["Scorer"])
     )
-    assert len(scorers) == 3
-    assert scorers[2].object_id == "gt6_scorer"
-    assert scorers[2].version_index == 1
+    assert len(scorers) == 4
+    assert scorers[3].object_id == "gt8_scorer"
+    assert scorers[3].version_index == 1
