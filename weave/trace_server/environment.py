@@ -113,3 +113,32 @@ def wf_storage_bucket_azure_account_url() -> Optional[str]:
 def wf_storage_bucket_gcp_credentials_json_b64() -> Optional[str]:
     """The GCP credentials JSON string (base64 encoded)."""
     return os.environ.get("WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64")
+
+
+def wf_file_storage_project_ramp_pct() -> Optional[int]:
+    """The percentage of projects that should use file storage (0-100).
+
+    Returns:
+        Optional[int]: The percentage of projects that should use file storage.
+            Returns None if not configured.
+
+    Raises:
+        ValueError: If the value is not a valid integer between 0 and 100.
+    """
+    pct_str = os.environ.get("WF_FILE_STORAGE_PROJECT_RAMP_PCT")
+    if not pct_str:
+        return None
+
+    try:
+        pct = int(pct_str)
+    except ValueError as e:
+        raise ValueError(
+            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {str(e)}"
+        )
+
+    if pct < 0 or pct > 100:
+        raise ValueError(
+            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT must be between 0 and 100, got {pct}"
+        )
+
+    return pct
