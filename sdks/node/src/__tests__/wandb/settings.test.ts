@@ -1,82 +1,118 @@
 import {Netrc} from '../../utils/netrc';
 import {getApiKey, getWandbConfigs} from '../../wandb/settings';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 jest.mock('../../utils/netrc');
-const MockedNetrc = Netrc as jest.MockedClass<typeof Netrc>;
+jest.mock('node:fs');
+jest.mock('node:path');
+jest.mock('node:os');
 
-describe('settings', () => {
+describe('Settings', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.WANDB_API_KEY;
+    process.env = { ...originalEnv };
+
+    // Mock os.homedir
+    (os.homedir as jest.Mock).mockReturnValue('/home/user');
+
+    // Mock path.join
+    (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   describe('getApiKey', () => {
-    it('returns API key from environment variable', () => {
-      process.env.WANDB_API_KEY = 'test-api-key';
-      expect(getApiKey('api.wandb.ai')).toBe('test-api-key');
+    test('returns API key from environment variable', () => {
+      process.env.WANDB_API_KEY = 'env-api-key';
+      expect(getApiKey('api.wandb.ai')).toBe('env-api-key');
     });
 
-    it('returns API key from netrc file', () => {
-      MockedNetrc.prototype.entries = new Map([
-        [
-          'api.wandb.ai',
-          {machine: 'api.wandb.ai', login: 'user', password: 'netrc-api-key'},
-        ],
-      ]);
+    test('returns API key from netrc when environment variable is not set', () => {
+      const mockNetrc = {
+        entries: new Map([
+          ['api.wandb.ai', {password: 'netrc-api-key'}]
+        ]),
+      };
+      (Netrc as jest.Mock).mockImplementation(() => mockNetrc);
+
       expect(getApiKey('api.wandb.ai')).toBe('netrc-api-key');
     });
 
-    it('throws error when no API key is found', () => {
-      MockedNetrc.prototype.entries = new Map();
-      expect(() => getApiKey('api.wandb.ai')).toThrow(
-        'wandb API key not found'
-      );
+    test('throws error when no API key is found', () => {
+      const mockNetrc = {
+        entries: new Map(),
+      };
+      (Netrc as jest.Mock).mockImplementation(() => mockNetrc);
+
+      expect(() => getApiKey('api.wandb.ai')).toThrow('wandb API key not found');
+    });
+
+    test('handles netrc read errors gracefully', () => {
+      (Netrc as jest.Mock).mockImplementation(() => {
+        throw new Error('Cannot read netrc file');
+      });
+
+      expect(() => getApiKey('api.wandb.ai')).toThrow('wandb API key not found');
     });
   });
 
   describe('getWandbConfigs', () => {
-    it('returns correct config when netrc has entry', () => {
-      // Mock successful netrc entry
-      MockedNetrc.prototype.getLastEntry = jest.fn().mockReturnValue({
-        machine: 'api.wandb.ai',
-        login: 'user',
-        password: 'test-api-key',
-      });
-      MockedNetrc.prototype.entries = new Map([
-        [
-          'api.wandb.ai',
-          {machine: 'api.wandb.ai', login: 'user', password: 'test-api-key'},
-        ],
-      ]);
+    test('uses WANDB_BASE_URL from environment', () => {
+      process.env.WANDB_BASE_URL = 'https://custom.wandb.ai';
+      process.env.WANDB_API_KEY = 'test-api-key';
 
       const configs = getWandbConfigs();
       expect(configs).toEqual({
         apiKey: 'test-api-key',
-        baseUrl: expect.stringContaining('api.wandb.ai'),
-        traceBaseUrl: expect.stringContaining('https://trace.wandb.ai'),
+        baseUrl: 'https://custom.wandb.ai',
+        traceBaseUrl: 'https://custom.wandb.ai/traces',
+        resolvedHost: 'custom.wandb.ai',
+        domain: 'custom.wandb.ai',
+      });
+    });
+
+    test('reads base URL from config file', () => {
+      const mockConfig = `
+[default]
+wandb_base_url = https://custom.wandb.ai
+`;
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockConfig);
+      process.env.WANDB_API_KEY = 'test-api-key';
+
+      const configs = getWandbConfigs();
+      expect(configs.resolvedHost).toBe('custom.wandb.ai');
+    });
+
+    test('falls back to default host when no custom URL is configured', () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      process.env.WANDB_API_KEY = 'test-api-key';
+
+      const configs = getWandbConfigs();
+      expect(configs).toEqual({
+        apiKey: 'test-api-key',
+        baseUrl: 'https://api.wandb.ai',
+        traceBaseUrl: 'https://trace.wandb.ai',
         resolvedHost: 'api.wandb.ai',
-        domain: expect.any(String),
+        domain: "wandb.ai",
       });
     });
 
-    it('throws error when no netrc entry is found', () => {
-      // Mock netrc with no entries
-      MockedNetrc.prototype.getLastEntry = jest.fn().mockReturnValue(null);
-
-      expect(() => getWandbConfigs()).toThrow(
-        'Could not find entry in netrc file'
-      );
-    });
-
-    it('throws error when netrc throws error', () => {
-      // Mock netrc throwing error
-      MockedNetrc.prototype.getLastEntry = jest.fn().mockImplementation(() => {
-        throw new Error('Failed to read netrc');
+    test('handles config file read errors gracefully', () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockImplementation(() => {
+        throw new Error('Cannot read config file');
       });
+      process.env.WANDB_API_KEY = 'test-api-key';
 
-      expect(() => getWandbConfigs()).toThrow(
-        'Could not find entry in netrc file'
-      );
+      const configs = getWandbConfigs();
+      expect(configs.resolvedHost).toBe('api.wandb.ai');
     });
   });
 });
