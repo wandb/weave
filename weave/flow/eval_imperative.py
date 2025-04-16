@@ -185,13 +185,19 @@ class ImperativeScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        @weave.op(name=scorer.name)
-        def score_method(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
-            # TODO: can't use score here because it will cause version mismatch
-            # return score
-            return cast(ScoreType, current_score.get())
+        def make_score_method() -> Callable[[Scorer, Any, Any], ScoreType]:
+            """This method is created just to avoid name collision between the
+            score method name and the score value the user passes in."""
 
-        scorer.__dict__["score"] = MethodType(score_method, scorer)
+            @weave.op(name=scorer.name)
+            def score(self: Scorer, *, output: Any, **inputs: Any) -> ScoreType:
+                # TODO: can't use score here because it will cause version mismatch
+                # return score
+                return cast(ScoreType, current_score.get())
+
+            return score
+
+        scorer.__dict__["score"] = MethodType(make_score_method(), scorer)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(

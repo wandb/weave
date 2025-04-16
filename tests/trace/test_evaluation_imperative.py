@@ -74,13 +74,13 @@ def test_basic_evaluation(client, user_dataset, user_model):
         assert predict_call.output == outputs
 
         scorer1_call = calls[predict_index + 2]
-        assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
+        assert op_name_from_call(scorer1_call) == "score"
         assert scorer1_call.inputs["output"]["model_output"] == outputs
         assert scorer1_call.inputs["inputs"]["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
-        assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
+        assert op_name_from_call(scorer2_call) == "score"
         assert scorer2_call.inputs["output"]["model_output"] == outputs
         assert scorer2_call.inputs["inputs"]["inputs"] == inputs
         assert scorer2_call.output == score2
