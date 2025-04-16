@@ -505,6 +505,16 @@ const fetchEvaluationComparisonResults = async (
     .datasetRef as string;
   const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
   // If the dataset has not been deleted, fetch rows
+  console.log(
+    'datasetRef',
+    datasetRef,
+    'refs',
+    Object.values(summaryData.evaluations),
+    'datasetObjRes',
+    datasetObjRes,
+    'rows',
+    datasetObjRes.vals[0]?.rows
+  );
   if (datasetObjRes.vals[0] != null) {
     const rowsRef = datasetObjRes.vals[0].rows;
     const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
@@ -514,6 +524,10 @@ const fetchEvaluationComparisonResults = async (
         project: parsedRowsRef.projectName,
       }),
       digest: parsedRowsRef.artifactVersion,
+      filter: {
+        row_digests: [],
+      },
+      limit: 1000,
     });
     rowsQuery.rows.forEach(row => {
       result.inputs[row.digest] = {

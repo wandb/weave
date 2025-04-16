@@ -184,7 +184,8 @@ const CompareEvaluationsPageInner: React.FC<{
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
-  const resultsLoading = state.loadableComparisonResults.loading;
+  // const resultsLoading = state.loadableComparisonResults.loading;
+  const resultsLoading = false;
   return (
     <Box
       sx={{
