@@ -1,7 +1,4 @@
-import {STRING_COLOR} from '@wandb/weave/panel/WeaveExpression/styles';
 import styled, {css} from 'styled-components';
-
-import {Icon} from '../../Icon';
 
 const COLORS = {
   teal: '#13a9ba',
@@ -29,63 +26,49 @@ const SPACING = {
 const FONTS = {
   code: 'Inconsolata',
   normal: 'Source Sans Pro',
-  sizes: {
-    xs: '0.75em',
-    sm: '0.8em',
-    md: '1em',
-  },
 };
 
-const flexCenter = css`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
 const cardBase = css`
-  padding: ${SPACING.xl};
+  padding: ${SPACING.lg};
   border-radius: 8px;
   border: 1px solid ${COLORS.border};
   background-color: #ffffff;
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
-  width: min(100%, 300px);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   position: relative;
 `;
 
 export const Container = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100%;
+
+  max-height: 90%;
   overflow: hidden;
   position: relative;
-  padding: 2px;
+  padding: ${SPACING.xs};
   box-sizing: border-box;
   container-type: inline-size; /* Enable container queries */
 `;
 
 export const HeaderSection = styled.div`
-  font-family: Source Sans Pro;
+  font-family: ${FONTS.normal};
   font-size: 14px;
   padding-top: ${SPACING.lg};
   text-align: center;
-  flex-shrink: 0;
   padding-bottom: ${SPACING.xs};
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   z-index: 2;
-  background-color: white;
-  min-height: min-content;
-  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  margin-bottom: ${SPACING.md};
 `;
 
 export const Title = styled.p`
   font-weight: 600;
   color: ${COLORS.text.primary};
-  margin: ${SPACING.md} 0;
 `;
 
 export const Subtitle = styled.p`
@@ -97,7 +80,7 @@ export const ScrollableContainer = styled.div`
   flex: 1 1 auto;
   overflow-x: hidden;
   width: 100%;
-  padding: 0 ${SPACING.xxl} ${SPACING.xxl};
+  padding: 0 ${SPACING.md} ${SPACING.md};
   box-sizing: border-box;
   position: relative;
   padding-top: ${SPACING.xs};
@@ -139,19 +122,21 @@ export const DynamicScrollContainer = styled(ScrollableContainer)<{
   overflow-y: ${props => (props.shouldScroll ? 'auto' : 'visible')};
   visibility: ${props => (props.isInitialized ? 'visible' : 'hidden')};
   transition: max-height 0.2s ease-out;
+  padding: 0 ${SPACING.xxl} ${SPACING.xxl};
+  padding-top: ${SPACING.xs};
 `;
 
 export const CardGrid = styled.div`
   display: grid;
-  gap: 8px;
+  gap: ${SPACING.md};
   width: 100%;
-  box-sizing: border-box;
-  margin-top: ${SPACING.lg};
-  padding-bottom: ${SPACING.xxl};
-  padding-top: ${SPACING.sm};
+  max-width: 900px; /* Prevent the grid from becoming too wide */
+  margin: ${SPACING.lg} auto 0;
+  padding-bottom: ${SPACING.md};
+  padding-top: ${SPACING.xs};
   height: fit-content;
   overflow: visible;
-  justify-items: stretch;
+  justify-content: start;
   align-items: stretch;
 `;
 
@@ -163,9 +148,7 @@ export const Card = styled.div`
   align-items: flex-start;
   cursor: pointer;
   z-index: 1;
-  transform-origin: center center;
-  margin-top: ${SPACING.xs};
-  height: 100%;
+  padding: ${SPACING.sm} ${SPACING.md};
 
   &:hover {
     border-color: ${COLORS.teal};
@@ -177,20 +160,29 @@ export const CardTitleContainer = styled.div`
   display: flex;
   align-items: center;
   gap: ${SPACING.md};
+  width: 100%;
 `;
 
 export const CardTitle = styled.div`
-  font-family: Source Sans Pro;
+  font-family: ${FONTS.normal};
   margin: 0;
   color: ${COLORS.text.primary};
   font-size: 14px;
   font-weight: 400;
-  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  min-width: 0; /* Allow element to shrink */
 `;
 
 export const CardSubtitle = styled.span`
-  padding-top: ${SPACING.xs};
+  padding-top: ${SPACING.sm};
   font-family: ${FONTS.code};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 `;
 
 export const ExpressionWrapper = styled.div`
@@ -200,114 +192,7 @@ export const ExpressionWrapper = styled.div`
   font-size: 14px;
   line-height: 1;
   flex-wrap: wrap;
-
-  .bracket-group-container {
-    display: inline-flex;
-    align-items: baseline;
-    margin: 0;
-    padding: 0;
-  }
-
-  @container (max-width: 230px) {
-    &.pickcard-expression {
-      display: grid;
-      grid-template-columns: auto;
-      gap: ${SPACING.xs};
-    }
-  }
-`;
-
-export const BracketGroup = styled.div.attrs({
-  className: 'bracket-group-container',
-})`
-  && {
-    display: inline-flex;
-    align-items: baseline;
-    margin: 0;
-    padding: 0;
-  }
-`;
-
-export const StyledDropdownWrapper = styled.div`
-  margin: 0 ${SPACING.xs};
-  display: flex;
-  align-content: center;
-
-  .ui.dropdown {
-    color: ${STRING_COLOR} !important;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    border-radius: 3px;
-    padding: 0;
-    display: flex;
-    align-content: center;
-    min-height: 0;
-    min-width: 48px;
-
-    .default.text {
-      color: ${STRING_COLOR} !important;
-    }
-
-    > .dropdown.icon {
-      display: none;
-    }
-
-    .menu {
-      border-radius: 3px;
-      margin-top: ${SPACING.xs};
-      min-width: 100px;
-      width: auto;
-      max-height: 120px;
-
-      > .item {
-        font-size: 14px;
-        padding: ${SPACING.md} ${SPACING.lg} !important;
-        border-bottom: 1px solid #f0f0f0;
-        color: ${STRING_COLOR} !important;
-        white-space: nowrap;
-        background-color: #ffffff !important;
-
-        &:hover {
-          background-color: ${COLORS.dropdown.itemHover} !important;
-        }
-      }
-
-      > .item.selected {
-        background-color: ${COLORS.dropdown.itemHover} !important;
-      }
-    }
-
-    input.search {
-      padding: 0 !important;
-    }
-  }
-
-  .ui.active.dropdown {
-    border-color: transparent !important;
-    box-shadow: none !important;
-  }
-`;
-
-export const SearchIconContainer = styled.div`
-  ${flexCenter}
-  height: 36px;
-  width: 36px;
-  aspect-ratio: 1;
-
-  @container (max-width: 200px) {
-    height: 32px;
-    width: 32px;
-  }
-
-  @container (max-width: 150px) {
-    height: 28px;
-    width: 28px;
-  }
-`;
-
-export const SearchIcon = styled(Icon)`
-  height: 50%;
-  width: 50%;
-  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 `;

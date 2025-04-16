@@ -1,25 +1,28 @@
 import {
-  EditingNode,
   isAssignableTo,
   list,
   Node,
   NodeOrVoidNode,
   pushFrame,
-  varNode,
 } from '@wandb/weave/core';
-import React, {useLayoutEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {Icon, IconName, IconNames} from '../../Icon';
 import {usePanelContext} from '../PanelContext';
 import {inputType} from '../PanelExpression/common';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from './EmptyExpressionPanel.styles';
-import {PickCard} from './PickCard';
-import {runConfig, runHistory, runSummary} from './shortcutExpressions';
 import {
   runConfigExpressionText,
   runHistoryExpressionText,
   runSummaryExpressionText,
+  runSummaryKeyExpressionText,
 } from './util';
 
 const recordEvent = makeEventRecorder('EmptyPanelShortcut');
@@ -27,7 +30,6 @@ const recordEvent = makeEventRecorder('EmptyPanelShortcut');
 type CardAction = {
   title: string;
   id: string;
-  outputNodeFn: (inputNode: Node) => EditingNode;
   icon: IconName;
   expressionText: ExpressionTextItem[];
   cursorPos?: {
@@ -40,30 +42,32 @@ const BASIC_CARD_ACTIONS: CardAction[] = [
     id: 'RUN_CONFIG_TABLE',
     title: 'Explore configuration',
     expressionText: runConfigExpressionText,
-    outputNodeFn: inputNode => runConfig(inputNode),
     icon: IconNames.SettingsParameters,
   },
   {
     id: 'RUN_SUMMARY_TABLE',
     title: 'View run summaries',
     expressionText: runSummaryExpressionText,
-    outputNodeFn: inputNode => runSummary(inputNode),
     icon: IconNames.Table,
-    cursorPos: {
-      offset: -1,
-    },
   },
   {
     id: 'RUN_HISTORY_TABLE',
     title: 'View run history',
     expressionText: runHistoryExpressionText,
-    outputNodeFn: inputNode => runHistory(inputNode),
     icon: IconNames.List,
+  },
+  {
+    id: 'RUN_SUMMARY_KEY_TABLE',
+    title: 'View summary key',
+    expressionText: runSummaryKeyExpressionText,
+    icon: IconNames.Table,
+    cursorPos: {
+      offset: -2,
+    },
   },
 ];
 
 interface EmptyExpressionPanelProps {
-  updateExp: (newExp: EditingNode) => void;
   inputNode: NodeOrVoidNode<typeof inputType>;
   newVars: {[key: string]: Node<'any'>};
   insertTextIntoEditor?: (
@@ -82,7 +86,7 @@ interface ExpressionTextItem {
 export const EmptyExpressionPanel: React.FC<
   EmptyExpressionPanelProps
 > = props => {
-  const {updateExp, inputNode, newVars, insertTextIntoEditor} = props;
+  const {inputNode, newVars, insertTextIntoEditor} = props;
   const panelContext = usePanelContext();
   const stack = useMemo(() => {
     return pushFrame(panelContext.stack, newVars);
@@ -97,8 +101,11 @@ export const EmptyExpressionPanel: React.FC<
   const [isInitialized, setIsInitialized] = useState(false);
   const [gridColumns, setGridColumns] = useState(1);
 
+  // Determine if compact mode is active (1 column)
+  const isCompactMode = gridColumns === 1;
+
   // Update grid columns based on container width
-  const updateGridColumns = (width: number) => {
+  const updateGridColumns = useCallback((width: number) => {
     if (width >= 600) {
       setGridColumns(3);
     } else if (width >= 400) {
@@ -106,7 +113,27 @@ export const EmptyExpressionPanel: React.FC<
     } else {
       setGridColumns(1);
     }
-  };
+  }, []);
+
+  // Update measurements when resizing
+  const updateContainerMeasurements = useCallback(
+    (width: number) => {
+      updateGridColumns(width);
+    },
+    [updateGridColumns]
+  );
+
+  // Create a grid template style based on columns
+  const cardContainerStyle = React.useMemo(() => {
+    return {
+      gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
+      width: '100%',
+      maxWidth: '900px',
+      gap: '8px',
+      marginTop: isCompactMode ? '0' : '12px',
+      paddingBottom: '8px',
+    };
+  }, [gridColumns, isCompactMode]);
 
   useLayoutEffect(() => {
     const resizeObserver = new ResizeObserver(() => {
@@ -118,24 +145,30 @@ export const EmptyExpressionPanel: React.FC<
           const marginBottom = parseInt(computedStyle.marginBottom, 10) || 0;
           const paddingBottom = parseInt(computedStyle.paddingBottom, 10) || 0;
 
-          const bufferSpace = 16;
-          const totalHeaderHeight =
-            Math.ceil(height) +
-            marginTop +
-            marginBottom +
-            paddingBottom +
-            bufferSpace;
+          let totalHeaderHeight;
+          if (isCompactMode) {
+            totalHeaderHeight = 40;
+          } else {
+            const bufferSpace = 16;
+            totalHeaderHeight =
+              Math.ceil(height) +
+              marginTop +
+              marginBottom +
+              paddingBottom +
+              bufferSpace;
+          }
 
           setHeaderDimensions({
             height: totalHeaderHeight,
           });
 
-          // Get and update container width
           const width = containerRef.current.clientWidth;
-          updateGridColumns(width);
+          updateContainerMeasurements(width);
 
           const containerHeight = containerRef.current.clientHeight;
-          setShouldScroll(containerHeight - totalHeaderHeight < 300);
+          setShouldScroll(
+            isCompactMode ? false : containerHeight - totalHeaderHeight < 300
+          );
         }
       });
     });
@@ -146,14 +179,19 @@ export const EmptyExpressionPanel: React.FC<
       const marginTop = parseInt(computedStyle.marginTop, 10) || 0;
       const marginBottom = parseInt(computedStyle.marginBottom, 10) || 0;
       const paddingBottom = parseInt(computedStyle.paddingBottom, 10) || 0;
-      const bufferSpace = 16;
 
-      const totalHeight =
-        Math.ceil(height) +
-        marginTop +
-        marginBottom +
-        paddingBottom +
-        bufferSpace;
+      let totalHeight;
+      if (isCompactMode) {
+        totalHeight = 40;
+      } else {
+        const bufferSpace = 16;
+        totalHeight =
+          Math.ceil(height) +
+          marginTop +
+          marginBottom +
+          paddingBottom +
+          bufferSpace;
+      }
 
       setHeaderDimensions({
         height: totalHeight,
@@ -165,7 +203,7 @@ export const EmptyExpressionPanel: React.FC<
     if (containerRef.current) {
       // Initial width measurement
       const width = containerRef.current.clientWidth;
-      updateGridColumns(width);
+      updateContainerMeasurements(width);
 
       resizeObserver.observe(containerRef.current);
     }
@@ -189,7 +227,7 @@ export const EmptyExpressionPanel: React.FC<
     setIsInitialized(true);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [isCompactMode, updateContainerMeasurements]);
 
   const handleCardClick = (action: CardAction) => {
     const runsValFromStack = stack.find(s => s.name === 'runs');
@@ -198,26 +236,18 @@ export const EmptyExpressionPanel: React.FC<
     }
 
     if (insertTextIntoEditor) {
-      // If we have insertTextIntoEditor, use it to insert the expression text
       const expressionText = action.expressionText
         .map(item => item.text)
         .join('');
 
-      // Use the action's cursorPos property if available
       if (action.cursorPos) {
         insertTextIntoEditor(expressionText, action.cursorPos);
       } else {
-        // Default behavior: place cursor at the end
         insertTextIntoEditor(expressionText);
       }
-    } else {
-      // Otherwise use the node-based approach
-      updateExp(
-        action.outputNodeFn(varNode(runsValFromStack.value.type, 'runs'))
-      );
     }
 
-    recordEvent('SELECT_SHORTCUT', {name: action.title});
+    recordEvent(`SELECT_SHORTCUT_${action.id}`);
   };
 
   if (!inputNode || !isAssignableTo(inputNode?.type, list('run'))) {
@@ -227,29 +257,40 @@ export const EmptyExpressionPanel: React.FC<
   return (
     <S.Container ref={containerRef}>
       <S.HeaderSection ref={headerRef}>
-        <S.SearchIconContainer
-          className={`my-8 rounded-full bg-[rgba(169,237,242,0.48)]`}>
-          <S.SearchIcon name={IconNames.Search} className={`text-[#038194]`} />
-        </S.SearchIconContainer>
+        {!isCompactMode && (
+          <div
+            style={{
+              height: '40px',
+              width: '40px',
+              backgroundColor: 'rgba(169, 237, 242, 0.48)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              aspectRatio: 1,
+              borderRadius: '9999px',
+              marginBottom: '8px',
+            }}>
+            <Icon
+              name={IconNames.Search}
+              style={{height: '24px', width: '24px', color: '#038194'}}
+            />
+          </div>
+        )}
         <S.Title>START WITH AN EXPRESSION</S.Title>
-        <S.Subtitle>
-          <span>
-            Enter a query expression to explore your data or choose from common
-            queries
-          </span>
-        </S.Subtitle>
+        {!isCompactMode && (
+          <S.Subtitle>
+            <span>
+              Enter a query expression or choose from common queries to explore
+              your data
+            </span>
+          </S.Subtitle>
+        )}
       </S.HeaderSection>
       <S.DynamicScrollContainer
         headerHeight={headerDimensions.height}
         shouldScroll={shouldScroll}
         isInitialized={isInitialized}>
-        <S.CardGrid
-          style={{gridTemplateColumns: `repeat(${gridColumns}, 1fr)`}}>
-          <PickCard
-            updateExp={updateExp}
-            stack={stack}
-            insertTextIntoEditor={insertTextIntoEditor}
-          />
+        <S.CardGrid style={cardContainerStyle}>
           {BASIC_CARD_ACTIONS.map(action => (
             <S.Card
               key={action.id}
@@ -257,22 +298,21 @@ export const EmptyExpressionPanel: React.FC<
               role="button"
               aria-label={`Select ${action.title}`}>
               <S.CardTitleContainer>
-                <Icon
-                  name={action.icon}
-                  style={{marginRight: '8px', color: '#565C66'}}
-                />
+                <Icon name={action.icon} />
                 <S.CardTitle>{action.title}</S.CardTitle>
               </S.CardTitleContainer>
 
-              <S.CardSubtitle>
-                <S.ExpressionWrapper>
-                  {action.expressionText.map((item, index) => (
-                    <React.Fragment key={index}>
-                      <span style={{color: item.color}}>{item.text}</span>
-                    </React.Fragment>
-                  ))}
-                </S.ExpressionWrapper>
-              </S.CardSubtitle>
+              {!isCompactMode && (
+                <S.CardSubtitle>
+                  <S.ExpressionWrapper>
+                    {action.expressionText.map((item, index) => (
+                      <React.Fragment key={index}>
+                        <span style={{color: item.color}}>{item.text}</span>
+                      </React.Fragment>
+                    ))}
+                  </S.ExpressionWrapper>
+                </S.CardSubtitle>
+              )}
             </S.Card>
           ))}
         </S.CardGrid>

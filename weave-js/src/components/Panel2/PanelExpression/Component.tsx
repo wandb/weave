@@ -64,7 +64,6 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
         // Position cursor at specific index from the start of the inserted text
         // Negative values count from the end
         offset?: number;
-        // Select a range of text (useful for placeholder replacement)
       }
     ) => {
       if (!editorRef.current) return;
@@ -77,17 +76,8 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
       // Insert the text at the current selection
       Transforms.insertText(editor, text, {at: []});
 
-      // Position cursor if options are provided
       if (options) {
-        // Get the current editor text
-        const editorText = Editor.string(editor, []);
-
         if (options.offset !== undefined) {
-          // Calculate position relative to end of inserted text
-          const currentPosition = Editor.point(editor, [], {edge: 'end'});
-          const newPosition = {...currentPosition};
-
-          // Calculate new offset
           let offset = options.offset;
           if (offset < 0) {
             // Negative offset means count from end
@@ -262,7 +252,6 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                   </WeaveActionContextProvider>
                 ) : (
                   <EmptyExpressionPanel
-                    updateExp={updateExp}
                     inputNode={props.input}
                     newVars={newVars}
                     insertTextIntoEditor={insertTextIntoEditor}
