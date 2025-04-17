@@ -250,6 +250,7 @@ export type WFDataModelHooksInterface = {
     limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
     offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
     sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'],
+    metadataOnly?: traceServerClientTypes.TraceTableQueryReq['metadata_only'],
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClientTypes.TraceTableQueryRes>;
   useTableQueryStats: (

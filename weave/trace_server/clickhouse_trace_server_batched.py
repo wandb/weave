@@ -115,6 +115,7 @@ from weave.trace_server.table_query_builder import (
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_metadata_only_table_query,
 )
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -186,10 +187,15 @@ ObjRefListType = list[ri.InternalObjectRef]
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
+# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
+DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE
+    or DEFAULT_MAX_MEMORY_USAGE,
+    # "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
+    # or DEFAULT_MAX_EXECUTION_TIME,
 }
 
 
@@ -966,6 +972,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
                 sort_fields.append(field)
+
+        if req.metadata_only:
+            query = make_metadata_only_table_query(
+                req.project_id,
+                req.digest,
+                pb,
+            )
+            res = self._query_stream(query, parameters=pb.get_params())
+            for row in res:
+                yield tsi.TableRowSchema(digest=row[0], val=None, original_index=row[1])
+            return
 
         rows = self._table_query_stream(
             req.project_id,

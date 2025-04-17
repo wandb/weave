@@ -528,6 +528,7 @@ const fetchEvaluationComparisonResults = async (
         row_digests: [],
       },
       limit: 1000,
+      metadata_only: true,
     });
     rowsQuery.rows.forEach(row => {
       result.inputs[row.digest] = {

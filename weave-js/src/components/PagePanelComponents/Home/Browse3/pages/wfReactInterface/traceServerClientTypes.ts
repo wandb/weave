@@ -284,6 +284,7 @@ export type TraceTableQueryReq = {
   limit?: number;
   offset?: number;
   sort_by?: SortBy[];
+  metadata_only?: boolean;
 };
 
 export type TraceTableQueryStatsReq = {
