@@ -5,10 +5,10 @@ import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from datetime import datetime
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
-import uuid_utils as uuid
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -23,6 +23,7 @@ from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
 from weave.flow.scorer import Scorer
+from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op
@@ -121,6 +122,12 @@ def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
         return value
     else:
         raise TypeError("Unsupported type for casting")
+
+
+def _default_dataset_name() -> str:
+    date = datetime.now().strftime("%Y-%m-%d")
+    unique_name = make_memorable_name()
+    return f"dataset-{date}-{unique_name}"
 
 
 def _validate_class_name(name: str) -> str:
@@ -271,8 +278,7 @@ class ImperativeEvaluationLogger(BaseModel):
         BeforeValidator(_cast_to_imperative_dataset),
         Field(
             default_factory=lambda: Dataset(
-                name=(dataset_id := uuid.uuid7()),
-                rows=weave.Table([{"dataset_id": dataset_id}]),
+                rows=weave.Table([{"dataset_id": _default_dataset_name()}]),
             ),
             description="A metadata-only Dataset used for comparisons."
             "If you already know your rows ahead of time, you can pass either"
