@@ -210,7 +210,9 @@ class ImperativeScoreLogger(BaseModel):
         with _set_current_score(score):
             await self.predict_call.apply_scorer(scorer)
 
-        self._captured_scores[scorer.name] = score
+        # this is always true because of how the scorer is created in the validator
+        scorer_name = cast(str, scorer.name)
+        self._captured_scores[scorer_name] = score
 
 
 class ImperativeEvaluationLogger(BaseModel):

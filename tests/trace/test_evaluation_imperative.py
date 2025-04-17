@@ -163,11 +163,8 @@ def test_evaluation_with_custom_models_and_scorers(
             filter=ObjectVersionFilter(base_object_classes=["Scorer"])
         )
         assert len(scorers) == 3
-        # The patching we do on Scorers triggers a version bump.
-        # Since we always do this, the min version will always be 1
         assert scorers[0].object_id == "gt2_scorer"
         assert scorers[0].version_index == 0
-
         assert scorers[1].object_id == "gt4_scorer"
         assert scorers[1].version_index == 0
         assert scorers[2].object_id == "gt6_scorer"
