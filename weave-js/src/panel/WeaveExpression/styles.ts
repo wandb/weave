@@ -129,16 +129,12 @@ export const ApplyButton = styled(Button)`
   &:disabled {
     color: ${globals.MOON_400} !important;
     background-color: transparent !important;
-    opacity: 0.5 !important;
+    opacity: 0.75 !important;
   }
 
   &:not(:disabled) {
-    color: ${globals.TEAL_350} !important;
-  }
-
-  &:hover:not(:disabled) {
-    background-color: transparent !important;
-    color: ${globals.TEAL_400} !important;
+    color: ${globals.TEAL_600} !important;
+    background-color: rgba(169, 237, 242, 0.48) !important;
   }
 `;
 ApplyButton.displayName = 'S.ApplyButton';
