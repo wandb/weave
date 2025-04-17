@@ -145,12 +145,12 @@ class ImperativeScoreLogger(BaseModel):
     predict_call: Call
 
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
+    _has_finished: bool = PrivateAttr(False)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def finish(self, *, scores: dict[str, ScoreType] | None = None) -> None:
-        if scores is None:
-            scores = self._captured_scores
+    def finish(self) -> None:
+        scores = self._captured_scores
 
         wc = require_weave_client()
         wc.finish_call(
@@ -162,9 +162,7 @@ class ImperativeScoreLogger(BaseModel):
             },
         )
 
-        # call_context.pop_call(self.predict_and_score_call.id)
-        # call_context.pop_call(self.evaluate_call.id)
-        # call_context.pop_call(self.predict_call.id)
+        self._has_finished = True
 
     def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
@@ -195,6 +193,9 @@ class ImperativeScoreLogger(BaseModel):
         ],
         score: ScoreType,
     ) -> None:
+        if self._has_finished:
+            raise ValueError("Cannot log score after finish has been called")
+
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
@@ -248,6 +249,7 @@ class ImperativeEvaluationLogger(BaseModel):
             "representing the ID of your model.",
         ),
     ]
+    dataset: Annotated[Dataset]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -257,6 +259,9 @@ class ImperativeEvaluationLogger(BaseModel):
             dataset=weave.Dataset(rows=weave.Table([{"": ""}])),
             scorers=[],
         )
+    )
+    _accumulated_predictions: list[ImperativeScoreLogger] = PrivateAttr(
+        default_factory=list
     )
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
@@ -288,6 +293,9 @@ class ImperativeEvaluationLogger(BaseModel):
                 predict_method = cast(Op, model.get_infer_method())
                 model_output, predict_call = predict_method.call(model, example)
                 current_predict_call.set(predict_call)
+
+                # This data is just a placeholder to give a sense of the data shape.
+                # The actual output is explicitly replaced in ImperativeScoreLogger.finish.
                 return {
                     "model_output": model_output,
                     "scores": {},
@@ -336,11 +344,13 @@ class ImperativeEvaluationLogger(BaseModel):
             raise ValueError("predict_call should not be None")
 
         assert self._evaluate_call is not None
-        return ImperativeScoreLogger(
+        pred = ImperativeScoreLogger(
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
         )
+        self._accumulated_predictions.append(pred)
+        return pred
 
     def log_summary(self, summary: dict) -> None:
         if self._logged_summary:
@@ -351,6 +361,10 @@ class ImperativeEvaluationLogger(BaseModel):
         assert self._evaluate_call is not None
         with _set_current_summary(summary):
             self._pseudo_evaluation.summarize()
+
+        for pred in self._accumulated_predictions:
+            if not pred._has_finished:
+                pred.finish()
 
         # Finish the evaluation call
         wc = require_weave_client()
