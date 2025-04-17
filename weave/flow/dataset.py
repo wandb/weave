@@ -95,7 +95,8 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
-
+    
+  
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
 
@@ -106,6 +107,13 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
+    
+    def __repr__(self) -> str:
+        return f"Dataset({{\n    features: {list(self.columns_names)},\n    num_rows: {len(self)}\n}})"
+
+    @property
+    def columns_names(self) -> list[str]:
+        return list(self.rows[0].keys())
 
     def select(self, indices: Iterable[int]) -> Self:
         """
