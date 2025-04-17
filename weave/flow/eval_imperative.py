@@ -163,6 +163,10 @@ class ImperativeScoreLogger(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def finish(self) -> None:
+        if self._has_finished:
+            logger.warn("(NO-OP): Already called finish, returning.")
+            return
+
         scores = self._captured_scores
 
         wc = require_weave_client()
@@ -267,7 +271,8 @@ class ImperativeEvaluationLogger(BaseModel):
         BeforeValidator(_cast_to_imperative_dataset),
         Field(
             default_factory=lambda: Dataset(
-                rows=weave.Table([{"dataset_id": uuid.uuid7()}])
+                name=(dataset_id := uuid.uuid7()),
+                rows=weave.Table([{"dataset_id": dataset_id}]),
             ),
             description="A metadata-only Dataset used for comparisons."
             "If you already know your rows ahead of time, you can pass either"
@@ -385,15 +390,17 @@ class ImperativeEvaluationLogger(BaseModel):
         if self._logged_summary:
             logger.warn("(NO-OP): Already called summary, returning.")
             return
+
         self._logged_summary = True
-        # Call the summarize method with the proper context
-        assert self._evaluate_call is not None
-        with _set_current_summary(summary):
-            self._pseudo_evaluation.summarize()
 
         for pred in self._accumulated_predictions:
             if not pred._has_finished:
                 pred.finish()
+
+        # Call the summarize method with the proper context
+        assert self._evaluate_call is not None
+        with _set_current_summary(summary):
+            self._pseudo_evaluation.summarize()
 
         # Finish the evaluation call
         wc = require_weave_client()

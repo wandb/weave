@@ -340,6 +340,9 @@ def _call_sync_func(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    # When this param is True, calls do not automatically "finish" when the function
+    # returns.  The user must explicitly call `finish` on the call object.  This is
+    # included to support the imperative evaluation logging interface.
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
@@ -522,6 +525,9 @@ def call(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    # When this param is True, calls do not automatically "finish" when the function
+    # returns.  The user must explicitly call `finish` on the call object.  This is
+    # included to support the imperative evaluation logging interface.
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
