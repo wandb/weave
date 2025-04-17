@@ -41,9 +41,7 @@ import {warnOnce} from './utils/warnOnce';
  *
  *   constructor() {
  *     this.oaiClient = weave.wrapOpenAI(new OpenAI());
- *     // Get the original method and wrap it
- *     const descriptor = Object.getOwnPropertyDescriptor(MyModel.prototype, 'invoke')!;
- *     this.invoke = weave.op(this, descriptor.value);
+ *     this.invoke = weave.op(this, this.invoke);
  *   }
  *
  *   async invoke(prompt: string) {

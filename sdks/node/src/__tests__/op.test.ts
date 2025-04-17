@@ -217,7 +217,7 @@ describe('op decorators', () => {
     expect((model.invoke as Op<any>).__boundThis).toBe(model);
   });
 
-  it('works with getOwnPropertyDescriptor in constructor', async () => {
+  it('works with wrapping in the constructor', async () => {
     class Model {
       private oaiClient: any;
 
@@ -230,9 +230,7 @@ describe('op decorators', () => {
           }
         };
 
-        // Get the original method descriptor from the prototype and wrap it
-        const descriptor = Object.getOwnPropertyDescriptor(Model.prototype, 'invoke')!;
-        this.invoke = weave.op(this, descriptor.value);
+        this.invoke = weave.op(this, this.invoke);
       }
 
       async invoke(prompt: string): Promise<string> {
