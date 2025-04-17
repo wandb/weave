@@ -3691,3 +3691,63 @@ def test_calls_hydrated(client):
     assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
     assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+
+
+def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def child_op(a: int, b: int) -> dict[str, Any]:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x["a"], x["b"])  # Call child op to create a trace
+
+    parent_op({"a": 1, "b": 2})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged FINAL",
+    )
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Test that "include_costs" and "include_total_storage_size" can be used together
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["id", "summary", "total_storage_size_bytes"],
+                include_costs=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if "parent_op" in c.op_name)
+    child_call = next(c for c in calls if "child_op" in c.op_name)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    assert parent_call.summary["usage"] is not None
+    assert child_call.summary["usage"] is not None
+
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is None

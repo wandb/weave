@@ -79,6 +79,7 @@ export type TraceCallReadReq = {
   project_id: string;
   id: string;
   include_costs?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallReadSuccess = {

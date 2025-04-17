@@ -36,6 +36,9 @@ export type CallKey = {
   project: string;
   callId: string;
 };
+
+export type CacheableCallKey = CallKey & Record<string, unknown>;
+
 export type CallSchema = CallKey & {
   spanName: string;
   displayName: string | null;
@@ -166,8 +169,8 @@ export type Refetchable = {
 
 export type WFDataModelHooksInterface = {
   useCall: (
-    key: CallKey | null,
-    opts?: {includeCosts?: boolean}
+    key: CacheableCallKey | null,
+    opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
