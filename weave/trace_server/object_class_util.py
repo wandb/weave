@@ -2,6 +2,7 @@ from typing import Any, Optional, TypedDict
 
 from pydantic import BaseModel
 
+from weave.client_server_common.pydantic_util import pydantic_asdict_one_level
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -128,8 +129,9 @@ def dump_object(val: BaseModel) -> dict:
     # Order matters here due to the way we calculate the digest!
     # This matches the client
     dump["_type"] = cls_name
-    for k in val.model_fields:
-        dump[k] = _general_dump(getattr(val, k))
+    d = pydantic_asdict_one_level(val)
+    for k, v in d.items():
+        dump[k] = _general_dump(v)
     # yes, this is done twice, to match the client
     dump["_class_name"] = cls_name
     dump["_bases"] = bases

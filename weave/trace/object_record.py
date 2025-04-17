@@ -3,10 +3,12 @@ from __future__ import annotations
 import dataclasses
 import types
 from inspect import getmro, isclass
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
-import pydantic
-
+from weave.client_server_common.pydantic_util import (
+    PydanticBaseModelGeneral,
+    pydantic_asdict_one_level,
+)
 from weave.trace.op import is_op
 
 
@@ -56,35 +58,6 @@ class ObjectRecord:
             ]
         }
         return unwrap(unwrapped_one_level)
-
-
-PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
-
-
-def pydantic_model_fields(
-    obj: PydanticBaseModelGeneral,
-) -> dict[str, pydantic.fields.FieldInfo]:
-    if isinstance(obj, pydantic.BaseModel):
-        return obj.model_fields
-    elif isinstance(obj, pydantic.v1.BaseModel):
-        return obj.__fields__
-    else:
-        raise TypeError(f"{obj} is not a pydantic model")
-
-
-def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    fields = pydantic_model_fields(obj)
-    final = {}
-    for prop_name, field in fields.items():
-        use_name = prop_name
-        # This odd check is to support different pydantic versions
-        if hasattr(field, "exclude") and field.exclude:
-            continue
-        # This odd check is to support different pydantic versions
-        if hasattr(field, "alias") and field.alias:
-            use_name = field.alias
-        final[use_name] = getattr(obj, prop_name)
-    return final
 
 
 def class_all_bases_names(cls: type) -> list[str]:
