@@ -1,8 +1,21 @@
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import pydantic
 
-PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
+if TYPE_CHECKING:
+    from pydantic.v1 import BaseModel as PydanticBaseModelV1
+
+
+def is_pydantic_v1_base_model(obj: Any) -> bool:
+    try:
+        from pydantic.v1 import BaseModel as PydanticBaseModelV1
+
+        return isinstance(obj, PydanticBaseModelV1)
+    except ImportError:
+        return False
+
+
+PydanticBaseModelGeneral = Union[pydantic.BaseModel, "PydanticBaseModelV1"]
 
 
 def pydantic_model_fields(
@@ -10,7 +23,7 @@ def pydantic_model_fields(
 ) -> dict[str, pydantic.fields.FieldInfo]:
     if isinstance(obj, pydantic.BaseModel):
         return obj.model_fields
-    elif isinstance(obj, pydantic.v1.BaseModel):
+    elif is_pydantic_v1_base_model(obj):
         return obj.__fields__
     else:
         raise TypeError(f"{obj} is not a pydantic model")
