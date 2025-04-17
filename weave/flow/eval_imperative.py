@@ -115,7 +115,7 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
 
 def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
     if isinstance(value, str):
-        return Dataset(rows=weave.Table([{"dataset_id": value}]))
+        return Dataset(name=value, rows=weave.Table([{"dataset_id": value}]))
     elif isinstance(value, list):
         return Dataset(rows=weave.Table(value))
     elif isinstance(value, Dataset):
@@ -127,7 +127,7 @@ def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
 def _default_dataset_name() -> str:
     date = datetime.now().strftime("%Y-%m-%d")
     unique_name = make_memorable_name()
-    return f"dataset-{date}-{unique_name}"
+    return f"{date}-{unique_name}-dataset"
 
 
 def _validate_class_name(name: str) -> str:
