@@ -238,3 +238,42 @@ def test_evaluation_with_custom_models_and_scorers(
     assert scorers[3].version_index == 0
 
     assert call_context.get_call_stack() == []
+
+
+def test_evaluation_version_reuse(
+    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+):
+    """Test that running the same evaluation twice results in only one version."""
+    model = {"a": 1, "b": "two"}
+    dataset_id = "test_dataset_unique_identifier"
+
+    # Run the same evaluation twice
+    for _ in range(2):
+        ev = ImperativeEvaluationLogger(model=model, dataset=dataset_id)
+
+        for row in user_dataset:
+            model_output = user_model(row["a"], row["b"])
+            # Convert TypedDict to dict to avoid type errors
+            inputs_dict = dict(row)
+            pred = ev.log_prediction(inputs=inputs_dict, output=model_output)
+
+            score_result = model_output > 2
+            pred.log_score(scorer="greater_than_2_scorer", score=score_result)
+            pred.finish()
+
+        ev.log_summary({"avg_score": 1.0, "total_examples": 3})
+
+        client.flush()
+
+    # Only 1 version of the dataset should exist (it's the same one)
+    evaluations = client._objects(
+        filter=ObjectVersionFilter(base_object_classes=["Dataset"])
+    )
+    assert len(evaluations) == 1
+
+    # Check that only one version of the evaluation exists (none of the methods
+    # nor any of the attributes should have changed)
+    evaluations = client._objects(
+        filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
+    )
+    assert len(evaluations) == 1
