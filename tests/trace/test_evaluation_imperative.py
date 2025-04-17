@@ -2,7 +2,7 @@ from typing import Callable, TypedDict
 
 import pytest
 
-from weave import ImperativeEvaluationLogger, Model, Scorer
+from weave.flow.eval_imperative import ImperativeEvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
