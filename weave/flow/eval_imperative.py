@@ -229,11 +229,7 @@ class ImperativeScoreLogger(BaseModel):
             # return score
             return cast(ScoreType, current_score.get())
 
-        @weave.op(name="Scorer.summarize", enable_code_capture=False)
-        def summarize_method(self: Scorer, score_rows: list) -> dict: ...
-
         scorer.__dict__["score"] = MethodType(score_method, scorer)
-        scorer.__dict__["summarize"] = MethodType(summarize_method, scorer)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
@@ -390,9 +386,9 @@ class ImperativeEvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert self._evaluate_call is not None, (
-            "Evaluation call should exist for finalization"
-        )
+        assert (
+            self._evaluate_call is not None
+        ), "Evaluation call should exist for finalization"
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -464,9 +460,9 @@ class ImperativeEvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert self._evaluate_call is not None, (
-            "Evaluation call should exist for summary"
-        )
+        assert (
+            self._evaluate_call is not None
+        ), "Evaluation call should exist for summary"
         try:
             with _set_current_summary(final_summary):
                 self._pseudo_evaluation.summarize()

@@ -619,6 +619,14 @@ def op(
 ) -> Callable[[Callable], Op]: ...
 
 
+@overload
+def op(
+    *,
+    name: str | None = None,
+    enable_code_capture: bool = True,
+) -> Callable[[Callable], Op]: ...
+
+
 def op(
     func: Callable | None = None,
     *,
