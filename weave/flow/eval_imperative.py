@@ -41,9 +41,6 @@ current_summary: ContextVar[dict | None] = ContextVar("current_summary", default
 current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
-current_predict_and_score_call: ContextVar[Call | None] = ContextVar(
-    "current_predict_and_score_call", default=None
-)
 
 
 @contextmanager
@@ -155,19 +152,17 @@ class ImperativeScoreLogger(BaseModel):
         if scores is None:
             scores = self._captured_scores
 
-        call = current_predict_and_score_call.get()
-        if call is None:
-            raise ValueError("predict_and_score_call should not be None")
-
         wc = require_weave_client()
         wc.finish_call(
-            call,
+            self.predict_and_score_call,
             output={
                 "model_output": self.predict_call.output,
                 "scores": scores,
                 "model_latency": None,
             },
         )
+
+        # call_context.pop_call()
 
     def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
@@ -210,11 +205,8 @@ class ImperativeScoreLogger(BaseModel):
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
-        with call_context.set_call_stack(
-            [self.evaluate_call, self.predict_and_score_call]
-        ):
-            with _set_current_score(score):
-                await self.predict_call.apply_scorer(scorer)
+        with _set_current_score(score):
+            await self.predict_call.apply_scorer(scorer)
 
         self._captured_scores[scorer.name] = score
 
@@ -330,7 +322,6 @@ class ImperativeEvaluationLogger(BaseModel):
                 inputs,
                 __require_explicit_finish=True,
             )
-            current_predict_and_score_call.set(predict_and_score_call)
 
         # Get the predict_call from the context variable
         predict_call = current_predict_call.get()
@@ -351,9 +342,8 @@ class ImperativeEvaluationLogger(BaseModel):
         self._logged_summary = True
         # Call the summarize method with the proper context
         assert self._evaluate_call is not None
-        with call_context.set_call_stack([self._evaluate_call]):
-            with _set_current_summary(summary):
-                self._pseudo_evaluation.summarize()
+        with _set_current_summary(summary):
+            self._pseudo_evaluation.summarize()
 
         # Finish the evaluation call
         wc = require_weave_client()

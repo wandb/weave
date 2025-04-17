@@ -4,6 +4,7 @@ import pytest
 
 from weave import ImperativeEvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
+from weave.trace.context import call_context
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -229,3 +230,5 @@ def test_evaluation_with_custom_models_and_scorers(
     assert len(scorers) == 4
     assert scorers[3].object_id == "gt8_scorer"
     assert scorers[3].version_index == 1
+
+    assert call_context.get_call_stack() == []
