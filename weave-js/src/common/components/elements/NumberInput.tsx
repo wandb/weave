@@ -3,6 +3,7 @@ import _ from 'lodash';
 import React from 'react';
 import {Input} from 'semantic-ui-react';
 
+import {Button} from '../../../components/Button';
 import clamp from '../../util/clamp';
 
 interface NumberInputProps {
@@ -18,10 +19,14 @@ interface NumberInputProps {
   stepper?: boolean;
   strideLength?: number;
   ticks?: number[];
+  useStepperPlusMinus?: boolean; // This should be true for any new components that use the NumberInput component
   value?: number;
 }
 
-const NumberInput: React.FC<NumberInputProps> = props => {
+const NumberInput: React.FC<NumberInputProps> = ({
+  useStepperPlusMinus = false,
+  ...props
+}) => {
   const [stringValue, setStringValue] = React.useState(
     props.value == null ? '' : props.value.toString()
   );
@@ -48,7 +53,12 @@ const NumberInput: React.FC<NumberInputProps> = props => {
         // Do nothing on non arrow keys
         return;
       }
-      const v = parseFloat(stringValue);
+      // If the value is empty, try falling back to the placeholder in case it's a number
+      // since that's what the input will show. We will want to be able to shift the value
+      // from the empty state in this case.
+      const v = parseFloat(
+        stringValue === '' ? props?.placeholder?.toString() ?? '' : stringValue
+      );
       let newValue;
       if (ticks) {
         if (strideLength) {
@@ -77,8 +87,74 @@ const NumberInput: React.FC<NumberInputProps> = props => {
       setStringValue(newValue.toString());
       onChange(newValue);
     },
-    [onChange, ticks, stringValue, strideLength, min, max]
+    [onChange, ticks, stringValue, strideLength, min, max, props?.placeholder]
   );
+
+  if (props.stepper && useStepperPlusMinus) {
+    return (
+      <div
+        className="number-input-plus-minus flex items-center rounded px-4 outline outline-moon-200"
+        style={props.containerStyle}>
+        <Button
+          icon="remove"
+          onClick={() => shiftValue(-1)}
+          variant="ghost"
+          size="small"
+        />
+        <Input
+          input={{
+            ref: inputRef,
+          }}
+          aria-label={props.label}
+          className={`number-input-plus-minus__input ${props.className || ''}`}
+          disabled={props.disabled}
+          placeholder={props.placeholder}
+          style={props.inputStyle}
+          type="number"
+          value={stringValue}
+          onFocus={() => {
+            focusedRef.current = true;
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+            setStateValueToProp();
+          }}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            const direction =
+              e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : null;
+
+            if (direction != null) {
+              shiftValue(direction);
+              e.preventDefault();
+            }
+          }}
+          onChange={e => {
+            const newVal = e.target.value;
+            setStringValue(newVal);
+
+            if (newVal === '') {
+              props.onChange(undefined);
+            } else {
+              const newValFloat = parseFloat(newVal);
+              if (!Number.isNaN(newValFloat) && newValFloat !== props.value) {
+                const newValue = clamp(newValFloat, {
+                  min: props.min,
+                  max: props.max,
+                });
+                props.onChange(newValue);
+              }
+            }
+          }}
+        />
+        <Button
+          icon="add-new"
+          onClick={() => shiftValue(1)}
+          variant="ghost"
+          size="small"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="number-input__container" style={props.containerStyle}>

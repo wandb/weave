@@ -1,3 +1,4 @@
+import json
 import uuid
 from binascii import hexlify
 from datetime import datetime
@@ -22,6 +23,11 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.attributes import (
+    Attributes,
+    AttributesFactory,
+    GenericAttributes,
+    OpenInferenceAttributes,
+    OpenTelemetryAttributes,
     convert_numeric_keys_to_list,
     expand_attributes,
     flatten_attributes,
@@ -29,12 +35,11 @@ from weave.trace_server.opentelemetry.attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
+from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
-    Attributes,
     SpanKind,
     StatusCode,
 )
-from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
 
@@ -171,8 +176,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     # Verify call deletion using client provided ID works
     client.server.calls_delete(
         tsi.CallsDeleteReq(
-            project_id=project_id,
-            call_ids=[decoded_span],
+            project_id=project_id, call_ids=[decoded_span], wb_user_id=None
         )
     )
 
@@ -380,3 +384,244 @@ class TestAttributes:
         }
 
         assert result == expected
+
+
+class TestSemanticConventionParsing:
+    """Test the semantic convention parsing functionality in attributes.py."""
+
+    def test_openinference_attributes_extraction(self):
+        """Test extracting attributes from OpenInference attributes."""
+        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+
+        # Create attribute dictionary with OpenInference attributes
+        attributes = {
+            "openinference": True,
+            OISpanAttr.LLM_SYSTEM: "This is a system prompt",
+            OISpanAttr.LLM_PROVIDER: "test-provider",
+            OISpanAttr.LLM_MODEL_NAME: "test-model",
+            OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
+            OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
+                {"temperature": 0.7, "max_tokens": 100}
+            ),
+        }
+
+        # Create OpenInference attributes object
+        oi_attrs = OpenInferenceAttributes(attributes)
+
+        # Test get_weave_attributes
+        extracted = oi_attrs.get_weave_attributes()
+        assert extracted["system"] == "This is a system prompt"
+        assert extracted["provider"] == "test-provider"
+        assert extracted["model"] == "test-model"
+        assert extracted["kind"] == "llm"
+        assert extracted["temperature"] == "0.7"
+        assert extracted["max_tokens"] == "100"
+
+    def test_openinference_inputs_extraction(self):
+        """Test extracting inputs from OpenInference attributes."""
+        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+
+        # Create attribute dictionary with OpenInference input messages
+        input_messages = {"0": {"role": "user", "content": "What is machine learning?"}}
+        attributes = {
+            "openinference": True,
+            OISpanAttr.LLM_INPUT_MESSAGES: input_messages,
+        }
+
+        # Create OpenInference attributes object
+        oi_attrs = OpenInferenceAttributes(attributes)
+
+        # Test get_weave_inputs
+        inputs = oi_attrs.get_weave_inputs()
+        assert inputs == {"role_0": "user", "content_0": "What is machine learning?"}
+
+        # Test with multiple messages
+        input_messages_multiple = {
+            "0": {"role": "system", "content": "You are an assistant"},
+            "1": {"role": "user", "content": "What is machine learning?"},
+        }
+        attributes = {
+            "openinference": True,
+            OISpanAttr.LLM_INPUT_MESSAGES: input_messages_multiple,
+        }
+        oi_attrs = OpenInferenceAttributes(attributes)
+        inputs = oi_attrs.get_weave_inputs()
+        assert inputs == {
+            "role_0": "system",
+            "content_0": "You are an assistant",
+            "role_1": "user",
+            "content_1": "What is machine learning?",
+        }
+
+    def test_openinference_outputs_extraction(self):
+        """Test extracting outputs from OpenInference attributes."""
+        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+
+        # Create attribute dictionary with OpenInference output messages
+        output_messages = {
+            "0": {
+                "role": "assistant",
+                "content": "Machine learning is a field of AI...",
+            }
+        }
+        attributes = {
+            "openinference": True,
+            OISpanAttr.LLM_OUTPUT_MESSAGES: output_messages,
+        }
+
+        # Create OpenInference attributes object
+        oi_attrs = OpenInferenceAttributes(attributes)
+
+        # Test get_weave_outputs
+        outputs = oi_attrs.get_weave_outputs()
+        assert outputs == {
+            "role_0": "assistant",
+            "content_0": "Machine learning is a field of AI...",
+        }
+
+    def test_openinference_usage_extraction(self):
+        """Test extracting usage from OpenInference attributes."""
+        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+
+        # Create attribute dictionary with OpenInference token counts
+        attributes = {
+            "openinference": True,
+            OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
+            OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
+            OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
+        }
+
+        # Create OpenInference attributes object
+        oi_attrs = OpenInferenceAttributes(attributes)
+
+        # Test get_weave_usage
+        usage = oi_attrs.get_weave_usage()
+        assert usage.get("prompt_tokens") == 10
+        assert usage.get("completion_tokens") == 20
+        assert usage.get("total_tokens") == 30
+
+    def test_opentelemetry_attributes_extraction(self):
+        """Test extracting attributes from OpenTelemetry attributes."""
+        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
+
+        # Create attribute dictionary with OpenTelemetry attributes
+        attributes = {
+            "gen_ai": True,
+            OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
+            OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
+            OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
+            OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
+        }
+
+        # Create OpenTelemetry attributes object
+        ot_attrs = OpenTelemetryAttributes(attributes)
+
+        # Test get_weave_attributes
+        extracted = ot_attrs.get_weave_attributes()
+        assert extracted["system"] == "You are a helpful assistant"
+        assert extracted["max_tokens"] == 150
+        assert extracted["kind"] == "llm"
+        assert extracted["model"] == "gpt-4"
+
+    def test_opentelemetry_inputs_extraction(self):
+        """Test extracting inputs from OpenTelemetry attributes."""
+        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
+
+        # Create attribute dictionary with OpenTelemetry prompts
+        prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
+        attributes = {
+            "gen_ai": True,
+            OTSpanAttr.LLM_PROMPTS: prompts,
+        }
+
+        # Create OpenTelemetry attributes object
+        ot_attrs = OpenTelemetryAttributes(attributes)
+
+        # Test get_weave_inputs
+        inputs = ot_attrs.get_weave_inputs()
+        assert inputs == {
+            "0": {"role": "user", "content": "Tell me about quantum computing"}
+        }
+
+        # Test with multiple prompts
+        prompts_multiple = {
+            "0": {"role": "system", "content": "You are an expert in quantum physics"},
+            "1": {"role": "user", "content": "Tell me about quantum computing"},
+        }
+        attributes = {
+            "gen_ai": True,
+            OTSpanAttr.LLM_PROMPTS: prompts_multiple,
+        }
+        ot_attrs = OpenTelemetryAttributes(attributes)
+        inputs = ot_attrs.get_weave_inputs()
+        assert inputs == prompts_multiple
+
+    def test_opentelemetry_outputs_extraction(self):
+        """Test extracting outputs from OpenTelemetry attributes."""
+        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
+
+        # Create attribute dictionary with OpenTelemetry completions
+        completions = {
+            "0": {
+                "role": "assistant",
+                "content": "Quantum computing uses quantum mechanics...",
+            }
+        }
+        attributes = {
+            "gen_ai": True,
+            OTSpanAttr.LLM_COMPLETIONS: completions,
+        }
+
+        # Create OpenTelemetry attributes object
+        ot_attrs = OpenTelemetryAttributes(attributes)
+
+        # Test get_weave_outputs
+        outputs = ot_attrs.get_weave_outputs()
+        assert outputs == {
+            "0": {
+                "role": "assistant",
+                "content": "Quantum computing uses quantum mechanics...",
+            }
+        }
+
+    def test_opentelemetry_usage_extraction(self):
+        """Test extracting usage from OpenTelemetry attributes."""
+        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
+
+        # Create attribute dictionary with OpenTelemetry token usage
+        attributes = {
+            "gen_ai": True,
+            OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
+            OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
+            OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
+        }
+
+        # Create OpenTelemetry attributes object
+        ot_attrs = OpenTelemetryAttributes(attributes)
+
+        # Test get_weave_usage
+        usage = ot_attrs.get_weave_usage()
+        assert usage.get("prompt_tokens") == 15
+        assert usage.get("completion_tokens") == 25
+        assert usage.get("total_tokens") == 40
+
+    def test_attributes_factory(self):
+        """Test the AttributesFactory for creating the correct attributes object."""
+        factory = AttributesFactory()
+
+        # Test OpenInference detection
+        oi_key_value = KeyValue(key="openinference", value=AnyValue(bool_value=True))
+        oi_attrs = factory.from_proto([oi_key_value])
+        assert isinstance(oi_attrs, OpenInferenceAttributes)
+
+        # Test OpenTelemetry detection
+        ot_key_value = KeyValue(key="gen_ai", value=AnyValue(bool_value=True))
+        ot_attrs = factory.from_proto([ot_key_value])
+        assert isinstance(ot_attrs, OpenTelemetryAttributes)
+
+        # Test generic attributes (no specific convention)
+        generic_key_value = KeyValue(
+            key="some_key", value=AnyValue(string_value="some_value")
+        )
+        generic_attrs = factory.from_proto([generic_key_value])
+        assert isinstance(generic_attrs, GenericAttributes)

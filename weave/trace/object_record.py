@@ -38,11 +38,32 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
+    def unwrap(self) -> dict[str, Any]:
+        # Nasty import to avoid circular import
+        from weave.trace.vals import unwrap
+
+        unwrapped_one_level = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k
+            not in [
+                "_class_name",
+                "_bases",
+                "map_values",
+                "unwrap",
+                "__repr__",
+                "__eq__",
+            ]
+        }
+        return unwrap(unwrapped_one_level)
+
 
 PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
 
 
-def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
+def pydantic_model_fields(
+    obj: PydanticBaseModelGeneral,
+) -> dict[str, pydantic.fields.FieldInfo]:
     if isinstance(obj, pydantic.BaseModel):
         return obj.model_fields
     elif isinstance(obj, pydantic.v1.BaseModel):
@@ -52,7 +73,18 @@ def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
 
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}
+    fields = pydantic_model_fields(obj)
+    final = {}
+    for prop_name, field in fields.items():
+        use_name = prop_name
+        # This odd check is to support different pydantic versions
+        if hasattr(field, "exclude") and field.exclude:
+            continue
+        # This odd check is to support different pydantic versions
+        if hasattr(field, "alias") and field.alias:
+            use_name = field.alias
+        final[use_name] = getattr(obj, prop_name)
+    return final
 
 
 def class_all_bases_names(cls: type) -> list[str]:
