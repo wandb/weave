@@ -200,6 +200,10 @@ def test_evaluation_with_custom_models_and_scorers(
         score2_result = model_output > 4
         pred.log_score(scorer=scorer2, score=score2_result)
 
+        pred.finish()
+
+    ev4.log_summary({"avg_score": 1.0, "total_examples": 3})
+
     models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
     assert len(models) == 4
     assert models[3].object_id == "new_string_model"
@@ -213,12 +217,17 @@ def test_evaluation_with_custom_models_and_scorers(
 
     # Run a new evaluation using the same models, but different scorers
     scorer4 = MyScorer(name="gt8_scorer", c=8)
+    ev5 = ImperativeEvaluationLogger(model=model4)
 
     for row in user_dataset:
         model_output = user_model(row["a"], row["b"])
-        pred = ev3.log_prediction(inputs=row, output=model_output)
+        pred = ev5.log_prediction(inputs=row, output=model_output)
         score3_result = model_output > 8
         pred.log_score(scorer=scorer4, score=score3_result)
+
+        pred.finish()
+
+    ev5.log_summary({"avg_score": 1.0, "total_examples": 3})
 
     # No change to models
     models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))

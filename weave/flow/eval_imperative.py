@@ -162,7 +162,9 @@ class ImperativeScoreLogger(BaseModel):
             },
         )
 
-        # call_context.pop_call()
+        # call_context.pop_call(self.predict_and_score_call.id)
+        # call_context.pop_call(self.evaluate_call.id)
+        # call_context.pop_call(self.predict_call.id)
 
     def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
         """Log a score synchronously by calling the async method.
@@ -348,3 +350,4 @@ class ImperativeEvaluationLogger(BaseModel):
         # Finish the evaluation call
         wc = require_weave_client()
         wc.finish_call(self._evaluate_call, output=summary)
+        call_context.pop_call(self._evaluate_call.id)
