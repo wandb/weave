@@ -249,7 +249,6 @@ class ImperativeEvaluationLogger(BaseModel):
             "representing the ID of your model.",
         ),
     ]
-    dataset: Annotated[Dataset]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
