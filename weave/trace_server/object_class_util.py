@@ -139,6 +139,10 @@ def dump_object(val: BaseModel) -> dict:
 
 
 def _general_dump(val: Any) -> Any:
+    """
+    This is a helper function that dumps a value into a dict. It is used to convert
+    pydantic objects to dicts in a recursive manner.
+    """
     if isinstance(val, BaseModel):
         return dump_object(val)
     elif isinstance(val, dict):
