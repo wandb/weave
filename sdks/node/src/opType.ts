@@ -23,6 +23,7 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   callDisplayName?: (...args: Parameters<T>) => string;
   summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
   bindThis?: WeaveObject;
+  isDecorator?: boolean;
   parameterNames?: ParameterNamesOption;
 }
 
