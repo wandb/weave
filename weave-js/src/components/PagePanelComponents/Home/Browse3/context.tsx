@@ -174,12 +174,6 @@ export const browse2Context = {
       parsed.artifactVersion
     );
   },
-  boardsUIUrl: (entityName: string, projectName: string) => {
-    throw new Error('Not implemented');
-  },
-  tablesUIUrl: (entityName: string, projectName: string) => {
-    throw new Error('Not implemented');
-  },
   boardForExpressionUIUrl: (
     entityName: string,
     projectName: string,
@@ -421,12 +415,6 @@ export const browse3ContextGen = (
         parsed.artifactVersion
       );
     },
-    boardsUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/boards`;
-    },
-    tablesUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/tables`;
-    },
     boardForExpressionUIUrl: (
       entityName: string,
       projectName: string,
@@ -561,20 +549,10 @@ type RouteType = {
     projectName: string,
     filter?: WFHighLevelObjectVersionFilter
   ) => string;
-  boardsUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
   boardForExpressionUIUrl: (
     entityName: string,
     projectName: string,
     expression: string
-    // TODO: Add filter when supported
-  ) => string;
-  tablesUIUrl: (
-    entityName: string,
-    projectName: string
     // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
@@ -693,12 +671,6 @@ const useMakePeekingRouter = (): RouteType => {
     },
     opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.opPageUrl(...args));
-    },
-    boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
-      return setSearchParam(PEEK_PARAM, baseContext.boardsUIUrl(...args));
-    },
-    tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
-      return setSearchParam(PEEK_PARAM, baseContext.tablesUIUrl(...args));
     },
     boardForExpressionUIUrl: (
       ...args: Parameters<typeof baseContext.boardForExpressionUIUrl>
