@@ -289,6 +289,7 @@ class ImperativeEvaluationLogger(BaseModel):
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
+    _is_finalized: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_evaluation: Evaluation = PrivateAttr()
 
@@ -369,7 +370,7 @@ class ImperativeEvaluationLogger(BaseModel):
             call_context.push_call(self._evaluate_call)
 
     def _cleanup_predictions(self) -> None:
-        if self._eval_started and not self._logged_summary:
+        if self._eval_started and not self._is_finalized:
             for pred in self._accumulated_predictions:
                 if not pred._has_finished:
                     try:
@@ -377,6 +378,37 @@ class ImperativeEvaluationLogger(BaseModel):
                     except Exception:
                         # This is best effort.  If we fail, just swallow the error.
                         pass
+
+    def _finalize_evaluation(self, output: Any = None) -> None:
+        """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
+        if self._is_finalized:
+            return
+
+        self._cleanup_predictions()
+
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
+
+        # Finish the evaluation call
+        wc = require_weave_client()
+        # Ensure the call is finished even if there was an error during summarize or elsewhere
+        try:
+            wc.finish_call(self._evaluate_call, output=output)
+        except Exception:
+            # Log error but continue cleanup
+            logger.error(
+                "Failed to finish evaluation call during finalization.", exc_info=True
+            )
+
+        # Pop the call regardless of finish success
+        try:
+            call_context.pop_call(self._evaluate_call.id)
+        except Exception:
+            # If popping fails (e.g., context already unwound), log and ignore
+            logger.warning("Failed to pop evaluation call from context.", exc_info=True)
+
+        self._is_finalized = True
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
         """Log a prediction to the Evaluation, and return a reference.
@@ -409,32 +441,63 @@ class ImperativeEvaluationLogger(BaseModel):
     def log_summary(self, summary: dict | None = None) -> None:
         """Log a summary dict to the Evaluation.
 
-        This will 'finish' the evaluation, meaning no more predictions or scores
-        can be logged."""
-        if self._logged_summary:
-            logger.warn("(NO-OP): Already called summary, returning.")
+        This will calculate the summary, call the summarize op, and then finalize
+        the evaluation, meaning no more predictions or scores can be logged.
+        """
+        if self._is_finalized:
+            logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
-        self._cleanup_predictions()
-
+        # Calculate summary
         data_to_summarize = [
             pred._captured_scores for pred in self._accumulated_predictions
         ]
         summary_data = auto_summarize(data_to_summarize)
-        combined_summary = {}
+        final_summary = {}
         if summary_data:
-            combined_summary = summary_data
-        if summary:
-            combined_summary = {**combined_summary, **summary}
+            final_summary = summary_data
+        if summary is not None:
+            final_summary = {**final_summary, **summary}
 
-        # Call the summarize method with the proper context
-        assert self._evaluate_call is not None
-        with _set_current_summary(combined_summary):
-            self._pseudo_evaluation.summarize()
+        # Call the summarize op
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
+        try:
+            with _set_current_summary(final_summary):
+                self._pseudo_evaluation.summarize()
+        except Exception:
+            logger.error("Error during execution of summarize op.", exc_info=True)
+            # Even if summarize fails, try to finalize with the calculated summary
 
-        self._logged_summary = True
+        self._finalize_evaluation(output=final_summary)
 
-        # Finish the evaluation call
-        wc = require_weave_client()
-        wc.finish_call(self._evaluate_call, output=summary)
-        call_context.pop_call(self._evaluate_call.id)
+    def close(self) -> None:
+        """Clean up the evaluation resources explicitly without logging a summary.
+
+        Ensures all prediction calls and the main evaluation call are finalized.
+        This is automatically called if the logger is used as a context manager.
+        """
+        if self._is_finalized:
+            return
+
+        # Finalize with None output, indicating closure without summary
+        self._finalize_evaluation(output=None)
+
+    def __del__(self) -> None:
+        """Ensure cleanup happens during garbage collection."""
+        if self._eval_started and not self._is_finalized:
+            logger.warning(
+                "ImperativeEvaluationLogger was garbage collected without explicit "
+                "cleanup. Please use a `with` statement or call `close()`/`log_summary()` explicitly. "
+                "Attempting implicit cleanup via close()."
+            )
+            try:
+                self.close()
+            except Exception:
+                # Del methods should not raise exceptions.
+                # Log or handle the error appropriately if needed, but avoid propagation.
+                logger.error(
+                    "Error during implicit cleanup of ImperativeEvaluationLogger.",
+                    exc_info=True,
+                )

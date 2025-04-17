@@ -61,7 +61,12 @@ def test_basic_evaluation(
     assert op_name_from_call(evaluate_call) == "Evaluation.evaluate"
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
     assert evaluate_call.inputs["model"]._class_name == "Model"
-    assert evaluate_call.output == {"avg_score": 1.0, "total_examples": 3}
+    assert evaluate_call.output == {
+        "avg_score": 1.0,
+        "total_examples": 3,
+        "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+    }
 
     for i, (inputs, outputs, score1, score2) in enumerate(
         zip(user_dataset, model_outputs, score1_results, score2_results)
@@ -103,7 +108,12 @@ def test_basic_evaluation(
     summarize_call = calls[13]
     assert op_name_from_call(summarize_call) == "Evaluation.summarize"
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
-    assert summarize_call.output == {"avg_score": 1.0, "total_examples": 3}
+    assert summarize_call.output == {
+        "avg_score": 1.0,
+        "total_examples": 3,
+        "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+    }
 
 
 def test_evaluation_with_custom_models_and_scorers(
