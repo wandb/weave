@@ -34,8 +34,10 @@ import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSectio
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
+import {SummarizePlotsSection} from './sections/SummarizePlotsSection/SummarizePlotsSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
-import {TraceCallsCompareEvaluationsPage} from './TraceCallsCompareEvaluationsPage';
+import {SummarizeCallsSection} from './SummarizeCallsSection';
+import {TraceCallsSection} from './TraceCallsSection';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -225,23 +227,13 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+  const projectContext = React.useContext(CustomWeaveTypeProjectContext);
 
-  // Check if we should show the traceCalls UI
-  const isTraceCallsPath = props.traceCalls && props.traceCalls.length > 0;
+  // Check if we have trace calls to display
+  const hasTraceCalls = props.traceCalls && props.traceCalls.length > 0;
+  const hasSummarizeCalls =
+    props.summarizeCalls && props.summarizeCalls.length > 0;
 
-  if (isTraceCallsPath) {
-    // Use the new TraceCallsCompareEvaluationsPage component
-    return (
-      <TraceCallsCompareEvaluationsPage
-        height={props.height}
-        traceCalls={props.traceCalls || []}
-        summarizeCalls={props.summarizeCalls || []}
-        state={state}
-      />
-    );
-  }
-
-  // Original UI for regular comparison path
   return (
     <Box
       sx={{
@@ -261,7 +253,117 @@ const CompareEvaluationsPageInner: React.FC<{
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
-        {resultsLoading ? (
+
+        {/* Summarize Calls Section */}
+        {hasSummarizeCalls && (
+          <VerticalBox
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+            }}>
+            <HorizontalBox
+              sx={{
+                flex: '0 0 auto',
+                paddingLeft: STANDARD_PADDING,
+                paddingRight: STANDARD_PADDING,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+              }}>
+              <Box
+                sx={{
+                  fontSize: '1.5em',
+                  fontWeight: 'bold',
+                }}>
+                Evaluation Summary
+              </Box>
+            </HorizontalBox>
+            <Box
+              sx={{
+                minHeight: 300,
+                overflow: 'auto',
+              }}>
+              <SummarizePlotsSection
+                summarizeCalls={props.summarizeCalls || []}
+                state={state}
+              />
+            </Box>
+
+            {/* Evaluation Summary Table */}
+            <HorizontalBox
+              sx={{
+                flex: '0 0 auto',
+                paddingLeft: STANDARD_PADDING,
+                paddingRight: STANDARD_PADDING,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                marginTop: STANDARD_PADDING,
+              }}>
+              <Box
+                sx={{
+                  fontSize: '1.5em',
+                  fontWeight: 'bold',
+                }}>
+                Summary
+              </Box>
+            </HorizontalBox>
+            <Box
+              sx={{
+                minHeight: 200,
+                overflow: 'auto',
+                marginTop: STANDARD_PADDING,
+              }}>
+              <SummarizeCallsSection
+                summarizeCalls={props.summarizeCalls || []}
+                entity={projectContext?.entity}
+                project={projectContext?.project}
+                state={state}
+              />
+            </Box>
+          </VerticalBox>
+        )}
+
+        {/* Trace Calls Section */}
+        {hasTraceCalls && (
+          <VerticalBox
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+            }}>
+            <HorizontalBox
+              sx={{
+                flex: '0 0 auto',
+                paddingLeft: STANDARD_PADDING,
+                paddingRight: STANDARD_PADDING,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+              }}>
+              <Box
+                sx={{
+                  fontSize: '1.5em',
+                  fontWeight: 'bold',
+                }}>
+                Trace Call Outputs
+              </Box>
+            </HorizontalBox>
+            <Box
+              sx={{
+                height: 500, // Give it a reasonable height
+                overflow: 'auto',
+              }}>
+              <TraceCallsSection
+                traceCalls={props.traceCalls || []}
+                entity={projectContext?.entity}
+                project={projectContext?.project}
+                state={state}
+              />
+            </Box>
+          </VerticalBox>
+        )}
+
+        {!hasTraceCalls && resultsLoading ? (
           <Box
             sx={{
               width: '100%',
@@ -272,12 +374,12 @@ const CompareEvaluationsPageInner: React.FC<{
             }}>
             <WaveLoader size="small" />
           </Box>
-        ) : showExamples ? (
+        ) : !hasTraceCalls && showExamples ? (
           <>
             {showExampleFilter && <ExampleFilterSection state={state} />}
             <ResultExplorer state={state} height={props.height} />
           </>
-        ) : (
+        ) : !hasTraceCalls && !showExamples ? (
           <VerticalBox
             sx={{
               paddingLeft: STANDARD_PADDING,
@@ -298,7 +400,7 @@ const CompareEvaluationsPageInner: React.FC<{
               common.
             </Alert>
           </VerticalBox>
-        )}
+        ) : null}
       </VerticalBox>
     </Box>
   );
