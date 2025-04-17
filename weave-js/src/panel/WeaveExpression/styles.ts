@@ -5,6 +5,13 @@ import styled, {css} from 'styled-components';
 
 import OpDoc from './OpDoc';
 
+export const IDENTIFER_COLOR = globals.MAGENTA;
+export const PROPERTY_IDENTIFIER_COLOR = globals.SIENNA_DARK;
+export const OPERATOR_COLOR = globals.SIENNA_DARK;
+export const STRING_COLOR = globals.TEAL;
+export const BOOLEAN_COLOR = globals.TEAL;
+export const NUMBER_COLOR = globals.TEAL;
+
 export const EditableContainer = styled.div<{
   noBox?: boolean;
   isInvalid?: boolean;
@@ -50,28 +57,28 @@ export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   }
 
   & span.identifier {
-    color: ${globals.MAGENTA};
+    color: ${IDENTIFER_COLOR};
   }
 
   span.property_identifier {
-    color: ${globals.SIENNA_DARK};
+    color: ${PROPERTY_IDENTIFIER_COLOR};
   }
 
   & span.operator {
-    color: ${globals.SIENNA_DARK};
+    color: ${OPERATOR_COLOR};
   }
 
   & span.string {
-    color: ${globals.TEAL};
+    color: ${STRING_COLOR};
   }
 
   & span.number,
   & span.null {
-    color: ${globals.TEAL};
+    color: ${NUMBER_COLOR};
   }
 
   & span.boolean {
-    color: ${globals.TEAL};
+    color: ${BOOLEAN_COLOR};
   }
 
   & span.ACTIVE_NODE {
