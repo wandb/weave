@@ -5,11 +5,11 @@ import types
 from inspect import getmro, isclass
 from typing import Any, Callable
 
-from weave.client_server_common.pydantic_util import (
+from weave.trace.op import is_op
+from weave.trace_server.client_server_common.pydantic_util import (
     PydanticBaseModelGeneral,
     pydantic_asdict_one_level,
 )
-from weave.trace.op import is_op
 
 
 class ObjectRecord:
