@@ -39,6 +39,9 @@ type TooltipProps = {
 
   /** Position for the popover. This is for backwards compatibility. Prefer side/align */
   position?: TooltipPosition;
+
+  /** Whether to hide the tooltip when the trigger is detached from the DOM. */
+  hideWhenDetached?: boolean;
 };
 
 type ParsedPosition = {
@@ -76,6 +79,7 @@ export const Tooltip = ({
   align,
   position,
   children,
+  hideWhenDetached = false,
 }: TooltipProps) => {
   const defaultPosition = parsePosition(position);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -100,7 +104,8 @@ export const Tooltip = ({
               zIndex: 2147483606,
             }}
             side={side ?? defaultPosition.side}
-            align={align ?? defaultPosition.align}>
+            align={align ?? defaultPosition.align}
+            hideWhenDetached={hideWhenDetached}>
             {children ?? content}
           </Content>
         </Portal>
