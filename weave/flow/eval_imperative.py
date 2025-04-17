@@ -207,8 +207,11 @@ class ImperativeScoreLogger(BaseModel):
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
-        with _set_current_score(score):
-            await self.predict_call.apply_scorer(scorer)
+        with call_context.set_call_stack(
+            [self.evaluate_call, self.predict_and_score_call]
+        ):
+            with _set_current_score(score):
+                await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
         scorer_name = cast(str, scorer.name)
