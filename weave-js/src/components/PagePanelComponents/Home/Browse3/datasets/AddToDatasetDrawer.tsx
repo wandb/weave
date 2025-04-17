@@ -97,11 +97,20 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     entity,
     project,
     {callIds: selectedCallIds},
-    selectedCallIds.length // limit to fetch all selected calls
+    selectedCallIds.length, // limit to fetch all selected calls
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {includeFeedback: true}
   );
 
-  // Recursively expand all refs in inputs and output
-  const expandRefColumns = useMemo(() => new Set(['inputs', 'output']), []);
+  // Recursively expand all refs in inputs, output, and summary
+  const expandRefColumns = useMemo(
+    () => new Set(['inputs', 'output', 'summary']),
+    []
+  );
 
   // Use the enhanced useClientSideCallRefExpansion hook with recursiveUnwrap option,
   // but only for inputs.* fields
