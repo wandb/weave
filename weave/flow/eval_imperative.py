@@ -223,13 +223,17 @@ class ImperativeScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        @weave.op(name=scorer.name)
+        @weave.op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
             # return score
             return cast(ScoreType, current_score.get())
 
+        @weave.op(name="Scorer.summarize", enable_code_capture=False)
+        def summarize_method(self: Scorer, score_rows: list) -> dict: ...
+
         scorer.__dict__["score"] = MethodType(score_method, scorer)
+        scorer.__dict__["summarize"] = MethodType(summarize_method, scorer)
 
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
@@ -315,7 +319,7 @@ class ImperativeEvaluationLogger(BaseModel):
             # objects that "look right" to our object saving system.
 
             # --- Setup the model object ---
-            @weave.op(name="Model.predict")
+            @weave.op(name="Model.predict", enable_code_capture=False)
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
@@ -323,10 +327,10 @@ class ImperativeEvaluationLogger(BaseModel):
             self.model.__dict__["predict"] = MethodType(predict, self.model)
 
             # --- Setup the evaluation object ---
-            @weave.op(name="Evaluation.evaluate")
+            @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
             def evaluate(self: Evaluation, model: Model) -> None: ...
 
-            @weave.op(name="Evaluation.predict_and_score")
+            @weave.op(name="Evaluation.predict_and_score", enable_code_capture=False)
             def predict_and_score(
                 self: Evaluation, model: Model, example: dict
             ) -> dict:
@@ -342,7 +346,7 @@ class ImperativeEvaluationLogger(BaseModel):
                     "model_latency": None,
                 }
 
-            @weave.op(name="Evaluation.summarize")
+            @weave.op(name="Evaluation.summarize", enable_code_capture=False)
             def summarize(self: Evaluation) -> dict:
                 return cast(dict, current_summary.get())
 
@@ -487,11 +491,6 @@ class ImperativeEvaluationLogger(BaseModel):
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
         if self._eval_started and not self._is_finalized:
-            logger.warning(
-                "ImperativeEvaluationLogger was garbage collected without explicit "
-                "cleanup. Please use a `with` statement or call `close()`/`log_summary()` explicitly. "
-                "Attempting implicit cleanup via close()."
-            )
             try:
                 self.close()
             except Exception:

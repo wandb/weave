@@ -204,6 +204,11 @@ class Op(Protocol):
     # it disables child ops as well.
     _tracing_enabled: bool
 
+    # `_code_capture_enabled` is a  flag that can be used to disable code capture
+    # for an op.  This is currently used in imperative evaluations to prevent
+    # unwanted code versioning using our code capture system.
+    _code_capture_enabled: bool
+
     tracing_sample_rate: float
 
 
@@ -622,6 +627,7 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
+    enable_code_capture: bool = True,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -693,6 +699,7 @@ def op(
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+            wrapper._code_capture_enabled = enable_code_capture  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
