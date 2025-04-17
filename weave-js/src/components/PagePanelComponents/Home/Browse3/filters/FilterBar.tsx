@@ -325,9 +325,7 @@ export const FilterBar = ({
             ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:hover:border-2 dark:hover:border-teal-400'
             : ''
         } ${
-          !hasBorder
-            ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200'
-            : ''
+          !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
         }`}
         onClick={onClick}>
         <div>
