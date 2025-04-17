@@ -553,11 +553,11 @@ export const ObjectViewer = ({
           // Normally, we would want autohieght as a prop as well as
           // a parent with adaptive hieght which would result in an
           // adaptive datagrid. However, that end up being very slow
-          // when there are many rows. 
+          // when there are many rows.
           //
           // Instead, when autoheight is false, MUI datagrid will
           // retain the larget height, even after collapsing. It does
-          // this by synthetically injecting a filler div and adding 
+          // this by synthetically injecting a filler div and adding
           // a height to it. I don't quite understand why it does this,
           // but it does.
           //
