@@ -164,11 +164,11 @@ def test_evaluation_with_custom_models_and_scorers(
         )
         assert len(scorers) == 3
         assert scorers[0].object_id == "gt2_scorer"
-        assert scorers[0].version_index == 0
+        assert scorers[0].version_index == 1
         assert scorers[1].object_id == "gt4_scorer"
-        assert scorers[1].version_index == 0
+        assert scorers[1].version_index == 1
         assert scorers[2].object_id == "gt6_scorer"
-        assert scorers[2].version_index == 0
+        assert scorers[2].version_index == 1
 
     # Run each evaluation once.
     # This creates 3 different model versions and 2 different scorer versions
@@ -235,7 +235,7 @@ def test_evaluation_with_custom_models_and_scorers(
     )
     assert len(scorers) == 4
     assert scorers[3].object_id == "gt8_scorer"
-    assert scorers[3].version_index == 0
+    assert scorers[3].version_index == 1
 
     assert call_context.get_call_stack() == []
 
