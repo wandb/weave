@@ -22,7 +22,7 @@ import weave
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
-from weave.flow.scorer import Scorer
+from weave.flow.scorer import Scorer, auto_summarize
 from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -291,6 +291,9 @@ class ImperativeEvaluationLogger(BaseModel):
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_evaluation: Evaluation = PrivateAttr()
+
+    # This private attr is used to keep track of predictions so we can finish
+    # them if the user forgot to.
     _accumulated_predictions: list[ImperativeScoreLogger] = PrivateAttr(
         default_factory=list
     )
@@ -303,10 +306,6 @@ class ImperativeEvaluationLogger(BaseModel):
             dataset=cast(Dataset, self.dataset),
             scorers=[],
         )
-
-    def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
-        # similar to how we dynamically create the scorer class, we will
-        # dynamically create the model class
 
         if not self._eval_started:
             self._eval_started = True
@@ -369,6 +368,21 @@ class ImperativeEvaluationLogger(BaseModel):
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
 
+    def _cleanup_predictions(self) -> None:
+        if self._eval_started and not self._logged_summary:
+            for pred in self._accumulated_predictions:
+                if not pred._has_finished:
+                    try:
+                        pred.finish()
+                    except Exception:
+                        # This is best effort.  If we fail, just swallow the error.
+                        pass
+
+    def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
+        """Log a prediction to the Evaluation, and return a reference.
+
+        The reference can be used to log scores which are attached to the specific
+        prediction instance."""
         # Make the prediction call
         with _set_current_output(output):
             _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
@@ -392,21 +406,33 @@ class ImperativeEvaluationLogger(BaseModel):
         self._accumulated_predictions.append(pred)
         return pred
 
-    def log_summary(self, summary: dict) -> None:
+    def log_summary(self, summary: dict | None = None) -> None:
+        """Log a summary dict to the Evaluation.
+
+        This will 'finish' the evaluation, meaning no more predictions or scores
+        can be logged."""
         if self._logged_summary:
             logger.warn("(NO-OP): Already called summary, returning.")
             return
 
-        self._logged_summary = True
+        self._cleanup_predictions()
 
-        for pred in self._accumulated_predictions:
-            if not pred._has_finished:
-                pred.finish()
+        data_to_summarize = [
+            pred._captured_scores for pred in self._accumulated_predictions
+        ]
+        summary_data = auto_summarize(data_to_summarize)
+        combined_summary = {}
+        if summary_data:
+            combined_summary = summary_data
+        if summary:
+            combined_summary = {**combined_summary, **summary}
 
         # Call the summarize method with the proper context
         assert self._evaluate_call is not None
-        with _set_current_summary(summary):
+        with _set_current_summary(combined_summary):
             self._pseudo_evaluation.summarize()
+
+        self._logged_summary = True
 
         # Finish the evaluation call
         wc = require_weave_client()
