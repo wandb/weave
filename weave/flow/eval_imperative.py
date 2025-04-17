@@ -8,6 +8,7 @@ from contextvars import ContextVar
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
+import uuid_utils as uuid
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -18,6 +19,7 @@ from pydantic import (
 )
 
 import weave
+from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
 from weave.flow.scorer import Scorer
@@ -108,6 +110,17 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
         raise TypeError("Unsupported type for casting")
 
     return _convert_to_cls_inner
+
+
+def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
+    if isinstance(value, str):
+        return Dataset(rows=weave.Table([{"dataset_id": value}]))
+    elif isinstance(value, list):
+        return Dataset(rows=weave.Table(value))
+    elif isinstance(value, Dataset):
+        return value
+    else:
+        raise TypeError("Unsupported type for casting")
 
 
 def _validate_class_name(name: str) -> str:
@@ -249,19 +262,36 @@ class ImperativeEvaluationLogger(BaseModel):
             "representing the ID of your model.",
         ),
     ]
+    dataset: Annotated[
+        Dataset | list[dict] | str,
+        BeforeValidator(_cast_to_imperative_dataset),
+        Field(
+            default_factory=lambda: Dataset(
+                rows=weave.Table([{"dataset_id": uuid.uuid7()}])
+            ),
+            description="A metadata-only Dataset used for comparisons."
+            "If you already know your rows ahead of time, you can pass either"
+            "a Dataset or list[dict]."
+            "If you don't, you can just pass any string as a unique identifier",
+        ),
+    ]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
-    _pseudo_evaluation: Evaluation = PrivateAttr(
-        default_factory=lambda: Evaluation(
-            dataset=weave.Dataset(rows=weave.Table([{"": ""}])),
-            scorers=[],
-        )
-    )
+    _pseudo_evaluation: Evaluation = PrivateAttr()
     _accumulated_predictions: list[ImperativeScoreLogger] = PrivateAttr(
         default_factory=list
     )
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize the pseudo evaluation with the dataset from the model."""
+        # At this point dataset has already been processed by the validator
+        # and converted to a Dataset object
+        self._pseudo_evaluation = Evaluation(
+            dataset=cast(Dataset, self.dataset),
+            scorers=[],
+        )
 
     def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
         # similar to how we dynamically create the scorer class, we will
