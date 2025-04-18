@@ -244,11 +244,13 @@ def reconstruct_signature(fn: Callable) -> str:
 
 
 def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
-    if is_op(fn):
-        fn = as_op(fn)
-        fn = fn.resolve_fn
+    if fn_is_op := is_op(fn):
+        op = as_op(fn)
+        fn = op.resolve_fn
 
-    if not settings.should_capture_code():
+    if not settings.should_capture_code() or (
+        fn_is_op and not op._code_capture_enabled
+    ):
         # This digest is kept for op versioning purposes
         digest = str_digest(inspect.getsource(fn))
         return textwrap.dedent(
@@ -510,6 +512,9 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
             message += "\n  " + warning
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
+    if not obj._code_capture_enabled:
+        import_code = []
+        code = []
 
     if settings.should_redact_pii():
         from weave.trace.pii_redaction import redact_pii_string

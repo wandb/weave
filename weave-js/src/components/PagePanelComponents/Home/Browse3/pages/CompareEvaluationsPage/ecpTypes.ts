@@ -150,3 +150,9 @@ export type MetricResult = {
   value: MetricValueType;
   sourceCallId: string;
 };
+
+// TraceCall shapes
+export type TraceCallData = {
+  callId: string;
+  traceCall: any;
+};

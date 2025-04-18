@@ -19,14 +19,15 @@ import {
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpState';
-import {ComparisonDimensionsType} from './ecpState';
-import {EvaluationCall} from './ecpTypes';
+import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
+import {EvaluationCall, TraceCallData} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
@@ -34,6 +35,7 @@ import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCom
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {TraceCallsCompareEvaluationsPage} from './TraceCallsCompareEvaluationsPage';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -42,6 +44,23 @@ type CompareEvaluationsPageProps = {
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+};
+
+const getCallsSubset = (
+  calls: CallSchema[] | null,
+  opNames: string[]
+): TraceCallData[] => {
+  return (
+    calls
+      ?.filter(call => {
+        const opName = call.traceCall?.op_name;
+        return opName && opNames.some(name => opName.includes(name));
+      })
+      ?.map(call => ({
+        callId: call.callId,
+        traceCall: call.traceCall,
+      })) || []
+  );
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -85,6 +104,19 @@ export const CompareEvaluationsPageContent: React.FC<
     string | null
   >(null);
 
+  const {useCalls} = useWFHooks();
+  const childCalls = useCalls(props.entity, props.project, {
+    parentIds: props.evaluationCallIds,
+  });
+
+  const predictAndScoreCalls = getCallsSubset(childCalls.result, [
+    'predict_and_score',
+  ]);
+  const summarizeCalls = getCallsSubset(childCalls.result, [
+    'summarize',
+    'Evaluation.summarize',
+  ]);
+
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
       dimensions:
@@ -122,7 +154,13 @@ export const CompareEvaluationsPageContent: React.FC<
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
         <AutoSizer style={{height: '100%', width: '100%'}}>
-          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
+          {({height, width}) => (
+            <CompareEvaluationsPageInner
+              height={height}
+              traceCalls={predictAndScoreCalls}
+              summarizeCalls={summarizeCalls}
+            />
+          )}
         </AutoSizer>
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
@@ -177,6 +215,8 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
+  traceCalls?: Array<TraceCallData>;
+  summarizeCalls?: Array<TraceCallData>;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
@@ -185,6 +225,23 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+
+  // Check if we should show the traceCalls UI
+  const isTraceCallsPath = props.traceCalls && props.traceCalls.length > 0;
+
+  if (isTraceCallsPath) {
+    // Use the new TraceCallsCompareEvaluationsPage component
+    return (
+      <TraceCallsCompareEvaluationsPage
+        height={props.height}
+        traceCalls={props.traceCalls || []}
+        summarizeCalls={props.summarizeCalls || []}
+        state={state}
+      />
+    );
+  }
+
+  // Original UI for regular comparison path
   return (
     <Box
       sx={{
@@ -223,7 +280,6 @@ const CompareEvaluationsPageInner: React.FC<{
         ) : (
           <VerticalBox
             sx={{
-              // alignItems: '',
               paddingLeft: STANDARD_PADDING,
               paddingRight: STANDARD_PADDING,
               width: '100%',

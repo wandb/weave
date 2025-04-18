@@ -11,8 +11,7 @@ import {
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from '../../ecpConstants';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
 import {
   flattenedDimensionPath,
   resolveSummaryMetricValueForEvaluateCall,

@@ -13,10 +13,12 @@
  */
 import _ from 'lodash';
 
-import {EvaluationComparisonSummary, MetricDefinition} from './ecpTypes';
-import {MetricType} from './ecpTypes';
-import {getScoreKeyNameFromScorerRef} from './ecpUtil';
-import {flattenedDimensionPath} from './ecpUtil';
+import {
+  EvaluationComparisonSummary,
+  MetricDefinition,
+  MetricType,
+} from './ecpTypes';
+import {flattenedDimensionPath, getScoreKeyNameFromScorerRef} from './ecpUtil';
 
 export const DERIVED_SCORER_REF_PLACEHOLDER = '__DERIVED__';
 

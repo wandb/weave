@@ -11,6 +11,7 @@ from weave.flow.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation
+from weave.flow.eval_imperative import ImperativeEvaluationLogger
 from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
@@ -37,6 +38,7 @@ __docspec__ = [
     attributes,
     # Re-exported from flow module
     Object,
+    ImperativeEvaluationLogger,
     Dataset,
     Model,
     Prompt,
