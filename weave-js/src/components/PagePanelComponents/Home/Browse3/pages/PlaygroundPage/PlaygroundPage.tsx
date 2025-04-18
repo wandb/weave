@@ -6,6 +6,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
+import {useLLMDropdownOptions} from './PlaygroundChat/useLLMDropdownOptions';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {
   DEFAULT_SYSTEM_MESSAGE,
@@ -82,6 +83,20 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }
   );
 
+  const {
+    allOptions,
+    overallLoading,
+    refetch,
+    configuredProviders,
+    configuredProvidersLoading,
+    refetchConfiguredProviders,
+    refetchSavedModels,
+    customProvidersResult,
+  } = useLLMDropdownOptions({
+    entity: props.entity,
+    project: props.project,
+  });
+
   useEffect(() => {
     if (!call.loading && call.result) {
       if (call.result.traceCall?.inputs) {
@@ -156,6 +171,13 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
           isOpenInPlayground={!!call.result}
+          allOptions={allOptions}
+          overallLoading={overallLoading}
+          refetch={refetch}
+          configuredProviders={configuredProviders}
+          configuredProvidersLoading={configuredProvidersLoading}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          customProvidersResult={(customProvidersResult ?? []).map(p => p.val)}
         />
       )}
       {settingsTab !== null && (
@@ -164,6 +186,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={`${props.entity}/${props.project}`}
+          refetch={refetchSavedModels}
         />
       )}
     </Box>
