@@ -150,13 +150,21 @@ def test_dataset_select(client):
     # Select first 3 using range
     selected_ds_range = ds.select(range(3))
     assert len(selected_ds_range) == 3
-    assert list(selected_ds_range) == [{"id": 0, "val": 0}, {"id": 1, "val": 2}, {"id": 2, "val": 4}]
+    assert list(selected_ds_range) == [
+        {"id": 0, "val": 0},
+        {"id": 1, "val": 2},
+        {"id": 2, "val": 4},
+    ]
 
     # Select specific indices using a list
     indices = [5, 2, 8]
     selected_ds_list = ds.select(indices)
     assert len(selected_ds_list) == 3
-    assert list(selected_ds_list) == [{"id": 5, "val": 10}, {"id": 2, "val": 4}, {"id": 8, "val": 16}]
+    assert list(selected_ds_list) == [
+        {"id": 5, "val": 10},
+        {"id": 2, "val": 4},
+        {"id": 8, "val": 16},
+    ]
 
     # Select with an empty list
     selected_ds_empty = ds.select([])
@@ -171,7 +179,7 @@ def test_dataset_select(client):
         {"id": 7, "val": 14},
         {"id": 1, "val": 2},
         {"id": 4, "val": 8},
-        {"id": 1, "val": 2}, # Duplicate index is allowed
+        {"id": 1, "val": 2},  # Duplicate index is allowed
     ]
 
     # Ensure original dataset is unchanged
@@ -180,7 +188,7 @@ def test_dataset_select(client):
 
     # Test index out of bounds
     with pytest.raises(IndexError):
-        ds.select([0, 10]) # 10 is out of bounds
+        ds.select([0, 10])  # 10 is out of bounds
 
     # Test negative index (should fail in __getitem__)
     with pytest.raises(IndexError):
