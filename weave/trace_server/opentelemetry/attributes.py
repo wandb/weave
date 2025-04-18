@@ -1,16 +1,5 @@
-import json
-from collections.abc import Iterable
 from datetime import datetime
-from enum import Enum
-from typing import Any, Union
-from uuid import UUID
-
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-
-from weave.trace_server.opentelemetry.helpers import (
-    get_attribute,
-    to_json_serializable,
-)
+from typing import Any, Callable, Union
 
 from weave.trace_server.opentelemetry.constants import (
     ATTRIBUTE_KEYS,
@@ -18,8 +7,13 @@ from weave.trace_server.opentelemetry.constants import (
     OUTPUT_KEYS,
     USAGE_KEYS,
     WB_KEYS,
-    KEY_HANDLERS
 )
+from weave.trace_server.opentelemetry.helpers import (
+    get_attribute,
+    to_json_serializable,
+    try_convert_numeric_keys_to_list,
+)
+
 
 class SpanEvent(dict):
     name: str
@@ -30,36 +24,55 @@ class SpanEvent(dict):
 
 def parse_weave_values(
     attributes: dict[str, Any],
-    key_mapping: Union[list[str], dict[str, list[str]]],
+    key_mapping: Union[
+        list[str],
+        dict[str, list[str]],
+        list[tuple[str, Callable[..., Any]]],
+        dict[str, list[tuple[str, Callable[..., Any]]]],
+    ],
 ) -> dict[str, Any]:
     result = {}
     # If list use the attribute as the key - Prevents synthetic attributes under input and output
+
     if isinstance(key_mapping, list):
-        for attribute_key in key_mapping:
+        for attribute_key_or_tuple in key_mapping:
+            handler = None
+            if isinstance(attribute_key_or_tuple, tuple):
+                attribute_key, handler = attribute_key_or_tuple
+            else:
+                attribute_key = attribute_key_or_tuple
             value = get_attribute(attributes, attribute_key)
             if value:
-                if attribute_key in KEY_HANDLERS:
-                    try:
-                        value = KEY_HANDLERS[attribute_key](value)
-                    except:
-                        pass
+                # Handler should never raise - Always use a try in handler and default to passed in value
+                if handler:
+                    value = handler(value)
                 result[attribute_key] = value
                 break
+        if result != {}:
+            to_json_serializable(try_convert_numeric_keys_to_list(result))
         return result
 
     # If dict, unpack to associate all nested keys with their parent
     for key, attribute_key_list in key_mapping.items():
-        for attribute_key in attribute_key_list:
+        for attribute_key_or_tuple in attribute_key_list:
+            handler = None
+            if isinstance(attribute_key_or_tuple, tuple):
+                attribute_key, handler = attribute_key_or_tuple
+            else:
+                attribute_key = attribute_key_or_tuple
+
             value = get_attribute(attributes, attribute_key)
             if value:
-                if attribute_key in KEY_HANDLERS:
-                    try:
-                        value = KEY_HANDLERS[attribute_key](value)
-                    except:
-                        pass
+                if handler:
+                    # Handler should never raise - Always use a try in handler and default to passed in value
+                    value = handler(value)
                 result[key] = value
                 break
-    return to_json_serializable(result)
+
+    # Prevent empty dict from becoming empty list
+    if result != {}:
+        to_json_serializable(try_convert_numeric_keys_to_list(result))
+    return result
 
 
 def get_weave_attributes(attributes: dict[str, Any]) -> dict[str, Any]:

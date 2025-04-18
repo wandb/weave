@@ -1,8 +1,5 @@
-from weave.trace_server.opentelemetry.helpers import (
-    try_parse_int,
-    try_convert_numeric_keys_to_list,
-    t
-)
+from weave.trace_server.opentelemetry.helpers import try_parse_int
+
 """
 The constants defined in this file map attribute keys from various telemetry standards
 to a common format used by Weave. This enables Weave to ingest traces and spans from
@@ -47,6 +44,8 @@ This would be the resulting dict dumped to clickhouse:
 # INPUT_KEYS: Maps attribute keys that represent user prompts or inputs to LLMs
 # Priority is given to standards in this order:
 # This is used to populate the `inputs_dump` column in clickhouse
+from weave.trace_server.opentelemetry.helpers import try_parse_int
+
 INPUT_KEYS = [
     "input.value",  # From OpenInference standard - highest priority
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
@@ -70,16 +69,24 @@ OUTPUT_KEYS = [
 # USAGE_KEYS: Maps internal Weave usage metric names to their equivalent keys in
 # various telemetry standards. Used for token counting and usage statistics.
 # Used to populate the usage field of `summary_dump` in clickhouse
+# The tuples represent handlers which the value should be passed through when found
+# Never assume that the value is of a certain type or error, conventions provide no guarantees
 USAGE_KEYS = {
     # Maps Weave's "prompt_tokens" to keys from different standards
-    "prompt_tokens": ["gen_ai.usage.prompt_tokens", "llm.token_count.prompt"],
+    "prompt_tokens": [
+        ("gen_ai.usage.prompt_tokens", try_parse_int),
+        ("llm.token_count.prompt", try_parse_int),
+    ],
     # Maps Weave's "completion_tokens" to keys from different standards
     "completion_tokens": [
-        "gen_ai.usage.completion_tokens",
-        "llm.token_count.completion",
+        ("gen_ai.usage.completion_tokens", try_parse_int),
+        ("llm.token_count.completion", try_parse_int),
     ],
     # Maps Weave's "total_tokens" to keys from different standards
-    "total_tokens": ["llm.usage.total_tokens", "llm.token_count.total"],
+    "total_tokens": [
+        ("llm.usage.total_tokens", try_parse_int),
+        ("llm.token_count.total", try_parse_int),
+    ],
 }
 
 # ATTRIBUTE_KEYS: Maps common LLM call metadata attributes to the types of attributes expected in weave traces
@@ -112,17 +119,3 @@ WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
 }
-
-
-KEY_HANDLERS = {
-    "gen_ai.prompt": try_convert_numeric_keys_to_list,
-    "gen_ai.completion": try_convert_numeric_keys_to_list,
-    "gen_ai.usage.prompt_tokens": try_parse_int,
-}
-
-for key in (
-    USAGE_KEYS["prompt_tokens"]
-    + USAGE_KEYS["completion_tokens"]
-    + USAGE_KEYS["total_tokens"]
-):
-    KEY_HANDLERS[key] = try_parse_int

@@ -1,5 +1,5 @@
-import re
 import json
+import re
 from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
@@ -7,6 +7,7 @@ from typing import Any, Union
 from uuid import UUID
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+
 
 def to_json_serializable(value: Any) -> Any:
     """
@@ -100,7 +101,12 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     current = d
     for part in parts:
         if not isinstance(current, dict) or part not in current:
-            return None
+            if isinstance(current, list) and part.isdigit():
+                part = int(part)
+                current = current[part] if part < len(current) else None
+                continue
+            else:
+                return None
         current = current[part]
     return current
 
@@ -304,21 +310,13 @@ def unflatten_key_values(
     return expand_attributes(iterator)
 
 
-def try_parse_json(value: Any) -> Any:
-    if isinstance(value, str):
-        try:
-            value = json.loads(value)
-        except:
-            pass
-    return value
-
-
 def try_parse_int(value: Any) -> Any:
     try:
         value = int(value)
     except:
         pass
     return value
+
 
 def try_convert_numeric_keys_to_list(value: Any) -> Any:
     if isinstance(value, dict):

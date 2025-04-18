@@ -4,7 +4,6 @@ import uuid
 from binascii import hexlify
 from datetime import datetime
 from typing import Any
-from unittest.mock import patch
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -25,21 +24,21 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.attributes import (
-    convert_numeric_keys_to_list,
-    expand_attributes,
-    flatten_attributes,
-    get_attribute,
     get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
     get_weave_outputs,
     get_weave_usage,
-    to_json_serializable,
-    unflatten_key_values,
 )
 from weave.trace_server.opentelemetry.helpers import (
     capture_parts,
+    convert_numeric_keys_to_list,
+    expand_attributes,
+    flatten_attributes,
+    get_attribute,
     shorten_name,
+    to_json_serializable,
+    unflatten_key_values,
 )
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
@@ -228,7 +227,7 @@ class TestPythonSpans:
         pb_span = create_test_span()
         py_span = PySpan.from_proto(pb_span)
 
-        start_call, end_call = py_span.to_call("test_project")
+        start_call, _ = py_span.to_call("test_project")
 
         # Verify start call
         assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
@@ -364,13 +363,7 @@ class TestAttributes:
         assert get_attribute(nested, "a.b") == {"c": "value1"}
         assert get_attribute(nested, "d") == [1, 2, 3]
 
-        # Need to patch get_attribute function to correctly handle array indices
-        with patch(
-            "weave.trace_server.opentelemetry.attributes._get_value_from_nested_dict"
-        ) as mock_get:
-            mock_get.return_value = 1
-            assert get_attribute(nested, "d.0") == 1
-            mock_get.assert_called_once_with(nested, "d.0")
+        assert get_attribute(nested, "d.0") == 1
 
         assert get_attribute(nested, "nonexistent") is None
 

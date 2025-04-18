@@ -32,8 +32,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
-from weave.trace_server.opentelemetry.helpers import shorten_name
-
 from weave.trace_server.opentelemetry.attributes import (
     SpanEvent,
     get_wandb_attributes,
@@ -42,11 +40,12 @@ from weave.trace_server.opentelemetry.attributes import (
     get_weave_outputs,
     get_weave_usage,
 )
-
 from weave.trace_server.opentelemetry.helpers import (
+    shorten_name,
     to_json_serializable,
     unflatten_key_values,
 )
+
 
 class SpanKind(Enum):
     """Enum representing the span's kind."""
