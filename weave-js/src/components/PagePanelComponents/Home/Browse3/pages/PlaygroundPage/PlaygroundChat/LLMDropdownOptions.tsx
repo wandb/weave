@@ -107,6 +107,7 @@ const SubMenu = ({
         overflowY: 'auto',
         border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
         p: '6px',
+        zIndex: 1,
       }}>
       {llms.map((llm, index) => (
         <Box

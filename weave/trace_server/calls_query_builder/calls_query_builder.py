@@ -861,6 +861,8 @@ ALLOWED_CALL_FIELDS = {
     ),
 }
 
+DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
+
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
@@ -1033,7 +1035,11 @@ def process_query_to_conditions(
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
+            if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
+                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+
             structured_field = get_field_by_name(operand.get_field_)
+
             if isinstance(structured_field, CallsMergedDynamicField):
                 field = structured_field.as_sql(
                     param_builder, table_alias, use_agg_fn=use_agg_fn
