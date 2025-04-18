@@ -1,4 +1,4 @@
-'''
+"""
 The constants defined in this file map attribute keys from various telemetry standards
 to a common format used by Weave. This enables Weave to ingest traces and spans from
 different instrumentation libraries while normalizing the data into a consistent format.
@@ -35,7 +35,7 @@ gen_ai.usage.llm.usage.total_tokens: 70
 
 This would be the resulting dict dumped to clickhouse:
 { "prompt_tokens": 30, "completion_tokens": 40, "total_tokens": 70 }
-'''
+"""
 
 # These mappings prioritize standards in a specific order for each attribute type.
 
@@ -68,13 +68,11 @@ OUTPUT_KEYS = [
 USAGE_KEYS = {
     # Maps Weave's "prompt_tokens" to keys from different standards
     "prompt_tokens": ["gen_ai.usage.prompt_tokens", "llm.token_count.prompt"],
-
     # Maps Weave's "completion_tokens" to keys from different standards
     "completion_tokens": [
         "gen_ai.usage.completion_tokens",
         "llm.token_count.completion",
     ],
-
     # Maps Weave's "total_tokens" to keys from different standards
     "total_tokens": ["llm.usage.total_tokens", "llm.token_count.total"],
 }
@@ -88,22 +86,18 @@ ATTRIBUTE_KEYS = {
         "gen_ai.system",  # OpenTelemetry AI
         "llm.system",  # OpenInference
     ],
-
     # Span kind - identifies the type of operation
     "kind": [
         "weave.span.kind",  # Weave-specific
         "traceloop.span.kind",  # Traceloop
         "openinference.span.kind",  # OpenInference
     ],
-
     # Model name/identifier
     "model": ["llm.model_name", "gen_ai.response.model"],
-
     # Provider/vendor of the model
     "provider": [
         "llm.provider",  # Common across standards
     ],
-
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
 }
