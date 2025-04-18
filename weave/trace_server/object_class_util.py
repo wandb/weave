@@ -109,7 +109,7 @@ def process_incoming_object_val(
                 )
             return ProcessIncomingObjectResult(
                 val=dict_val,
-                base_object_class=new_val_object_classes["base_object_class"],
+                base_object_class=new_val_object_classes["object_class"],
             )
         else:
             raise ValueError(f"Unknown object class: {req_builtin_object_class}")
