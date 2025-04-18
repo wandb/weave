@@ -12,6 +12,7 @@ from weave.trace_server.opentelemetry.constants import (
     INPUT_KEYS,
     OUTPUT_KEYS,
     USAGE_KEYS,
+    WB_KEYS,
 )
 
 
@@ -413,3 +414,7 @@ def get_weave_inputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str
 # Pass events here even though they are unused because some libraries put output in event attribtes
 def get_weave_outputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
     return parse_weave_values(attributes, OUTPUT_KEYS)
+
+# Custom attributes for weave to enable setting fields like wb_user_id otherwise unavailable in OTEL Traces
+def get_wandb_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
+    return parse_weave_values(attributes, WB_KEYS)

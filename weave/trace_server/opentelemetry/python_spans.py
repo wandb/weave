@@ -35,6 +35,7 @@ from weave.trace_server.opentelemetry.helpers import shorten_name
 
 from .attributes import (
     SpanEvent,
+    get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
     get_weave_outputs,
@@ -286,6 +287,8 @@ class Span:
         inputs = get_weave_inputs(events, self.attributes) or {}
         outputs = get_weave_outputs(events, self.attributes) or {}
         attributes = get_weave_attributes(self.attributes) or {}
+        wandb_attributes = get_wandb_attributes(self.attributes) or {}
+
         llm_usage = tsi.LLMUsageSchema(
             input_tokens=usage.get("input_tokens"),
             output_tokens=usage.get("output_tokens"),
@@ -328,8 +331,9 @@ class Span:
             started_at=self.start_time,
             attributes=attributes,
             inputs=inputs,
-            wb_user_id=None,
-            wb_run_id=None,
+            display_name=wandb_attributes.get("display_name"),
+            wb_user_id=wandb_attributes.get("wb_user_id"),
+            wb_run_id=wandb_attributes.get("wb_run_id"),
         )
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None
