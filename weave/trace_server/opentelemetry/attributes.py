@@ -328,10 +328,17 @@ def try_parse_int(value: Any) -> Any:
         pass
     return value
 
+def try_convert_numeric_keys_to_list(value: Any) -> Any:
+    if isinstance(value, dict):
+        try:
+            value = convert_numeric_keys_to_list(value)
+        except:
+            pass
+    return value
 
 KEY_HANDLERS = {
-    "gen_ai.prompt": convert_numeric_keys_to_list,
-    "gen_ai.completion": convert_numeric_keys_to_list,
+    "gen_ai.prompt": try_convert_numeric_keys_to_list,
+    "gen_ai.completion": try_convert_numeric_keys_to_list,
     "gen_ai.usage.prompt_tokens": try_parse_int,
 }
 
