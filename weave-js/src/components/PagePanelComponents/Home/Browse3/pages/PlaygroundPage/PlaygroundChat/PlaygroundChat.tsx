@@ -18,7 +18,7 @@ import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
-import {useLLMDropdownOptions} from './LLMDropdownOptions';
+import {getLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -136,7 +136,7 @@ export const PlaygroundChat = ({
   );
   const isTeamAdmin = maybeTeamAdmin ?? false;
 
-  const llmDropdownOptions = useLLMDropdownOptions(
+  const llmDropdownOptions = getLLMDropdownOptions(
     configuredProviders,
     configuredProvidersLoading,
     customProvidersResult,

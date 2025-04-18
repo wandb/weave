@@ -384,7 +384,7 @@ export const addProviderOption: ProviderOption = {
   llms: [],
 };
 
-export const useLLMDropdownOptions = (
+export const getLLMDropdownOptions = (
   configuredProviders: Record<string, ProviderStatus>,
   configuredProvidersLoading: boolean,
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],
