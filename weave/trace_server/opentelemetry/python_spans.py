@@ -332,8 +332,8 @@ class Span:
             attributes=attributes,
             inputs=inputs,
             display_name=wandb_attributes.get("display_name"),
-            wb_user_id=wandb_attributes.get("wb_user_id"),
-            wb_run_id=wandb_attributes.get("wb_run_id"),
+            wb_user_id=None,
+            wb_run_id=None,
         )
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None

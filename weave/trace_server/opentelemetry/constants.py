@@ -43,11 +43,6 @@ ATTRIBUTE_KEYS = {
 
 # Wandb/Weave specific call attributes
 WB_KEYS = {
-    "wb_user_id": ["wandb.user_id"],
-    "wb_run_id": ["wandb.run_id"],
     "display_name": ["wandb.display_name"],
-
-    # TODO: Currently unused, should fall back to these values if not sent in headers
     "project_id": ["wandb.project_id"],
-    "entity": ["wandb.entity"],
 }
