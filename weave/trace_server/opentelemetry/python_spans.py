@@ -5,6 +5,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
 import datetime
+import uuid
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -278,7 +279,15 @@ class Span:
         )
         op_name = self.name
         if len(op_name) >= MAX_OP_NAME_LENGTH:
-            op_name = shorten_name(op_name, MAX_OP_NAME_LENGTH)
+            # Since op_name will typically be what is displayed, we don't want to just truncate
+            # Create an identifier abbreviation so similar long names can be distinguished
+            identifier = str(uuid.uuid4())[:4]
+            op_name = shorten_name(
+                op_name,
+                MAX_OP_NAME_LENGTH,
+                abbrv=f":{identifier}",
+                use_delimiter_in_abbr=False,
+            )
 
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
