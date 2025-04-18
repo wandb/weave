@@ -28,26 +28,45 @@ def capture_parts(
 
 
 def shorten_name(name: str, max_len: int, abbrv: str = "...") -> str:
+    if len(name) <= max_len:
+        return name
     # Split the string based on all of the listed delimiters
-    parts = capture_parts(name)
+    delimiters = [",", ";", "|", " ", "/", "?", "."]
+    parts = capture_parts(name, delimiters)
+    abbrv_len = len(abbrv)
     if len(parts) <= 1:
         # No delimiters found, just truncate
-        return name[: max_len - (len(abbrv))] + abbrv
+        return name[: max_len - abbrv_len] + abbrv
 
     shortened_name = parts[0]
 
     # If the first part is already longer than max_len, truncate it
-    if len(shortened_name) > max_len - len(abbrv):
-        return shortened_name[: max_len - len(abbrv)] + abbrv
+    if len(shortened_name) > max_len - abbrv_len:
+        return shortened_name[: max_len - abbrv_len] + abbrv
 
-    # We already have the first part in shortened_name, so skip it
-    for i in range(1, len(parts) - 1, 2):
+    i = 1
+    while i < len(parts):
         # Concatenate the delimiter with the next part
-        next_delimiter = parts[i]
-        next_part = f"{next_delimiter}{parts[i+1]}"
-        if len(shortened_name) + len(next_part) > max_len - (len(abbrv) + 1):
-            shortened_name += f"{next_delimiter}{abbrv}"
-            break
-        shortened_name += next_part
+        next_delimiter = ""
+        while parts[i] in delimiters:
+            next_delimiter = next_delimiter + parts[i]
+            i += 1
 
+        next_part = f"{next_delimiter}{parts[i]}"
+        # If there is no abbreviation, do not end on a delimiter (ex. no trailing periods)
+        if not abbrv_len:
+            delimiter_with_abbrv = ""
+        elif abbrv.startswith(next_delimiter):
+            delimiter_with_abbrv = abbrv
+        else:
+            delimiter_with_abbrv = f"{next_delimiter}{abbrv}"
+
+        if len(shortened_name) + len(next_part) >= max_len - (
+            len(delimiter_with_abbrv)
+        ):
+            shortened_name += delimiter_with_abbrv
+            break
+        else:
+            shortened_name += next_part
+        i += 1
     return shortened_name
