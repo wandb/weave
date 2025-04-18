@@ -1,5 +1,8 @@
+import {Button} from '@wandb/weave/components/Button/Button';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {convertBytes, getJsonPayloadSize} from '@wandb/weave/util';
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {parseRefMaybe} from '../../../../../../react';
 import {Timestamp} from '../../../../../Timestamp';
@@ -15,6 +18,20 @@ const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'usage',
   'weave',
 ];
+
+const StorageSizeDisplay: React.FC<{
+  size: number;
+}> = ({size}) => (
+  <span className="flex items-center gap-2">
+    {convertBytes(size)}
+    <Tooltip
+      content="The size does not include referenced objects, for example, images or audio blob storage."
+      trigger={
+        <Button icon="info" variant="ghost" size="small" active={false} />
+      }
+    />
+  </span>
+);
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -36,6 +53,34 @@ export const CallSummary: React.FC<{
     )
   );
   const costData = call.traceCall?.summary?.weave?.costs;
+
+  const storageSizeBytesRow = useMemo(() => {
+    const size =
+      getJsonPayloadSize(span.inputs) +
+      getJsonPayloadSize(span.output) +
+      getJsonPayloadSize(span.attributes) +
+      getJsonPayloadSize(span.summary);
+
+    if (size === 0) {
+      return null;
+    }
+
+    return {
+      'Call Storage Size': <StorageSizeDisplay size={size} />,
+    };
+  }, [span]);
+
+  const traceStorageSizeBytesRow = useMemo(() => {
+    if (call.parentId !== null) {
+      return null;
+    }
+
+    return {
+      'Trace Storage Size': (
+        <StorageSizeDisplay size={call.totalStorageSizeBytes ?? 0} />
+      ),
+    };
+  }, [call.parentId, call.totalStorageSizeBytes]);
 
   return (
     <div className="overflow-auto px-16 pt-12">
@@ -88,6 +133,8 @@ export const CallSummary: React.FC<{
                   Latency: span.summary.latency_s.toFixed(3) + 's',
                 }
               : {}),
+            ...storageSizeBytesRow,
+            ...traceStorageSizeBytesRow,
             ...(Object.keys(summary).length > 0 ? summary : {}),
           }}
         />

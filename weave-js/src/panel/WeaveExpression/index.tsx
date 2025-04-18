@@ -228,6 +228,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             onKeyDown={keyDownHandler}
             onBlur={onBlur}
             onFocus={onFocus}
+            placeholder="Enter query expression"
             decorate={decorate}
             renderLeaf={leafProps => <Leaf {...leafProps} />}
             style={{overflowWrap: 'anywhere'}}
@@ -251,7 +252,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
                   ev.preventDefault();
                 }}
                 onClick={applyPendingExpr}>
-                Run {isBusy ? '⧗' : '⏎'}
+                {isBusy ? '⧗' : '⏎'}
               </S.ApplyButton>
             </Ref>
           )}
