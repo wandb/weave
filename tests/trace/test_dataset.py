@@ -166,10 +166,11 @@ def test_dataset_select(client):
         {"id": 8, "val": 16},
     ]
 
-    # Select with an empty list
-    selected_ds_empty = ds.select([])
-    assert len(selected_ds_empty) == 0
-    assert list(selected_ds_empty) == []
+    # Select with an empty list - should raise ValueError
+    with pytest.raises(
+        ValueError, match="Cannot select rows with an empty set of indices."
+    ):
+        ds.select([])
 
     # Select with indices that are out of order
     indices_unordered = [7, 1, 4, 1]

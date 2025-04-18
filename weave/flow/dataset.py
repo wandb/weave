@@ -129,5 +129,10 @@ class Dataset(Object):
         Returns:
             A new Dataset object containing only the selected rows.
         """
-        selected_rows = [self[i] for i in indices]
+        # Ensure indices is not empty before proceeding
+        indices_list = list(indices)
+        if not indices_list:
+            raise ValueError("Cannot select rows with an empty set of indices.")
+
+        selected_rows = [self[i] for i in indices_list]
         return self.__class__(rows=selected_rows)
