@@ -2,6 +2,39 @@
 The constants defined in this file map attribute keys from various telemetry standards
 to a common format used by Weave. This enables Weave to ingest traces and spans from
 different instrumentation libraries while normalizing the data into a consistent format.
+
+For INPUT_KEYS and OUTPUT_KEYS we respect the original source key when placing it into
+our input and output fields respectively.
+
+E.g. If a value is discovered in the `input.value` field of attributes the dict dumped
+to clickhouse is:
+{ "input.value": SOME_JSON_OR_STR_VALUE, }
+
+For prefix values with nested keys (such as `gen_ai.prompt`) we might see attributes like:
+
+gen_ai.prompt.0.role: user
+gen_ai.prompt.0.content: abc
+
+gen_ai.prompt.1.role: user
+gen_ai.prompt.1.content: def
+
+the dict dumped to clickhouse is:
+{ "gen_ai.prompt": [{ "role": user, "content": abc }, { "role": user, "content": def }] }
+
+For these fields, once a value is discovered in the attributes, so the ordering of these keys matters.
+
+
+For the other key mappings, a dict is dumped with each of the top level keys in the dict.
+The inner list of those key represents the attributes which are checked similarly to
+how INPUT_KEYS and OUTPUT_KEYS are checked, where the first one found is used.
+
+If we recieved attributes where:
+gen_ai.usage.prompt_tokens: 30
+gen_ai.usage.completion_tokens: 40
+gen_ai.usage.llm.usage.total_tokens: 70
+
+This would be the resulting dict dumped to clickhouse:
+{ "prompt_tokens": 30, "completion_tokens": 40, "total_tokens": 70 }
 '''
 
 # These mappings prioritize standards in a specific order for each attribute type.
