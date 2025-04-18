@@ -35,6 +35,10 @@ from weave.trace_server.opentelemetry.attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
+from weave.trace_server.opentelemetry.helpers import (
+    capture_parts,
+    shorten_name,
+)
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
@@ -645,3 +649,90 @@ class TestSemanticConventionParsing:
         assert usage.get("prompt_tokens") == 15
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
+
+
+class TestHelpers:
+    def test_capture_parts(self):
+        """Test capturing parts of a string split by delimiters."""
+        # Test with a single delimiter
+        assert capture_parts("part1.part2") == ["part1", ".", "part2"]
+
+        # Test with multiple delimiters
+        assert capture_parts("part1.part2,part3") == [
+            "part1",
+            ".",
+            "part2",
+            ",",
+            "part3",
+        ]
+
+        # Test with delimiters that don't appear in the string
+        assert capture_parts("nodelimiters") == ["nodelimiters"]
+
+        # Test with an empty string
+        assert capture_parts("") == [""]
+
+        # Test with custom delimiters
+        assert capture_parts("a-b-c", delimiters=["-"]) == ["a", "-", "b", "-", "c"]
+
+        # Test with adjacent delimiters
+        assert capture_parts("part1..part2") == ["part1", ".", ".", "part2"]
+
+    def test_shorten_name_no_delimiters(self):
+        """Test shortening a name with no delimiters."""
+        # Test a string shorter than max_len - the function always adds ellipsis
+        assert shorten_name("short", 10) == "short..."
+
+        # Test a string longer than max_len with no delimiters
+        long_name = "abcdefghijklmnopqrstuvwxyz"
+        assert shorten_name(long_name, 10) == "abcdefg..."
+
+    def test_shorten_name_with_delimiters(self):
+        """Test shortening a name with delimiters."""
+        # Test with a single delimiter
+        assert shorten_name("part1.part2", 10) == "part1...."
+
+        # Test with multiple delimiters where it fits
+        assert shorten_name("a.b.c", 10) == "a.b.c"
+
+        # Test with multiple delimiters where it needs truncation
+        assert shorten_name("part1.part2.part3", 12) == "part1...."
+
+    def test_shorten_name_first_part_too_long(self):
+        """Test shortening a name where first part is already too long."""
+        # First part already exceeds max_len
+        assert shorten_name("verylongfirstpart.second", 10) == "verylon..."
+
+    def test_shorten_name_custom_abbreviation(self):
+        """Test shortening a name with custom abbreviation."""
+        assert shorten_name("part1.part2.part3", 10, "***") == "part1.***"
+
+        # Test with empty abbreviation
+        assert shorten_name("part1.part2.part3", 10, "") == "part1."
+
+    def test_shorten_name_different_delimiters(self):
+        """Test shortening a name with different types of delimiters."""
+        # Test with a space delimiter
+        assert shorten_name("word1 word2 word3", 12) == "word1 ..."
+
+        # Test with a slash delimiter
+        assert shorten_name("path/to/file", 8) == "path/..."
+
+        # Test with mixed delimiters
+        assert shorten_name("user.name@example.com", 12) == "user...."
+
+        # Test with a delimiter not in the default list
+        # Note: This will be treated as having no delimiters since '-' is not in the default list
+        assert shorten_name("part1-part2-part3", 10) == "part1-p..."
+
+        # Test with a question mark delimiter
+        assert shorten_name("api/endpoint?param=value", 15) == "api/..."
+
+    def test_long_url_regression(self):
+        # Test for a modified version of the URL which caused failed traces due to op_name length
+        actual = shorten_name(
+            "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
+            128,
+        )
+        expected = "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig..."
+        assert actual == expected

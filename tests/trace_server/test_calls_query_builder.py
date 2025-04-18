@@ -238,6 +238,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         HardCodedFilter(
             filter=tsi.CallsFilter(
                 op_names=["a", "b"],
+                trace_ids=["111111111111"],
             )
         )
     )
@@ -271,9 +272,11 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            WHERE calls_merged.project_id = {pb_2:String}
+            WHERE calls_merged.project_id = {pb_3:String}
                 AND ((calls_merged.op_name IN {pb_1:Array(String)})
                     OR (calls_merged.op_name IS NULL))
+                AND (calls_merged.trace_id = {pb_2:String}
+                    OR calls_merged.trace_id IS NULL)
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.wb_user_id) = {pb_0:String}))
@@ -288,15 +291,15 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
-            calls_merged.project_id = {pb_2:String}
+            calls_merged.project_id = {pb_3:String}
         AND (calls_merged.id IN filtered_calls)
-        AND ((calls_merged.inputs_dump LIKE {pb_7:String} OR calls_merged.inputs_dump IS NULL)
-            AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
+        AND ((calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL)
+            AND (calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}))
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) = {pb_5:String}))
             AND
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) = {pb_6:String}))
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) = {pb_7:String}))
         )
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
@@ -304,13 +307,14 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         {
             "pb_0": "my_user_id",
             "pb_1": ["a", "b"],
-            "pb_2": "project",
-            "pb_3": '$."param"."val"',
-            "pb_4": "hello",
-            "pb_5": '$."param"."bool"',
-            "pb_6": "true",
-            "pb_7": '%"hello"%',
-            "pb_8": "%true%",
+            "pb_2": "111111111111",
+            "pb_3": "project",
+            "pb_4": '$."param"."val"',
+            "pb_5": "hello",
+            "pb_6": '$."param"."bool"',
+            "pb_7": "true",
+            "pb_8": '%"hello"%',
+            "pb_9": "%true%",
         },
     )
 
@@ -1971,6 +1975,61 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             "pb_6": '$."message"',
             "pb_7": "hello",
             "pb_8": '%"hello"%',
+        },
+    )
+
+
+def test_trace_id_filter_in():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"trace_ids": ["111111111111", "222222222222"]}
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.trace_id IN {pb_0:Array(String)}
+                OR calls_merged.trace_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": ["111111111111", "222222222222"], "pb_1": "project"},
+    )
+
+
+def test_trace_id_filter_eq():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "trace_ids": ["111111111111"],
+            "op_names": ["weave-trace-internal:///%"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                OR (calls_merged.op_name IS NULL))
+            AND (calls_merged.trace_id = {pb_1:String}
+                OR calls_merged.trace_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_1": "111111111111",
+            "pb_0": ["weave-trace-internal:///%"],
+            "pb_2": "project",
         },
     )
 

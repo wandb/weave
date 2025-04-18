@@ -30,6 +30,8 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+from weave.trace_server.opentelemetry.helpers import shorten_name
 
 from .attributes import (
     SpanEvent,
@@ -292,13 +294,17 @@ class Span:
             total_tokens=usage.get("total_tokens"),
             requests=usage.get("requests"),
         )
+
+        # Read the model name from attributes to load cost info
         model = attributes.get("model")
         if not model:
             model_parameters = attributes.get("model_parameters")
             if model_parameters:
                 model = model_parameters.get("model")
+
         usage_key = model or "usage"
         summary_insert_map = tsi.SummaryInsertMap(usage={usage_key: llm_usage})
+
 
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
@@ -310,6 +316,9 @@ class Span:
             attributes = to_json_serializable(self.attributes)
 
         attributes["otel_span"] = self.as_dict()
+        op_name = self.name
+        if len(op_name) >= MAX_OP_NAME_LENGTH:
+            op_name = shorten_name(op_name, MAX_OP_NAME_LENGTH)
 
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
