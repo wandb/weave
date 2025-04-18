@@ -1,3 +1,8 @@
+from weave.trace_server.opentelemetry.helpers import (
+    try_parse_int,
+    try_convert_numeric_keys_to_list,
+    t
+)
 """
 The constants defined in this file map attribute keys from various telemetry standards
 to a common format used by Weave. This enables Weave to ingest traces and spans from
@@ -107,3 +112,17 @@ WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
 }
+
+
+KEY_HANDLERS = {
+    "gen_ai.prompt": try_convert_numeric_keys_to_list,
+    "gen_ai.completion": try_convert_numeric_keys_to_list,
+    "gen_ai.usage.prompt_tokens": try_parse_int,
+}
+
+for key in (
+    USAGE_KEYS["prompt_tokens"]
+    + USAGE_KEYS["completion_tokens"]
+    + USAGE_KEYS["total_tokens"]
+):
+    KEY_HANDLERS[key] = try_parse_int
