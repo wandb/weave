@@ -40,3 +40,9 @@ ATTRIBUTE_KEYS = {
     ],
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
 }
+
+# Wandb/Weave specific call attributes
+WB_KEYS = {
+    "display_name": ["wandb.display_name"],
+    "project_id": ["wandb.project_id"],
+}

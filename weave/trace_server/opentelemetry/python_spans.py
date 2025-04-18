@@ -30,11 +30,12 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.helpers import shorten_name
 
 from .attributes import (
     SpanEvent,
+    get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
     get_weave_outputs,
@@ -286,6 +287,8 @@ class Span:
         inputs = get_weave_inputs(events, self.attributes) or {}
         outputs = get_weave_outputs(events, self.attributes) or {}
         attributes = get_weave_attributes(self.attributes) or {}
+        wandb_attributes = get_wandb_attributes(self.attributes) or {}
+
         llm_usage = tsi.LLMUsageSchema(
             input_tokens=usage.get("input_tokens"),
             output_tokens=usage.get("output_tokens"),
@@ -318,6 +321,9 @@ class Span:
         op_name = self.name
         if len(op_name) >= MAX_OP_NAME_LENGTH:
             op_name = shorten_name(op_name, MAX_OP_NAME_LENGTH)
+        display_name = wandb_attributes.get("display_name")
+        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
+            display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
@@ -328,6 +334,7 @@ class Span:
             started_at=self.start_time,
             attributes=attributes,
             inputs=inputs,
+            display_name=display_name,
             wb_user_id=None,
             wb_run_id=None,
         )
