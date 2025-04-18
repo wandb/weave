@@ -391,6 +391,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
 
+        # The order is actually important, it has something to do with how the cost_query wants to arrange things.
+        # specifically, the summary column should always be the last.
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_total_storage_size:
+            columns.append("total_storage_size_bytes")
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             summary_columns = ["summary", "summary_dump"]
@@ -398,12 +406,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
-
-        if req.include_storage_size:
-            columns.append("storage_size_bytes")
-
-        if req.include_total_storage_size:
-            columns.append("total_storage_size_bytes")
 
         for col in columns:
             cq.add_field(col)
@@ -1356,10 +1358,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
+        set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+        set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
@@ -1395,6 +1399,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
+        set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
@@ -1485,15 +1490,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                client = self.file_storage_client
-                if client is None:
-                    raise FileStorageReadError("File storage client is not configured")
-                bytes += read_from_bucket(client, file_storage_uri)
+                bytes += self._file_read_bucket(file_storage_uri)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
+                set_root_span_dd_tags({"storage_provider": "clickhouse"})
 
+        set_root_span_dd_tags({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
+    def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
+        set_root_span_dd_tags({"storage_provider": "bucket"})
+        client = self.file_storage_client
+        if client is None:
+            raise FileStorageReadError("File storage client is not configured")
+        return read_from_bucket(client, file_storage_uri)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
@@ -2395,3 +2407,11 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     hash_obj = hashlib.md5(input_string.encode())
     hash_int = int(hash_obj.hexdigest(), 16)
     return hash_int % range_max
+
+
+def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
+    root_span = ddtrace.tracer.current_root_span()
+    if root_span is None:
+        logger.debug("No root span")
+    else:
+        root_span.set_tags(tags)
