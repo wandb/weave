@@ -28,6 +28,7 @@ from weave.trace_server.opentelemetry.attributes import (
     expand_attributes,
     flatten_attributes,
     get_attribute,
+    get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
     get_weave_outputs,
@@ -432,6 +433,49 @@ class TestSemanticConventionParsing:
         assert extracted["kind"] == "llm"
         assert extracted["model_parameters"]["max_tokens"] == 100
         assert extracted["model_parameters"]["temperature"] == 0.7
+
+    def test_wandb_attributes_extraction(self):
+        """Test extracting wandb-specific attributes."""
+        # Create attribute dictionary with W&B specific attributes
+        attributes = create_attributes(
+            {
+                "wandb.display_name": "My Custom Display Name",
+                "wandb.project_id": "project-123",
+            }
+        )
+
+        # Test get_wandb_attributes
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["display_name"] == "My Custom Display Name"
+        assert extracted["project_id"] == "project-123"
+
+        # Test with missing attributes
+        empty_attributes = create_attributes({})
+        extracted = get_wandb_attributes(empty_attributes)
+        assert extracted == {}
+
+        # Test with partial attributes
+        partial_attributes = create_attributes(
+            {
+                "wandb.display_name": "Only Display Name",
+            }
+        )
+        extracted = get_wandb_attributes(partial_attributes)
+        assert extracted["display_name"] == "Only Display Name"
+        assert "project_id" not in extracted
+
+        # Test with nested attributes format
+        nested_attributes = create_attributes(
+            {
+                "wandb": {
+                    "display_name": "Nested Display Name",
+                    "project_id": "nested-project-123",
+                }
+            }
+        )
+        extracted = get_wandb_attributes(nested_attributes)
+        assert extracted["display_name"] == "Nested Display Name"
+        assert extracted["project_id"] == "nested-project-123"
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
