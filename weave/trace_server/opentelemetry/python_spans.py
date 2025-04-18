@@ -322,7 +322,7 @@ class Span:
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            op_name=self.name,
+            op_name=op_name,
             trace_id=self.trace_id,
             parent_id=self.parent_id,
             started_at=self.start_time,
