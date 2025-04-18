@@ -426,7 +426,6 @@ class TestSemanticConventionParsing:
 
         # Test get_weave_attributes
         extracted = get_weave_attributes(attributes)
-        print(extracted)
         assert extracted["system"] == "This is a system prompt"
         assert extracted["provider"] == "test-provider"
         assert extracted["model"] == "test-model"
@@ -449,8 +448,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs with text input
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": "What is machine learning?",
-            "type": "text/plain",
+            "input.value": "What is machine learning?",
         }
 
         # Test with JSON input
@@ -470,13 +468,12 @@ class TestSemanticConventionParsing:
         )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": {
+            "input.value": {
                 "messages": [
                     {"role": "system", "content": "You are an assistant"},
                     {"role": "user", "content": "What is machine learning?"},
                 ]
             },
-            "type": "application/json",
         }
 
     def test_openinference_outputs_extraction(self):
@@ -494,8 +491,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_outputs with text output
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": "Machine learning is a field of AI...",
-            "type": "text/plain",
+            "output.value": "Machine learning is a field of AI...",
         }
 
         # Test with JSON output
@@ -515,13 +511,12 @@ class TestSemanticConventionParsing:
         )
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": {
+            "output.value": {
                 "response": {
                     "role": "assistant",
                     "content": "Machine learning is a field of AI...",
                 }
             },
-            "type": "application/json",
         }
 
     def test_openinference_usage_extraction(self):
@@ -579,7 +574,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": [{"role": "user", "content": "Tell me about quantum computing"}]
+            "gen_ai.prompt": [{"role": "user", "content": "Tell me about quantum computing"}]
         }
 
         # Test with multiple prompts
@@ -594,7 +589,7 @@ class TestSemanticConventionParsing:
         )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": [
+            "gen_ai.prompt": [
                 {"role": "system", "content": "You are an expert in quantum physics"},
                 {"role": "user", "content": "Tell me about quantum computing"},
             ]
@@ -622,7 +617,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_outputs
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": [
+            "gen_ai.completion": [
                 {
                     "role": "assistant",
                     "content": "Quantum computing uses quantum mechanics...",
