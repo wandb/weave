@@ -1,6 +1,7 @@
 import hashlib
 import re
 from collections.abc import Iterable
+from concurrent.futures import Future
 from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
@@ -90,6 +91,12 @@ def flattened_calls_to_names(flattened_calls: list) -> list:
 
 def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
+
+
+def op_name_from_call(call: Call) -> str:
+    if isinstance(op_name := call._op_name, Future):
+        op_name = op_name.result()
+    return op_name_from_ref(op_name)
 
 
 def filter_body(r: Any) -> Any:
