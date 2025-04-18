@@ -13,10 +13,12 @@ import {
   EMPTY_PROPS_NO_LLM_PROVIDERS,
   EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
 } from '../../common/EmptyContent';
+import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
-import {useConfiguredProviders} from '../useConfiguredProviders';
+import {ProviderStatus} from '../useConfiguredProviders';
+import {ProviderOption} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -80,6 +82,13 @@ export type PlaygroundChatProps = {
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
   isOpenInPlayground?: boolean;
+  allOptions: ProviderOption[];
+  overallLoading: boolean;
+  refetch: () => void;
+  configuredProviders: Record<string, ProviderStatus>;
+  configuredProvidersLoading: boolean;
+  refetchConfiguredProviders: () => void;
+  customProvidersResult: Provider[];
 };
 
 export const PlaygroundChat = ({
@@ -91,13 +100,15 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
   isOpenInPlayground = false,
+  allOptions,
+  overallLoading,
+  refetch,
+  configuredProviders,
+  configuredProvidersLoading,
+  refetchConfiguredProviders,
+  customProvidersResult,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const {
-    result: configuredProviders,
-    loading: configuredProvidersLoading,
-    refetch: refetchConfiguredProviders,
-  } = useConfiguredProviders(entity);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -189,9 +200,10 @@ export const PlaygroundChat = ({
                 entity={entity}
                 project={project}
                 isTeamAdmin={isTeamAdmin}
-                onConfigureProvider={() => {
-                  refetchConfiguredProviders();
-                }}
+                allOptions={allOptions}
+                overallLoading={overallLoading}
+                refetch={refetch}
+                customProvidersResult={customProvidersResult}
               />
             </Box>
             <Box
@@ -305,9 +317,10 @@ export const PlaygroundChat = ({
                   entity={entity}
                   project={project}
                   isTeamAdmin={isTeamAdmin}
-                  onConfigureProvider={() => {
-                    refetchConfiguredProviders();
-                  }}
+                  allOptions={allOptions}
+                  overallLoading={overallLoading}
+                  refetch={refetch}
+                  customProvidersResult={customProvidersResult}
                 />
               </Box>
               <Box

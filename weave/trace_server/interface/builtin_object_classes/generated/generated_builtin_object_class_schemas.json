@@ -484,6 +484,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -952,6 +955,190 @@
       "title": "InOperation",
       "type": "object"
     },
+    "LLMStructuredCompletionModel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "llm_model_id": {
+          "title": "Llm Model Id",
+          "type": "string"
+        },
+        "messages_template": {
+          "items": {
+            "type": "object"
+          },
+          "title": "Messages Template",
+          "type": "array"
+        },
+        "response_format_schema": {
+          "title": "Response Format Schema",
+          "type": "object"
+        },
+        "default_params": {
+          "$ref": "#/$defs/LLMStructuredCompletionModelDefaultParams"
+        }
+      },
+      "required": [
+        "llm_model_id",
+        "messages_template",
+        "response_format_schema"
+      ],
+      "title": "LLMStructuredCompletionModel",
+      "type": "object"
+    },
+    "LLMStructuredCompletionModelDefaultParams": {
+      "properties": {
+        "temperature": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top P"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "presence_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Presence Penalty"
+        },
+        "frequency_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency Penalty"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop"
+        },
+        "n_times": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Times"
+        },
+        "response_format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResponseFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "functions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Functions"
+        }
+      },
+      "title": "LLMStructuredCompletionModelDefaultParams",
+      "type": "object"
+    },
     "Leaderboard": {
       "properties": {
         "name": {
@@ -1073,6 +1260,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1153,6 +1343,42 @@
         "$not"
       ],
       "title": "NotOperation",
+      "type": "object"
+    },
+    "ObjectRef": {
+      "properties": {
+        "entity": {
+          "title": "Entity",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "_digest": {
+          "title": " Digest",
+          "type": "string"
+        },
+        "_extra": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": " Extra",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "project",
+        "name",
+        "_digest"
+      ],
+      "title": "ObjectRef",
       "type": "object"
     },
     "OrOperation": {
@@ -1271,7 +1497,11 @@
           "type": "object"
         },
         "return_type": {
-          "$ref": "#/$defs/ProviderReturnType",
+          "allOf": [
+            {
+              "$ref": "#/$defs/ProviderReturnType"
+            }
+          ],
           "default": "openai"
         }
       },
@@ -1325,6 +1555,7 @@
       "type": "object"
     },
     "ProviderReturnType": {
+      "const": "openai",
       "enum": [
         "openai"
       ],
@@ -1368,6 +1599,15 @@
       ],
       "title": "Query",
       "type": "object"
+    },
+    "ResponseFormat": {
+      "enum": [
+        "json",
+        "jsonschema",
+        "text"
+      ],
+      "title": "ResponseFormat",
+      "type": "string"
     },
     "SavedView": {
       "properties": {
@@ -1654,6 +1894,9 @@
     },
     "SavedView": {
       "$ref": "#/$defs/SavedView"
+    },
+    "LLMStructuredCompletionModel": {
+      "$ref": "#/$defs/LLMStructuredCompletionModel"
     }
   },
   "required": [
@@ -1664,7 +1907,8 @@
     "AnnotationSpec",
     "Provider",
     "ProviderModel",
-    "SavedView"
+    "SavedView",
+    "LLMStructuredCompletionModel"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
