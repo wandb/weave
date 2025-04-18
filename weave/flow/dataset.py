@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Iterator
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import field_validator
@@ -110,11 +111,11 @@ class Dataset(Object):
     def __str__(self) -> str:
         return f"Dataset({{\n    features: {list(self.columns_names)},\n    num_rows: {self.num_rows}\n}})"
 
-    @property
+    @cached_property
     def columns_names(self) -> list[str]:
         return list(self.rows[0].keys())
 
-    @property
+    @cached_property
     def num_rows(self) -> int:
         return len(self.rows)
 
