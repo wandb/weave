@@ -35,14 +35,14 @@ from weave.trace_server.opentelemetry.attributes import (
     to_json_serializable,
     unflatten_key_values,
 )
+from weave.trace_server.opentelemetry.helpers import (
+    capture_parts,
+    shorten_name,
+)
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
     StatusCode,
-)
-from weave.trace_server.opentelemetry.helpers import (
-    capture_parts,
-    shorten_name,
 )
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
@@ -638,7 +638,13 @@ class TestHelpers:
         assert capture_parts("part1.part2") == ["part1", ".", "part2"]
 
         # Test with multiple delimiters
-        assert capture_parts("part1.part2,part3") == ["part1", ".", "part2", ",", "part3"]
+        assert capture_parts("part1.part2,part3") == [
+            "part1",
+            ".",
+            "part2",
+            ",",
+            "part3",
+        ]
 
         # Test with delimiters that don't appear in the string
         assert capture_parts("nodelimiters") == ["nodelimiters"]
@@ -704,6 +710,9 @@ class TestHelpers:
 
     def test_long_url_regression(self):
         # Test for a modified version of the URL which caused failed traces due to op_name length
-        actual = shorten_name("GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D", 128)
+        actual = shorten_name(
+            "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
+            128,
+        )
         expected = "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig..."
         assert actual == expected

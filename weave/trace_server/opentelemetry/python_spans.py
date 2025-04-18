@@ -9,7 +9,7 @@ from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -30,6 +30,8 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+from weave.trace_server.opentelemetry.helpers import shorten_name
 
 from .attributes import (
     Attributes,
@@ -38,8 +40,6 @@ from .attributes import (
     unflatten_key_values,
 )
 
-from weave.trace_server.constants import MAX_OP_NAME_LENGTH
-from weave.trace_server.opentelemetry.helpers import shorten_name
 
 class SpanKind(Enum):
     """Enum representing the span's kind."""
