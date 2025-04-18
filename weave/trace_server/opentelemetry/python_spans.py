@@ -5,6 +5,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
 import datetime
+import hashlib
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -30,6 +31,8 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+from weave.trace_server.opentelemetry.helpers import shorten_name
 
 from .attributes import (
     Attributes,
@@ -274,12 +277,23 @@ class Span:
         attributes = self.attributes.get_weave_attributes(
             extra={"otel_span": self.as_dict()}
         )
+        op_name = self.name
+        if len(op_name) >= MAX_OP_NAME_LENGTH:
+            # Since op_name will typically be what is displayed, we don't want to just truncate
+            # Create an identifier abbreviation so similar long names can be distinguished
+            identifier = hashlib.sha256(op_name.encode("utf-8")).hexdigest()[:4]
+            op_name = shorten_name(
+                op_name,
+                MAX_OP_NAME_LENGTH,
+                abbrv=f":{identifier}",
+                use_delimiter_in_abbr=False,
+            )
 
         # Options: set
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            op_name=self.name,
+            op_name=op_name,
             trace_id=self.trace_id,
             parent_id=self.parent_id,
             started_at=self.start_time,

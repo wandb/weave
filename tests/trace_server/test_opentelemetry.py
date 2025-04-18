@@ -1,3 +1,4 @@
+import hashlib
 import json
 import uuid
 from binascii import hexlify
@@ -34,6 +35,10 @@ from weave.trace_server.opentelemetry.attributes import (
     get_attribute,
     to_json_serializable,
     unflatten_key_values,
+)
+from weave.trace_server.opentelemetry.helpers import (
+    capture_parts,
+    shorten_name,
 )
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import (
@@ -229,9 +234,35 @@ class TestPythonSpans:
         assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
         assert start_call.project_id == "test_project"
         assert start_call.id == py_span.span_id
-        assert start_call.op_name == py_span.name
+        assert (
+            start_call.op_name == py_span.name
+        )  # This should be using the shortened name if necessary
         assert start_call.trace_id == py_span.trace_id
         assert start_call.started_at == py_span.start_time
+
+    def test_span_to_call_long_name(self):
+        """Test that span names are properly shortened when too long."""
+        from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+        from weave.trace_server.opentelemetry.helpers import shorten_name
+
+        # Create a test span with a very long name
+        pb_span = create_test_span()
+        long_name = "a" * (MAX_OP_NAME_LENGTH + 10)
+        pb_span.name = long_name
+
+        py_span = PySpan.from_proto(pb_span)
+        start_call, end_call = py_span.to_call("test_project")
+
+        # Verify that the op_name was shortened
+        identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
+        shortened_name = shorten_name(
+            long_name,
+            MAX_OP_NAME_LENGTH,
+            abbrv=f":{identifier}",
+            use_delimiter_in_abbr=False,
+        )
+        assert start_call.op_name == shortened_name
+        assert len(start_call.op_name) <= MAX_OP_NAME_LENGTH
 
         # Verify attributes in start call
         assert "test" in start_call.attributes
@@ -625,3 +656,96 @@ class TestSemanticConventionParsing:
         )
         generic_attrs = factory.from_proto([generic_key_value])
         assert isinstance(generic_attrs, GenericAttributes)
+
+
+class TestHelpers:
+    def test_capture_parts(self):
+        """Test capturing parts of a string split by delimiters."""
+        # Test with a single delimiter
+        assert capture_parts("part1.part2") == ["part1", ".", "part2"]
+
+        # Test with multiple delimiters
+        assert capture_parts("part1.part2,part3") == [
+            "part1",
+            ".",
+            "part2",
+            ",",
+            "part3",
+        ]
+
+        # Test with delimiters that don't appear in the string
+        assert capture_parts("nodelimiters") == ["nodelimiters"]
+
+        # Test with an empty string
+        assert capture_parts("") == [""]
+
+        # Test with custom delimiters
+        assert capture_parts("a-b-c", delimiters=["-"]) == ["a", "-", "b", "-", "c"]
+
+        # Test with adjacent delimiters
+        assert capture_parts("part1..part2") == ["part1", ".", ".", "part2"]
+
+    def test_shorten_name_no_delimiters(self):
+        """Test shortening a name with no delimiters."""
+        # Test a string shorter than max_len - the function always adds ellipsis
+        assert shorten_name("short", 10) == "short"
+
+        # Test a string longer than max_len with no delimiters
+        long_name = "abcdefghijklmnopqrstuvwxyz"
+        assert shorten_name(long_name, 10) == "abcdefg..."
+
+    def test_shorten_name_with_delimiters(self):
+        """Test shortening a name with delimiters."""
+        # Test with a single delimiter
+        assert shorten_name("part1.part2", 10) == "part1..."
+
+        # Test with multiple delimiters where it fits within the max_len
+        assert shorten_name("a.b.c", 10) == "a.b.c"
+
+        # Test with multiple delimiters where it needs truncation
+        assert shorten_name("part1.part2.part3", 12) == "part1..."
+
+    def test_shorten_name_first_part_too_long(self):
+        """Test shortening a name where first part is already too long."""
+        # First part already exceeds max_len
+        assert shorten_name("verylongfirstpart.second", 10) == "verylon..."
+
+    def test_shorten_name_custom_abbreviation(self):
+        """Test shortening a name with custom abbreviation."""
+        assert shorten_name("part1.part2.part3", 10, "***") == "part1.***"
+
+        # Test with empty abbreviation
+        assert shorten_name("part1.part2.part3", 10, "") == "part1"
+
+    def test_shorten_name_different_delimiters(self):
+        """Test shortening a name with different types of delimiters."""
+        # Test with a space delimiter
+        assert shorten_name("word1 word2 word3", 12) == "word1 ..."
+
+        # Test with a slash delimiter
+        assert shorten_name("path/to/file", 8) == "path/..."
+
+        # Test with mixed delimiters
+        assert shorten_name("user.name@example.com", 12) == "user..."
+
+        # Test with a delimiter not in the default list
+        # Since '-' is not in the default delimiters list, it's treated as part of the string
+        result = shorten_name("part1-part2-part3", 10)
+        assert result.startswith("part1-")
+        assert result.endswith("...")
+        assert len(result) == 10
+
+        # Test with a question mark delimiter
+        assert shorten_name("api/endpoint?param=value", 15) == "api/..."
+
+    def test_long_url_regression(self):
+        # Test for a modified version of the URL which caused failed traces due to op_name length
+        actual = shorten_name(
+            "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
+            128,
+        )
+        # The new implementation shortens the URL differently, so we check that it has the correct format
+        # and doesn't exceed the maximum length
+        assert actual.startswith("GET /")
+        assert actual.endswith("...")
+        assert len(actual) <= 128
