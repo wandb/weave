@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, op
+from weave.trace.op import Op, is_op, op
 from weave.trace.refs import ObjectRef, OpRef, parse_uri
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
@@ -49,6 +49,9 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # Ensure load_instance is an op
         if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
+            # We don't want to actually trace the load_instance op,
+            # just save it.
+            serializer.load._tracing_enabled = False  # type: ignore
         # Save the load_instance_op
         wc = require_weave_client()
 
@@ -86,6 +89,10 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     if _type in KNOWN_TYPES:
         serializer = get_serializer_by_id(_type)
         if serializer is not None:
+            if is_op(serializer.load):
+                # We would expect this to be already set to False, but
+                # just in case.
+                serializer.load._tracing_enabled = False  # type: ignore
             return serializer.load(obj["val"])
 
     load_op_uri = obj.get("load_op")

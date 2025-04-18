@@ -30,7 +30,7 @@ import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
-const DEBOUNCE_MS = 700;
+const DEBOUNCE_MS = 1_000;
 
 type FilterBarProps = {
   entity: string;
@@ -48,6 +48,8 @@ type FilterBarProps = {
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
   return (
     filter.field === undefined ||
+    // Empty string is never valid
+    filter.value === '' ||
     (filter.value === undefined && !isValuelessOperator(filter.operator))
   );
 };
@@ -70,9 +72,25 @@ export const FilterBar = ({
   // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
   const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
+
+  // Keep track of incomplete filters that should be preserved during state sync
+  const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
+    []
+  );
+
+  // Merge the parent filter model with our incomplete filters
   useEffect(() => {
-    setLocalFilterModel(filterModel);
-  }, [filterModel]);
+    const newItems = [...filterModel.items];
+
+    // Add incomplete filters that aren't in the parent model
+    incompleteFilters.forEach(incompleteFilter => {
+      if (!newItems.some(item => item.id === incompleteFilter.id)) {
+        newItems.push(incompleteFilter);
+      }
+    });
+
+    setLocalFilterModel({...filterModel, items: newItems});
+  }, [filterModel, incompleteFilters]);
 
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : refBar.current);
@@ -152,7 +170,9 @@ export const FilterBar = ({
   });
 
   const onRemoveAll = () => {
-    setFilterModel({items: []});
+    const emptyModel = {items: []};
+    setLocalFilterModel(emptyModel);
+    setFilterModel(emptyModel);
     setAnchorEl(null);
   };
 
@@ -175,24 +195,26 @@ export const FilterBar = ({
     [localFilterModel]
   );
 
-  const debouncedSetFilterModel = useMemo(
-    () =>
-      _.debounce(
-        (newModel: GridFilterModel) => setFilterModel(newModel),
-        DEBOUNCE_MS
-      ),
+  // Only send complete filters to the parent component
+  const applyCompletedFilters = useCallback(
+    (model: GridFilterModel) => {
+      const completeFilters = model.items.filter(
+        item => !isFilterIncomplete(item)
+      );
+      setFilterModel({...model, items: completeFilters});
+      setIncompleteFilters(model.items.filter(isFilterIncomplete));
+    },
     [setFilterModel]
   );
-  const updateLocalAndDebouncedFilterModel = useCallback(
-    (newModel: GridFilterModel) => {
-      setLocalFilterModel(newModel);
-      debouncedSetFilterModel(newModel);
-    },
-    [debouncedSetFilterModel]
+
+  const debouncedSetFilterModel = useMemo(
+    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
+    [applyCompletedFilters]
   );
 
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
+      debouncedSetFilterModel.cancel();
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
@@ -201,7 +223,8 @@ export const FilterBar = ({
 
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
-        updateLocalAndDebouncedFilterModel(newModel);
+        setLocalFilterModel(newModel);
+        debouncedSetFilterModel(newModel);
         return;
       }
 
@@ -211,9 +234,10 @@ export const FilterBar = ({
         ...oldItems.slice(index + 1),
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
-      updateLocalAndDebouncedFilterModel(newItemsModel);
+      setLocalFilterModel(newItemsModel);
+      debouncedSetFilterModel(newItemsModel);
     },
-    [localFilterModel, updateLocalAndDebouncedFilterModel]
+    [localFilterModel, debouncedSetFilterModel]
   );
 
   const onRemoveFilter = useCallback(
@@ -221,14 +245,14 @@ export const FilterBar = ({
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
-      setFilterModel(newModel);
+      applyCompletedFilters(newModel);
 
       // Clear active edit if removed
       if (activeEditId === filterId) {
         setActiveEditId(null);
       }
     },
-    [localFilterModel, setFilterModel, activeEditId]
+    [localFilterModel, applyCompletedFilters, activeEditId]
   );
 
   const onSetSelected = useCallback(() => {
@@ -251,13 +275,22 @@ export const FilterBar = ({
       newFilter,
       f => f.field === 'id'
     );
-    setFilterModel(newModel);
+
+    // Apply filter immediately (won't be incomplete)
+    setLocalFilterModel(newModel);
+    applyCompletedFilters(newModel);
+
     clearSelectedCalls();
     setAnchorEl(null);
 
     // Clear active edit when popover is closed
     setActiveEditId(null);
-  }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
+  }, [
+    localFilterModel,
+    applyCompletedFilters,
+    selectedCalls,
+    clearSelectedCalls,
+  ]);
 
   const onFilterTagClick = useCallback((filterId: FilterId) => {
     setActiveEditId(filterId);
@@ -289,12 +322,10 @@ export const FilterBar = ({
         ref={refBar}
         className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
           hasBorder
-            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-700 dark:hover:border-teal-300 dark:hover:ring-teal-300'
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:hover:border-2 dark:hover:border-teal-400'
             : ''
         } ${
-          !hasBorder
-            ? 'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400'
-            : ''
+          !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
         }`}
         onClick={onClick}>
         <div>

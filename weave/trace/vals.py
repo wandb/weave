@@ -90,6 +90,21 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
+def unwrap(val: Any) -> Any:
+    if isinstance(val, Traceable):
+        return val.unwrap()
+    elif isinstance(val, ObjectRecord):
+        return val.unwrap()
+    elif isinstance(val, dict):
+        return {k: unwrap(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [unwrap(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(unwrap(v) for v in val)
+    else:
+        return val
+
+
 class Traceable:
     ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
@@ -129,6 +144,8 @@ class Traceable:
         self.mutations = None
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
+
+    def unwrap(self) -> Any: ...
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
@@ -263,6 +280,9 @@ class WeaveObject(Traceable):
 
     def __eq__(self, other: Any) -> bool:
         return self._val == other
+
+    def unwrap(self) -> Any:
+        return unwrap(self._val)
 
 
 class WeaveTable(Traceable):
@@ -550,6 +570,9 @@ class WeaveTable(Traceable):
         self._mark_dirty()
         rows.pop(index)
 
+    def unwrap(self) -> Any:
+        return unwrap(list(self.rows))
+
 
 class WeaveList(Traceable, list):
     def __init__(
@@ -625,6 +648,9 @@ class WeaveList(Traceable, list):
             if v1 != v2:
                 return False
         return True
+
+    def unwrap(self) -> Any:
+        return unwrap(list(self))
 
 
 class WeaveDict(Traceable, dict):
@@ -707,6 +733,9 @@ class WeaveDict(Traceable, dict):
             if other[k] != v:
                 return False
         return True
+
+    def unwrap(self) -> Any:
+        return unwrap(dict(self.items()))
 
 
 class InternalError(Exception): ...

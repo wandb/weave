@@ -2,7 +2,7 @@ import pytest
 
 import weave
 from weave.trace.op import _add_accumulator
-from weave.trace.weave_client import get_ref
+from weave.trace.ref_util import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 

@@ -28,3 +28,6 @@ generate_doc_images:
 
 generate_all: generate_service_api_docs generate_python_sdk_docs generate_notebooks_docs generate_doc_images
 	yarn build
+
+update_playground_models:
+	python scripts/update_playground_models.py

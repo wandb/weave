@@ -86,10 +86,8 @@ export function colorFromString(s: string): RGB {
 
 function hashString(s: string) {
   return s.split('').reduce((a, b) => {
-    // tslint:disable:no-bitwise
     a = (a << 10) - a + b.charCodeAt(0);
     return a & a;
-    // tslint:enable:no-bitwise
   }, 0);
 }
 
