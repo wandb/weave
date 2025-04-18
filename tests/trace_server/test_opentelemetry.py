@@ -1,5 +1,6 @@
 import json
 import uuid
+import hashlib
 from binascii import hexlify
 from datetime import datetime
 from unittest.mock import patch
@@ -253,7 +254,13 @@ class TestPythonSpans:
         start_call, end_call = py_span.to_call("test_project")
 
         # Verify that the op_name was shortened
-        shortened_name = shorten_name(long_name, MAX_OP_NAME_LENGTH)
+        identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
+        shortened_name= shorten_name(
+            long_name,
+            MAX_OP_NAME_LENGTH,
+            abbrv=f":{identifier}",
+            use_delimiter_in_abbr=False,
+        )
         assert start_call.op_name == shortened_name
         assert len(start_call.op_name) <= MAX_OP_NAME_LENGTH
 
