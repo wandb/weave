@@ -12,8 +12,12 @@ This page describes how to use W&B Weave with the Google Vertex AI API and the G
 
 You can use Weave to evaluate, monitor, and iterate on your Google GenAI applications. Weave automatically captures traces for the:
 
-1. [Google Vertex AI API](https://cloud.google.com/vertex-ai/docs), which provides access to Google’s Gemini models and [various partner models](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models).
-2. [Google GenAI SDK](https://github.com/googleapis/python-genai), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.
+1. [Google GenAI SDK](https://github.com/googleapis/python-genai), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.
+2. [Google Vertex AI API](https://cloud.google.com/vertex-ai/docs), which provides access to Google’s Gemini models and [various partner models](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models).
+
+:::note
+We also have support for the deprecated [Google AI Python SDK for the Gemini API](https://github.com/google-gemini/deprecated-generative-ai-python). Note that this support is deprecated as well and will be removed in a future version.
+:::
 
 ## Get started
 
@@ -35,7 +39,7 @@ response = google_client.models.generate_content(
 
 [![dspy_trace.png](imgs/google-genai-trace.png)](https://wandb.ai/geekyrakshit/google-genai/weave/traces)
 
-Weave will also automatically capture traces for [Vertex APIs](https://cloud.google.com/vertexai/docs). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
+Weave will also automatically capture traces for [Vertex APIs](https://github.com/googleapis/python-aiplatform/tree/main/vertexai/generative_models). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
 ```python
 import vertexai
