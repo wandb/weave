@@ -381,7 +381,7 @@ def parse_weave_values(
                         pass
                 result[key] = value
                 break
-    return result
+    return to_json_serializable(result)
 
 
 def get_weave_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
@@ -395,12 +395,16 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
         "prompt_tokens" in usage
         and "completion_tokens" in usage
         and "total_tokens" not in usage
+        and isinstance(usage["prompt_tokens"], int)
+        and isinstance(usage["completion_tokens"], int)
     ):
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
     if (
         "input_tokens" in usage
         and "output_tokens" in usage
         and "total_tokens" not in usage
+        and isinstance(usage["input_tokens"], int)
+        and isinstance(usage["output_tokens"], int)
     ):
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
     return usage
