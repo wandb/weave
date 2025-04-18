@@ -5,7 +5,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
 import datetime
-import uuid
+import hashlib
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -281,7 +281,7 @@ class Span:
         if len(op_name) >= MAX_OP_NAME_LENGTH:
             # Since op_name will typically be what is displayed, we don't want to just truncate
             # Create an identifier abbreviation so similar long names can be distinguished
-            identifier = str(uuid.uuid4())[:4]
+            identifier = hashlib.sha256(op_name.encode("utf-8")).hexdigest()[:4]
             op_name = shorten_name(
                 op_name,
                 MAX_OP_NAME_LENGTH,
