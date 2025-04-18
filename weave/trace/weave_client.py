@@ -465,16 +465,16 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(map_to_refs)
+        # Should be marking as inside of an object here?
+        with set_inside_object(obj):
+            return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         # This subtlty is very important. When pytantic models are nested, you
         # only ever need the "first" one to be annotated with additional object
         # record annotations. The nested ones should not be annotated as the ancestor
         # is responsible for recursively deserializing
         if not is_inside_object():
-            obj_record = pydantic_object_record(obj)
-            with set_inside_object(obj_record):
-                return obj_record.map_values(map_to_refs)
+            return map_to_refs(pydantic_object_record(obj))
         else:
             return map_to_refs(pydantic_asdict_one_level(obj))
     elif dataclasses.is_dataclass(obj):

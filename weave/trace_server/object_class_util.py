@@ -124,8 +124,13 @@ def process_incoming_object_val(
     return ProcessIncomingObjectResult(val=val, base_object_class=None)
 
 
+# Once we put the Weave package on the server, we will need to extend this to
+# include weave.Object (union). In fact, if we merge things, we can reduce duplicate code.
+WEAVE_OBJECT_CLASS = BaseObject
+
+
 # Server-side version of `pydantic_object_record`
-def dump_object(val: BaseObject) -> dict:
+def dump_object(val: WEAVE_OBJECT_CLASS) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
     bases = [c.__name__ for c in cls.mro()[1:-1]]
@@ -148,7 +153,7 @@ def _general_dump(val: Any) -> Any:
     This is a helper function that dumps a value into a dict. It is used to convert
     pydantic objects to dicts in a recursive manner.
     """
-    if isinstance(val, BaseObject):
+    if isinstance(val, WEAVE_OBJECT_CLASS):
         return dump_object(val)
     elif isinstance(val, BaseModel):
         # Important: we do not recurse into `dump_object` as that would add
