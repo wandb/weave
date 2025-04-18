@@ -10,7 +10,6 @@ import {
   FilterId,
   getFieldType,
   getGroupedOperatorOptions,
-  getOperatorValueType,
   isWeaveRef,
 } from './common';
 import {SelectField, SelectFieldOption} from './SelectField';
@@ -56,17 +55,6 @@ export const FilterRow = ({
   );
 
   const onSelectOperator = (operator: string) => {
-    // If the operator type changes, clear the value
-    if (item.operator && operator) {
-      const oldType = getOperatorValueType(item.operator);
-      const newType = getOperatorValueType(operator);
-
-      if (oldType !== newType) {
-        onUpdateFilter({...item, operator, value: undefined});
-        return;
-      }
-    }
-
     onUpdateFilter({...item, operator});
   };
 
