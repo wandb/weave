@@ -65,7 +65,7 @@ describe('Type Tests', () => {
             description: '',
             nested_base_model: {
               a: 1,
-              'aliased_property_alias': 2,
+              aliased_property_alias: 2,
             },
             nested_base_object: '',
             primitive: 1,
