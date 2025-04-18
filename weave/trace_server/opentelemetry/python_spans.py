@@ -305,7 +305,6 @@ class Span:
         usage_key = model or "usage"
         summary_insert_map = tsi.SummaryInsertMap(usage={usage_key: llm_usage})
 
-
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
         has_outputs = len(outputs) > 0

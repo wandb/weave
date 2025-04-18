@@ -4,13 +4,17 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Union
 from uuid import UUID
+
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+
 from weave.trace_server.opentelemetry.constants import (
+    ATTRIBUTE_KEYS,
     INPUT_KEYS,
     OUTPUT_KEYS,
     USAGE_KEYS,
-    ATTRIBUTE_KEYS
 )
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+
+
 def to_json_serializable(value: Any) -> Any:
     """
     Transform common data types into JSON-serializable values.
