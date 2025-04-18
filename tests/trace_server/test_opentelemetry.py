@@ -1,6 +1,6 @@
+import hashlib
 import json
 import uuid
-import hashlib
 from binascii import hexlify
 from datetime import datetime
 from unittest.mock import patch
@@ -255,7 +255,7 @@ class TestPythonSpans:
 
         # Verify that the op_name was shortened
         identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
-        shortened_name= shorten_name(
+        shortened_name = shorten_name(
             long_name,
             MAX_OP_NAME_LENGTH,
             abbrv=f":{identifier}",
