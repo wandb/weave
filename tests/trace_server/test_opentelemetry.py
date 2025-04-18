@@ -574,7 +574,9 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "gen_ai.prompt": [{"role": "user", "content": "Tell me about quantum computing"}]
+            "gen_ai.prompt": [
+                {"role": "user", "content": "Tell me about quantum computing"}
+            ]
         }
 
         # Test with multiple prompts

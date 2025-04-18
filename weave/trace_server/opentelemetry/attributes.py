@@ -348,6 +348,7 @@ class SpanEvent(dict):
     attributes: dict[str, Any]
     dropped_attributes_count: int
 
+
 def parse_weave_values(
     attributes: dict[str, Any],
     key_mapping: Union[list[str], dict[str, list[str]]],
