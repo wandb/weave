@@ -13,10 +13,12 @@ import {
   EMPTY_PROPS_NO_LLM_PROVIDERS,
   EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
 } from '../../common/EmptyContent';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
-import {useConfiguredProviders} from '../useConfiguredProviders';
+import {ProviderStatus} from '../useConfiguredProviders';
+import {useLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -80,6 +82,13 @@ export type PlaygroundChatProps = {
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
   isOpenInPlayground?: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
+  customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[];
+  areCustomProvidersLoading: boolean;
+  refetchCustomLLMs: () => void;
+  refetchConfiguredProviders: () => void;
+  configuredProvidersLoading: boolean;
+  configuredProviders: Record<string, ProviderStatus>;
 };
 
 export const PlaygroundChat = ({
@@ -91,13 +100,15 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
   isOpenInPlayground = false,
+  customProvidersResult,
+  customProviderModelsResult,
+  areCustomProvidersLoading,
+  refetchCustomLLMs,
+  refetchConfiguredProviders,
+  configuredProvidersLoading,
+  configuredProviders,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const {
-    result: configuredProviders,
-    loading: configuredProvidersLoading,
-    refetch: refetchConfiguredProviders,
-  } = useConfiguredProviders(entity);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -124,6 +135,14 @@ export const PlaygroundChat = ({
     userInfo && 'username' in userInfo ? userInfo.username : ''
   );
   const isTeamAdmin = maybeTeamAdmin ?? false;
+
+  const llmDropdownOptions = useLLMDropdownOptions(
+    configuredProviders,
+    configuredProvidersLoading,
+    customProvidersResult,
+    customProviderModelsResult,
+    areCustomProvidersLoading
+  );
 
   // Check if any chat is loading
   const isAnyLoading = useMemo(
@@ -189,9 +208,13 @@ export const PlaygroundChat = ({
                 entity={entity}
                 project={project}
                 isTeamAdmin={isTeamAdmin}
-                onConfigureProvider={() => {
-                  refetchConfiguredProviders();
-                }}
+                refetchConfiguredProviders={refetchConfiguredProviders}
+                refetchCustomLLMs={refetchCustomLLMs}
+                llmDropdownOptions={llmDropdownOptions}
+                areProvidersLoading={
+                  configuredProvidersLoading || areCustomProvidersLoading
+                }
+                customProvidersResult={customProvidersResult}
               />
             </Box>
             <Box
@@ -305,9 +328,13 @@ export const PlaygroundChat = ({
                   entity={entity}
                   project={project}
                   isTeamAdmin={isTeamAdmin}
-                  onConfigureProvider={() => {
-                    refetchConfiguredProviders();
-                  }}
+                  refetchConfiguredProviders={refetchConfiguredProviders}
+                  refetchCustomLLMs={refetchCustomLLMs}
+                  llmDropdownOptions={llmDropdownOptions}
+                  areProvidersLoading={
+                    configuredProvidersLoading || areCustomProvidersLoading
+                  }
+                  customProvidersResult={customProvidersResult}
                 />
               </Box>
               <Box
