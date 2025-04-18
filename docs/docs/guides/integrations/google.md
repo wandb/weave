@@ -1,4 +1,8 @@
-# Google 
+# Google
+
+<a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_google.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
 
 :::tip
 For the latest tutorials, visit [Weights & Biases on Google Cloud](https://wandb.ai/site/partners/googlecloud/).
