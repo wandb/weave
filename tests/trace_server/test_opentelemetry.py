@@ -28,6 +28,7 @@ from weave.trace_server.opentelemetry.attributes import (
     expand_attributes,
     flatten_attributes,
     get_attribute,
+    get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
     get_weave_outputs,
@@ -446,13 +447,51 @@ class TestSemanticConventionParsing:
 
         # Test get_weave_attributes
         extracted = get_weave_attributes(attributes)
-        print(extracted)
         assert extracted["system"] == "This is a system prompt"
         assert extracted["provider"] == "test-provider"
         assert extracted["model"] == "test-model"
         assert extracted["kind"] == "llm"
         assert extracted["model_parameters"]["max_tokens"] == 100
         assert extracted["model_parameters"]["temperature"] == 0.7
+
+    def test_wandb_attributes_extraction(self):
+        """Test extracting wandb-specific attributes."""
+        # Create attribute dictionary with W&B specific attributes
+        attributes = create_attributes(
+            {
+                "wandb.display_name": "My Custom Display Name",
+            }
+        )
+
+        # Test get_wandb_attributes
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["display_name"] == "My Custom Display Name"
+
+        # Test with missing attributes
+        empty_attributes = create_attributes({})
+        extracted = get_wandb_attributes(empty_attributes)
+        assert extracted == {}
+
+        # Test with partial attributes
+        partial_attributes = create_attributes(
+            {
+                "wandb.display_name": "Only Display Name",
+            }
+        )
+        extracted = get_wandb_attributes(partial_attributes)
+        assert extracted["display_name"] == "Only Display Name"
+        assert "project_id" not in extracted
+
+        # Test with nested attributes format
+        nested_attributes = create_attributes(
+            {
+                "wandb": {
+                    "display_name": "Nested Display Name",
+                }
+            }
+        )
+        extracted = get_wandb_attributes(nested_attributes)
+        assert extracted["display_name"] == "Nested Display Name"
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
@@ -469,8 +508,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs with text input
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": "What is machine learning?",
-            "type": "text/plain",
+            "input.value": "What is machine learning?",
         }
 
         # Test with JSON input
@@ -490,13 +528,12 @@ class TestSemanticConventionParsing:
         )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": {
+            "input.value": {
                 "messages": [
                     {"role": "system", "content": "You are an assistant"},
                     {"role": "user", "content": "What is machine learning?"},
                 ]
             },
-            "type": "application/json",
         }
 
     def test_openinference_outputs_extraction(self):
@@ -514,8 +551,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_outputs with text output
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": "Machine learning is a field of AI...",
-            "type": "text/plain",
+            "output.value": "Machine learning is a field of AI...",
         }
 
         # Test with JSON output
@@ -535,13 +571,12 @@ class TestSemanticConventionParsing:
         )
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": {
+            "output.value": {
                 "response": {
                     "role": "assistant",
                     "content": "Machine learning is a field of AI...",
                 }
             },
-            "type": "application/json",
         }
 
     def test_openinference_usage_extraction(self):
@@ -599,7 +634,9 @@ class TestSemanticConventionParsing:
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": [{"role": "user", "content": "Tell me about quantum computing"}]
+            "gen_ai.prompt": [
+                {"role": "user", "content": "Tell me about quantum computing"}
+            ]
         }
 
         # Test with multiple prompts
@@ -614,7 +651,7 @@ class TestSemanticConventionParsing:
         )
         inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "value": [
+            "gen_ai.prompt": [
                 {"role": "system", "content": "You are an expert in quantum physics"},
                 {"role": "user", "content": "Tell me about quantum computing"},
             ]
@@ -642,7 +679,7 @@ class TestSemanticConventionParsing:
         # Test get_weave_outputs
         outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "value": [
+            "gen_ai.completion": [
                 {
                     "role": "assistant",
                     "content": "Quantum computing uses quantum mechanics...",
