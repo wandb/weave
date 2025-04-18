@@ -460,14 +460,12 @@ class TestSemanticConventionParsing:
         attributes = create_attributes(
             {
                 "wandb.display_name": "My Custom Display Name",
-                "wandb.project_id": "project-123",
             }
         )
 
         # Test get_wandb_attributes
         extracted = get_wandb_attributes(attributes)
         assert extracted["display_name"] == "My Custom Display Name"
-        assert extracted["project_id"] == "project-123"
 
         # Test with missing attributes
         empty_attributes = create_attributes({})
@@ -489,13 +487,11 @@ class TestSemanticConventionParsing:
             {
                 "wandb": {
                     "display_name": "Nested Display Name",
-                    "project_id": "nested-project-123",
                 }
             }
         )
         extracted = get_wandb_attributes(nested_attributes)
         assert extracted["display_name"] == "Nested Display Name"
-        assert extracted["project_id"] == "nested-project-123"
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""

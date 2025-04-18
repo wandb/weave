@@ -44,5 +44,4 @@ ATTRIBUTE_KEYS = {
 # Wandb/Weave specific call attributes
 WB_KEYS = {
     "display_name": ["wandb.display_name"],
-    "project_id": ["wandb.project_id"],
 }
