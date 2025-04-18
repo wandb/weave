@@ -39,6 +39,7 @@ export const UNFILTERABLE_FIELDS = [
   'cost',
   'wb_user_id', // Option+Click works
   'wb_run_id', // Option+Click works
+  'total_storage_size_bytes',
 ];
 
 export type ColumnInfo = {
