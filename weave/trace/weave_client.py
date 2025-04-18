@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import dataclasses
 import datetime
 import json
@@ -87,8 +89,14 @@ from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.client_server_common.pydantic_util import (
+    pydantic_asdict_one_level,
+)
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.builtin_object_classes.base_object_def import (
+    BaseObject,
+)
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
@@ -434,6 +442,22 @@ def _get_direct_ref(obj: Any) -> Ref | None:
     return get_ref(obj)
 
 
+inside_object = contextvars.ContextVar("inside_object", default=False)
+
+
+@contextlib.contextmanager
+def set_inside_object(obj: Any) -> Any:
+    token = inside_object.set(True)
+    try:
+        yield map_to_refs(obj)
+    finally:
+        inside_object.reset(token)
+
+
+def is_inside_object() -> bool:
+    return inside_object.get()
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -443,9 +467,18 @@ def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-        obj_record = pydantic_object_record(obj)
-        return obj_record.map_values(map_to_refs)
+        # This subtlty is very important. When pytantic models are nested, you
+        # only ever need the "first" one to be annotated with additional object
+        # record annotations. The nested ones should not be annotated as the ancestor
+        # is responsible for recursively deserializing
+        if not is_inside_object():
+            obj_record = pydantic_object_record(obj)
+            with set_inside_object(obj_record):
+                return obj_record.map_values(map_to_refs)
+        else:
+            return map_to_refs(pydantic_asdict_one_level(obj))
     elif dataclasses.is_dataclass(obj):
+        # Consider similar nesting protection as pydantic
         obj_record = dataclass_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
@@ -1775,7 +1808,7 @@ class WeaveClient:
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
         # and save them, and then save the object itself.
-        if isinstance(obj, Object):
+        if isinstance(obj, (Object, BaseObject)):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)

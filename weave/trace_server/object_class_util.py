@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from weave.trace_server.client_server_common.pydantic_util import (
     pydantic_asdict_one_level,
 )
+from weave.trace_server.interface.builtin_object_classes.base_object_def import (
+    BaseObject,
+)
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -122,12 +125,12 @@ def process_incoming_object_val(
 
 
 # Server-side version of `pydantic_object_record`
-def dump_object(val: BaseModel) -> dict:
+def dump_object(val: BaseObject) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
     bases = [c.__name__ for c in cls.mro()[1:-1]]
 
-    dump = {}
+    dump: dict[str, Any] = {}
     # Order matters here due to the way we calculate the digest!
     # This matches the client
     dump["_type"] = cls_name
@@ -145,8 +148,12 @@ def _general_dump(val: Any) -> Any:
     This is a helper function that dumps a value into a dict. It is used to convert
     pydantic objects to dicts in a recursive manner.
     """
-    if isinstance(val, BaseModel):
+    if isinstance(val, BaseObject):
         return dump_object(val)
+    elif isinstance(val, BaseModel):
+        # Important: we do not recurse into `dump_object` as that would add
+        # unnecessary descendent base object annotations.
+        return _general_dump(pydantic_asdict_one_level(val))
     elif isinstance(val, dict):
         return {k: _general_dump(v) for k, v in val.items()}
     elif isinstance(val, list):

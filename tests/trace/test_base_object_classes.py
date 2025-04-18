@@ -207,10 +207,7 @@ def test_interface_creation(client):
             **with_base_object_class_annotations(
                 top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"
             ),
-            "nested_base_model": with_base_object_class_annotations(
-                top_obj.nested_base_model.model_dump(by_alias=True),
-                "TestOnlyNestedBaseModel",
-            ),
+            "nested_base_model": top_obj.nested_base_model.model_dump(by_alias=True),
         }
         == {
             "_type": "TestOnlyExample",
@@ -218,11 +215,11 @@ def test_interface_creation(client):
             "description": None,
             "primitive": 1,
             "nested_base_model": {
-                "_type": "TestOnlyNestedBaseModel",
+                # When this was first implemented, the nested base model would ALSO contain the base object class annotations.
+                # This was a bug since the ancestor base model should be responsible for recursively deserializing. As a
+                # meta rule, you should never have two Object class annotations within the same object heirarchy (siblings are ok.)
                 "a": 2,
                 "aliased_property_alias": 3,
-                "_class_name": "TestOnlyNestedBaseModel",
-                "_bases": ["BaseModel"],
             },
             "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
             "_class_name": "TestOnlyExample",
