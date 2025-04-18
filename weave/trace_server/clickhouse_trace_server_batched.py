@@ -2409,7 +2409,7 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     return hash_int % range_max
 
 
-def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
+def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
     root_span = ddtrace.tracer.current_root_span()
     if root_span is None:
         logger.debug("No root span")
