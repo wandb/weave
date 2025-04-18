@@ -12,11 +12,21 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
+import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {OptionalTraceCallSchema, PlaygroundState} from '../types';
+import {
+  OptionalSavedPlaygroundModelParams,
+  OptionalTraceCallSchema,
+  PlaygroundState,
+} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
-import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
+import {ProviderOption} from './LLMDropdownOptions';
+import {
+  SetPlaygroundStateFieldFunctionType,
+  TraceCallOutput,
+} from './useChatFunctions';
+
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -27,7 +37,10 @@ type PlaygroundChatTopBarProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
   isTeamAdmin: boolean;
-  onConfigureProvider: () => void;
+  allOptions: ProviderOption[];
+  overallLoading: boolean;
+  refetch: () => void;
+  customProvidersResult: Provider[];
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -47,7 +60,10 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   playgroundStates,
   setPlaygroundStates,
   isTeamAdmin,
-  onConfigureProvider,
+  allOptions,
+  overallLoading,
+  refetch,
+  customProvidersResult,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -77,11 +93,40 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   const handleModelChange = (
     index: number,
     model: LLMMaxTokensKey,
-    maxTokens: number
+    maxTokens: number,
+    baseModel: LLMMaxTokensKey | null,
+    params: OptionalSavedPlaygroundModelParams
   ) => {
-    setPlaygroundStateField(index, 'model', model);
-    setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
-    setPlaygroundStateField(index, 'maxTokens', Math.floor(maxTokens / 2));
+    setPlaygroundStates(
+      playgroundStates.map((state, i) => {
+        if (i === index) {
+          return {
+            ...state,
+            model,
+            baseModel,
+            maxTokensLimit: maxTokens,
+            maxTokens: Math.floor(maxTokens / 2),
+            traceCall: {
+              ...state.traceCall,
+              inputs: {
+                ...state.traceCall?.inputs,
+                messages:
+                  params.messagesTemplate || state.traceCall?.inputs?.messages,
+              },
+              // If we have a messagesTemplate(ie prompt), we need to clear the output
+              output: {
+                ...(state.traceCall?.output as TraceCallOutput),
+                choices: params.messagesTemplate
+                  ? []
+                  : (state.traceCall?.output as TraceCallOutput)?.choices,
+              },
+            },
+            ...params,
+          };
+        }
+        return state;
+      })
+    );
   };
 
   const ConfirmClearModal: React.FC<{
@@ -124,13 +169,22 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
           value={playgroundStates[idx].model}
-          onChange={(model, maxTokens) =>
-            handleModelChange(idx, model, maxTokens)
+          onChange={(model, maxTokens, baseModel, params) =>
+            handleModelChange(
+              idx,
+              model as LLMMaxTokensKey,
+              maxTokens,
+              baseModel,
+              params
+            )
           }
           entity={entity}
           project={project}
           isTeamAdmin={isTeamAdmin}
-          onConfigureProvider={onConfigureProvider}
+          allOptions={allOptions}
+          overallLoading={overallLoading}
+          refetch={refetch}
+          customProvidersResult={customProvidersResult}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />

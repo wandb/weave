@@ -17,20 +17,29 @@ import {components, OptionProps} from 'react-select';
 
 import {Link} from '../../common/Links';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
+import {OptionalSavedPlaygroundModelParams} from '../types';
+export interface LLMOption {
+  label: string;
+  value: LLMMaxTokensKey | string;
+  max_tokens: number;
+  baseModelId?: LLMMaxTokensKey | null;
+  defaultParams?: OptionalSavedPlaygroundModelParams;
+}
 
 export interface ProviderOption {
   label: string | React.ReactNode;
   value: string;
-  llms: Array<{
-    label: string;
-    value: LLMMaxTokensKey;
-    max_tokens: number;
-  }>;
+  llms: Array<LLMOption>;
   isDisabled?: boolean;
 }
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    baseModel: LLMMaxTokensKey | null,
+    params: OptionalSavedPlaygroundModelParams
+  ) => void;
   entity: string;
   project: string;
   isAdmin?: boolean;
@@ -88,8 +97,13 @@ const SubMenu = ({
   position,
   onSelect,
 }: {
-  llms: Array<{label: string; value: LLMMaxTokensKey; max_tokens: number}>;
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  llms: Array<LLMOption>;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    baseModel: LLMMaxTokensKey | null,
+    params: OptionalSavedPlaygroundModelParams
+  ) => void;
   position: {top: number; left: number};
   onSelect: () => void;
 }) => {
@@ -114,7 +128,12 @@ const SubMenu = ({
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
-            onChange(llm.value, llm.max_tokens);
+            onChange(
+              llm.value as LLMMaxTokensKey,
+              llm.max_tokens,
+              llm.baseModelId as LLMMaxTokensKey | null,
+              llm.defaultParams ?? ({} as OptionalSavedPlaygroundModelParams)
+            );
             onSelect();
           }}
           sx={{
@@ -320,7 +339,13 @@ export const CustomOption = ({
             <Box
               key={llm.value}
               onClick={() => {
-                onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
+                onChange(
+                  llm.value as LLMMaxTokensKey,
+                  llm.max_tokens,
+                  llm.baseModelId as LLMMaxTokensKey | null,
+                  llm.defaultParams ??
+                    ({} as OptionalSavedPlaygroundModelParams)
+                );
                 props.selectProps.onInputChange?.('', {
                   action: 'set-value',
                   prevInputValue: props.selectProps.inputValue,
