@@ -98,6 +98,7 @@ export type SortBy = z.infer<typeof SortBySchema>;
 
 export const TestOnlyNestedBaseModelSchema = z.object({
   a: z.number(),
+  aliased_property_alias: z.number(),
 });
 export type TestOnlyNestedBaseModel = z.infer<
   typeof TestOnlyNestedBaseModelSchema
