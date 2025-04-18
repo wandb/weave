@@ -18,7 +18,6 @@ class VerdictPatcher(Patcher):
     def __init__(self):
         self._patched = False
         self._orig_pipeline_init = None
-        self._orig_unit_init = None
         self._tracer = VerdictTracer()
 
     def attempt_patch(self) -> bool:
@@ -41,21 +40,6 @@ class VerdictPatcher(Patcher):
 
         Pipeline.__init__ = pipeline_init
 
-        # Patch Unit.__init__
-        Unit = verdict.core.primitive.Unit
-        self._orig_unit_init = Unit.__init__
-        orig_unit_init = self._orig_unit_init
-
-        def unit_init(self, *args, tracer=None, **kwargs):
-            orig_unit_init(
-                self,
-                *args,
-                tracer=tracer if tracer is not None else default_tracer,
-                **kwargs,
-            )
-
-        Unit.__init__ = unit_init
-
         self._patched = True
         return True
 
@@ -66,7 +50,6 @@ class VerdictPatcher(Patcher):
         if verdict is None:
             return False
         verdict.core.pipeline.Pipeline.__init__ = self._orig_pipeline_init
-        verdict.core.primitive.Unit.__init__ = self._orig_unit_init
         self._patched = False
         return True
 
