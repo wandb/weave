@@ -66,7 +66,9 @@ export const CellViewingRenderer: React.FC<
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isEditable =
-    !isWeaveUrl && typeof value !== 'object' && typeof value !== 'boolean';
+    !isWeaveUrl &&
+    (typeof value !== 'object' || Array.isArray(value)) &&
+    typeof value !== 'boolean';
 
   const handleEditClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -104,6 +106,17 @@ export const CellViewingRenderer: React.FC<
       return CELL_COLORS.NEW;
     }
     return CELL_COLORS.TRANSPARENT;
+  };
+
+  // Format array display for better readability
+  const formatArrayForDisplay = (arr: any[]) => {
+    if (arr.length <= 3) {
+      return JSON.stringify(arr);
+    }
+    return `[${arr
+      .slice(0, 3)
+      .map(item => (typeof item === 'string' ? `"${item}"` : item))
+      .join(', ')}, ... (${arr.length} items)]`;
   };
 
   if (typeof value === 'boolean') {
@@ -272,7 +285,7 @@ export const CellViewingRenderer: React.FC<
           }),
         }}>
         <span style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
-          {value}
+          {Array.isArray(value) ? formatArrayForDisplay(value) : value}
           {isEditing}
         </span>
         {isHovered && (
@@ -406,6 +419,354 @@ const NumberEditor: React.FC<{
   );
 };
 
+const ArrayEditor: React.FC<{
+  value: any[];
+  serverValue?: any[];
+  onClose: () => void;
+  params: GridRenderCellParams;
+}> = ({value, serverValue, onClose, params}) => {
+  const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
+  const initialWidth = React.useRef<number>();
+  const initialHeight = React.useRef<number>();
+  const [editorMode, setEditorMode] = useState<EditorMode>('code');
+  const [editedValue, setEditedValue] = useState(
+    JSON.stringify(value, null, 2)
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const parsedValueRef = React.useRef<any[]>(value);
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
+
+  const handleEditorModeChange = (newMode: EditorMode) => {
+    setEditorMode(newMode);
+    initialWidth.current = getPopoverWidth(newMode);
+    initialHeight.current = getPopoverHeight();
+  };
+
+  const validateAndUpdateValue = (newJsonString: string) => {
+    try {
+      const parsed = JSON.parse(newJsonString);
+      if (!Array.isArray(parsed)) {
+        setErrorMessage('Value must be a valid JSON array');
+        return false;
+      }
+      setErrorMessage(null);
+      setEditedValue(newJsonString);
+      parsedValueRef.current = parsed;
+      params.api.setEditCellValue({
+        id: params.id,
+        field: params.field,
+        value: parsed,
+      });
+      return true;
+    } catch (e) {
+      setErrorMessage((e as Error).message);
+      setEditedValue(newJsonString);
+      return false;
+    }
+  };
+
+  // Debounced validation for error display only
+  const debouncedValidateErrors = (newValue: string) => {
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set a new timer for error validation only
+    debounceTimerRef.current = setTimeout(() => {
+      try {
+        const parsed = JSON.parse(newValue);
+        if (!Array.isArray(parsed)) {
+          setErrorMessage('Value must be a valid JSON array');
+        } else {
+          setErrorMessage(null);
+        }
+      } catch (e) {
+        setErrorMessage((e as Error).message);
+      }
+      debounceTimerRef.current = null;
+    }, 1000); // 1000ms = 1 second
+  };
+
+  const handleValueChange = (newValue: string) => {
+    // Always update the displayed value immediately
+    setEditedValue(newValue);
+
+    // Try to persist valid JSON immediately without waiting for debounce
+    try {
+      const parsed = JSON.parse(newValue);
+      if (Array.isArray(parsed)) {
+        // Immediately update the parsed value reference and the grid
+        parsedValueRef.current = parsed;
+        params.api.setEditCellValue({
+          id: params.id,
+          field: params.field,
+          value: parsed,
+        });
+        // Clear any error since we have valid JSON
+        setErrorMessage(null);
+      }
+    } catch (e) {
+      // Don't update error message immediately - let the debounced validation handle it
+    }
+
+    // Debounce the error validation to avoid showing errors while typing
+    debouncedValidateErrors(newValue);
+  };
+
+  // Clean up the timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Force validation before closing
+  const validateBeforeClose = () => {
+    // Clear any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    // Perform immediate validation
+    return validateAndUpdateValue(editedValue);
+  };
+
+  const getPopoverWidth = useCallback(
+    (mode: EditorMode = editorMode) => {
+      const screenWidth = window.innerWidth;
+      const maxWidth = screenWidth - 48;
+      const minWidth = 400;
+      const jsonString = JSON.stringify(value);
+      const valueLength = jsonString ? jsonString.length : 0;
+      const approximateWidth = Math.min(
+        Math.max(valueLength, minWidth),
+        maxWidth
+      );
+      return mode === 'diff'
+        ? Math.min(approximateWidth * 2, maxWidth)
+        : approximateWidth;
+    },
+    [editorMode, value]
+  );
+
+  const getPopoverHeight = useCallback(() => {
+    const width = getPopoverWidth();
+    const charsPerLine = Math.floor(width / 8);
+    const jsonString = JSON.stringify(value, null, 2);
+    const lines = jsonString.split('\n').reduce((acc, line) => {
+      return acc + Math.ceil(line.length / charsPerLine);
+    }, 0);
+
+    const maxHeight = Math.min(window.innerHeight / 2, 400);
+    const contentHeight = Math.min(Math.max(lines * 24 + 80, 120), maxHeight);
+    return contentHeight;
+  }, [value, getPopoverWidth]);
+
+  React.useLayoutEffect(() => {
+    const element = document.activeElement?.closest('.MuiDataGrid-cell');
+    if (element) {
+      setAnchorEl(element as HTMLDivElement);
+      if (!initialWidth.current) {
+        initialWidth.current = getPopoverWidth();
+      }
+      if (!initialHeight.current) {
+        initialHeight.current = getPopoverHeight();
+      }
+    }
+  }, [getPopoverWidth, getPopoverHeight]);
+
+  const handlePopoverClose = () => {
+    try {
+      // Always try to use the latest parsed value
+      if (parsedValueRef.current) {
+        // Get the existing row and update it
+        const existingRow = params.api.getRow(params.id);
+        const updatedRow = {...existingRow};
+        updatedRow[params.field] = parsedValueRef.current;
+
+        // Update the grid first with the new row data
+        params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+        // Set the edit cell value to ensure the new value is in the edit buffer
+        params.api.setEditCellValue({
+          id: params.id,
+          field: params.field,
+          value: parsedValueRef.current,
+        });
+
+        // Now gracefully stop editing to commit the changes
+        params.api.stopCellEditMode({
+          id: params.id,
+          field: params.field,
+        });
+
+        // Handle differently based on whether this is a new row or an edited row
+        if (existingRow.___weave?.isNew) {
+          setAddedRows(prev => {
+            const newMap = new Map(prev);
+            newMap.set(existingRow.___weave?.id, updatedRow);
+            return newMap;
+          });
+        } else {
+          // Mark the field as edited if it's different from the server value
+          const isValueChanged =
+            JSON.stringify(parsedValueRef.current) !==
+            JSON.stringify(serverValue);
+
+          if (isValueChanged && !updatedRow.___weave.editedFields) {
+            updatedRow.___weave.editedFields = new Set<string>();
+          }
+
+          if (isValueChanged) {
+            updatedRow.___weave.editedFields.add(params.field);
+
+            // Use setFieldEdited for better tracking
+            if (existingRow.___weave?.index !== undefined) {
+              setFieldEdited(existingRow.___weave.index, params.field, true);
+            }
+          }
+
+          setEditedRows(prev => {
+            const newMap = new Map(prev);
+
+            if (!isValueChanged || !updatedRow.___weave.editedFields?.size) {
+              newMap.delete(existingRow.___weave?.index);
+            } else {
+              newMap.set(existingRow.___weave?.index, updatedRow);
+            }
+
+            return newMap;
+          });
+        }
+
+        onClose();
+      } else {
+        // If we don't have a valid parsed value, force validation now
+        if (validateBeforeClose()) {
+          const parsedValue = JSON.parse(editedValue);
+
+          // Get the existing row and update it
+          const existingRow = params.api.getRow(params.id);
+          const updatedRow = {...existingRow};
+          updatedRow[params.field] = parsedValue;
+
+          // Update the grid with the complete row data first
+          params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+          // Set the edit cell value to ensure it's in the edit buffer
+          params.api.setEditCellValue({
+            id: params.id,
+            field: params.field,
+            value: parsedValue,
+          });
+
+          // Now stop edit mode to commit the changes
+          params.api.stopCellEditMode({
+            id: params.id,
+            field: params.field,
+          });
+
+          if (existingRow.___weave?.isNew) {
+            setAddedRows(prev => {
+              const newMap = new Map(prev);
+              newMap.set(existingRow.___weave?.id, updatedRow);
+              return newMap;
+            });
+          } else {
+            const isValueChanged =
+              JSON.stringify(parsedValue) !== JSON.stringify(serverValue);
+
+            if (isValueChanged && !updatedRow.___weave.editedFields) {
+              updatedRow.___weave.editedFields = new Set<string>();
+            }
+
+            if (isValueChanged) {
+              updatedRow.___weave.editedFields.add(params.field);
+
+              // Use setFieldEdited for better tracking
+              if (existingRow.___weave?.index !== undefined) {
+                setFieldEdited(existingRow.___weave.index, params.field, true);
+              }
+            }
+
+            setEditedRows(prev => {
+              const newMap = new Map(prev);
+
+              if (!isValueChanged || !updatedRow.___weave.editedFields?.size) {
+                newMap.delete(existingRow.___weave?.index);
+              } else {
+                newMap.set(existingRow.___weave?.index, updatedRow);
+              }
+
+              return newMap;
+            });
+          }
+
+          onClose();
+        }
+      }
+    } catch (e) {
+      // If any unexpected error, update error message
+      setErrorMessage((e as Error).message);
+    }
+  };
+
+  const renderEditor = () => {
+    switch (editorMode) {
+      case 'code':
+        return (
+          <div
+            style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+            <CodeEditor
+              value={editedValue}
+              onChange={handleValueChange}
+              onClose={handlePopoverClose}
+            />
+          </div>
+        );
+      case 'diff':
+        const originalValueString = Array.isArray(serverValue)
+          ? JSON.stringify(serverValue, null, 2)
+          : '[]';
+
+        return (
+          <div
+            style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+            <DiffEditor
+              value={editedValue}
+              originalValue={originalValueString}
+              onChange={handleValueChange}
+              onClose={handlePopoverClose}
+            />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <CellViewingRenderer {...params} isEditing />
+      <EditPopover
+        anchorEl={anchorEl}
+        onClose={handlePopoverClose}
+        initialWidth={initialWidth.current}
+        initialHeight={initialHeight.current}
+        editorMode={editorMode}
+        setEditorMode={handleEditorModeChange}
+        allowedModes={['code', 'diff'] as EditorMode[]}
+        errorMessage={errorMessage}>
+        {renderEditor()}
+      </EditPopover>
+    </>
+  );
+};
+
 const StringEditor: React.FC<{
   value: string;
   serverValue?: string;
@@ -500,7 +861,21 @@ const StringEditor: React.FC<{
           <TextEditor
             value={editedValue}
             onChange={handleValueChange}
-            onClose={onClose}
+            onClose={() => {
+              // For string editor, make sure changes are applied immediately when closing
+              const currentValue = params.api.getCellValue(
+                params.id,
+                params.field
+              );
+              const existingRow = params.api.getRow(params.id);
+              const updatedRow = {...existingRow, [params.field]: currentValue};
+
+              // First update the row in the grid
+              params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+              // Then stop editing mode
+              onClose();
+            }}
             inputRef={inputRef}
           />
         );
@@ -509,7 +884,21 @@ const StringEditor: React.FC<{
           <CodeEditor
             value={editedValue}
             onChange={handleValueChange}
-            onClose={onClose}
+            onClose={() => {
+              // For string editor, make sure changes are applied immediately when closing
+              const currentValue = params.api.getCellValue(
+                params.id,
+                params.field
+              );
+              const existingRow = params.api.getRow(params.id);
+              const updatedRow = {...existingRow, [params.field]: currentValue};
+
+              // First update the row in the grid
+              params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+              // Then stop editing mode
+              onClose();
+            }}
           />
         );
       case 'diff':
@@ -518,7 +907,21 @@ const StringEditor: React.FC<{
             value={editedValue}
             originalValue={serverValue ?? ''}
             onChange={handleValueChange}
-            onClose={onClose}
+            onClose={() => {
+              // For string editor, make sure changes are applied immediately when closing
+              const currentValue = params.api.getCellValue(
+                params.id,
+                params.field
+              );
+              const existingRow = params.api.getRow(params.id);
+              const updatedRow = {...existingRow, [params.field]: currentValue};
+
+              // First update the row in the grid
+              params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+              // Then stop editing mode
+              onClose();
+            }}
           />
         );
     }
@@ -529,7 +932,18 @@ const StringEditor: React.FC<{
       <CellViewingRenderer {...params} isEditing />
       <EditPopover
         anchorEl={anchorEl}
-        onClose={onClose}
+        onClose={() => {
+          // For string editor, make sure changes are applied immediately when closing
+          const currentValue = params.api.getCellValue(params.id, params.field);
+          const existingRow = params.api.getRow(params.id);
+          const updatedRow = {...existingRow, [params.field]: currentValue};
+
+          // First update the row in the grid
+          params.api.updateRows([{id: params.id, ...updatedRow}]);
+
+          // Then stop editing mode
+          onClose();
+        }}
         initialWidth={initialWidth.current}
         initialHeight={initialHeight.current}
         editorMode={editorMode}
@@ -576,6 +990,61 @@ export const CellEditingRenderer: React.FC<
         id={id}
         field={field}
         serverValue={serverValue}
+      />
+    );
+  }
+
+  // For array values, show array editor
+  if (Array.isArray(value)) {
+    return (
+      <ArrayEditor
+        value={value}
+        serverValue={Array.isArray(serverValue) ? serverValue : undefined}
+        onClose={() => {
+          const existingRow = api.getRow(id);
+          const currentValue = api.getCellValue(id, field);
+          const updatedRow = updateRow(existingRow, currentValue);
+
+          const isValueChanged =
+            JSON.stringify(currentValue) !== JSON.stringify(serverValue);
+          const rowToUpdate = {...updatedRow};
+
+          if (existingRow.___weave?.isNew) {
+            // For added rows, ensure we properly update the entire row
+            setAddedRows(prev => {
+              const newMap = new Map(prev);
+              // Make sure the field gets updated with the current array value
+              const updatedAddedRow = {...rowToUpdate};
+              updatedAddedRow[field] = currentValue;
+              newMap.set(existingRow.___weave?.id, updatedAddedRow);
+              return newMap;
+            });
+          } else {
+            if (!rowToUpdate.___weave.editedFields) {
+              rowToUpdate.___weave.editedFields = new Set<string>();
+            }
+
+            if (isValueChanged) {
+              rowToUpdate.___weave.editedFields.add(field);
+            } else {
+              rowToUpdate.___weave.editedFields.delete(field);
+            }
+
+            setEditedRows(prev => {
+              const newMap = new Map(prev);
+
+              if (rowToUpdate.___weave.editedFields.size === 0) {
+                newMap.delete(existingRow.___weave?.index);
+              } else {
+                newMap.set(existingRow.___weave?.index, rowToUpdate);
+              }
+
+              return newMap;
+            });
+          }
+          api.stopCellEditMode({id, field});
+        }}
+        params={renderParams}
       />
     );
   }

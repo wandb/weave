@@ -15,7 +15,9 @@ interface EditPopoverProps {
   editorMode: EditorMode;
   setEditorMode: (mode: EditorMode) => void;
   onRevert?: () => void;
+  allowedModes?: EditorMode[];
   children: React.ReactNode;
+  errorMessage?: string | null;
 }
 
 export const EditPopover: React.FC<EditPopoverProps> = ({
@@ -26,12 +28,16 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
   editorMode,
   setEditorMode,
   onRevert,
+  allowedModes = ['text', 'code', 'diff'],
   children,
+  errorMessage,
 }) => {
   const [position, setPosition] = React.useState<{
     top: number;
     left: number;
   } | null>(null);
+
+  const hasError = !!errorMessage;
 
   React.useLayoutEffect(() => {
     if (anchorEl) {
@@ -115,27 +121,33 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
                 borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               }}>
               <Box>
-                <Button
-                  tooltip="Text mode"
-                  icon="text-language"
-                  size="small"
-                  variant={editorMode === 'text' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('text')}
-                />
-                <Button
-                  tooltip="Code mode"
-                  icon="code-alt"
-                  size="small"
-                  variant={editorMode === 'code' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('code')}
-                />
-                <Button
-                  tooltip="Diff mode"
-                  icon="diff"
-                  size="small"
-                  variant={editorMode === 'diff' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('diff')}
-                />
+                {allowedModes.includes('text') && (
+                  <Button
+                    tooltip="Text mode"
+                    icon="text-language"
+                    size="small"
+                    variant={editorMode === 'text' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('text')}
+                  />
+                )}
+                {allowedModes.includes('code') && (
+                  <Button
+                    tooltip="Code mode"
+                    icon="code-alt"
+                    size="small"
+                    variant={editorMode === 'code' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('code')}
+                  />
+                )}
+                {allowedModes.includes('diff') && (
+                  <Button
+                    tooltip="Diff mode"
+                    icon="diff"
+                    size="small"
+                    variant={editorMode === 'diff' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('diff')}
+                  />
+                )}
               </Box>
               {onRevert && (
                 <Box>
@@ -158,6 +170,32 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
             }}>
             {children}
           </Box>
+          {hasError && (
+            <Box
+              sx={{
+                backgroundColor: '#FFE6E6',
+                borderTop: '1px solid #f5c2c7',
+                color: '#CC2944',
+                padding: '8px 12px',
+                fontSize: '14px',
+                fontWeight: 500,
+                minHeight: '36px',
+                maxHeight: '60px',
+                overflowY: 'auto',
+                display: 'flex',
+                alignItems: 'flex-start',
+              }}>
+              <strong style={{marginRight: '6px'}}>Error:</strong>
+              <div
+                style={{
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  flex: 1,
+                }}>
+                {errorMessage}
+              </div>
+            </Box>
+          )}
         </Box>
       </ResizableBox>
     </Popover>
