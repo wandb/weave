@@ -11,7 +11,7 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
@@ -446,10 +446,10 @@ inside_object = contextvars.ContextVar("inside_object", default=False)
 
 
 @contextlib.contextmanager
-def set_inside_object(obj: Any) -> Any:
+def set_inside_object() -> Generator[None, None, None]:
     token = inside_object.set(True)
     try:
-        yield map_to_refs(obj)
+        yield
     finally:
         inside_object.reset(token)
 
@@ -466,7 +466,7 @@ def map_to_refs(obj: Any) -> Any:
 
     if isinstance(obj, ObjectRecord):
         # Should be marking as inside of an object here?
-        with set_inside_object(obj):
+        with set_inside_object():
             return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         # This subtlty is very important. When pytantic models are nested, you
