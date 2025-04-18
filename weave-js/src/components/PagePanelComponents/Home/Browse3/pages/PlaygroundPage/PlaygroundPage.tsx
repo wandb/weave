@@ -1,6 +1,5 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import {Pill} from '@wandb/weave/components/Tag/Pill';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -25,7 +24,6 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
       title={
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           Playground
-          <Pill label="Preview" color="moon" />
         </Box>
       }
       hideTabsIfSingle
@@ -155,6 +153,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           project={props.project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
+          isOpenInPlayground={!!call.result}
         />
       )}
       {settingsTab !== null && (

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {Icon, Menu, Popup} from 'semantic-ui-react';
-import {Editor} from 'slate';
+import {Editor, Transforms} from 'slate';
 import {ThemeProvider} from 'styled-components';
 
 import {WeaveActionContextProvider} from '../../../actions';
@@ -9,6 +9,7 @@ import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import Sidebar from '../../Sidebar/Sidebar';
 import {themes} from '../Editor.styles';
+import {EmptyExpressionPanel} from '../EmptyExpressionPanel/EmptyExpressionPanel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
 import {PanelContextProvider} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
@@ -40,16 +41,60 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
   } = state;
   const weave = useWeaveContext();
   const enableFullScreen = useWeaveFeaturesContext().fullscreenMode;
+  const editorRef = useRef<Editor>();
 
   const {updateConfig} = props;
   const onMount = React.useCallback(
     (editor: Editor) => {
+      editorRef.current = editor;
       if (state.config.autoFocus) {
         focusEditor(editor);
         updateConfig({autoFocus: false});
       }
     },
     [updateConfig, state.config.autoFocus]
+  );
+
+  // Function to directly insert text into the WeaveExpression editor
+  // with optional cursor positioning
+  const insertTextIntoEditor = React.useCallback(
+    (
+      text: string,
+      options?: {
+        // Position cursor at specific index from the start of the inserted text
+        // Negative values count from the end
+        offset?: number;
+      }
+    ) => {
+      if (!editorRef.current) {
+        return;
+      }
+
+      const editor = editorRef.current;
+
+      // Focus the editor first
+      focusEditor(editor);
+
+      // Insert the text at the current selection
+      Transforms.insertText(editor, text, {at: []});
+
+      if (options) {
+        if (options.offset !== undefined) {
+          let offset = options.offset;
+          if (offset < 0) {
+            // Negative offset means count from end
+            offset = text.length + offset;
+          }
+
+          // Move cursor to that position
+          Transforms.select(editor, {
+            anchor: {path: [], offset},
+            focus: {path: [], offset},
+          });
+        }
+      }
+    },
+    []
   );
 
   const actions = React.useMemo(
@@ -61,7 +106,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
 
   return (
     <ThemeProvider theme={themes.light}>
-      <S.Main>
+      <S.Main data-dd-action-name="query panel">
         <S.EditorBar style={{pointerEvents: isLoading ? 'none' : 'auto'}}>
           {
             <div style={{width: '100%'}}>
@@ -189,25 +234,32 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
             {isLoading ? (
               <Panel2Loader />
             ) : (
-              calledExpanded.nodeType !== 'void' &&
-              handler != null && (
-                <WeaveActionContextProvider newActions={actions}>
-                  <PanelComp2
-                    input={inputPath}
-                    inputType={calledExpanded.type}
-                    loading={false}
-                    panelSpec={handler}
-                    configMode={false}
-                    context={props.context}
-                    config={renderPanelConfig}
-                    updateConfig={updateRenderPanelConfig}
-                    updateConfig2={updateRenderPanelConfig2}
-                    updateContext={props.updateContext}
-                    updateInput={updatePanelInput}
-                    noPanelControls
+              <>
+                {calledExpanded.nodeType !== 'void' && handler != null ? (
+                  <WeaveActionContextProvider newActions={actions}>
+                    <PanelComp2
+                      input={inputPath}
+                      inputType={calledExpanded.type}
+                      loading={false}
+                      panelSpec={handler}
+                      configMode={false}
+                      context={props.context}
+                      config={renderPanelConfig}
+                      updateConfig={updateRenderPanelConfig}
+                      updateConfig2={updateRenderPanelConfig2}
+                      updateContext={props.updateContext}
+                      updateInput={updatePanelInput}
+                      noPanelControls
+                    />
+                  </WeaveActionContextProvider>
+                ) : (
+                  <EmptyExpressionPanel
+                    inputNode={props.input}
+                    newVars={newVars}
+                    insertTextIntoEditor={insertTextIntoEditor}
                   />
-                </WeaveActionContextProvider>
-              )
+                )}
+              </>
             )}
           </S.PanelHandlerContent>
         </S.PanelHandler>

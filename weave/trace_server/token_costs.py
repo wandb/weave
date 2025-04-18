@@ -70,8 +70,14 @@ def get_calls_merged_columns() -> list[Column]:
     return columns
 
 
-def calls_merged_table(table_alias: str) -> Table:
-    return Table(table_alias, get_calls_merged_columns())
+def get_optional_join_field_columns() -> list[Column]:
+    return [
+        # These two columns are added here, because the ORM will validate that
+        # the table contains those columns in case any of the storage size column
+        # is included.
+        Column(name="storage_size_bytes", type="float"),
+        Column(name="total_storage_size_bytes", type="float"),
+    ]
 
 
 # SELECT
@@ -401,7 +407,12 @@ def final_call_select_with_cost(
     ]
 
     ranked_price_table = Table(
-        price_table_alias, [*get_calls_merged_columns(), *usage_with_costs_fields]
+        price_table_alias,
+        [
+            *get_calls_merged_columns(),
+            *get_optional_join_field_columns(),
+            *usage_with_costs_fields,
+        ],
     )
 
     final_query = (

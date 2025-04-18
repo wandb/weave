@@ -2195,6 +2195,28 @@ def test_call_query_stream_columns(client):
     assert calls[0].attributes == {}
     assert calls[0].inputs == {"a": 0, "b": 0}
 
+    # now get summary
+    calls2 = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+    calls2 = list(calls2)
+    assert len(calls2) == 2
+    # assert derived summary fields are included when getting summary
+    assert calls2[0].summary["weave"]["status"] == "success"
+    assert isinstance(calls2[0].summary["weave"]["latency_ms"], int)
+    assert calls2[0].summary["weave"]["trace_name"] == "calculate"
+    # this means other fields on the call should be set
+    assert calls2[0].started_at is not None
+    assert calls2[0].ended_at is not None
+    assert calls2[0].op_name is not None
+    # but not other big fields
+    assert calls2[0].attributes == {}
+    assert calls2[0].inputs == {}
+    assert calls2[0].output is None
+
 
 def test_call_query_stream_columns_with_costs(client):
     if client_is_sqlite(client):
@@ -2225,6 +2247,11 @@ def test_call_query_stream_columns_with_costs(client):
     assert len(calls) == 2
     assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
+
+    # also assert that derived summary fields are included when getting costs
+    assert calls[0].summary["weave"]["status"] == "success"
+    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
     # Test that costs are returned if we include the summary_dump field
@@ -3624,3 +3651,103 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_clien
     assert child_call.storage_size_bytes is not None
     # Child should not have total size
     assert child_call.total_storage_size_bytes is None
+
+
+def test_calls_hydrated(client):
+    nested = {"hi": {"there": {"foo": "bar"}}}
+    nested_ref = weave.publish(nested)
+
+    @weave.op
+    def nest(input_ref: str):
+        my_obj = {
+            "woahhhh": input_ref,
+        }
+        ref = weave.publish(my_obj)
+        return ref
+
+    nest(nested_ref)
+    nest(nested_ref)
+    nest(nested_ref)
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["inputs", "output", "output.woahhhh"],
+                expand_columns=[
+                    "inputs",
+                    "inputs.input_ref",
+                    "output",
+                    "output.woahhhh",
+                ],
+            )
+        )
+    )
+
+    assert len(calls) == 3
+    assert calls[0].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[0].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+
+
+def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def child_op(a: int, b: int) -> dict[str, Any]:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x["a"], x["b"])  # Call child op to create a trace
+
+    parent_op({"a": 1, "b": 2})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged FINAL",
+    )
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Test that "include_costs" and "include_total_storage_size" can be used together
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["id", "summary", "total_storage_size_bytes"],
+                include_costs=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if "parent_op" in c.op_name)
+    child_call = next(c for c in calls if "child_op" in c.op_name)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    assert parent_call.summary["usage"] is not None
+    assert child_call.summary["usage"] is not None
+
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is None

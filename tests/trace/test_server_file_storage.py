@@ -26,7 +26,6 @@ TEST_BUCKET = "test-bucket"
 # Azure Constants
 AZURITE_ACCOUNT = "devstoreaccount1"
 AZURITE_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-AZURITE_B64_KEY = base64.b64encode(AZURITE_KEY.encode()).decode()
 AZURITE_URL = f"http://127.0.0.1:10000/{AZURITE_ACCOUNT}"
 
 
@@ -220,7 +219,7 @@ class TestAzureStorage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": AZURITE_B64_KEY,
+                "WF_FILE_STORAGE_AZURE_ACCESS_KEY": AZURITE_KEY,
                 "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": AZURITE_URL,
                 "WF_FILE_STORAGE_URI": f"az://{AZURITE_ACCOUNT}/{TEST_BUCKET}",
                 "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",

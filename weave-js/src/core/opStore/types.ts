@@ -1,7 +1,5 @@
-// tslint:disable-next-line:no-circular-imports
 import type {Client} from '../client/types';
 import type {ForwardGraph, ForwardOp} from '../engine/forwardGraph/types';
-// tslint:disable-next-line:no-circular-imports
 import type {Engine} from '../engine/types';
 import type {
   ExpansionRefineNodeCallback,
