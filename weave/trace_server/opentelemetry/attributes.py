@@ -346,8 +346,11 @@ class SpanEvent(dict):
 
 
 def parse_weave_values(
-    attributes: dict[str, Any], key_mapping: dict[str, list[str]]
+    attributes: dict[str, Any],
+    key_mapping: Union[list[str], dict[str, list[str]]],
 ) -> dict[str, Any]:
+    if isinstance(key_mapping, list):
+        key_mapping = {key: [key] for key in key_mapping}
     result = {}
     for key, attribute_key_list in key_mapping.items():
         for attribute_key in attribute_key_list:
