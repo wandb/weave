@@ -5,6 +5,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
 import datetime
+import hashlib
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -319,11 +320,21 @@ class Span:
 
         attributes["otel_span"] = self.as_dict()
         op_name = self.name
-        if len(op_name) >= MAX_OP_NAME_LENGTH:
-            op_name = shorten_name(op_name, MAX_OP_NAME_LENGTH)
+
         display_name = wandb_attributes.get("display_name")
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
+
+        if len(op_name) >= MAX_OP_NAME_LENGTH:
+            # Since op_name will typically be what is displayed, we don't want to just truncate
+            # Create an identifier abbreviation so similar long names can be distinguished
+            identifier = hashlib.sha256(op_name.encode("utf-8")).hexdigest()[:4]
+            op_name = shorten_name(
+                op_name,
+                MAX_OP_NAME_LENGTH,
+                abbrv=f":{identifier}",
+                use_delimiter_in_abbr=False,
+            )
 
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
