@@ -789,12 +789,13 @@ const CallsPageBinding = () => {
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
 
-  const {initialDatetimeFilter} = useMakeInitialDatetimeFilter(
-    entity,
-    project,
-    initialFilter,
-    isEvaluationsTab
-  );
+  const {initialDatetimeFilter, isFilterAdjusting} =
+    useMakeInitialDatetimeFilter(
+      entity,
+      project,
+      initialFilter,
+      isEvaluationsTab
+    );
 
   const onFilterUpdate = useCallback(
     filter => {
@@ -912,6 +913,7 @@ const CallsPageBinding = () => {
       setSortModel={setSortModel}
       paginationModel={paginationModel}
       setPaginationModel={setPaginationModel}
+      isFilterAdjusting={isFilterAdjusting}
     />
   );
 };
