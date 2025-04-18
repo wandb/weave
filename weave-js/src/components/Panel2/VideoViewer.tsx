@@ -44,9 +44,7 @@ const VideoViewer = (props: VideoViewerProps) => {
 
   const [videoWidth, setVideoWidth] = useState<number>();
   const [videoHeight, setVideoHeight] = useState<number>();
-  const [isPlayButtonVisible, setPlayButtonVisibility] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
-  const [containerHeight, setContainerHeight] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [error, setError] = useState<ReactNode | null>(null);
@@ -96,18 +94,6 @@ const VideoViewer = (props: VideoViewerProps) => {
     }
   }, [muted, autoPlay]);
 
-  // the exhaustive-deps rule will complain here that it "can't verify" the dependencies,
-  // but the intent is for this to run on _every_ render, so I needed to disable it
-  useLayoutEffect(
-    () => {
-      if (containerRef.current) {
-        // this won't trigger a re-render if the height hasn't actually changed
-        setContainerHeight(containerRef.current.getBoundingClientRect().height);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    undefined
-  );
   // Check the dom element and the loading spinner
   // In situations with no failures the dom will load first
 
@@ -178,45 +164,12 @@ const VideoViewer = (props: VideoViewerProps) => {
               className="video-container"
               ref={containerRef}
               style={mediaStyles}>
-              {containerHeight > 0 && (
-                <div
-                  className={`video-card__play-btn__${
-                    isPlayButtonVisible ? 'visible' : 'hidden'
-                  }`}
-                  style={{
-                    margin: containerHeight * 0.03,
-                    width: containerHeight * 0.2,
-                    height: containerHeight * 0.2,
-                  }}>
-                  <i
-                    className="play icon"
-                    style={{
-                      fontSize: containerHeight * 0.1,
-                      paddingLeft: containerHeight * 0.02,
-                    }}></i>
-                </div>
-              )}
               <video
                 autoPlay={autoPlay ?? false}
+                controls
                 ref={videoRef}
                 loop
                 muted
-                onClick={e => {
-                  const v = e.target as HTMLVideoElement;
-                  if (v.paused) {
-                    v.play()
-                      .catch(() => {
-                        // Browsers have their own implementations of how to handle auto-play and
-                        // many disallow it, for example: https://goo.gl/xX8pDD
-                      })
-                      .then(() => {
-                        setPlayButtonVisibility(false);
-                      });
-                  } else {
-                    v.pause();
-                    setPlayButtonVisibility(true);
-                  }
-                }}
                 onLoadedData={onLoaded}
                 onError={onError}
                 src={videoSrc}
