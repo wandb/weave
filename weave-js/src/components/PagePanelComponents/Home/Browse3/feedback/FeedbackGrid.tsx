@@ -1,18 +1,24 @@
 import {Box} from '@mui/material';
+import {Popover} from '@mui/material';
+import EmojiPicker, {SkinTonePickerLocation} from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useEffect, useMemo} from 'react';
+import React, {useContext, useEffect, useMemo} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
-import {TargetBlank} from '../../../../../common/util/links';
 import {Alert} from '../../../../Alert';
+import {Button} from '../../../../Button';
 import {Loading} from '../../../../Loading';
 import {Tailwind} from '../../../../Tailwind';
+import {FeedbackContext} from '../context';
 import {Empty} from '../pages/common/Empty';
+import {EMPTY_PROPS_FEEDBACK} from '../pages/common/EmptyContent';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
+import {Notes} from './Notes';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
+import {WeaveEmojiPicker} from './WeaveEmojiPicker';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
@@ -30,6 +36,15 @@ export const FeedbackGrid = ({
   objectType,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const [showThumbsEmojiPicker, setShowThumbsEmojiPicker] =
+    React.useState(false);
+  const [showNoteInput, setShowNoteInput] = React.useState(false);
+  const [note, setNote] = React.useState('');
+  const [showCompleteEmojiPicker, setShowCompleteEmojiPicker] =
+    React.useState(false);
+  const emojiButtonRef = React.useRef<HTMLButtonElement>(null);
+  const noteButtonRef = React.useRef<HTMLButtonElement>(null);
+  const {setShowFeedback} = useContext(FeedbackContext);
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
@@ -83,6 +98,33 @@ export const FeedbackGrid = ({
 
   const paths = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
+  const onAddEmoji = (emoji: string) => {
+    const req = {
+      project_id: `${entity}/${project}`,
+      weave_ref: weaveRef,
+      creator: null,
+      feedback_type: 'wandb.reaction.1',
+      payload: {emoji},
+    };
+    getTsClient().feedbackCreate(req);
+    setShowThumbsEmojiPicker(false);
+  };
+
+  const onAddNote = () => {
+    if (note.trim()) {
+      const req = {
+        project_id: `${entity}/${project}`,
+        weave_ref: weaveRef,
+        creator: null,
+        feedback_type: 'wandb.note.1',
+        payload: {note: note.trim()},
+      };
+      getTsClient().feedbackCreate(req);
+      setNote('');
+      setShowNoteInput(false);
+    }
+  };
+
   if (query.loading || loadingUserInfo) {
     return (
       <Box
@@ -106,21 +148,103 @@ export const FeedbackGrid = ({
 
   if (!paths.length) {
     return (
-      <Empty
-        size="small"
-        icon="add-reaction"
-        heading="No feedback yet"
-        description="You can provide feedback directly within the Weave UI or through the API."
-        moreInformation={
-          <>
-            Learn how to{' '}
-            <TargetBlank href="http://wandb.me/weave_feedback">
-              add feedback
-            </TargetBlank>
-            .
-          </>
-        }
-      />
+      <div className="flex h-full flex-col items-center justify-center">
+        <div className="mx-8 flex flex-col items-center gap-16">
+          <Empty size="small" {...EMPTY_PROPS_FEEDBACK} />
+          <div className="flex gap-8">
+            <div>
+              <Button
+                ref={emojiButtonRef}
+                variant="secondary"
+                icon="add-reaction"
+                onClick={() => setShowThumbsEmojiPicker(true)}>
+                Reaction
+              </Button>
+              <Popover
+                open={showThumbsEmojiPicker}
+                anchorEl={emojiButtonRef.current}
+                onClose={() => {
+                  setShowThumbsEmojiPicker(false);
+                  // Requires 100ms to complete animation before changing state to minimal-picker
+                  setTimeout(() => {
+                    setShowCompleteEmojiPicker(false);
+                  }, 100);
+                }}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      backgroundColor: 'transparent',
+                      boxShadow: 'none',
+                    },
+                  },
+                }}>
+                {!showCompleteEmojiPicker && (
+                  <WeaveEmojiPicker
+                    onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
+                    skinTonesDisabled={true}
+                    reactionsDefaultOpen={true}
+                    skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
+                    reactions={[
+                      '1f44d', // thumbs up
+                      '1f44e', // thumbs down
+                    ]}
+                    onPlusButtonClick={() => {
+                      setShowCompleteEmojiPicker(true);
+                    }}
+                  />
+                )}
+                {showCompleteEmojiPicker && (
+                  <EmojiPicker
+                    onEmojiClick={emojiData => onAddEmoji(emojiData.emoji)}
+                    skinTonesDisabled={true}
+                    skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
+                    previewConfig={{
+                      defaultEmoji: '1f44d',
+                      defaultCaption: 'Hover for emoji name',
+                    }}
+                  />
+                )}
+              </Popover>
+            </div>
+            <div>
+              <Button
+                ref={noteButtonRef}
+                variant="secondary"
+                icon="forum-chat-bubble"
+                onClick={() => setShowNoteInput(true)}>
+                Note
+              </Button>
+              <Popover
+                open={showNoteInput}
+                anchorEl={noteButtonRef.current}
+                onClose={() => setShowNoteInput(false)}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}>
+                <Notes
+                  notes={[]}
+                  readonly={false}
+                  note={note}
+                  setNote={setNote}
+                  onNoteAdded={onAddNote}
+                  onClose={() => setShowNoteInput(false)}
+                />
+              </Popover>
+            </div>
+            <Button
+              variant="secondary"
+              icon="marker"
+              onClick={() => setShowFeedback(true)}>
+              Annotation
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
