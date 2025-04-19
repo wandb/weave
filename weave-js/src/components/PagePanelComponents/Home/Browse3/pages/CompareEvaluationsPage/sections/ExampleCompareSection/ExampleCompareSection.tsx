@@ -1,5 +1,6 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -50,6 +51,7 @@ import {
 } from '../ScorecardSection/ScorecardSection';
 import {
   PivotedRow,
+  useExampleCompareData,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
 
@@ -225,6 +227,16 @@ export const ExampleCompareSection: React.FC<{
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
 
+  const {targetRowValue, loading: loadingInputValue} = useExampleCompareData(
+    props.state,
+    filteredRows,
+    targetIndex
+  );
+
+  const inputColumnKeys = useMemo(() => {
+    return Object.keys(targetRowValue ?? {});
+  }, [targetRowValue]);
+
   const [selectedTrials, setSelectedTrials] = React.useState<{
     [evalCallId: string]: number;
   }>({});
@@ -251,9 +263,8 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-  const inputColumnKeys = Object.keys(target.input);
-  const numInputProps = inputColumnKeys.length;
-  const numOutputKeys = outputColumnKeys.length;
+  const numInputProps = inputColumnKeys?.length ?? 0;
+  const numOutputKeys = outputColumnKeys?.length ?? 0;
 
   const numTrials = orderedCallIds.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
@@ -448,7 +459,7 @@ export const ExampleCompareSection: React.FC<{
 
   const inputPropValComp = (inputPropIndex: number) => {
     return (
-      <ICValueView value={target.input[inputColumnKeys[inputPropIndex]]} />
+      <ICValueView value={targetRowValue?.[inputColumnKeys[inputPropIndex]]} />
     );
   };
 
@@ -759,16 +770,29 @@ export const ExampleCompareSection: React.FC<{
             </React.Fragment>
           )}
           {/* INPUT ROWS */}
-          {_.range(numInputProps).map(inputPropIndex => {
-            return (
-              <React.Fragment key={inputPropMapKey(inputPropIndex)}>
-                <GridCell style={{...stickySidebarStyleMixin}}>
-                  {inputPropKeyComp(inputPropIndex)}
-                </GridCell>
-                <GridCell>{inputPropValComp(inputPropIndex)}</GridCell>
-              </React.Fragment>
-            );
-          })}
+          {loadingInputValue || targetRowValue === undefined ? (
+            <React.Fragment key={'loading'}>
+              <GridCell style={{...stickySidebarStyleMixin}}>
+                <LoadingDots />
+              </GridCell>
+              <GridCell>
+                <LoadingDots />
+              </GridCell>
+            </React.Fragment>
+          ) : (
+            <>
+              {_.range(numInputProps).map(inputPropIndex => {
+                return (
+                  <React.Fragment key={inputPropMapKey(inputPropIndex)}>
+                    <GridCell style={{...stickySidebarStyleMixin}}>
+                      {inputPropKeyComp(inputPropIndex)}
+                    </GridCell>
+                    <GridCell>{inputPropValComp(inputPropIndex)}</GridCell>
+                  </React.Fragment>
+                );
+              })}
+            </>
+          )}
         </GridCellSubgrid>
         {/* OUTPUT SECTION */}
         <GridCellSubgrid
