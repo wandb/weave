@@ -1294,6 +1294,7 @@ const useTableQuery = makeTraceServerEndpointHook<
     traceServerTypes.TraceTableQueryReq['limit'],
     traceServerTypes.TraceTableQueryReq['offset'],
     traceServerTypes.TraceTableQueryReq['sort_by'],
+    traceServerTypes.TraceTableQueryReq['metadata_only'],
     {skip?: boolean}?
   ],
   any[]
@@ -1306,6 +1307,7 @@ const useTableQuery = makeTraceServerEndpointHook<
     limit: traceServerTypes.TraceTableQueryReq['limit'],
     offset: traceServerTypes.TraceTableQueryReq['offset'],
     sortBy: traceServerTypes.TraceTableQueryReq['sort_by'],
+    metadataOnly: traceServerTypes.TraceTableQueryReq['metadata_only'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -1315,6 +1317,7 @@ const useTableQuery = makeTraceServerEndpointHook<
       limit,
       offset,
       sort_by: sortBy,
+      metadata_only: metadataOnly,
     },
     skip: opts?.skip,
   }),
@@ -1473,6 +1476,7 @@ const useRefsData = (
     tableQuery?.limit,
     undefined,
     undefined,
+    false,
     {skip: tableRefUris.length === 0 || cachedTableResult != null}
   );
 
@@ -1537,6 +1541,7 @@ const useTableRowsQuery = (
   limit?: traceServerTypes.TraceTableQueryReq['limit'],
   offset?: traceServerTypes.TraceTableQueryReq['offset'],
   sortBy?: traceServerTypes.TraceTableQueryReq['sort_by'],
+  metadataOnly?: traceServerTypes.TraceTableQueryReq['metadata_only'],
   opts?: {skip?: boolean}
 ): Loadable<traceServerTypes.TraceTableQueryRes> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1560,6 +1565,7 @@ const useTableRowsQuery = (
       limit,
       offset,
       sort_by: sortBy,
+      metadata_only: metadataOnly,
     };
 
     getTsClient()
@@ -1581,6 +1587,7 @@ const useTableRowsQuery = (
     limit,
     offset,
     sortBy,
+    metadataOnly,
     opts?.skip,
   ]);
 

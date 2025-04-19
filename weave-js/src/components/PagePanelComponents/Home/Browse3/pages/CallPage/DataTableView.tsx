@@ -148,6 +148,7 @@ export const WeaveCHTable: FC<{
     limit,
     offset,
     sortBy,
+    false,
     {skip: lookupKey == null}
   );
 

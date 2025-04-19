@@ -190,6 +190,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     numRowsToFetch,
     offset,
     sortBy,
+    false,
     {skip: lookupKey == null}
   );
 

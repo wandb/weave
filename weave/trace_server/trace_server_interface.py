@@ -739,6 +739,11 @@ class TableQueryReq(BaseModel):
         description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
         examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
     )
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, only the metadata is returned, not the values. This is faster for large tables.",
+        examples=[True],
+    )
 
 
 class TableQueryRes(BaseModel):

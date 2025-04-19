@@ -113,3 +113,25 @@ def make_standard_table_query(
     {sql_safe_offset}
     """
     return query
+
+
+def make_metadata_only_table_query(
+    project_id: str,
+    digest: str,
+    pb: ParamBuilder,
+) -> str:
+    project_id_name = pb.add_param(project_id)
+    digest_name = pb.add_param(digest)
+    query = f"""
+        SELECT row_digest, original_index
+        FROM (
+            SELECT row_digests,
+                   arrayEnumerate(row_digests) as original_indices
+            FROM tables
+            WHERE project_id = {{{project_id_name}: String}}
+            AND digest = {{{digest_name}: String}}
+            LIMIT 1
+        )
+        ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
+    """
+    return query
