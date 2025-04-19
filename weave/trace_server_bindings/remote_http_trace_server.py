@@ -4,6 +4,7 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
+import sentry_sdk
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
@@ -140,11 +141,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return
 
         # If a single item is too large, we can't send it -- log an error and drop it
-        if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            logger.error(
-                f"Single call size ({encoded_bytes} bytes) is too large to send. "
-                f"The maximum size is {self.remote_request_bytes_limit} bytes."
-            )
+        try:
+            if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
+                raise ValueError(
+                    f"Single call size ({encoded_bytes} bytes) is too large to send. "
+                    f"The maximum size is {self.remote_request_bytes_limit} bytes."
+                )
+        except Exception as e:
+            logger.exception(e)
+            sentry_sdk.capture_exception(e)
+            return
 
         try:
             self._send_batch_to_server(encoded_data)
