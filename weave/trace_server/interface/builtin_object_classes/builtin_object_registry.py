@@ -6,6 +6,9 @@ from weave.trace_server.interface.builtin_object_classes.base_object_def import 
     BaseObject,
 )
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModel,
+)
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
@@ -37,3 +40,4 @@ register_base_object(AnnotationSpec)
 register_base_object(Provider)
 register_base_object(ProviderModel)
 register_base_object(SavedView)
+register_base_object(LLMStructuredCompletionModel)
