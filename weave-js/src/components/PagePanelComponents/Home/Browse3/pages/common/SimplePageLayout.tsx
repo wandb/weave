@@ -263,7 +263,7 @@ export const SimplePageLayoutWithHeader: FC<{
       <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
         <SplitPanelLeft
           minWidth={150}
-          defaultWidth={200}
+          defaultWidth={400}
           maxWidth="50%"
           isDrawerOpen={props.isLeftSidebarOpen ?? false}
           drawer={props.leftSidebarContent}

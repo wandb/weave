@@ -1,5 +1,5 @@
 import * as Colors from '@wandb/weave/common/css/color.styles';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import TraceScrubber from '../TraceScrubber';
@@ -252,6 +252,14 @@ export const CompositionView: React.FC<TraceViewProps> = props => {
     setFocusedCallId: onCallSelect,
     stack,
   } = props;
+
+  // Add default visibleColumns state
+  const [visibleColumns] = useState({
+    tokens: false,
+    cost: false,
+    duration: true,
+  });
+
   const codeMap = useMemo(
     () => buildCodeCompositionMap(traceTreeFlat),
     [traceTreeFlat]
@@ -301,6 +309,7 @@ export const CompositionView: React.FC<TraceViewProps> = props => {
                 filterCallIds={selectedPeerPathCallIds}
                 stack={stack}
                 setRootCallId={props.setRootCallId}
+                visibleColumns={visibleColumns}
               />
             </div>
           </>
