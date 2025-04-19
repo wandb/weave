@@ -14,7 +14,8 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "experimentalDecorators": true
   },
   "include": ["src/**/*"],
   "exclude": [
