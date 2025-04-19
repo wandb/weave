@@ -9,7 +9,7 @@ import {StyledTextArea} from '../../../StyledTextarea';
 type FunctionDrawerProps = {
   drawerFunctionIndex: number | null;
   onClose: () => void;
-  functions: Array<{name: string; [key: string]: any}>;
+  functions: Array<Record<string, any>>;
   onAddFunction: (functionJSON: string, index: number) => void;
 };
 

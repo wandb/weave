@@ -4,7 +4,7 @@ import {SetStateAction} from 'react';
 import {Message} from '../../ChatView/types';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 
-type TraceCallOutput = {
+export type TraceCallOutput = {
   choices?: any[];
 };
 

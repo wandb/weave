@@ -26,9 +26,9 @@ const StyledChip = styled(Chip)(({theme}) => ({
 
 type FunctionEditorProps = {
   playgroundState: PlaygroundState;
-  functions: Array<{name: string; [key: string]: any}>;
+  functions: Array<Record<string, any>>;
   setFunctions: React.Dispatch<
-    React.SetStateAction<Array<{name: string; [key: string]: any}>>
+    React.SetStateAction<Array<Record<string, any>>>
   >;
 };
 
@@ -46,17 +46,15 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
     try {
       const json = JSON.parse(functionJSON);
       if (typeof json === 'object') {
-        setFunctions(
-          (prevFunctions: Array<{name: string; [key: string]: any}>) => {
-            const newFunctions = [...prevFunctions];
-            if (index < newFunctions.length) {
-              newFunctions[index] = json;
-            } else {
-              newFunctions.push(json);
-            }
-            return newFunctions;
+        setFunctions((prevFunctions: Array<Record<string, any>>) => {
+          const newFunctions = [...prevFunctions];
+          if (index < newFunctions.length) {
+            newFunctions[index] = json;
+          } else {
+            newFunctions.push(json);
           }
-        );
+          return newFunctions;
+        });
       }
     } catch (err) {
       console.error('Error parsing function json', err);

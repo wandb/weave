@@ -12,19 +12,31 @@ export type PlaygroundState = {
   traceCall: OptionalTraceCallSchema;
   trackLLMCall: boolean;
   loading: boolean;
-  functions: Array<{name: string; [key: string]: any}>;
-  responseFormat: PlaygroundResponseFormats;
-  temperature: number;
+  model: LLMMaxTokensKey;
+  baseModel: LLMMaxTokensKey | null;
+  selectedChoiceIndex: number;
+  maxTokensLimit: number;
+} & PlaygroundModelParams;
+
+export type PlaygroundModelParams = {
   maxTokens: number;
-  stopSequences: string[];
+  temperature: number;
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
   nTimes: number;
-  maxTokensLimit: number;
-  model: LLMMaxTokensKey;
-  selectedChoiceIndex: number;
+  responseFormat: PlaygroundResponseFormats;
+  functions: Array<Record<string, any>>;
+  stopSequences: string[];
+  responseFormatSchema?: Record<string, any>;
 };
+
+export type SavedPlaygroundModelParams = PlaygroundModelParams & {
+  messagesTemplate: Array<Record<string, any>>;
+};
+
+export type OptionalSavedPlaygroundModelParams =
+  Partial<SavedPlaygroundModelParams>;
 
 export type PlaygroundStateKey = keyof PlaygroundState;
 
