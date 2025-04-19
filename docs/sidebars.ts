@@ -51,6 +51,7 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tools/playground",
             "guides/integrations/index",
+            "guides/tools/saved-views",
             {
               type: "doc",
               label: "Compare Traces",
