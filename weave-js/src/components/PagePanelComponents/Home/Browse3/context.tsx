@@ -144,6 +144,9 @@ export const browse2Context = {
   ) => {
     return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
   },
+  evaluationsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
   tracesUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
@@ -371,6 +374,9 @@ export const browse3ContextGen = (
       }
       return url;
     },
+    evaluationsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/evaluations`;
+    },
     tracesUIUrl: (entityName: string, projectName: string) => {
       return `${projectRoot(entityName, projectName)}/traces`;
     },
@@ -545,6 +551,7 @@ type RouteType = {
     hideTraceTree?: boolean,
     showFeedback?: boolean
   ) => string;
+  evaluationsUIUrl: (entityName: string, projectName: string) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
     entityName: string,
@@ -676,6 +683,11 @@ const useMakePeekingRouter = (): RouteType => {
     },
     callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.callUIUrl(...args));
+    },
+    evaluationsUIUrl: (
+      ...args: Parameters<typeof baseContext.evaluationsUIUrl>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.evaluationsUIUrl(...args));
     },
     tracesUIUrl: (...args: Parameters<typeof baseContext.tracesUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.tracesUIUrl(...args));

@@ -220,7 +220,7 @@ const OverlayCanvas = styled.canvas`
 interface SegmentationCanvasProps {
   segmentation: ImageData;
   classState: Record<string, ClassState>;
-  classOverlay: Record<string, Controls.OverlayClassState>;
+  classOverlay: Partial<Record<string, Controls.OverlayClassState>>;
 }
 
 /**
@@ -242,8 +242,11 @@ const SegmentationCanvas: FC<SegmentationCanvasProps> = ({
       _.map(classState, ({color}, classId) => {
         const classToggle = classOverlay[classId] ?? DEFAULT_CLASS_MASK_CONTROL;
 
-        const {disabled, opacity} = classToggle;
-        const isDisabled = allToggle.disabled || disabled;
+        const {opacity} = classToggle;
+        const isDisabled =
+          classOverlay[classId]?.disabled ??
+          classOverlay.all?.disabled ??
+          DEFAULT_CLASS_MASK_CONTROL.disabled;
 
         const rgb = colorFromString(color);
         const alpha = isDisabled ? 0 : allToggle.opacity * opacity * 255;

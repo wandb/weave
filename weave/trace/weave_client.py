@@ -58,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -180,8 +181,6 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("page_size must be greater than 0")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
-        if offset is not None and offset < 0:
-            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
@@ -324,12 +323,18 @@ def _make_calls_iterator(
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        # Add the global offset to the page offset
+        # This ensures the offset is applied only once
+        effective_offset = offset
+        if offset_override is not None:
+            effective_offset += offset_override
+
         return list(
             server.calls_query_stream(
                 CallsQueryReq(
                     project_id=project_id,
                     filter=filter,
-                    offset=offset,
+                    offset=effective_offset,
                     limit=limit,
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -351,17 +356,20 @@ def _make_calls_iterator(
         )
         if limit_override is not None:
             offset = offset_override or 0
-            return min(limit_override, response.count - offset)
+            return min(limit_override, max(0, response.count - offset))
         if offset_override is not None:
             return response.count - offset_override
         return response.count
+
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
 
     return PaginatedIterator(
         fetch_func,
         transform_func=transform_func,
         size_func=size_func,
         limit=limit_override,
-        offset=offset_override,
+        offset=None,  # Set offset to None since we handle it in fetch_func
         page_size=page_size,
     )
 
@@ -416,37 +424,6 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> ObjectRef | None:
-    return getattr(obj, "ref", None)
-
-
-def remove_ref(obj: Any) -> None:
-    if get_ref(obj) is not None:
-        if "ref" in obj.__dict__:  # for methods
-            obj.__dict__["ref"] = None
-        else:
-            obj.ref = None
-
-
-def set_ref(obj: Any, ref: Ref | None) -> None:
-    """Try to set the ref on "any" object.
-
-    We use increasingly complex methods to try to set the ref
-    to support different kinds of objects. This will still
-    fail for python primitives, but those can't be traced anyway.
-    """
-    try:
-        obj.ref = ref
-    except:
-        try:
-            setattr(obj, "ref", ref)
-        except:
-            try:
-                obj.__dict__["ref"] = ref
-            except:
-                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
-
-
 def _get_direct_ref(obj: Any) -> Ref | None:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -454,7 +431,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
         # the "container ref", ie a ref to the root object that the WeaveTable
         # is within, with extra pointing to the table.
         return obj.table_ref
-    return getattr(obj, "ref", None)
+    return get_ref(obj)
 
 
 def map_to_refs(obj: Any) -> Any:
@@ -475,7 +452,9 @@ def map_to_refs(obj: Any) -> Any:
         return obj.ref
     elif isinstance(obj, WeaveTable):
         return obj.ref
-    elif isinstance(obj, list):
+    elif isinstance_namedtuple(obj):
+        return {k: map_to_refs(v) for k, v in obj._asdict().items()}
+    elif isinstance(obj, (list, tuple)):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
