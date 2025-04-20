@@ -40,3 +40,7 @@ def maybe_objectify(obj: WeaveObject) -> T_co | WeaveObject:
         set_ref(res, ref)
 
     return res
+
+
+def is_registered(cls_name: str) -> bool:
+    return cls_name in _registry
