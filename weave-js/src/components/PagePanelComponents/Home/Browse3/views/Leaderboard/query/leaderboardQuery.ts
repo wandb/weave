@@ -20,9 +20,9 @@ import {
 } from '../types/leaderboardConfigType';
 
 // Helper function to detect if a call is from an imperative evaluation
+// We assume that any Evaluation object without scorers is imperative.
+// This is not strictly true, but I think it's a reasonable enough heuristic.
 const isImperativeEvaluation = (call: any): boolean => {
-  // We assume that any Evaluation object without scorers is imperative.
-  // This is not strictly true, but I think it's a reasonable enough heuristic.
   return (
     call.inputs &&
     call.inputs.self &&
@@ -215,7 +215,6 @@ const getLeaderboardGroupableData = async (
     }
 
     const isImperative = isImperativeEvaluation(call);
-
     const evalObjectName = evalObjectRef.artifactName;
     const evalObjectVersion = evalObjectRef.artifactVersion;
     const evalObject = evaluationObjectDigestMap
@@ -262,48 +261,7 @@ const getLeaderboardGroupableData = async (
       sourceEvaluationObjectRef: evalObjectRefUri,
     };
 
-    // For regular evals, process using explicit scorer refs
-    if (!isImperative) {
-      const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
-      scorerRefUris.forEach(scorerRefUri => {
-        const scorerRef = parseRefMaybe(scorerRefUri);
-        if (!scorerRef || !isWeaveObjectRef(scorerRef)) {
-          console.warn('Skipping scorer ref', scorerRefUri);
-          return;
-        }
-        const scorerName = scorerRef.artifactName;
-        const scorerVersion = scorerRef.artifactVersion;
-        // const scorerType = scorerRef.weaveKind === 'op' ? 'op' : 'object';
-        const scorePayload = (call.output as any)?.[scorerName];
-        if (typeof scorePayload !== 'object' || scorePayload == null) {
-          console.warn(
-            'Skipping scorer call with invalid score payload',
-            scorerName,
-            scorerVersion,
-            call
-          );
-          return;
-        }
-        const flatScorePayload =
-          flattenObjectPreservingWeaveTypes(scorePayload);
-        Object.entries(flatScorePayload).forEach(
-          ([metricPath, metricValue]) => {
-            const scoreRecord: LeaderboardValueRecord = {
-              ...recordPartial,
-              metricType: 'scorerMetric',
-              scorerName,
-              scorerVersion,
-              metricPath,
-              metricValue,
-            };
-            data.push(scoreRecord);
-          }
-        );
-      });
-    }
-
     // For imperative evals, process scorer metrics directly from the output
-    // Only do this for imperative evaluations
     if (isImperative) {
       const outputObj = call.output as any;
 
@@ -367,6 +325,44 @@ const getLeaderboardGroupableData = async (
             }
           );
         }
+      });
+    } else {
+      // For regular evals, process using explicit scorer refs
+      const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
+      scorerRefUris.forEach(scorerRefUri => {
+        const scorerRef = parseRefMaybe(scorerRefUri);
+        if (!scorerRef || !isWeaveObjectRef(scorerRef)) {
+          console.warn('Skipping scorer ref', scorerRefUri);
+          return;
+        }
+        const scorerName = scorerRef.artifactName;
+        const scorerVersion = scorerRef.artifactVersion;
+        // const scorerType = scorerRef.weaveKind === 'op' ? 'op' : 'object';
+        const scorePayload = (call.output as any)?.[scorerName];
+        if (typeof scorePayload !== 'object' || scorePayload == null) {
+          console.warn(
+            'Skipping scorer call with invalid score payload',
+            scorerName,
+            scorerVersion,
+            call
+          );
+          return;
+        }
+        const flatScorePayload =
+          flattenObjectPreservingWeaveTypes(scorePayload);
+        Object.entries(flatScorePayload).forEach(
+          ([metricPath, metricValue]) => {
+            const scoreRecord: LeaderboardValueRecord = {
+              ...recordPartial,
+              metricType: 'scorerMetric',
+              scorerName,
+              scorerVersion,
+              metricPath,
+              metricValue,
+            };
+            data.push(scoreRecord);
+          }
+        );
       });
     }
 
