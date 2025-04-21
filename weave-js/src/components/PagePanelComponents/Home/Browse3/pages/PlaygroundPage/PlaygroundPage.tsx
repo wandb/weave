@@ -1,6 +1,5 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import {Pill} from '@wandb/weave/components/Tag/Pill';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
