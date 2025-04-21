@@ -14,8 +14,8 @@ from typing_extensions import Self
 from weave.trace import api
 from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
+from weave.trace.ref_util import get_ref
 from weave.trace.vals import WeaveObject, pydantic_getattribute
-from weave.trace.weave_client import get_ref
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    ref: Optional[ObjectRef] = Field(None, repr=False)
+    ref: Optional[ObjectRef] = Field(default=None, repr=False)
 
     # Allow Op attributes
     model_config = ConfigDict(

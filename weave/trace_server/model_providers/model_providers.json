@@ -107,11 +107,27 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "o3": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-2025-04-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "o3-mini": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
   "o3-mini-2025-01-31": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini-2025-04-16": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },

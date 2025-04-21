@@ -3,9 +3,6 @@
  * Hand converted to TS.
  */
 
-// disabling tslint because this is vendored code
-/* tslint:disable */
-
 // utility function
 const assert = function (condition: any, message: any) {
   if (!condition) {
