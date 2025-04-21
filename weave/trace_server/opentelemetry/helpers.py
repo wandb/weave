@@ -9,7 +9,6 @@ from enum import Enum
 from typing import Any, Union
 from uuid import UUID
 
-import numpy as np
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 
@@ -56,10 +55,6 @@ def to_json_serializable(value: Any) -> Any:
             k: to_json_serializable(getattr(value, k))
             for k in value.__dataclass_fields__
         }
-    elif isinstance(value, np.generic):  # e.g., np.int64, np.float64
-        return value.item()
-    elif isinstance(value, np.ndarray):
-        return to_json_serializable(value.tolist())
     else:
         raise ValueError(f"Unsupported type for JSON serialization: {type(value)}")
 
