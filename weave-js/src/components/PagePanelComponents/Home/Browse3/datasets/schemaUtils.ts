@@ -1,5 +1,43 @@
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
+// Field prefix constants
+export const FIELD_PREFIX = {
+  INPUTS: 'inputs.',
+  OUTPUT: 'output.',
+  ANNOTATIONS: 'annotations.',
+  SCORER: 'scorer.',
+};
+
+// Feedback type constants
+export const FEEDBACK_TYPE = {
+  ANNOTATION_PREFIX: 'wandb.annotation.',
+  RUNNABLE_PREFIX: 'wandb.runnable.',
+};
+
+// Special object property constants
+export const WEAVE_EXPANDED_REF_PROPS = {
+  REF: '__ref__',
+  VAL: '__val__',
+};
+
+// Common field name constants
+export const FIELD_NAMES = {
+  FEEDBACK_TYPE: 'feedback_type',
+  PAYLOAD: 'payload',
+  VALUE: 'value',
+  OUTPUT: 'output',
+  SUMMARY: 'summary',
+  WEAVE: 'weave',
+  FEEDBACK: 'feedback',
+  ID: 'id',
+  IS_NEW: 'isNew',
+  SERVER_VALUE: 'serverValue',
+  SELF: 'self',
+};
+
+// Weave metadata namespace
+export const WEAVE_NAMESPACE = '___weave';
+
 export interface SchemaField {
   name: string;
   type: string;
@@ -72,13 +110,22 @@ export const extractTopLevelFields = (obj: any, prefix = ''): SchemaField[] => {
   }
 
   // Special handling for __ref__ and __val__ pattern
-  if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
-    if (typeof obj.__val__ === 'object' && !Array.isArray(obj.__val__)) {
+  if (
+    typeof obj === 'object' &&
+    WEAVE_EXPANDED_REF_PROPS.REF in obj &&
+    WEAVE_EXPANDED_REF_PROPS.VAL in obj
+  ) {
+    if (
+      typeof obj[WEAVE_EXPANDED_REF_PROPS.VAL] === 'object' &&
+      !Array.isArray(obj[WEAVE_EXPANDED_REF_PROPS.VAL])
+    ) {
       // For object values, extract its top-level fields
-      return extractTopLevelFields(obj.__val__, prefix);
+      return extractTopLevelFields(obj[WEAVE_EXPANDED_REF_PROPS.VAL], prefix);
     } else {
       // For primitive or array values, return as is
-      return [{name: prefix, type: inferType(obj.__val__)}];
+      return [
+        {name: prefix, type: inferType(obj[WEAVE_EXPANDED_REF_PROPS.VAL])},
+      ];
     }
   }
 
@@ -168,6 +215,30 @@ export const createTargetSchemaFromDenested = (data: any[]): SchemaField[] => {
   }));
 };
 
+// Type for feedback items to resolve TypeScript errors
+interface FeedbackItem {
+  feedback_type: string;
+  payload?: {
+    output?: Record<string, any>;
+    value?: any;
+  };
+  [key: string]: any;
+}
+
+// Type for weave metadata
+interface WeaveMetadata {
+  id: string;
+  isNew: boolean;
+  serverValue?: any;
+  [key: string]: any;
+}
+
+// Type for a row with weave metadata
+interface WeaveRow {
+  [WEAVE_NAMESPACE]: WeaveMetadata;
+  [key: string]: any;
+}
+
 /**
  * Creates a schema representation of call data (source) by only extracting
  * top-level fields under inputs and output, without deep flattening.
@@ -179,22 +250,25 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
     return allFields;
   }
 
+  // Add input and output fields
   calls.forEach(call => {
     // Skip if call or call.val is undefined
     if (!call || !call.val) {
       return;
     }
 
+    // Extract input fields
     if (call.val.inputs) {
       Object.entries(call.val.inputs).forEach(([key, value]) => {
         allFields.push({
-          name: `inputs.${key}`,
+          name: `${FIELD_PREFIX.INPUTS}${key}`,
           type: inferType(value),
         });
       });
     }
 
-    const output = call.val.output;
+    // Extract output fields
+    const output = unwrapRefValue(call.val.output);
     if (output !== undefined) {
       if (
         output !== null &&
@@ -203,18 +277,73 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
       ) {
         Object.entries(output).forEach(([key, value]) => {
           allFields.push({
-            name: `output.${key}`,
+            name: `${FIELD_PREFIX.OUTPUT}${key}`,
             type: inferType(value),
           });
         });
       } else {
-        allFields.push({name: 'output', type: inferType(output)});
+        allFields.push({name: FIELD_NAMES.OUTPUT, type: inferType(output)});
+      }
+    }
+
+    // Extract feedback fields (annotations and runnables) from summary.weave.feedback
+    const summary = call.val.summary || {};
+    const weave = summary.weave || {};
+    const feedback = weave.feedback;
+
+    if (feedback) {
+      if (Array.isArray(feedback)) {
+        // Process each feedback item
+        feedback.forEach(item => {
+          const feedbackItem = item as FeedbackItem;
+          if (
+            typeof feedbackItem === 'object' &&
+            feedbackItem !== null &&
+            feedbackItem.feedback_type
+          ) {
+            const fieldName = getFieldNameFromFeedbackType(
+              feedbackItem.feedback_type
+            );
+
+            if (fieldName) {
+              // We've already filtered out runnables in getFieldNameFromFeedbackType
+              // Add field to schema (only for annotations now)
+              allFields.push({
+                name: fieldName,
+                type: inferType(feedbackItem.payload?.value),
+              });
+            }
+          }
+        });
+      } else if (typeof feedback === 'object' && feedback !== null) {
+        // Process object-form feedback
+        Object.entries(feedback).forEach(([feedbackType, feedbackItem]) => {
+          const fieldName = getFieldNameFromFeedbackType(feedbackType);
+
+          if (
+            fieldName &&
+            typeof feedbackItem === 'object' &&
+            feedbackItem !== null
+          ) {
+            // We've already filtered out runnables in getFieldNameFromFeedbackType
+            const typedFeedbackItem = feedbackItem as FeedbackItem;
+
+            // Add field to schema (only for annotations now)
+            allFields.push({
+              name: fieldName,
+              type: inferType(typedFeedbackItem.payload?.value),
+            });
+          }
+        });
       }
     }
   });
 
   return allFields
-    .filter(field => !field.name.startsWith('inputs.self'))
+    .filter(
+      field =>
+        !field.name.startsWith(`${FIELD_PREFIX.INPUTS}${FIELD_NAMES.SELF}`)
+    )
     .reduce((acc, field) => {
       if (!acc.some(f => f.name === field.name)) {
         acc.push(field);
@@ -244,8 +373,11 @@ export const unwrapRefValue = (value: any): any => {
   }
 
   // If this is an expanded reference object, return just the __val__ part (recursively unwrapped)
-  if (value.__ref__ && value.__val__) {
-    return unwrapRefValue(value.__val__);
+  if (
+    value[WEAVE_EXPANDED_REF_PROPS.REF] &&
+    value[WEAVE_EXPANDED_REF_PROPS.VAL]
+  ) {
+    return unwrapRefValue(value[WEAVE_EXPANDED_REF_PROPS.VAL]);
   }
 
   // Handle arrays
@@ -314,6 +446,20 @@ export const mapCallsToDatasetRows = (
 ) => {
   const resolveValue = (obj: any, path: string): any => {
     const parts = path.split('.');
+
+    // Handle the standard "output" field directly
+    if (path === FIELD_NAMES.OUTPUT) {
+      return unwrapRefValue(obj.output);
+    }
+
+    // Special handling for feedback fields (annotations and runnables)
+    if (isFeedbackField(path)) {
+      const summary = obj.summary || {};
+      const weave = summary.weave || {};
+      return getFeedbackValue(weave.feedback, path);
+    }
+
+    // Regular path resolution for non-feedback fields
     let current = obj;
 
     for (const part of parts) {
@@ -379,12 +525,19 @@ export const mapCallsToDatasetRows = (
     fieldMappings.forEach(mapping => {
       const inputs = call.val.inputs || {};
       const output = call.val.output;
+      const summary = call.val.summary || {};
 
       let sourceValue: any;
-      if (mapping.sourceField === 'output' && typeof output === 'string') {
+      if (
+        mapping.sourceField === FIELD_NAMES.OUTPUT &&
+        typeof output === 'string'
+      ) {
         sourceValue = output;
       } else {
-        sourceValue = resolveValue({inputs, output}, mapping.sourceField);
+        sourceValue = resolveValue(
+          {inputs, output, summary},
+          mapping.sourceField
+        );
       }
 
       if (sourceValue !== undefined) {
@@ -407,12 +560,12 @@ export const mapCallsToDatasetRows = (
     });
 
     return {
-      ___weave: {
+      [WEAVE_NAMESPACE]: {
         id: call.digest,
         isNew: true,
       },
       ...rowData,
-    };
+    } as WeaveRow;
   });
 };
 
@@ -424,36 +577,30 @@ export const mapCallsToDatasetRows = (
  * @returns Filtered rows containing only the specified target fields
  */
 export function filterRowsForNewDataset(
-  mappedRows: Array<{
-    ___weave: {id: string; isNew: boolean};
-    [key: string]: any;
-  }>,
+  mappedRows: WeaveRow[],
   targetFields: Set<string>
-): Array<{___weave: {id: string; isNew: boolean}; [key: string]: any}> {
+): WeaveRow[] {
   return mappedRows
     .map(row => {
       try {
-        if (!row || typeof row !== 'object' || !row.___weave) {
+        if (!row || typeof row !== 'object' || !row[WEAVE_NAMESPACE]) {
           return undefined;
         }
 
-        const {___weave, ...rest} = row;
+        const {[WEAVE_NAMESPACE]: weaveData, ...rest} = row;
         const filteredData = Object.fromEntries(
           Object.entries(rest).filter(([key]) => targetFields.has(key))
         );
         return {
-          ___weave,
+          [WEAVE_NAMESPACE]: weaveData,
           ...filteredData,
-        };
+        } as WeaveRow;
       } catch (rowError) {
         console.error('Error processing row:', rowError);
         return undefined;
       }
     })
-    .filter(row => row !== undefined) as Array<{
-    ___weave: {id: string; isNew: boolean};
-    [key: string]: any;
-  }>;
+    .filter((row): row is WeaveRow => row !== undefined);
 }
 
 /**
@@ -464,22 +611,19 @@ export function filterRowsForNewDataset(
  * @returns A Map of row IDs to processed row data
  */
 export function createProcessedRowsMap(
-  mappedRows: Array<{
-    ___weave: {id: string; isNew: boolean};
-    [key: string]: any;
-  }>,
+  mappedRows: WeaveRow[],
   datasetObject: any
 ): Map<string, any> {
   return new Map(
     mappedRows
-      .filter(row => row && row.___weave && row.___weave.id)
+      .filter(row => row && row[WEAVE_NAMESPACE] && row[WEAVE_NAMESPACE].id)
       .map(row => {
         // If datasetObject has a schema, filter row properties to match schema fields
         if (datasetObject?.schema && Array.isArray(datasetObject.schema)) {
           const schemaFields = new Set(
             datasetObject.schema.map((f: {name: string}) => f.name)
           );
-          const {___weave, ...rest} = row;
+          const {[WEAVE_NAMESPACE]: weaveData, ...rest} = row;
 
           // Only include fields that are in the schema
           const filteredData = Object.fromEntries(
@@ -487,29 +631,50 @@ export function createProcessedRowsMap(
           );
 
           return [
-            row.___weave.id,
+            row[WEAVE_NAMESPACE].id,
             {
               ...filteredData,
-              ___weave: {...row.___weave, serverValue: filteredData},
+              [WEAVE_NAMESPACE]: {...weaveData, serverValue: filteredData},
             },
           ];
         }
 
         // Default case - keep all fields
         return [
-          row.___weave.id,
-          {...row, ___weave: {...row.___weave, serverValue: row}},
+          row[WEAVE_NAMESPACE].id,
+          {
+            ...row,
+            [WEAVE_NAMESPACE]: {...row[WEAVE_NAMESPACE], serverValue: row},
+          },
         ];
       })
   );
 }
 
 /**
+ * Removes prefixes from a field name for comparison purposes
+ * @param fieldName Field name that might have prefixes
+ * @returns Field name without prefixes
+ */
+const removeFieldPrefixes = (fieldName: string): string => {
+  if (fieldName.startsWith(FIELD_PREFIX.INPUTS)) {
+    return fieldName.replace(FIELD_PREFIX.INPUTS, '');
+  } else if (fieldName.startsWith(FIELD_PREFIX.OUTPUT)) {
+    return fieldName.replace(FIELD_PREFIX.OUTPUT, '');
+  } else if (fieldName.startsWith(FIELD_PREFIX.ANNOTATIONS)) {
+    return fieldName.replace(FIELD_PREFIX.ANNOTATIONS, '');
+  } else if (fieldName.startsWith(FIELD_PREFIX.SCORER)) {
+    return fieldName.replace(FIELD_PREFIX.SCORER, '');
+  }
+  return fieldName;
+};
+
+/**
  * Suggests field mappings between source and target schemas.
  *
  * This function attempts to match fields between schemas using various strategies:
  * 1. Preserves existing mappings if the fields still exist
- * 2. Matches fields with identical names
+ * 2. Matches fields with identical names after removing prefixes
  * 3. Matches fields where one name contains the other
  *
  * @param sourceSchema - Array of fields in the source schema
@@ -546,10 +711,13 @@ export const suggestFieldMappings = (
       return;
     }
 
-    // Try to find a matching source field by exact name
-    const exactMatch = sourceSchema.find(
-      sourceField => sourceField.name === targetField.name
-    );
+    // Try to find a matching source field by exact name after removing prefixes
+    const targetNameNoPrefixes = removeFieldPrefixes(targetField.name);
+    const exactMatch = sourceSchema.find(sourceField => {
+      const sourceNameNoPrefixes = removeFieldPrefixes(sourceField.name);
+      return sourceNameNoPrefixes === targetNameNoPrefixes;
+    });
+
     if (exactMatch) {
       newMappings.push({
         targetField: targetField.name,
@@ -559,9 +727,13 @@ export const suggestFieldMappings = (
     }
 
     // Try to find a matching source field by name containing the target field name
-    const containsMatch = sourceSchema.find(sourceField =>
-      sourceField.name.toLowerCase().includes(targetField.name.toLowerCase())
-    );
+    const containsMatch = sourceSchema.find(sourceField => {
+      const sourceNameNoPrefixes = removeFieldPrefixes(sourceField.name);
+      return sourceNameNoPrefixes
+        .toLowerCase()
+        .includes(targetNameNoPrefixes.toLowerCase());
+    });
+
     if (containsMatch) {
       newMappings.push({
         targetField: targetField.name,
@@ -571,9 +743,13 @@ export const suggestFieldMappings = (
     }
 
     // Try to find a matching source field where the target field name contains the source field name
-    const reverseContainsMatch = sourceSchema.find(sourceField =>
-      targetField.name.toLowerCase().includes(sourceField.name.toLowerCase())
-    );
+    const reverseContainsMatch = sourceSchema.find(sourceField => {
+      const sourceNameNoPrefixes = removeFieldPrefixes(sourceField.name);
+      return targetNameNoPrefixes
+        .toLowerCase()
+        .includes(sourceNameNoPrefixes.toLowerCase());
+    });
+
     if (reverseContainsMatch) {
       newMappings.push({
         targetField: targetField.name,
@@ -586,4 +762,198 @@ export const suggestFieldMappings = (
   });
 
   return newMappings;
+};
+
+/**
+ * Extracts the field name from a feedback_type string.
+ * For annotations: "wandb.annotation.Quality" -> "annotations.Quality"
+ * For runnables: "wandb.runnable.toxicity" -> "scorer.toxicity" (currently disabled)
+ */
+export const getFieldNameFromFeedbackType = (
+  feedbackType: string
+): string | null => {
+  if (feedbackType.startsWith(FEEDBACK_TYPE.ANNOTATION_PREFIX)) {
+    const annotationType = feedbackType.substring(
+      FEEDBACK_TYPE.ANNOTATION_PREFIX.length
+    );
+    return `${FIELD_PREFIX.ANNOTATIONS}${annotationType}`;
+  }
+
+  if (feedbackType.startsWith(FEEDBACK_TYPE.RUNNABLE_PREFIX)) {
+    // Currently returning null to disable runnable fields
+    // const scorerName = feedbackType.substring(FEEDBACK_TYPE.RUNNABLE_PREFIX.length);
+    // return `${FIELD_PREFIX.SCORER}${scorerName}`;
+    return null;
+  }
+
+  return null;
+};
+
+/**
+ * Determines if a field name might represent a feedback field (annotation or runnable).
+ * Uses prefixed format: "annotations.*" for annotations, "scorer.*" for runnable scorers.
+ */
+export const isFeedbackField = (fieldName: string): boolean => {
+  // Check for annotation fields
+  if (fieldName.startsWith(FIELD_PREFIX.ANNOTATIONS)) {
+    return true;
+  }
+
+  // Check for scorer fields (currently disabled)
+  if (fieldName.startsWith(FIELD_PREFIX.SCORER)) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Extracts a feedback value from feedback data for a given field name.
+ * Works with both array and object formats of feedback data.
+ * Handles prefixed field names: "annotations.*" for annotations, "scorer.*" for runnable scorers.
+ */
+export const getFeedbackValue = (feedback: any, fieldName: string): any => {
+  if (!feedback) {
+    return undefined;
+  }
+
+  // Parse prefixed field name
+  let prefix: string | null = null;
+  let actualName: string | null = null;
+
+  if (fieldName.startsWith(FIELD_PREFIX.ANNOTATIONS)) {
+    prefix = 'annotations';
+    actualName = fieldName.substring(FIELD_PREFIX.ANNOTATIONS.length);
+  } else if (fieldName.startsWith(FIELD_PREFIX.SCORER)) {
+    prefix = 'scorer';
+    actualName = fieldName.substring(FIELD_PREFIX.SCORER.length);
+  }
+
+  if (!prefix || !actualName) {
+    return undefined;
+  }
+
+  // For annotation fields
+  if (prefix === 'annotations') {
+    // Handle array format
+    if (Array.isArray(feedback)) {
+      const annotationItem = feedback.find(item => {
+        const feedbackItem = item as FeedbackItem;
+        return (
+          feedbackItem &&
+          typeof feedbackItem === 'object' &&
+          feedbackItem.feedback_type ===
+            `${FEEDBACK_TYPE.ANNOTATION_PREFIX}${actualName}`
+        );
+      });
+
+      if (annotationItem) {
+        const typedItem = annotationItem as FeedbackItem;
+        return typedItem.payload?.value;
+      }
+      return undefined;
+    }
+
+    // Handle object format (post-processed)
+    if (typeof feedback === 'object' && feedback !== null) {
+      const annotationKey = `${FEEDBACK_TYPE.ANNOTATION_PREFIX}${actualName}`;
+      if (feedback[annotationKey]) {
+        const typedItem = feedback[annotationKey] as FeedbackItem;
+        return typedItem.payload?.value;
+      }
+    }
+  }
+
+  // For scorer fields (not currently used since we're returning null for scorers)
+  if (prefix === 'scorer') {
+    // Handle array format
+    if (Array.isArray(feedback)) {
+      const scorerItem = feedback.find(item => {
+        const feedbackItem = item as FeedbackItem;
+        return (
+          feedbackItem &&
+          typeof feedbackItem === 'object' &&
+          feedbackItem.feedback_type ===
+            `${FEEDBACK_TYPE.RUNNABLE_PREFIX}${actualName}`
+        );
+      });
+
+      if (scorerItem) {
+        const typedItem = scorerItem as FeedbackItem;
+        if (
+          typedItem.payload?.output &&
+          typeof typedItem.payload.output === 'object'
+        ) {
+          return typedItem.payload.output;
+        }
+        return typedItem.payload?.value;
+      }
+      return undefined;
+    }
+
+    // Handle object format (post-processed)
+    if (typeof feedback === 'object' && feedback !== null) {
+      const scorerKey = `${FEEDBACK_TYPE.RUNNABLE_PREFIX}${actualName}`;
+      if (feedback[scorerKey]) {
+        const typedItem = feedback[scorerKey] as FeedbackItem;
+        if (
+          typedItem.payload?.output &&
+          typeof typedItem.payload.output === 'object'
+        ) {
+          return typedItem.payload.output;
+        }
+        return typedItem.payload?.value;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+/**
+ * Generates preview data for fields across all calls
+ *
+ * @param sourceSchema - Schema fields to generate previews for
+ * @param selectedCalls - Call data to extract values from
+ * @returns A Map where keys are field names and values are arrays of records with field values
+ */
+export const generateFieldPreviews = (
+  sourceSchema: SchemaField[],
+  selectedCalls: CallData[]
+): Map<string, Array<Record<string, any>>> => {
+  const previews = new Map<string, Array<Record<string, any>>>();
+
+  sourceSchema.forEach(field => {
+    const fieldData = selectedCalls.map(call => {
+      let value: any;
+
+      // Handle standard input/output fields first
+      if (field.name === FIELD_NAMES.OUTPUT) {
+        value = unwrapRefValue(call.val.output);
+      } else if (field.name.startsWith(FIELD_PREFIX.INPUTS)) {
+        const path = field.name.slice(FIELD_PREFIX.INPUTS.length).split('.');
+        value = getNestedValue(call.val.inputs, path);
+      } else if (field.name.startsWith(FIELD_PREFIX.OUTPUT)) {
+        if (typeof call.val.output === 'object' && call.val.output !== null) {
+          const path = field.name.slice(FIELD_PREFIX.OUTPUT.length).split('.');
+          value = getNestedValue(call.val.output, path);
+        } else {
+          value = unwrapRefValue(call.val.output);
+        }
+      }
+      // Special handling for feedback fields (annotations and runnables)
+      else if (isFeedbackField(field.name)) {
+        const summary = call.val.summary || {};
+        const weave = summary.weave || {};
+        value = getFeedbackValue(weave.feedback, field.name);
+      } else {
+        // General path resolution for any other fields
+        const path = field.name.split('.');
+        value = getNestedValue(call.val, path);
+      }
+      return {[field.name]: value};
+    });
+    previews.set(field.name, fieldData);
+  });
+  return previews;
 };
