@@ -250,7 +250,7 @@ class ImperativeEvaluationLogger(BaseModel):
     using the `log_prediction` method, and finished when the `log_summary` method
     is called.
 
-    Each time you log a prediction, you will get back an `ImperativePredictionLogger`
+    Each time you log a prediction, you will get back an `ImperativeScoreLogger`
     object.  You can use this object to log scores and metadata for that specific
     prediction (see that class for more details).
 
@@ -386,9 +386,9 @@ class ImperativeEvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -460,9 +460,9 @@ class ImperativeEvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 self._pseudo_evaluation.summarize()
