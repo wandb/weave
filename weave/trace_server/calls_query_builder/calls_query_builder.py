@@ -1184,22 +1184,25 @@ def process_ref_filters_to_sql(
     ):
         return ""
 
-    def process_ref_filter(field_name: str) -> str:
+    def process_ref_filter(field_name: str, refs: list[str]) -> str:
         field = get_field_by_name(field_name)
         if not isinstance(field, CallsMergedAggField):
             raise TypeError(f"{field_name} is not an aggregate field")
 
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        param = param_builder.add_param(hardcoded_filter.filter.output_refs)
+        param = param_builder.add_param(refs)
         ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
-    if hardcoded_filter.filter.output_refs:
-        ref_filters.append(process_ref_filter("output_refs"))
-
     if hardcoded_filter.filter.input_refs:
-        ref_filters.append(process_ref_filter("input_refs"))
+        ref_filters.append(
+            process_ref_filter("input_refs", hardcoded_filter.filter.input_refs)
+        )
+    if hardcoded_filter.filter.output_refs:
+        ref_filters.append(
+            process_ref_filter("output_refs", hardcoded_filter.filter.output_refs)
+        )
 
     if not ref_filters:
         return ""

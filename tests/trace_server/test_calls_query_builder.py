@@ -2039,8 +2039,8 @@ def test_input_output_refs_filter():
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={
-            "input_refs": ["weave-trace-internal:///%"],
-            "output_refs": ["weave-trace-internal:///%"],
+            "input_refs": ["weave-trace-internal:///222222222222%"],
+            "output_refs": ["weave-trace-internal:///111111111111%"],
         }
     )
     assert_sql(
@@ -2050,10 +2050,10 @@ def test_input_output_refs_filter():
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_4:String}
-            AND ((hasAny(calls_merged.output_refs, {pb_2:Array(String)})
-                OR length(calls_merged.output_refs) = 0)
-            AND (hasAny(calls_merged.input_refs, {pb_3:Array(String)})
-                OR length(calls_merged.input_refs) = 0))
+            AND ((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
+                OR length(calls_merged.input_refs) = 0)
+            AND (hasAny(calls_merged.output_refs, {pb_3:Array(String)})
+                OR length(calls_merged.output_refs) = 0))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -2062,10 +2062,10 @@ def test_input_output_refs_filter():
         """,
         {
             "pb_4": "project",
-            "pb_0": ["weave-trace-internal:///%"],
-            "pb_1": ["weave-trace-internal:///%"],
-            "pb_2": ["weave-trace-internal:///%"],
-            "pb_3": ["weave-trace-internal:///%"],
+            "pb_0": ["weave-trace-internal:///222222222222%"],
+            "pb_1": ["weave-trace-internal:///111111111111%"],
+            "pb_2": ["weave-trace-internal:///222222222222%"],
+            "pb_3": ["weave-trace-internal:///111111111111%"],
         },
     )
 
