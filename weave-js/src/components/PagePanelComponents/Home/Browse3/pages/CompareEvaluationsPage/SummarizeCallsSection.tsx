@@ -1,0 +1,379 @@
+import {Box} from '@material-ui/core';
+import {Alert} from '@mui/material';
+import React, {useMemo} from 'react';
+
+import {Pill} from '@wandb/weave/components/Tag/Pill';
+import {EvaluationComparisonState} from './ecpState';
+import {TraceCallData} from './ecpTypes';
+import {VerticalBox} from './Layout';
+
+// Common border styles
+const BORDER_COLOR = '#e0e0e0';
+const STANDARD_BORDER = `1px solid ${BORDER_COLOR}`;
+
+export const SummarizeCallsSection: React.FC<{
+  summarizeCalls: Array<TraceCallData>;
+  entity?: string;
+  project?: string;
+  state: EvaluationComparisonState;
+}> = ({summarizeCalls, entity, project, state}) => {
+  // Group calls by their parent evaluation
+  const callsByParent = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+
+    summarizeCalls.forEach(call => {
+      const parentId = call.traceCall?.parent_id || 'unknown';
+      if (!grouped[parentId]) {
+        grouped[parentId] = [];
+      }
+      grouped[parentId].push(call);
+    });
+
+    return grouped;
+  }, [summarizeCalls]);
+
+  // Column headers (evaluation IDs)
+  const evaluationIds = useMemo(() => {
+    // Get evaluation IDs in the same order as they appear in the state
+    // and reverse the array to match the order in the rest of the UI
+    return Object.keys(state.summary.evaluationCalls).reverse();
+  }, [state.summary.evaluationCalls]);
+
+  // Extract all unique metrics from all summarize calls
+  const allMetrics = useMemo(() => {
+    const metrics = new Set<string>();
+
+    // For each parent evaluation that has summarize calls
+    Object.entries(callsByParent).forEach(([parentId, calls]) => {
+      if (calls.length > 0) {
+        // Get the first call's output data
+        const call = calls[0];
+        const resultObj = call?.traceCall?.result_obj;
+        const output = call?.traceCall?.output; // Check traceCall.output as indicated by user
+        const inputs = call?.traceCall?.inputs || {};
+
+        // Try various paths where metrics might be stored
+        const potentialMetricsObjects = [
+          output, // Direct output
+          resultObj, // Direct result object
+          resultObj?.metrics, // Common pattern: {metrics: {...}}
+          resultObj?.summary, // Common pattern: {summary: {...}}
+          resultObj?.result, // Common pattern: {result: {...}}
+          inputs?.summary, // Sometimes the summary is in the inputs
+        ];
+
+        // Check each potential path for metrics
+        potentialMetricsObjects.forEach(metricsObj => {
+          if (metricsObj && typeof metricsObj === 'object') {
+            Object.keys(metricsObj).forEach(key => {
+              metrics.add(key);
+            });
+          }
+        });
+      }
+    });
+
+    return Array.from(metrics).sort();
+  }, [callsByParent]);
+
+  // If no summarize calls, show message
+  if (summarizeCalls.length === 0) {
+    return (
+      <Alert severity="info">
+        No summarize calls found for the selected evaluations.
+      </Alert>
+    );
+  }
+
+  // If no metrics found, show message
+  if (allMetrics.length === 0) {
+    return (
+      <Alert severity="info">
+        No metrics data found in the summarize calls. Check the console for
+        debugging information.
+      </Alert>
+    );
+  }
+
+  // Function to get metric value from a call
+  const getMetricValue = (call: any, metricName: string) => {
+    if (!call) return undefined;
+
+    // Try various possible paths to find the metric
+    const resultObj = call.traceCall?.result_obj;
+    const output = call.traceCall?.output; // Check direct output as mentioned by user
+    const inputs = call.traceCall?.inputs || {};
+
+    // Check common paths where metrics might be stored
+    const potentialSources = [
+      output, // Direct output as mentioned by user
+      resultObj, // Direct result object
+      resultObj?.metrics, // Common pattern: {metrics: {...}}
+      resultObj?.summary, // Common pattern: {summary: {...}}
+      resultObj?.result, // Common pattern: {result: {...}}
+      inputs?.summary, // Sometimes the summary is in the inputs
+    ];
+
+    // Look for the metric in each potential source
+    for (const source of potentialSources) {
+      if (
+        source &&
+        typeof source === 'object' &&
+        source[metricName] !== undefined
+      ) {
+        return source[metricName];
+      }
+    }
+
+    return undefined;
+  };
+
+  // Common table styles
+  const tableStyle = {
+    display: 'table',
+    width: '100%',
+    border: STANDARD_BORDER,
+    borderSpacing: 0,
+    borderCollapse: 'collapse' as const,
+  };
+
+  // Common cell styles
+  const cellStyle = {
+    padding: '8px 16px',
+    borderRight: STANDARD_BORDER,
+    borderBottom: STANDARD_BORDER,
+  };
+
+  // Last cell in a row style
+  const lastCellStyle = {
+    ...cellStyle,
+    borderRight: 'none',
+  };
+
+  // Header cell style
+  const headerCellStyle = {
+    ...cellStyle,
+    fontWeight: 'bold' as const,
+    bgcolor: '#f5f5f5',
+  };
+
+  // Header last cell style
+  const headerLastCellStyle = {
+    ...headerCellStyle,
+    borderRight: 'none',
+  };
+
+  return (
+    <VerticalBox>
+      {/* Main content area */}
+      <Box>
+        {/* Output section */}
+        <Box sx={tableStyle}>
+          {/* Header row */}
+          <Box
+            sx={{
+              display: 'table-row',
+              bgcolor: '#f5f5f5',
+            }}>
+            <Box
+              sx={{
+                display: 'table-cell',
+                width: '200px',
+                ...headerCellStyle,
+              }}>
+              Metric
+            </Box>
+            {evaluationIds.map((evalId, colIndex) => {
+              const isLast = colIndex === evaluationIds.length - 1;
+              return (
+                <Box
+                  key={evalId}
+                  sx={{
+                    display: 'table-cell',
+                    ...(isLast ? headerLastCellStyle : headerCellStyle),
+                    textAlign: 'center',
+                  }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Box
+                      sx={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        bgcolor: state.summary.evaluationCalls[evalId].color,
+                        marginRight: '8px',
+                      }}
+                    />
+                    {state.summary.evaluationCalls[evalId].name || 'model'}
+                    <Pill color="moon" label={evalId.slice(-4)} />
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Render metrics from summarize calls */}
+          {allMetrics.map((metricName, metricIndex) => {
+            // Get a sample of this metric to determine type
+            let sampleValue;
+            for (const [, calls] of Object.entries(callsByParent)) {
+              if (calls.length > 0) {
+                const value = getMetricValue(calls[0], metricName);
+                if (value !== undefined) {
+                  sampleValue = value;
+                  break;
+                }
+              }
+            }
+
+            const isObject =
+              typeof sampleValue === 'object' &&
+              sampleValue !== null &&
+              !Array.isArray(sampleValue);
+            // Use alternating colors for parent rows
+            const parentRowBgColor =
+              metricIndex % 2 === 0 ? '#f8f8f8' : '#ffffff';
+
+            return (
+              <React.Fragment key={metricName}>
+                {/* Parent row for metric */}
+                <Box
+                  sx={{
+                    display: 'table-row',
+                    bgcolor: parentRowBgColor,
+                  }}>
+                  <Box
+                    sx={{
+                      display: 'table-cell',
+                      ...cellStyle,
+                      fontWeight: 'bold',
+                      textAlign: 'left',
+                    }}>
+                    {metricName}
+                  </Box>
+
+                  {evaluationIds.map((evalId, colIndex) => {
+                    const isLast = colIndex === evaluationIds.length - 1;
+                    // Find call for this evaluation
+                    const evalCalls = callsByParent[evalId] || [];
+                    const evalCall = evalCalls[0];
+                    const value = evalCall
+                      ? getMetricValue(evalCall, metricName)
+                      : undefined;
+
+                    return (
+                      <Box
+                        key={evalId}
+                        sx={{
+                          display: 'table-cell',
+                          ...(isLast ? lastCellStyle : cellStyle),
+                          textAlign: 'center',
+                          color: typeof value === 'object' ? '#666' : 'inherit',
+                          fontStyle:
+                            typeof value === 'object' ? 'italic' : 'normal',
+                        }}>
+                        {typeof value === 'object' && value !== null
+                          ? `${Object.keys(value).length} properties`
+                          : typeof value === 'number'
+                          ? value.toFixed(4)
+                          : value !== undefined
+                          ? String(value)
+                          : '-'}
+                      </Box>
+                    );
+                  })}
+                </Box>
+
+                {/* Child rows for object properties */}
+                {isObject &&
+                  Object.entries(sampleValue).map(
+                    ([subKey, subValue], subIdx) => {
+                      // Use consistent alternating colors for child rows regardless of parent
+                      const childRowBgColor =
+                        (metricIndex % 2 === 0 && subIdx % 2 === 0) ||
+                        (metricIndex % 2 === 1 && subIdx % 2 === 1)
+                          ? '#f0f0f0'
+                          : '#ffffff';
+
+                      return (
+                        <Box
+                          key={`${metricName}.${subKey}`}
+                          sx={{
+                            display: 'table-row',
+                            bgcolor: childRowBgColor,
+                          }}>
+                          <Box
+                            sx={{
+                              display: 'table-cell',
+                              ...cellStyle,
+                              padding: '8px 16px 8px 32px', // Increased left padding for hierarchy
+                              fontWeight: 'normal',
+                              textAlign: 'left',
+                            }}>
+                            {subKey}
+                          </Box>
+
+                          {evaluationIds.map((evalId, colIndex) => {
+                            const isLast =
+                              colIndex === evaluationIds.length - 1;
+                            // Find call for this evaluation
+                            const evalCalls = callsByParent[evalId] || [];
+                            const evalCall = evalCalls[0];
+                            const parentValue = evalCall
+                              ? getMetricValue(evalCall, metricName)
+                              : undefined;
+                            const nestedValue =
+                              typeof parentValue === 'object' &&
+                              parentValue !== null
+                                ? parentValue[subKey]
+                                : undefined;
+
+                            return (
+                              <Box
+                                key={evalId}
+                                sx={{
+                                  display: 'table-cell',
+                                  ...(isLast ? lastCellStyle : cellStyle),
+                                  textAlign:
+                                    typeof nestedValue === 'object'
+                                      ? 'left'
+                                      : 'center',
+                                }}>
+                                {typeof nestedValue === 'object' &&
+                                nestedValue !== null ? (
+                                  <pre
+                                    style={{
+                                      margin: 0,
+                                      fontSize: '0.9em',
+                                      whiteSpace: 'pre-wrap',
+                                      wordBreak: 'break-word',
+                                      textAlign: 'left',
+                                    }}>
+                                    {JSON.stringify(nestedValue, null, 2)}
+                                  </pre>
+                                ) : typeof nestedValue === 'number' ? (
+                                  nestedValue.toFixed(4)
+                                ) : nestedValue !== undefined ? (
+                                  String(nestedValue)
+                                ) : (
+                                  '-'
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      );
+                    }
+                  )}
+              </React.Fragment>
+            );
+          })}
+        </Box>
+      </Box>
+    </VerticalBox>
+  );
+};
