@@ -1,5 +1,4 @@
 import {EditingNode, Stack, Type} from '../../model';
-// tslint:disable-next-line:no-circular-imports
 import type {WeaveInterface} from '../../weaveInterface';
 import {ExpressionResult, LanguageBinding} from '../types';
 import {parseCG} from './parser';

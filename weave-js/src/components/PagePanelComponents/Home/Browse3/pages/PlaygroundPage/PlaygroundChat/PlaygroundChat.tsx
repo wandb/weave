@@ -1,15 +1,18 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
-import {MOON_200, MOON_500, WHITE} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
-import {TargetBlank} from '@wandb/weave/common/util/links';
+import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import getConfig from '@wandb/weave/config';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {Empty} from '../../common/Empty';
-import {EMPTY_PROPS_NO_LLM_PROVIDERS} from '../../common/EmptyContent';
+import {
+  EMPTY_PROPS_NO_LLM_PROVIDERS,
+  EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
+} from '../../common/EmptyContent';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
@@ -17,6 +20,7 @@ import {useConfiguredProviders} from '../useConfiguredProviders';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
+import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 import {useChatCompletionFunctions} from './useChatCompletionFunctions';
 import {
   SetPlaygroundStateFieldFunctionType,
@@ -24,66 +28,46 @@ import {
 } from './useChatFunctions';
 
 const EmptyWithSettingsButton: React.FC<{
-  emptyProps: typeof EMPTY_PROPS_NO_LLM_PROVIDERS;
-  onSettingsClick: () => void;
   entity: string;
   project: string;
-}> = ({emptyProps, onSettingsClick, entity, project}) => {
-  const {urlPrefixed} = getConfig();
+  isTeamAdmin: boolean;
+  onConfigureProvider: () => void;
+}> = ({entity, project, isTeamAdmin, onConfigureProvider}) => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const emptyProps = isTeamAdmin
+    ? EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN
+    : EMPTY_PROPS_NO_LLM_PROVIDERS;
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '24px',
-      }}>
-      <Empty {...emptyProps} />
+    <>
       <Box
         sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '8px',
+          gap: '16px',
         }}>
-        <Box sx={{display: 'flex', gap: '8px'}}>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              window.open(
-                urlPrefixed(`/${entity}/${project}/overview/providers`)
-              );
-            }}
-            size="medium">
-            View project providers
-          </Button>
+        <Empty {...emptyProps} />
+        {isTeamAdmin && (
           <Button
             variant="primary"
-            onClick={() => {
-              window.open(urlPrefixed(`/${entity}/settings`), '_blank');
-              onSettingsClick();
-            }}
+            onClick={() => setIsDrawerOpen(true)}
             icon="key-admin"
             size="medium">
-            Configure secrets
+            Configure provider
           </Button>
-        </Box>
-        <Tailwind>
-          <div
-            className="mt-[16px] max-w-[400px] text-center text-sm"
-            style={{color: MOON_500}}>
-            Example setup:
-            <br />
-            Find your OpenAI API key in your{' '}
-            <TargetBlank href="https://platform.openai.com/api-keys">
-              OpenAI dashboard
-            </TargetBlank>
-            . <br /> Use <code className="mx-1.5 text-sm">OPENAI_API_KEY</code>{' '}
-            as your team's secret.
-          </div>
-        </Tailwind>
+        )}
       </Box>
-    </Box>
+      <ProviderConfigDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          onConfigureProvider();
+          setIsDrawerOpen(false);
+        }}
+        entity={entity}
+      />
+    </>
   );
 };
 
@@ -95,6 +79,7 @@ export type PlaygroundChatProps = {
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
+  isOpenInPlayground?: boolean;
 };
 
 export const PlaygroundChat = ({
@@ -105,10 +90,14 @@ export const PlaygroundChat = ({
   setPlaygroundStateField,
   setSettingsTab,
   settingsTab,
+  isOpenInPlayground = false,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
-  const {result: configuredProviders, loading: configuredProvidersLoading} =
-    useConfiguredProviders(entity);
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entity);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
@@ -129,6 +118,13 @@ export const PlaygroundChat = ({
     setChatText('');
   };
 
+  const {userInfo} = useViewerInfo();
+  const {isAdmin: maybeTeamAdmin} = useIsTeamAdmin(
+    entity,
+    userInfo && 'username' in userInfo ? userInfo.username : ''
+  );
+  const isTeamAdmin = maybeTeamAdmin ?? false;
+
   // Check if any chat is loading
   const isAnyLoading = useMemo(
     () => playgroundStates.some(state => state.loading),
@@ -143,7 +139,7 @@ export const PlaygroundChat = ({
     return Object.values(configuredProviders).some(({status}) => status);
   }, [configuredProviders, configuredProvidersLoading]);
 
-  if (!hasConfiguredProviders) {
+  if (!hasConfiguredProviders && !isOpenInPlayground) {
     return (
       <Box
         sx={{
@@ -192,6 +188,10 @@ export const PlaygroundChat = ({
                 playgroundStates={playgroundStates}
                 entity={entity}
                 project={project}
+                isTeamAdmin={isTeamAdmin}
+                onConfigureProvider={() => {
+                  refetchConfiguredProviders();
+                }}
               />
             </Box>
             <Box
@@ -204,10 +204,12 @@ export const PlaygroundChat = ({
                 paddingTop: '48px',
               }}>
               <EmptyWithSettingsButton
-                emptyProps={EMPTY_PROPS_NO_LLM_PROVIDERS}
-                onSettingsClick={() => setSettingsTab(0)}
                 entity={entity}
                 project={project}
+                isTeamAdmin={isTeamAdmin}
+                onConfigureProvider={() => {
+                  refetchConfiguredProviders();
+                }}
               />
             </Box>
           </Box>
@@ -302,6 +304,10 @@ export const PlaygroundChat = ({
                   playgroundStates={playgroundStates}
                   entity={entity}
                   project={project}
+                  isTeamAdmin={isTeamAdmin}
+                  onConfigureProvider={() => {
+                    refetchConfiguredProviders();
+                  }}
                 />
               </Box>
               <Box

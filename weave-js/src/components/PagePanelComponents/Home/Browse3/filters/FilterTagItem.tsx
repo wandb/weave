@@ -22,6 +22,7 @@ import {
   isWeaveRef,
 } from './common';
 import {FilterTag} from './FilterTag';
+import {FilterTagStatus} from './FilterTagStatus';
 import {IdList} from './IdList';
 
 type FilterTagItemProps = {
@@ -54,6 +55,8 @@ export const FilterTagItem = ({
     value = <IdList ids={getStringList(item.value)} type="Call" />;
   } else if (fieldType === 'user') {
     value = <UserLink userId={item.value} hasPopover={false} />;
+  } else if (fieldType === 'status') {
+    value = <FilterTagStatus value={item.value} />;
   } else if (isWeaveRef(item.value)) {
     value = <SmallRef objRef={parseRef(item.value)} />;
   } else if (isValuelessOperator(item.operator)) {

@@ -66,7 +66,7 @@ const formatSmallTime = (then: moment.Moment): string | null => {
   }
 
   // Show weeks when exact multiple
-  if (days % 7 === 0) {
+  if (days >= 7 && days % 7 === 0) {
     return `${weeks}w`;
   }
 

@@ -17,7 +17,6 @@ import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
-
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -27,6 +26,8 @@ type PlaygroundChatTopBarProps = {
   project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
+  isTeamAdmin: boolean;
+  onConfigureProvider: () => void;
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -45,6 +46,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  isTeamAdmin,
+  onConfigureProvider,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -126,6 +129,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           }
           entity={entity}
           project={project}
+          isTeamAdmin={isTeamAdmin}
+          onConfigureProvider={onConfigureProvider}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />

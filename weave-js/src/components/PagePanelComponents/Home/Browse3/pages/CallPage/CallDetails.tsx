@@ -89,6 +89,7 @@ export const CallDetails: FC<{
     () => getDisplayInputsAndOutput(call),
     [call]
   );
+  const {otelSpan} = useMemo(() => getDisplayOtelSpan(call), [call]);
   const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
   const childCalls = useCalls(
     call.entity,
@@ -168,6 +169,29 @@ export const CallDetails: FC<{
                 mode: 'object_viewer',
               }}>
               <ObjectViewerSection title="Output" data={output} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
+          )}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
+            p: 2,
+          }}>
+          {otelSpan && Object.keys(otelSpan).length > 0 && (
+            <CustomWeaveTypeProjectContext.Provider
+              value={{
+                entity: call.entity,
+                project: call.project,
+                mode: 'object_viewer',
+              }}>
+              <ObjectViewerSection
+                title="OTEL Span"
+                data={otelSpan}
+                isExpanded
+              />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
@@ -255,6 +279,14 @@ export const CallDetails: FC<{
       </Box>
     </Box>
   );
+};
+
+const getDisplayOtelSpan = (call: CallSchema) => {
+  const span = call.rawSpan;
+  if ('otel_span' in span.attributes) {
+    return {otelSpan: span.attributes.otel_span};
+  }
+  return {};
 };
 
 const getDisplayInputsAndOutput = (call: CallSchema) => {

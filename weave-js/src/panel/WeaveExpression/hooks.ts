@@ -1,5 +1,6 @@
 import {computePosition, flip, offset, shift} from '@floating-ui/react';
 import {useIsMounted} from '@wandb/weave/common/util/hooks';
+import {makeEventRecorder} from '@wandb/weave/components/Panel2/panellib/libanalytics';
 import {
   AutosuggestResult,
   Parser,
@@ -25,6 +26,7 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
+const recordEvent = makeEventRecorder('Expression');
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -154,6 +156,7 @@ export const useWeaveExpressionState = (
   const onFocus = React.useCallback(() => {
     setIsFocused(true);
     propsOnFocus?.();
+    recordEvent('EDITOR_FOCUS');
   }, [setIsFocused, propsOnFocus]);
 
   // Internal state should never be reinstantiated, but props will change
@@ -306,17 +309,11 @@ export const useRunButtonVisualState = (
     }
 
     const maxLeft = containerNode.offsetWidth - buttonNode.offsetWidth - 5;
-    const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
-    // Using setProperty because we need the !important priority on these
-    // since semantic-ui also sets it.
-    if (naturalLeft > maxLeft) {
-      buttonNode.style.setProperty('opacity', '0.3', 'important');
-    } else {
-      buttonNode.style.setProperty('opacity', '1.0', 'important');
-    }
 
-    buttonNode.style.left = `${Math.min(maxLeft, naturalLeft)}px`;
-    buttonNode.style.top = `${grandOffset - 20}px`;
+    // Position the button at the far right edge of the container
+    buttonNode.style.setProperty('opacity', '1.0', 'important');
+    buttonNode.style.left = `${maxLeft}px`;
+    buttonNode.style.top = `${grandOffset - 22}px`;
   });
 
   return {
@@ -451,8 +448,12 @@ export const useSuggestionVisualState = ({
     trace(`SuggestionVisualState: showing`);
     element.style.opacity = '1';
 
+    // Use the DOM node of the current cursor position or selection for positioning
+    // instead of relying on the last child
+
     const lastChild = editor.children[editor.children.length - 1];
     const lastChildNode = ReactEditor.toDOMNode(editor, lastChild);
+
     computePosition(lastChildNode, element, {
       placement: 'bottom-start',
       middleware: [

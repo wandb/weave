@@ -10,18 +10,21 @@ const missingSecrets = (secrets: string[], providerKey: string[]): string => {
   return providerKey.filter(key => !secrets.includes(key)).join(', ');
 };
 
-type ProviderStatus = {
+export type ProviderStatus = {
   status: boolean;
   missingSecrets: string;
 };
 
-export const useConfiguredProviders = (
-  entityName: string
-): {
+export type ConfiguredProvidersResult = {
   result: Record<string, ProviderStatus>;
   loading: boolean;
-} => {
-  const {loading: secretsLoading, secrets} = useSecrets({entityName});
+  refetch: () => void;
+};
+
+export const useConfiguredProviders = (
+  entityName: string
+): ConfiguredProvidersResult => {
+  const {loading: secretsLoading, secrets, refetch} = useSecrets({entityName});
 
   const providers = LLM_PROVIDERS.reduce((acc, provider) => {
     acc[provider] = {
@@ -34,5 +37,6 @@ export const useConfiguredProviders = (
   return {
     result: secretsLoading ? {} : providers,
     loading: secretsLoading,
+    refetch,
   };
 };

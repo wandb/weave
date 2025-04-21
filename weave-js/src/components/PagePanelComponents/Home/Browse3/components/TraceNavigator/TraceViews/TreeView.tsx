@@ -137,7 +137,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-300"
               />
             ) : (
-              <div className="w-[8px]" />
+              <div className="w-[18px]" />
             )}
             <div className="truncate pl-4 font-medium">
               <Tooltip
@@ -428,9 +428,20 @@ export const TreeView: React.FC<
   const handleToggleExpand = (id: string) => {
     const newExpandedNodes = new Set(collapsedNodes);
     if (newExpandedNodes.has(id)) {
+      // When expanding, only remove current node from collapsed nodes
       newExpandedNodes.delete(id);
     } else {
-      newExpandedNodes.add(id);
+      // When collapsing, we add this node and all its descendants to collapsed nodes
+      const addDescendants = (nodeId: string) => {
+        newExpandedNodes.add(nodeId);
+        const node = traceTreeFlat[nodeId];
+        if (node) {
+          node.childrenIds.forEach(childId => {
+            addDescendants(childId);
+          });
+        }
+      };
+      addDescendants(id);
     }
     setCollapsedNodes(newExpandedNodes);
   };

@@ -64,6 +64,7 @@ import {
   DEFAULT_SORT_CALLS,
   filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
+import {WFHighLevelCallFilter} from './Browse3/pages/CallsPage/callsTableFilter';
 import {
   DEFAULT_FILTER_CALLS,
   useMakeInitialDatetimeFilter,
@@ -761,7 +762,7 @@ const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const isEvaluationsTab = tab === 'evaluations';
-  const initialFilter = useMemo(() => {
+  const initialFilter: WFHighLevelCallFilter = useMemo(() => {
     if (isEvaluationsTab) {
       return {
         frozen: true,
