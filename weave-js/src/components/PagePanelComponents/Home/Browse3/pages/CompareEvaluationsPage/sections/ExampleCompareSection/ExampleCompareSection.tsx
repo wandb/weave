@@ -199,6 +199,18 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
 
+const safeParseRef = (ref: any): WeaveObjectRef | null => {
+  if (!ref || typeof ref !== 'string') {
+    return null;
+  }
+
+  try {
+    return parseRef(ref) as WeaveObjectRef;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
@@ -250,7 +262,8 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
-  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
+  // Handle input reference null case
+  const inputRef = safeParseRef(target.inputRef);
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
@@ -628,8 +641,10 @@ export const ExampleCompareSection: React.FC<{
     if (scorerRefs.length === 0) {
       inner = null;
     } else if (scorerRefs.length === 1) {
-      const parsedRef = parseRef(scorerRefs[0]);
-      inner = <SmallRef objRef={parsedRef as WeaveObjectRef} iconOnly />;
+      const parsedRef = safeParseRef(scorerRefs[0]);
+      if (parsedRef) {
+        inner = <SmallRef objRef={parsedRef} iconOnly />;
+      }
     } else {
       inner = (
         <Tooltip
@@ -684,7 +699,7 @@ export const ExampleCompareSection: React.FC<{
           style={{
             flex: 0,
           }}>
-          <SmallRef objRef={inputRef} iconOnly />
+          {inputRef ? <SmallRef objRef={inputRef} iconOnly /> : null}
         </Box>
         <Box
           style={{
@@ -971,7 +986,12 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
     }
     text = JSON.stringify(value || {}, null, 2);
   } else if (typeof value === 'string' && isWeaveRef(value)) {
-    return <SmallRef objRef={parseRef(value)} />;
+    const parsedRef = safeParseRef(value);
+    if (parsedRef) {
+      return <SmallRef objRef={parsedRef} />;
+    }
+    // Fall back to showing the string if parsing fails
+    text = value.toString();
   } else {
     text = value.toString();
   }

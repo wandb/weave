@@ -1062,12 +1062,25 @@ const CompareEvaluationsBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
-    return JSON.parse(query.evaluationCallIds);
+    try {
+      if (!query.evaluationCallIds) {
+        console.warn('Missing evaluationCallIds in URL');
+        return [];
+      }
+      return JSON.parse(query.evaluationCallIds);
+    } catch (e) {
+      console.error('Error parsing evaluationCallIds:', e);
+      return [];
+    }
   }, [query.evaluationCallIds]);
   const selectedMetrics: Record<string, boolean> | null = useMemo(() => {
     try {
+      if (!query.metrics) {
+        return null;
+      }
       return JSON.parse(query.metrics);
     } catch (e) {
+      console.error('Error parsing metrics:', e);
       return null;
     }
   }, [query.metrics]);

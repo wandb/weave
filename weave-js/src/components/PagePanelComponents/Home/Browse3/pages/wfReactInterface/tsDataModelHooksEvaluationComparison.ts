@@ -591,27 +591,108 @@ const fetchEvaluationComparisonResults = async (
     });
 
   // 3.5 Populate the inputs
-  // We only need 1 since we are going to effectively do an inner join on the rowDigest
-  const datasetRef = Object.values(summaryData.evaluations)[0]
-    .datasetRef as string;
-  const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
-  // If the dataset has not been deleted, fetch rows
-  if (datasetObjRes.vals[0] != null) {
-    const rowsRef = datasetObjRes.vals[0].rows;
-    const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
-    const rowsQuery = await traceServerClient.tableQuery({
-      project_id: projectIdFromParts({
-        entity: parsedRowsRef.entityName,
-        project: parsedRowsRef.projectName,
-      }),
-      digest: parsedRowsRef.artifactVersion,
+  // Check if we have imperative evaluations
+  const hasImperativeEvals = evaluationCallCache
+    ? Object.keys(summaryData.evaluationCalls).some(
+        id => id in evaluationCallCache && isImperative(evaluationCallCache[id])
+      )
+    : false;
+
+  // Store imperative calls for later use
+  let imperativePredictAndScoreCalls: TraceCallSchema[] = [];
+
+  if (hasImperativeEvals) {
+    // For imperative evaluations, extract inputs from the predict_and_score calls
+    // Wait for trace data to be fetched
+    const evalTraceRes = await evalTraceResProm;
+
+    // Find all imperative predict_and_score calls
+    imperativePredictAndScoreCalls = evalTraceRes.calls.filter(call =>
+      call.op_name.includes('Evaluation.predict_and_score:')
+    );
+
+    // Extract inputs from these calls
+    imperativePredictAndScoreCalls.forEach(call => {
+      if (!call || !call.inputs) {
+        return;
+      }
+
+      try {
+        const example = call.inputs.example;
+        if (example && typeof example === 'object') {
+          // Create a stable digest for the example object
+          const digest = generateStableDigest(example);
+
+          // Add to inputs if not already present
+          if (!result.inputs[digest]) {
+            result.inputs[digest] = {
+              digest,
+              val: example,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Error extracting input from imperative call:', e);
+      }
     });
-    rowsQuery.rows.forEach(row => {
-      result.inputs[row.digest] = {
-        digest: row.digest,
-        val: row.val,
-      };
+
+    // If we still don't have any inputs, try to extract them from model predict calls
+    if (Object.keys(result.inputs).length === 0) {
+      const modelPredictCalls = evalTraceRes.calls.filter(
+        call => call && call.op_name && call.op_name.includes('Model.predict:')
+      );
+
+      modelPredictCalls.forEach(call => {
+        if (!call || !call.inputs) {
+          return;
+        }
+
+        try {
+          // Remove special properties like 'self' from the inputs
+          const inputsCopy = {...call.inputs};
+          delete inputsCopy.self;
+
+          if (Object.keys(inputsCopy).length > 0) {
+            const digest = generateStableDigest(inputsCopy);
+
+            if (!result.inputs[digest]) {
+              result.inputs[digest] = {
+                digest,
+                val: inputsCopy,
+              };
+            }
+          }
+        } catch (e) {
+          console.warn('Error extracting input from model predict call:', e);
+        }
+      });
+    }
+  } else {
+    // Original logic for regular evaluations
+    // We only need 1 since we are going to effectively do an inner join on the rowDigest
+    const datasetRef = Object.values(summaryData.evaluations)[0]
+      .datasetRef as string;
+    const datasetObjRes = await traceServerClient.readBatch({
+      refs: [datasetRef],
     });
+    // If the dataset has not been deleted, fetch rows
+    if (datasetObjRes.vals[0] != null) {
+      const rowsRef = datasetObjRes.vals[0].rows;
+      const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
+      const rowsQuery = await traceServerClient.tableQuery({
+        project_id: projectIdFromParts({
+          entity: parsedRowsRef.entityName,
+          project: parsedRowsRef.projectName,
+        }),
+        digest: parsedRowsRef.artifactVersion,
+      });
+      rowsQuery.rows.forEach(row => {
+        result.inputs[row.digest] = {
+          digest: row.digest,
+          val: row.val,
+        };
+      });
+    }
   }
 
   // 4. Populate the predictions and scores
@@ -685,168 +766,187 @@ const fetchEvaluationComparisonResults = async (
       // For imperative evaluations, we need to handle different input structure
       let modelRef;
       let evaluationCallId;
+      let rowDigest;
 
       if (isImperativePredictAndScore) {
         modelRef = parentPredictAndScore.inputs.model;
         evaluationCallId = parentPredictAndScore.parent_id!;
+
+        // For imperative evaluations, the example is the direct input object
+        // We need to create a stable digest for it
+        try {
+          if (exampleRef && typeof exampleRef === 'object') {
+            rowDigest = generateStableDigest(exampleRef);
+          } else {
+            // Skip if we can't identify the example
+            return;
+          }
+        } catch (e) {
+          console.warn('Error generating digest for imperative example:', e);
+          return;
+        }
       } else {
         modelRef = parentPredictAndScore.inputs.model;
         evaluationCallId = parentPredictAndScore.parent_id!;
+
+        // For regular evaluations, extract digest from dataset path
+        const split = '/attr/rows/id/';
+        if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
+          const parts = exampleRef.split(split);
+          if (parts.length === 2) {
+            const maybeDigest = parts[1];
+            if (maybeDigest != null && !maybeDigest.includes('/')) {
+              rowDigest = maybeDigest;
+            } else {
+              // Skip if we can't identify the row digest
+              return;
+            }
+          } else {
+            // Skip if we can't parse the dataset path
+            return;
+          }
+        } else {
+          // Skip if we can't identify the dataset path
+          return;
+        }
       }
 
-      const split = '/attr/rows/id/';
-      if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
-        const parts = exampleRef.split(split);
-        if (parts.length === 2) {
-          const maybeDigest = parts[1];
-          if (maybeDigest != null && !maybeDigest.includes('/')) {
-            const rowDigest = maybeDigest;
+      // Detect call types with different strategies for imperative vs regular
+      let isProbablyPredictCall;
+      let isProbablyScoreCall;
+      let isProbablyBoundScoreCall;
 
-            // Detect call types with different strategies for imperative vs regular
-            let isProbablyPredictCall;
-            let isProbablyScoreCall;
-            let isProbablyBoundScoreCall;
+      if (isImperativePredictAndScore) {
+        // For imperative, check for Model.predict
+        isProbablyPredictCall = traceCall.op_name.includes('Model.predict:');
+        // For imperative, check different score patterns
+        isProbablyScoreCall = traceCall.op_name.includes('.score:');
+        isProbablyBoundScoreCall = false; // Typically not used in imperative mode
+      } else {
+        // Standard evaluation logic
+        isProbablyPredictCall =
+          modelRefs.includes(traceCall.inputs.self) ||
+          modelRefs.includes(traceCall.op_name);
 
-            if (isImperativePredictAndScore) {
-              // For imperative, check for Model.predict
-              isProbablyPredictCall =
-                traceCall.op_name.includes('Model.predict:');
-              // For imperative, check different score patterns
-              isProbablyScoreCall = traceCall.op_name.includes('.score:');
-              isProbablyBoundScoreCall = false; // Typically not used in imperative mode
-            } else {
-              // Standard evaluation logic
-              isProbablyPredictCall =
-                modelRefs.includes(traceCall.inputs.self) ||
-                modelRefs.includes(traceCall.op_name);
+        isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
+        isProbablyBoundScoreCall = scorerRefs.has(traceCall.inputs.self);
+      }
 
-              isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
-              isProbablyBoundScoreCall = scorerRefs.has(traceCall.inputs.self);
-            }
+      if (result.resultRows[rowDigest] == null) {
+        result.resultRows[rowDigest] = {
+          evaluations: {},
+        };
+      }
+      const digestCollection = result.resultRows[rowDigest];
 
-            if (result.resultRows[rowDigest] == null) {
-              result.resultRows[rowDigest] = {
-                evaluations: {},
-              };
-            }
-            const digestCollection = result.resultRows[rowDigest];
+      if (digestCollection.evaluations[evaluationCallId] == null) {
+        digestCollection.evaluations[evaluationCallId] = {
+          predictAndScores: {},
+        };
+      }
 
-            if (digestCollection.evaluations[evaluationCallId] == null) {
-              digestCollection.evaluations[evaluationCallId] = {
-                predictAndScores: {},
-              };
-            }
+      const modelForDigestCollection =
+        digestCollection.evaluations[evaluationCallId];
 
-            const modelForDigestCollection =
-              digestCollection.evaluations[evaluationCallId];
+      if (
+        modelForDigestCollection.predictAndScores[parentPredictAndScore.id] ==
+        null
+      ) {
+        modelForDigestCollection.predictAndScores[parentPredictAndScore.id] = {
+          callId: parentPredictAndScore.id,
+          exampleRef,
+          rowDigest,
+          modelRef,
+          evaluationCallId,
+          scoreMetrics: {},
+          _rawPredictAndScoreTraceData: parentPredictAndScore,
+          _rawPredictTraceData: undefined,
+        };
+      }
 
-            if (
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ] == null
-            ) {
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ] = {
-                callId: parentPredictAndScore.id,
-                exampleRef,
-                rowDigest,
-                modelRef,
-                evaluationCallId,
-                scoreMetrics: {},
-                _rawPredictAndScoreTraceData: parentPredictAndScore,
-                _rawPredictTraceData: undefined,
-              };
-            }
+      const predictAndScoreFinal =
+        modelForDigestCollection.predictAndScores[parentPredictAndScore.id];
 
-            const predictAndScoreFinal =
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ];
+      if (isProbablyPredictCall) {
+        predictAndScoreFinal._rawPredictTraceData = traceCall;
 
-            if (isProbablyPredictCall) {
-              predictAndScoreFinal._rawPredictTraceData = traceCall;
+        // Add model latency and tokens
+        const modelLatencyMetricId = metricDefinitionId(
+          modelLatencyMetricDimension
+        );
+        predictAndScoreFinal.scoreMetrics[modelLatencyMetricId] = {
+          value:
+            (convertISOToDate(
+              traceCall.ended_at ?? traceCall.started_at
+            ).getTime() -
+              convertISOToDate(traceCall.started_at).getTime()) /
+            1000, // why is this different than the predictandscore model latency?
+          sourceCallId: traceCall.id,
+        };
 
-              // Add model latency and tokens
-              const modelLatencyMetricId = metricDefinitionId(
-                modelLatencyMetricDimension
-              );
-              predictAndScoreFinal.scoreMetrics[modelLatencyMetricId] = {
-                value:
-                  (convertISOToDate(
-                    traceCall.ended_at ?? traceCall.started_at
-                  ).getTime() -
-                    convertISOToDate(traceCall.started_at).getTime()) /
-                  1000, // why is this different than the predictandscore model latency?
-                sourceCallId: traceCall.id,
-              };
+        // Add total tokens
+        const totalTokensmetricId = metricDefinitionId(
+          totalTokensMetricDimension
+        );
+        const totalTokens = sum(
+          Object.values(traceCall.summary?.usage ?? {}).map(
+            (x: any) => x?.total_tokens ?? 0
+          )
+        );
+        predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
+          value: totalTokens,
+          sourceCallId: traceCall.id,
+        };
+      } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
+        const results = traceCall.output as any;
 
-              // Add total tokens
-              const totalTokensmetricId = metricDefinitionId(
-                totalTokensMetricDimension
-              );
-              const totalTokens = sum(
-                Object.values(traceCall.summary?.usage ?? {}).map(
-                  (x: any) => x?.total_tokens ?? 0
-                )
-              );
-              predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
-                value: totalTokens,
-                sourceCallId: traceCall.id,
-              };
-            } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
-              const results = traceCall.output as any;
-
-              let scorerRef = traceCall.op_name;
-              if (isProbablyBoundScoreCall) {
-                scorerRef = traceCall.inputs.self;
-              }
-
-              const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-                if (isBinaryScore(scoreVal)) {
-                  const metricDimension: MetricDefinition = {
-                    scoreType: 'binary',
-                    metricSubPath: currPath,
-                    source: 'scorer',
-                    scorerOpOrObjRef: scorerRef,
-                  };
-                  const metricId = metricDefinitionId(metricDimension);
-                  summaryData.scoreMetrics[metricId] = metricDimension;
-                  predictAndScoreFinal.scoreMetrics[metricId] = {
-                    sourceCallId: traceCall.id,
-                    value: scoreVal,
-                  };
-                } else if (isContinuousScore(scoreVal)) {
-                  const metricDimension: MetricDefinition = {
-                    scoreType: 'continuous',
-                    metricSubPath: currPath,
-                    source: 'scorer',
-                    scorerOpOrObjRef: scorerRef,
-                  };
-                  const metricId = metricDefinitionId(metricDimension);
-                  summaryData.scoreMetrics[metricId] = metricDimension;
-
-                  predictAndScoreFinal.scoreMetrics[metricId] = {
-                    sourceCallId: traceCall.id,
-                    value: scoreVal,
-                  };
-                } else if (
-                  scoreVal != null &&
-                  typeof scoreVal === 'object' &&
-                  !Array.isArray(scoreVal)
-                ) {
-                  Object.entries(scoreVal).forEach(([key, val]) => {
-                    recursiveAddScore(val, [...currPath, key]);
-                  });
-                }
-              };
-
-              recursiveAddScore(results, []);
-            } else {
-              // pass
-            }
-          }
+        let scorerRef = traceCall.op_name;
+        if (isProbablyBoundScoreCall) {
+          scorerRef = traceCall.inputs.self;
         }
+
+        const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
+          if (isBinaryScore(scoreVal)) {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'binary',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            summaryData.scoreMetrics[metricId] = metricDimension;
+            predictAndScoreFinal.scoreMetrics[metricId] = {
+              sourceCallId: traceCall.id,
+              value: scoreVal,
+            };
+          } else if (isContinuousScore(scoreVal)) {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'continuous',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            summaryData.scoreMetrics[metricId] = metricDimension;
+
+            predictAndScoreFinal.scoreMetrics[metricId] = {
+              sourceCallId: traceCall.id,
+              value: scoreVal,
+            };
+          } else if (
+            scoreVal != null &&
+            typeof scoreVal === 'object' &&
+            !Array.isArray(scoreVal)
+          ) {
+            Object.entries(scoreVal).forEach(([key, val]) => {
+              recursiveAddScore(val, [...currPath, key]);
+            });
+          }
+        };
+
+        recursiveAddScore(results, []);
+      } else {
+        // pass
       }
     } else {
       const maybeParentSummaryOp = summaryOps.find(
@@ -878,40 +978,171 @@ const fetchEvaluationComparisonResults = async (
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
-      // Check if we have a mix of imperative and regular evaluations
-      const evalCallIds = Object.keys(summaryData.evaluationCalls);
-      const hasMixedEvaluationTypes = evaluationCallCache
-        ? evalCallIds.some(
+      // Check if we have imperative evaluations
+      const hasImperativeEvals = evaluationCallCache
+        ? Object.keys(summaryData.evaluationCalls).some(
             id =>
               id in evaluationCallCache && isImperative(evaluationCallCache[id])
-          ) &&
-          evalCallIds.some(
-            id =>
-              id in evaluationCallCache &&
-              !isImperative(evaluationCallCache[id])
           )
         : false;
 
-      // For mixed evaluation types, we're more lenient about matching
-      if (hasMixedEvaluationTypes) {
-        // As long as we have at least one result from each evaluation, consider it valid
+      // For imperative evaluations, we're more lenient
+      if (hasImperativeEvals) {
+        // For imperative evaluations:
+        // 1. Make sure the row digest exists in our inputs
+        // 2. Make sure at least one evaluation has results for this row
         return (
-          Object.values(row.evaluations).length > 0 &&
-          // Make sure each evaluation has at least one predict and score
-          Object.values(row.evaluations).every(
-            evalResult => Object.values(evalResult.predictAndScores).length > 0
-          )
+          digest in result.inputs && Object.keys(row.evaluations).length > 0
         );
       }
 
-      // For consistent evaluation types (all regular or all imperative)
-      // require an exact match - all evaluations must have this row
+      // For standard evaluations, we want exact matches across all evaluations
       return (
         Object.values(row.evaluations).length ===
         Object.values(summaryData.evaluationCalls).length
       );
     })
   );
+
+  // Additional debug check to ensure we have examples
+  if (Object.keys(result.resultRows).length === 0) {
+    console.log('Warning: No example rows found for evaluation comparison.');
+    // If inputs exist but no resultRows, let's try to be more permissive
+    if (Object.keys(result.inputs).length > 0) {
+      // Add a simple placeholder entry for each input
+      Object.entries(result.inputs).forEach(([digest, input]) => {
+        // For each input that has an evaluation result, add it to resultRows
+        if (
+          Object.values(summaryData.evaluationCalls).some(
+            call => result.resultRows[digest]?.evaluations[call.callId]
+          )
+        ) {
+          result.resultRows[digest] = result.resultRows[digest] || {
+            evaluations: Object.fromEntries(
+              Object.values(summaryData.evaluationCalls).map(call => [
+                call.callId,
+                {predictAndScores: {}},
+              ])
+            ),
+          };
+        }
+      });
+    }
+  }
+
+  // If we still don't have matching results in resultRows for our inputs, try direct matching
+  if (
+    Object.keys(result.resultRows).length === 0 &&
+    imperativePredictAndScoreCalls.length > 0
+  ) {
+    // This means we have imperative evaluations but couldn't match inputs to resultRows
+    // Let's try to manually build result entries from predict_and_score calls directly
+    imperativePredictAndScoreCalls.forEach(
+      (predictAndScoreCall: TraceCallSchema) => {
+        try {
+          if (!predictAndScoreCall || !predictAndScoreCall.inputs) {
+            return;
+          }
+
+          const example = predictAndScoreCall.inputs.example;
+          const modelRef = predictAndScoreCall.inputs.model;
+          const evaluationCallId = predictAndScoreCall.parent_id;
+
+          if (!evaluationCallId) {
+            return;
+          }
+
+          if (example && typeof example === 'object') {
+            // Generate stable digest for the example
+            const digest = generateStableDigest(example);
+
+            // Ensure input exists
+            if (!result.inputs[digest]) {
+              result.inputs[digest] = {
+                digest,
+                val: example,
+              };
+            }
+
+            // Create result entry if it doesn't exist
+            if (!result.resultRows[digest]) {
+              result.resultRows[digest] = {
+                evaluations: {},
+              };
+            }
+
+            // Add evaluation entry if it doesn't exist
+            if (!result.resultRows[digest].evaluations[evaluationCallId]) {
+              result.resultRows[digest].evaluations[evaluationCallId] = {
+                predictAndScores: {},
+              };
+            }
+
+            // Add predict_and_score entry
+            result.resultRows[digest].evaluations[
+              evaluationCallId
+            ].predictAndScores[predictAndScoreCall.id] = {
+              callId: predictAndScoreCall.id,
+              exampleRef: example,
+              rowDigest: digest,
+              modelRef,
+              evaluationCallId,
+              scoreMetrics: {},
+              _rawPredictAndScoreTraceData: predictAndScoreCall,
+              _rawPredictTraceData: evalTraceRes.calls.find(
+                call =>
+                  call &&
+                  call.parent_id === predictAndScoreCall.id &&
+                  call.op_name &&
+                  call.op_name.includes('Model.predict:')
+              ),
+            };
+
+            // Find and add score calls
+            const scoreCalls = evalTraceRes.calls.filter(
+              call =>
+                call &&
+                call.parent_id === predictAndScoreCall.id &&
+                call.op_name &&
+                call.op_name.includes('.score:')
+            );
+
+            scoreCalls.forEach(scoreCall => {
+              if (!scoreCall || !scoreCall.op_name) {
+                return;
+              }
+
+              const scorerRef = scoreCall.op_name;
+              const results = scoreCall.output as any;
+
+              if (results) {
+                const metricId = `${scorerRef}-score`;
+                const metricDimension: MetricDefinition = {
+                  scoreType:
+                    typeof results === 'boolean' ? 'binary' : 'continuous',
+                  metricSubPath: [],
+                  source: 'scorer',
+                  scorerOpOrObjRef: scorerRef,
+                };
+
+                summaryData.scoreMetrics[metricId] = metricDimension;
+                result.resultRows[digest].evaluations[
+                  evaluationCallId
+                ].predictAndScores[predictAndScoreCall.id].scoreMetrics[
+                  metricId
+                ] = {
+                  sourceCallId: scoreCall.id,
+                  value: results,
+                };
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Error during direct matching of imperative call:', e);
+        }
+      }
+    );
+  }
 
   return result;
 };
@@ -1102,4 +1333,37 @@ const processImperativeEvaluationSummary = (
   Object.entries(output).forEach(([key, val]) => {
     recursiveAddMetric(val, [key]);
   });
+};
+
+// Improve the generateStableDigest function to handle edge cases
+const generateStableDigest = (obj: any): string => {
+  if (obj === undefined || obj === null) {
+    return 'null'; // Return consistent string for null/undefined
+  }
+
+  try {
+    // Sort keys to ensure stable stringification
+    const sortObjectKeys = (val: any): any => {
+      if (val === null || val === undefined) {
+        return null;
+      }
+
+      if (typeof val !== 'object' || Array.isArray(val)) {
+        return val;
+      }
+
+      return Object.keys(val)
+        .sort()
+        .reduce((result: any, key) => {
+          result[key] = sortObjectKeys(val[key]);
+          return result;
+        }, {});
+    };
+
+    return JSON.stringify(sortObjectKeys(obj));
+  } catch (e) {
+    // In case of any JSON serialization errors, return a fallback value
+    console.warn('Error generating stable digest:', e);
+    return `digest_${Date.now()}`;
+  }
 };
