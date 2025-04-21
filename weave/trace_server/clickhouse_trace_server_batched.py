@@ -49,7 +49,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.calls_query_builder import (
+from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     OrderField,
@@ -83,8 +83,11 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    FileStorageClient,
+    FileStorageReadError,
     FileStorageWriteError,
     key_for_project_digest,
+    maybe_get_storage_client_from_env,
     read_from_bucket,
     store_in_bucket,
 )
@@ -136,9 +139,6 @@ from weave.trace_server.trace_server_interface_util import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-MAX_FLUSH_COUNT = 10000
-MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
@@ -215,6 +215,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._file_storage_client: Optional[FileStorageClient] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -228,6 +229,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
         )
+
+    @property
+    def file_storage_client(self) -> Optional[FileStorageClient]:
+        if self._file_storage_client is not None:
+            return self._file_storage_client
+        self._file_storage_client = maybe_get_storage_client_from_env()
+        return self._file_storage_client
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -383,6 +391,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
 
+        # The order is actually important, it has something to do with how the cost_query wants to arrange things.
+        # specifically, the summary column should always be the last.
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_total_storage_size:
+            columns.append("total_storage_size_bytes")
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             summary_columns = ["summary", "summary_dump"]
@@ -390,12 +406,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
-
-        if req.include_storage_size:
-            columns.append("storage_size_bytes")
-
-        if req.include_total_storage_size:
-            columns.append("total_storage_size_bytes")
 
         for col in columns:
             cq.add_field(col)
@@ -1338,19 +1348,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri(req.project_id)
+        use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
+        client = self.file_storage_client
 
-        if base_file_storage_uri is not None:
+        if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, base_file_storage_uri)
+                self._file_create_bucket(req, digest, client)
             except FileStorageWriteError as e:
                 self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
+        set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+        set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
@@ -1384,14 +1397,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
+        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
-        target_file_storage_uri = base_file_storage_uri.with_path(
-            # It is entirely compatible with the design to support chunking on the
-            # bucket side. Just need to add a `/CHUNK` suffix to the key.
-            key_for_project_digest(req.project_id, digest)
+        set_root_span_dd_tags({"storage_provider": "bucket"})
+        target_file_storage_uri = store_in_bucket(
+            client, key_for_project_digest(req.project_id, digest), req.content
         )
-        store_in_bucket(target_file_storage_uri, req.content)
         self._insert(
             "files",
             data=[
@@ -1418,38 +1429,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
         )
 
-    def _get_base_file_storage_uri(self, project_id: str) -> Optional[FileStorageURI]:
-        """
-        Get the base storage URI for a project.
+    def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
+        """Determine if we should use file storage for a project."""
+        # Check if we should use file storage based on the ramp percentage
+        ramp_pct = wf_env.wf_file_storage_project_ramp_pct()
+        if ramp_pct is not None:
+            # If the hash value is less than the ramp percentage, use file storage
+            project_hash_value = _string_to_int_in_range(project_id, 100)
+            if project_hash_value < ramp_pct:
+                return True
 
-        Currently this is quite simple as it uses the default storage bucket
-        for the entire client (most typically configured via environment variable).
-
-        However, in the near future, this might be something that is driven by
-        the project or a context variable. Leaving this method here for clarity
-        and future extensibility.
-        """
-        file_storage_uri_str = wf_env.wf_file_storage_uri()
-        if not file_storage_uri_str:
-            return None
-
+        # Check if we should use file storage based on the allow list
         project_allow_list = wf_env.wf_file_storage_project_allow_list()
         if project_allow_list is None:
-            return None
+            return False
 
         universally_enabled = (
             len(project_allow_list) == 1 and project_allow_list[0] == "*"
         )
 
         if not universally_enabled and project_id not in project_allow_list:
-            return None
+            return False
 
-        res = FileStorageURI.parse_uri_str(file_storage_uri_str)
-        if res.has_path():
-            raise ValueError(
-                f"Supplied file storage uri contains path components: {file_storage_uri_str}"
-            )
-        return res
+        return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
@@ -1488,12 +1490,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                bytes += read_from_bucket(file_storage_uri)
+                bytes += self._file_read_bucket(file_storage_uri)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
+                set_root_span_dd_tags({"storage_provider": "clickhouse"})
 
+        set_root_span_dd_tags({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
+    def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
+        set_root_span_dd_tags({"storage_provider": "bucket"})
+        client = self.file_storage_client
+        if client is None:
+            raise FileStorageReadError("File storage client is not configured")
+        return read_from_bucket(client, file_storage_uri)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
@@ -2380,3 +2392,26 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
+
+
+def _string_to_int_in_range(input_string: str, range_max: int) -> int:
+    """Convert a string to a deterministic integer within a specified range.
+
+    Args:
+        input_string: The string to convert to an integer
+        range_max: The maximum allowed value (exclusive)
+
+    Returns:
+        int: A deterministic integer value between 0 and range_max
+    """
+    hash_obj = hashlib.md5(input_string.encode())
+    hash_int = int(hash_obj.hexdigest(), 16)
+    return hash_int % range_max
+
+
+def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
+    root_span = ddtrace.tracer.current_root_span()
+    if root_span is None:
+        logger.debug("No root span")
+    else:
+        root_span.set_tags(tags)

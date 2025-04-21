@@ -35,7 +35,7 @@ To get started with the Sensitive Data Protection feature in Weave, complete the
 3. (Optional) Customize redaction fields using the `redact_pii_fields` parameter:
 
     ```python
-    weave.init("my-project", settings={"redact_pii": True, "redact_pii_fields"=["CREDIT_CARD", "US_SSN"]})
+    weave.init("my-project", settings={"redact_pii": True, "redact_pii_fields":["CREDIT_CARD", "US_SSN"]})
     ```
 
     For a full list of the entities that can be detected and redacted, see [PII entities supported by Presidio](https://microsoft.github.io/presidio/supported_entities/).
@@ -63,7 +63,60 @@ The following entities are automatically redacted when PII redaction is enabled:
 - `US_PASSPORT`
 - `US_SSN`
 
-## Usage information 
+## Redacting sensitive keys with `REDACT_KEYS`
+
+In addition to PII redaction, the Weave SDK also supports redaction of custom keys using `REDACT_KEYS`. This is useful when you want to protect additional sensitive data that might not fall under the PII category but needs to be kept private. Examples include:
+
+- API keys
+- Authentication headers
+- Tokens
+- Internal IDs
+- Config values
+
+### Pre-defined `REDACT_KEYS`
+
+Weave automatically redacts the following sensitive keys by default:
+
+```json
+[
+  "api_key",
+  "auth_headers",
+  "authorization"
+]
+```
+
+### Adding your own keys
+
+You can extend this list with your own custom keys that you want to redact from traces:
+
+```python
+import weave
+
+client = weave.init("my-project")
+
+# Add custom keys to redact
+weave.trace.sanitize.REDACT_KEYS.add("client_id")
+weave.trace.sanitize.REDACT_KEYS.add("whatever_else")
+
+client_id = "123"
+whatever_else = "456"
+
+@weave.op()
+def test():
+    a = client_id
+    b = whatever_else
+    return 1
+```
+
+When viewed in the Weave UI, the values of `client_id` and `whatever_else` will appear as `"REDACTED"`:
+
+```python
+client_id = "REDACTED"
+whatever_else = "REDACTED"
+```
+
+## Usage information
 
 - This feature is only available in the Python SDK.
 - Enabling redaction increases processing time due to the Presidio dependency.
+

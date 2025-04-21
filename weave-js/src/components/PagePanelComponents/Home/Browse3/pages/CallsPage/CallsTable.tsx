@@ -265,6 +265,8 @@ export const CallsTable: FC<{
     [expandedRefCols]
   );
 
+  const shouldIncludeTotalStorageSize = effectiveFilter.traceRootsOnly;
+
   // Fetch the calls
   const calls = useCallsForQuery(
     entity,
@@ -273,7 +275,13 @@ export const CallsTable: FC<{
     filterModelResolved,
     paginationModelResolved,
     sortModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    undefined,
+    {
+      // The total storage size only makes sense for traces,
+      // and not for calls.
+      includeTotalStorageSize: shouldIncludeTotalStorageSize,
+    }
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -445,7 +453,10 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading
+    calls.costsLoading,
+    shouldIncludeTotalStorageSize,
+    shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -856,13 +867,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCallIds={selectedCalls}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton

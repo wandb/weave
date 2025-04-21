@@ -14,12 +14,8 @@ def remote_project_root_url(entity_name: str, project_name: str) -> str:
     )
 
 
-def remote_project_weave_root_url(entity_name: str, project_name: str) -> str:
-    return f"{remote_project_root_url(entity_name, project_name)}/{WEAVE_SLUG}"
-
-
 def project_weave_root_url(entity_name: str, project_name: str) -> str:
-    return remote_project_weave_root_url(entity_name, project_name)
+    return f"{remote_project_root_url(entity_name, project_name)}/{WEAVE_SLUG}"
 
 
 def op_version_path(

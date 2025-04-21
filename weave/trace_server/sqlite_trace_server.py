@@ -52,10 +52,6 @@ from weave.trace_server.trace_server_interface_util import (
 )
 from weave.trace_server.validation import object_id_validator
 
-MAX_FLUSH_COUNT = 10000
-MAX_FLUSH_AGE = 15
-
-
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
 ] = contextvars.ContextVar("conn_cursor", default=None)

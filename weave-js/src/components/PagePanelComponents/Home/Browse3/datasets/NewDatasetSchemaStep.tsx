@@ -6,7 +6,12 @@ import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {useDatasetEditContext} from './DatasetEditorContext';
-import {CallData, extractSourceSchema, getNestedValue} from './schemaUtils';
+import {
+  CallData,
+  extractSourceSchema,
+  FIELD_PREFIX,
+  generateFieldPreviews,
+} from './schemaUtils';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -55,41 +60,37 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
   // Initialize field configs when source schema changes
   useEffect(() => {
     if (sourceSchema.length > 0 && fieldConfigs.length === 0) {
-      const initialConfigs = sourceSchema.map(field => ({
-        sourceField: field.name,
-        targetField: field.name.replace(/^(inputs\.|output\.)/, ''),
-        included: true,
-      }));
+      const initialConfigs = sourceSchema.map(field => {
+        // Get target field name by removing prefixes and standard input/output prefixes
+        let targetField = field.name;
+
+        // Remove input/output prefixes
+        if (field.name.startsWith(FIELD_PREFIX.INPUTS)) {
+          targetField = field.name.replace(FIELD_PREFIX.INPUTS, '');
+        } else if (field.name.startsWith(FIELD_PREFIX.OUTPUT)) {
+          targetField = field.name.replace(FIELD_PREFIX.OUTPUT, '');
+        }
+
+        // Remove annotation/scorer prefixes
+        if (field.name.startsWith(FIELD_PREFIX.ANNOTATIONS)) {
+          targetField = field.name.replace(FIELD_PREFIX.ANNOTATIONS, '');
+        } else if (field.name.startsWith(FIELD_PREFIX.SCORER)) {
+          targetField = field.name.replace(FIELD_PREFIX.SCORER, '');
+        }
+
+        return {
+          sourceField: field.name,
+          targetField,
+          included: true,
+        };
+      });
       onFieldConfigsChange(initialConfigs);
     }
   }, [sourceSchema, fieldConfigs.length, onFieldConfigsChange]);
 
   // Extract preview data for each source field
   const fieldPreviews = useMemo(() => {
-    const previews = new Map<string, Array<Record<string, any>>>();
-
-    sourceSchema.forEach(field => {
-      const fieldData = selectedCalls.map(call => {
-        let value: any;
-        if (field.name.startsWith('inputs.')) {
-          const path = field.name.slice(7).split('.');
-          value = getNestedValue(call.val.inputs, path);
-        } else if (field.name.startsWith('output.')) {
-          if (typeof call.val.output === 'object' && call.val.output !== null) {
-            const path = field.name.slice(7).split('.');
-            value = getNestedValue(call.val.output, path);
-          } else {
-            value = call.val.output;
-          }
-        } else {
-          const path = field.name.split('.');
-          value = getNestedValue(call.val, path);
-        }
-        return {[field.name]: value};
-      });
-      previews.set(field.name, fieldData);
-    });
-    return previews;
+    return generateFieldPreviews(sourceSchema, selectedCalls);
   }, [sourceSchema, selectedCalls]);
 
   const handleTargetFieldChange = (
