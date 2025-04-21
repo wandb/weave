@@ -307,10 +307,7 @@ const getLeaderboardGroupableData = async (
           const scorerName = key;
           const scorerVersion = '';
 
-          // For imperative evaluations, the metric values might be nested in the value object
-          // or directly in the output object
           const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
-
           Object.entries(flatScorePayload).forEach(
             ([metricPath, metricValue]) => {
               const scoreRecord: LeaderboardValueRecord = {
