@@ -69,8 +69,7 @@
  *  across different datasets.
  */
 
-import {sum} from 'lodash';
-import _ from 'lodash';
+import _, {sum} from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
@@ -84,9 +83,9 @@ import {
 } from '../CompareEvaluationsPage/ecpTypes';
 import {
   EVALUATION_NAME_DEFAULT,
+  getScoreKeyNameFromScorerRef,
   metricDefinitionId,
 } from '../CompareEvaluationsPage/ecpUtil';
-import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
@@ -104,9 +103,18 @@ export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Loadable<EvaluationComparisonSummary> => {
+): Loadable<
+  EvaluationComparisonSummary & {
+    _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
+  }
+> => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
+  const [data, setData] = useState<
+    | (EvaluationComparisonSummary & {
+        _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
+      })
+    | null
+  >(null);
   const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
   const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
 
@@ -148,7 +156,11 @@ export const useEvaluationComparisonResults = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary | null
+  summaryData:
+    | (EvaluationComparisonSummary & {
+        _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
+      })
+    | null
 ): Loadable<EvaluationComparisonResults> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonResults | null>(null);
@@ -166,7 +178,8 @@ export const useEvaluationComparisonResults = (
       entity,
       project,
       evaluationCallIdsMemo,
-      summaryData
+      summaryData,
+      summaryData._evaluationCallCache
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -200,9 +213,15 @@ const fetchEvaluationSummaryData = async (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Promise<EvaluationComparisonSummary> => {
+): Promise<
+  EvaluationComparisonSummary & {
+    _evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema};
+  }
+> => {
   const projectId = projectIdFromParts({entity, project});
-  const result: EvaluationComparisonSummary = {
+  const result: EvaluationComparisonSummary & {
+    _evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema};
+  } = {
     entity,
     project,
     evaluationCalls: {},
@@ -210,6 +229,7 @@ const fetchEvaluationSummaryData = async (
     models: {},
     scoreMetrics: {},
     summaryMetrics: {},
+    _evaluationCallCache: {},
   };
   // 1. Fetch the evaluation calls
   // 2. For each evaluation:
@@ -229,6 +249,10 @@ const fetchEvaluationSummaryData = async (
     Object.fromEntries(
       evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
     );
+
+  // Store the evaluation call cache for later use
+  result._evaluationCallCache = evaluationCallCache;
+
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
       call.id,
@@ -282,95 +306,106 @@ const fetchEvaluationSummaryData = async (
       return;
     }
 
-    // Add the user-defined scores
-    evalObj.scorerRefs.forEach(scorerRef => {
-      const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      // TODO: REMOVE when sanitized scorer names have been released
-      // this is a hack to support previous unsanitized scorer names
-      // that have spaces.
-      let score = output[scorerKey];
-      if (score == null && scorerKey.includes('-')) {
-        // no score found, '-' means we probably sanitized an illegal character
-        const foundScorerNameMaybe = fuzzyMatchScorerName(
-          Object.keys(output),
-          scorerKey
-        );
-        if (foundScorerNameMaybe != null) {
-          score = output[foundScorerNameMaybe];
-        }
-      }
-      const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-        if (isBinarySummaryScore(scoreVal)) {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'binary',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal.true_fraction,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (isContinuousSummaryScore(scoreVal)) {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'continuous',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal.mean,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (typeof scoreVal === 'boolean') {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'binary',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (typeof scoreVal === 'number') {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'continuous',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (
-          scoreVal != null &&
-          typeof scoreVal === 'object' &&
-          !Array.isArray(scoreVal)
-        ) {
-          Object.entries(scoreVal).forEach(([key, val]) => {
-            recursiveAddScore(val, [...currPath, key]);
-          });
-        }
-      };
+    // Check if this is an imperative evaluation
+    const isImperativeEvaluation = isImperative(
+      evaluationCallCache[evalCall.callId]
+    );
 
-      recursiveAddScore(score, []);
-    });
+    if (isImperativeEvaluation) {
+      // Process imperative evaluation summary
+      processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
+    } else {
+      // Process regular evaluation summary - existing logic
+      // Add the user-defined scores
+      evalObj.scorerRefs.forEach(scorerRef => {
+        const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
+        // TODO: REMOVE when sanitized scorer names have been released
+        // this is a hack to support previous unsanitized scorer names
+        // that have spaces.
+        let score = output[scorerKey];
+        if (score == null && scorerKey.includes('-')) {
+          // no score found, '-' means we probably sanitized an illegal character
+          const foundScorerNameMaybe = fuzzyMatchScorerName(
+            Object.keys(output),
+            scorerKey
+          );
+          if (foundScorerNameMaybe != null) {
+            score = output[foundScorerNameMaybe];
+          }
+        }
+        const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
+          if (isBinarySummaryScore(scoreVal)) {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'binary',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            result.summaryMetrics[metricId] = metricDimension;
+            evalCall.summaryMetrics[metricId] = {
+              value: scoreVal.true_fraction,
+              // Later on this will be updated to the Summary or CustomScorer's Summary Call
+              sourceCallId: evalCallId,
+            };
+          } else if (isContinuousSummaryScore(scoreVal)) {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'continuous',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            result.summaryMetrics[metricId] = metricDimension;
+            evalCall.summaryMetrics[metricId] = {
+              value: scoreVal.mean,
+              // Later on this will be updated to the Summary or CustomScorer's Summary Call
+              sourceCallId: evalCallId,
+            };
+          } else if (typeof scoreVal === 'boolean') {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'binary',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            result.summaryMetrics[metricId] = metricDimension;
+            evalCall.summaryMetrics[metricId] = {
+              value: scoreVal,
+              // Later on this will be updated to the Summary or CustomScorer's Summary Call
+              sourceCallId: evalCallId,
+            };
+          } else if (typeof scoreVal === 'number') {
+            const metricDimension: MetricDefinition = {
+              scoreType: 'continuous',
+              metricSubPath: currPath,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDimension);
+            result.summaryMetrics[metricId] = metricDimension;
+            evalCall.summaryMetrics[metricId] = {
+              value: scoreVal,
+              // Later on this will be updated to the Summary or CustomScorer's Summary Call
+              sourceCallId: evalCallId,
+            };
+          } else if (
+            scoreVal != null &&
+            typeof scoreVal === 'object' &&
+            !Array.isArray(scoreVal)
+          ) {
+            Object.entries(scoreVal).forEach(([key, val]) => {
+              recursiveAddScore(val, [...currPath, key]);
+            });
+          }
+        };
 
-    // Add the derived metrics
+        recursiveAddScore(score, []);
+      });
+    }
+
+    // Add the derived metrics - common for both regular and imperative evals
     // Model latency
     if (output.model_latency != null) {
       const metricId = metricDefinitionId(modelLatencyMetricDimension);
@@ -451,7 +486,8 @@ const fetchEvaluationComparisonResults = async (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary
+  summaryData: EvaluationComparisonSummary,
+  evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema}
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
@@ -466,6 +502,7 @@ const fetchEvaluationComparisonResults = async (
   const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
     call => call.traceId
   );
+
   // First, get all the children of the evaluations (predictAndScoreCalls + summary)
   const evalTraceResProm = traceServerClient
     .callsStreamQuery({
@@ -473,7 +510,61 @@ const fetchEvaluationComparisonResults = async (
       filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
     })
     .then(predictAndScoreCallRes => {
-      // Then, get all the children of those calls (predictions + scores)
+      // Check for imperative evaluations and handle specially
+      const hasImperativeEvals = predictAndScoreCallRes.calls.some(
+        call =>
+          call.op_name.includes('Evaluation.predict_and_score:') ||
+          call.op_name.includes('Evaluation.summarize:')
+      );
+
+      // For imperative evaluations, we need to fetch all predict_and_score calls
+      // that might have a different op name pattern
+      if (hasImperativeEvals) {
+        // Add additional query to find imperative predict_and_score calls
+        return traceServerClient
+          .callsStreamQuery({
+            project_id: projectId,
+            filter: {
+              trace_ids: evalTraceIds,
+              op_names: ['Evaluation.predict_and_score:'],
+            },
+          })
+          .then(imperativePredictAndScoreCalls => {
+            // Combine with the original calls, removing duplicates
+            const combinedCalls = [
+              ...predictAndScoreCallRes.calls,
+              ...imperativePredictAndScoreCalls.calls.filter(
+                call =>
+                  !predictAndScoreCallRes.calls.some(c => c.id === call.id)
+              ),
+            ];
+
+            // Continue with the same logic as before
+            const predictAndScoreIds = combinedCalls.map(call => call.id);
+
+            return Promise.all(
+              _.chunk(predictAndScoreIds, 500).map(chunk => {
+                return traceServerClient
+                  .callsStreamQuery({
+                    project_id: projectId,
+                    filter: {trace_ids: evalTraceIds, parent_ids: chunk},
+                  })
+                  .then(predictionsAndScoresCallsRes => {
+                    return predictionsAndScoresCallsRes.calls;
+                  });
+              })
+            ).then(predictionsAndScoresCallsResMany => {
+              return {
+                calls: [
+                  ...combinedCalls,
+                  ...predictionsAndScoresCallsResMany.flat(),
+                ],
+              };
+            });
+          });
+      }
+
+      // Original logic for standard evaluations
       const predictAndScoreIds = predictAndScoreCallRes.calls.map(
         call => call.id
       );
@@ -536,8 +627,10 @@ const fetchEvaluationComparisonResults = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call =>
-        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(
+        call =>
+          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
+          call.op_name.includes('Evaluation.predict_and_score:') // Include imperative predict_and_score calls
       )
       .map(call => [call.id, call])
   );
@@ -584,8 +677,22 @@ const fetchEvaluationComparisonResults = async (
     ) {
       const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
       const exampleRef = parentPredictAndScore.inputs.example;
-      const modelRef = parentPredictAndScore.inputs.model;
-      const evaluationCallId = parentPredictAndScore.parent_id!;
+
+      // Handle imperative evaluation predict and score calls
+      const isImperativePredictAndScore =
+        parentPredictAndScore.op_name.includes('Evaluation.predict_and_score:');
+
+      // For imperative evaluations, we need to handle different input structure
+      let modelRef;
+      let evaluationCallId;
+
+      if (isImperativePredictAndScore) {
+        modelRef = parentPredictAndScore.inputs.model;
+        evaluationCallId = parentPredictAndScore.parent_id!;
+      } else {
+        modelRef = parentPredictAndScore.inputs.model;
+        evaluationCallId = parentPredictAndScore.parent_id!;
+      }
 
       const split = '/attr/rows/id/';
       if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
@@ -594,15 +701,28 @@ const fetchEvaluationComparisonResults = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const isProbablyPredictCall =
-              modelRefs.includes(traceCall.inputs.self) ||
-              modelRefs.includes(traceCall.op_name);
 
-            const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
-            // WOW - super hacky. we have to do this b/c we support both instances and ops for scorers!
-            const isProbablyBoundScoreCall = scorerRefs.has(
-              traceCall.inputs.self
-            );
+            // Detect call types with different strategies for imperative vs regular
+            let isProbablyPredictCall;
+            let isProbablyScoreCall;
+            let isProbablyBoundScoreCall;
+
+            if (isImperativePredictAndScore) {
+              // For imperative, check for Model.predict
+              isProbablyPredictCall =
+                traceCall.op_name.includes('Model.predict:');
+              // For imperative, check different score patterns
+              isProbablyScoreCall = traceCall.op_name.includes('.score:');
+              isProbablyBoundScoreCall = false; // Typically not used in imperative mode
+            } else {
+              // Standard evaluation logic
+              isProbablyPredictCall =
+                modelRefs.includes(traceCall.inputs.self) ||
+                modelRefs.includes(traceCall.op_name);
+
+              isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
+              isProbablyBoundScoreCall = scorerRefs.has(traceCall.inputs.self);
+            }
 
             if (result.resultRows[rowDigest] == null) {
               result.resultRows[rowDigest] = {
@@ -758,6 +878,34 @@ const fetchEvaluationComparisonResults = async (
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
+      // Check if we have a mix of imperative and regular evaluations
+      const evalCallIds = Object.keys(summaryData.evaluationCalls);
+      const hasMixedEvaluationTypes = evaluationCallCache
+        ? evalCallIds.some(
+            id =>
+              id in evaluationCallCache && isImperative(evaluationCallCache[id])
+          ) &&
+          evalCallIds.some(
+            id =>
+              id in evaluationCallCache &&
+              !isImperative(evaluationCallCache[id])
+          )
+        : false;
+
+      // For mixed evaluation types, we're more lenient about matching
+      if (hasMixedEvaluationTypes) {
+        // As long as we have at least one result from each evaluation, consider it valid
+        return (
+          Object.values(row.evaluations).length > 0 &&
+          // Make sure each evaluation has at least one predict and score
+          Object.values(row.evaluations).every(
+            evalResult => Object.values(evalResult.predictAndScores).length > 0
+          )
+        );
+      }
+
+      // For consistent evaluation types (all regular or all imperative)
+      // require an exact match - all evaluations must have this row
       return (
         Object.values(row.evaluations).length ===
         Object.values(summaryData.evaluationCalls).length
@@ -855,3 +1003,103 @@ function fuzzyMatchScorerName(
   const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
   return scoreNames.find(name => regex.test(name));
 }
+
+/**
+ * Determines if an evaluation call is an imperative evaluation
+ */
+const isImperative = (evalCall: EvaluationEvaluateCallSchema): boolean => {
+  // Check for characteristics that identify imperative evaluations
+  // 1. Check op_name for Evaluation.summarize (imperative uses this op)
+  // 2. Check for a direct summary structure in the output
+  return (
+    evalCall.op_name.includes('Evaluation.summarize:') ||
+    (evalCall.output != null &&
+      typeof evalCall.output === 'object' &&
+      !Array.isArray(evalCall.output) &&
+      Object.keys(evalCall.output).length > 0)
+  );
+};
+
+/**
+ * Process summary data specifically for imperative evaluations
+ */
+const processImperativeEvaluationSummary = (
+  result: EvaluationComparisonSummary,
+  evalCall: any,
+  evalCallId: string,
+  output: any
+): void => {
+  // In imperative evaluations, the metrics can appear directly in the output object
+  // We need to recursively process them to extract all metrics
+  const recursiveAddMetric = (metricVal: any, currPath: string[]) => {
+    if (typeof metricVal === 'boolean') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'binary',
+        metricSubPath: currPath,
+        source: 'derived', // Using 'derived' since we don't have a direct scorer reference
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (typeof metricVal === 'number') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'continuous',
+        metricSubPath: currPath,
+        source: 'derived',
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (
+      metricVal != null &&
+      typeof metricVal === 'object' &&
+      !Array.isArray(metricVal)
+    ) {
+      // Special case for auto-summarized binary scores
+      if (isBinarySummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.true_fraction,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Special case for auto-summarized continuous scores
+      else if (isContinuousSummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.mean,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Otherwise, process nested objects
+      else {
+        Object.entries(metricVal).forEach(([key, val]) => {
+          recursiveAddMetric(val, [...currPath, key]);
+        });
+      }
+    }
+  };
+
+  // Start processing from the root of the output
+  Object.entries(output).forEach(([key, val]) => {
+    recursiveAddMetric(val, [key]);
+  });
+};
