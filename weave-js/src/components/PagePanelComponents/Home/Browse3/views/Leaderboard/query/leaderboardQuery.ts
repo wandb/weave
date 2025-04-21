@@ -289,15 +289,53 @@ const getLeaderboardGroupableData = async (
       // Find all properties that aren't built-in metrics
       const builtInMetrics = ['model_latency', 'model_output', 'scores'];
       Object.entries(outputObj).forEach(([key, value]) => {
+        // Check if the key is a scorer name and the value is a scorer result object
         if (
           !builtInMetrics.includes(key) &&
           typeof value === 'object' &&
           value !== null
         ) {
+          // Special handling for common auto-summarized data formats (true_count, true_fraction)
+          // that might not be properly flattened
+          if ('true_count' in value || 'true_fraction' in value) {
+            console.log(`Handling auto-summarized format for ${key}:`, value);
+
+            if ('true_count' in value && value.true_count != null) {
+              const scoreRecord: LeaderboardValueRecord = {
+                ...recordPartial,
+                metricType: 'scorerMetric',
+                scorerName: key,
+                scorerVersion: '',
+                metricPath: 'true_count',
+                metricValue: value.true_count as number,
+              };
+              data.push(scoreRecord);
+            }
+
+            if ('true_fraction' in value && value.true_fraction != null) {
+              const scoreRecord: LeaderboardValueRecord = {
+                ...recordPartial,
+                metricType: 'scorerMetric',
+                scorerName: key,
+                scorerVersion: '',
+                metricPath: 'true_fraction',
+                metricValue: value.true_fraction as number,
+              };
+              data.push(scoreRecord);
+            }
+            return;
+          }
+
           // Treat this as a scorer result
           const scorerName = key;
           const scorerVersion = '';
+
+          // For imperative evaluations, the metric values might be nested in the value object
+          // or directly in the output object
           const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
+
+          // Log the payload for debugging
+          console.log(`Scorer ${scorerName} payload:`, flatScorePayload);
 
           Object.entries(flatScorePayload).forEach(
             ([metricPath, metricValue]) => {
@@ -368,7 +406,9 @@ const getLeaderboardGroupableData = async (
       datasetGroup: `${row.datasetName}:${row.datasetVersion}`,
       scorerGroup:
         row.metricType === 'scorerMetric'
-          ? `${row.scorerName}:${row.scorerVersion}`
+          ? row.scorerVersion
+            ? `${row.scorerName}:${row.scorerVersion}`
+            : `${row.scorerName}`
           : row.scorerName,
       modelGroup: `${row.modelName}:${row.modelVersion}`,
       metricPathGroup: row.metricPath,
@@ -495,6 +535,10 @@ export const getLeaderboardData = async (
     project,
     spec
   );
+
+  // Sort groupableData by sortKey to ensure most recent evaluations appear first
+  groupableData.sort((a, b) => a.sortKey - b.sortKey);
+
   const finalData: GroupedLeaderboardData = {
     modelGroups: _.mapValues(
       _.groupBy(groupableData, 'modelGroup'),
@@ -511,6 +555,8 @@ export const getLeaderboardData = async (
                       metricPathGroups: _.mapValues(
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
+                          // Sort by sortKey again to ensure most recent is first
+                          metricPathGroup.sort((a, b) => a.sortKey - b.sortKey);
                           return metricPathGroup.map(row => row.row);
                         }
                       ),
@@ -544,6 +590,9 @@ export const getPythonLeaderboardData = async (
     columns
   );
 
+  // Sort groupableData by sortKey to ensure most recent evaluations appear first
+  groupableData.sort((a, b) => a.sortKey - b.sortKey);
+
   const finalData: GroupedLeaderboardData = {
     modelGroups: _.mapValues(
       _.groupBy(groupableData, 'modelGroup'),
@@ -560,6 +609,8 @@ export const getPythonLeaderboardData = async (
                       metricPathGroups: _.mapValues(
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
+                          // Sort by sortKey again to ensure most recent is first
+                          metricPathGroup.sort((a, b) => a.sortKey - b.sortKey);
                           return metricPathGroup.map(row => row.row);
                         }
                       ),
@@ -660,26 +711,53 @@ const getLeaderboardObjectGroupableData = async (
             // Found a direct match in the output object
             let value = (output as any)[col.scorer_name];
 
-            col.summary_metric_path.split('.').forEach(part => {
-              if (value == null) {
-                return;
-              }
-              if (_.isArray(value)) {
-                try {
-                  const index = parseInt(part, 10);
-                  value = value[index];
-                } catch (e) {
-                  console.warn('Skipping model latency', call, e);
-                  value = null;
+            // Log the raw value for debugging
+            console.log(`Column ${col.scorer_name} value before path:`, value);
+
+            // Special handling for auto-summarized data that might not access correctly through the path
+            if (
+              typeof value === 'object' &&
+              value !== null &&
+              (col.summary_metric_path === 'true_count' ||
+                col.summary_metric_path === 'true_fraction') &&
+              col.summary_metric_path in value
+            ) {
+              // Directly access the property instead of using path traversal
+              value = value[col.summary_metric_path];
+              console.log(
+                `Direct access to ${col.summary_metric_path}:`,
+                value
+              );
+            } else {
+              // Regular path traversal
+              col.summary_metric_path.split('.').forEach(part => {
+                if (value == null) {
+                  return;
                 }
-              } else {
-                value = (value as any)[part];
-              }
-            });
+                if (_.isArray(value)) {
+                  try {
+                    const index = parseInt(part, 10);
+                    value = value[index];
+                  } catch (e) {
+                    console.warn('Skipping model latency', call, e);
+                    value = null;
+                  }
+                } else {
+                  value = (value as any)[part];
+                }
+              });
+            }
+
+            // Log the processed value for debugging
+            console.log(
+              `Column ${col.scorer_name} value after path ${col.summary_metric_path}:`,
+              value
+            );
 
             const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
             const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
-            const scorerGroup = `${col.scorer_name}:`; // No version for imperative evaluation scorers
+            // Fix: Use scorerName without trailing colon to match the format expected elsewhere
+            const scorerGroup = `${col.scorer_name}`;
 
             const row: GroupableLeaderboardValueRecord = {
               modelGroup,
