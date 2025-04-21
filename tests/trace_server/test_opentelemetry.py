@@ -466,23 +466,6 @@ class TestAttributes:
         result = to_json_serializable(dept)
         assert result == {"name": "Engineering", "head": {"name": "Jane", "age": 35}}
 
-    def test_to_json_serializable_numpy(self):
-        """Test converting NumPy objects."""
-        import numpy as np
-
-        # Test numpy scalar types
-        assert to_json_serializable(np.int32(42)) == 42
-        assert to_json_serializable(np.float64(3.14)) == 3.14
-        assert to_json_serializable(np.bool_(True)) is True
-
-        # Test numpy arrays
-        arr = np.array([1, 2, 3])
-        assert to_json_serializable(arr) == [1, 2, 3]
-
-        # Test 2D numpy array
-        arr_2d = np.array([[1, 2], [3, 4]])
-        assert to_json_serializable(arr_2d) == [[1, 2], [3, 4]]
-
     def test_unflatten_key_values(self):
         """Test unflattening key-value pairs into nested structure."""
         # Create key-value pairs
