@@ -762,28 +762,10 @@ const getLeaderboardObjectGroupableData = async (
           return;
         }
 
-        // Use the appropriate processing function based on evaluation type
-        if (isImperative) {
-          processImperativeLeaderboardEvaluation(
-            call,
-            col,
-            evalVal,
-            modelRef,
-            datasetRef,
-            data,
-            evalData
-          );
-        } else {
-          processNonImperativeLeaderboardEvaluation(
-            call,
-            col,
-            evalVal,
-            modelRef,
-            datasetRef,
-            data,
-            evalData
-          );
-        }
+        const process = isImperative
+          ? processImperativeLeaderboardEvaluation
+          : processNonImperativeLeaderboardEvaluation;
+        process(call, col, evalVal, modelRef, datasetRef, data, evalData);
       }
     });
   });
