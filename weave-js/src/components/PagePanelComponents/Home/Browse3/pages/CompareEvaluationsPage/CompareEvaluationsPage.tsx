@@ -23,7 +23,6 @@ import {
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
 import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
@@ -45,16 +44,6 @@ type CompareEvaluationsPageProps = {
 export const CompareEvaluationsPage: React.FC<
   CompareEvaluationsPageProps
 > = props => {
-  if (!props.evaluationCallIds || props.evaluationCallIds.length === 0) {
-    return (
-      <Box sx={{padding: STANDARD_PADDING}}>
-        <Alert severity="info">
-          No evaluations selected. Please select evaluations to compare.
-        </Alert>
-      </Box>
-    );
-  }
-
   return (
     <SimplePageLayout
       title={
