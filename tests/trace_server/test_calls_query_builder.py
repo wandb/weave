@@ -2034,6 +2034,37 @@ def test_trace_id_filter_eq():
     )
 
 
+def test_trace_roots_only_filter_with_condition():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "wb_user_id"},
+                    {"$literal": 1},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.parent_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.wb_user_id) = {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": 1, "pb_1": "project"},
+    )
+
+
 def test_filter_length_validation():
     """Test that filter length validation works"""
     pb = ParamBuilder()

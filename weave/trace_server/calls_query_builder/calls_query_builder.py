@@ -1182,7 +1182,7 @@ def process_trace_roots_only_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    return f"{parent_id_field_sql} IS NULL"
+    return f"AND ({parent_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
