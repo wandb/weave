@@ -7,6 +7,7 @@ interface DiffEditorProps {
   originalValue: string;
   onChange: (value: string) => void;
   onClose: (value?: any) => void;
+  language?: string;
 }
 
 export const DiffEditor: React.FC<DiffEditorProps> = ({
@@ -14,6 +15,7 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
   originalValue,
   onChange,
   onClose,
+  language,
 }) => {
   const editorRef = useRef<any>(null);
   const currentValueRef = useRef(value);
@@ -76,6 +78,7 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
         height="100%"
         original={originalValue}
         modified={value}
+        language={language}
         onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},

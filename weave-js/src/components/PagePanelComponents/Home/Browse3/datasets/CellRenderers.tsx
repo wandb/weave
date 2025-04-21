@@ -2,12 +2,50 @@ import {Box, Tooltip} from '@mui/material';
 import {GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useCallback, useLayoutEffect, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {CellValue} from '../../Browse2/CellValue';
 import {isRefPrefixedString} from '../filters/common';
 import {useDatasetEditContext} from './DatasetEditorContext';
 import {EditPopover} from './EditPopover';
+
+// Helper functions for JSON validation
+const validateJSONArray = (
+  jsonString: string
+): {isValid: boolean; error: string | null} => {
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (!Array.isArray(parsed)) {
+      return {isValid: false, error: 'Value must be a valid JSON array'};
+    }
+    return {isValid: true, error: null};
+  } catch (error) {
+    return {isValid: false, error: 'Invalid JSON: ' + (error as Error).message};
+  }
+};
+
+// Custom hook for debounced validation
+const useDebounce = <T,>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 export const CELL_COLORS = {
   DELETED: '#FFE6E6', // Red 200
@@ -54,7 +92,8 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [editedValue, setEditedValue] = useState(value);
+  const [editedValue, setEditedValue] = useState<any>(value);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const {updateCellValue} = useDatasetEditContext();
 
   // Refs and state for edit popover
@@ -73,28 +112,69 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
   }, [isEditing]);
 
   const isWeaveUrl = isRefPrefixedString(value);
+  const isJSONArray = Array.isArray(value);
   const isEditable =
     !isDeleted &&
     !isWeaveUrl &&
-    typeof value !== 'object' &&
+    (typeof value !== 'object' || isJSONArray) &&
     typeof value !== 'boolean';
+
+  // Debounce the value for validation
+  const debouncedValue = useDebounce(editedValue, 500);
+
+  // Run validation only when the debounced value changes
+  useEffect(() => {
+    if (isJSONArray && typeof debouncedValue === 'string') {
+      const {error} = validateJSONArray(debouncedValue);
+      setValidationError(error);
+    }
+  }, [debouncedValue, isJSONArray]);
 
   // Use the context's updateCellValue function instead of local implementation
   const handleUpdateValue = useCallback(
     (newValue: any) => {
-      updateCellValue(row, field, newValue, serverValue, preserveFieldOrder);
+      // Parse the JSON string back to an array if it was a JSON array
+      let processedValue = newValue;
+      if (isJSONArray && typeof newValue === 'string') {
+        try {
+          processedValue = JSON.parse(newValue);
+        } catch (error) {
+          console.error('Error parsing JSON array:', error);
+          // If there's a JSON parse error, keep the value as a string
+          // This will cause validation errors, but prevents data loss
+          processedValue = newValue;
+        }
+      }
+      updateCellValue(
+        row,
+        field,
+        processedValue,
+        serverValue,
+        preserveFieldOrder
+      );
     },
-    [row, field, serverValue, preserveFieldOrder, updateCellValue]
+    [row, field, serverValue, preserveFieldOrder, updateCellValue, isJSONArray]
   );
 
   const handleEditClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (isEditable) {
+      // Make sure we have the latest value when starting to edit
+      setEditedValue(value);
       setIsEditing(true);
     }
   };
 
   const handleCloseEdit = (valueOverride?: any) => {
+    // For JSON arrays, validate before closing
+    if (isJSONArray && typeof editedValue === 'string') {
+      const {isValid, error} = validateJSONArray(editedValue);
+      if (!isValid) {
+        setValidationError(error);
+        return; // Don't close if validation fails
+      }
+    }
+
     setIsEditing(false);
     // Use the provided valueOverride if available, otherwise use editedValue
     const finalValue =
@@ -103,6 +183,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
     if (finalValue !== value) {
       handleUpdateValue(finalValue);
     }
+    setValidationError(null);
   };
 
   const handleRevert = (event: React.MouseEvent) => {
@@ -126,6 +207,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
 
   const handleValueChange = (newValue: string) => {
     setEditedValue(newValue);
+    // Validation now happens through the debounced effect
   };
 
   // Special handler for boolean values - toggle directly
@@ -273,7 +355,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
             },
           }}>
           <span style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
-            {value}
+            {isJSONArray ? JSON.stringify(value) : value}
           </span>
           {isHovered && (
             <Box

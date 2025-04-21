@@ -6,12 +6,14 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   onClose: (value?: any) => void;
+  language?: string;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   onChange,
   onClose,
+  language,
 }) => {
   const editorRef = useRef<any>(null);
   const currentValueRef = useRef(value);
@@ -74,6 +76,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         height="100%"
         width="100%"
         defaultValue={value}
+        language={language}
+        onChange={newValue => onChange(newValue ?? '')}
         onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},

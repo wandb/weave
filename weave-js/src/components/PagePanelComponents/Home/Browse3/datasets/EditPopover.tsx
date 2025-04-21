@@ -20,6 +20,8 @@ interface EditPopoverProps {
   originalValue?: string;
   onChange: (value: string) => void;
   inputRef?: React.RefObject<HTMLTextAreaElement>;
+  disabledModes?: EditorMode[];
+  validationError?: string | null;
 }
 
 export const EditPopover: React.FC<EditPopoverProps> = ({
@@ -32,6 +34,8 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
   originalValue = '',
   onChange,
   inputRef,
+  disabledModes = [],
+  validationError,
 }) => {
   const [editorMode, setEditorMode] =
     React.useState<EditorMode>(initialEditorMode);
@@ -198,27 +202,33 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
                 borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
               }}>
               <Box>
-                <Button
-                  tooltip="Text mode"
-                  icon="text-language"
-                  size="small"
-                  variant={editorMode === 'text' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('text')}
-                />
-                <Button
-                  tooltip="Code mode"
-                  icon="code-alt"
-                  size="small"
-                  variant={editorMode === 'code' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('code')}
-                />
-                <Button
-                  tooltip="Diff mode"
-                  icon="diff"
-                  size="small"
-                  variant={editorMode === 'diff' ? 'secondary' : 'ghost'}
-                  onClick={() => setEditorMode('diff')}
-                />
+                {!disabledModes.includes('text') && (
+                  <Button
+                    tooltip="Text mode"
+                    icon="text-language"
+                    size="small"
+                    variant={editorMode === 'text' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('text')}
+                  />
+                )}
+                {!disabledModes.includes('code') && (
+                  <Button
+                    tooltip="Code mode"
+                    icon="code-alt"
+                    size="small"
+                    variant={editorMode === 'code' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('code')}
+                  />
+                )}
+                {!disabledModes.includes('diff') && (
+                  <Button
+                    tooltip="Diff mode"
+                    icon="diff"
+                    size="small"
+                    variant={editorMode === 'diff' ? 'secondary' : 'ghost'}
+                    onClick={() => setEditorMode('diff')}
+                  />
+                )}
               </Box>
               <Box sx={{display: 'flex', gap: '4px'}}>
                 <Button
@@ -230,10 +240,23 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
                     e.preventDefault();
                     onClose(value);
                   }}
+                  disabled={!!validationError}
                 />
               </Box>
             </Box>
           </DraggableHandle>
+          {validationError && (
+            <Box
+              sx={{
+                padding: '8px 12px',
+                backgroundColor: '#FFEBEE',
+                color: '#D32F2F',
+                fontSize: '12px',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+              }}>
+              {validationError}
+            </Box>
+          )}
           <Box
             sx={{
               flex: 1,
