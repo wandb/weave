@@ -716,12 +716,19 @@ class CallsQuery(BaseModel):
         # call starts before grouping, creating orphan call ends. By conditioning
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
-        op_name_sql = process_op_name_filter_to_conditions(
+        op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
         )
-        trace_id_sql = process_trace_id_filter_to_conditions(
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        # ref filters also have group by filters, because output_refs exist on the
+        # call end parts.
+        ref_filter_opt_sql = process_ref_filters_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -1077,7 +1084,7 @@ def process_query_to_conditions(
     )
 
 
-def process_op_name_filter_to_conditions(
+def process_op_name_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1128,7 +1135,7 @@ def process_op_name_filter_to_conditions(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
-def process_trace_id_filter_to_conditions(
+def process_trace_id_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1157,6 +1164,43 @@ def process_trace_id_filter_to_conditions(
         return ""
 
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
+def process_ref_filters_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Adds a ref filter optimization to the query.
+
+    To be used before group by. This filter is NOT guaranteed to return
+    the correct results, as it can operate on call ends (output_refs) so it
+    should be used in addition to the existing ref filters after group by
+    generated in process_calls_filter_to_conditions."""
+    if hardcoded_filter is None or (
+        not hardcoded_filter.filter.output_refs
+        and not hardcoded_filter.filter.input_refs
+    ):
+        return ""
+
+    def process_ref_filter(field_name: str) -> str:
+        field = get_field_by_name(field_name)
+        if not isinstance(field, CallsMergedAggField):
+            raise TypeError(f"{field_name} is not an aggregate field")
+
+        field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
+        param = param_builder.add_param(hardcoded_filter.filter.output_refs)
+        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        return f"({ref_filter_sql} OR length({field_sql}) = 0)"
+
+    ref_filters = []
+    if hardcoded_filter.filter.output_refs:
+        ref_filters.append(process_ref_filter("output_refs"))
+
+    if hardcoded_filter.filter.input_refs:
+        ref_filters.append(process_ref_filter("input_refs"))
+
+    return combine_conditions(ref_filters, "AND")
 
 
 def process_calls_filter_to_conditions(
