@@ -70,7 +70,7 @@ def get_symbol_patcher(
 
 def get_multi_step_agent_patchers(
     agent_class_name: str, settings: OpSettings
-) -> list[SymbolPatcher]:
+) -> list[SymbolPatcher | None]:
     return [
         get_symbol_patcher("smolagents", f"{agent_class_name}.run", settings),
         get_symbol_patcher(
