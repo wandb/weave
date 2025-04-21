@@ -147,8 +147,6 @@ title: Head Metadata
 docusaurus_head_meta::end -->
 ```
 
-Here’s a suggested update to the **Contributing to Weave Documentation** doc that explains how and why to use the script:
-
 ### Playground Model List Sync
 
 The [playground model list in `playground.md`](https://weave-docs.wandb.ai/guides/tools/playground#select-an-llm) is generated via `update_playground_models.py`.
