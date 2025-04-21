@@ -103,18 +103,11 @@ export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Loadable<
-  EvaluationComparisonSummary & {
-    _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
-  }
-> => {
+): Loadable<EvaluationTraceComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<
-    | (EvaluationComparisonSummary & {
-        _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
-      })
-    | null
-  >(null);
+  const [data, setData] = useState<EvaluationTraceComparisonSummary | null>(
+    null
+  );
   const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
   const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
 
@@ -156,11 +149,7 @@ export const useEvaluationComparisonResults = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData:
-    | (EvaluationComparisonSummary & {
-        _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
-      })
-    | null
+  summaryData: EvaluationTraceComparisonSummary | null
 ): Loadable<EvaluationComparisonResults> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonResults | null>(null);
@@ -213,15 +202,9 @@ const fetchEvaluationSummaryData = async (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Promise<
-  EvaluationComparisonSummary & {
-    _evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema};
-  }
-> => {
+): Promise<EvaluationTraceComparisonSummary> => {
   const projectId = projectIdFromParts({entity, project});
-  const result: EvaluationComparisonSummary & {
-    _evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema};
-  } = {
+  const result: EvaluationTraceComparisonSummary = {
     entity,
     project,
     evaluationCalls: {},
@@ -1223,6 +1206,10 @@ type EvaluationEvaluateCallSchema = TraceCallSchema & {
     };
   };
 };
+type EvaluationTraceComparisonSummary = EvaluationComparisonSummary & {
+  _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
+};
+
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
 
 function fuzzyMatchScorerName(
@@ -1255,7 +1242,7 @@ const isImperative = (evalCall: EvaluationEvaluateCallSchema): boolean => {
  * Process summary data specifically for imperative evaluations
  */
 const processImperativeEvaluationSummary = (
-  result: EvaluationComparisonSummary,
+  result: EvaluationTraceComparisonSummary,
   evalCall: any,
   evalCallId: string,
   output: any
