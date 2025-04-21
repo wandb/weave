@@ -84,7 +84,7 @@ def test_tool_calling_agent_ddgsearch(client):
     )
 
     calls = client.calls()
-    assert len(calls) == 11
+    assert len(calls) == 12
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -117,7 +117,7 @@ def test_tool_calling_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 11
+    assert len(calls) == 10
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -139,7 +139,7 @@ def test_code_agent_ddgsearch(client):
     )
 
     calls = client.calls()
-    assert len(calls) == 10
+    assert len(calls) == 14
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -172,7 +172,7 @@ def test_code_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 10
+    assert len(calls) == 12
 
     call = calls[0]
     assert call.started_at < call.ended_at
