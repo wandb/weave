@@ -1,8 +1,14 @@
 import {BoundingBoxSliderControl} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {
+  isAssignableTo,
+  Node,
   opAssetArtifactVersion,
+  opGetRunTag,
+  opRunConfig,
   replaceInputVariables,
+  taggedValue,
+  typedDict,
   WBImage,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -32,14 +38,59 @@ type PanelImageProps = Panel2.PanelProps<
   PanelImageConfigType
 >;
 
+const useClassLabels = (input: Node<typeof inputType>) => {
+  const hasRunTag = isAssignableTo(
+    input.type,
+    taggedValue(typedDict({run: 'run'}), 'any')
+  );
+
+  const {loading: runConfigLoading} = CGReact.useNodeValue(
+    opRunConfig({run: opGetRunTag({obj: input})}),
+    {skip: !hasRunTag}
+  );
+
+  const {loading: runTagLoading, result: runTag} = CGReact.useNodeValue(
+    opGetRunTag({obj: input}),
+    {skip: !hasRunTag}
+  );
+
+  return useMemo(() => {
+    if (
+      !(runConfigLoading || runTagLoading) &&
+      runTag != null &&
+      runTag.configSubset != null
+    ) {
+      try {
+        const configSubset: {[key: string]: any} = JSON.parse(
+          runTag.configSubset
+        );
+        return _.get(configSubset, '_wandb.value.mask/class_labels', {});
+      } catch (error) {
+        console.error('Failed to parse config subset:', error);
+        return {};
+      }
+    }
+    return {};
+  }, [runTag, runTagLoading, runConfigLoading]);
+};
+
 const PanelImageConfig: FC<PanelImageProps> = ({
   config,
   updateConfig,
   input,
 }) => {
+  const weave = useWeaveContext();
+
+  const exemplarsNode = useMemo(() => {
+    return replaceInputVariables(input, weave.client.opStore);
+  }, [input, weave.client.opStore]);
+
+  const classLabels = useClassLabels(exemplarsNode as Node<typeof inputType>);
+
   const {classSets, controls} = Controls.useImageControls(
     input.type,
-    config?.overlayControls
+    config?.overlayControls,
+    classLabels
   );
   const updatedConfig = useMemo(() => {
     if (controls === config?.overlayControls) {
@@ -51,12 +102,6 @@ const PanelImageConfig: FC<PanelImageProps> = ({
       };
     }
   }, [config, controls]);
-
-  const weave = useWeaveContext();
-
-  const exemplarsNode = useMemo(() => {
-    return replaceInputVariables(input, weave.client.opStore);
-  }, [input, weave.client.opStore]);
 
   const exemplars = CGReact.useNodeValue(exemplarsNode).result;
   const boxes = useMemo(() => {
@@ -108,11 +153,17 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
 
   const image: WBImage = nodeValueQuery.result;
 
+  const classLabels = useClassLabels(inputNode);
+
   const {
     maskControls: mergedMaskControls,
     boxControls: mergedBoxControls,
     classSets,
-  } = Controls.useImageControls(inputNode.type, config?.overlayControls);
+  } = Controls.useImageControls(
+    inputNode.type,
+    config?.overlayControls,
+    classLabels
+  );
 
   const {imageBoxes, imageMasks, boxControls, maskControls} = useMemo(() => {
     const knownBoxKeys = image?.boxes != null ? _.keys(image.boxes) : [];
@@ -158,6 +209,7 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
     loadedFrom: imageArtifact,
     width: image?.width,
     height: image?.height,
+    caption: image?.caption,
   };
 
   if (tileLayout === 'MASKS_NEXT_TO_IMAGE') {

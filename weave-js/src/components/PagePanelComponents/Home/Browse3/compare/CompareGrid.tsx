@@ -16,8 +16,8 @@ import {
 import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {WeaveObjectRef} from '../../../../../react';
-import {SmallRef} from '../../Browse2/SmallRef';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRef} from '../smallRef/SmallRef';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {RowDataWithDiff, UNCHANGED} from './compare';
 import {CompareGridCell} from './CompareGridCell';

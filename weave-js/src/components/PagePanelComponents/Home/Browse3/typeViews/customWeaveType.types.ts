@@ -26,7 +26,8 @@ export const isCustomWeaveTypePayload = (
   ) {
     return false;
   }
-  if (typeof data.files !== 'object' || data.files == null) {
+  // Inline custom objects will not have a files property.
+  if (data.files != null && typeof data.files !== 'object') {
     return false;
   }
   if (data.weave_type.type === 'Op') {

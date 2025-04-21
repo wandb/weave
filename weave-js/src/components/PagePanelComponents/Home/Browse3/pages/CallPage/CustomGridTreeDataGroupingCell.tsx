@@ -9,7 +9,7 @@ import styled from 'styled-components';
 import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
 import {Icon, IconParentBackUp} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCostStats} from './cost/TraceCostStats';
@@ -87,11 +87,9 @@ export const CustomGridTreeDataGroupingCell: FC<
     <IconParentBackUp color={MOON_500} width={18} height={18} />
   ) : null;
 
-  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
-
-  if (call == null) {
-    return <div />;
-  }
+  const isHiddenChildCount =
+    typeof id === 'string' && id.endsWith('_HIDDEN_CHILDREN_COUNT');
+  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT' || isHiddenChildCount;
 
   const box = (
     <CursorBox
@@ -184,7 +182,7 @@ export const CustomGridTreeDataGroupingCell: FC<
       <CallOrCountRow>
         {isHiddenCount ? (
           <Box>{row.count.toLocaleString()} hidden calls</Box>
-        ) : (
+        ) : call != null ? (
           <>
             <Box
               sx={{
@@ -217,11 +215,17 @@ export const CustomGridTreeDataGroupingCell: FC<
               />
             )}
           </>
+        ) : (
+          <Box />
         )}
-        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
       </CallOrCountRow>
+      {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
     </CursorBox>
   );
 
-  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
+  return tooltip ? (
+    <Tooltip content={tooltip} noTriggerWrap trigger={box} />
+  ) : (
+    box
+  );
 };

@@ -12,7 +12,7 @@ import {
 } from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Icon} from '@wandb/weave/components/Icon';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import React from 'react';
 import {Link} from 'react-router-dom';
 import styled from 'styled-components';
@@ -156,6 +156,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 pathname: item.slug
                   ? `${props.baseUrl}/${item.slug}`
                   : props.baseUrl,
+                search: item.search,
               },
         };
 
@@ -186,11 +187,11 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
 
         if (item.nameTooltip) {
           return (
-            <Tooltip
+            <TooltipDeprecated
               key={item.name}
               content={<span>{item.nameTooltip}</span>}
               trigger={wrapper}
-              position="right center"
+              side="right"
             />
           );
         }

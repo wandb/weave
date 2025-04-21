@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -35,7 +36,6 @@ const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
       ([k, v]) =>
         v != null &&
         v !== undefined &&
-        v !== false &&
         (_.isArray(v) ? v.length > 0 : true) &&
         (typeof v === 'string' ? v.length > 0 : true)
     )
@@ -100,8 +100,9 @@ export const browse2Context = {
     projectName: string,
     traceId: string,
     callId: string,
-    path?: string | null,
-    tracetree?: boolean
+    descendentCallId?: string,
+    hideTraceTree?: boolean,
+    showFeedback?: boolean
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
@@ -143,13 +144,17 @@ export const browse2Context = {
   ) => {
     return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
   },
+  evaluationsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
   tracesUIUrl: (entityName: string, projectName: string) => {
     throw new Error('Not implemented');
   },
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    gridFilters?: GridFilterModel
   ) => {
     throw new Error('Not implemented');
   },
@@ -171,12 +176,6 @@ export const browse2Context = {
       parsed.artifactName,
       parsed.artifactVersion
     );
-  },
-  boardsUIUrl: (entityName: string, projectName: string) => {
-    throw new Error('Not implemented');
-  },
-  tablesUIUrl: (entityName: string, projectName: string) => {
-    throw new Error('Not implemented');
   },
   boardForExpressionUIUrl: (
     entityName: string,
@@ -349,25 +348,28 @@ export const browse3ContextGen = (
       projectName: string,
       traceId: string,
       callId: string,
-      path?: string | null,
-      tracetree?: boolean,
-      feedbackExpand?: boolean
+      descendentCallId?: string,
+      hideTraceTree?: boolean,
+      showFeedback?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
       const params = new URLSearchParams();
-      if (path) {
-        params.set(PATH_PARAM, path);
+      if (descendentCallId) {
+        params.set(DESCENDENT_CALL_ID_PARAM, descendentCallId);
       }
-      if (tracetree !== undefined) {
-        params.set(TRACETREE_PARAM, tracetree ? '1' : '0');
+      if (hideTraceTree !== undefined) {
+        params.set(HIDE_TRACETREE_PARAM, hideTraceTree ? '1' : '0');
       }
-      if (feedbackExpand !== undefined) {
-        params.set(FEEDBACK_EXPAND_PARAM, feedbackExpand ? '1' : '0');
+      if (showFeedback !== undefined) {
+        params.set(SHOW_FEEDBACK_PARAM, showFeedback ? '1' : '0');
       }
       if (params.toString()) {
         url += '?' + params.toString();
       }
       return url;
+    },
+    evaluationsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/evaluations`;
     },
     tracesUIUrl: (entityName: string, projectName: string) => {
       return `${projectRoot(entityName, projectName)}/traces`;
@@ -375,16 +377,21 @@ export const browse3ContextGen = (
     callsUIUrl: (
       entityName: string,
       projectName: string,
-      filter?: WFHighLevelCallFilter
+      filter?: WFHighLevelCallFilter,
+      gridFilters?: GridFilterModel
     ) => {
+      const searchParams = new URLSearchParams();
       const prunedFilter = pruneEmptyFields(filter);
-      if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/calls`;
+      if (Object.keys(prunedFilter).length !== 0) {
+        searchParams.set('filter', JSON.stringify(prunedFilter));
+      }
+      if (gridFilters) {
+        searchParams.set('filters', JSON.stringify(gridFilters));
       }
       return `${projectRoot(
         entityName,
         projectName
-      )}/calls?filter=${encodeURIComponent(JSON.stringify(prunedFilter))}`;
+      )}/traces?${searchParams.toString()}`;
     },
     objectVersionsUIUrl: (
       entityName: string,
@@ -413,12 +420,6 @@ export const browse3ContextGen = (
         parsed.artifactName,
         parsed.artifactVersion
       );
-    },
-    boardsUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/boards`;
-    },
-    tablesUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/tables`;
     },
     boardForExpressionUIUrl: (
       entityName: string,
@@ -534,35 +535,31 @@ type RouteType = {
     projectName: string,
     traceId: string,
     callId: string,
-    path?: string | null,
-    tracetree?: boolean,
-    feedbackExpand?: boolean
+    descendentCallId?: string,
+    hideTraceTree?: boolean,
+    showFeedback?: boolean
   ) => string;
+  evaluationsUIUrl: (entityName: string, projectName: string) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    // Using GridFilterModel here is really bad. Somehow this leaked into
+    // the implementation and now it is a part of our URL spec forever... :(
+    // It should have been implemented as the `query` component of WFHighLevelCallFilter
+    // which maps to our actual service API.
+    gridFilters?: GridFilterModel
   ) => string;
   objectVersionsUIUrl: (
     entityName: string,
     projectName: string,
     filter?: WFHighLevelObjectVersionFilter
   ) => string;
-  boardsUIUrl: (
-    entityName: string,
-    projectName: string
-    // TODO: Add filter when supported
-  ) => string;
   boardForExpressionUIUrl: (
     entityName: string,
     projectName: string,
     expression: string
-    // TODO: Add filter when supported
-  ) => string;
-  tablesUIUrl: (
-    entityName: string,
-    projectName: string
     // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
@@ -612,9 +609,9 @@ const useSetSearchParam = () => {
 };
 
 export const PEEK_PARAM = 'peekPath';
-export const TRACETREE_PARAM = 'tracetree';
-export const FEEDBACK_EXPAND_PARAM = 'feedbackExpand';
-export const PATH_PARAM = 'path';
+export const HIDE_TRACETREE_PARAM = 'hideTraceTree';
+export const SHOW_FEEDBACK_PARAM = 'showFeedback';
+export const DESCENDENT_CALL_ID_PARAM = 'descendentCallId';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
@@ -665,6 +662,11 @@ const useMakePeekingRouter = (): RouteType => {
     callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.callUIUrl(...args));
     },
+    evaluationsUIUrl: (
+      ...args: Parameters<typeof baseContext.evaluationsUIUrl>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.evaluationsUIUrl(...args));
+    },
     tracesUIUrl: (...args: Parameters<typeof baseContext.tracesUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.tracesUIUrl(...args));
     },
@@ -681,12 +683,6 @@ const useMakePeekingRouter = (): RouteType => {
     },
     opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.opPageUrl(...args));
-    },
-    boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
-      return setSearchParam(PEEK_PARAM, baseContext.boardsUIUrl(...args));
-    },
-    tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
-      return setSearchParam(PEEK_PARAM, baseContext.tablesUIUrl(...args));
     },
     boardForExpressionUIUrl: (
       ...args: Parameters<typeof baseContext.boardForExpressionUIUrl>

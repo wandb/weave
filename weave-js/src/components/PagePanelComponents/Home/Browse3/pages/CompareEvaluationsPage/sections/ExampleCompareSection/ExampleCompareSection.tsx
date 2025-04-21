@@ -18,9 +18,9 @@ import {
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
-import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
+import {NotApplicable} from '../../../../NotApplicable';
+import {SmallRef} from '../../../../smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';

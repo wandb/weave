@@ -1,24 +1,19 @@
 from collections.abc import Iterable, Iterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import field_validator
 from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
+from weave.flow.util import short_str
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     import pandas as pd
-
-
-def short_str(obj: Any, limit: int = 25) -> str:
-    str_val = str(obj)
-    if len(str_val) > limit:
-        return str_val[:limit] + "..."
-    return str_val
 
 
 @register_object
@@ -47,16 +42,16 @@ class Dataset(Object):
     ```
     """
 
-    rows: weave.Table
+    rows: Union[weave.Table, WeaveTable]
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        return cls(
-            name=obj.name,
-            description=obj.description,
-            ref=obj.ref,
-            rows=obj.rows,
-        )
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
 
     @classmethod
     def from_calls(cls, calls: Iterable[Call]) -> Self:
@@ -77,11 +72,11 @@ class Dataset(Object):
         return pd.DataFrame(self.rows)
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> weave.Table:
+    def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:
+        if weave_isinstance(rows, WeaveTable):
+            return rows
         if not isinstance(rows, weave.Table):
             table_ref = getattr(rows, "table_ref", None)
-            if isinstance(rows, WeaveTable):
-                rows = list(rows)
             rows = weave.Table(rows)
             if table_ref:
                 rows.table_ref = table_ref
@@ -105,8 +100,7 @@ class Dataset(Object):
         return iter(self.rows)
 
     def __len__(self) -> int:
-        # TODO: This can be slow for large datasets...
-        return len(list(self.rows))
+        return len(self.rows)
 
     def __getitem__(self, key: int) -> dict:
         if key < 0:

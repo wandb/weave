@@ -4,16 +4,22 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
-import tenacity
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
+from weave.trace.settings import max_calls_queue_size
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.utils.retry import with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
+
+# Default timeout values (in seconds)
+# DEFAULT_CONNECT_TIMEOUT = 10
+# DEFAULT_READ_TIMEOUT = 30
+# DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
 class StartBatchItem(BaseModel):
@@ -38,49 +44,6 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 
-REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
-REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
-
-
-def _is_retryable_exception(e: Exception) -> bool:
-    # Don't retry pydantic validation errors
-    if isinstance(e, ValidationError):
-        return False
-
-    # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError) and e.response is not None:
-        code_class = e.response.status_code // 100
-
-        # Bad request, not rate-limiting
-        if code_class == 4 and e.response.status_code != 429:
-            return False
-
-    # Otherwise, retry: 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
-    return True
-
-
-def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    logger.info(
-        "retry_attempt",
-        extra={
-            "fn": retry_state.fn,
-            "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
-        },
-    )
-
-
-def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
-    logger.info(
-        "retry_failed",
-        extra={
-            "fn": retry_state.fn,
-            "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
-        },
-    )
-    return retry_state.outcome.result()
-
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
@@ -96,8 +59,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
+        self.call_processor = None
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(self._flush_calls)
+            self.call_processor = AsyncBatchProcessor(
+                self._flush_calls,
+                max_queue_size=max_calls_queue_size(),
+            )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
@@ -119,22 +86,37 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @with_retry
+    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of data to the server with retry logic.
+
+        This method is separated from _flush_calls to avoid recursive retries.
+        """
+        r = requests.post(
+            self.trace_server_url + "/call/upsert_batch",
+            data=encoded_data,  # type: ignore
+            auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
+        )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
+        r.raise_for_status()
+
     def _flush_calls(
         self,
-        batch: list,
+        batch: list[Union[StartBatchItem, EndBatchItem]],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
+        """Process a batch of calls, splitting if necessary and sending to the server.
+
+        This method handles the logic of splitting batches that are too large,
+        but delegates the actual server communication (with retries) to _send_batch_to_server.
+        """
+        # Call processor must be defined for this method
+        assert self.call_processor is not None
         if len(batch) == 0:
             return
 
@@ -150,34 +132,40 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
             self.call_processor.max_batch_size = max(1, target_batch_size)
 
-        # If the batch is too big, recursively split it in half
+        # If the batch is too big, split it in half and process each half
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
             split_idx = int(len(batch) // 2)
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        r = requests.post(
-            self.trace_server_url + "/call/upsert_batch",
-            data=encoded_data,
-            auth=self._auth,
-        )
-        if r.status_code == 413:
-            # handle 413 explicitly to provide actionable error message
-            reason = json.loads(r.text)["reason"]
-            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
-        r.raise_for_status()
+        # If a single item is too large, we can't send it -- log an error and drop it
+        if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
+            logger.error(
+                f"Single call size ({encoded_bytes} bytes) is too large to send. "
+                f"The maximum size is {self.remote_request_bytes_limit} bytes."
+            )
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+        try:
+            self._send_batch_to_server(encoded_data)
+        except Exception:
+            # Add items back to the queue for later processing
+            logger.warning(
+                f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+            )
+
+            # only if debug mode
+            if logger.isEnabledFor(logging.DEBUG):
+                ids = []
+                for item in batch:
+                    if isinstance(item, StartBatchItem):
+                        ids.append(f"{item.req.start.id}-start")
+                    elif isinstance(item, EndBatchItem):
+                        ids.append(f"{item.req.end.id}-end")
+                logger.debug(f"Requeueing batch with {ids=}")
+            self.call_processor.enqueue(batch)
+
+    @with_retry
     def _generic_request_executor(
         self,
         url: str,
@@ -193,6 +181,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
             stream=stream,
+            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 500:
             reason_val = r.text
@@ -234,26 +223,26 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             if line:
                 yield res_model.model_validate_json(line)
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @with_retry
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(self.trace_server_url + "/server_info")
+        r = requests.get(
+            self.trace_server_url + "/server_info",
+            # timeout=DEFAULT_TIMEOUT,
+        )
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
+
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        # TODO: Add docs link (DOCS-1390)
+        raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
     # Call API
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
@@ -271,8 +260,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return self._generic_request(
+            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
+        )
+
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
@@ -290,11 +286,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
-        return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
-        )
+        # This previously called the deprecated /calls/query endpoint.
+        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(
+        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
+    ) -> Iterator[tsi.CallSchema]:
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
@@ -461,41 +458,25 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
             auth=self._auth,
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         r = requests.post(
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
             auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         # TODO: Should stream to disk rather than to memory

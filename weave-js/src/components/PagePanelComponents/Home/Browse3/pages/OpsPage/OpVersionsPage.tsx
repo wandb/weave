@@ -16,12 +16,8 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
 import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_OPERATIONS} from '../common/EmptyContent';
-import {
-  CallsLink,
-  opNiceName,
-  OpVersionLink,
-  OpVersionsLink,
-} from '../common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -113,6 +109,9 @@ export const FilterableOpVersionsTable: React.FC<{
   const columns: GridColDef[] = [
     basicField('op', 'Op', {
       hideable: false,
+      valueGetter: (unused: any, row: any) => {
+        return row.obj.opId;
+      },
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
         const obj: OpVersionSchema = cellParams.row.obj;
@@ -160,8 +159,8 @@ export const FilterableOpVersionsTable: React.FC<{
         ]
       : []),
 
-    basicField('createdAtMs', 'Created', {
-      width: 100,
+    basicField('createdAtMs', 'Last updated', {
+      width: 130,
       renderCell: cellParams => {
         const createdAtMs = cellParams.value;
         return <Timestamp value={createdAtMs / 1000} format="relative" />;

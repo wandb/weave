@@ -16,6 +16,7 @@ type SplitPanelRightProps = {
   minWidth?: number | string;
   maxWidth?: number | string;
   defaultWidth?: number | string;
+  style?: React.CSSProperties;
 };
 
 const DIVIDER_LINE_WIDTH = 1;
@@ -62,6 +63,7 @@ export const SplitPanelRight = ({
   minWidth,
   maxWidth,
   defaultWidth = '30%',
+  style,
 }: SplitPanelRightProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useLocalStorage(
@@ -125,6 +127,7 @@ export const SplitPanelRight = ({
               position: 'relative',
               cursor,
               overflow: 'hidden',
+              ...style,
             }}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}

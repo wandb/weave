@@ -29,7 +29,10 @@ export const TabUseDataset = ({
   const isParentObject = !ref.artifactRefExtra;
   const isRow = ref.artifactRefExtra?.startsWith(ROW_PATH_PREFIX) ?? false;
   const label = isParentObject ? 'dataset version' : isRow ? 'row' : 'object';
-  let pythonName = isValidVarName(name) ? name : 'dataset';
+  const versionName = `${name}_v${versionIndex}`;
+  let pythonName = isValidVarName(versionName)
+    ? versionName
+    : `dataset_v${versionIndex}`;
   if (isRow) {
     pythonName += '_row';
   }
@@ -37,9 +40,13 @@ export const TabUseDataset = ({
   // TODO: Row references are not yet supported, you get:
   //       ValueError: '/' not currently supported in short-form URI
   let long = '';
+  let download = '';
+  let downloadCopyText = '';
   if (!isRow && 'projectName' in ref) {
-    long = `weave.init('${ref.projectName}')
+    long = `weave.init('${ref.entityName}/${ref.projectName}')
 ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
+    download = `${pythonName}.to_pandas().to_csv("${versionName}.csv", index=False)`;
+    downloadCopyText = long + '\n' + download;
   }
 
   return (
@@ -71,6 +78,17 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
             <div className="mt-8">or</div>
             <CopyableText language="python" text={long} />
           </>
+        )}
+        {download && (
+          <Box mt={2}>
+            For further analysis or export you can convert this {label} to a
+            Pandas DataFrame, for example:
+            <CopyableText
+              language="python"
+              text={download}
+              copyText={downloadCopyText}
+            />
+          </Box>
         )}
       </Box>
     </Box>

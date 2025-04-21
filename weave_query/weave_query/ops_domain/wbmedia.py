@@ -5,8 +5,7 @@ import json
 import typing
 
 from weave_query import api as weave
-from weave_query import types
-from weave_query import errors, engine_trace, artifact_fs, file_base
+from weave_query import artifact_fs, engine_trace, errors, file_base, types
 from weave_query.language_features.tagging.tag_store import isolated_tagging_context
 from weave_query.ops_primitives import html, markdown
 
@@ -155,6 +154,7 @@ class ImageArtifactFileRefType(types.ObjectType):
                     }
                 )
             ),
+            "caption": types.optional(types.String()),
         }
         return res
 
@@ -213,6 +213,7 @@ class ImageArtifactFileRef:
         default_factory=dict
     )  # type: ignore
     classes: typing.Optional[typing.Optional[dict]] = None
+    caption: typing.Optional[str] = None
 
 
 ImageArtifactFileRef.WeaveType = ImageArtifactFileRefType  # type: ignore
@@ -365,6 +366,7 @@ def file_media(file: artifact_fs.FilesystemArtifactFile):
             height=data.get("height", 0),
             width=data.get("width", 0),
             sha256=data.get("sha256", file_path),
+            caption=data.get("caption", None),
         )
     elif any(
         file.path.endswith(path_suffix)

@@ -22,8 +22,8 @@ import React, {
 import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
+import {objectRefDisplayName} from '../../smallRef/SmallWeaveRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
   CustomWeaveTypePayload,
@@ -547,6 +547,24 @@ export const ObjectViewer = ({
             '&:first-of-type': {
               paddingRight: '8px',
             },
+          },
+
+          // Honestly, this feels like a bug with MUI datagrid.
+          // Normally, we would want autohieght as a prop as well as
+          // a parent with adaptive hieght which would result in an
+          // adaptive datagrid. However, that end up being very slow
+          // when there are many rows.
+          //
+          // Instead, when autoheight is false, MUI datagrid will
+          // retain the larget height, even after collapsing. It does
+          // this by synthetically injecting a filler div and adding
+          // a height to it. I don't quite understand why it does this,
+          // but it does.
+          //
+          // This hack basically hides that dom element, resulting in a
+          // performant, adaptive datagrid.
+          '& .MuiDataGrid-filler': {
+            height: '0px !important',
           },
         }}
       />

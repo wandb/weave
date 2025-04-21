@@ -1,0 +1,64 @@
+name: Run TLDR Code Summarization
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The branch name or PR number to run TLDR on'
+        required: true
+        type: string
+
+jobs:
+  run-tldr:
+    name: Run TLDR Code Summarization
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: "read"
+      pull-requests: "write"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+          
+     # Recommended uv setup: https://docs.astral.sh/uv/guides/integration/github/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run TLDR
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+        run: |
+          uvx --from git+https://github.com/wandb/tldr@main tldr -o summary.md
+          
+      - name: Detect PR and post summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find PR associated with current branch
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+            PR_NUMBER=$(gh pr list --head $BRANCH_NAME --json number -q '.[0].number')
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.ref }}" =~ ^[0-9]+$ ]]; then
+            # If ref is numeric, assume it's a PR number
+            PR_NUMBER=${{ github.event.inputs.ref }}
+          else
+            BRANCH_NAME=${{ github.event.inputs.ref || github.ref_name }}
+            PR_NUMBER=$(gh pr list --head $BRANCH_NAME --json number -q '.[0].number')
+          fi
+          
+          # Post summary to PR if found
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Found PR #$PR_NUMBER"
+            if [ -f summary.md ]; then
+              gh pr comment $PR_NUMBER --body-file summary.md
+            else
+              echo "No summary file found"
+            fi
+          else
+            echo "No associated PR found for this branch"
+          fi 

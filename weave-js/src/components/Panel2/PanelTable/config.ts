@@ -34,6 +34,12 @@ export type PanelTableConfig = {
   pinnedColumns: string[];
   activeRowForGrouping: {[groupKey: string]: number};
   simpleTable?: boolean;
+  tableSelection?: {
+    currentSelection: string;
+    show: boolean;
+    keys: string[];
+    callback: (key: string) => void;
+  };
 };
 
 const tableStateKeys = [

@@ -25,6 +25,7 @@ from weave_query.arrow.list_ import (
     make_vec_none,
     offsets_starting_at_zero,
     unsafe_awl_construction,
+    safe_list_array_from_arrays
 )
 from weave_query.language_features.tagging import tagged_value_type
 
@@ -198,6 +199,7 @@ def _concatenate_lists(
         l2_arrow_data.flatten(), l2.object_type.object_type, l2._artifact
     )
     concatted_values = _concatenate(self_values, other_values, depth=depth + 1)
+
     new_offsets = pa_concat_arrays(
         [
             offsets_starting_at_zero(l1_arrow_data)[:-1],
@@ -207,17 +209,18 @@ def _concatenate_lists(
             ).cast(pa.int32()),
         ]
     )
+
+    result_array = safe_list_array_from_arrays(
+        new_offsets,
+        concatted_values._arrow_data,
+        mask=pa_concat_arrays([
+            pa.compute.is_null(l1._arrow_data),
+            pa.compute.is_null(l2._arrow_data)
+        ])
+    )
+
     return ArrowWeaveList(
-        pa.ListArray.from_arrays(
-            new_offsets,
-            concatted_values._arrow_data,
-            mask=pa_concat_arrays(
-                [
-                    pa.compute.is_null(l1_arrow_data),
-                    pa.compute.is_null(l2_arrow_data),
-                ]
-            ),
-        ),
+        result_array,
         types.List(
             types.merge_types(l1.object_type.object_type, l2.object_type.object_type)
         ),
@@ -512,7 +515,6 @@ def _concatenate(
                             pa.array(np.zeros(len(other), dtype=np.int8)),
                         ]
                     ),
-                    # offsets=pa.array(np.arange(len(self), dtype=np.int32)),
                     offsets=pa_concat_arrays(
                         [
                             self_offsets,
@@ -539,7 +541,6 @@ def _concatenate(
                         pa.compute.equal(other_type_codes, other_i).cast(pa.int8()),
                     ]
                 ),
-                # offsets=pa.array(np.arange(len(other), dtype=np.int32)),
                 offsets=pa_concat_arrays(
                     [
                         pa.array(np.zeros(len(self), dtype=np.int32)),

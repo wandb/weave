@@ -6,12 +6,18 @@ export const TableRowSelectionContext = React.createContext<{
   setRowIds?: (rowIds: string[]) => void;
   getNextRowId?: (currentId: string) => string | null;
   getPreviousRowId?: (currentId: string) => string | null;
+  getDescendantCallIdAtSelectionPath?: (callId: string) => string | null;
+  setGetDescendantCallIdAtSelectionPath?: (
+    getDescendantCallIdAtSelectionPath: (callId: string) => string | null
+  ) => void;
 }>({
   rowIdsConfigured: false,
   rowIdInTable: (id: string) => false,
   setRowIds: () => {},
   getNextRowId: () => null,
   getPreviousRowId: () => null,
+  getDescendantCallIdAtSelectionPath: () => null,
+  setGetDescendantCallIdAtSelectionPath: () => {},
 });
 
 export const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
@@ -22,6 +28,18 @@ export const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
   const rowIdInTable = useCallback(
     (currentId: string) => rowIds.includes(currentId),
     [rowIds]
+  );
+
+  const [
+    getDescendantCallIdAtSelectionPath,
+    setGetDescendantCallIdAtSelectionPathRaw,
+  ] = useState<((callId: string) => string | null) | undefined>(undefined);
+
+  const setGetDescendantCallIdAtSelectionPath = useCallback(
+    (newFn: (callId: string) => string | null) => {
+      setGetDescendantCallIdAtSelectionPathRaw(() => newFn);
+    },
+    [setGetDescendantCallIdAtSelectionPathRaw]
   );
 
   const getNextRowId = useCallback(
@@ -54,6 +72,8 @@ export const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
         setRowIds,
         getNextRowId,
         getPreviousRowId,
+        getDescendantCallIdAtSelectionPath,
+        setGetDescendantCallIdAtSelectionPath,
       }}>
       {children}
     </TableRowSelectionContext.Provider>

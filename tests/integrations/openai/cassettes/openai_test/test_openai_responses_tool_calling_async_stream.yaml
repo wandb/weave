@@ -1,0 +1,796 @@
+interactions:
+- request:
+    body: '{"input":"What was a positive news story from today?","model":"gpt-4o-2024-08-06","stream":true,"tools":[{"type":"web_search_preview"}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '136'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: 'event: response.created
+
+        data: {"type":"response.created","response":{"id":"resp_67d989288c5c8192b547d4bd79ece6df06a0769afc10b23a","object":"response","created_at":1742309672,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.in_progress
+
+        data: {"type":"response.in_progress","response":{"id":"resp_67d989288c5c8192b547d4bd79ece6df06a0769afc10b23a","object":"response","created_at":1742309672,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.output_item.added
+
+        data: {"type":"response.output_item.added","output_index":0,"item":{"type":"web_search_call","id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a","status":"in_progress"}}
+
+
+        event: response.web_search_call.in_progress
+
+        data: {"type":"response.web_search_call.in_progress","output_index":0,"item_id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a"}
+
+
+        event: response.web_search_call.searching
+
+        data: {"type":"response.web_search_call.searching","output_index":0,"item_id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a"}
+
+
+        event: response.web_search_call.completed
+
+        data: {"type":"response.web_search_call.completed","output_index":0,"item_id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a"}
+
+
+        event: response.output_item.done
+
+        data: {"type":"response.output_item.done","output_index":0,"item":{"type":"web_search_call","id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a","status":"completed"}}
+
+
+        event: response.output_item.added
+
+        data: {"type":"response.output_item.added","output_index":1,"item":{"type":"message","id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","status":"in_progress","role":"assistant","content":[]}}
+
+
+        event: response.content_part.added
+
+        data: {"type":"response.content_part.added","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"Today"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        March"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"18"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"202"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"5"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        European"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        markets"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        experienced"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        positive"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        surge"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        as"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        German"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        lawmakers"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        prepared"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        to"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        vote"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        on"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        significant"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        government"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        spending"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        overhaul"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"This"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        anticipated"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        decision"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        boosted"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        euro"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        above"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        $"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"1"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"09"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        and"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        elevated"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        German"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        bond"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        yields"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"The"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        STO"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"XX"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"600"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        index"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        Europe"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        rose"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        by"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"0"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"7"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"%,"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        marking"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        an"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"8"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"%"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        increase"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        this"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        year"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        contrasting"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        with"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"4"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"%"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        decline"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        S"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"&P"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"500"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"This"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        development"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        reflects"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        growing"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        investor"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        confidence"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        in"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        Europe''s"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        economic"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        prospects"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"annotation_index":0,"annotation":{"type":"url_citation","start_index":451,"end_index":553,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"\n##
+        European Markets Rise Ahead of German Spending Vote:\n"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"-
+        [Euro, stocks rise ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)"}
+
+
+        event: response.output_text.annotation.added
+
+        data: {"type":"response.output_text.annotation.added","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"annotation_index":1,"annotation":{"type":"url_citation","start_index":614,"end_index":759,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"delta":"
+        "}
+
+
+        event: response.output_text.done
+
+        data: {"type":"response.output_text.done","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"text":"Today,
+        March 18, 2025, European markets experienced a positive surge as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, marking an 8% increase this year,
+        contrasting with a 4% decline in the S&P 500. This development reflects growing
+        investor confidence in Europe''s economic prospects. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\n\n##
+        European Markets Rise Ahead of German Spending Vote:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)
+        "}
+
+
+        event: response.content_part.done
+
+        data: {"type":"response.content_part.done","item_id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","output_index":1,"content_index":0,"part":{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive surge as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, marking an 8% increase this year,
+        contrasting with a 4% decline in the S&P 500. This development reflects growing
+        investor confidence in Europe''s economic prospects. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\n\n##
+        European Markets Rise Ahead of German Spending Vote:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":451,"end_index":553,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":614,"end_index":759,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}]}}
+
+
+        event: response.output_item.done
+
+        data: {"type":"response.output_item.done","output_index":1,"item":{"type":"message","id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive surge as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, marking an 8% increase this year,
+        contrasting with a 4% decline in the S&P 500. This development reflects growing
+        investor confidence in Europe''s economic prospects. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\n\n##
+        European Markets Rise Ahead of German Spending Vote:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":451,"end_index":553,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":614,"end_index":759,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}]}]}}
+
+
+        event: response.completed
+
+        data: {"type":"response.completed","response":{"id":"resp_67d989288c5c8192b547d4bd79ece6df06a0769afc10b23a","object":"response","created_at":1742309672,"status":"completed","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[{"type":"web_search_call","id":"ws_67d98929d9608192955970dd5150d7ce06a0769afc10b23a","status":"completed"},{"type":"message","id":"msg_67d9892ce7448192ad349c21cc22550706a0769afc10b23a","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Today,
+        March 18, 2025, European markets experienced a positive surge as German lawmakers
+        prepared to vote on a significant government spending overhaul. This anticipated
+        decision boosted the euro above $1.09 and elevated German bond yields. The
+        STOXX 600 index in Europe rose by 0.7%, marking an 8% increase this year,
+        contrasting with a 4% decline in the S&P 500. This development reflects growing
+        investor confidence in Europe''s economic prospects. ([reuters.com](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai))\n\n\n##
+        European Markets Rise Ahead of German Spending Vote:\n- [Euro, stocks rise
+        ahead of landmark German spending vote](https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai)
+        ","annotations":[{"type":"url_citation","start_index":451,"end_index":553,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"},{"type":"url_citation","start_index":614,"end_index":759,"url":"https://www.reuters.com/markets/global-markets-wrapup-1-2025-03-18/?utm_source=openai","title":"Euro,
+        stocks rise ahead of landmark German spending vote"}]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search_preview","search_context_size":"medium","user_location":{"type":"approximate","city":null,"country":"US","region":null,"timezone":null}}],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":328,"input_tokens_details":{"cached_tokens":0},"output_tokens":209,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":537},"user":null,"metadata":{}}}
+
+
+        '
+    headers:
+      CF-RAY:
+      - 922590dcf8eeebb6-YYZ
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 18 Mar 2025 14:54:32 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=qRz4D.jopdU4_v_uOFGjt2LSAwD0vyVejODY9dAYbe8-1742309672-1.0.1.1-6dDr2IqJHOFdVwKr7W57d5_L2QwrEEmfROSkQvaPbEi2LNkvvk68ICfzgSZj4JgSoewOiu6oT_J_JQ5MOAxAxvWxa_ADeoHt7qPAA_.7N2I;
+        path=/; expires=Tue, 18-Mar-25 15:24:32 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=fTHH4Z6OGo4ASBEwo3He5OrXlF18c5bRb1TUARQTTA4-1742309672692-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '121'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_b0921f0d9015d7b89d536187dc396b13
+    status:
+      code: 200
+      message: OK
+version: 1

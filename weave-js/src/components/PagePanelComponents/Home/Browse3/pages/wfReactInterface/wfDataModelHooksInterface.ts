@@ -36,6 +36,9 @@ export type CallKey = {
   project: string;
   callId: string;
 };
+
+export type CacheableCallKey = CallKey & Record<string, unknown>;
+
 export type CallSchema = CallKey & {
   spanName: string;
   displayName: string | null;
@@ -49,6 +52,7 @@ export type CallSchema = CallKey & {
   userId: string | null;
   runId: string | null;
   traceCall?: traceServerClientTypes.TraceCallSchema; // this will eventually be the entire call schema
+  totalStorageSizeBytes?: number | null;
 };
 
 export type CallFilter = {
@@ -76,6 +80,7 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
+  userId?: string;
 };
 
 export type OpVersionFilter = {
@@ -164,8 +169,8 @@ export type Refetchable = {
 
 export type WFDataModelHooksInterface = {
   useCall: (
-    key: CallKey | null,
-    opts?: {includeCosts?: boolean}
+    key: CacheableCallKey | null,
+    opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
@@ -182,6 +187,7 @@ export type WFDataModelHooksInterface = {
       refetchOnDelete?: boolean;
       includeCosts?: boolean;
       includeFeedback?: boolean;
+      includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
@@ -213,7 +219,8 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefCols?: string[],
-    includeFeedback?: boolean
+    includeFeedback?: boolean,
+    includeCosts?: boolean
   ) => Promise<Blob>;
   useObjCreate: () => (
     projectId: string,
@@ -222,7 +229,8 @@ export type WFDataModelHooksInterface = {
     baseObjectClass?: string
   ) => Promise<string>;
   useOpVersion: (
-    key: OpVersionKey | null
+    key: OpVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -230,10 +238,12 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
+    orderBy?: traceServerClientTypes.SortBy[],
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
-    key: ObjectVersionKey | null
+    key: ObjectVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
@@ -305,6 +315,9 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  useTableCreate: () => (
+    table: traceServerClientTypes.TableCreateReq
+  ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

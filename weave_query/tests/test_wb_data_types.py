@@ -6,23 +6,18 @@ import numpy as np
 import pytest
 import wandb
 from bokeh.plotting import figure
-from wandb import Artifact
 from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
-import weave_query as weave
 import weave_query
-from weave_query import artifact_fs
+import weave_query as weave
 from weave_query import weave_types as types
-from weave_query.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from weave_query.language_features.tagging.tagged_value_type import TaggedValueType
 from weave_query.ops_domain.wbmedia import ImageArtifactFileRefType
 from weave_query.ops_primitives import file
 from weave_query.wandb_client_api import wandb_gql_query
 from weave_query.wandb_util import weave0_type_json_to_weave1_type
-
-from tests.fixture_fakewandb import FakeApi
 
 
 class RandomClass:
@@ -265,6 +260,7 @@ def make_table():
             ["b", make_wb_image(False, True)],
             ["c", make_wb_image(True, False)],
             ["d", make_wb_image(True, True)],
+            ["e", wandb.Image(make_np_image(), caption="This is a caption")],
         ],
     )
 
@@ -323,6 +319,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -377,6 +374,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -431,6 +429,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
             },
         },
         {
@@ -485,9 +484,103 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": None,
+            },
+        },
+        {
+            "label": "e",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {"box_set_1": None, "box_set_2": None},
+                "masks": {"mask_set_1": None},
+                "caption": "This is a caption",
             },
         },
     ]
+
+
+def test_image_with_caption_in_tables(fake_wandb):
+    # test the image caption in isolation from the box and mask layers
+    def run_test():
+        table = wandb.Table(
+            columns=["label", "image"],
+            data=[
+                ["e", wandb.Image(make_np_image(), caption="This is a caption")],
+            ],
+        )
+        art = wandb.Artifact("test_name", "test_type")
+        art.add(table, "table")
+        art_node = fake_wandb.mock_artifact_as_node(art)
+
+        file_node = art_node.file("table.table.json")
+        table_node = file_node.table()
+        table_rows = table_node.rows()
+        table_rows_type = table_node.rowsType()
+
+        raw_data = weave.use(table_rows).to_pylist_notags()
+        assert raw_data == [
+            {
+                "label": "e",
+                "image": {
+                    "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
+                    "path": "media/images/724389f96d933f4166db.png",
+                    "format": "png",
+                    "height": 128,
+                    "width": 128,
+                    "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                    "caption": "This is a caption",
+                    "boxes": {},
+                    "masks": {},
+                },
+            }
+        ]
+
+        ot = weave.use(table_rows_type).object_type
+        assert ot == TaggedValueType(
+            types.TypedDict(
+                {"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}
+            ),
+            weave.types.TypedDict(
+                {
+                    "label": weave.types.UnionType(
+                        weave.types.NoneType(), weave.types.String()
+                    ),
+                    "image": weave.types.UnionType(
+                        ImageArtifactFileRefType(
+                            boxLayers={},
+                            boxScoreKeys=[],
+                            maskLayers={},
+                            classMap={},
+                        ),
+                        weave.types.NoneType(),
+                    ),
+                }
+            ),
+        )
+
+    run_test()
+
+    # Legacy code path.
+    from wandb.sdk.data_types._dtypes import InvalidType
+    from wandb.sdk.data_types.image import _ImageFileType
+
+    def dummy_params(self):
+        return {}
+
+    def dummy_assign_type(self, wb_type=None):
+        if isinstance(wb_type, _ImageFileType):
+            return self
+        return InvalidType()
+
+    _ImageFileType.params = property(dummy_params)
+    _ImageFileType.assign_type = dummy_assign_type
+
+    run_test()
 
 
 def test_annotated_images_in_tables(fake_wandb):
@@ -536,8 +629,8 @@ def test_annotated_images_in_tables(fake_wandb):
 
 def test_annotated_legacy_images_in_tables(fake_wandb):
     # Mocking this property makes the payload look like the legacy version.
-    from wandb.sdk.data_types.image import _ImageFileType
     from wandb.sdk.data_types._dtypes import InvalidType
+    from wandb.sdk.data_types.image import _ImageFileType
 
     def dummy_params(self):
         return {}

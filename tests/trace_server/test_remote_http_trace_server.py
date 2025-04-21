@@ -1,4 +1,5 @@
 import datetime
+import os
 import unittest
 from unittest.mock import patch
 
@@ -64,6 +65,9 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
 
     @patch("weave.trace_server.requests.post")
     def test_500_502_503_504_429_retry(self, mock_post):
+        # This test has multiple failures, so it needs extra retries!
+        os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "6"
+        os.environ["WEAVE_RETRY_MAX_INTERVAL"] = "0.1"
         call_id = generate_id()
 
         resp0 = requests.Response()
@@ -90,9 +94,14 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         mock_post.side_effect = [resp0, resp1, resp2, resp3, resp4, resp5]
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
+        del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
+        del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
 
     @patch("weave.trace_server.requests.post")
     def test_other_error_retry(self, mock_post):
+        # This test has multiple failures, so it needs extra retries!
+        os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "6"
+        os.environ["WEAVE_RETRY_MAX_INTERVAL"] = "0.1"
         call_id = generate_id()
 
         resp2 = requests.Response()
@@ -110,6 +119,8 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         ]
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
+        del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
+        del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
 
 
 if __name__ == "__main__":

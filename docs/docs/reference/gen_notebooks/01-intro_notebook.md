@@ -1,5 +1,5 @@
 ---
-title: Introduction Notebook
+title: Quickstart
 ---
 
 :::tip This is a notebook

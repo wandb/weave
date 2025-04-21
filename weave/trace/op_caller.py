@@ -44,7 +44,10 @@ def async_call_op(
     Returns:
         A coroutine that will execute the Op and return a tuple of (result, Call)
     """
-    call_res = func.call(*args, __should_raise=True, **kwargs)
-    if inspect.iscoroutine(call_res):
-        return call_res
-    return asyncio.to_thread(lambda: call_res)
+    is_async = inspect.iscoroutinefunction(func.resolve_fn)
+    if is_async:
+        return func.call(*args, __should_raise=True, **kwargs)
+    else:
+        return asyncio.to_thread(
+            lambda: func.call(*args, __should_raise=True, **kwargs)
+        )

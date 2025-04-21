@@ -1,6 +1,7 @@
 import {IconNames} from '@wandb/weave/components/Icon';
 import _ from 'lodash';
 import {useMemo} from 'react';
+import {useLocation} from 'react-router-dom';
 
 import {FancyPageSidebarItem} from './FancyPageSidebar';
 
@@ -14,6 +15,18 @@ export const useProjectSidebar = (
   isLaunchActive: boolean = false,
   isWandbAdmin: boolean = false
 ): FancyPageSidebarItem[] => {
+  // must preserve named workspace url query string
+  // when navigating between workspace & runs pages
+  let nwSearchStr: string | undefined;
+  const location = useLocation();
+  const allSearchParams = new URLSearchParams(location.search);
+  const nwId = allSearchParams.get('nw');
+  if (nwId) {
+    const nwSearchParams = new URLSearchParams();
+    nwSearchParams.append('nw', nwId);
+    nwSearchStr = nwSearchParams.toString();
+  }
+
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
   // Should show weave sidebar items if we have weave data and we have a trace backend
@@ -47,21 +60,27 @@ export const useProjectSidebar = (
       ? []
       : [
           {
+            type: 'button' as const,
+            name: 'Overview',
+            slug: 'overview',
+            isShown: true,
+            iconName: IconNames.Info,
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerOverview',
+            isShown: isShowAll,
+          },
+          {
             type: 'label' as const,
             label: 'Models',
             isShown: isShowAll,
           },
           {
             type: 'button' as const,
-            name: 'Overview',
-            slug: 'overview',
-            isShown: isModelsOnly,
-            iconName: IconNames.Info,
-          },
-          {
-            type: 'button' as const,
             name: 'Workspace',
             slug: 'workspace',
+            search: nwSearchStr,
             isShown: !isWeaveOnly,
             isDisabled: viewingRestricted,
             iconName: IconNames.DashboardBlackboard,
@@ -70,6 +89,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Runs',
             slug: 'table',
+            search: nwSearchStr,
             isShown: !isWeaveOnly,
             isDisabled: viewingRestricted,
             iconName: IconNames.Table,
@@ -259,13 +279,14 @@ export const useProjectSidebar = (
 
     return onlyShownItems;
   }, [
-    isLoading,
-    isShowAll,
-    isWeaveOnly,
-    viewingRestricted,
-    isModelsOnly,
-    showWeaveSidebarItems,
     isLaunchActive,
+    isLoading,
+    isModelsOnly,
+    isShowAll,
     isWandbAdmin,
+    isWeaveOnly,
+    nwSearchStr,
+    showWeaveSidebarItems,
+    viewingRestricted,
   ]);
 };

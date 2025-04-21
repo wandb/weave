@@ -2,6 +2,8 @@ import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
+import {DateTimeView} from './datetime.datetime/DateTimeView';
+import {MarkdownView} from './Markdown/MarkdownView';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
@@ -22,6 +24,7 @@ const customWeaveTypeRegistry: {
     component: React.FC<{
       entity: string;
       project: string;
+      mode?: string;
       data: any; // I wish this could be typed more specifically
     }>;
     preferredRowHeight?: number;
@@ -41,6 +44,13 @@ const customWeaveTypeRegistry: {
   },
   'wave.Wave_read': {
     component: AudioPlayer,
+  },
+  'datetime.datetime': {
+    component: DateTimeView,
+  },
+  'rich.markdown.Markdown': {
+    component: MarkdownView,
+    preferredRowHeight: 350,
   },
 };
 
@@ -65,12 +75,11 @@ export const getCustomWeaveTypePreferredRowHeight = (
 export const CustomWeaveTypeProjectContext = React.createContext<{
   entity: string;
   project: string;
+  mode?: string;
 } | null>(null);
 
 /**
- * This is the primary entry-point for dispatching custom weave types. Currently
- * we just have 1, but as we add more, we might want to add a more robust
- * "registry"
+ * This is the primary entry-point for dispatching custom weave types.
  */
 export const CustomWeaveTypeDispatcher: React.FC<
   CustomWeaveTypeDispatcherProps
@@ -92,6 +101,7 @@ export const CustomWeaveTypeDispatcher: React.FC<
     return React.createElement(comp, {
       entity: applicableEntity,
       project: applicableProject,
+      mode: projectContext?.mode,
       data,
     });
   }

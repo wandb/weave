@@ -5,14 +5,14 @@ import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../../../../Button';
+import {DEFAULT_SORT_CALLS} from '../../../CallsPage/CallsTable';
 import {
   DEFAULT_FILTER_CALLS,
-  DEFAULT_SORT_CALLS,
-} from '../../../CallsPage/CallsTable';
-import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
+  useCallsForQuery,
+} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
-import {opNiceName} from '../../../common/Links';
+import {opNiceName} from '../../../common/opNiceName';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,

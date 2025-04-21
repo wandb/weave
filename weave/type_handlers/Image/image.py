@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
-from weave.trace import object_preparers, serializer
-from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.serialization import serializer
+from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
 
 try:
@@ -24,25 +23,10 @@ pil_format_to_ext = InvertableDict[str, str](
     {
         "JPEG": "jpg",
         "PNG": "png",
+        "WEBP": "webp",
     }
 )
 ext_to_pil_format = pil_format_to_ext.inv
-
-
-class PILImagePreparer:
-    def should_prepare(self, obj: Any) -> bool:
-        return isinstance(obj, Image.Image)
-
-    def prepare(self, obj: Image.Image) -> None:
-        try:
-            # This load is necessary to ensure that the image is fully loaded into memory.
-            # If we don't do this, it's possible that only part of the data is loaded
-            # before the object is returned.  This can happen when trying to run an evaluation
-            # on a ref-get'd dataset with image columns.
-            obj.load()
-        except Exception as e:
-            logger.exception(f"Failed to load PIL Image: {e}")
-            raise
 
 
 def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
@@ -84,4 +68,3 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
 def register() -> None:
     if dependencies_met:
         serializer.register_serializer(Image.Image, save, load)
-        object_preparers.register(PILImagePreparer())

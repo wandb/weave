@@ -6,8 +6,7 @@ typing_extensions>=4.0.0
 
 # Definitely need arrow
 # TODO: Colab has 9.0.0, can we support?
-# TODO: 17.0.0 breaks a bunch of tests - can we move this requirement to just the engine?
-pyarrow>=14.0.1,<17.0.0
+pyarrow==17.0.0
 
 # pydantic integration, and required by openai anyway
 openai>=1.0.0

@@ -629,7 +629,6 @@ export const opRunLoggedArtifactVersion = makeRunOp({
   )} logged by the ${docType('run')} for a given name and alias`,
   returnType: inputTypes => 'artifactVersion',
   resolver: ({run, artifactVersionName}) => {
-    // tslint:disable-next-line: prefer-const
     let [artifactName, version] = String.splitOnce(artifactVersionName, ':');
     if (version == null) {
       version = 'latest';

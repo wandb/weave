@@ -2,6 +2,7 @@ import asyncio
 import logging
 import multiprocessing
 import random
+from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
@@ -9,6 +10,14 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 _shown_warnings = set()
+
+
+def transpose(rows: list[dict]) -> dict[str, list]:
+    cols = defaultdict(list)
+    for row in rows:
+        for k, v in row.items():
+            cols[k].append(v)
+    return dict(cols)
 
 
 async def async_foreach(
@@ -233,3 +242,10 @@ def make_memorable_name() -> str:
     adj = random.choice(adjectives)
     noun = random.choice(nouns)
     return f"{adj}-{noun}"
+
+
+def short_str(obj: Any, limit: int = 25) -> str:
+    str_val = str(obj)
+    if len(str_val) > limit:
+        return str_val[:limit] + "..."
+    return str_val

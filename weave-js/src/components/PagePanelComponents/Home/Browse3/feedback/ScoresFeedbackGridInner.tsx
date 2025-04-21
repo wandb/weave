@@ -6,23 +6,21 @@ import React from 'react';
 import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {CellValue} from '../../Browse2/CellValue';
-import {SmallRef} from '../../Browse2/SmallRef';
 import {CallRefLink} from '../pages/common/Links';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
+import {SmallRef} from '../smallRef/SmallRef';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 
-type FeedbackGridInnerProps = {
+type ScoresFeedbackGridInnerProps = {
   feedback: Feedback[];
   currentViewerId: string | null;
-  showAnnotationName?: boolean;
 };
 
 export const ScoresFeedbackGridInner = ({
   feedback,
   currentViewerId,
-  showAnnotationName,
-}: FeedbackGridInnerProps) => {
+}: ScoresFeedbackGridInnerProps) => {
   /**
    * This component is very similar to `FeedbackGridInner`, but it only shows scores.
    * While some of the code is duplicated, it is kept separate to make it easier
@@ -142,7 +140,11 @@ export const ScoresFeedbackGridInner = ({
           return null;
         }
         return (
-          <FeedbackGridActions projectId={projectId} feedbackId={feedbackId} />
+          <FeedbackGridActions
+            projectId={projectId}
+            feedbackId={feedbackId}
+            feedbackType="score"
+          />
         );
       },
     },

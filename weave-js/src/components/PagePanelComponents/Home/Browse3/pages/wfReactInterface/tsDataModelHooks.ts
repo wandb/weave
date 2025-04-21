@@ -34,8 +34,8 @@ import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
+  CacheableCallKey,
   CallFilter,
-  CallKey,
   CallSchema,
   FeedbackKey,
   Loadable,
@@ -165,8 +165,8 @@ const useMakeTraceServerEndpoint = <
 };
 
 const useCall = (
-  key: CallKey | null,
-  opts?: {includeCosts?: boolean}
+  key: CacheableCallKey | null,
+  opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -176,20 +176,23 @@ const useCall = (
   const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
           include_costs: opts?.includeCosts,
+          ...(opts?.includeTotalStorageSize
+            ? {include_total_storage_size: true}
+            : null),
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient, opts?.includeCosts]);
+  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]);
 
   useEffect(() => {
     doFetch();
@@ -232,7 +235,7 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }
@@ -253,6 +256,7 @@ const useCallsNoExpansion = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -287,6 +291,9 @@ const useCallsNoExpansion = (
       columns,
       include_costs: opts?.includeCosts,
       include_feedback: opts?.includeFeedback,
+      ...(opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -299,18 +306,27 @@ const useCallsNoExpansion = (
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
     opts?.skip,
     opts?.includeCosts,
     opts?.includeFeedback,
-    getTsClient,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter.opVersionRefs,
+    deepFilter.inputObjectVersionRefs,
+    deepFilter.outputObjectVersionRefs,
+    deepFilter.parentIds,
+    deepFilter.traceId,
+    deepFilter.callIds,
+    deepFilter.traceRootsOnly,
+    deepFilter.runIds,
+    deepFilter.userIds,
+    limit,
     offset,
     sortBy,
     query,
     columns,
+    getTsClient,
   ]);
 
   // register doFetch as a callback after deletion
@@ -397,6 +413,7 @@ const useCalls = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
@@ -578,7 +595,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -600,6 +618,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -676,7 +695,8 @@ const useFeedback = (
 
 const useOpVersion = (
   // Null value skips
-  key: OpVersionKey | null
+  key: OpVersionKey | null,
+  metadataOnly?: boolean
 ): LoadableWithError<OpVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -697,11 +717,12 @@ const useOpVersion = (
           }),
           object_id: deepKey?.opId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
-          if (res.obj == null) {
+          if (res.obj == null && !metadataOnly) {
             setError(new Error(JSON.stringify(res)));
             // be conservative and unset the cache when there's an error
             if (deepKey) {
@@ -710,7 +731,7 @@ const useOpVersion = (
           }
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
@@ -765,13 +786,22 @@ const useOpVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     opVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedOpVersion, key, opVersionRes, error]);
+  }, [cachedOpVersion, key, opVersionRes, error, metadataOnly]);
 };
 
 const useOpVersions = (
@@ -780,6 +810,7 @@ const useOpVersions = (
   filter: OpVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
+  orderBy?: traceServerTypes.SortBy[],
   opts?: {skip?: boolean}
 ): LoadableWithError<OpVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -792,6 +823,7 @@ const useOpVersions = (
     result: null,
   });
   const deepFilter = useDeepMemo(filter);
+  const deepOrderBy = useDeepMemo(orderBy);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -809,6 +841,7 @@ const useOpVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: deepOrderBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -832,6 +865,7 @@ const useOpVersions = (
     project,
     limit,
     metadataOnly,
+    deepOrderBy,
   ]);
 
   useEffect(() => {
@@ -865,6 +899,7 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionHash: obj.digest,
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -891,7 +926,8 @@ const useFileContent = makeTraceServerEndpointHook<
 
 const useObjectVersion = (
   // Null value skips
-  key: ObjectVersionKey | null
+  key: ObjectVersionKey | null,
+  metadataOnly?: boolean
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -912,6 +948,7 @@ const useObjectVersion = (
           }),
           object_id: deepKey?.objectId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
@@ -929,7 +966,7 @@ const useObjectVersion = (
           setError(new Error(JSON.stringify(err)));
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
@@ -983,13 +1020,22 @@ const useObjectVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     objectVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedObjectVersion, key, objectVersionRes, error]);
+  }, [cachedObjectVersion, key, objectVersionRes, error, metadataOnly]);
 };
 
 export const convertTraceServerObjectVersionToSchema = <
@@ -1887,22 +1933,24 @@ export const privateRefToSimpleName = (ref: string) => {
   }
 };
 
+export const parseSpanName = (opName: string) => {
+  if (
+    opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    opName.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return opVersionRefOpName(opName);
+  }
+  if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+    return privateRefToSimpleName(opName);
+  }
+  return opName;
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  const parseSpanName = (opName: string) => {
-    if (
-      opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      opName.startsWith(WEAVE_REF_PREFIX)
-    ) {
-      return opVersionRefOpName(opName);
-    }
-    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
-      return privateRefToSimpleName(opName);
-    }
-    return opName;
-  };
+
   return {
     entity,
     project,
@@ -1922,6 +1970,7 @@ export const traceCallToUICallSchema = (
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
     traceCall,
+    totalStorageSizeBytes: traceCall.total_storage_size_bytes ?? null,
   };
 };
 
@@ -1980,6 +2029,19 @@ export const useTableUpdate = (): ((
   );
 };
 
+export const useTableCreate = (): ((
+  table: traceServerTypes.TableCreateReq
+) => Promise<traceServerTypes.TableCreateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (table: traceServerTypes.TableCreateReq) => {
+      return getTsClient().tableCreate(table);
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2006,6 +2068,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableRowsQuery,
   useTableQueryStats,
   useTableUpdate,
+  useTableCreate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

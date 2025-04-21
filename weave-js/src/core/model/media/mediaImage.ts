@@ -18,6 +18,7 @@ export interface WBImage {
   path: string;
   width: number;
   height: number;
+  caption?: string;
   boxes?: {
     [boxGroup: string]: BoundingBox2D[];
   };

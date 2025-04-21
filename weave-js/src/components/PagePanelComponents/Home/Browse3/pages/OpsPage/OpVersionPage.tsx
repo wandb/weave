@@ -1,4 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -14,13 +15,9 @@ import {
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {OpCodeViewer} from '../../OpCodeViewer';
 import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
-import {
-  CallsLink,
-  opNiceName,
-  OpVersionsLink,
-  opVersionText,
-} from '../common/Links';
+import {CallsLink, OpVersionsLink, opVersionText} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
+import {opNiceName} from '../common/opNiceName';
 import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
@@ -124,11 +121,17 @@ const OpVersionPageInner: React.FC<{
               <p>{versionIndex}</p>
             </div>
             <div className="block">
-              <p className="text-moon-500">Created</p>
+              <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
               </p>
             </div>
+            {opVersion.userId && (
+              <div className="block">
+                <p className="text-moon-500">Last updated by</p>
+                <UserLink userId={opVersion.userId} includeName />
+              </div>
+            )}
             <div className="block">
               <p className="text-moon-500">Calls:</p>
               {!callsStats.loading || opVersionCallCount > 0 ? (

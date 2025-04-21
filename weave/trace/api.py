@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import contextlib
-import os
-import threading
-import time
 from collections.abc import Iterator
 from typing import Any
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import urls, util, weave_client, weave_init
+from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
@@ -30,6 +27,7 @@ from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
+_global_attributes: dict[str, Any] = {}
 
 
 def init(
@@ -39,6 +37,7 @@ def init(
     autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -54,6 +53,7 @@ def init(
         autopatch_settings: Configuration for autopatch integrations, e.g. openai
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
+        global_attributes: A dictionary of attributes that will be applied to all traces.
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -67,9 +67,11 @@ def init(
 
     global _global_postprocess_inputs
     global _global_postprocess_output
+    global _global_attributes
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output
+    _global_attributes = global_attributes or {}
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
@@ -226,53 +228,6 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         call_context.call_attributes.reset(token)
 
 
-def serve(
-    model_ref: ObjectRef,
-    method_name: str | None = None,
-    auth_entity: str | None = None,
-    port: int = 9996,
-    thread: bool = False,
-) -> str:
-    import uvicorn
-
-    from weave.trace.serve_fastapi import object_method_app
-    from weave.wandb_interface import wandb_api
-
-    client = weave_client_context.require_weave_client()
-    # if not isinstance(
-    #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-    # ):
-    #     raise ValueError("serve currently only supports wandb client")
-
-    print(f"Serving {model_ref}")
-    print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
-    print()
-    os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
-    os.environ["MODEL_REF"] = str(model_ref)
-
-    wandb_api_ctx = wandb_api.get_wandb_api_context()
-    app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = call_context.call_attributes.get()
-
-    def run() -> None:
-        # This function doesn't return, because uvicorn.run does not return.
-        with wandb_api.wandb_api_context(wandb_api_ctx):
-            with attributes(trace_attrs):
-                uvicorn.run(app, host="0.0.0.0", port=port)
-
-    if util.is_notebook():
-        thread = True
-    if thread:
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
-        time.sleep(1)
-        return "http://localhost:%d" % port
-    else:
-        # Run should never return
-        run()
-    raise ValueError("Should not reach here")
-
-
 def finish() -> None:
     """Stops logging to weave.
 
@@ -298,7 +253,6 @@ __all__ = [
     "obj_ref",
     "output_of",
     "attributes",
-    "serve",
     "finish",
     "op",
     "Table",

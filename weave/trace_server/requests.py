@@ -133,6 +133,9 @@ class LoggingHTTPAdapter(HTTPAdapter):
     # Actual signature is:
     # self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
     def send(self, request: PreparedRequest, **kwargs: Any) -> Response:  # type: ignore
+        if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
+            return super().send(request, **kwargs)
+
         console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
         pprint_prepared_request(request)
         start_time = time()
@@ -148,10 +151,9 @@ class LoggingHTTPAdapter(HTTPAdapter):
 
 
 session = Session()
-if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
-    adapter = LoggingHTTPAdapter()
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+adapter = LoggingHTTPAdapter()
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
 
 def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:

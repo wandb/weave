@@ -131,7 +131,7 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
 
 ## 3. Automated LLM library logging
 
-Calls made to OpenAI, Anthropic and [many more LLM libraries](guides/integrations/) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
+Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrations/index.md) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
 
 ## 4. See traces of your application in your project
 

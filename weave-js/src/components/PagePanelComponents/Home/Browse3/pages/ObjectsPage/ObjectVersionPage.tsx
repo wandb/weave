@@ -11,6 +11,10 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
 import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
+import {
+  callQueryFieldForScorerOutput,
+  callQueryFieldForScorerVersion,
+} from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
@@ -58,11 +62,14 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Model: 'model',
   Dataset: 'table',
   Evaluation: 'baseline-alt',
+  EvaluationResults: 'baseline-alt',
   Leaderboard: 'benchmark-square',
   Scorer: 'type-number-alt',
   ActionSpec: 'rocket-launch',
   AnnotationSpec: 'forum-chat-bubble',
   SavedView: 'view-glasses',
+  Provider: 'model',
+  ProviderModel: 'model',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -204,6 +211,7 @@ const ObjectVersionPageInner: React.FC<{
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
+  const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
@@ -236,7 +244,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid-cols-auto grid w-full grid-flow-col gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -272,15 +280,44 @@ const ObjectVersionPageInner: React.FC<{
               <p>{objectVersionIndex}</p>
             </div>
             <div className="block">
-              <p className="text-moon-500">Created</p>
+              <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
               </p>
             </div>
             {objectVersion.userId && (
               <div className="block">
-                <p className="text-moon-500">Created by</p>
+                <p className="text-moon-500">Last updated by</p>
                 <UserLink userId={objectVersion.userId} includeName />
+              </div>
+            )}
+            {isScorer && (
+              <div className="block">
+                <p className="text-moon-500">Scores</p>
+                <CallsLink
+                  entity={entityName}
+                  project={projectName}
+                  neverPeek
+                  filter={{
+                    traceRootsOnly: false,
+                  }}
+                  gridFilters={{
+                    items: [
+                      {
+                        id: 0,
+                        field: callQueryFieldForScorerOutput(objectName),
+                        operator: '(any): isNotEmpty',
+                      },
+                      // This second clause makes it version-specific
+                      {
+                        id: 1,
+                        field: callQueryFieldForScorerVersion(objectName),
+                        operator: '(string): equals',
+                        value: refUri,
+                      },
+                    ],
+                  }}
+                />
               </div>
             )}
             {refExtra && (

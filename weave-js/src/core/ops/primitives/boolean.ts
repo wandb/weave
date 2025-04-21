@@ -7,7 +7,12 @@ import {
   typedDictPropertyTypes,
   union,
 } from '../../model';
-import {makeEqualOp, makeNotEqualOp, makeStandardOp} from '../opKinds';
+import {
+  makeBasicDimDownOp,
+  makeEqualOp,
+  makeNotEqualOp,
+  makeStandardOp,
+} from '../opKinds';
 import {opDict} from './literals';
 
 const makeBooleanOp = makeStandardOp;
@@ -154,3 +159,41 @@ export const weaveIf = (
     results: opDict({whenTrue, whenFalse} as any),
   });
 };
+
+const booleansArgTypes = {
+  values: {
+    type: 'list' as const,
+    objectType: {
+      type: 'union' as const,
+      members: ['none' as const, 'boolean' as const],
+    },
+  },
+};
+
+export const opBooleanAll = makeBasicDimDownOp({
+  name: 'boolean-all',
+  argTypes: booleansArgTypes,
+  description: 'Test whether all values are true. Null values are skipped.',
+  argDescriptions: {
+    values: 'A list of boolean values',
+  },
+  returnValueDescription: 'True if all values are true',
+  returnType: inputTypes => 'boolean',
+  resolver: ({values}) => {
+    return values.every(v => v);
+  },
+});
+
+export const opBooleanAny = makeBasicDimDownOp({
+  name: 'boolean-any',
+  argTypes: booleansArgTypes,
+  description: 'Test whether any value is true. Null values are skipped.',
+  argDescriptions: {
+    values: 'A list of boolean values',
+  },
+  returnValueDescription: 'True if any value is true',
+  returnType: inputTypes => 'boolean',
+  resolver: ({values}) => {
+    return values.some(v => v);
+  },
+});

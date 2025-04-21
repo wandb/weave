@@ -1,24 +1,23 @@
 import asyncio
 import dataclasses
-import datetime
 import json
 import logging
 import typing
 
-from weave_query import weave_internal
-from weave_query import weave_types as types
-from weave_query.api import op, weave_class
 from weave_query import (
     artifact_fs,
     artifact_wandb,
+    engine_trace,
+    errors,
     io_service,
     ops_arrow,
+    util,
     wandb_util,
-    engine_trace,
-    errors, 
-    util, 
+    weave_internal,
 )
 from weave_query import timestamp as weave_timestamp
+from weave_query import weave_types as types
+from weave_query.api import op, weave_class
 from weave_query.ops_domain import trace_tree, wbmedia
 
 
@@ -363,6 +362,7 @@ def _table_data_to_weave1_objects(
                 boxes=cell.get("boxes", {}),  # type: ignore
                 masks=cell.get("masks", {}),  # type: ignore
                 classes=cell.get("classes"),  # type: ignore
+                caption=cell.get("caption", None),
             )
         elif file_type in [
             "audio-file",
@@ -861,6 +861,7 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
     # https://wandb.atlassian.net/browse/WB-22355
     except OSError as e:
         import errno
+
         if e.errno == errno.ESTALE:
             return None
         raise

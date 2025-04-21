@@ -1,0 +1,108 @@
+interactions:
+- request:
+    body: '{"input":"What was a positive news story from today?","model":"gpt-4o-2024-08-06","tools":[{"type":"web_search_preview"}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '122'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      CF-RAY:
+      - 922592379dbda223-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 14:55:33 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=_Y0mBGpWvAiW1cKG9GRgMKmvXaXwBcDH1BDolfpvqfs-1742309733-1.0.1.1-0qAP0S4pUSE65h69uBS1ANq8mk3CCc6z3W0a.WTPdoNoc95VyTAc9q8p2OsUcTnkjs5LSCvCrceN9LOykIZADdH6QGwlylPLXJ9vAGb5E0E;
+        path=/; expires=Tue, 18-Mar-25 15:25:33 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=cw.gTgFcgDAT0fRaoHNSAa5KXPILpgv05Pppvvycl4M-1742309733146-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '5114'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_ddb60c58d3fefe26fd90e0026c6c0bb7
+    status:
+      code: 200
+      message: OK
+version: 1

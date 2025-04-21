@@ -4,8 +4,7 @@ from typing import Any
 import pytest
 
 import weave
-from weave.trace import errors
-from weave.trace.op import is_op, op
+from weave.trace.op import OpCallError, is_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
@@ -140,7 +139,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
     with pytest.raises(MissingSelfInstanceError):
         weave_obj_method2 = weave_obj_method_ref.get()
 
-    with pytest.raises(errors.OpCallError):
+    with pytest.raises(OpCallError):
         res2, call2 = py_obj.method.call(1)
 
 
@@ -175,7 +174,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
     with pytest.raises(MissingSelfInstanceError):
         weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
-    with pytest.raises(errors.OpCallError):
+    with pytest.raises(OpCallError):
         res2, call2 = await py_obj.amethod.call(1)
 
 

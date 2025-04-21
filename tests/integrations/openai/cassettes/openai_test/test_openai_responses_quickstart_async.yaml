@@ -1,0 +1,93 @@
+interactions:
+- request:
+    body: '{"input":"Write a one-sentence bedtime story about a unicorn.","model":"gpt-4o-2024-08-06"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '91'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RUy27jMAy85ysIn5PCSZyH8w173VNRGLREu9rKoiFR2wZF/n1h2XGSbnsJohkO
+        SQ0pfy4AMqOzE2SeQl/tD7o8FrTbF0VxXJcbpEPdkNa0O5TF+nDIi11ZE233+tjQfl1kyyEB139I
+        yTUJu0AjrjyhkK5w4NaHYrPNj7vjOnFBUGIYNIq73pKQHkXkPfvsBC5amwDjrhGVJkFjwyMbxEcl
+        ht0D3uFHxVH6KJXwG30hWZMdare9rApebfJNscqPq3w/XSgJsxM8LwAAPtMvQCbnngZZRyFgO94y
+        EaOFXWhnB1W5VYOD5W7TUNngsS7Keq3zbx1MOX5yJJGebaqMIZgg6ORGKXZC7tbtfccPXV/toI+b
+        egwYkBNkv50mD/JKIO/GvVnjWgiC3hqB8HZewq/oMPHRGcXeQUtO7BkCuhZstBZrQwGEU1DH7Jag
+        MMiQSHvCLgA3EF5N15EfQI/G1fweAJXnEJIsWKJ+IN/ZW/302Co6x4LXaT+/zNxl+jciw+kljbJH
+        j9aSrYTZVgptWh/xkUba01/DMVTXza3SKOdN8YSBnXFtdppMzahp2MtdEEDWkiOPQlWIXYf+PLEL
+        gMu07ezpvq5Q1w+KmOD1Uz6haRBToYZ9h7fz3SRT3HzRscR4v1c2alyUKJzNxGjWdOyr/r6mj04l
+        RweZNgFre32LMW353JBxD89pu1/+j9+90bltheqV9E2Yj61P6q+vdLv9jvgu7zycn1ILC9obuS9n
+        t2Kgh49MR4IaBYf0l8XlHwAAAP//AwC9LK63GAUAAA==
+    headers:
+      CF-RAY:
+      - 922576393aa537cf-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 14:36:22 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=fDmP_QrwyyGD.iHQxPJuOCAN7Fd7DDcDTrzmaVdS1.8-1742308582-1.0.1.1-c3Atju5txmDTQZxXpdKiHO07ZvNJnErR05UVXLUTfTaECd5Ub8hzFE2T4QXFzcduQU8838KGGucJp3pFixLEqksG6IeZQr7Qrt.2sCgTy40;
+        path=/; expires=Tue, 18-Mar-25 15:06:22 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=z8GfIJW0ev5pvFfjIj7r8wi8agAq0c_THe_4Dzo.eKw-1742308582704-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1298'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_a9951457033382c00a02849e6eba2c9f
+    status:
+      code: 200
+      message: OK
+version: 1

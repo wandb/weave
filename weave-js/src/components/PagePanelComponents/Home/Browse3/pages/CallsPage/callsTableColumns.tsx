@@ -11,7 +11,15 @@ import {
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {convertBytes} from '@wandb/weave/util';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
@@ -19,7 +27,8 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
-import {CellValueString} from '../../../Browse2/CellValueString';
+import {CellValueRun} from '../../../Browse2/CellValueRun';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -39,7 +48,7 @@ import {
 } from '../CallPage/cost';
 import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
-import {StatusChip} from '../common/StatusChip';
+import {STATUS_TO_FILTER, StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -74,7 +83,10 @@ export const useCallsTableColumns = (
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  costsLoading: boolean = false,
+  includeTotalStorageSizeBytes: boolean = false,
+  storageSizeResults: Map<string, number> | null = null,
+  storageSizeLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -151,7 +163,13 @@ export const useCallsTableColumns = (
         userDefinedColumnWidths,
         allowedColumnPatterns,
         onAddFilter,
-        costsLoading
+        costsLoading,
+        includeTotalStorageSizeBytes
+          ? {
+              storageSizeResults,
+              storageSizeLoading,
+            }
+          : null
       ),
     [
       entity,
@@ -169,6 +187,9 @@ export const useCallsTableColumns = (
       allowedColumnPatterns,
       onAddFilter,
       costsLoading,
+      includeTotalStorageSizeBytes,
+      storageSizeResults,
+      storageSizeLoading,
     ]
   );
 
@@ -179,6 +200,41 @@ export const useCallsTableColumns = (
     };
   }, [columns, setUserDefinedColumnWidths]);
 };
+
+const CallLinkCell: FC<{
+  rowParams: GridRenderCellParams;
+  entity: string;
+  project: string;
+  preservePath: boolean;
+}> = ({rowParams, entity, project, preservePath}) => {
+  const {getDescendantCallIdAtSelectionPath} = useContext(
+    TableRowSelectionContext
+  );
+
+  const opName =
+    rowParams.row.display_name ??
+    opVersionRefOpName(rowParams.row.op_name) ??
+    rowParams.row.op_name;
+  const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
+
+  return (
+    <CallLink
+      entityName={entity}
+      projectName={project}
+      opName={opName}
+      callId={rowParams.row.id}
+      fullWidth={true}
+      color={TEAL_600}
+      isEval={isEval}
+      focusedCallId={
+        preservePath
+          ? getDescendantCallIdAtSelectionPath?.(rowParams.row.id) ?? undefined
+          : undefined
+      }
+    />
+  );
+};
+
 function buildCallsTableColumns(
   entity: string,
   project: string,
@@ -194,7 +250,11 @@ function buildCallsTableColumns(
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  costsLoading: boolean = false,
+  storageSizeInfo: {
+    storageSizeResults: Map<string, number> | null;
+    storageSizeLoading: boolean;
+  } | null = null
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -219,7 +279,7 @@ function buildCallsTableColumns(
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
-      field: 'op_name',
+      field: 'summary.weave.trace_name',
       headerName: 'Trace',
       minWidth: 100,
       width: 250,
@@ -233,21 +293,12 @@ function buildCallsTableColumns(
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
-        const opName =
-          rowParams.row.display_name ??
-          opVersionRefOpName(rowParams.row.op_name) ??
-          rowParams.row.op_name;
-        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
-          <CallLink
-            entityName={entity}
-            projectName={project}
-            opName={opName}
-            callId={rowParams.row.id}
-            fullWidth={true}
+          <CallLinkCell
+            rowParams={rowParams}
+            entity={entity}
+            project={project}
             preservePath={preservePath}
-            color={TEAL_600}
-            isEval={isEval}
           />
         );
       },
@@ -293,23 +344,11 @@ function buildCallsTableColumns(
           },
         ]
       : []),
-    // {
-    //   field: 'run_id',
-    //   headerName: 'Run',
-    //   disableColumnMenu: true,
-    //   renderCell: cellParams => {
-    //     return (
-    //       <div style={{margin: 'auto'}}>
-    //         {cellParams.row.call.runId ?? <NotApplicable />}
-    //       </div>
-    //     );
-    //   },
-    // },
     {
-      field: 'status',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
-      sortable: false,
+      sortable: true,
       // disableColumnMenu: true,
       resizable: false,
       width: 59,
@@ -318,10 +357,19 @@ function buildCallsTableColumns(
         return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
+        const valueStatus = traceCallStatusCode(cellParams.row);
+        const valueFilter = STATUS_TO_FILTER[valueStatus];
         return (
-          <div style={{margin: 'auto'}}>
-            <StatusChip value={traceCallStatusCode(cellParams.row)} iconOnly />
-          </div>
+          <CellFilterWrapper
+            onAddFilter={onAddFilter}
+            field="summary.weave.status"
+            rowId={cellParams.id.toString()}
+            operation={'(string): in'}
+            value={valueFilter}>
+            <div style={{margin: 'auto'}}>
+              <StatusChip value={valueStatus} iconOnly />
+            </div>
+          </CellFilterWrapper>
         );
       },
     },
@@ -370,6 +418,8 @@ function buildCallsTableColumns(
           field: convertFeedbackFieldToBackendFilter(c),
           headerName: parsed ? parsed.displayName : `${c}`,
           width: 150,
+          minWidth: 150,
+          flex: 1,
           renderHeader: () => {
             return <div>{parsed ? parsed.userDefinedType : c}</div>;
           },
@@ -377,13 +427,7 @@ function buildCallsTableColumns(
             return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            if (typeof params.value === 'boolean') {
-              return <div>{params.value ? 'true' : 'false'}</div>;
-            }
-            if (typeof params.value === 'string') {
-              return <CellValueString value={params.value} />;
-            }
-            return <div>{params.value}</div>;
+            return <CellValue value={params.value} />;
           },
         };
       });
@@ -396,63 +440,118 @@ function buildCallsTableColumns(
       c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
   );
   if (scoreColNames.length > 0) {
-    // Add feedback group to grouping model
+    // Group scores by scorer name and nested paths
+    const scorerGroups = new Map<string, Map<string, string[]>>();
+    scoreColNames.forEach(colName => {
+      const parsed = parseScorerFeedbackField(colName);
+      if (parsed) {
+        const scorerName = parsed.scorerName;
+        const pathParts = parsed.scorePath.replace(/^\./, '').split('.');
+        // Only create a group path if there are multiple parts
+        const groupPath =
+          pathParts.length > 1 ? pathParts.slice(0, -1).join('.') : '';
+
+        if (!scorerGroups.has(scorerName)) {
+          scorerGroups.set(scorerName, new Map());
+        }
+        const scorerGroup = scorerGroups.get(scorerName)!;
+        if (!scorerGroup.has(groupPath)) {
+          scorerGroup.set(groupPath, []);
+        }
+        scorerGroup.get(groupPath)!.push(colName);
+      }
+    });
+
+    // Create scorer groups in the grouping model for each scorer
     const scoreGroup = {
       groupId: 'scores',
       headerName: 'Scores',
-      children: [] as any[],
+      children: Array.from(scorerGroups.entries()).map(
+        ([scorerName, pathGroups]) => {
+          const scorerGroupChildren = Array.from(pathGroups.entries())
+            .filter(([groupPath, _]) => groupPath !== '') // Filter out non-grouped fields
+            .map(([groupPath, _]) => ({
+              groupId: `scores.${scorerName}.${groupPath}`,
+              headerName: groupPath,
+              children: [] as any[],
+            }));
+
+          return {
+            groupId: `scores.${scorerName}`,
+            headerName: scorerName,
+            children: scorerGroupChildren,
+          };
+        }
+      ),
     };
     groupingModel.push(scoreGroup);
 
-    // Add feedback columns
-    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
-      c => {
-        const parsed = parseScorerFeedbackField(c);
-        const field = convertScorerFeedbackFieldToBackendFilter(c);
-        scoreGroup.children.push({
-          field,
-        });
-        if (parsed === null) {
-          return {
+    // Create columns for each scorer's fields
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = [];
+    scorerGroups.forEach((pathGroups, scorerName) => {
+      pathGroups.forEach((colNames, groupPath) => {
+        const scorerGroup = groupPath
+          ? scoreGroup.children
+              .find(g => g.groupId === `scores.${scorerName}`)
+              ?.children.find(
+                g => g.groupId === `scores.${scorerName}.${groupPath}`
+              )
+          : scoreGroup.children.find(g => g.groupId === `scores.${scorerName}`);
+
+        colNames.forEach(colName => {
+          const parsed = parseScorerFeedbackField(colName);
+          const field = convertScorerFeedbackFieldToBackendFilter(colName);
+          if (parsed === null) {
+            scoreColumns.push({
+              field,
+              headerName: colName,
+              width: 150,
+              renderHeader: () => {
+                return <div>{colName}</div>;
+              },
+              valueGetter: (unused: any, row: any) => {
+                return row[colName];
+              },
+              renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+                return <CellValue value={params.value} />;
+              },
+            });
+            return;
+          }
+
+          // Add to scorer's group
+          scorerGroup?.children.push({field});
+
+          const leafName =
+            parsed.scorePath.split('.').pop()?.replace(/^\./, '') ||
+            parsed.scorePath;
+
+          scoreColumns.push({
             field,
-            headerName: c,
+            headerName: `Scores.${parsed.scorerName}${parsed.scorePath}`,
             width: 150,
             renderHeader: () => {
-              return <div> {c}</div>;
+              return <div>{leafName}</div>;
             },
             valueGetter: (unused: any, row: any) => {
-              return row[c];
+              return row[colName];
             },
             renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-              return <CellValue value={params.value} />;
+              return (
+                <CellFilterWrapper
+                  onAddFilter={onAddFilter}
+                  field={field}
+                  rowId={params.id.toString()}
+                  operation={null}
+                  value={params.value}>
+                  <CellValue value={params.value} />
+                </CellFilterWrapper>
+              );
             },
-          };
-        }
-        return {
-          field,
-          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
-          width: 150,
-          renderHeader: () => {
-            return <div>{parsed.scorerName + parsed.scorePath}</div>;
-          },
-          valueGetter: (unused: any, row: any) => {
-            return row[c];
-          },
-          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            return (
-              <CellFilterWrapper
-                onAddFilter={onAddFilter}
-                field={field}
-                rowId={params.id.toString()}
-                operation={null}
-                value={params.value}>
-                <CellValue value={params.value} />
-              </CellFilterWrapper>
-            );
-          },
-        };
-      }
-    );
+          });
+        });
+      });
+    });
     cols.push(...scoreColumns);
   }
 
@@ -563,14 +662,14 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'latency',
+    field: 'summary.weave.latency_ms',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     // Should probably have a custom filter here.
     filterable: false,
-    sortable: false,
+    sortable: true,
     valueGetter: (unused: any, row: any) => {
       if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
@@ -586,6 +685,70 @@ function buildCallsTableColumns(
         return null;
       }
       return monthRoundedTime(traceCallLatencyS(cellParams.row));
+    },
+  });
+
+  if (storageSizeInfo) {
+    cols.push({
+      field: 'total_storage_size_bytes',
+      headerName: 'Trace Size',
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      align: 'right',
+      headerAlign: 'right',
+      // filtering and sorting are expensive for this column, hence disabled
+      filterable: false,
+      sortable: false,
+      renderCell: cellParams => {
+        if (storageSizeInfo.storageSizeLoading) {
+          return <LoadingDots />;
+        }
+        const storageSize =
+          storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;
+        return (
+          <div>{storageSize !== null ? convertBytes(storageSize) : ''}</div>
+        );
+      },
+    });
+  }
+
+  cols.push({
+    field: 'wb_run_id',
+    width: 150,
+    minWidth: 150,
+    headerName: 'Run',
+    sortable: false,
+    filterable: false,
+    renderCell: cellParams => {
+      const runId = cellParams.row.wb_run_id;
+      if (runId == null) {
+        return null;
+      }
+      const parts = runId.split('/');
+      if (parts.length !== 3) {
+        return <span>{runId}</span>;
+      }
+      const [entityName, projectName, runName] = parts;
+      // The filtering here is kind of hacky.
+      // We would need the project internal id to construct an equals filter,
+      // or we need to pass the restriction in as part of the "filter" argument
+      // instead of the "query" argument. A slight improvement that wouldn't go
+      // that far would be if we had an "ends with" operator.
+      return (
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="wb_run_id"
+          rowId={cellParams.id.toString()}
+          operation="(string): contains"
+          value={':' + runName}>
+          <CellValueRun
+            entity={entityName}
+            project={projectName}
+            run={runName}
+          />
+        </CellFilterWrapper>
+      );
     },
   });
 

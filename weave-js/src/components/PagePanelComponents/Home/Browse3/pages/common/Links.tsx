@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   MOON_200,
   MOON_700,
@@ -12,9 +13,8 @@ import styled, {css} from 'styled-components';
 import {TargetBlank} from '../../../../../../common/util/links';
 import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {
-  FEEDBACK_EXPAND_PARAM,
-  PATH_PARAM,
-  TRACETREE_PARAM,
+  HIDE_TRACETREE_PARAM,
+  SHOW_FEEDBACK_PARAM,
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
@@ -22,6 +22,7 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
+import {opNiceName} from './opNiceName';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -213,14 +214,6 @@ export const OpLink: React.FC<{
   );
 };
 
-export const opNiceName = (opName: string) => {
-  let text = opName;
-  if (text.startsWith('op-')) {
-    text = text.slice(3);
-  }
-  return text;
-};
-
 export const opVersionText = (opName: string, versionIndex: number) => {
   let text = opNiceName(opName);
   text += ':v' + versionIndex;
@@ -303,7 +296,7 @@ export const CallLink: React.FC<{
   callId: string;
   variant?: LinkVariant;
   fullWidth?: boolean;
-  preservePath?: boolean;
+  focusedCallId?: string;
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
@@ -319,26 +312,31 @@ export const CallLink: React.FC<{
   // to provide the right abstractions.
   const peekLoc = usePeekLocation();
   const peekParams = new URLSearchParams(peekLoc?.search ?? '');
-  const existingPath = peekParams.get(PATH_PARAM) ?? '';
-  // Preserve the path only when showing trace tree
-  const path = props.preservePath ? existingPath : null;
   // default to true if not specified and not an eval
-  const traceTreeParam = peekParams.get(TRACETREE_PARAM);
-  const showTraceTree =
+  const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
+  const hideTraceTree =
     traceTreeParam === '1'
       ? true
       : traceTreeParam === '0'
       ? false
-      : !props.isEval;
+      : props.isEval
+      ? true
+      : undefined;
   // default to false if not specified
-  const showFeedbackExpand = peekParams.get(FEEDBACK_EXPAND_PARAM) === '1';
+  const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
+  const showFeedbackExpand =
+    showFeedbackParam === '1'
+      ? true
+      : showFeedbackParam === '0'
+      ? false
+      : undefined;
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
     '',
     props.callId,
-    path,
-    showTraceTree,
+    props.focusedCallId,
+    hideTraceTree,
     showFeedbackExpand
   );
 
@@ -419,21 +417,32 @@ export const CustomLink: React.FC<{
 export const CallsLink: React.FC<{
   entity: string;
   project: string;
-  callCount: number;
+  callCount?: number;
   countIsLimited?: boolean;
   filter?: WFHighLevelCallFilter;
+  gridFilters?: GridFilterModel;
   neverPeek?: boolean;
   variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
+  let label = 'View Calls';
+  if (props.callCount != null) {
+    label = props.callCount.toString();
+    label += props.countIsLimited ? '+' : '';
+    label += ' ';
+    label += maybePluralizeWord(props.callCount, 'call');
+  }
   return (
     <Link
       $variant={props.variant}
-      to={router.callsUIUrl(props.entity, props.project, props.filter)}>
-      {props.callCount}
-      {props.countIsLimited ? '+' : ''}{' '}
-      {maybePluralizeWord(props.callCount, 'call')}
+      to={router.callsUIUrl(
+        props.entity,
+        props.project,
+        props.filter,
+        props.gridFilters
+      )}>
+      {label}
     </Link>
   );
 };

@@ -19,6 +19,12 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_root_op,
     make_root_op_gql_op_output_type,
 )
+from weave_query.constants import (
+    LIMIT_ARTIFACT_COLLECTIONS,
+    LIMIT_ARTIFACT_TYPES,
+    LIMIT_PROJECT_RUNS,
+    LIMIT_PROJECT_FILTERED_RUNS,
+)
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -180,7 +186,7 @@ gql_connection_op(
     "runs",
     wdt.RunType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_PROJECT_RUNS}",
 )
 
 
@@ -193,7 +199,7 @@ gql_connection_op(
         "filter": types.String(),
         "order": types.String(),
     },
-    lambda inputs: f'first: 100, filters: {inputs["filter"]}, order: {inputs["order"]}',
+    lambda inputs: f'first: {LIMIT_PROJECT_FILTERED_RUNS}, filters: {inputs["filter"]}, order: {inputs["order"]}',
 )
 
 
@@ -234,11 +240,11 @@ def _project_artifacts_gql_op_output_type(
     output_type=lambda input_types: types.List(wdt.ArtifactCollectionType),
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-            artifactTypes_100: artifactTypes(first: 100) {{
+            artifactTypes_100: artifactTypes(first: {LIMIT_ARTIFACT_TYPES}) {{
                 edges {{
                     node {{
                         id
-                        artifactCollections_100: artifactCollections(first: 100) {{
+                        artifactCollections_100: artifactCollections(first: {LIMIT_ARTIFACT_COLLECTIONS}) {{
                             edges {{
                                 node {{
                                     {wdt.ArtifactCollection.REQUIRED_FRAGMENT}

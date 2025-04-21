@@ -11,7 +11,7 @@ import {
   WeaveHeaderExtrasContext,
   WeaveHeaderExtrasProvider,
 } from '../../context';
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';

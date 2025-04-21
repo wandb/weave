@@ -3,8 +3,6 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
-from weave.trace.errors import WeaveInitError
-
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
@@ -36,6 +34,9 @@ def get_weave_client() -> WeaveClient | None:
     # if (context_client := context_state._graph_client.get()) is not None:
     #     return context_client
     return _global_weave_client
+
+
+class WeaveInitError(Exception): ...
 
 
 def require_weave_client() -> WeaveClient:
