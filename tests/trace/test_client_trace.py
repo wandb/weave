@@ -3751,3 +3751,26 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
 
     assert parent_call.total_storage_size_bytes is not None
     assert child_call.storage_size_bytes is None
+
+
+def test_call_query_stream_with_invalid_filter_field(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    with pytest.raises(InvalidFieldError):
+        res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "total_storage_size_bytes"},
+                                "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
+                            }
+                        }
+                    },
+                }
+            )
+        )
