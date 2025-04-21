@@ -113,6 +113,7 @@ mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
   "Levenshtein>=0.26.0",
+  "langfair>=0.3.1",
   "litellm>=1.58",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
