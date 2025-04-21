@@ -214,7 +214,6 @@ const getLeaderboardGroupableData = async (
       return;
     }
 
-    // Determine if this is an imperative evaluation
     const isImperative = isImperativeEvaluation(call);
 
     const evalObjectName = evalObjectRef.artifactName;
@@ -263,8 +262,7 @@ const getLeaderboardGroupableData = async (
       sourceEvaluationObjectRef: evalObjectRefUri,
     };
 
-    // Process normal evaluations with explicit scorer references
-    // Skip this section for imperative evaluations
+    // For regular evals, process using explicit scorer refs
     if (!isImperative) {
       const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
       scorerRefUris.forEach(scorerRefUri => {
@@ -304,9 +302,9 @@ const getLeaderboardGroupableData = async (
       });
     }
 
-    // Process scorer metrics directly from the output for imperative evaluations
+    // For imperative evals, process scorer metrics directly from the output
     // Only do this for imperative evaluations
-    if (isImperative && call.output && typeof call.output === 'object') {
+    if (isImperative) {
       const outputObj = call.output as any;
 
       // Find all properties that aren't built-in metrics
@@ -429,9 +427,7 @@ const getLeaderboardGroupableData = async (
       datasetGroup: `${row.datasetName}:${row.datasetVersion}`,
       scorerGroup:
         row.metricType === 'scorerMetric'
-          ? row.scorerVersion
-            ? `${row.scorerName}:${row.scorerVersion}`
-            : `${row.scorerName}`
+          ? `${row.scorerName}:${row.scorerVersion}`
           : row.scorerName,
       modelGroup: `${row.modelName}:${row.modelVersion}`,
       metricPathGroup: row.metricPath,
@@ -558,10 +554,6 @@ export const getLeaderboardData = async (
     project,
     spec
   );
-
-  // Sort groupableData by sortKey to ensure most recent evaluations appear first
-  groupableData.sort((a, b) => a.sortKey - b.sortKey);
-
   const finalData: GroupedLeaderboardData = {
     modelGroups: _.mapValues(
       _.groupBy(groupableData, 'modelGroup'),
@@ -578,8 +570,6 @@ export const getLeaderboardData = async (
                       metricPathGroups: _.mapValues(
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
-                          // Sort by sortKey again to ensure most recent is first
-                          metricPathGroup.sort((a, b) => a.sortKey - b.sortKey);
                           return metricPathGroup.map(row => row.row);
                         }
                       ),
@@ -613,9 +603,6 @@ export const getPythonLeaderboardData = async (
     columns
   );
 
-  // Sort groupableData by sortKey to ensure most recent evaluations appear first
-  groupableData.sort((a, b) => a.sortKey - b.sortKey);
-
   const finalData: GroupedLeaderboardData = {
     modelGroups: _.mapValues(
       _.groupBy(groupableData, 'modelGroup'),
@@ -632,8 +619,6 @@ export const getPythonLeaderboardData = async (
                       metricPathGroups: _.mapValues(
                         _.groupBy(scorerGroup, 'metricPathGroup'),
                         metricPathGroup => {
-                          // Sort by sortKey again to ensure most recent is first
-                          metricPathGroup.sort((a, b) => a.sortKey - b.sortKey);
                           return metricPathGroup.map(row => row.row);
                         }
                       ),
@@ -703,7 +688,6 @@ const getLeaderboardObjectGroupableData = async (
   const data: GroupableLeaderboardValueRecord[] = [];
   const evalData: LeaderboardObjectEvalData = {};
   allEvaluationCallsRes.calls.forEach(call => {
-    // Determine if this is an imperative evaluation
     const isImperative = isImperativeEvaluation(call);
 
     columns.forEach(col => {
