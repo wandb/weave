@@ -10,11 +10,7 @@ import {
   MOON_300,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {
-  parseRef,
-  parseRefMaybe,
-  WeaveObjectRef,
-} from '../../../../../../../../react';
+import {parseRefMaybe} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
@@ -199,18 +195,6 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
 
-const safeParseRef = (ref: any): WeaveObjectRef | null => {
-  if (!ref || typeof ref !== 'string') {
-    return null;
-  }
-
-  try {
-    return parseRef(ref) as WeaveObjectRef;
-  } catch (e) {
-    return null;
-  }
-};
-
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
@@ -263,7 +247,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   // Handle input reference null case
-  const inputRef = safeParseRef(target.inputRef);
+  const inputRef = parseRefMaybe(target.inputRef);
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
@@ -641,7 +625,7 @@ export const ExampleCompareSection: React.FC<{
     if (scorerRefs.length === 0) {
       inner = null;
     } else if (scorerRefs.length === 1) {
-      const parsedRef = safeParseRef(scorerRefs[0]);
+      const parsedRef = parseRefMaybe(scorerRefs[0]);
       if (parsedRef) {
         inner = <SmallRef objRef={parsedRef} iconOnly />;
       }
@@ -986,7 +970,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
     }
     text = JSON.stringify(value || {}, null, 2);
   } else if (typeof value === 'string' && isWeaveRef(value)) {
-    const parsedRef = safeParseRef(value);
+    const parsedRef = parseRefMaybe(value);
     if (parsedRef) {
       return <SmallRef objRef={parsedRef} />;
     }
