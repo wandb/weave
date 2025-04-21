@@ -45,8 +45,7 @@ interactions:
       Call a tool only when needed: do not call the search agent if you do not need
       information, try to solve the task yourself.\nIf no tool call is needed, use
       final_answer tool to return your answer.\n4. Never re-do a tool call that you
-      previously did with the exact same parameters.\n\nNow Begin! If you solve the
-      task correctly, you will receive a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
+      previously did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
       task:\nWhat is the weather in Tokyo?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
       tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"get_weather","description":"Get
       weather in the next days at given location.","parameters":{"type":"object","properties":{"location":{"type":"string","description":"the
@@ -62,13 +61,13 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '4587'
+      - '4513'
       content-type:
       - application/json
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.67.0
+      - OpenAI/Python 1.75.0
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -78,7 +77,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.67.0
+      - 1.75.0
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -86,25 +85,25 @@ interactions:
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.13.2
+      - 3.11.11
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNi9swFLz7V4h3Tood59PHUgJtod1D6BaaxWilZ0ddWVIludk05L8X
-        y4ntZFOoD0ZoNPPmzZOOESEgOGQE2I56Vhk5fv/hkX5P1p+kKMr9wxfzDb+mSbxZ/0r+bD7CqGHo
-        55/I/IX1junKSPRCqxZmFqnHRjVZTCezeTpJ0wBUmqNsaKXx46keT+LJdBwvx/H8TNxpwdBBRn5E
-        hBByDP/GouL4ChmJR5edCp2jJULWHSIErJbNDlDnhPNUeRj1INPKo2pcq1rKAeC1ljmjUvaF2+84
-        WPc5USlz3D+omdPzzypmzj3qaomzYvG6HtRrpQ8mGCpqxbp8Bni3n90UIwQUrQK3RJ/vkfod2hs6
-        IUBtWVeofGMdjluQmtFGcAvZFjb65aC3cIIr1im6t34aBGKxqB2Vb5OiSmkf9ENUT2fk1E1F6tJY
-        /exuqFAIJdwut0hdaHaYeXQxEixAfTVWMFZXxudev2AoulpMW1Xob12PJrMz6LWncsBarkZ39HKO
-        noow9+6qMcp2yHtqf+VozYUeANGg97du7mm3/QtV/o98DzCGxiPPjUUu2HXH/TGLzaP817Eu5WAY
-        HNrfgmHuBdpmHhwLWsv2vYA7OI9VXghVojVWhEcDhclXMU9Tlsz4FKJT9BcAAP//AwDsSaavPQQA
-        AA==
+        H4sIAAAAAAAAAwAAAP//jFNNi9swEL37V4g5JyU2zibxcdlCCy2l7V7SejGKPHLUlSVFkjcbQv57
+        sZzYTnYL9cGIeXpv3nzoGBECooSMANtSz2ojp/ff+ObjrsQDXx/mC1zvzB33v37udbKLHUxaht78
+        QeYvrA9M10aiF1p1MLNIPbaq8SKdJ/EqXc4CUOsSZUurjJ+meprMknQ6W05nd2fiVguGDjLyOyKE
+        kGP4txZVia+QkSATIjU6RyuErL9ECFgt2whQ54TzVHmYDCDTyqNqXatGyhHgtZYFo1IOibvvODoP
+        faJSFsnL/kGtmLI/6i/fX0Xz8Lim8dfPn0b5OumDCYZ4o1jfnxHex7ObZISAonXgVuiLPVK/RXtD
+        JwSorZoalW+twzEHqRltBXPIcnjUzwedwyQHhtKJxuWQedvgCa5kTtF756dRhyzyxlH5tnVUKe1D
+        wtC7pzNy6sckdWWs3rgbKnChhNsWFqkL1Y+HEF2MBAvQXM0ZjNW18YXXzxiSruZppwrDGg5oct4Y
+        8NpTOWItLqwrvaJET0VYhH73GGVbLAfqsIO0KYUeAdGo9rdu3tPu6heq+h/5AWAMjceyMBZLwa4r
+        Hq5ZbF/pv671XQ6GwaF9EQwLL9C28yiR00Z2DwjcwXmsCy5UhdZYEV4RcFPwBZ0vU8ZjDtEp+gsA
+        AP//AwC5wg6rTgQAAA==
     headers:
       CF-RAY:
-      - 923dbf517af63a3b-BOM
+      - 933b11177a987ffe-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -112,14 +111,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 21 Mar 2025 13:20:34 GMT
+      - Mon, 21 Apr 2025 07:11:21 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=jrffbxsHKCGOx80Dw4QrnFah3HUYjakxVcI1kxWApOE-1742563234-1.0.1.1-kzbqWXmBVNwPEkLuuCCVKoLbFvhW0ULCQmO6yLipyTLGLoJTvp30.Y8ljoDvKeojkh9CYASpjuPlyZDtxA8JAVUC48gJdHJ5pupJHTB7RHo;
-        path=/; expires=Fri, 21-Mar-25 13:50:34 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=pO7iE2TMCYK3ZqJM.6hQbMR1QGUqIGGIW9dimbAiX7o-1745219481-1.0.1.1-9jQM9rd8I4eaK8xkv9mmCxryohkos.1USfLCZ.YOC6BFnBJ0CDFCWzy2iPFiQWnYvdjv_MuqDrCxRdXexHX2dovHPsRYyQboe0xEphwxWmw;
+        path=/; expires=Mon, 21-Apr-25 07:41:21 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=nOp7yZpbWDA5NAXiZqtRTJTqjdtPNiV5ji6tt3Q_c2c-1742563234541-0.0.1.1-604800000;
+      - _cfuvid=SupmnG9eKjZI.GjnS5agtknMxbjI2.FM0rO7TEabliA-1745219481340-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -134,25 +133,25 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '678'
+      - '797'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-ratelimit-limit-requests:
-      - '50000'
+      - '10000'
       x-ratelimit-limit-tokens:
-      - '150000000'
+      - '30000000'
       x-ratelimit-remaining-requests:
-      - '49999'
+      - '9999'
       x-ratelimit-remaining-tokens:
-      - '149999111'
+      - '29999129'
       x-ratelimit-reset-requests:
-      - 1ms
+      - 6ms
       x-ratelimit-reset-tokens:
-      - 0s
+      - 1ms
       x-request-id:
-      - req_f08e363359f7b9a6a4c82579b18de7cb
+      - req_9a13920680b9df9226b3d2c93f9174c7
     status:
       code: 200
       message: OK
@@ -204,13 +203,12 @@ interactions:
       Call a tool only when needed: do not call the search agent if you do not need
       information, try to solve the task yourself.\\nIf no tool call is needed, use
       final_answer tool to return your answer.\\n4. Never re-do a tool call that you
-      previously did with the exact same parameters.\\n\\nNow Begin! If you solve
-      the task correctly, you will receive a reward of $1,000,000.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
-      task:\\nWhat is the weather in Tokyo?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Calling
-      tools:\\n[{'id': 'call_ewPn5so6Kn0cssWom8e5f7xF', 'type': 'function', 'function':
-      {'name': 'get_weather', 'arguments': {'location': 'Tokyo'}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call
-      id: call_ewPn5so6Kn0cssWom8e5f7xF\\nObservation:\\nThe weather in Tokyo is sunny
-      with temperatures around 7\xB0C.\"}]}],\"model\":\"gpt-4o\",\"stop\":[\"Observation:\",\"Calling
+      previously did with the exact same parameters.\\n\\nNow Begin!\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
+      task:\\nWhat is the weather in Tokyo?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Called
+      Tool: 'get_weather' with arguments: {'location': 'Tokyo', 'celsius': True}\\nCalling
+      tools:\\n[{'id': 'call_2vwDn9cnrRmLQxiuDTYa1MIH', 'type': 'function', 'function':
+      {'name': 'get_weather', 'arguments': {'location': 'Tokyo', 'celsius': True}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Observation:\\nThe
+      weather in Tokyo is sunny with temperatures around 7\xB0C.\"}]}],\"model\":\"gpt-4o\",\"stop\":[\"Observation:\",\"Calling
       tools:\"],\"tool_choice\":\"required\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get
       weather in the next days at given location.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"the
       location\"},\"celsius\":{\"type\":\"boolean\",\"nullable\":true,\"description\":\"whether
@@ -225,16 +223,16 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '4964'
+      - '4950'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=jrffbxsHKCGOx80Dw4QrnFah3HUYjakxVcI1kxWApOE-1742563234-1.0.1.1-kzbqWXmBVNwPEkLuuCCVKoLbFvhW0ULCQmO6yLipyTLGLoJTvp30.Y8ljoDvKeojkh9CYASpjuPlyZDtxA8JAVUC48gJdHJ5pupJHTB7RHo;
-        _cfuvid=nOp7yZpbWDA5NAXiZqtRTJTqjdtPNiV5ji6tt3Q_c2c-1742563234541-0.0.1.1-604800000
+      - __cf_bm=pO7iE2TMCYK3ZqJM.6hQbMR1QGUqIGGIW9dimbAiX7o-1745219481-1.0.1.1-9jQM9rd8I4eaK8xkv9mmCxryohkos.1USfLCZ.YOC6BFnBJ0CDFCWzy2iPFiQWnYvdjv_MuqDrCxRdXexHX2dovHPsRYyQboe0xEphwxWmw;
+        _cfuvid=SupmnG9eKjZI.GjnS5agtknMxbjI2.FM0rO7TEabliA-1745219481340-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.67.0
+      - OpenAI/Python 1.75.0
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -244,7 +242,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.67.0
+      - 1.75.0
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -252,25 +250,25 @@ interactions:
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.13.2
+      - 3.11.11
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFPbbtswDH33Vwh8Tgo7l2bJ41psK4Z1Q5etw5bCYGQ6ViNLgiQ3TYP8
-        075hXzbYTmInzYD5wRB4eMjDI2oTMAYigQkDnqHnuZHdt9f3+BPv7qdfnvzH96vP/Nvy5u77TX8+
-        FuYddEqGnj8S93vWBde5keSFVjXMLaGnsmo0GvSGl/1ef1gBuU5IlrSF8d2B7vbC3qAbvumGlzti
-        pgUnBxP2K2CMsU31LyWqhJ5hwsLOPpKTc7ggmBySGAOrZRkBdE44j8pDpwG5Vp5UqVoVUrYAr7WM
-        OUrZNK6/Tevc+IRSxo8vz7fmKo3Ghb1drdWHT+l1Pv3xVbX61aXXphKUFoof/Gnhh/jkpBljoDCv
-        uUKhjFG5FdkTPmOAdlHkpHypHTYzqPNmMJnBNCO2IvQZWSYUm+rlWjPhmCuUWrOV8BnzlBuy6AtL
-        jqHVhUrY6M/vq4sZbOGo1TY4d35o2WgpLRzK1/6iUtpjOWZl8MMO2R7uUuqFsXruTqjl5MJlsSV0
-        lUXtmwr2QioJUBwtAxirc+Njr5dUNY3C0aAuC82yNnBvtAO99ihbtCiMOmcqxgl5FNW+HFaUI88o
-        abjNqmKRCN0Cgtb0r+Wcq107INTif8o3AOdkPCWxsZQIfjxyk2apfMz/Sjv4XAkGR/ZJcIq9IFve
-        SEIpFrJ+Z+DWzlMep0ItyBorqscGqYnHYdLv82iYDCDYBn8BAAD//wMAo/DyTnUEAAA=
+        H4sIAAAAAAAAAwAAAP//jFPBjtowEL3nK6w5wypQKNkct1W1VZF2K9GVqrKKBmeSGBw7sh0oRfxT
+        v6FfViWBJLBUag6RNW/ezJvn8cFjDEQMIQOeoeN5IYcPT8nqE//6/Iz+ejvni4/f7Cqm+cv94+df
+        MxhUDL1aE3dn1h3XeSHJCa0amBtCR1XV0WwyHY/uJ8GoBnIdk6xoaeGGEz0c++PJ0A+G/vsTMdOC
+        k4WQ/fAYY+xQ/yuJKqafEDJ/cI7kZC2mBGGbxBgYLasIoLXCOlQOBh3ItXKkKtWqlLIHOK1lxFHK
+        rnHzHXrnzieUMpq7l/gpSzfb/GW3Vsnjl4189/BdB71+Tel9UQtKSsVbf3p4Gw+vmjEGCvOGKxTK
+        CJXdkbniMwZo0jIn5SrtcFhCk7eEcAmLjNiO0GVkmFBsoTd7zYRltlRqz3bCZcxRXpBBVxqyDI0u
+        Vcxmf35/uFvCES5aHb1b59eejYaS0qJ86y8qpR1WY9YGv56QY3uXUqeF0St7Ra0mFzaLDKGtLerf
+        lHcWUkuA8mIZoDA6L1zk9IbqpiN/GjRloVvWDh7PTqDTDmWfFkwHNypGMTkU9b60K8qRZxR33G5V
+        sYyF7gFeb/q3cm7VbhwQKv2f8h3AORWO4qgwFAt+OXKXZqh6zP9Ka32uBYMlsxWcIifIVDcSU4Kl
+        bN4Z2L11lEeJUCmZwoj6sUFSRMkMp8GEJ6MEvKP3FwAA//8DAAl1yMh1BAAA
     headers:
       CF-RAY:
-      - 923dbf5889a33a3b-BOM
+      - 933b111f4aef7ffe-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -278,7 +276,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 21 Mar 2025 13:20:35 GMT
+      - Mon, 21 Apr 2025 07:11:22 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -294,25 +292,25 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '516'
+      - '701'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-ratelimit-limit-requests:
-      - '50000'
+      - '10000'
       x-ratelimit-limit-tokens:
-      - '150000000'
+      - '30000000'
       x-ratelimit-remaining-requests:
-      - '49999'
+      - '9999'
       x-ratelimit-remaining-tokens:
-      - '149999042'
+      - '29999046'
       x-ratelimit-reset-requests:
-      - 1ms
+      - 6ms
       x-ratelimit-reset-tokens:
-      - 0s
+      - 1ms
       x-request-id:
-      - req_bd9ec3b1ea83e2969220f3cd9839933e
+      - req_5686916127db89978c674cce9592e129
     status:
       code: 200
       message: OK
