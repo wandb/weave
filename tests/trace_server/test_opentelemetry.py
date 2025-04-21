@@ -40,11 +40,12 @@ from weave.trace_server.opentelemetry.helpers import (
     to_json_serializable,
     unflatten_key_values,
 )
-
+from weave.trace_server.opentelemetry.python_spans import (
+    Span as PySpan,
+)
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
     StatusCode,
-    Span as PySpan,
 )
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
