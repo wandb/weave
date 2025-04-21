@@ -825,6 +825,7 @@ class CallsQuery(BaseModel):
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
+        {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1191,7 +1192,7 @@ def process_ref_filters_to_sql(
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
         param = param_builder.add_param(hardcoded_filter.filter.output_refs)
         ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
-        return f"({ref_filter_sql} OR length({field_sql}) = 0)"
+        return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
     if hardcoded_filter.filter.output_refs:
@@ -1200,7 +1201,10 @@ def process_ref_filters_to_sql(
     if hardcoded_filter.filter.input_refs:
         ref_filters.append(process_ref_filter("input_refs"))
 
-    return combine_conditions(ref_filters, "AND")
+    if not ref_filters:
+        return ""
+
+    return " AND " + combine_conditions(ref_filters, "AND")
 
 
 def process_calls_filter_to_conditions(
@@ -1214,6 +1218,9 @@ def process_calls_filter_to_conditions(
     """
     conditions: list[str] = []
 
+    # technically not required, as we are now doing a pre-groupby optimization
+    # that should filter out 100% of non-matching rows. However, we can't remove
+    # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
