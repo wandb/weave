@@ -34,29 +34,18 @@ export type LeaderboardColumnOrderType = Array<{
   minimize: boolean;
 }>;
 
-export const getMetricText = (
-  value: LeaderboardValueRecord['metricValue'],
-  isDate: boolean
-) => {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (isDate && value instanceof Date) {
-    return <Timestamp timestamp={value as Date} />;
-  }
-  if (typeof value === 'number') {
-    // Preserve integers when possible, otherwise limit to 4 decimal places
-    return Number.isInteger(value) ? value.toString() : value.toFixed(4);
-  }
-  return value.toString();
-};
-
-export type LeaderboardGridProps = {
+interface LeaderboardGridProps {
   entity: string;
   project: string;
   data: GroupedLeaderboardData;
   loading: boolean;
   columnOrder?: LeaderboardColumnOrderType;
+}
+
+type RowData = {
+  id: string;
+  modelGroupName: string;
+  modelGroup: GroupedLeaderboardModelGroup;
 };
 
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
