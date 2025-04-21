@@ -47,8 +47,8 @@ This would be the resulting dict dumped to clickhouse:
 from weave.trace_server.opentelemetry.helpers import try_parse_int
 
 INPUT_KEYS = [
-    "input.value",  # From OpenInference standard - highest priority
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
+    "input.value",  # From OpenInference standard - highest priority
     "mlflow.spanInputs",  # From MLFlow's tracking format
     "traceloop.entity.input"  # From Traceloop's conventions
     "input",  # Generic fallback for Pydantic models - lowest priority
@@ -58,8 +58,8 @@ INPUT_KEYS = [
 # Priority is given to standards in this order:
 # This is used to populate the `output_dump` column in clickhouse
 OUTPUT_KEYS = [
-    "output.value",  # From OpenInference standard - highest priority
     "gen_ai.completion",  # From OpenTelemetry AI semantic conventions
+    "output.value",  # From OpenInference standard - highest priority
     "mlflow.spanOutputs",  # From MLFlow's tracking format
     "gen_ai.content.completion",  # From OpenLit project's format
     "traceloop.entity.output",  # From Traceloop's conventions
@@ -105,7 +105,7 @@ ATTRIBUTE_KEYS = {
         "openinference.span.kind",  # OpenInference
     ],
     # Model name/identifier
-    "model": ["llm.model_name", "gen_ai.response.model"],
+    "model": ["gen_ai.response.model", "llm.model_name"],
     # Provider/vendor of the model
     "provider": [
         "llm.provider",  # Common across standards
