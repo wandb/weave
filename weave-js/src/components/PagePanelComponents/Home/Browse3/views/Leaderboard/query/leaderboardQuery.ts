@@ -319,8 +319,6 @@ const getLeaderboardGroupableData = async (
           // Special handling for common auto-summarized data formats (true_count, true_fraction)
           // that might not be properly flattened
           if ('true_count' in value || 'true_fraction' in value) {
-            console.log(`Handling auto-summarized format for ${key}:`, value);
-
             if ('true_count' in value && value.true_count != null) {
               const scoreRecord: LeaderboardValueRecord = {
                 ...recordPartial,
@@ -354,9 +352,6 @@ const getLeaderboardGroupableData = async (
           // For imperative evaluations, the metric values might be nested in the value object
           // or directly in the output object
           const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
-
-          // Log the payload for debugging
-          console.log(`Scorer ${scorerName} payload:`, flatScorePayload);
 
           Object.entries(flatScorePayload).forEach(
             ([metricPath, metricValue]) => {
@@ -731,7 +726,6 @@ const getLeaderboardObjectGroupableData = async (
                 const index = parseInt(part, 10);
                 value = value[index];
               } catch (e) {
-                console.warn('Skipping model latency', call, e);
                 value = null;
               }
             } else {
@@ -786,9 +780,6 @@ const getLeaderboardObjectGroupableData = async (
             // Found a direct match in the output object
             let value = (output as any)[col.scorer_name];
 
-            // Log the raw value for debugging
-            console.log(`Column ${col.scorer_name} value before path:`, value);
-
             // Special handling for auto-summarized data that might not access correctly through the path
             if (
               typeof value === 'object' &&
@@ -799,10 +790,6 @@ const getLeaderboardObjectGroupableData = async (
             ) {
               // Directly access the property instead of using path traversal
               value = value[col.summary_metric_path];
-              console.log(
-                `Direct access to ${col.summary_metric_path}:`,
-                value
-              );
             } else {
               // Regular path traversal
               col.summary_metric_path.split('.').forEach(part => {
@@ -814,7 +801,6 @@ const getLeaderboardObjectGroupableData = async (
                     const index = parseInt(part, 10);
                     value = value[index];
                   } catch (e) {
-                    console.warn('Skipping model latency', call, e);
                     value = null;
                   }
                 } else {
@@ -822,12 +808,6 @@ const getLeaderboardObjectGroupableData = async (
                 }
               });
             }
-
-            // Log the processed value for debugging
-            console.log(
-              `Column ${col.scorer_name} value after path ${col.summary_metric_path}:`,
-              value
-            );
 
             const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
             const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
