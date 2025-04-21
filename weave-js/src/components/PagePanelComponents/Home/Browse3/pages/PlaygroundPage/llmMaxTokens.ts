@@ -637,7 +637,7 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
 export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
   openai: ['OPENAI_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY'],
-  gemini: ['GOOGLE_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
   xai: ['XAI_API_KEY'],
   bedrock: ['AWS_SECRET_ACCESS_KEY', 'AWS_REGION_NAME', 'AWS_ACCESS_KEY_ID'],
   azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],

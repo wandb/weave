@@ -38,7 +38,7 @@ Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazo
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
-- Google: `GOOGLE_API_KEY`
+- Google: `GEMINI_API_KEY`
 - Groq: `GROQ_API_KEY`
 - Amazon Bedrock:
   - `AWS_ACCESS_KEY_ID`
