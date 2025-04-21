@@ -1,30 +1,32 @@
+import base64
 import json
+import math
 import re
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Union
 from uuid import UUID
 
+import numpy as np
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 
 def to_json_serializable(value: Any) -> Any:
     """
     Transform common data types into JSON-serializable values.
-
-    Args:
-        value: Any value that needs to be converted to JSON-serializable format
-
-    Returns:
-        A JSON-serializable version of the input value
-
-    Raises:
-        ValueError: If the value type is not supported for JSON serialization
     """
     if value is None:
         return None
-    elif isinstance(value, (str, int, float, bool)):
+    elif isinstance(value, (str, bool)):
+        return value
+    elif isinstance(value, int):
+        return value
+    elif isinstance(value, float):
+        # Handle special floats: NaN, inf, -inf
+        if math.isnan(value) or math.isinf(value):
+            return str(value)
         return value
     elif isinstance(value, (list, tuple)):
         return [to_json_serializable(item) for item in value]
@@ -32,15 +34,34 @@ def to_json_serializable(value: Any) -> Any:
         return {str(k): to_json_serializable(v) for k, v in value.items()}
     elif isinstance(value, datetime):
         return value.isoformat()
+    elif isinstance(value, date):  # date without time
+        return value.isoformat()
+    elif isinstance(value, time):  # time without date
+        return value.isoformat()
+    elif isinstance(value, timedelta):
+        return value.total_seconds()
     elif isinstance(value, UUID):
         return str(value)
     elif isinstance(value, Enum):
         return value.value
-    elif hasattr(value, "__dataclass_fields__"):  # Handle dataclasses
+    elif isinstance(value, Decimal):
+        # Convert Decimal to float or str, depending on requirements.
+        return float(value)
+    elif isinstance(value, (set, frozenset)):
+        return [to_json_serializable(item) for item in value]
+    elif isinstance(value, complex):
+        return {"real": value.real, "imag": value.imag}
+    elif isinstance(value, (bytes, bytearray)):
+        return base64.b64encode(value).decode("ascii")
+    elif hasattr(value, "__dataclass_fields__"):
         return {
             k: to_json_serializable(getattr(value, k))
             for k in value.__dataclass_fields__
         }
+    elif isinstance(value, np.generic):  # e.g., np.int64, np.float64
+        return value.item()
+    elif isinstance(value, np.ndarray):
+        return to_json_serializable(value.tolist())
     else:
         raise ValueError(f"Unsupported type for JSON serialization: {type(value)}")
 
