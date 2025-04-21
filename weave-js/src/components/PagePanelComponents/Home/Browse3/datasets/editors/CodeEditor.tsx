@@ -1,11 +1,11 @@
 import {Editor} from '@monaco-editor/react';
 import {Box} from '@mui/material';
-import React from 'react';
+import React, {useRef} from 'react';
 
 interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onClose: () => void;
+  onClose: (value?: any) => void;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -13,6 +13,43 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onChange,
   onClose,
 }) => {
+  const editorRef = useRef<any>(null);
+  const currentValueRef = useRef(value);
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Set initial value
+    editor.setValue(value);
+
+    // Track content changes
+    editor.onDidChangeModelContent(() => {
+      const newValue = editor.getValue();
+      currentValueRef.current = newValue;
+      onChange(newValue);
+    });
+
+    // Override the default Enter key behavior to prevent newlines on Cmd+Enter
+    editor.onKeyDown((e: any) => {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Get the latest value directly from the editor
+        onClose(editor.getValue());
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Also close and get value directly from editor
+        onClose(editor.getValue());
+      }
+    });
+  };
+
+  // Update ref when value changes - not using effect now
+  currentValueRef.current = value;
+
   return (
     <Box
       sx={
@@ -37,30 +74,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         height="100%"
         width="100%"
         defaultValue={value}
-        onChange={newValue => onChange(newValue ?? '')}
-        onMount={(editor, monacoInstance) => {
-          editor.addAction({
-            id: 'closeEditor',
-            label: 'Close Editor',
-            keybindings: [
-              monacoInstance.KeyMod.CtrlCmd + monacoInstance.KeyCode.Enter,
-            ],
-            run: () => {
-              onClose();
-            },
-          });
-          const disposable = editor.onKeyDown(e => {
-            if (e.browserEvent.key === 'Enter' && !e.browserEvent.metaKey) {
-              e.browserEvent.preventDefault();
-              e.browserEvent.stopPropagation();
-              editor.trigger('keyboard', 'type', {text: '\n'});
-            }
-          });
-
-          editor.onDidDispose(() => {
-            disposable.dispose();
-          });
-        }}
+        onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},
           scrollBeyondLastLine: true,
