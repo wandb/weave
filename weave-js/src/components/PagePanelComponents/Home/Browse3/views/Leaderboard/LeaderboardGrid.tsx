@@ -347,41 +347,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     }
   }, [columns, defaultSortModel, loading]);
 
-  // Modify the findNonZeroValue function to prioritize non-zero values
-  const findNonZeroValue = useCallback(
-    (datasetGroup, scorerGroup, metricPathGroup, model) => {
-      try {
-        const records =
-          data.modelGroups[model].datasetGroups[datasetGroup].scorerGroups[
-            scorerGroup
-          ].metricPathGroups[metricPathGroup];
-
-        // Sort by recency, then prefer non-zero values
-        if (records && records.length > 0) {
-          // First, check if there are any non-zero values
-          const nonZeroRecord = records.find(
-            record =>
-              record.metricValue !== 0 &&
-              record.metricValue !== '0' &&
-              record.metricValue !== 0.0
-          );
-
-          // If there's a non-zero value, use it
-          if (nonZeroRecord) {
-            return nonZeroRecord;
-          }
-
-          // Otherwise, use the most recent (which should be the first one, as we've sorted)
-          return records[0];
-        }
-        return {metricValue: null, sourceEvaluationCallId: null} as any;
-      } catch (e) {
-        return {metricValue: null, sourceEvaluationCallId: null};
-      }
-    },
-    [data]
-  );
-
   if (loading) {
     return <Loading centered />;
   }
@@ -611,23 +576,7 @@ const getAggregatedResults = (
   if (data.length === 1) {
     return data[0];
   }
-  // First sort by most recent
-  const sortedByRecent = [...data].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
-
-  // Then try to find a non-zero value among the recent ones (first 3 entries)
-  // This focuses on recent evaluations but prioritizes non-zero values
-  const recentEntries = sortedByRecent.slice(0, 3);
-  const nonZeroValue = recentEntries.find(
-    record =>
-      record.metricValue !== 0 &&
-      record.metricValue !== '0' &&
-      record.metricValue !== 0.0
-  );
-
-  // Return the non-zero value if found, otherwise the most recent
-  return nonZeroValue || sortedByRecent[0];
+  return data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 };
 
 const defaultGetSortComparator =
