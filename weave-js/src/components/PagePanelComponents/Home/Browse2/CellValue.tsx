@@ -66,5 +66,10 @@ export const CellValue = ({value, noLink}: CellValueProps) => {
   if (isCustomWeaveTypePayload(value)) {
     return <CustomWeaveTypeDispatcher data={value} />;
   }
-  return <CellValueString value={JSON.stringify(value)} />;
+
+  try {
+    return <CellValueString value={JSON.stringify(value)} />;
+  } catch (e) {
+    return <CellValueString value="[Unable to display value]" />;
+  }
 };
