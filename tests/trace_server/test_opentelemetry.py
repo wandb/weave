@@ -339,6 +339,150 @@ class TestAttributes:
         # Test enums
         assert to_json_serializable(SpanKind.INTERNAL) == 1
 
+    def test_to_json_serializable_special_floats(self):
+        """Test converting special float values (NaN, Infinity)."""
+        # Test NaN
+        assert to_json_serializable(float("nan")) == "nan"
+
+        # Test positive infinity
+        assert to_json_serializable(float("inf")) == "inf"
+
+        # Test negative infinity
+        assert to_json_serializable(float("-inf")) == "-inf"
+
+    def test_to_json_serializable_date_time(self):
+        """Test converting date and time objects."""
+        from datetime import date, time
+
+        # Test date
+        d = date(2023, 1, 1)
+        assert to_json_serializable(d) == "2023-01-01"
+
+        # Test time
+        t = time(12, 30, 45)
+        assert to_json_serializable(t) == "12:30:45"
+
+    def test_to_json_serializable_timedelta(self):
+        """Test converting timedelta objects."""
+        from datetime import timedelta
+
+        # Test one day
+        td = timedelta(days=1)
+        assert to_json_serializable(td) == 86400.0  # 24 * 60 * 60 seconds
+
+        # Test complex timedelta
+        td = timedelta(days=1, hours=2, minutes=30, seconds=15)
+        expected_seconds = (1 * 24 * 60 * 60) + (2 * 60 * 60) + (30 * 60) + 15
+        assert to_json_serializable(td) == expected_seconds
+
+    def test_to_json_serializable_uuid(self):
+        """Test converting UUID objects."""
+        import uuid
+
+        # Create a UUID with a known value
+        test_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        assert to_json_serializable(test_uuid) == "12345678-1234-5678-1234-567812345678"
+
+    def test_to_json_serializable_decimal(self):
+        """Test converting Decimal objects."""
+        from decimal import Decimal
+
+        # Test simple decimal
+        assert to_json_serializable(Decimal("10.5")) == 10.5
+
+        # Test high precision decimal
+        assert (
+            to_json_serializable(Decimal("3.14159265358979323846"))
+            == 3.14159265358979323846
+        )
+
+        # Test zero
+        assert to_json_serializable(Decimal("0")) == 0.0
+
+    def test_to_json_serializable_sets(self):
+        """Test converting set and frozenset objects."""
+        # Test set
+        s = {1, 2, 3, "test"}
+        result = to_json_serializable(s)
+        assert isinstance(result, list)
+        assert len(result) == 4
+        assert 1 in result
+        assert 2 in result
+        assert 3 in result
+        assert "test" in result
+
+        # Test frozenset
+        fs = frozenset([4, 5, 6, "frozen"])
+        result = to_json_serializable(fs)
+        assert isinstance(result, list)
+        assert len(result) == 4
+        assert 4 in result
+        assert 5 in result
+        assert 6 in result
+        assert "frozen" in result
+
+    def test_to_json_serializable_complex(self):
+        """Test converting complex numbers."""
+        c = complex(3, 4)
+        result = to_json_serializable(c)
+        assert isinstance(result, dict)
+        assert result == {"real": 3.0, "imag": 4.0}
+
+        # Test complex with negative imaginary part
+        c = complex(1, -2)
+        assert to_json_serializable(c) == {"real": 1.0, "imag": -2.0}
+
+    def test_to_json_serializable_bytes(self):
+        """Test converting bytes and bytearray objects."""
+        # Test bytes
+        b = b"hello world"
+        assert to_json_serializable(b) == "aGVsbG8gd29ybGQ="  # Base64 encoded
+
+        # Test bytearray
+        ba = bytearray(b"hello world")
+        assert to_json_serializable(ba) == "aGVsbG8gd29ybGQ="  # Base64 encoded
+
+    def test_to_json_serializable_dataclass(self):
+        """Test converting dataclass objects."""
+        from dataclasses import dataclass
+
+        @dataclass
+        class Person:
+            name: str
+            age: int
+
+        person = Person(name="John", age=30)
+        result = to_json_serializable(person)
+        assert isinstance(result, dict)
+        assert result == {"name": "John", "age": 30}
+
+        # Nested dataclass
+        @dataclass
+        class Department:
+            name: str
+            head: Person
+
+        dept = Department(name="Engineering", head=Person(name="Jane", age=35))
+        result = to_json_serializable(dept)
+        assert result == {"name": "Engineering", "head": {"name": "Jane", "age": 35}}
+
+    def test_to_json_serializable_numpy(self):
+        """Test converting NumPy objects."""
+        import numpy as np
+
+        # Test numpy scalar types
+        assert to_json_serializable(np.int32(42)) == 42
+        assert to_json_serializable(np.float64(3.14)) == 3.14
+        assert to_json_serializable(np.bool_(True)) is True
+
+        # Test numpy arrays
+        arr = np.array([1, 2, 3])
+        assert to_json_serializable(arr) == [1, 2, 3]
+
+        # Test 2D numpy array
+        arr_2d = np.array([[1, 2], [3, 4]])
+        assert to_json_serializable(arr_2d) == [[1, 2], [3, 4]]
+
     def test_unflatten_key_values(self):
         """Test unflattening key-value pairs into nested structure."""
         # Create key-value pairs

@@ -14,9 +14,7 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 
 def to_json_serializable(value: Any) -> Any:
-    """
-    Transform common data types into JSON-serializable values.
-    """
+    # Transform common data types into JSON-serializable values.
     if value is None:
         return None
     elif isinstance(value, (str, bool)):
