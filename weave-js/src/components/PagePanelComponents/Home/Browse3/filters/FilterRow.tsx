@@ -2,10 +2,10 @@
  * Each filter in the filter popup is shown as one row.
  */
 
-import {GridFilterItem} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../Button';
+import {ExtendedGridFilterItem} from '../grid/extendedFilters';
 import {
   FilterId,
   getFieldType,
@@ -19,10 +19,10 @@ import {SelectValue} from './SelectValue';
 type FilterRowProps = {
   entity: string;
   project: string;
-  item: GridFilterItem;
+  item: ExtendedGridFilterItem;
   options: SelectFieldOption[];
   onAddFilter: (field: string) => void;
-  onUpdateFilter: (item: GridFilterItem) => void;
+  onUpdateFilter: (item: ExtendedGridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
   activeEditId?: FilterId | null;
 };

@@ -1,6 +1,5 @@
 import {Box, Popover} from '@mui/material';
 import {
-  GridFilterModel,
   gridPageCountSelector,
   gridPageSelector,
   gridPageSizeSelector,
@@ -27,6 +26,7 @@ import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -85,7 +85,7 @@ export const ExportSelector = ({
     entity: string;
     project: string;
     filter: WFHighLevelCallFilter;
-    gridFilter: GridFilterModel;
+    gridFilter: ExtendedGridFilterModel;
     gridSort?: GridSortModel;
   };
   disabled: boolean;

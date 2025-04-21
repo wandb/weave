@@ -3,7 +3,6 @@
  */
 
 import {Popover} from '@mui/material';
-import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -15,6 +14,10 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  ExtendedGridFilterItem,
+  ExtendedGridFilterModel,
+} from '../grid/extendedFilters';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -35,8 +38,8 @@ const DEBOUNCE_MS = 1_000;
 type FilterBarProps = {
   entity: string;
   project: string;
-  filterModel: GridFilterModel;
-  setFilterModel: (newModel: GridFilterModel) => void;
+  filterModel: ExtendedGridFilterModel;
+  setFilterModel: (newModel: ExtendedGridFilterModel) => void;
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
@@ -45,7 +48,7 @@ type FilterBarProps = {
   height: number;
 };
 
-const isFilterIncomplete = (filter: GridFilterItem): boolean => {
+const isFilterIncomplete = (filter: ExtendedGridFilterItem): boolean => {
   return (
     filter.field === undefined ||
     // Empty string is never valid
@@ -74,9 +77,9 @@ export const FilterBar = ({
   const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
 
   // Keep track of incomplete filters that should be preserved during state sync
-  const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
-    []
-  );
+  const [incompleteFilters, setIncompleteFilters] = useState<
+    ExtendedGridFilterItem[]
+  >([]);
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -197,7 +200,7 @@ export const FilterBar = ({
 
   // Only send complete filters to the parent component
   const applyCompletedFilters = useCallback(
-    (model: GridFilterModel) => {
+    (model: ExtendedGridFilterModel) => {
       const completeFilters = model.items.filter(
         item => !isFilterIncomplete(item)
       );
@@ -213,7 +216,7 @@ export const FilterBar = ({
   );
 
   const onUpdateFilter = useCallback(
-    (item: GridFilterItem) => {
+    (item: ExtendedGridFilterItem) => {
       debouncedSetFilterModel.cancel();
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);

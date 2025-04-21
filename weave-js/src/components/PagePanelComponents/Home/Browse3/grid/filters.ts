@@ -1,11 +1,12 @@
-import {
-  GridFilterItem,
-  GridFilterModel,
-  GridLogicOperator,
-} from '@mui/x-data-grid-pro';
+import {GridLogicOperator} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 
-const isValidFilterItem = (obj: any): obj is GridFilterItem => {
+import {
+  ExtendedGridFilterItem,
+  ExtendedGridFilterModel,
+} from './extendedFilters';
+
+const isValidFilterItem = (obj: any): obj is ExtendedGridFilterItem => {
   if (!_.isPlainObject(obj)) {
     return false;
   }
@@ -20,7 +21,7 @@ const isValidFilterItem = (obj: any): obj is GridFilterItem => {
   return false;
 };
 
-export const getValidFilterModel = <T extends GridFilterModel | null>(
+export const getValidFilterModel = <T extends ExtendedGridFilterModel | null>(
   jsonString: string,
   def: T = null as T
 ): T => {

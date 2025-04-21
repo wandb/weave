@@ -1,6 +1,5 @@
 import {
   GridColumnVisibilityModel,
-  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridSortModel,
@@ -11,6 +10,7 @@ import {
   WeaveHeaderExtrasContext,
   WeaveHeaderExtrasProvider,
 } from '../../context';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {opNiceName} from '../common/opNiceName';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
@@ -38,8 +38,8 @@ export const CallsPage: FC<{
   pinModel: GridPinnedColumnFields;
   setPinModel: (newModel: GridPinnedColumnFields) => void;
 
-  filterModel: GridFilterModel;
-  setFilterModel: (newModel: GridFilterModel) => void;
+  filterModel: ExtendedGridFilterModel;
+  setFilterModel: (newModel: ExtendedGridFilterModel) => void;
 
   sortModel: GridSortModel;
   setSortModel: (newModel: GridSortModel) => void;

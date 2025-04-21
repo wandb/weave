@@ -2,13 +2,13 @@
  * FilterTagItem shows one filter. It can be removed by clicking the 'x' button.
  */
 
-import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {RemoveAction} from '@wandb/weave/components/Tag';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
 import {Timestamp, TimestampRange, TimestampSmall} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
+import {ExtendedGridFilterItem} from '../grid/extendedFilters';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
   FilterId,
@@ -26,7 +26,7 @@ import {FilterTagStatus} from './FilterTagStatus';
 import {IdList} from './IdList';
 
 type FilterTagItemProps = {
-  item: GridFilterItem;
+  item: ExtendedGridFilterItem;
   onRemoveFilter: (id: FilterId) => void;
   isEditing?: boolean;
 };

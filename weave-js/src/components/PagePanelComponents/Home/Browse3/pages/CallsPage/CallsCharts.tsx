@@ -1,4 +1,4 @@
-import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {GridSortModel} from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {MOON_400} from '../../../../../../common/css/color.styles';
@@ -6,6 +6,7 @@ import * as userEvents from '../../../../../../integrations/analytics/userEvents
 import {IconInfo} from '../../../../../Icon';
 import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {Tailwind} from '../../../../../Tailwind';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {
@@ -17,7 +18,7 @@ import {
 type CallsChartsProps = {
   entity: string;
   project: string;
-  filterModelProp: GridFilterModel;
+  filterModelProp: ExtendedGridFilterModel;
   filter: WFHighLevelCallFilter;
 };
 

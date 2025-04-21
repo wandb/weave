@@ -16,7 +16,6 @@ import {
 import {
   GridColDef,
   GridColumnVisibilityModel,
-  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridRowSelectionModel,
@@ -59,7 +58,9 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {hasDefaultDateFilter} from '../../filters/filterUtils';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -125,12 +126,6 @@ export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
 
-export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
-  return filter.items.some(
-    item => item.field === 'started_at' && item.operator === '(date): after'
-  );
-};
-
 export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
@@ -154,8 +149,8 @@ export const CallsTable: FC<{
   pinModel?: GridPinnedColumnFields;
   setPinModel?: (newModel: GridPinnedColumnFields) => void;
 
-  filterModel?: GridFilterModel;
-  setFilterModel?: (newModel: GridFilterModel) => void;
+  filterModel?: ExtendedGridFilterModel;
+  setFilterModel?: (newModel: ExtendedGridFilterModel) => void;
 
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
@@ -319,6 +314,14 @@ export const CallsTable: FC<{
     () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
+
+  const expectingAnotherFetch = useMemo(() => {
+    // if we have a default date filter, and there are no results
+    if (hasDefaultDateFilter(filterModelResolved) && tableData.length === 0) {
+      return true;
+    }
+    return false;
+  }, [filterModelResolved, tableData]);
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -997,7 +1000,7 @@ export const CallsTable: FC<{
         // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
-        loading={callsLoading}
+        loading={callsLoading || expectingAnotherFetch}
         rows={tableData}
         // initialState={initialState}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}

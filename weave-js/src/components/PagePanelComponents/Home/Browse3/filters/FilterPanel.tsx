@@ -2,20 +2,20 @@
  * This gets size information and passes it down.
  */
 
-import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {LocalizationProvider} from '@mui/x-date-pickers';
 import {AdapterMoment} from '@mui/x-date-pickers/AdapterMoment';
 import React from 'react';
 import {AutoSizer} from 'react-virtualized';
 
+import {ExtendedGridFilterModel} from '../grid/extendedFilters';
 import {ColumnInfo} from '../types';
 import {FilterBar} from './FilterBar';
 
 type FilterPanelProps = {
   entity: string;
   project: string;
-  filterModel: GridFilterModel;
-  setFilterModel: (newModel: GridFilterModel) => void;
+  filterModel: ExtendedGridFilterModel;
+  setFilterModel: (newModel: ExtendedGridFilterModel) => void;
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;

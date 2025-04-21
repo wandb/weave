@@ -1,4 +1,3 @@
-import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -16,6 +15,7 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
+import {ExtendedGridFilterModel} from './grid/extendedFilters';
 import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from './pages/OpsPage/opsPageTypes';
@@ -154,7 +154,7 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     filter?: WFHighLevelCallFilter,
-    gridFilters?: GridFilterModel
+    gridFilters?: ExtendedGridFilterModel
   ) => {
     throw new Error('Not implemented');
   },
@@ -378,7 +378,7 @@ export const browse3ContextGen = (
       entityName: string,
       projectName: string,
       filter?: WFHighLevelCallFilter,
-      gridFilters?: GridFilterModel
+      gridFilters?: ExtendedGridFilterModel
     ) => {
       const searchParams = new URLSearchParams();
       const prunedFilter = pruneEmptyFields(filter);
@@ -549,7 +549,7 @@ type RouteType = {
     // the implementation and now it is a part of our URL spec forever... :(
     // It should have been implemented as the `query` component of WFHighLevelCallFilter
     // which maps to our actual service API.
-    gridFilters?: GridFilterModel
+    gridFilters?: ExtendedGridFilterModel
   ) => string;
   objectVersionsUIUrl: (
     entityName: string,

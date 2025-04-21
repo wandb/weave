@@ -2,12 +2,7 @@
  * Shared type definitions and utility methods for filtering UI.
  */
 
-import {
-  GridColDef,
-  GridColumnGroupingModel,
-  GridFilterItem,
-  GridFilterModel,
-} from '@mui/x-data-grid-pro';
+import {GridColDef, GridColumnGroupingModel} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -20,6 +15,10 @@ import {
   parseScorerFeedbackField,
   RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
 } from '../feedback/HumanFeedback/tsScorerFeedback';
+import {
+  ExtendedGridFilterItem,
+  ExtendedGridFilterModel,
+} from '../grid/extendedFilters';
 import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
@@ -365,14 +364,14 @@ export const getStringList = (value: any): string[] => {
   throw new Error('Invalid value');
 };
 
-type ReplacementTest = (item: GridFilterItem) => boolean;
+type ReplacementTest = (item: ExtendedGridFilterItem) => boolean;
 
 export const upsertFilter = (
-  model: GridFilterModel,
-  item: GridFilterItem,
+  model: ExtendedGridFilterModel,
+  item: ExtendedGridFilterItem,
   replacementTest: ReplacementTest
-): GridFilterModel => {
-  const items: GridFilterItem[] = [];
+): ExtendedGridFilterModel => {
+  const items: ExtendedGridFilterItem[] = [];
   let found = false;
   for (const i of model.items) {
     if (replacementTest(i)) {
@@ -415,14 +414,14 @@ export const makeRawDateFilter = (
  * @param id Optional filter ID (defaults to 0)
  * @param field Optional field name (defaults to 'started_at')
  * @param operator Optional operator (defaults to '(date): after')
- * @returns GridFilterItem configured with the specified parameters
+ * @returns ExtendedGridFilterItem configured with the specified parameters
  */
 export const makeDateFilter = (
   days: number,
   id: number | string = 0,
   field: string = 'started_at',
   operator: string = '(date): after'
-): GridFilterItem => {
+): ExtendedGridFilterItem => {
   const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return {
     id,
@@ -432,7 +431,7 @@ export const makeDateFilter = (
   };
 };
 
-export const makeMonthFilter = (): GridFilterItem => {
+export const makeMonthFilter = (): ExtendedGridFilterItem => {
   // Get last month
   const curMonth = new Date().getMonth();
   // Number of days in the previous month

@@ -260,7 +260,7 @@ const useCallsNoExpansion = (
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
-  const loadingRef = useRef(false);
+  const [loading, setLoading] = useState(true);
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
@@ -270,7 +270,7 @@ const useCallsNoExpansion = (
       return;
     }
     setCallRes(null);
-    loadingRef.current = true;
+    setLoading(true);
     const req: traceServerTypes.TraceCallsQueryReq = {
       project_id: projectIdFromParts({entity, project}),
       filter: {
@@ -296,11 +296,11 @@ const useCallsNoExpansion = (
         : null),
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
-      loadingRef.current = false;
       setCallRes(res);
+      setLoading(false);
     };
     const onError = (e: any) => {
-      loadingRef.current = false;
+      setLoading(false);
       console.error(e);
       setCallRes({calls: []});
     };
@@ -367,7 +367,7 @@ const useCallsNoExpansion = (
       .map(traceCallToUICallSchema);
     const result = allResults;
 
-    if (callRes == null || loadingRef.current) {
+    if (callRes == null || loading) {
       return {
         loading: true,
         result: [],
@@ -395,7 +395,7 @@ const useCallsNoExpansion = (
         refetch,
       };
     }
-  }, [opts?.skip, callRes, columns, refetch, entity, project]);
+  }, [opts?.skip, callRes, columns, refetch, entity, project, loading]);
 };
 
 const useCalls = (

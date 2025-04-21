@@ -2,7 +2,6 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
-  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridSortModel,
@@ -48,7 +47,9 @@ import {
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
+import {hasDefaultDateFilter} from './Browse3/filters/filterUtils';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {ExtendedGridFilterModel} from './Browse3/grid/extendedFilters';
 import {getValidFilterModel} from './Browse3/grid/filters';
 import {
   DEFAULT_PAGE_SIZE,
@@ -62,7 +63,6 @@ import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
-  filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
 import {WFHighLevelCallFilter} from './Browse3/pages/CallsPage/callsTableFilter';
 import {
@@ -844,11 +844,11 @@ const CallsPageBinding = () => {
     [query.filters, defaultFilter]
   );
 
-  const setFilterModel = (newModel: GridFilterModel) => {
+  const setFilterModel = (newModel: ExtendedGridFilterModel) => {
     // If there was a date filter and now there isn't, mark it as explicitly removed
     // so we don't add it back on subsequent navigations
-    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
-    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
+    const hadDefaultFilters = hasDefaultDateFilter(filterModel);
+    if (hadDefaultFilters && !hasDefaultDateFilter(newModel)) {
       hasRemovedDateFilter.current = true;
     }
 

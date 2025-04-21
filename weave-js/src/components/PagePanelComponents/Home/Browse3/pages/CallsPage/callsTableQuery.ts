@@ -1,5 +1,4 @@
 import {
-  GridFilterModel,
   GridLogicOperator,
   GridPaginationModel,
   GridSortModel,
@@ -18,6 +17,7 @@ import {
   makeMonthFilter,
   makeRawDateFilter,
 } from '../../filters/common';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -28,7 +28,7 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
-export const DEFAULT_FILTER_CALLS: GridFilterModel = {
+export const DEFAULT_FILTER_CALLS: ExtendedGridFilterModel = {
   items: [],
   logicOperator: GridLogicOperator.And,
 };
@@ -47,7 +47,7 @@ export const useCallsForQuery = (
   entity: string,
   project: string,
   filter: WFHighLevelCallFilter,
-  gridFilter: GridFilterModel,
+  gridFilter: ExtendedGridFilterModel,
   gridPage: GridPaginationModel,
   gridSort?: GridSortModel,
   expandedColumns?: Set<string>,
@@ -216,7 +216,7 @@ export const useCallsForQuery = (
 
 export const useFilterSortby = (
   filter: WFHighLevelCallFilter,
-  gridFilter: GridFilterModel,
+  gridFilter: ExtendedGridFilterModel,
   gridSort: GridSortModel | undefined
 ) => {
   const sortBy = useDeepMemo(
@@ -239,7 +239,7 @@ export const useFilterSortby = (
 };
 
 const getFilterByRaw = (
-  gridFilter: GridFilterModel
+  gridFilter: ExtendedGridFilterModel
 ): Query['$expr'] | undefined => {
   const completeItems = gridFilter.items.filter(
     item => item.value !== undefined || isValuelessOperator(item.operator)
@@ -345,7 +345,7 @@ export const useMakeInitialDatetimeFilter = (
   project: string,
   highLevelFilter: WFHighLevelCallFilter,
   skip: boolean
-): {initialDatetimeFilter: GridFilterModel} => {
+): {initialDatetimeFilter: ExtendedGridFilterModel} => {
   // Fire off 2 stats queries, one for the # of calls in the last 7 days
   // one for the  # of calls in the last 30 days.
   // If the first query returns > 50 calls, set the default filter to 7 days
@@ -379,7 +379,12 @@ export const useMakeInitialDatetimeFilter = (
 
   const defaultDatetimeFilter = useMemo(
     () => ({
-      items: [makeDateFilter(7)],
+      items: [
+        {
+          ...makeDateFilter(7),
+          isDefault: true,
+        },
+      ],
       logicOperator: GridLogicOperator.And,
     }),
     []
@@ -397,7 +402,12 @@ export const useMakeInitialDatetimeFilter = (
       newFilter = defaultDatetimeFilter;
     } else if (callStats30Days.result && callStats30Days.result.count >= 50) {
       newFilter = {
-        items: [makeMonthFilter()],
+        items: [
+          {
+            ...makeMonthFilter(),
+            isDefault: true,
+          },
+        ],
         logicOperator: GridLogicOperator.And,
       };
     } else if (callStats30Days.result && callStats30Days.result.count < 50) {
@@ -416,7 +426,7 @@ export const useMakeInitialDatetimeFilter = (
 
   if (cachedFilter) {
     return {
-      initialDatetimeFilter: cachedFilter as GridFilterModel,
+      initialDatetimeFilter: cachedFilter as ExtendedGridFilterModel,
     };
   }
 

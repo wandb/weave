@@ -1,9 +1,10 @@
 import {Box, Typography} from '@mui/material';
-import {GridFilterModel} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {makeDateFilter, makeMonthFilter} from '../../filters/common';
+import {hasDefaultDateFilter} from '../../filters/filterUtils';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -11,7 +12,6 @@ import {
 } from '../common/EmptyContent';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {filterHasCalledAfterDateFilter} from './CallsTable';
 
 type CallsTableNoRowsOverlayProps = {
   entity: string;
@@ -23,9 +23,9 @@ type CallsTableNoRowsOverlayProps = {
     traceRootsOnly?: boolean;
     [key: string]: any;
   };
-  filterModelResolved: GridFilterModel;
+  filterModelResolved: ExtendedGridFilterModel;
   clearFilters?: () => void;
-  setFilterModel?: (model: GridFilterModel) => void;
+  setFilterModel?: (model: ExtendedGridFilterModel) => void;
 };
 
 export const CallsTableNoRowsOverlay: React.FC<
@@ -52,11 +52,11 @@ export const CallsTableNoRowsOverlay: React.FC<
   }
 
   const opExists = opCreatedAt != null;
-  const hasDateFilter = filterHasCalledAfterDateFilter(filterModelResolved);
+  const hasDefaultFilter = hasDefaultDateFilter(filterModelResolved);
 
   // Handle special empty states
   if (isEvaluateTable) {
-    if (!hasDateFilter) {
+    if (!hasDefaultFilter) {
       return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
     } else {
       return (
@@ -72,7 +72,7 @@ export const CallsTableNoRowsOverlay: React.FC<
     return <Empty {...EMPTY_PROPS_TRACES} />;
   }
 
-  if (hasDateFilter) {
+  if (hasDefaultFilter) {
     return (
       <DateFilterEmptyState
         filterModelResolved={filterModelResolved}
@@ -86,9 +86,9 @@ export const CallsTableNoRowsOverlay: React.FC<
 };
 
 type DateFilterEmptyStateProps = {
-  filterModelResolved: GridFilterModel;
+  filterModelResolved: ExtendedGridFilterModel;
   clearFilters?: () => void;
-  setFilterModel?: (model: GridFilterModel) => void;
+  setFilterModel?: (model: ExtendedGridFilterModel) => void;
 };
 
 const DateFilterEmptyState: React.FC<DateFilterEmptyStateProps> = ({

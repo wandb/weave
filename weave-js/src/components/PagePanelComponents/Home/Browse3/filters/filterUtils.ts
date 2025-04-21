@@ -1,5 +1,8 @@
-import {GridFilterItem} from '@mui/x-data-grid-pro';
-
+import {
+  ExtendedGridFilterItem,
+  ExtendedGridFilterModel,
+  hasDefaultFilters,
+} from '../grid/extendedFilters';
 import {FilterId} from './common';
 
 /**
@@ -9,7 +12,7 @@ import {FilterId} from './common';
  * - Converts string IDs to numbers, defaulting to 0 if parsing fails
  * - Returns the maximum ID + 1
  */
-export const getNextFilterId = (items: GridFilterItem[]): number => {
+export const getNextFilterId = (items: ExtendedGridFilterItem[]): number => {
   if (items.length === 0) {
     return 0;
   }
@@ -31,13 +34,13 @@ export const getNextFilterId = (items: GridFilterItem[]): number => {
  * - Returns combined items and active edit IDs
  */
 export const combineRangeFilters = (
-  items: GridFilterItem[],
+  items: ExtendedGridFilterItem[],
   activeEditId: FilterId | null
-): {items: GridFilterItem[]; activeIds: Set<FilterId>} => {
-  const result: GridFilterItem[] = [];
+): {items: ExtendedGridFilterItem[]; activeIds: Set<FilterId>} => {
+  const result: ExtendedGridFilterItem[] = [];
   const dateRanges = new Map<
     string,
-    {before?: GridFilterItem; after?: GridFilterItem}
+    {before?: ExtendedGridFilterItem; after?: ExtendedGridFilterItem}
   >();
   const activeIds = new Set<FilterId>();
 
@@ -90,4 +93,18 @@ export const combineRangeFilters = (
   });
 
   return {items: result, activeIds};
+};
+
+export const hasDefaultDateFilter = (
+  model: ExtendedGridFilterModel
+): boolean => {
+  return (
+    hasDefaultFilters(model) &&
+    model.items.some(item => {
+      if (item.field === 'started_at' && item.operator === '(date): after') {
+        return true;
+      }
+      return false;
+    })
+  );
 };

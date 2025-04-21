@@ -1,11 +1,11 @@
-import {GridFilterItem} from '@mui/x-data-grid';
 import _ from 'lodash';
 
+import {ExtendedGridFilterItem} from '../../../grid/extendedFilters';
 import {Query} from '../../wfReactInterface/traceServerClientInterface/query';
 
-// Convert one Material GridFilterItem to our Mongo-like query format.
+// Convert one ExtendedGridFilterItem to our Mongo-like query format.
 export const operationConverter = (
-  item: GridFilterItem
+  item: ExtendedGridFilterItem
 ): null | Query['$expr'] => {
   if (item.operator === '(any): isEmpty') {
     return {

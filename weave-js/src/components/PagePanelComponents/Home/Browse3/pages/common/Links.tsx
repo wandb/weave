@@ -1,4 +1,3 @@
-import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   MOON_200,
   MOON_700,
@@ -18,6 +17,7 @@ import {
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
+import {ExtendedGridFilterModel} from '../../grid/extendedFilters';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
@@ -420,7 +420,7 @@ export const CallsLink: React.FC<{
   callCount?: number;
   countIsLimited?: boolean;
   filter?: WFHighLevelCallFilter;
-  gridFilters?: GridFilterModel;
+  gridFilters?: ExtendedGridFilterModel;
   neverPeek?: boolean;
   variant?: LinkVariant;
 }> = props => {
