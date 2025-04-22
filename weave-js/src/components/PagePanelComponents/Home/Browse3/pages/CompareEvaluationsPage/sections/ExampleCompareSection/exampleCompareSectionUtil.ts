@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
+import {parseRefMaybe} from '@wandb/weave/react';
 import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
 import {
   buildCompositeMetricsMap,
@@ -224,7 +225,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: rows[0].inputRef, // Should be the same for all,
+            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
             input: rows[0].input, // Should be the same for all
             output: aggregateGroupedNestedRows(
               rows,

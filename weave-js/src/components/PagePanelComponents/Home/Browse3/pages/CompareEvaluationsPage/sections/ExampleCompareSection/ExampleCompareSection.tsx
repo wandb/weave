@@ -10,11 +10,7 @@ import {
   MOON_300,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {
-  parseRef,
-  parseRefMaybe,
-  WeaveObjectRef,
-} from '../../../../../../../../react';
+import {parseRef, parseRefMaybe} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
@@ -250,7 +246,7 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
-  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
+  const inputRef = target.inputRef;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
@@ -684,7 +680,7 @@ export const ExampleCompareSection: React.FC<{
           style={{
             flex: 0,
           }}>
-          <SmallRef objRef={inputRef} iconOnly />
+          {inputRef && <SmallRef objRef={inputRef} iconOnly />}
         </Box>
         <Box
           style={{
