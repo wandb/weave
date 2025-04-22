@@ -290,9 +290,10 @@ const fetchEvaluationSummaryData = async (
     }
 
     // Check if this is an imperative evaluation
-    const isImperativeEvaluation = isImperative(
-      evaluationCallCache[evalCall.callId]
-    );
+    // const isImperativeEvaluation = isImperative(
+    //   evaluationCallCache[evalCall.callId]
+    // );
+    const isImperativeEvaluation = false;
 
     if (isImperativeEvaluation) {
       processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
@@ -475,38 +476,6 @@ const fetchEvaluationComparisonResults = async (
         console.warn('Error extracting input from imperative call:', e);
       }
     });
-
-    // If we still don't have any inputs, try to extract them from model predict calls
-    if (Object.keys(result.inputs).length === 0) {
-      const modelPredictCalls = evalTraceRes.calls.filter(
-        call => call && call.op_name && call.op_name.includes('Model.predict:')
-      );
-
-      modelPredictCalls.forEach(call => {
-        if (!call || !call.inputs) {
-          return;
-        }
-
-        try {
-          // Remove special properties like 'self' from the inputs
-          const inputsCopy = {...call.inputs};
-          delete inputsCopy.self;
-
-          if (Object.keys(inputsCopy).length > 0) {
-            const digest = generateStableDigest(inputsCopy);
-
-            if (!result.inputs[digest]) {
-              result.inputs[digest] = {
-                digest,
-                val: inputsCopy,
-              };
-            }
-          }
-        } catch (e) {
-          console.warn('Error extracting input from model predict call:', e);
-        }
-      });
-    }
   } else {
     // Original logic for regular evaluations
     // We only need 1 since we are going to effectively do an inner join on the rowDigest
@@ -601,7 +570,8 @@ const fetchEvaluationComparisonResults = async (
 
       // Handle imperative evaluation predict and score calls
       const isImperativePredictAndScore =
-        parentPredictAndScore.op_name.includes('Evaluation.predict_and_score:');
+        // parentPredictAndScore.op_name.includes('Evaluation.predict_and_score:');
+        false;
 
       // For imperative evaluations, we need to handle different input structure
       let modelRef;
@@ -819,22 +789,24 @@ const fetchEvaluationComparisonResults = async (
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
       // Check if we have imperative evaluations
-      const hasImperativeEvals = evaluationCallCache
-        ? Object.keys(summaryData.evaluationCalls).some(
-            id =>
-              id in evaluationCallCache && isImperative(evaluationCallCache[id])
-          )
-        : false;
+      // const hasImperativeEvals = evaluationCallCache
+      //   ? Object.keys(summaryData.evaluationCalls).some(
+      //       id =>
+      //         id in evaluationCallCache && isImperative(evaluationCallCache[id])
+      //     )
+      //   : false;
 
-      // For imperative evaluations, we're more lenient
-      if (hasImperativeEvals) {
-        // For imperative evaluations:
-        // 1. Make sure the row digest exists in our inputs
-        // 2. Make sure at least one evaluation has results for this row
-        return (
-          digest in result.inputs && Object.keys(row.evaluations).length > 0
-        );
-      }
+      // // For imperative evaluations, we're more lenient
+      // if (hasImperativeEvals) {
+      //   // For imperative evaluations:
+      //   // 1. Make sure the row digest exists in our inputs
+      //   // 2. Make sure at least one evaluation has results for this row
+      //   return (
+      //     digest in result.inputs && Object.keys(row.evaluations).length > 0
+      //   );
+      // }
+      console.log('row.evaluations', row.evaluations);
+      console.log('summaryData.evaluationCalls', summaryData.evaluationCalls);
 
       // For standard evaluations, we want exact matches across all evaluations
       return (
