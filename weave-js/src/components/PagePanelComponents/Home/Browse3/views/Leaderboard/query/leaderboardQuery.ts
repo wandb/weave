@@ -1,4 +1,8 @@
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {
+  isWeaveObjectRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
@@ -544,11 +548,11 @@ export type LeaderboardObjectEvalData = {
 };
 
 const processImperativeLeaderboardEvaluation = (
-  call: any,
-  col: any,
+  call: TraceCallSchema,
+  col: LeaderboardObjectVal['columns'][number],
   evalVal: any,
-  modelRef: any,
-  datasetRef: any,
+  modelRef: WeaveObjectRef,
+  datasetRef: WeaveObjectRef,
   data: GroupableLeaderboardValueRecord[],
   evalData: LeaderboardObjectEvalData
 ) => {

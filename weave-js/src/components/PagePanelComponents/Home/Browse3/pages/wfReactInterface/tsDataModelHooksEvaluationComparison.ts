@@ -1046,19 +1046,13 @@ function fuzzyMatchScorerName(
   return scoreNames.find(name => regex.test(name));
 }
 
-/**
- * Determines if an evaluation call is an imperative evaluation
- */
+// Determines if an evaluation call is an imperative evaluation
 const isImperative = (evalCall: EvaluationEvaluateCallSchema): boolean => {
-  // Check for characteristics that identify imperative evaluations
-  // 1. Check op_name for Evaluation.summarize (imperative uses this op)
-  // 2. Check for a direct summary structure in the output
   return (
-    evalCall.op_name.includes('Evaluation.summarize:') ||
-    (evalCall.output != null &&
-      typeof evalCall.output === 'object' &&
-      !Array.isArray(evalCall.output) &&
-      Object.keys(evalCall.output).length > 0)
+    evalCall.output != null &&
+    typeof evalCall.output === 'object' &&
+    !Array.isArray(evalCall.output) &&
+    Object.keys(evalCall.output).length > 0
   );
 };
 
