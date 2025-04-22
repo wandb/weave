@@ -18,7 +18,6 @@ import {
   makeMonthFilter,
   makeRawDateFilter,
 } from '../../filters/common';
-import {addCostsToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
@@ -56,13 +55,10 @@ export const useCallsForQuery = (
     includeTotalStorageSize?: boolean;
   }
 ): {
-  costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
   refetch: () => void;
-  storageSizeLoading: boolean;
-  storageSizeResults: Map<string, number> | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -73,6 +69,13 @@ export const useCallsForQuery = (
     gridSort
   );
 
+  const columnsWithTotalStorageSize = useMemo(() => {
+    return [
+      ...(columns ?? []),
+      ...(options?.includeTotalStorageSize ? ['total_storage_size_bytes'] : []),
+    ];
+  }, [columns, options?.includeTotalStorageSize]);
+
   const calls = useCalls(
     entity,
     project,
@@ -81,11 +84,13 @@ export const useCallsForQuery = (
     effectiveOffset,
     sortBy,
     filterBy,
-    columns,
+    columnsWithTotalStorageSize,
     expandedColumns,
     {
       refetchOnDelete: true,
       includeFeedback: true,
+      includeCosts: true,
+      includeTotalStorageSize: options?.includeTotalStorageSize,
     }
   );
 
@@ -110,108 +115,30 @@ export const useCallsForQuery = (
     effectiveOffset,
   ]);
 
-  const costFilter: CallFilter = useMemo(
-    () => ({
-      callIds: calls.result?.map(call => call.traceCall?.id || '') || [],
-    }),
-    [calls.result]
-  );
-
-  const costCols = useMemo(() => ['id'], []);
-  const noCalls = calls.result == null || calls.result.length === 0;
-  const costs = useCalls(
-    entity,
-    project,
-    costFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    costCols,
-    expandedColumns,
-    {
-      skip: calls.loading || noCalls,
-      includeCosts: true,
-    }
-  );
-
-  const storageSizeCols = useMemo(() => ['id', 'total_storage_size_bytes'], []);
-  const storageSizeFilter = costFilter;
-
-  const storageSize = useCalls(
-    entity,
-    project,
-    storageSizeFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    storageSizeCols,
-    undefined,
-    {
-      skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
-      includeTotalStorageSize: true,
-    }
-  );
-
-  const storageSizeResults = useMemo(() => {
-    if (storageSize.loading) {
-      return null;
-    }
-    return new Map(
-      storageSize.result?.map(r => [
-        r.callId,
-        r.totalStorageSizeBytes as number,
-      ])
-    );
-  }, [storageSize]);
-
-  const costResults = useMemo(() => {
-    return getFeedbackMerged(costs.result ?? []);
-  }, [costs]);
   const refetch = useCallback(() => {
     calls.refetch();
-    costs.refetch();
     callsStats.refetch();
-  }, [calls, callsStats, costs]);
+  }, [calls, callsStats]);
 
   return useMemo(() => {
     if (calls.loading) {
       return {
-        costsLoading: costs.loading,
         loading: calls.loading,
         result: [],
         total: 0,
         refetch,
-        storageSizeLoading: storageSize.loading,
         storageSizeResults: null,
       };
     }
 
     return {
-      costsLoading: costs.loading,
-      storageSizeLoading: storageSize.loading,
-      storageSizeResults,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
-      result: calls.loading
-        ? []
-        : costResults.length > 0
-        ? addCostsToCallResults(callResults, costResults)
-        : callResults,
+      result: calls.loading ? [] : callResults,
       total,
       refetch,
     };
-  }, [
-    callResults,
-    calls.loading,
-    total,
-    costs.loading,
-    costResults,
-    refetch,
-    storageSize.loading,
-    storageSizeResults,
-  ]);
+  }, [callResults, calls.loading, total, refetch]);
 };
 
 export const useFilterSortby = (

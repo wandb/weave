@@ -8,7 +8,6 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {convertBytes} from '@wandb/weave/util';
@@ -83,10 +82,7 @@ export const useCallsTableColumns = (
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false,
-  includeTotalStorageSizeBytes: boolean = false,
-  storageSizeResults: Map<string, number> | null = null,
-  storageSizeLoading: boolean = false
+  includeTotalStorageSizeBytes: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -163,13 +159,7 @@ export const useCallsTableColumns = (
         userDefinedColumnWidths,
         allowedColumnPatterns,
         onAddFilter,
-        costsLoading,
         includeTotalStorageSizeBytes
-          ? {
-              storageSizeResults,
-              storageSizeLoading,
-            }
-          : null
       ),
     [
       entity,
@@ -186,10 +176,7 @@ export const useCallsTableColumns = (
       userDefinedColumnWidths,
       allowedColumnPatterns,
       onAddFilter,
-      costsLoading,
       includeTotalStorageSizeBytes,
-      storageSizeResults,
-      storageSizeLoading,
     ]
   );
 
@@ -250,11 +237,7 @@ function buildCallsTableColumns(
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false,
-  storageSizeInfo: {
-    storageSizeResults: Map<string, number> | null;
-    storageSizeLoading: boolean;
-  } | null = null
+  includeTotalStorageSizeBytes: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -651,9 +634,6 @@ function buildCallsTableColumns(
       return costNum;
     },
     renderCell: cellParams => {
-      if (costsLoading) {
-        return <LoadingDots />;
-      }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
       return (
         <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
@@ -688,7 +668,7 @@ function buildCallsTableColumns(
     },
   });
 
-  if (storageSizeInfo) {
+  if (includeTotalStorageSizeBytes) {
     cols.push({
       field: 'total_storage_size_bytes',
       headerName: 'Trace Size',
@@ -701,11 +681,7 @@ function buildCallsTableColumns(
       filterable: false,
       sortable: false,
       renderCell: cellParams => {
-        if (storageSizeInfo.storageSizeLoading) {
-          return <LoadingDots />;
-        }
-        const storageSize =
-          storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;
+        const storageSize = cellParams.row.total_storage_size_bytes;
         return (
           <div>{storageSize !== null ? convertBytes(storageSize) : ''}</div>
         );

@@ -453,10 +453,7 @@ export const CallsTable: FC<{
     columnIsRefExpanded,
     allowedColumnPatterns,
     onAddFilter,
-    calls.costsLoading,
-    shouldIncludeTotalStorageSize,
-    shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
-    shouldIncludeTotalStorageSize && calls.storageSizeLoading
+    shouldIncludeTotalStorageSize
   );
 
   // This contains columns which are suitable for selection and raw data
