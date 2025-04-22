@@ -246,7 +246,8 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
-  const inputRef = parseRefMaybe(target.inputRef);
+  // inputRef is already parsed in the utility function
+  const inputRef = target.inputRef;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
