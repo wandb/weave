@@ -188,15 +188,12 @@ export const useEvaluationComparisonResults = (
     summaryData,
   ]);
 
-  return useMemo(() => {
-    if (
-      data == null ||
-      evaluationCallIdsRef.current !== evaluationCallIdsMemo
-    ) {
-      return {loading: true, result: null};
-    }
-    return {loading: false, result: data};
-  }, [data, evaluationCallIdsMemo]);
+  const returnValue =
+    data == null || evaluationCallIdsRef.current !== evaluationCallIdsMemo
+      ? {loading: true, result: null}
+      : {loading: false, result: data};
+
+  return returnValue;
 };
 
 const fetchEvaluationSummaryData = async (
@@ -738,10 +735,9 @@ const fetchEvaluationComparisonResults = async (
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
-      return (
-        Object.values(row.evaluations).length ===
-        Object.values(summaryData.evaluationCalls).length
-      );
+      // Instead of requiring ALL evaluations to have this row (strict inner join),
+      // just require that at least one evaluation has it
+      return Object.values(row.evaluations).length > 0;
     })
   );
 
@@ -752,6 +748,7 @@ const fetchEvaluationComparisonResults = async (
   ) {
     // This means we have imperative evaluations but couldn't match inputs to resultRows
     // Try to manually build result entries from predict_and_score calls directly
+    let rowsAdded = 0;
     imperativePredictAndScoreCalls.forEach(
       (predictAndScoreCall: TraceCallSchema) => {
         try {
@@ -812,6 +809,7 @@ const fetchEvaluationComparisonResults = async (
                   call.op_name.includes(PREDICT_OP_NAME)
               ),
             };
+            rowsAdded++;
 
             // Find and add score calls
             const scoreCalls = evalTraceRes.calls.filter(
@@ -857,6 +855,58 @@ const fetchEvaluationComparisonResults = async (
         }
       }
     );
+  }
+
+  // Add missing inputs for each row
+  if (
+    Object.keys(result.resultRows).length > 0 &&
+    Object.keys(result.inputs).length === 0
+  ) {
+    // For each row without corresponding input, create a placeholder
+    Object.entries(result.resultRows).forEach(([digest, row]) => {
+      if (!result.inputs[digest]) {
+        // Try to get some data from the evaluations to use as input
+        let inputValue = {digest, placeholder: true};
+
+        // Look for exampleRef in predictAndScores
+        const evaluationIds = Object.keys(row.evaluations);
+        if (evaluationIds.length > 0) {
+          const evalId = evaluationIds[0];
+          const predictAndScoreIds = Object.keys(
+            row.evaluations[evalId].predictAndScores
+          );
+          if (predictAndScoreIds.length > 0) {
+            const predictAndScoreId = predictAndScoreIds[0];
+            const predictAndScore =
+              row.evaluations[evalId].predictAndScores[predictAndScoreId];
+            if (
+              predictAndScore.exampleRef &&
+              typeof predictAndScore.exampleRef === 'object'
+            ) {
+              inputValue = predictAndScore.exampleRef;
+            }
+          }
+        }
+
+        // Add the input
+        result.inputs[digest] = {
+          digest,
+          val: inputValue,
+        };
+
+        // In case any UI component expects the input value to have certain properties,
+        // make sure it's a properly structured object
+        if (
+          typeof result.inputs[digest].val !== 'object' ||
+          result.inputs[digest].val === null
+        ) {
+          result.inputs[digest].val = {
+            value: result.inputs[digest].val,
+            _placeholder: true,
+          };
+        }
+      }
+    });
   }
 
   return result;
