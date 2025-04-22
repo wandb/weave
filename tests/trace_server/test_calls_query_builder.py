@@ -374,7 +374,7 @@ def test_query_light_column_with_costs() -> None:
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(
                         if(
-                            usage_raw != '',
+                            usage_raw != '' and usage_raw != '{}',
                             JSONExtractKeysAndValuesRaw(usage_raw),
                             [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')]
                         )
