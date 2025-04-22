@@ -6,12 +6,16 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   onClose: (value?: any) => void;
+  language?: string;
+  disableClosing?: boolean;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   onChange,
   onClose,
+  language,
+  disableClosing = false,
 }) => {
   const editorRef = useRef<any>(null);
   const currentValueRef = useRef(value);
@@ -20,7 +24,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     editorRef.current = editor;
 
     // Set initial value
-    editor.setValue(value);
+    if (editor.getValue() !== value) {
+      editor.setValue(value);
+    }
 
     // Track content changes
     editor.onDidChangeModelContent(() => {
@@ -35,19 +41,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
         // Get the latest value directly from the editor
         onClose(editor.getValue());
       } else if (e.code === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
 
-        // Also close and get value directly from editor
-        onClose(editor.getValue());
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
+        // Escape cancels the edit
+        onClose();
       }
     });
   };
 
-  // Update ref when value changes - not using effect now
+  // Update ref when value changes
   currentValueRef.current = value;
 
   return (
@@ -73,7 +89,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       <Editor
         height="100%"
         width="100%"
-        defaultValue={value}
+        value={value}
+        language={language}
         onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},
