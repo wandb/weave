@@ -738,9 +738,10 @@ const fetchEvaluationComparisonResults = async (
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
-      // Instead of requiring ALL evaluations to have this row (strict inner join),
-      // just require that at least one evaluation has it
-      return Object.values(row.evaluations).length > 0;
+      return (
+        Object.values(row.evaluations).length ===
+        Object.values(summaryData.evaluationCalls).length
+      );
     })
   );
 
@@ -751,7 +752,6 @@ const fetchEvaluationComparisonResults = async (
   ) {
     // This means we have imperative evaluations but couldn't match inputs to resultRows
     // Try to manually build result entries from predict_and_score calls directly
-    let rowsAdded = 0;
     imperativePredictAndScoreCalls.forEach(
       (predictAndScoreCall: TraceCallSchema) => {
         try {
@@ -896,18 +896,6 @@ const fetchEvaluationComparisonResults = async (
           digest,
           val: inputValue,
         };
-
-        // In case any UI component expects the input value to have certain properties,
-        // make sure it's a properly structured object
-        if (
-          typeof result.inputs[digest].val !== 'object' ||
-          result.inputs[digest].val === null
-        ) {
-          result.inputs[digest].val = {
-            value: result.inputs[digest].val,
-            _placeholder: true,
-          };
-        }
       }
     });
   }
