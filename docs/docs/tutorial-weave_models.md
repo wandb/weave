@@ -126,7 +126,7 @@ Now after calling `.invoke` you can see the trace in Weave **now tracks the mode
 
 - You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
 - If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
-- Parameter starting with an underscore are ignored by weave and won't be logged
+- Parameters starting with an underscore are ignored by weave and won't be logged
 
 ## Exporting and re-using a logged `weave.Model`
 

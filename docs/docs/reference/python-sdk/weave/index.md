@@ -34,7 +34,7 @@ The top-level functions and classes for working with Weave.
 - [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
 - [`api.finish`](#function-finish): Stops logging to weave.
 - [`op.op`](#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
-- [`api.attributes`](#function-attributes): Context manager for setting z on a call.
+- [`api.attributes`](#function-attributes): Context manager for setting metadata on a call.
 
 
 ---
