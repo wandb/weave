@@ -176,14 +176,11 @@ const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  console.log('state', state);
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
-  console.log('showExamples', showExamples);
-  console.log('state', state);
   const resultsLoading = state.loadableComparisonResults.loading;
   return (
     <Box
