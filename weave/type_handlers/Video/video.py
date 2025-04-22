@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from typing import Optional
 
 from weave.trace.serialization import serializer
@@ -42,6 +43,30 @@ def save(obj: mp.VideoClip, artifact: MemTraceFilesArtifact, name: str) -> None:
     """
     # Get the format of the video, default to GIF if unknown
     fmt = getattr(obj, "format", DEFAULT_FORMAT)
+    
+    # Check if the object is a VideoFileClip, which has a filename attribute
+    is_file_clip = hasattr(obj, "filename") and isinstance(obj, mp.VideoFileClip)
+    
+    # For VideoFileClip objects, use the original format when it's webm
+    if is_file_clip and obj.filename:
+        original_ext = os.path.splitext(obj.filename)[1].lower().lstrip('.')
+        if original_ext == "webm":
+            # Use webm directly for webm files
+            fname = "video.webm"
+            with artifact.writeable_file_path(fname) as fp:
+                # Use shutil.copy instead of reencoding to preserve quality and improve performance
+                shutil.copy(obj.filename, fp)
+            return
+        elif original_ext == "mp4":
+            # Convert mp4 to webm
+            fname = "video.webm"
+            with artifact.writeable_file_path(fname) as fp:
+                logger.debug("Converting MP4 to WebM for browser compatibility")
+                obj.write_videofile(fp, codec="libvpx", audio_codec="libvorbis", 
+                                  fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
+            return
+    
+    # Handle other cases as before
     ext = format_to_ext.get(fmt, DEFAULT_FORMAT)
     
     # Similar to image.py, we're using a standard filename for consistency
