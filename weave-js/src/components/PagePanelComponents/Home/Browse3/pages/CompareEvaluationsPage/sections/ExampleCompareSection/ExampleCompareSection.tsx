@@ -247,7 +247,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   // inputRef is already parsed in the utility function
-  const inputRef = target.inputRef;
+  const inputRef = parseRefMaybe(target.inputRef);
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
