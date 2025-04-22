@@ -1,21 +1,25 @@
-import {Box, Popover} from '@mui/material';
+import {Box, Popover, PopoverProps} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
-import React from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {ResizableBox} from 'react-resizable';
 
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
+import {CodeEditor} from './editors/CodeEditor';
+import {DiffEditor} from './editors/DiffEditor';
+import {TextEditor} from './editors/TextEditor';
 
 export type EditorMode = 'text' | 'code' | 'diff';
 
 interface EditPopoverProps {
   anchorEl: HTMLElement | null;
-  onClose: () => void;
+  onClose: (value?: string) => void;
   initialWidth?: number;
   initialHeight?: number;
-  editorMode: EditorMode;
-  setEditorMode: (mode: EditorMode) => void;
-  onRevert?: () => void;
-  children: React.ReactNode;
+  initialEditorMode?: EditorMode;
+  value: string;
+  originalValue?: string;
+  onChange: (value: string) => void;
+  inputRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
 export const EditPopover: React.FC<EditPopoverProps> = ({
@@ -23,31 +27,107 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
   onClose,
   initialWidth = 400,
   initialHeight = 300,
-  editorMode,
-  setEditorMode,
-  onRevert,
-  children,
+  initialEditorMode = 'text',
+  value,
+  originalValue = '',
+  onChange,
+  inputRef,
 }) => {
-  const [position, setPosition] = React.useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [editorMode, setEditorMode] =
+    React.useState<EditorMode>(initialEditorMode);
+  const [boxWidth, setBoxWidth] = useState(initialWidth);
+  const [boxHeight, setBoxHeight] = useState(initialHeight);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const hasInitializedSize = useRef(false);
 
-  React.useLayoutEffect(() => {
-    if (anchorEl) {
-      const rect = anchorEl.getBoundingClientRect();
-      const isInTopHalf = rect.top < window.innerHeight / 2;
+  // Calculate position directly from anchorEl when rendering
+  let position = null;
+  if (anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const isInTopHalf = rect.top < window.innerHeight / 2;
 
-      setPosition({
-        left: rect.left + window.scrollX,
-        top: isInTopHalf
-          ? rect.bottom + window.scrollY - 36 // Move up by 36px when below
-          : rect.top + window.scrollY - initialHeight + 36, // Move down by 36px when above
-      });
-    } else {
-      setPosition(null);
+    position = {
+      left: rect.left + window.scrollX,
+      top: isInTopHalf
+        ? rect.bottom + window.scrollY - 36 // Move up by 36px when below
+        : rect.top + window.scrollY - initialHeight + 36, // Move down by 36px when above
+    };
+  }
+
+  // Only calculate the initial size once when the component mounts
+  useEffect(() => {
+    if (boxRef.current && !hasInitializedSize.current) {
+      const contentWidth = Math.max(boxRef.current.scrollWidth, initialWidth);
+      const contentHeight = Math.max(
+        boxRef.current.scrollHeight,
+        initialHeight
+      );
+
+      // Limit sizes to avoid excessive popover
+      const maxWidth = Math.min(window.innerWidth * 0.8, 1000);
+      const maxHeight = Math.min(window.innerHeight * 0.8, 800);
+
+      setBoxWidth(Math.min(contentWidth, maxWidth));
+      setBoxHeight(Math.min(contentHeight, maxHeight));
+
+      hasInitializedSize.current = true;
     }
-  }, [anchorEl, initialHeight]);
+  }, [initialWidth, initialHeight]);
+
+  // Handle resize events from ResizableBox
+  const handleResize = (
+    e: any,
+    data: {size: {width: number; height: number}}
+  ) => {
+    setBoxWidth(data.size.width);
+    setBoxHeight(data.size.height);
+  };
+
+  const renderEditor = () => {
+    switch (editorMode) {
+      case 'text':
+        return (
+          <TextEditor
+            value={value}
+            onChange={onChange}
+            onClose={finalValue =>
+              finalValue !== undefined ? onClose(finalValue) : onClose()
+            }
+            inputRef={inputRef}
+          />
+        );
+      case 'code':
+        return (
+          <CodeEditor
+            value={value}
+            onChange={onChange}
+            onClose={finalValue =>
+              finalValue !== undefined ? onClose(finalValue) : onClose()
+            }
+          />
+        );
+      case 'diff':
+        return (
+          <DiffEditor
+            value={value}
+            originalValue={originalValue}
+            onChange={onChange}
+            onClose={finalValue =>
+              finalValue !== undefined ? onClose(finalValue) : onClose()
+            }
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Handle MUI Popover close events separately from our value-based close
+  const handlePopoverClose: PopoverProps['onClose'] = (event, reason) => {
+    // When closing via backdrop or escape key, just call the onClose handler
+    // Need to cast the function to handle any type of parameter
+    (onClose as any)();
+  };
 
   if (!position) {
     return null;
@@ -62,7 +142,7 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
         vertical: 'top',
         horizontal: 'left',
       }}
-      onClose={onClose}
+      onClose={handlePopoverClose}
       TransitionComponent={DraggableGrow}
       sx={{
         '& .MuiPaper-root': {
@@ -76,9 +156,11 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
         },
       }}>
       <ResizableBox
-        width={initialWidth}
-        height={initialHeight}
+        width={boxWidth}
+        height={boxHeight}
+        minConstraints={[initialWidth, initialHeight]}
         resizeHandles={['se']}
+        onResize={handleResize}
         handle={
           <div
             className="react-resizable-handle react-resizable-handle-se"
@@ -94,6 +176,7 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
           />
         }>
         <Box
+          ref={boxRef}
           sx={{
             height: '100%',
             display: 'flex',
@@ -137,17 +220,18 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
                   onClick={() => setEditorMode('diff')}
                 />
               </Box>
-              {onRevert && (
-                <Box>
-                  <Button
-                    tooltip="Revert"
-                    icon="undo"
-                    size="small"
-                    variant="ghost"
-                    onClick={onRevert}
-                  />
-                </Box>
-              )}
+              <Box sx={{display: 'flex', gap: '4px'}}>
+                <Button
+                  tooltip="Confirm changes (Cmd+Enter)"
+                  icon="checkmark"
+                  size="small"
+                  variant="primary"
+                  onClick={e => {
+                    e.preventDefault();
+                    onClose(value);
+                  }}
+                />
+              </Box>
             </Box>
           </DraggableHandle>
           <Box
@@ -156,7 +240,7 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
               overflow: 'auto',
               padding: editorMode === 'text' ? '12px' : '0px',
             }}>
-            {children}
+            {renderEditor()}
           </Box>
         </Box>
       </ResizableBox>

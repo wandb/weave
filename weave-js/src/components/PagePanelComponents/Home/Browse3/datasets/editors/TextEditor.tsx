@@ -4,7 +4,7 @@ import React from 'react';
 interface TextEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onClose: () => void;
+  onClose: (value?: any) => void;
   inputRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
@@ -14,19 +14,32 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   onClose,
   inputRef,
 }) => {
+  const localInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const actualInputRef = inputRef || localInputRef;
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // Only prevent propagation for normal Enter key
     if (event.key === 'Enter' && !event.metaKey) {
       event.stopPropagation();
     } else if (event.key === 'Enter' && event.metaKey) {
-      onClose();
+      event.stopPropagation();
+      // Get the current value directly when closing
+      onClose(value);
+    } else if (event.key === 'Escape') {
+      event.stopPropagation();
+      // Also get the value directly when escaping
+      onClose(value);
     }
   };
 
   return (
     <TextField
-      inputRef={inputRef}
+      inputRef={actualInputRef}
       value={value}
-      onChange={e => onChange(e.target.value)}
+      onChange={e => {
+        const newValue = e.target.value;
+        onChange(newValue);
+      }}
       onKeyDown={handleKeyDown}
       onFocus={e => {
         const target = e.target as HTMLTextAreaElement;
