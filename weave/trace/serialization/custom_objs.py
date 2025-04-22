@@ -30,6 +30,8 @@ KNOWN_TYPES = {
     "wave.Wave_read",
     "datetime.datetime",
     "rich.markdown.Markdown",
+    "moviepy.video.VideoClip.VideoClip",
+    "moviepy.video.VideoFileClip.VideoFileClip"
 }
 
 
