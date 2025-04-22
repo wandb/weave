@@ -26,7 +26,6 @@ export const SmallRefLoaded = ({
   error,
   noLink = false,
 }: SmallRefLoadedProps) => {
-  console.log(error);
   const content = (
     <div
       className={classNames(

@@ -17,15 +17,11 @@ import {Timestamp} from '../../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
-import {Empty} from '../common/Empty';
+import {Empty, EmptyProps} from '../common/Empty';
 import {
-  EMPTY_PROPS_ACTION_SPECS,
-  EMPTY_PROPS_ANNOTATIONS,
-  EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
-  EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
 } from '../common/EmptyContent';
 import {
@@ -68,6 +64,8 @@ export const ObjectVersionsTable: React.FC<{
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
   customColumns?: GridColDef[];
+  actionMenu?: (obj: ObjectVersionSchema) => React.JSX.Element;
+  keepNestedVal?: string[];
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
   const {selectedVersions, setSelectedVersions} = props;
@@ -84,6 +82,12 @@ export const ObjectVersionsTable: React.FC<{
         // solution here in the future. Maybe exclude table refs?
         val = _.omit(val, 'rows');
       }
+      // This is a dirty hack to enable keeping the nested query value for Monitors
+      (props.keepNestedVal || []).forEach(keepVal => {
+        if (keepVal in vals[i]) {
+          val[keepVal] = vals[i][keepVal];
+        }
+      });
       // Show name, even though it can be = to object id, consider adding back
       // val = _.omit(val, 'name');
       return {
@@ -94,7 +98,7 @@ export const ObjectVersionsTable: React.FC<{
         },
       };
     });
-  }, [props.objectVersions]);
+  }, [props.objectVersions, props.keepNestedVal]);
 
   const showUserColumn = rows.some(row => row.obj.userId != null);
 
@@ -317,6 +321,15 @@ export const ObjectVersionsTable: React.FC<{
       );
     }
 
+    if (props.actionMenu) {
+      cols.push({
+        field: 'actionMenu',
+        headerName: '',
+        renderCell: param =>
+          props.actionMenu && props.actionMenu(param.row.obj),
+      });
+    }
+
     return {cols, groups};
   }, [
     props,
@@ -404,6 +417,10 @@ export const FilterableObjectVersionsTable: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
+  propsEmpty?: EmptyProps;
+  actionMenu?: (obj: ObjectVersionSchema) => React.JSX.Element;
+  keepNestedVal?: string[];
+  hidePeerVersionsColumn?: boolean;
 }> = props => {
   const {useRootObjectVersions} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -441,22 +458,14 @@ export const FilterableObjectVersionsTable: React.FC<{
   const objectVersions = filteredObjectVersions.result ?? [];
   const isEmpty = objectVersions.length === 0;
   if (isEmpty) {
-    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    let propsEmpty = props.propsEmpty || EMPTY_PROPS_OBJECTS;
     const base = props.initialFilter?.baseObjectClass;
     if ('Prompt' === base) {
       propsEmpty = EMPTY_PROPS_PROMPTS;
     } else if ('Model' === base) {
       propsEmpty = EMPTY_PROPS_MODEL;
-    } else if (DATASET_BASE_OBJECT_CLASS === base) {
-      propsEmpty = EMPTY_PROPS_DATASETS;
     } else if (base === 'Leaderboard') {
       propsEmpty = EMPTY_PROPS_LEADERBOARDS;
-    } else if (base === 'Scorer') {
-      propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
-    } else if (base === 'ActionSpec') {
-      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
-    } else if (base === 'AnnotationSpec') {
-      propsEmpty = EMPTY_PROPS_ANNOTATIONS;
     }
     return <Empty {...propsEmpty} />;
   }
@@ -474,12 +483,18 @@ export const FilterableObjectVersionsTable: React.FC<{
         objectVersions={objectVersions}
         objectTitle={props.objectTitle}
         hidePropsAsColumns={!!effectivelyLatestOnly}
-        hidePeerVersionsColumn={!effectivelyLatestOnly}
+        hidePeerVersionsColumn={
+          props.hidePeerVersionsColumn !== undefined
+            ? props.hidePeerVersionsColumn
+            : !effectivelyLatestOnly
+        }
         hideCategoryColumn={props.hideCategoryColumn}
         hideCreatedAtColumn={props.hideCreatedAtColumn}
         selectedVersions={props.selectedVersions}
         setSelectedVersions={props.setSelectedVersions}
         customColumns={props.customColumns}
+        actionMenu={props.actionMenu}
+        keepNestedVal={props.keepNestedVal}
       />
     </FilterLayoutTemplate>
   );

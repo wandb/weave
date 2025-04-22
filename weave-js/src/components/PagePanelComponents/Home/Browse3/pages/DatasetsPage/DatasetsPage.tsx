@@ -15,6 +15,7 @@ import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {createNewDataset} from '../../datasets/datasetOperations';
 import {DatasetPublishToast} from '../../datasets/DatasetPublishToast';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {EMPTY_PROPS_DATASETS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {DeleteObjectVersionsButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
@@ -188,6 +189,7 @@ export const DatasetsPage: React.FC<{
                 setSelectedVersions={
                   hasComparison ? setSelectedVersions : undefined
                 }
+                propsEmpty={EMPTY_PROPS_DATASETS}
               />
             ),
           },

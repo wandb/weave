@@ -1,6 +1,6 @@
 import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useMemo, useState} from 'react';
-import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+
 import {useWFHooks} from '../pages/wfReactInterface/context';
 
 type SelectMonitorOption = {
@@ -68,7 +68,7 @@ export const SelectMonitor = ({
       );
       setLoading(false);
     }
-  }, [latestMonitors.result]);
+  }, [latestMonitors.result, entity, project]);
 
   const selectedValue = useMemo(() => {
     return monitors.find(monitor => monitor.value === value);

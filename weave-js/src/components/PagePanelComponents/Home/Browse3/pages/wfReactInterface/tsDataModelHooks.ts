@@ -31,6 +31,7 @@ import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
+import {SortBy} from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
@@ -52,7 +53,6 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
-import {SortBy} from './traceServerClientTypes';
 
 export const projectIdFromParts = ({
   entity,
@@ -1081,6 +1081,8 @@ const useRootObjectVersions = (
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
+      console.log(res.objs);
+      console.log(res.objs?.map(convertTraceServerObjectVersionToSchema));
       setObjectVersionRes({
         loading: false,
         error: null,
@@ -1101,6 +1103,7 @@ const useRootObjectVersions = (
     project,
     limit,
     metadataOnly,
+    sortBy,
   ]);
 
   useEffect(() => {

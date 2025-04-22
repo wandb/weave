@@ -1,13 +1,15 @@
-import {Box, Switch} from '@mui/material';
+import {Box} from '@mui/material';
+import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
+import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React from 'react';
-import {IconNames} from '@wandb/weave/components/Icon';
-import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
-import {CellValueBoolean} from '../../../Browse2/CellValueBoolean';
-import {SmallRef} from '../../smallRef/SmallRef';
-import {parseRef} from '../../../../../../react';
+import React, {useState} from 'react';
+
 import {CellValue} from '../../../Browse2/CellValue';
+import {EMPTY_PROPS_MONITORS} from '../common/EmptyContent';
+import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CreateMonitorDrawer} from './CreateMonitorDrawer';
 
 export const MonitorsPage = ({
   entity,
@@ -16,12 +18,23 @@ export const MonitorsPage = ({
   entity: string;
   project: string;
 }) => {
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [selectedMonitor, setSelectedMonitor] = useState<
+    ObjectVersionSchema | undefined
+  >();
   return (
     <Tailwind>
       <Box>
         <Box className="mx-16 my-16 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Monitors</h1>
-          <Button variant="primary" size="large" startIcon={IconNames.AddNew}>
+          <Button
+            icon="add-new"
+            variant="ghost"
+            tooltip="Create a new monitor"
+            onClick={() => {
+              setSelectedMonitor(undefined);
+              setIsCreateDrawerOpen(true);
+            }}>
             Create monitor
           </Button>
         </Box>
@@ -34,6 +47,26 @@ export const MonitorsPage = ({
             baseObjectClass: 'Monitor',
           }}
           metadataOnly={false}
+          propsEmpty={EMPTY_PROPS_MONITORS}
+          keepNestedVal={['query']}
+          hidePeerVersionsColumn
+          actionMenu={obj => (
+            <PopupDropdown
+              sections={[
+                [
+                  {
+                    key: 'edit',
+                    text: 'Edit',
+                    icon: <IconPencilEdit style={{marginRight: '8px'}} />,
+                    onClick: () => setIsCreateDrawerOpen(true),
+                  },
+                ],
+              ]}
+              trigger={<Button icon="overflow-horizontal" variant="ghost" />}
+              offset="0px, -20px"
+              onOpen={() => setSelectedMonitor(obj)}
+            />
+          )}
           customColumns={[
             {
               field: 'description',
@@ -55,7 +88,7 @@ export const MonitorsPage = ({
               field: 'ops',
               headerName: 'Ops',
               flex: 1,
-              valueGetter: (_, row) => row.obj.val['call_filter.op_names'],
+              valueGetter: (_, row) => row.obj.val['op_names'],
               renderCell: params => {
                 const opRefs: string[] = params.value;
                 return opRefs.length > 0 ? (
@@ -95,9 +128,53 @@ export const MonitorsPage = ({
                 return <CellValue value={params.value} />;
               },
             },
+            {
+              field: 'callCount',
+              headerName: 'Calls',
+              valueGetter: (_, row) => {
+                return row.id;
+              },
+              renderCell: params => (
+                <CallCountCell
+                  id={params.value}
+                  entity={entity}
+                  project={project}
+                />
+              ),
+            },
           ]}
         />
       </Box>
+      <CreateMonitorDrawer
+        entity={entity}
+        project={project}
+        open={isCreateDrawerOpen}
+        onClose={() => setIsCreateDrawerOpen(false)}
+        monitor={selectedMonitor}
+      />
     </Tailwind>
   );
+};
+
+const CallCountCell = ({
+  id,
+  entity,
+  project,
+}: {
+  id: string;
+  entity: string;
+  project: string;
+}) => {
+  /*const {useCallsStats} = useWFHooks();
+  const callsStats = useCallsStats(
+    'entity',
+    'project',
+    {},
+    {$expr: {$eq: [{$getField: 'feedback.[*].trigger_ref'}, {$literal: id}]}}
+  );
+  console.log(callsStats);
+  if (callsStats.loading) {
+    return <LoadingDots />;
+  }*/
+  return <CellValue value={`123 calls`} />;
 };

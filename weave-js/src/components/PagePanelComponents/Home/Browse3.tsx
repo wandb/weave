@@ -1,5 +1,5 @@
 import {ApolloProvider} from '@apollo/client';
-import {Box, Drawer } from '@mui/material';
+import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import * as Tabs from '@wandb/weave/components/Tabs';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -33,6 +34,7 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Tailwind} from '../../Tailwind';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -72,6 +74,7 @@ import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
+import {MonitorsPage} from './Browse3/pages/MonitorsPage/MonitorsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
 import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
@@ -91,10 +94,7 @@ import {
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
-import { useDrawerResize } from './useDrawerResize';
-import * as Tabs from '@wandb/weave/components/Tabs';
-import { Tailwind } from '../../Tailwind';
-import { MonitorsPage } from './Browse3/pages/MonitorsPage/MonitorsPage';
+import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -760,7 +760,7 @@ const CallPageBinding = () => {
 
 const EvaluationsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
-  const tabs: Record<string, {label: string, content: React.ReactNode}> = {
+  const tabs: Record<string, {label: string; content: React.ReactNode}> = {
     evals: {
       label: 'Evals',
       content: <CallsPageBinding />,
@@ -772,36 +772,39 @@ const EvaluationsPageBinding = () => {
   };
 
   const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
 
-  const navigateToTab = useCallback((clickedTab: string) => {
-    history.push(`/${entity}/${project}/weave/evaluations/${clickedTab}`);
-  }, [entity, project]);
+  const navigateToTab = useCallback(
+    (clickedTab: string) => {
+      history.push(`/${entity}/${project}/weave/evaluations/${clickedTab}`);
+    },
+    [entity, project, history]
+  );
 
-  return <><Tabs.Root
-    value={tab}
-    onValueChange={navigateToTab}
-    className='mx-16 mt-12'>
-    <Tabs.List className='border-b-0'>
-      {Object.entries(tabs).map(([key, tab]) => (
-        <Tabs.Trigger value={key} className='text-lg border-b-4' key={key}>
-          {tab.label}
-        </Tabs.Trigger>
-      ))}
-    </Tabs.List>
-  </Tabs.Root>
-  <Tailwind>
-
-    <Box className='pt-8'>
-      <ErrorBoundary>{tabs[tab].content}</ErrorBoundary>
-    </Box>
-  </Tailwind>
-  </>;
+  return (
+    <>
+      <Tabs.Root
+        value={tab}
+        onValueChange={navigateToTab}
+        className="mx-16 mt-12">
+        <Tabs.List className="border-b-0">
+          {Object.entries(tabs).map(([key, tab]) => (
+            <Tabs.Trigger value={key} className="border-b-4 text-lg" key={key}>
+              {tab.label}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+      </Tabs.Root>
+      <Tailwind>
+        <Box className="pt-8">
+          <ErrorBoundary>{tabs[tab].content}</ErrorBoundary>
+        </Box>
+      </Tailwind>
+    </>
+  );
 };
 
 const MonitorsPageBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
-
   return <MonitorsPage entity={entity} project={project} />;
 };
 

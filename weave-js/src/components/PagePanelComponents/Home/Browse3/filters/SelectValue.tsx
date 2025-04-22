@@ -17,9 +17,9 @@ import {
 } from './common';
 import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
+import {SelectMonitor} from './SelectMonitor';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
-import {SelectMonitor} from './SelectMonitor';
 
 type SelectValueProps = {
   entity: string;
@@ -66,10 +66,7 @@ export const SelectValue = ({
         entity={entity}
         project={project}
         value={value}
-        onChange={value => {
-          console.log('onChange', value);
-          onSetValue(value);
-        }}
+        onChange={onSetValue}
       />
     );
   }
