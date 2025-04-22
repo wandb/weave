@@ -2123,6 +2123,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             raise
         except Exception as e:
+            # Do potentially expensive data length calculation, only on
+            # error, which should be very rare!
             data_bytes = sum(_num_bytes(row) for row in data)
             logger.exception(
                 "clickhouse_insert_error",
