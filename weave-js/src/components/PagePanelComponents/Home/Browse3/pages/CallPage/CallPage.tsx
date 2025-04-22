@@ -66,7 +66,14 @@ export const CallPage: FC<CallPageProps> = props => {
       callId: descendentCallId,
       withTotalStorageSize: true,
     },
-    {includeCosts: true, includeTotalStorageSize: true}
+    {
+      // Sadly we cannot include costs as unfinished calls will result
+      // in null response (bug on server side). As a result, the summary
+      // will not show costs. FIXME (This results in a second query in
+      // CallSummary.tsx)
+      // includeCosts: true,
+      includeTotalStorageSize: true,
+    }
   );
 
   // This is a little hack, but acceptable for now.
