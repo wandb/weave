@@ -23,8 +23,7 @@ import {
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpState';
-import {ComparisonDimensionsType} from './ecpState';
+import {ComparisonDimensionsType, EvaluationComparisonState} from './ecpState';
 import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
@@ -179,9 +178,11 @@ const CompareEvaluationsPageInner: React.FC<{
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
-  const showExamples =
+  const showExamples = true; // FORCE SHOW EXAMPLES FOR DEBUGGING
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
+  console.log('showExamples', showExamples);
+  console.log('state', state);
   const resultsLoading = state.loadableComparisonResults.loading;
   return (
     <Box

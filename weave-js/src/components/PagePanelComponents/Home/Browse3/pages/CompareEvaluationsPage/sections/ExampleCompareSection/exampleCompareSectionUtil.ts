@@ -1,7 +1,6 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
-import {ObjectRef, parseRefMaybe} from '../../../../../../../../react';
 import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
 import {
   buildCompositeMetricsMap,
@@ -19,7 +18,7 @@ type RowBase = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
-  inputRef: string; // Original unparsed reference string
+  inputRef: string;
   input: {[inputKey: string]: any};
   path: string[];
   predictAndScore: PredictAndScoreCall;
@@ -33,17 +32,6 @@ type FlattenedRow = RowBase & {
 export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
-};
-
-export type AggregatedRow = {
-  id: string;
-  count: number;
-  inputDigest: string;
-  inputRef: ObjectRef | null; // Changed from string to ObjectRef | null
-  input: {[inputKey: string]: any};
-  output: {[outputKey: string]: {[callId: string]: any}};
-  scores: {[scoreId: string]: {[callId: string]: number | boolean | undefined}};
-  originalRows: PivotedRow[];
 };
 
 const aggregateGroupedNestedRows = <T>(
@@ -230,15 +218,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     const grouped = _.groupBy(pivotedRows, row => row.inputDigest);
     return Object.fromEntries(
       Object.entries(grouped).map(([inputDigest, rows]) => {
-        const parsedInputRef = parseRefMaybe(rows[0].inputRef);
-
         return [
           inputDigest,
           {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: parsedInputRef,
+            inputRef: rows[0].inputRef,
             input: rows[0].input, // Should be the same for all
             output: aggregateGroupedNestedRows(
               rows,
@@ -337,7 +323,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   return useMemo(() => {
     return {
-      filteredRows: filteredRows as AggregatedRow[],
+      filteredRows,
       inputColumnKeys,
       outputColumnKeys,
       leafDims,
