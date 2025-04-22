@@ -75,7 +75,12 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {
+  PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+  PREDICT_OP_NAME,
+  SCORE_OP_NAME,
+  SUMMARIZE_OP_NAME,
+} from '../common/heuristics';
 import {
   EvaluationComparisonResults,
   EvaluationComparisonSummary,
@@ -400,6 +405,7 @@ const fetchEvaluationComparisonResults = async (
       filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
     })
     .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
       const predictAndScoreIds = predictAndScoreCallRes.calls.map(
         call => call.id
       );
@@ -510,17 +516,15 @@ const fetchEvaluationComparisonResults = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(
-        call =>
-          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
-          call.op_name.includes('Evaluation.predict_and_score:') // Include imperative predict_and_score calls
+      .filter(call =>
+        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
       )
       .map(call => [call.id, call])
   );
 
   const summaryOps = evalTraceRes.calls.filter(
     call =>
-      call.op_name.includes('Evaluation.summarize:') &&
+      call.op_name.includes(SUMMARIZE_OP_NAME) &&
       call.parent_id &&
       evaluationCallIds.includes(call.parent_id)
   );
@@ -747,7 +751,7 @@ const fetchEvaluationComparisonResults = async (
     imperativePredictAndScoreCalls.length > 0
   ) {
     // This means we have imperative evaluations but couldn't match inputs to resultRows
-    // Let's try to manually build result entries from predict_and_score calls directly
+    // Try to manually build result entries from predict_and_score calls directly
     imperativePredictAndScoreCalls.forEach(
       (predictAndScoreCall: TraceCallSchema) => {
         try {
@@ -805,7 +809,7 @@ const fetchEvaluationComparisonResults = async (
                   call &&
                   call.parent_id === predictAndScoreCall.id &&
                   call.op_name &&
-                  call.op_name.includes('Model.predict:')
+                  call.op_name.includes(PREDICT_OP_NAME)
               ),
             };
 
@@ -815,7 +819,7 @@ const fetchEvaluationComparisonResults = async (
                 call &&
                 call.parent_id === predictAndScoreCall.id &&
                 call.op_name &&
-                call.op_name.includes('.score:')
+                call.op_name.includes(SCORE_OP_NAME)
             );
 
             scoreCalls.forEach(scoreCall => {

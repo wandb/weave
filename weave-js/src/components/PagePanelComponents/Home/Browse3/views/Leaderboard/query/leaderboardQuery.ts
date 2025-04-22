@@ -819,30 +819,21 @@ const processImperativeEvaluation = (
     ) {
       // Special handling for common auto-summarized data formats (true_count, true_fraction)
       // that might not be properly flattened
-      if ('true_count' in value || 'true_fraction' in value) {
-        if ('true_count' in value && value.true_count != null) {
-          const scoreRecord: LeaderboardValueRecord = {
-            ...recordPartial,
-            metricType: 'scorerMetric',
-            scorerName: key,
-            scorerVersion: '',
-            metricPath: 'true_count',
-            metricValue: value.true_count as number,
-          };
-          data.push(scoreRecord);
-        }
-
-        if ('true_fraction' in value && value.true_fraction != null) {
-          const scoreRecord: LeaderboardValueRecord = {
-            ...recordPartial,
-            metricType: 'scorerMetric',
-            scorerName: key,
-            scorerVersion: '',
-            metricPath: 'true_fraction',
-            metricValue: value.true_fraction as number,
-          };
-          data.push(scoreRecord);
-        }
+      const valueObj = value as Record<string, unknown>;
+      if ('true_count' in valueObj || 'true_fraction' in valueObj) {
+        // Process binary score metrics if they exist
+        ['true_count', 'true_fraction'].forEach(metricPath => {
+          if (metricPath in valueObj && valueObj[metricPath] != null) {
+            data.push({
+              ...recordPartial,
+              metricType: 'scorerMetric',
+              scorerName: key,
+              scorerVersion: '',
+              metricPath,
+              metricValue: valueObj[metricPath] as number,
+            });
+          }
+        });
         return;
       }
 
