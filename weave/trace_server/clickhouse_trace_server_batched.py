@@ -2149,13 +2149,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
-        ddtrace.tracer.current_span().set_tags(
-            {
-                "clickhouse_trace_server_batched._flush_calls.insert_bytes": str(
-                    sum(len(row) for row in self._call_batch)
-                )
-            }
-        )
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
