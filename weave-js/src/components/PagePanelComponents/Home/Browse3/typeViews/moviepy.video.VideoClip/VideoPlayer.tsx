@@ -12,7 +12,7 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type VideoClipTypePayload = CustomWeaveTypePayload<
   'moviepy.video.VideoClip.VideoClip',
-  {'video.gif': string} | {'video.mp4': string}
+  {'video.gif': string} | {'video.mp4': string} | {'video.webm': string}
 >;
 
 type VideoPlayerProps = {
@@ -54,6 +54,7 @@ const VideoPlayerWithSize = ({
   const videoTypes = {
     'video.gif': 'gif',
     'video.mp4': 'mp4',
+    'video.webm': 'webm',
   } as const;
 
   const videoKey = Object.keys(data.files).find(key => key in videoTypes) as
@@ -87,7 +88,7 @@ const VideoPlayerWithSize = ({
 };
 
 type VideoPlayerWithDataProps = {
-  fileExt: 'gif' | 'mp4';
+  fileExt: 'gif' | 'mp4' | 'webm';
   buffer: ArrayBuffer;
   containerWidth: number;
   containerHeight: number;
@@ -102,7 +103,21 @@ const VideoPlayerWithData = ({
   const [url, setUrl] = useState<string>('');
 
   useEffect(() => {
-    const mimeType = fileExt === 'gif' ? 'image/gif' : 'video/mp4';
+    let mimeType: string;
+    switch (fileExt) {
+      case 'gif':
+        mimeType = 'image/gif';
+        break;
+      case 'mp4':
+        mimeType = 'video/mp4';
+        break;
+      case 'webm':
+        mimeType = 'video/webm';
+        break;
+      default:
+        mimeType = 'video/mp4';
+    }
+    
     const blob = new Blob([buffer], {
       type: mimeType,
     });
@@ -130,7 +145,7 @@ const VideoPlayerWithData = ({
 
 type VideoPlayerLoadedProps = {
   url: string;
-  fileExt: 'gif' | 'mp4';
+  fileExt: 'gif' | 'mp4' | 'webm';
   containerWidth: number;
   containerHeight: number;
 };
@@ -225,7 +240,7 @@ const VideoPlayerLoaded = ({
           )}
         </div>
         <TooltipHint>
-          {fileExt.toUpperCase()} - Click for more details
+          {fileExt.toUpperCase()} Video - Click for more details
         </TooltipHint>
       </div>
     );
@@ -259,7 +274,7 @@ const VideoPlayerLoaded = ({
             ? {src: url}
             : {
                 type: 'video',
-                sources: [{src: url, type: 'video/mp4'}],
+                sources: [{src: url, type: fileExt === 'webm' ? 'video/webm' : 'video/mp4'}],
               },
         ]}
         render={{

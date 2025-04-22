@@ -58,12 +58,11 @@ def save(obj: mp.VideoClip, artifact: MemTraceFilesArtifact, name: str) -> None:
                 shutil.copy(obj.filename, fp)
             return
         elif original_ext == "mp4":
-            # Convert mp4 to webm
-            fname = "video.webm"
+            # Use mp4 directly
+            fname = "video.mp4"
             with artifact.writeable_file_path(fname) as fp:
-                logger.debug("Converting MP4 to WebM for browser compatibility")
-                obj.write_videofile(fp, codec="libvpx", audio_codec="libvorbis", 
-                                  fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
+                # Use shutil.copy instead of reencoding to preserve quality and improve performance
+                shutil.copy(obj.filename, fp)
             return
     
     # Handle other cases as before
@@ -74,16 +73,11 @@ def save(obj: mp.VideoClip, artifact: MemTraceFilesArtifact, name: str) -> None:
     fname = f"video.{ext}"
     
     with artifact.writeable_file_path(fname) as fp:
-        # If the video is MP4 format, convert to webm for web compatibility
-        if ext == "mp4":
-            logger.debug("Converting MP4 to WebM for browser compatibility")
-            obj.write_videofile(fp, codec="libvpx", audio_codec="libvorbis", 
-                               fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
-            # Update the filename to reflect the new format
-            os.rename(fp, fp.replace(".mp4", ".webm"))
-            fname = "video.webm"
-        elif ext == "gif":
+        if ext == "gif":
             obj.write_gif(fp, fps=obj.fps)
+        elif ext == "mp4":
+            obj.write_videofile(fp, codec="libx264", audio_codec="aac", 
+                              fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
         elif ext == "webm":
             obj.write_videofile(fp, codec="libvpx", audio_codec="libvorbis", 
                                fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
