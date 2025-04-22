@@ -1,5 +1,4 @@
-import {WeaveObjectRef} from '@wandb/weave/react';
-import {parseRef} from '@wandb/weave/react';
+import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
 import _, {isEmpty} from 'lodash';
 import {
   MutableRefObject,
@@ -19,11 +18,12 @@ import {
   CompositeScoreMetrics,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
 import {PredictAndScoreCall} from '../../ecpTypes';
-import {metricDefinitionId} from '../../ecpUtil';
-import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
+import {
+  metricDefinitionId,
+  resolveScoreMetricValueForPASCall,
+} from '../../ecpUtil';
 
 type RowBase = {
   id: string;
@@ -225,7 +225,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: rows[0].inputRef, // Should be the same for all,
+            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
             output: aggregateGroupedNestedRows(
               rows,
               'output',
