@@ -7,7 +7,7 @@ import {
   useViewerUserInfo,
 } from '@wandb/weave/common/hooks/useViewerUserInfo';
 import React, {FC, useEffect} from 'react';
-import ReactDOM from 'react-dom';
+import {createRoot} from 'react-dom/client';
 import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
@@ -160,7 +160,9 @@ const BrowseWrapper: FC = props => (
 );
 
 const basename = getConfig().PREFIX;
-ReactDOM.render(
+const rootElement = document.getElementById('root');
+const root = createRoot(rootElement!);
+root.render(
   <ApolloProvider client={makeGorillaApolloClient()}>
     <Router basename={basename}>
       <Switch>
@@ -196,6 +198,5 @@ ReactDOM.render(
         </Route>
       </Switch>
     </Router>
-  </ApolloProvider>,
-  document.getElementById('root')
+  </ApolloProvider>
 );

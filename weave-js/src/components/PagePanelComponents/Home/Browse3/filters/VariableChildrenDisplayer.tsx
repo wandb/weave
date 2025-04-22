@@ -5,7 +5,7 @@
 
 import _ from 'lodash';
 import React, {isValidElement, ReactChild, useEffect, useState} from 'react';
-import ReactDOM from 'react-dom';
+import {createRoot} from 'react-dom/client';
 
 import {useDeepMemo} from '../../../../../hookUtils';
 
@@ -73,12 +73,16 @@ const measureWidths = (nodes: ReactChild[]): Promise<number[]> => {
 
       // Render the node and measure its width
       if (React.isValidElement(node)) {
-        ReactDOM.render(node, wrapper, () => {
+        const root = createRoot(wrapper);
+        root.render(node);
+
+        // Use requestAnimationFrame to ensure the component has rendered
+        requestAnimationFrame(() => {
           const width = wrapper.offsetWidth;
           resolve(width);
 
           // Clean up after measuring
-          ReactDOM.unmountComponentAtNode(wrapper);
+          root.unmount();
           container.removeChild(wrapper);
         });
       } else {
