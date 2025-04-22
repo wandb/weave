@@ -188,12 +188,15 @@ export const useEvaluationComparisonResults = (
     summaryData,
   ]);
 
-  const returnValue =
-    data == null || evaluationCallIdsRef.current !== evaluationCallIdsMemo
-      ? {loading: true, result: null}
-      : {loading: false, result: data};
-
-  return returnValue;
+  return useMemo(() => {
+    if (
+      data == null ||
+      evaluationCallIdsRef.current !== evaluationCallIdsMemo
+    ) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: data};
+  }, [data, evaluationCallIdsMemo]);
 };
 
 const fetchEvaluationSummaryData = async (
