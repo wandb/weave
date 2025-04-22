@@ -543,7 +543,6 @@ export type LeaderboardObjectEvalData = {
   };
 };
 
-// Process imperative evaluation from a leaderboard
 const processImperativeLeaderboardEvaluation = (
   call: any,
   col: any,
@@ -632,7 +631,6 @@ const processImperativeLeaderboardEvaluation = (
   }
 };
 
-// Process non-imperative evaluation from a leaderboard
 const processNonImperativeLeaderboardEvaluation = (
   call: any,
   col: any,

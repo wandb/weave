@@ -295,17 +295,9 @@ const fetchEvaluationSummaryData = async (
     );
 
     if (isImperativeEvaluation) {
-      // Process imperative evaluation summary
       processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
     } else {
-      // Process regular evaluation summary - existing logic
-      processRegularEvaluationSummary(
-        result,
-        evalCall,
-        evalCallId,
-        evalObj,
-        output
-      );
+      processEvaluationSummary(result, evalCall, evalCallId, evalObj, output);
     }
 
     // Add the derived metrics - common for both regular and imperative evals
@@ -1190,7 +1182,7 @@ const processImperativeEvaluationSummary = (
 /**
  * Process summary data specifically for regular (non-imperative) evaluations
  */
-const processRegularEvaluationSummary = (
+const processEvaluationSummary = (
   result: EvaluationTraceComparisonSummary,
   evalCall: any,
   evalCallId: string,
