@@ -2123,13 +2123,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             raise
         except Exception as e:
+            data_bytes = sum(_num_bytes(row) for row in data)
             logger.exception(
                 "clickhouse_insert_error",
                 extra={
                     "error_str": str(e),
                     "table": table,
                     "data_len": len(data),
-                    "data_bytes": sum(len(row) for row in data),
+                    "data_bytes": data_bytes,
                     "example_data": None if len(data) == 0 else data[0],
                     "column_names": column_names,
                     "settings": settings,
