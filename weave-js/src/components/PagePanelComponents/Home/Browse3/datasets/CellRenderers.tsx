@@ -97,10 +97,11 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
   }, [isEditing]);
 
   const isWeaveUrl = isRefPrefixedString(value);
+  const isJsonList = Array.isArray(value);
   const isEditable =
     !isDeleted &&
     !isWeaveUrl &&
-    typeof value !== 'object' &&
+    (typeof value !== 'object' || isJsonList) &&
     typeof value !== 'boolean';
 
   // Use the context's updateCellValue function instead of local implementation
@@ -129,6 +130,10 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
     }
   };
 
+  const handleValueChange = (newValue: string | any[]) => {
+    setEditedValue(newValue);
+  };
+
   const handleRevert = (event: React.MouseEvent) => {
     event.stopPropagation();
     setEditedValue(serverValue); // Reset editedValue to serverValue
@@ -146,10 +151,6 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
       return CELL_COLORS.NEW;
     }
     return CELL_COLORS.TRANSPARENT;
-  };
-
-  const handleValueChange = (newValue: string) => {
-    setEditedValue(newValue);
   };
 
   // Special handler for boolean values - toggle directly
@@ -198,7 +199,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
     );
   }
 
-  // Non-editable cell types (objects, weave URLs)
+  // Non-editable cell types (objects except arrays, weave URLs)
   if (!isEditable) {
     return (
       <CellTooltip title="Cell type cannot be edited">
@@ -258,7 +259,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
             },
           }}>
           <span style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
-            {value}
+            {isJsonList ? JSON.stringify(value) : value}
           </span>
           {isHovered && (
             <Box
@@ -297,7 +298,6 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
     );
   }
 
-  // Render cell in edit mode
   if (typeof value === 'number') {
     return (
       <Box
@@ -362,10 +362,11 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
         onClose={finalValue => handleCloseEdit(finalValue)}
         initialWidth={initialWidth.current}
         initialHeight={initialHeight.current}
-        value={typeof editedValue === 'string' ? editedValue : ''}
+        value={value}
         originalValue={serverValue ?? ''}
         onChange={handleValueChange}
         inputRef={inputRef}
+        initialEditorMode={isJsonList ? 'code' : 'text'}
       />
     </>
   );

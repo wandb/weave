@@ -7,6 +7,8 @@ interface DiffEditorProps {
   originalValue: string;
   onChange: (value: string) => void;
   onClose: (value?: any) => void;
+  language?: string;
+  disableClosing?: boolean;
 }
 
 export const DiffEditor: React.FC<DiffEditorProps> = ({
@@ -14,6 +16,8 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
   originalValue,
   onChange,
   onClose,
+  language,
+  disableClosing = false,
 }) => {
   const editorRef = useRef<any>(null);
   const currentValueRef = useRef(value);
@@ -23,6 +27,11 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
 
     // Get the modified editor (right side of diff)
     const modifiedEditor = editor.getModifiedEditor();
+
+    // Ensure value is in sync
+    if (modifiedEditor && modifiedEditor.getValue() !== value) {
+      modifiedEditor.setValue(value);
+    }
 
     // Track content changes
     modifiedEditor.onDidChangeModelContent(() => {
@@ -37,19 +46,29 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
         // Get the latest value before closing
         onClose(modifiedEditor.getValue());
       } else if (e.code === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
 
-        // Also close and pass value on Escape
-        onClose(modifiedEditor.getValue());
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
+        // Escape cancels the edit
+        onClose();
       }
     });
   };
 
-  // Update ref when value changes - not using effect now
+  // Update ref when value changes
   currentValueRef.current = value;
 
   return (
@@ -76,6 +95,7 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
         height="100%"
         original={originalValue}
         modified={value}
+        language={language}
         onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},

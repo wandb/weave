@@ -138,7 +138,11 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
         ? preserveFieldOrder(updatedRow)
         : updatedRow;
 
-      const isValueChanged = newValue !== serverValue;
+      // Compare arrays by value instead of by reference
+      const isValueChanged =
+        Array.isArray(newValue) && Array.isArray(serverValue)
+          ? JSON.stringify(newValue) !== JSON.stringify(serverValue)
+          : newValue !== serverValue;
 
       if (existingRow.___weave?.isNew) {
         // For newly added rows
