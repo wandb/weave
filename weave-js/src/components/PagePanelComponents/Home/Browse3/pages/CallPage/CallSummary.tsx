@@ -9,10 +9,10 @@ import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
 import {ObjectViewerSection} from './ObjectViewerSection';
-import { useWFHooks } from '../wfReactInterface/context';
 
 const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
   'latency_s',
@@ -63,13 +63,12 @@ export const CallSummary: React.FC<{
       entity: call.entity,
       project: call.project,
       callId: call.callId,
-      includeCosts: true, 
+      includeCosts: true,
     },
     {
-      includeCosts: true, 
+      includeCosts: true,
     }
   );
-
 
   const costData = useMemo(() => {
     return callWithCosts.result?.traceCall?.summary?.weave?.costs;

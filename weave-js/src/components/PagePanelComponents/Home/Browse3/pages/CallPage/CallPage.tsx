@@ -71,8 +71,8 @@ export const CallPage: FC<CallPageProps> = props => {
       // in null response (bug on server side). As a result, the summary
       // will not show costs. FIXME (This results in a second query in
       // CallSummary.tsx)
-      // includeCosts: true, 
-      includeTotalStorageSize: true
+      // includeCosts: true,
+      includeTotalStorageSize: true,
     }
   );
 
