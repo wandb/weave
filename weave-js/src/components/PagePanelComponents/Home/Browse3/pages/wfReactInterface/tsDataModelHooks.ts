@@ -1081,8 +1081,6 @@ const useRootObjectVersions = (
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
-      console.log(res.objs);
-      console.log(res.objs?.map(convertTraceServerObjectVersionToSchema));
       setObjectVersionRes({
         loading: false,
         error: null,

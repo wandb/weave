@@ -60,7 +60,6 @@ export const SelectValue = ({
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
   if (fieldType === 'monitor') {
-    console.log(value);
     return (
       <SelectMonitor
         entity={entity}

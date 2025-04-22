@@ -18,8 +18,8 @@ import {
   useOpVersionOptions,
   WFHighLevelCallFilter,
 } from '../CallsPage/callsTableFilter';
-import {getFilterByRaw,useFilterSortby} from '../CallsPage/callsTableQuery';
-import {Autocomplete,OpSelector} from '../CallsPage/OpSelector';
+import {getFilterByRaw, useFilterSortby} from '../CallsPage/callsTableQuery';
+import {Autocomplete, OpSelector} from '../CallsPage/OpSelector';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useObjCreate} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -184,7 +184,7 @@ export const CreateMonitorDrawer = ({
     objCreate,
     project,
   ]);
-  console.log(filterModel);
+
   return (
     <Drawer
       open={open}
