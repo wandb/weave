@@ -589,8 +589,8 @@ const fetchEvaluationComparisonResults = async (
                 evaluations: {},
               };
             }
-            const digestCollection = result.resultRows[rowDigest];
 
+            const digestCollection = result.resultRows[rowDigest];
             if (digestCollection.evaluations[evaluationCallId] == null) {
               digestCollection.evaluations[evaluationCallId] = {
                 predictAndScores: {},
