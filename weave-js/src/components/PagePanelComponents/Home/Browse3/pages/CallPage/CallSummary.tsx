@@ -63,7 +63,6 @@ export const CallSummary: React.FC<{
       entity: call.entity,
       project: call.project,
       callId: call.callId,
-      includeCosts: true,
     },
     {
       includeCosts: true,
