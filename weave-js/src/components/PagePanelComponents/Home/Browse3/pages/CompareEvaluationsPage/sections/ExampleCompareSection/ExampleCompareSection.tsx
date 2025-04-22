@@ -246,7 +246,6 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
-  // Handle input reference null case
   const inputRef = parseRefMaybe(target.inputRef);
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
@@ -683,7 +682,7 @@ export const ExampleCompareSection: React.FC<{
           style={{
             flex: 0,
           }}>
-          {inputRef ? <SmallRef objRef={inputRef} iconOnly /> : null}
+          {inputRef && <SmallRef objRef={inputRef} iconOnly />}
         </Box>
         <Box
           style={{
