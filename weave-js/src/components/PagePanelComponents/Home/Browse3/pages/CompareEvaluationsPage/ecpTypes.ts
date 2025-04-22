@@ -6,6 +6,7 @@
  * Comparing Evaluations.
  */
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {EvaluationEvaluateCallSchema} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 
 export type EvaluationComparisonSummary = {
   // Entity and Project are constant across all calls
@@ -34,6 +35,9 @@ export type EvaluationComparisonSummary = {
   // SummaryMetrics define the metrics that are associated with the evaluation as a whole
   // often aggregated from the scoreMetrics.
   summaryMetrics: MetricDefinitionMap;
+
+  // Cache of the evaluation calls for Imperative Evaluations
+  _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
 };
 
 export type EvaluationComparisonResults = {

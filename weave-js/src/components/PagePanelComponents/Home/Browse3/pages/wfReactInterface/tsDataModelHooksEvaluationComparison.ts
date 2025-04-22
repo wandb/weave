@@ -103,11 +103,9 @@ export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Loadable<EvaluationTraceComparisonSummary> => {
+): Loadable<EvaluationComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<EvaluationTraceComparisonSummary | null>(
-    null
-  );
+  const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
   const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
   const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
 
@@ -149,7 +147,7 @@ export const useEvaluationComparisonResults = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationTraceComparisonSummary | null
+  summaryData: EvaluationComparisonSummary | null
 ): Loadable<EvaluationComparisonResults> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonResults | null>(null);
@@ -202,9 +200,9 @@ const fetchEvaluationSummaryData = async (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Promise<EvaluationTraceComparisonSummary> => {
+): Promise<EvaluationComparisonSummary> => {
   const projectId = projectIdFromParts({entity, project});
-  const result: EvaluationTraceComparisonSummary = {
+  const result: EvaluationComparisonSummary = {
     entity,
     project,
     evaluationCalls: {},
@@ -1035,9 +1033,6 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
     };
   };
 };
-type EvaluationTraceComparisonSummary = EvaluationComparisonSummary & {
-  _evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema};
-};
 
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
 
@@ -1071,7 +1066,7 @@ const isImperative = (evalCall: EvaluationEvaluateCallSchema): boolean => {
  * Process summary data specifically for imperative evaluations
  */
 const processImperativeEvaluationSummary = (
-  result: EvaluationTraceComparisonSummary,
+  result: EvaluationComparisonSummary,
   evalCall: any,
   evalCallId: string,
   output: any
@@ -1155,7 +1150,7 @@ const processImperativeEvaluationSummary = (
  * Process summary data specifically for regular (non-imperative) evaluations
  */
 const processEvaluationSummary = (
-  result: EvaluationTraceComparisonSummary,
+  result: EvaluationComparisonSummary,
   evalCall: any,
   evalCallId: string,
   evalObj: any,
