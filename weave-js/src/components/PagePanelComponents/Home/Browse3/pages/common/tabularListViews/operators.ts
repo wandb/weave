@@ -42,6 +42,17 @@ export const operationConverter = (
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: item.value}]}],
     };
+  } else if (item.operator === '(string): notContains') {
+    return {
+      $not: [
+        {
+          $contains: {
+            input: {$getField: item.field},
+            substr: {$literal: item.value},
+          },
+        },
+      ],
+    };
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
       return null;
