@@ -236,7 +236,8 @@ class ImperativeScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                await self.predict_call.apply_scorer(scorer)
+                with weave.attributes({"eval_type": "imperative"}):
+                    await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
         scorer_name = cast(str, scorer.name)
@@ -331,8 +332,9 @@ class ImperativeEvaluationLogger(BaseModel):
                 self: Evaluation, model: Model, example: dict
             ) -> dict:
                 predict_method = cast(Op, model.get_infer_method())
-                model_output, predict_call = predict_method.call(model, example)
-                current_predict_call.set(predict_call)
+                with weave.attributes({"eval_type": "imperative"}):
+                    model_output, predict_call = predict_method.call(model, example)
+                    current_predict_call.set(predict_call)
 
                 # This data is just a placeholder to give a sense of the data shape.
                 # The actual output is explicitly replaced in ImperativeScoreLogger.finish.
@@ -365,6 +367,7 @@ class ImperativeEvaluationLogger(BaseModel):
                     "self": self._pseudo_evaluation,
                     "model": self.model,
                 },
+                attributes={"eval_type": "imperative"},
             )
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
@@ -386,9 +389,9 @@ class ImperativeEvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -417,12 +420,15 @@ class ImperativeEvaluationLogger(BaseModel):
         prediction instance."""
         # Make the prediction call
         with _set_current_output(output):
-            _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
-                self._pseudo_evaluation,
-                self.model,
-                inputs,
-                __require_explicit_finish=True,
-            )
+            with weave.attributes({"eval_type": "imperative"}):
+                _, predict_and_score_call = (
+                    self._pseudo_evaluation.predict_and_score.call(
+                        self._pseudo_evaluation,
+                        self.model,
+                        inputs,
+                        __require_explicit_finish=True,
+                    )
+                )
 
         # Get the predict_call from the context variable
         predict_call = current_predict_call.get()
@@ -460,9 +466,9 @@ class ImperativeEvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 self._pseudo_evaluation.summarize()
