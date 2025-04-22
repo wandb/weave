@@ -299,93 +299,13 @@ const fetchEvaluationSummaryData = async (
       processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
     } else {
       // Process regular evaluation summary - existing logic
-      // Add the user-defined scores
-      evalObj.scorerRefs.forEach(scorerRef => {
-        const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-        // TODO: REMOVE when sanitized scorer names have been released
-        // this is a hack to support previous unsanitized scorer names
-        // that have spaces.
-        let score = output[scorerKey];
-        if (score == null && scorerKey.includes('-')) {
-          // no score found, '-' means we probably sanitized an illegal character
-          const foundScorerNameMaybe = fuzzyMatchScorerName(
-            Object.keys(output),
-            scorerKey
-          );
-          if (foundScorerNameMaybe != null) {
-            score = output[foundScorerNameMaybe];
-          }
-        }
-        const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-          if (isBinarySummaryScore(scoreVal)) {
-            const metricDimension: MetricDefinition = {
-              scoreType: 'binary',
-              metricSubPath: currPath,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            };
-            const metricId = metricDefinitionId(metricDimension);
-            result.summaryMetrics[metricId] = metricDimension;
-            evalCall.summaryMetrics[metricId] = {
-              value: scoreVal.true_fraction,
-              // Later on this will be updated to the Summary or CustomScorer's Summary Call
-              sourceCallId: evalCallId,
-            };
-          } else if (isContinuousSummaryScore(scoreVal)) {
-            const metricDimension: MetricDefinition = {
-              scoreType: 'continuous',
-              metricSubPath: currPath,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            };
-            const metricId = metricDefinitionId(metricDimension);
-            result.summaryMetrics[metricId] = metricDimension;
-            evalCall.summaryMetrics[metricId] = {
-              value: scoreVal.mean,
-              // Later on this will be updated to the Summary or CustomScorer's Summary Call
-              sourceCallId: evalCallId,
-            };
-          } else if (typeof scoreVal === 'boolean') {
-            const metricDimension: MetricDefinition = {
-              scoreType: 'binary',
-              metricSubPath: currPath,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            };
-            const metricId = metricDefinitionId(metricDimension);
-            result.summaryMetrics[metricId] = metricDimension;
-            evalCall.summaryMetrics[metricId] = {
-              value: scoreVal,
-              // Later on this will be updated to the Summary or CustomScorer's Summary Call
-              sourceCallId: evalCallId,
-            };
-          } else if (typeof scoreVal === 'number') {
-            const metricDimension: MetricDefinition = {
-              scoreType: 'continuous',
-              metricSubPath: currPath,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            };
-            const metricId = metricDefinitionId(metricDimension);
-            result.summaryMetrics[metricId] = metricDimension;
-            evalCall.summaryMetrics[metricId] = {
-              value: scoreVal,
-              // Later on this will be updated to the Summary or CustomScorer's Summary Call
-              sourceCallId: evalCallId,
-            };
-          } else if (
-            scoreVal != null &&
-            typeof scoreVal === 'object' &&
-            !Array.isArray(scoreVal)
-          ) {
-            Object.entries(scoreVal).forEach(([key, val]) => {
-              recursiveAddScore(val, [...currPath, key]);
-            });
-          }
-        };
-
-        recursiveAddScore(score, []);
-      });
+      processRegularEvaluationSummary(
+        result,
+        evalCall,
+        evalCallId,
+        evalObj,
+        output
+      );
     }
 
     // Add the derived metrics - common for both regular and imperative evals
@@ -1183,7 +1103,7 @@ type ContinuousSummaryScore = {
   mean: number;
 };
 
-type EvaluationEvaluateCallSchema = TraceCallSchema & {
+export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   inputs: TraceCallSchema['inputs'] & {
     self: string;
     model: string;
@@ -1319,6 +1239,105 @@ const processImperativeEvaluationSummary = (
   // Start processing from the root of the output
   Object.entries(output).forEach(([key, val]) => {
     recursiveAddMetric(val, [key]);
+  });
+};
+
+/**
+ * Process summary data specifically for regular (non-imperative) evaluations
+ */
+const processRegularEvaluationSummary = (
+  result: EvaluationTraceComparisonSummary,
+  evalCall: any,
+  evalCallId: string,
+  evalObj: any,
+  output: any
+): void => {
+  // Add the user-defined scores
+  evalObj.scorerRefs.forEach((scorerRef: string) => {
+    const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
+    // TODO: REMOVE when sanitized scorer names have been released
+    // this is a hack to support previous unsanitized scorer names
+    // that have spaces.
+    let score = output[scorerKey];
+    if (score == null && scorerKey.includes('-')) {
+      // no score found, '-' means we probably sanitized an illegal character
+      const foundScorerNameMaybe = fuzzyMatchScorerName(
+        Object.keys(output),
+        scorerKey
+      );
+      if (foundScorerNameMaybe != null) {
+        score = output[foundScorerNameMaybe];
+      }
+    }
+    const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
+      if (isBinarySummaryScore(scoreVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal.true_fraction,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (isContinuousSummaryScore(scoreVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal.mean,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (typeof scoreVal === 'boolean') {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (typeof scoreVal === 'number') {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (
+        scoreVal != null &&
+        typeof scoreVal === 'object' &&
+        !Array.isArray(scoreVal)
+      ) {
+        Object.entries(scoreVal).forEach(([key, val]) => {
+          recursiveAddScore(val, [...currPath, key]);
+        });
+      }
+    };
+
+    recursiveAddScore(score, []);
   });
 };
 

@@ -4,11 +4,15 @@ import _ from 'lodash';
 import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../../../pages/common/heuristics';
 import {TraceServerClient} from '../../../pages/wfReactInterface/traceServerClient';
-import {TraceObjSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
+import {
+  TraceCallSchema,
+  TraceObjSchema,
+} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   projectIdFromParts,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {EvaluationEvaluateCallSchema} from '../../../pages/wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
@@ -22,7 +26,9 @@ import {
 // Helper function to detect if a call is from an imperative evaluation
 // We assume that any Evaluation object without scorers is imperative.
 // This is not strictly true, but I think it's a reasonable enough heuristic.
-const isImperativeEvaluation = (call: any): boolean => {
+const isImperativeEvaluation = (
+  call: TraceCallSchema | EvaluationEvaluateCallSchema
+): boolean => {
   return (
     call.inputs &&
     call.inputs.self &&
