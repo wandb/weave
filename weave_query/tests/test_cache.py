@@ -44,6 +44,48 @@ def test_lru_time_window_cache():
 class TestBucketTimestamp:
     DAY_IN_SECONDS = 60 * 60 * 24
 
+    def test_docstring_examples(self):
+        test_timestamps = [
+            datetime.datetime(
+                1970, 1, 1, 11, 22, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 2, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 7, 23, 59, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 8, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 12, 16, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+        ]
+        expected_timestamps = [
+            datetime.datetime(
+                1970, 1, 8, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 8, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 8, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 15, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+            datetime.datetime(
+                1970, 1, 15, 0, 0, tzinfo=datetime.timezone.utc
+            ).timestamp(),
+        ]
+        with mock.patch(
+            "time.time",
+            side_effect=test_timestamps,
+        ):
+            for expected_timestamp in expected_timestamps:
+                assert int(cache.bucket_timestamp(7), 10) == expected_timestamp
+
     def test_buckets_can_vary_by_interval(self):
         cache_timestamps = []
         mock_current_time = self.DAY_IN_SECONDS * 10
@@ -52,7 +94,10 @@ class TestBucketTimestamp:
                 cache_timestamps.append(int(cache.bucket_timestamp(i), 10))
 
         expected_timestamps = [0] + [
-            mock_current_time + self.DAY_IN_SECONDS * i for i in range(1, 10)
+            (int(mock_current_time / (self.DAY_IN_SECONDS * i)) + 1)
+            * self.DAY_IN_SECONDS
+            * i
+            for i in range(1, 10)
         ]
         assert cache_timestamps == expected_timestamps
 
@@ -64,32 +109,6 @@ class TestBucketTimestamp:
             assert cache_timestamps == [
                 int(cache.bucket_timestamp(i), 10) for i in range(10)
             ]
-
-    def test_buckets_can_vary_by_interval_when_time_is_not_day_aligned(self):
-        cache_timestamps = []
-        mock_current_time = self.DAY_IN_SECONDS * 10 + int(self.DAY_IN_SECONDS / 2)
-        with mock.patch("time.time", return_value=mock_current_time):
-            for i in range(10):
-                cache_timestamps.append(int(cache.bucket_timestamp(i), 10))
-
-        expected_timestamps = [0] + [
-            mock_current_time - int(self.DAY_IN_SECONDS / 2) + (self.DAY_IN_SECONDS * i)
-            for i in range(1, 10)
-        ]
-        assert cache_timestamps == expected_timestamps
-
-    def test_bucket_should_advance_when_time_passes(self):
-        INTERVAL_DAYS = 7
-        INITIAL_TIME = 100
-        with mock.patch("time.time", return_value=100):
-            initial_bucket = int(cache.bucket_timestamp(INTERVAL_DAYS), 10)
-            assert initial_bucket == INTERVAL_DAYS * self.DAY_IN_SECONDS
-
-        with mock.patch("time.time", return_value=INITIAL_TIME + self.DAY_IN_SECONDS):
-            assert (
-                int(cache.bucket_timestamp(INTERVAL_DAYS), 10)
-                == initial_bucket + self.DAY_IN_SECONDS
-            )
 
 
 def test_clear_cache():
