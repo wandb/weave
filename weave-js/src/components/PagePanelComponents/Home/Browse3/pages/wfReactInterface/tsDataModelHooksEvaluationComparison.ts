@@ -413,61 +413,6 @@ const fetchEvaluationComparisonResults = async (
       filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
     })
     .then(predictAndScoreCallRes => {
-      // Check for imperative evaluations and handle specially
-      const hasImperativeEvals = predictAndScoreCallRes.calls.some(
-        call =>
-          call.op_name.includes('Evaluation.predict_and_score:') ||
-          call.op_name.includes('Evaluation.summarize:')
-      );
-
-      // For imperative evaluations, we need to fetch all predict_and_score calls
-      // that might have a different op name pattern
-      if (hasImperativeEvals) {
-        // Add additional query to find imperative predict_and_score calls
-        return traceServerClient
-          .callsStreamQuery({
-            project_id: projectId,
-            filter: {
-              trace_ids: evalTraceIds,
-              op_names: ['Evaluation.predict_and_score:'],
-            },
-          })
-          .then(imperativePredictAndScoreCalls => {
-            // Combine with the original calls, removing duplicates
-            const combinedCalls = [
-              ...predictAndScoreCallRes.calls,
-              ...imperativePredictAndScoreCalls.calls.filter(
-                call =>
-                  !predictAndScoreCallRes.calls.some(c => c.id === call.id)
-              ),
-            ];
-
-            // Continue with the same logic as before
-            const predictAndScoreIds = combinedCalls.map(call => call.id);
-
-            return Promise.all(
-              _.chunk(predictAndScoreIds, 500).map(chunk => {
-                return traceServerClient
-                  .callsStreamQuery({
-                    project_id: projectId,
-                    filter: {trace_ids: evalTraceIds, parent_ids: chunk},
-                  })
-                  .then(predictionsAndScoresCallsRes => {
-                    return predictionsAndScoresCallsRes.calls;
-                  });
-              })
-            ).then(predictionsAndScoresCallsResMany => {
-              return {
-                calls: [
-                  ...combinedCalls,
-                  ...predictionsAndScoresCallsResMany.flat(),
-                ],
-              };
-            });
-          });
-      }
-
-      // Original logic for standard evaluations
       const predictAndScoreIds = predictAndScoreCallRes.calls.map(
         call => call.id
       );
