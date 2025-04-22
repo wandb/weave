@@ -812,7 +812,6 @@ const fetchEvaluationComparisonResults = async (
                   call.op_name.includes(PREDICT_OP_NAME)
               ),
             };
-            rowsAdded++;
 
             // Find and add score calls
             const scoreCalls = evalTraceRes.calls.filter(
