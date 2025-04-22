@@ -110,7 +110,7 @@ class HttpAsync:
         auth: typing.Optional[aiohttp.BasicAuth] = None,
     ) -> None:
         await self.fs.makedirs(os.path.dirname(path), exist_ok=True)
-        with tracer.trace("download_file_task"):
+        with tracer.trace("async_download_file_task") as span:
             # TODO: Error handling when no file or manifest
 
             # yarl.URL encoded=True is very important! Otherwise aiohttp
@@ -120,6 +120,9 @@ class HttpAsync:
                 yarl.URL(url, encoded=True), headers=headers, cookies=cookies, auth=auth
             ) as r:
                 if r.status == 200:
+                    span.set_metric(
+                        "content_length", r.headers.get("content-length", 0), True
+                    )
                     async with self.fs.open_write(path, mode="wb") as f:
                         async for data in r.content.iter_chunked(16 * 1024):
                             await f.write(data)
@@ -149,7 +152,7 @@ class Http:
         auth: typing.Optional[requests.auth.HTTPBasicAuth] = None,
     ) -> None:
         self.fs.makedirs(os.path.dirname(path), exist_ok=True)
-        with tracer.trace("download_file_task"):
+        with tracer.trace("download_file_task") as span:
             # TODO: Error handling when no file or manifest
 
             # yarl.URL encoded=True is very important! Otherwise aiohttp
@@ -162,6 +165,9 @@ class Http:
                 auth=auth,
             ) as r:
                 if r.status_code == 200:  # type: ignore
+                    span.set_metric(
+                        "content_length", r.headers.get("content-length", 0), True
+                    )
                     with self.fs.open_write(path, mode="wb") as f:
                         f.write(r.content)  # type: ignore
                 else:
