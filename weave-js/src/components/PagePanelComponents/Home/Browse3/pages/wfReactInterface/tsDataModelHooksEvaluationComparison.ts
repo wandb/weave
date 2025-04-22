@@ -165,8 +165,7 @@ export const useEvaluationComparisonResults = (
       entity,
       project,
       evaluationCallIdsMemo,
-      summaryData,
-      summaryData._evaluationCallCache
+      summaryData
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -288,10 +287,9 @@ const fetchEvaluationSummaryData = async (
     }
 
     // Check if this is an imperative evaluation
-    // const isImperativeEvaluation = isImperative(
-    //   evaluationCallCache[evalCall.callId]
-    // );
-    const isImperativeEvaluation = false;
+    const isImperativeEvaluation = isImperative(
+      evaluationCallCache[evalCall.callId]
+    );
 
     if (isImperativeEvaluation) {
       processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
@@ -299,7 +297,7 @@ const fetchEvaluationSummaryData = async (
       processEvaluationSummary(result, evalCall, evalCallId, evalObj, output);
     }
 
-    // Add the derived metrics - common for both regular and imperative evals
+    // Add the derived metrics
     // Model latency
     if (output.model_latency != null) {
       const metricId = metricDefinitionId(modelLatencyMetricDimension);
@@ -380,15 +378,13 @@ const fetchEvaluationComparisonResults = async (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary,
-  evaluationCallCache?: {[callId: string]: EvaluationEvaluateCallSchema}
+  summaryData: EvaluationComparisonSummary
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
     inputs: {},
     resultRows: {},
   };
-
   // Kick off the trace query to get the actual trace data
   // Note: we split this into 2 steps to ensure we only get level 2 children
   // of the evaluations. This avoids massive overhead of fetching gigantic traces
@@ -431,11 +427,10 @@ const fetchEvaluationComparisonResults = async (
 
   // 3.5 Populate the inputs
   // Check if we have imperative evaluations
-  const hasImperativeEvals = evaluationCallCache
-    ? Object.keys(summaryData.evaluationCalls).some(
-        id => id in evaluationCallCache && isImperative(evaluationCallCache[id])
-      )
-    : false;
+  const evaluationCallCache = summaryData._evaluationCallCache || {};
+  const hasImperativeEvals = Object.keys(evaluationCallCache).some(
+    id => id in evaluationCallCache && isImperative(evaluationCallCache[id])
+  );
 
   // Store imperative calls for later use
   let imperativePredictAndScoreCalls: TraceCallSchema[] = [];
@@ -786,59 +781,12 @@ const fetchEvaluationComparisonResults = async (
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
-      // Check if we have imperative evaluations
-      // const hasImperativeEvals = evaluationCallCache
-      //   ? Object.keys(summaryData.evaluationCalls).some(
-      //       id =>
-      //         id in evaluationCallCache && isImperative(evaluationCallCache[id])
-      //     )
-      //   : false;
-
-      // // For imperative evaluations, we're more lenient
-      // if (hasImperativeEvals) {
-      //   // For imperative evaluations:
-      //   // 1. Make sure the row digest exists in our inputs
-      //   // 2. Make sure at least one evaluation has results for this row
-      //   return (
-      //     digest in result.inputs && Object.keys(row.evaluations).length > 0
-      //   );
-      // }
-      console.log('row.evaluations', row.evaluations);
-      console.log('summaryData.evaluationCalls', summaryData.evaluationCalls);
-
-      // For standard evaluations, we want exact matches across all evaluations
       return (
         Object.values(row.evaluations).length ===
         Object.values(summaryData.evaluationCalls).length
       );
     })
   );
-
-  // Additional debug check to ensure we have examples
-  if (Object.keys(result.resultRows).length === 0) {
-    console.log('Warning: No example rows found for evaluation comparison.');
-    // If inputs exist but no resultRows, let's try to be more permissive
-    if (Object.keys(result.inputs).length > 0) {
-      // Add a simple placeholder entry for each input
-      Object.entries(result.inputs).forEach(([digest, input]) => {
-        // For each input that has an evaluation result, add it to resultRows
-        if (
-          Object.values(summaryData.evaluationCalls).some(
-            call => result.resultRows[digest]?.evaluations[call.callId]
-          )
-        ) {
-          result.resultRows[digest] = result.resultRows[digest] || {
-            evaluations: Object.fromEntries(
-              Object.values(summaryData.evaluationCalls).map(call => [
-                call.callId,
-                {predictAndScores: {}},
-              ])
-            ),
-          };
-        }
-      });
-    }
-  }
 
   // If we still don't have matching results in resultRows for our inputs, try direct matching
   if (
@@ -1033,7 +981,6 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
     };
   };
 };
-
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
 
 function fuzzyMatchScorerName(
@@ -1056,9 +1003,7 @@ const isImperative = (evalCall: EvaluationEvaluateCallSchema): boolean => {
   );
 };
 
-/**
- * Process summary data specifically for imperative evaluations
- */
+// Process summary data specifically for imperative evaluations
 const processImperativeEvaluationSummary = (
   result: EvaluationComparisonSummary,
   evalCall: any,
@@ -1140,9 +1085,7 @@ const processImperativeEvaluationSummary = (
   });
 };
 
-/**
- * Process summary data specifically for regular (non-imperative) evaluations
- */
+// Process summary data specifically for regular evaluations
 const processEvaluationSummary = (
   result: EvaluationComparisonSummary,
   evalCall: any,
@@ -1239,7 +1182,6 @@ const processEvaluationSummary = (
   });
 };
 
-// Improve the generateStableDigest function to handle edge cases
 const generateStableDigest = (obj: any): string => {
   if (obj === undefined || obj === null) {
     return 'null'; // Return consistent string for null/undefined
