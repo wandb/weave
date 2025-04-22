@@ -867,13 +867,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCallIds={selectedCalls}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton

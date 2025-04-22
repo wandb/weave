@@ -1584,10 +1584,15 @@
         "a": {
           "title": "A",
           "type": "integer"
+        },
+        "aliased_property_alias": {
+          "title": "Aliased Property Alias",
+          "type": "integer"
         }
       },
       "required": [
-        "a"
+        "a",
+        "aliased_property_alias"
       ],
       "title": "TestOnlyNestedBaseModel",
       "type": "object"

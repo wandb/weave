@@ -75,7 +75,7 @@ export const FilterRow = ({
           onSelectField={onSelectField}
         />
       </div>
-      <div className="w-[140px]">
+      <div className="w-[165px]">
         {item.field && (
           <SelectOperator
             options={operatorOptions}

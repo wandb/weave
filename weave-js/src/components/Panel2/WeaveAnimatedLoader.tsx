@@ -31,6 +31,7 @@ const AnimationWrapper = styled.div`
   opacity: 0.6;
   animation: 4s ease-out infinite logo-animation;
 `;
+AnimationWrapper.displayName = 'S.AnimationWrapper';
 
 export const WeaveAnimatedLoader: React.FC<{
   style?: React.CSSProperties;
