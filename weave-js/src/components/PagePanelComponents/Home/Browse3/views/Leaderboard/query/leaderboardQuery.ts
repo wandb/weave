@@ -270,7 +270,7 @@ const getLeaderboardGroupableData = async (
     if (isImperative) {
       processImperativeEvaluation(call, recordPartial, data);
     } else {
-      processNonImperativeEvaluation(call, evalObject, recordPartial, data);
+      processEvaluation(call, evalObject, recordPartial, data);
     }
 
     const modelLatency = (call.output as any)?.model_latency?.mean;
@@ -631,7 +631,7 @@ const processImperativeLeaderboardEvaluation = (
   }
 };
 
-const processNonImperativeLeaderboardEvaluation = (
+const processLeaderboardEvaluation = (
   call: any,
   col: any,
   evalVal: any,
@@ -766,10 +766,27 @@ const getLeaderboardObjectGroupableData = async (
           return;
         }
 
-        const process = isImperative
-          ? processImperativeLeaderboardEvaluation
-          : processNonImperativeLeaderboardEvaluation;
-        process(call, col, evalVal, modelRef, datasetRef, data, evalData);
+        if (isImperative) {
+          processImperativeLeaderboardEvaluation(
+            call,
+            col,
+            evalVal,
+            modelRef,
+            datasetRef,
+            data,
+            evalData
+          );
+        } else {
+          processLeaderboardEvaluation(
+            call,
+            col,
+            evalVal,
+            modelRef,
+            datasetRef,
+            data,
+            evalData
+          );
+        }
       }
     });
   });
@@ -778,7 +795,7 @@ const getLeaderboardObjectGroupableData = async (
 };
 
 const processImperativeEvaluation = (
-  call: any,
+  call: TraceCallSchema,
   recordPartial: Omit<
     LeaderboardValueRecord,
     'metricType' | 'scorerName' | 'scorerVersion' | 'metricPath' | 'metricValue'
@@ -825,17 +842,13 @@ const processImperativeEvaluation = (
         return;
       }
 
-      // Treat this as a scorer result
-      const scorerName = key;
-      const scorerVersion = '';
-
       const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
       Object.entries(flatScorePayload).forEach(([metricPath, metricValue]) => {
         const scoreRecord: LeaderboardValueRecord = {
           ...recordPartial,
           metricType: 'scorerMetric',
-          scorerName,
-          scorerVersion,
+          scorerName: key,
+          scorerVersion: '',
           metricPath,
           metricValue,
         };
@@ -845,9 +858,9 @@ const processImperativeEvaluation = (
   });
 };
 
-const processNonImperativeEvaluation = (
-  call: any,
-  evalObject: any,
+const processEvaluation = (
+  call: TraceCallSchema,
+  evalObject: TraceObjSchema<any, string>,
   recordPartial: Omit<
     LeaderboardValueRecord,
     'metricType' | 'scorerName' | 'scorerVersion' | 'metricPath' | 'metricValue'
