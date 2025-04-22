@@ -46,9 +46,10 @@ def save(obj: mp.VideoClip, artifact: MemTraceFilesArtifact, name: str) -> None:
     
     # Check if the object is a VideoFileClip, which has a filename attribute
     is_file_clip = hasattr(obj, "filename") and isinstance(obj, mp.VideoFileClip)
-    
+
     # For VideoFileClip objects, use the original format when it's webm
     if is_file_clip and obj.filename:
+        thumbnail = obj.get_frame(0)
         original_ext = os.path.splitext(obj.filename)[1].lower().lstrip('.')
         if original_ext == "webm":
             # Use webm directly for webm files
@@ -64,27 +65,15 @@ def save(obj: mp.VideoClip, artifact: MemTraceFilesArtifact, name: str) -> None:
                 # Use shutil.copy instead of reencoding to preserve quality and improve performance
                 shutil.copy(obj.filename, fp)
             return
-    
-    # Handle other cases as before
-    ext = format_to_ext.get(fmt, DEFAULT_FORMAT)
-    
-    # Similar to image.py, we're using a standard filename for consistency
-    # See the extensive comment in the image.py file for rationale
-    fname = f"video.{ext}"
-    
-    with artifact.writeable_file_path(fname) as fp:
-        if ext == "gif":
-            obj.write_gif(fp, fps=obj.fps)
-        elif ext == "mp4":
-            obj.write_videofile(fp, codec="libx264", audio_codec="aac", 
-                              fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
-        elif ext == "webm":
-            obj.write_videofile(fp, codec="libvpx", audio_codec="libvorbis", 
-                               fps=obj.fps, preset="fast", ffmpeg_params=["-crf", "20"])
+        elif original_ext == "gif":
+            # Use mp4 directly
+            fname = "video.gif"
+            with artifact.writeable_file_path(fname) as fp:
+                # Use shutil.copy instead of reencoding to preserve quality and improve performance
+                shutil.copy(obj.filename, fp)
+            return
         else:
-            # Fallback to GIF if format is unknown
-            logger.debug(f"Unknown video format {fmt}, defaulting to {DEFAULT_FORMAT}")
-            obj.write_gif(fp, fps=obj.fps)
+            raise ValueError(f"Unsupported video format: {fmt} - Only gif, mp4, and webm are supported")
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> mp.VideoClip:
@@ -93,7 +82,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> mp.VideoClip:
     Args:
         artifact: The artifact to load from
         name: Ignored, consistent with save method
-        
+
     Returns:
         The loaded VideoClip
     """
@@ -101,10 +90,10 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> mp.VideoClip:
     filename = next(iter(artifact.path_contents))
     if not filename.startswith("video."):
         raise ValueError(f"Expected filename to start with 'video.', got {filename}")
-    
+
     path = artifact.path(filename)
     ext = os.path.splitext(filename)[1][1:]  # Get the extension without the dot
-    
+
     if ext in ["gif", "mp4", "webm"]:
         return mp.VideoFileClip(path)
     else:
