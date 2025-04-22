@@ -64,7 +64,6 @@ export const CallPage: FC<CallPageProps> = props => {
       entity: props.entity,
       project: props.project,
       callId: descendentCallId,
-      withTotalStorageSize: true,
     },
     {
       // Sadly we cannot include costs as unfinished calls will result
