@@ -2128,7 +2128,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 extra={
                     "error_str": str(e),
                     "table": table,
-                    "data": data,
+                    "data_len": len(data),
+                    "data_bytes": sum(len(row) for row in data),
+                    "example_data": data[0],
                     "column_names": column_names,
                     "settings": settings,
                 },
