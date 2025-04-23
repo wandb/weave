@@ -1,8 +1,68 @@
 import {getGlobalClient} from './clientApi';
 import {TRACE_CALL_EMOJI} from './constants';
-import {Op, OpOptions} from './opType';
+import {Op, OpOptions } from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
+
+export interface MethodDecoratorContext {
+  kind: 'method';
+  name: string | symbol;
+  static?: boolean;
+  class?: Function;
+  addInitializer?(initializer: () => void): void;
+  private?: boolean;
+  access?: {
+    has(object: object): boolean;
+    get(object: object): Function;
+  };
+  metadata?: any;
+}
+
+/**
+ * Check if the arguments are for a Stage 3 decorator.
+ * New-style decorators are called with 2 arguments:
+ *   [value, context]
+ *   where context is an object with a "kind" property (among others).
+ * @param args - The arguments passed to the decorator.
+ * @returns boolean
+ */
+function isOfficiallDecorator(args: any[]) {
+  if (args.length === 2 && args[1] && typeof args[1] === 'object' && 'kind' in args[1]) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Helper function to extract the class name from a function and optional
+ * context.  When a context is provided the name is set via the addInitializer
+ * hook.  When no context is provided the name is extracted from the target.
+ * @param target The original method being decorated or class prototype
+ * @param context The optionalcontext of the decorator
+ * @returns The class name or 'anonymous' if it cannot be determined
+ */
+function extractClassName(target: any, context?: MethodDecoratorContext): string {
+  // Use addInitializer to set the name after class definition/instantiation
+  if (context && context.addInitializer && target.__name === "__pending__") {
+    context.addInitializer(function(this: any) {
+      const actualClassName = context.static ? this.name : this.constructor.name;
+      target.__name = `${actualClassName}.${String(context.name)}`;
+    });
+    return '__pending__';
+  }
+
+  // For legacy decorators
+  if (target) {
+    // For static methods, target is the class constructor
+    if (target.constructor === Function) {
+      return target.name || 'anonymous';
+    }
+    // For instance methods, target is the prototype
+    return target.constructor?.name || 'anonymous';
+  }
+
+  return 'anonymous';
+}
 
 /**
  * A wrapper to weave op-ify a function or method that works on sync and async functions.
@@ -52,7 +112,7 @@ import {warnOnce} from './utils/warnOnce';
  *   }
  * }
  *
- * // Decorator usage (requires experimentalDecorators: true in tsconfig.json)
+ * // Decorator usage (requires TS 5.0+ or legacy TS with experimentalDecorators: true in tsconfig.json)
  * class DecoratedModel {
  *   // Basic decorator
  *   @weave.op
@@ -64,11 +124,11 @@ import {warnOnce} from './utils/warnOnce';
  *   }
  *
  *   // Decorator with options
- *   @weave.op({
+ *   @(weave.op({
  *     name: 'customName',
  *     callDisplayName: (...args) => `Processing: ${args[0]}`,
  *     parameterNames: ['input']
- *   })
+ *   }) as any)
  *   static async process(input: string) {
  *     return `Processed ${input}`;
  *   }
@@ -79,28 +139,56 @@ import {warnOnce} from './utils/warnOnce';
 export function op<T extends (...args: any[]) => any>(
   fn: T,
   options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
+): Op<T>;
 // Method binding: const op = weave.op(this, fn)
 export function op<T extends (...args: any[]) => any>(
   thisArg: any,
   fn: T,
   options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>>;
-// Decorator usage: @weave.op
+): Op<T>;
+// Legacy decorator usage (experimentalDecorators in tsconfig.json): @weave.op
 export function op(
   target: Object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<any>
 ): void;
-// Decorator factory usage: @weave.op({...})
+// Stage 3 method decorator usage (decorators in tsconfig.json): @weave.op
+export function op<T extends (...args: any[]) => any>(
+  value: T,
+  context: MethodDecoratorContext
+): Op<T>;
+// Decorator factory usage: @weave.op({ ... })
 export function op(options: Partial<OpOptions<any>>): MethodDecorator;
 export function op(...args: any[]): any {
-  // Case 1: Basic decorator - @op
-  // args = [target (class/prototype), propertyKey (string), descriptor (PropertyDescriptor)]
+  // ─────────────────────────────
+  // Stage 3 decorators support
+  if (isOfficiallDecorator(args)) {
+    // Destructure the decorated value and the context
+    const [originalMethod, context] = args;
+    // We only support methods with Stage 3 for now
+    if (context.kind === 'method') {
+      // Call our base function-wrapping version of op without a name yet
+      const wrapped = op(originalMethod, {
+        name: "__pending__",
+        isDecorator: true,
+        originalFunction: originalMethod,
+      }) as Op<typeof originalMethod>;
+      // Set our name via the addInitializer hook
+      extractClassName(wrapped, context);
+
+      // Return the replacement method (as expected by Stage 3 decorators)
+      return wrapped;
+    } else {
+      throw new Error('@weave.op currently only supports method decorators (Stage 3)');
+    }
+  }
+
+  // ─────────────────────────────
+  // Legacy decorator branch: called with (target, propertyKey, descriptor)
   if (
     args.length === 3 &&
     (typeof args[0] === 'object' || typeof args[0] === 'function') &&
-    typeof args[1] === 'string' &&
+    (typeof args[1] === 'string' || typeof args[1] === 'symbol') &&
     typeof args[2] === 'object'
   ) {
     const [target, propertyKey, descriptor] = args;
@@ -108,26 +196,20 @@ export function op(...args: any[]): any {
     if (typeof originalFn !== 'function') {
       throw new Error('@weave.op can only be used to decorate methods');
     }
-
-    const isStatic = typeof target === 'function';
-    const className = isStatic ? target.name : target.constructor?.name ?? 'anonymous';
+    const className = extractClassName(target);
     const name = `${className}.${String(propertyKey)}`;
 
-    // Recursively call op() to create the wrapper, passing the function and options
     const wrapped = op(originalFn, {
       name,
       isDecorator: true,
-      originalFunction: originalFn
+      originalFunction: originalFn,
     }) as Op<typeof originalFn>;
-
-    // Update the descriptor
     descriptor.value = wrapped;
-
     return descriptor;
   }
 
-  // Case 2: Decorator factory - @op({...options})
-  // args = [{...options}]
+  // ─────────────────────────────
+  // Decorator factory branch: @weave.op({...})
   if (
     args.length === 1 &&
     typeof args[0] === 'object' &&
@@ -136,69 +218,79 @@ export function op(...args: any[]): any {
     !Array.isArray(args[0])
   ) {
     const options = args[0];
-    // Return a decorator function that will be called with (target, propertyKey, descriptor)
-    return function (
-      target: Object,
-      propertyKey: string | symbol,
-      descriptor: TypedPropertyDescriptor<any>
-    ) {
-      const originalFn = descriptor.value;
-      if (typeof originalFn !== 'function') {
-        throw new Error('@weave.op can only be used to decorate methods');
+    return function (...factoryArgs: any[]) {
+      // Detect Stage 3 form in the returned decorator
+      if (isOfficiallDecorator(factoryArgs)) {
+        const [originalMethod, context] = factoryArgs;
+        if (context.kind === 'method') {
+          const wrapped = op(originalMethod, {
+            ...options,
+            name: options.name || "__pending__",
+            isDecorator: true,
+            originalFunction: originalMethod
+          });
+          extractClassName(wrapped, context);
+          return wrapped;
+        }
+        throw new Error('@weave.op currently supports factory usage only on methods (Stage 3).');
       }
 
-      const isStatic = typeof target === 'function';
-      const className = isStatic ? target.name : target.constructor?.name ?? 'anonymous';
+      // Legacy usage branch within the factory
+      const [target, propertyKey, descriptor] = factoryArgs;
+      const originalMethod = descriptor.value;
+      if (typeof originalMethod !== 'function') {
+        throw new Error('@weave.op can only be used to decorate methods');
+      }
+      const className = extractClassName(target);
       const name = options?.name || `${className}.${String(propertyKey)}`;
 
-      // Recursively call op() to create the wrapper, passing the function and merged options
-      const wrapped = op(originalFn, {
+      const wrapped = op(originalMethod, {
         ...options,
         name,
         isDecorator: true,
-        originalFunction: originalFn
+        originalFunction: originalMethod,
       });
 
-      // Update the descriptor
       descriptor.value = wrapped;
-
       return descriptor;
     };
   }
 
-  // Case 3: Function wrapping with binding - op(this, fn, options)
-  // args = [thisArg, function, options?]
+  // ─────────────────────────────
+  // Function binding branch: op(this, fn, options)
   if (args.length >= 2 && typeof args[1] === 'function') {
     const [bindThis, fn, options] = args;
     const boundFn = fn.bind(bindThis);
     return op(boundFn, {
       originalFunction: fn,
       bindThis,
-      ...options
+      ...options,
     });
   }
 
-  // Case 4: Direct function wrapping - op(fn, options?)
-  // args = [function, options?]
-  // This is our base case that actually creates the wrapper
+  // ─────────────────────────────
+  // Base case: Direct function wrapping: op(fn, options?)
   const fn = args[0];
   const options = args[1] || {};
   type T = typeof fn;
 
-  // Create the wrapper function that handles call tracking
-  const opWrapper = async function (this: any, ...params: Parameters<T>): Promise<ReturnType<T>> {
+  // Create the wrapper function that tracks calls
+  const opWrapper = async function (
+    this: any,
+    ...params: Parameters<T>
+  ): Promise<ReturnType<T>> {
     const client = getGlobalClient();
     const thisArg = options?.isDecorator ? this : options?.bindThis;
 
     if (!client) {
       warnOnce(
         'weave-not-initialized',
-        'WARNING: Weave is not initialized, so calls wont be tracked. Call `weave.init` to initialize before calling ops. If this is intentional, you can safely ignore this warning.'
+        'WARNING: Weave is not initialized, so calls won\'t be tracked. Call `weave.init` to initialize before calling ops. If this is intentional, you can safely ignore this warning.'
       );
       return await fn.apply(thisArg, params);
     }
 
-    const {currentCall, parentCall, newStack} = client.pushNewCall();
+    const { currentCall, parentCall, newStack } = client.pushNewCall();
     const startTime = new Date();
     if (client.settings.shouldPrintCallLink && parentCall == null) {
       const domain = getGlobalDomain();
@@ -226,7 +318,7 @@ export function op(...args: any[]): any {
       });
 
       if (options?.streamReducer && Symbol.asyncIterator in result) {
-        const {initialStateFn, reduceFn} = options.streamReducer;
+        const { initialStateFn, reduceFn } = options.streamReducer;
         let state = initialStateFn();
 
         const wrappedIterator = {
@@ -266,7 +358,6 @@ export function op(...args: any[]): any {
         return result;
       }
     } catch (error) {
-      // console.error(`Op ${actualOpName} failed:`, error);
       const endTime = new Date();
       await client.finishCallWithException(
         error,
@@ -280,7 +371,6 @@ export function op(...args: any[]): any {
     }
   };
 
-  // Set the name based on the context
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
   const className = options?.bindThis
     ? Object.getPrototypeOf(options.bindThis).constructor.name
@@ -289,7 +379,7 @@ export function op(...args: any[]): any {
 
   // Set properties on the wrapper function
   opWrapper.__name = actualOpName;
-  opWrapper.__isOp = true;
+  opWrapper.__isOp = true as const;
   opWrapper.__wrappedFunction = options?.originalFunction ?? fn;
   opWrapper.__boundThis = options?.bindThis;
 

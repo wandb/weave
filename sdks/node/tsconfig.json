@@ -14,15 +14,15 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "experimentalDecorators": true
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
   "exclude": [
     "examples",
     "dist",
     "node_modules",
-    "src/integrations/checkOpenai.ts"
+    "src/integrations/checkOpenai.ts",
+    "src/__tests__/**/*"
   ]
   // "references": [
   //   {
