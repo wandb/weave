@@ -94,10 +94,9 @@ export type ClassIdToLabelMap = Map<number, string>;
 // transformation was tricky/more error prone than this way.
 // TODO: merge this and isBoundingBoxHidden.
 const isBoundingBoxVisible = (box: SceneBox, filter: Filter) => {
-  if (
-    filter.hideAllBoxes &&
-    (box.label == null || !filter.shownBoundingBoxLabels.includes(box.label))
-  ) {
+  const isBoxManuallyShown =
+    box.label != null && filter.shownBoundingBoxLabels.includes(box.label);
+  if (filter.hideAllBoxes && !isBoxManuallyShown) {
     return false;
   }
 
