@@ -258,6 +258,8 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
+  console.log('props', props);
+
   const inputRef = target.inputRef;
   const numInputProps = inputColumnKeys?.length ?? 0;
   const numOutputKeys = outputColumnKeys?.length ?? 0;

@@ -75,7 +75,11 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {
+  PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+  PREDICT_OP_NAME,
+  SCORE_OP_NAME,
+} from '../common/heuristics';
 import {
   EvaluationComparisonResults,
   EvaluationComparisonSummary,
@@ -243,6 +247,8 @@ const fetchEvaluationSummaryData = async (
     ])
   );
 
+  console.log('evaluationCallCache', evaluationCallCache);
+
   const evalRefs = evalRes.calls.map(call => call.inputs.self);
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
   const combinedEvalAndModelObjs = await traceServerClient.readBatch({
@@ -375,6 +381,7 @@ const fetchEvaluationComparisonResults = async (
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
+    inputs: {},
     resultRows: {},
   };
 
@@ -420,6 +427,177 @@ const fetchEvaluationComparisonResults = async (
 
   // 4. Populate the predictions and scores
   const evalTraceRes = await evalTraceResProm;
+  console.log('evalTraceRes', evalTraceRes);
+
+  const isImperative = true;
+  if (isImperative) {
+    const predictAndScoreCalls = evalTraceRes.calls.filter(call =>
+      call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+    );
+
+    // Extract inputs from these calls
+    predictAndScoreCalls.forEach(call => {
+      if (!call || !call.inputs) {
+        return;
+      }
+
+      try {
+        const example = call.inputs.example;
+        if (example && typeof example === 'object') {
+          // Create a stable digest for the example object
+          const digest = generateStableDigest(example);
+
+          // Add to inputs if not already present
+          if (!result.inputs[digest]) {
+            result.inputs[digest] = {
+              digest,
+              val: example,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Error extracting input from imperative call:', e);
+      }
+
+      try {
+        if (!call || !call.inputs) {
+          return;
+        }
+
+        const example = call.inputs.example;
+        const modelRef = call.inputs.model;
+        const evaluationCallId = call.parent_id;
+
+        if (!evaluationCallId) {
+          return;
+        }
+
+        if (example && typeof example === 'object') {
+          // Generate stable digest for the example
+          const digest = generateStableDigest(example);
+
+          // Ensure input exists
+          if (!result.inputs[digest]) {
+            result.inputs[digest] = {
+              digest,
+              val: example,
+            };
+          }
+
+          // Create result entry if it doesn't exist
+          if (!result.resultRows[digest]) {
+            result.resultRows[digest] = {
+              evaluations: {},
+            };
+          }
+
+          // Add evaluation entry if it doesn't exist
+          if (!result.resultRows[digest].evaluations[evaluationCallId]) {
+            result.resultRows[digest].evaluations[evaluationCallId] = {
+              predictAndScores: {},
+            };
+          }
+
+          // Add predict_and_score entry
+          result.resultRows[digest].evaluations[
+            evaluationCallId
+          ].predictAndScores[call.id] = {
+            callId: call.id,
+            exampleRef: example,
+            rowDigest: digest,
+            modelRef,
+            evaluationCallId,
+            scoreMetrics: {},
+            _rawPredictAndScoreTraceData: call,
+            _rawPredictTraceData: evalTraceRes.calls.find(
+              call =>
+                call &&
+                call.parent_id === call.id &&
+                call.op_name &&
+                call.op_name.includes(PREDICT_OP_NAME)
+            ),
+          };
+
+          // Find and add score calls
+          const scoreCalls = evalTraceRes.calls.filter(
+            call =>
+              call &&
+              call.parent_id === call.id &&
+              call.op_name &&
+              call.op_name.includes(SCORE_OP_NAME)
+          );
+
+          scoreCalls.forEach(scoreCall => {
+            if (!scoreCall || !scoreCall.op_name) {
+              return;
+            }
+
+            const scorerRef = scoreCall.op_name;
+            const results = scoreCall.output as any;
+
+            if (results) {
+              const metricId = `${scorerRef}-score`;
+              const metricDimension: MetricDefinition = {
+                scoreType:
+                  typeof results === 'boolean' ? 'binary' : 'continuous',
+                metricSubPath: [],
+                source: 'scorer',
+                scorerOpOrObjRef: scorerRef,
+              };
+
+              summaryData.scoreMetrics[metricId] = metricDimension;
+              result.resultRows[digest].evaluations[
+                evaluationCallId
+              ].predictAndScores[call.id].scoreMetrics[metricId] = {
+                sourceCallId: scoreCall.id,
+                value: results,
+              };
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Error during direct matching of imperative call:', e);
+      }
+    });
+
+    console.log('result.resultRows', result.resultRows);
+
+    // For each row without corresponding input, create a placeholder
+    Object.entries(result.resultRows).forEach(([digest, row]) => {
+      console.log('digest', digest);
+      if (!result.inputs[digest]) {
+        console.log('no input');
+        // Try to get some data from the evaluations to use as input
+        let inputValue = {digest, placeholder: true};
+
+        // Look for exampleRef in predictAndScores
+        const evaluationIds = Object.keys(row.evaluations);
+        if (evaluationIds.length > 0) {
+          const evalId = evaluationIds[0];
+          const predictAndScoreIds = Object.keys(
+            row.evaluations[evalId].predictAndScores
+          );
+          if (predictAndScoreIds.length > 0) {
+            const predictAndScoreId = predictAndScoreIds[0];
+            const predictAndScore =
+              row.evaluations[evalId].predictAndScores[predictAndScoreId];
+            if (
+              predictAndScore.exampleRef &&
+              typeof predictAndScore.exampleRef === 'object'
+            ) {
+              inputValue = predictAndScore.exampleRef;
+            }
+          }
+        }
+
+        // Add the input
+        result.inputs[digest] = {
+          digest,
+          val: inputValue,
+        };
+      }
+    });
+  }
 
   // Create a set of all of the scorer refs
   const scorerRefs = new Set(
@@ -932,4 +1110,36 @@ const processImperativeEvaluationSummary = (
 
 const isImperativeEvalCall = (call: TraceCallSchema) => {
   return call.attributes?.['eval_type'] === 'imperative';
+};
+
+const generateStableDigest = (obj: any): string => {
+  if (obj === undefined || obj === null) {
+    return 'null'; // Return consistent string for null/undefined
+  }
+
+  try {
+    // Sort keys to ensure stable stringification
+    const sortObjectKeys = (val: any): any => {
+      if (val === null || val === undefined) {
+        return null;
+      }
+
+      if (typeof val !== 'object' || Array.isArray(val)) {
+        return val;
+      }
+
+      return Object.keys(val)
+        .sort()
+        .reduce((result: any, key) => {
+          result[key] = sortObjectKeys(val[key]);
+          return result;
+        }, {});
+    };
+
+    return JSON.stringify(sortObjectKeys(obj));
+  } catch (e) {
+    // In case of any JSON serialization errors, return a fallback value
+    console.warn('Error generating stable digest:', e);
+    return `digest_${Date.now()}`;
+  }
 };

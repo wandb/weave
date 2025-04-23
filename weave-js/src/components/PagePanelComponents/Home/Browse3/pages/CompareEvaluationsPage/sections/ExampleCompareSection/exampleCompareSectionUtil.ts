@@ -402,6 +402,16 @@ export function useExampleCompareData(
       return undefined;
     }
     const digest = filteredRows[targetIndex].inputDigest;
+
+    console.log('digest', digest);
+    console.log('cachedRowData', cachedRowData);
+    console.log('cachedRowData.current[digest]', cachedRowData.current[digest]);
+
+    const res = flattenObjectPreservingWeaveTypes(
+      cachedRowData.current[digest]
+    );
+    console.log('res', res);
+
     return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
     // Including `cacheVersion` in the dependency array ensures the memo recalculates
     // when it changes, even though it's not directly used in the calculation.

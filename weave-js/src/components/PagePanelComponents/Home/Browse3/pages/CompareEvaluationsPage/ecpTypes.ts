@@ -37,6 +37,13 @@ export type EvaluationComparisonSummary = {
 };
 
 export type EvaluationComparisonResults = {
+  // Inputs are the intersection of all inputs used in the evaluations.
+  // Note, we are able to "merge" the same input digest even if it is
+  // used in different evaluations.
+  inputs: {
+    [rowDigest: string]: DatasetRow;
+  };
+
   // ResultRows are the actual results of running the evaluation against
   // the inputs.
   resultRows: {
@@ -56,6 +63,11 @@ export type EvaluationComparisonResults = {
       };
     };
   };
+};
+
+type DatasetRow = {
+  digest: string;
+  val: any;
 };
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
