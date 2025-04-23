@@ -403,20 +403,28 @@ export function useExampleCompareData(
     }
     const digest = filteredRows[targetIndex].inputDigest;
 
-    console.log('digest', digest);
-    console.log('cachedRowData', cachedRowData);
-    console.log('cachedRowData.current[digest]', cachedRowData.current[digest]);
+    // If we already have the data in cache, use it
+    if (cachedRowData.current[digest]) {
+      return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
+    }
 
-    const res = flattenObjectPreservingWeaveTypes(
-      cachedRowData.current[digest]
-    );
-    console.log('res', res);
+    // Check if we can get the data from the results directly
+    // This is specifically for imperative evaluations
+    if (state.loadableComparisonResults.result?.inputs?.[digest]) {
+      const inputData =
+        state.loadableComparisonResults.result.inputs[digest].val;
+      cachedRowData.current[digest] = inputData;
+      return flattenObjectPreservingWeaveTypes(inputData);
+    }
 
-    return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
-    // Including `cacheVersion` in the dependency array ensures the memo recalculates
-    // when it changes, even though it's not directly used in the calculation.
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheVersion, filteredRows, targetIndex]);
+  }, [
+    cacheVersion,
+    filteredRows,
+    targetIndex,
+    state.loadableComparisonResults.result,
+  ]);
 
   useEffect(() => {
     (async () => {
@@ -427,23 +435,39 @@ export function useExampleCompareData(
 
       const selectedRowDigest = targetRow.inputDigest;
 
-      if (!cachedPartialTableRequest.current) {
-        cachedPartialTableRequest.current = await makePartialTableReq(
-          state.summary.evaluations,
-          filteredRows,
-          targetIndex,
-          getTraceServerClient
-        );
-      }
-
-      if (cachedPartialTableRequest.current == null) {
-        // couldn't get the table digest, no way to proceed
+      // If we already have the data in cache, no need to fetch
+      if (selectedRowDigest in cachedRowData.current) {
         return;
       }
 
-      if (!(selectedRowDigest in cachedRowData.current)) {
-        // immediately fetch the current row
-        setLoading(true);
+      // Check if we can get the data from the results directly
+      // This is specifically for imperative evaluations
+      if (state.loadableComparisonResults.result?.inputs?.[selectedRowDigest]) {
+        const inputData =
+          state.loadableComparisonResults.result.inputs[selectedRowDigest].val;
+        cachedRowData.current[selectedRowDigest] = inputData;
+        increaseCacheVersion();
+        return;
+      }
+
+      // For regular evaluations, need to fetch from table
+      setLoading(true);
+
+      try {
+        if (!cachedPartialTableRequest.current) {
+          cachedPartialTableRequest.current = await makePartialTableReq(
+            state.summary.evaluations,
+            filteredRows,
+            targetIndex,
+            getTraceServerClient
+          );
+        }
+
+        if (cachedPartialTableRequest.current == null) {
+          // couldn't get the table digest, no way to proceed
+          setLoading(false);
+          return;
+        }
 
         await loadRowDataIntoCache(
           [selectedRowDigest],
@@ -454,6 +478,9 @@ export function useExampleCompareData(
 
         // This trigger a re-calculation of the `target` and a re-render immediately
         increaseCacheVersion();
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
         setLoading(false);
       }
 
@@ -471,24 +498,52 @@ export function useExampleCompareData(
       );
 
       if (adjacentRowsToFetch.length > 0) {
-        // we load the data into the cache, but don't trigger a re-render
-        await loadRowDataIntoCache(
-          adjacentRowsToFetch,
-          cachedRowData,
-          cachedPartialTableRequest,
-          getTraceServerClient
+        // Check if any adjacent row data is available in comparison results
+        const adjacentRowsFromResults = adjacentRowsToFetch.filter(
+          digest => state.loadableComparisonResults.result?.inputs?.[digest]
         );
+
+        // Add data from comparison results to cache
+        adjacentRowsFromResults.forEach(digest => {
+          const inputData =
+            state.loadableComparisonResults.result!.inputs[digest].val;
+          cachedRowData.current[digest] = inputData;
+        });
+
+        // Fetch remaining adjacent rows from table
+        const rowsToFetchFromTable = adjacentRowsToFetch.filter(
+          digest => !adjacentRowsFromResults.includes(digest)
+        );
+
+        if (
+          rowsToFetchFromTable.length > 0 &&
+          cachedPartialTableRequest.current
+        ) {
+          try {
+            await loadRowDataIntoCache(
+              rowsToFetchFromTable,
+              cachedRowData,
+              cachedPartialTableRequest,
+              getTraceServerClient
+            );
+          } catch (error) {
+            console.error('Error loading adjacent rows:', error);
+          }
+        }
       }
 
       // evict the obsolete cache
       const newCache: Record<string, any> = {};
       for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
-        newCache[rowDigest] = cachedRowData.current[rowDigest];
+        if (cachedRowData.current[rowDigest]) {
+          newCache[rowDigest] = cachedRowData.current[rowDigest];
+        }
       }
       cachedRowData.current = newCache;
     })();
   }, [
     state.summary.evaluations,
+    state.loadableComparisonResults.result,
     filteredRows,
     targetIndex,
     increaseCacheVersion,

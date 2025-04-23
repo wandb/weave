@@ -230,7 +230,10 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const inputColumnKeys = useMemo(() => {
-    return Object.keys(targetRowValue ?? {});
+    if (!targetRowValue) {
+      return [];
+    }
+    return Object.keys(targetRowValue);
   }, [targetRowValue]);
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
@@ -251,6 +254,21 @@ export const ExampleCompareSection: React.FC<{
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
+  }
+
+  // Show loading state when input data is being fetched
+  if (loadingInputValue) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        }}>
+        <LoadingDots />
+      </div>
+    );
   }
 
   // This section contains the primary helper variable for laying out the grid
