@@ -379,7 +379,6 @@ const fetchEvaluationComparisonResults = async (
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
-    inputs: {}, // Keep inputs for backward compatibility
     resultRows: {},
   };
 
@@ -843,19 +842,16 @@ const populatePredictionsAndScoresImperative = (
       // Generate a digest for the example
       const digest = generateStableDigest(example);
 
-      // Add to inputs for backwards compatibility
-      if (!result.inputs[digest]) {
-        result.inputs[digest] = {
-          digest,
-          val: example,
-        };
-      }
-
       // Create result entry if it doesn't exist
       if (!result.resultRows[digest]) {
         result.resultRows[digest] = {
           evaluations: {},
+          // Store the original input data directly in the resultRows
+          originalInput: example,
         };
+      } else if (!result.resultRows[digest].originalInput) {
+        // If the row exists but doesn't have originalInput yet, add it
+        result.resultRows[digest].originalInput = example;
       }
 
       // Add evaluation entry if it doesn't exist

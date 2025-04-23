@@ -419,11 +419,11 @@ export function useExampleCompareData(
 
       // Check if we can get the data from the results directly
       // This is specifically for imperative evaluations
-      const preloadedDataRow =
-        state.loadableComparisonResults.result?.inputs?.[selectedRowDigest];
-      if (!(selectedRowDigest in cachedRowData.current) && preloadedDataRow) {
-        const inputData = preloadedDataRow.val;
-        cachedRowData.current[selectedRowDigest] = inputData;
+      const digRow =
+        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest];
+      const preloadedInputData = digRow?.originalInput;
+      if (!(selectedRowDigest in cachedRowData.current) && preloadedInputData) {
+        cachedRowData.current[selectedRowDigest] = preloadedInputData;
         increaseCacheVersion();
         return;
       }
@@ -472,15 +472,18 @@ export function useExampleCompareData(
       );
 
       if (adjacentRowsToFetch.length > 0) {
-        // Check if any adjacent row data is available in comparison results
+        // Check if any adjacent row data is available in resultRows
         const adjacentRowsFromResults = adjacentRowsToFetch.filter(
-          digest => state.loadableComparisonResults.result?.inputs?.[digest]
+          digest =>
+            state.loadableComparisonResults.result?.resultRows?.[digest]
+              ?.originalInput
         );
 
         // Add data from comparison results to cache
         adjacentRowsFromResults.forEach(digest => {
           const inputData =
-            state.loadableComparisonResults.result!.inputs[digest].val;
+            state.loadableComparisonResults.result!.resultRows[digest]
+              .originalInput;
           cachedRowData.current[digest] = inputData;
         });
 
