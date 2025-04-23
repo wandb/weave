@@ -1,14 +1,22 @@
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {
+  isWeaveObjectRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../../../pages/common/heuristics';
 import {TraceServerClient} from '../../../pages/wfReactInterface/traceServerClient';
-import {TraceObjSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
+import {
+  TraceCallSchema,
+  TraceObjSchema,
+} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   projectIdFromParts,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {isImperativeEvalCall} from '../../../pages/wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
@@ -197,6 +205,7 @@ const getLeaderboardGroupableData = async (
       return;
     }
 
+    const isImperative = isImperativeEvalCall(call);
     const evalObjectName = evalObjectRef.artifactName;
     const evalObjectVersion = evalObjectRef.artifactVersion;
     const evalObject = evaluationObjectDigestMap
@@ -243,39 +252,11 @@ const getLeaderboardGroupableData = async (
       sourceEvaluationObjectRef: evalObjectRefUri,
     };
 
-    const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
-    scorerRefUris.forEach(scorerRefUri => {
-      const scorerRef = parseRefMaybe(scorerRefUri);
-      if (!scorerRef || !isWeaveObjectRef(scorerRef)) {
-        console.warn('Skipping scorer ref', scorerRefUri);
-        return;
-      }
-      const scorerName = scorerRef.artifactName;
-      const scorerVersion = scorerRef.artifactVersion;
-      // const scorerType = scorerRef.weaveKind === 'op' ? 'op' : 'object';
-      const scorePayload = (call.output as any)?.[scorerName];
-      if (typeof scorePayload !== 'object' || scorePayload == null) {
-        console.warn(
-          'Skipping scorer call with invalid score payload',
-          scorerName,
-          scorerVersion,
-          call
-        );
-        return;
-      }
-      const flatScorePayload = flattenObjectPreservingWeaveTypes(scorePayload);
-      Object.entries(flatScorePayload).forEach(([metricPath, metricValue]) => {
-        const scoreRecord: LeaderboardValueRecord = {
-          ...recordPartial,
-          metricType: 'scorerMetric',
-          scorerName,
-          scorerVersion,
-          metricPath,
-          metricValue,
-        };
-        data.push(scoreRecord);
-      });
-    });
+    if (isImperative) {
+      processImperativeEvaluation(call, recordPartial, data);
+    } else {
+      processEvaluation(call, evalObject, recordPartial, data);
+    }
 
     const modelLatency = (call.output as any)?.model_latency?.mean;
     if (modelLatency == null) {
@@ -547,6 +528,170 @@ export type LeaderboardObjectEvalData = {
   };
 };
 
+const processImperativeLeaderboardEvaluation = (
+  call: TraceCallSchema,
+  col: LeaderboardObjectVal['columns'][number],
+  evalVal: any,
+  modelRef: WeaveObjectRef,
+  datasetRef: WeaveObjectRef,
+  data: GroupableLeaderboardValueRecord[],
+  evalData: LeaderboardObjectEvalData
+) => {
+  const output = call.output;
+  if (
+    typeof output === 'object' &&
+    output !== null &&
+    col.scorer_name in output
+  ) {
+    // Found a direct match in the output object
+    let value = (output as any)[col.scorer_name];
+
+    // Special handling for auto-summarized data that might not access correctly through the path
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      // col.summary_metric_path === 'true_count' ||
+      col.summary_metric_path === 'true_fraction' &&
+      col.summary_metric_path in value
+    ) {
+      // Directly access the property instead of using path traversal
+      value = value[col.summary_metric_path];
+    } else {
+      // Regular path traversal
+      col.summary_metric_path.split('.').forEach((part: string) => {
+        if (value == null) {
+          return;
+        }
+        if (_.isArray(value)) {
+          try {
+            const index = parseInt(part, 10);
+            value = value[index];
+          } catch (e) {
+            value = null;
+          }
+        } else {
+          value = (value as any)[part];
+        }
+      });
+    }
+
+    const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
+    const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
+    // Fix: Use scorerName without trailing colon to match the format expected elsewhere
+    const scorerGroup = `${col.scorer_name}`;
+
+    const row: GroupableLeaderboardValueRecord = {
+      modelGroup,
+      datasetGroup,
+      scorerGroup,
+      metricPathGroup: col.summary_metric_path,
+      sortKey: -convertISOToDate(call.started_at).getTime(),
+      row: {
+        datasetName: datasetRef.artifactName,
+        datasetVersion: datasetRef.artifactVersion,
+        metricType: 'scorerMetric',
+        scorerName: col.scorer_name,
+        scorerVersion: '',
+        metricPath: col.summary_metric_path,
+        metricValue: value as any,
+        modelName: modelRef.artifactName,
+        modelVersion: modelRef.artifactVersion,
+        modelType: modelRef.weaveKind === 'op' ? 'op' : 'object',
+        trials: evalVal.trials,
+        createdAt: convertISOToDate(call.started_at),
+        sourceEvaluationCallId: call.id,
+        sourceEvaluationObjectRef: col.evaluation_object_ref,
+        shouldMinimize: col.should_minimize ?? false,
+      },
+    };
+
+    data.push(row);
+    if (!(col.evaluation_object_ref in evalData)) {
+      evalData[col.evaluation_object_ref] = {
+        datasetGroup,
+        scorers: {},
+      };
+    }
+    evalData[col.evaluation_object_ref].scorers[col.scorer_name] = scorerGroup;
+  }
+};
+
+const processLeaderboardEvaluation = (
+  call: any,
+  col: any,
+  evalVal: any,
+  modelRef: any,
+  datasetRef: any,
+  data: GroupableLeaderboardValueRecord[],
+  evalData: LeaderboardObjectEvalData
+) => {
+  const scorerRefUri = evalVal.scorers.find(
+    (scorer: string) =>
+      parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
+  );
+  const scorerRef = parseRefMaybe(scorerRefUri ?? '');
+  if (scorerRef?.scheme !== 'weave') {
+    return;
+  }
+  let value = call.output;
+  if (typeof value !== 'object' || value == null) {
+    value = null;
+  } else {
+    value = (value as any)[col.scorer_name];
+  }
+  col.summary_metric_path.split('.').forEach((part: string) => {
+    if (value == null) {
+      return;
+    }
+    if (_.isArray(value)) {
+      try {
+        const index = parseInt(part, 10);
+        value = value[index];
+      } catch (e) {
+        value = null;
+      }
+    } else {
+      value = (value as any)[part];
+    }
+  });
+  const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
+  const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
+  const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
+  const row: GroupableLeaderboardValueRecord = {
+    modelGroup,
+    datasetGroup,
+    scorerGroup,
+    metricPathGroup: col.summary_metric_path,
+    sortKey: -convertISOToDate(call.started_at).getTime(),
+    row: {
+      datasetName: datasetRef.artifactName,
+      datasetVersion: datasetRef.artifactVersion,
+      metricType: 'scorerMetric',
+      scorerName: scorerRef.artifactName,
+      scorerVersion: scorerRef.artifactVersion,
+      metricPath: col.summary_metric_path,
+      metricValue: value as any,
+      modelName: modelRef.artifactName,
+      modelVersion: modelRef.artifactVersion,
+      modelType: modelRef.weaveKind === 'op' ? 'op' : 'object',
+      trials: evalVal.trials,
+      createdAt: convertISOToDate(call.started_at),
+      sourceEvaluationCallId: call.id,
+      sourceEvaluationObjectRef: col.evaluation_object_ref,
+      shouldMinimize: col.should_minimize ?? false,
+    },
+  };
+  data.push(row);
+  if (!(col.evaluation_object_ref in evalData)) {
+    evalData[col.evaluation_object_ref] = {
+      datasetGroup,
+      scorers: {},
+    };
+  }
+  evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
+    scorerGroup;
+};
+
 const getLeaderboardObjectGroupableData = async (
   client: TraceServerClient,
   entity: string,
@@ -590,6 +735,7 @@ const getLeaderboardObjectGroupableData = async (
   const data: GroupableLeaderboardValueRecord[] = [];
   const evalData: LeaderboardObjectEvalData = {};
   allEvaluationCallsRes.calls.forEach(call => {
+    const isImperative = isImperativeEvalCall(call);
     columns.forEach(col => {
       const evalObjRefUri = call.inputs.self;
       if (col.evaluation_object_ref === evalObjRefUri) {
@@ -604,75 +750,137 @@ const getLeaderboardObjectGroupableData = async (
         if (modelRef?.scheme !== 'weave' || datasetRef?.scheme !== 'weave') {
           return;
         }
-        const scorerRefUri = evalVal.scorers.find(
-          (scorer: string) =>
-            parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
-        );
-        const scorerRef = parseRefMaybe(scorerRefUri ?? '');
-        if (scorerRef?.scheme !== 'weave') {
-          return;
-        }
-        let value = call.output;
-        if (typeof value !== 'object' || value == null) {
-          value = null;
+
+        if (isImperative) {
+          processImperativeLeaderboardEvaluation(
+            call,
+            col,
+            evalVal,
+            modelRef,
+            datasetRef,
+            data,
+            evalData
+          );
         } else {
-          value = (value as any)[col.scorer_name];
+          processLeaderboardEvaluation(
+            call,
+            col,
+            evalVal,
+            modelRef,
+            datasetRef,
+            data,
+            evalData
+          );
         }
-        col.summary_metric_path.split('.').forEach(part => {
-          if (value == null) {
-            return;
-          }
-          if (_.isArray(value)) {
-            try {
-              const index = parseInt(part, 10);
-              value = value[index];
-            } catch (e) {
-              console.warn('Skipping model latency', call, e);
-              value = null;
-            }
-          } else {
-            value = (value as any)[part];
-          }
-        });
-        const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
-        const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
-        const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
-        const row: GroupableLeaderboardValueRecord = {
-          modelGroup,
-          datasetGroup,
-          scorerGroup,
-          metricPathGroup: col.summary_metric_path,
-          sortKey: -convertISOToDate(call.started_at).getTime(),
-          row: {
-            datasetName: datasetRef.artifactName,
-            datasetVersion: datasetRef.artifactVersion,
-            metricType: 'scorerMetric',
-            scorerName: scorerRef.artifactName,
-            scorerVersion: scorerRef.artifactVersion,
-            metricPath: col.summary_metric_path,
-            metricValue: value as any,
-            modelName: modelRef.artifactName,
-            modelVersion: modelRef.artifactVersion,
-            modelType: modelRef.weaveKind === 'op' ? 'op' : 'object',
-            trials: evalVal.trials,
-            createdAt: convertISOToDate(call.started_at),
-            sourceEvaluationCallId: call.id,
-            sourceEvaluationObjectRef: col.evaluation_object_ref,
-            shouldMinimize: col.should_minimize ?? false,
-          },
-        };
-        data.push(row);
-        if (!(col.evaluation_object_ref in evalData)) {
-          evalData[col.evaluation_object_ref] = {
-            datasetGroup,
-            scorers: {},
-          };
-        }
-        evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
-          scorerGroup;
       }
     });
   });
 
   return {groupableData: data, evalData};
+};
+
+const processImperativeEvaluation = (
+  call: TraceCallSchema,
+  recordPartial: Omit<
+    LeaderboardValueRecord,
+    'metricType' | 'scorerName' | 'scorerVersion' | 'metricPath' | 'metricValue'
+  >,
+  data: LeaderboardValueRecord[]
+) => {
+  const outputObj = call.output as any;
+
+  // Find all properties that aren't built-in metrics
+  const builtInMetrics = ['model_latency', 'model_output', 'scores'];
+  Object.entries(outputObj).forEach(([key, value]) => {
+    // Check if the key is a scorer name and the value is a scorer result object
+    if (
+      !builtInMetrics.includes(key) &&
+      typeof value === 'object' &&
+      value !== null
+    ) {
+      // Special handling for common auto-summarized data formats (true_count, true_fraction)
+      // that might not be properly flattened
+      const valueObj = value as Record<string, unknown>;
+      if (
+        // 'true_count' in valueObj ||
+        'true_fraction' in valueObj
+      ) {
+        // Process binary score metrics if they exist
+        [
+          // 'true_count',
+          'true_fraction',
+        ].forEach(metricPath => {
+          if (metricPath in valueObj && valueObj[metricPath] != null) {
+            data.push({
+              ...recordPartial,
+              metricType: 'scorerMetric',
+              scorerName: key,
+              scorerVersion: '',
+              metricPath,
+              metricValue: valueObj[metricPath] as number,
+            });
+          }
+        });
+        return;
+      }
+
+      const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
+      Object.entries(flatScorePayload).forEach(([metricPath, metricValue]) => {
+        const scoreRecord: LeaderboardValueRecord = {
+          ...recordPartial,
+          metricType: 'scorerMetric',
+          scorerName: key,
+          scorerVersion: '',
+          metricPath,
+          metricValue,
+        };
+        data.push(scoreRecord);
+      });
+    }
+  });
+};
+
+const processEvaluation = (
+  call: TraceCallSchema,
+  evalObject: TraceObjSchema<any, string>,
+  recordPartial: Omit<
+    LeaderboardValueRecord,
+    'metricType' | 'scorerName' | 'scorerVersion' | 'metricPath' | 'metricValue'
+  >,
+  data: LeaderboardValueRecord[]
+) => {
+  // For regular evals, process using explicit scorer refs
+  const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
+  scorerRefUris.forEach(scorerRefUri => {
+    const scorerRef = parseRefMaybe(scorerRefUri);
+    if (!scorerRef || !isWeaveObjectRef(scorerRef)) {
+      console.warn('Skipping scorer ref', scorerRefUri);
+      return;
+    }
+    const scorerName = scorerRef.artifactName;
+    const scorerVersion = scorerRef.artifactVersion;
+    // const scorerType = scorerRef.weaveKind === 'op' ? 'op' : 'object';
+    const scorePayload = (call.output as any)?.[scorerName];
+    if (typeof scorePayload !== 'object' || scorePayload == null) {
+      console.warn(
+        'Skipping scorer call with invalid score payload',
+        scorerName,
+        scorerVersion,
+        call
+      );
+      return;
+    }
+    const flatScorePayload = flattenObjectPreservingWeaveTypes(scorePayload);
+    Object.entries(flatScorePayload).forEach(([metricPath, metricValue]) => {
+      const scoreRecord: LeaderboardValueRecord = {
+        ...recordPartial,
+        metricType: 'scorerMetric',
+        scorerName,
+        scorerVersion,
+        metricPath,
+        metricValue,
+      };
+      data.push(scoreRecord);
+    });
+  });
 };

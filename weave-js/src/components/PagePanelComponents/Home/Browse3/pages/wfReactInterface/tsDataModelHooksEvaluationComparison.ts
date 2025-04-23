@@ -776,7 +776,7 @@ const processImperativeEvaluationSummary = (
   });
 };
 
-const isImperativeEvalCall = (call: TraceCallSchema) => {
+export const isImperativeEvalCall = (call: TraceCallSchema) => {
   return call.attributes?._weave_eval_meta?.imperative;
 };
 
