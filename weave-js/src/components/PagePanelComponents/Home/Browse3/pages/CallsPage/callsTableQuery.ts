@@ -194,11 +194,10 @@ export const useCallsForQuery = (
       storageSizeResults,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
-      result: calls.loading
-        ? []
-        : costResults.length > 0
-        ? addCostsToCallResults(callResults, costResults)
-        : callResults,
+      result:
+        costResults.length > 0
+          ? addCostsToCallResults(callResults, costResults)
+          : callResults,
       total,
       refetch,
     };
@@ -345,7 +344,10 @@ export const useMakeInitialDatetimeFilter = (
   project: string,
   highLevelFilter: WFHighLevelCallFilter,
   skip: boolean
-): {initialDatetimeFilter: GridFilterModel} => {
+): {
+  initialDatetimeFilter: GridFilterModel;
+  isFilterAdjusting: boolean;
+} => {
   // Fire off 2 stats queries, one for the # of calls in the last 7 days
   // one for the  # of calls in the last 30 days.
   // If the first query returns > 50 calls, set the default filter to 7 days
@@ -414,13 +416,19 @@ export const useMakeInitialDatetimeFilter = (
     return newFilter;
   }, [callStats7Days, callStats30Days, defaultDatetimeFilter, key]);
 
+  // If we have a cached filter, we're not adjusting
   if (cachedFilter) {
     return {
       initialDatetimeFilter: cachedFilter as GridFilterModel,
+      isFilterAdjusting: false,
     };
   }
 
+  // We're still adjusting if either stats query is still loading
+  const isFilterAdjusting = callStats7Days.loading || callStats30Days.loading;
+
   return {
     initialDatetimeFilter: computedDatetimeFilter ?? defaultDatetimeFilter,
+    isFilterAdjusting,
   };
 };
