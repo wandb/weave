@@ -42,8 +42,9 @@ export type EvaluationComparisonResults = {
   resultRows: {
     // Each rowDigest is a unique identifier for the input data.
     [rowDigest: string]: {
-      // For imperative evaluations, we store the original input directly
-      originalInput?: any;
+      // Optional cache of the raw data row.  This is most frequently populated
+      // if one of the evaluations is an imperative evaluation.
+      rawDataRow?: any;
       // Each RowDigest is further broken down by the evaluations that
       // used the input.
       evaluations: {

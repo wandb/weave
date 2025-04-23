@@ -847,11 +847,11 @@ const populatePredictionsAndScoresImperative = (
         result.resultRows[digest] = {
           evaluations: {},
           // Store the original input data directly in the resultRows
-          originalInput: example,
+          rawDataRow: example,
         };
-      } else if (!result.resultRows[digest].originalInput) {
+      } else if (!result.resultRows[digest].rawDataRow) {
         // If the row exists but doesn't have originalInput yet, add it
-        result.resultRows[digest].originalInput = example;
+        result.resultRows[digest].rawDataRow = example;
       }
 
       // Add evaluation entry if it doesn't exist

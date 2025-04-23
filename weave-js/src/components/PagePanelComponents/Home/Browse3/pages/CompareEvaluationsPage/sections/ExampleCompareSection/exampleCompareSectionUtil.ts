@@ -421,7 +421,7 @@ export function useExampleCompareData(
       // This will only be true for imperative evaluations
       const row =
         state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest];
-      const preloadedInputData = row?.originalInput;
+      const preloadedInputData = row?.rawDataRow;
       if (!(selectedRowDigest in cachedRowData.current) && preloadedInputData) {
         cachedRowData.current[selectedRowDigest] = preloadedInputData;
         increaseCacheVersion();
@@ -476,14 +476,14 @@ export function useExampleCompareData(
         const adjacentRowsFromResults = adjacentRowsToFetch.filter(
           digest =>
             state.loadableComparisonResults.result?.resultRows?.[digest]
-              ?.originalInput
+              ?.rawDataRow
         );
 
         // Add data from comparison results to cache
         adjacentRowsFromResults.forEach(digest => {
           const inputData =
             state.loadableComparisonResults.result!.resultRows[digest]
-              .originalInput;
+              .rawDataRow;
           cachedRowData.current[digest] = inputData;
         });
 
