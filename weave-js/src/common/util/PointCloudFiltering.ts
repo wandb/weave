@@ -24,6 +24,43 @@ export const BOXES = 'boxes';
 const ALL_LABEL = 'all';
 export const GROUP_NAME_3D_BOUNDING_BOXES = 'Labels';
 
+function categorizeBoxVisibility(
+  classIdControl: NonNullable<
+    AllBoundingBoxControls['toggles']
+  >[string][string],
+  classIdToLabel: ClassIdToLabelMap
+) {
+  return Object.keys(classIdControl).reduce<{
+    hiddenBoundingBoxLabels: string[];
+    shownBoundingBoxLabels: string[];
+  }>(
+    ({hiddenBoundingBoxLabels, shownBoundingBoxLabels}, strClassId) => {
+      if (strClassId === ALL_LABEL) {
+        // all label handled separately
+        return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+      }
+      const classId = parseInt(strClassId, 10);
+      const label = classIdToLabel.get(classId);
+      const toggle = classIdControl[classId];
+      // If the toggle is not disabled, then it's not a toggle we want to hide the box for.
+      if (!label || !toggle) {
+        return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+      }
+      if (toggle.disabled) {
+        hiddenBoundingBoxLabels.push(label);
+      } else {
+        shownBoundingBoxLabels.push(label);
+      }
+
+      return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+    },
+    {
+      hiddenBoundingBoxLabels: [] as string[],
+      shownBoundingBoxLabels: [] as string[],
+    }
+  );
+}
+
 export const getFilterFromBBoxConfig = (
   boundingBoxConfig: AllBoundingBoxControls | undefined,
   classIdToLabel: ClassIdToLabelMap
@@ -35,34 +72,8 @@ export const getFilterFromBBoxConfig = (
   const classIdControl =
     boundingBoxConfig?.toggles?.[BOXES]?.[GROUP_NAME_3D_BOUNDING_BOXES] ?? {};
 
-  const [hiddenBoundingBoxLabels, shownBoundingBoxLabels] = Object.keys(
-    classIdControl
-  ).reduce<[string[], string[]]>(
-    (
-      [hiddenBoundingBoxLabelsSoFar, shownBoundingBoxLabelsSoFar],
-      strClassId
-    ) => {
-      if (strClassId === ALL_LABEL) {
-        // all label handled separately
-        return [hiddenBoundingBoxLabelsSoFar, shownBoundingBoxLabelsSoFar];
-      }
-      const classId = parseInt(strClassId, 10);
-      const label = classIdToLabel.get(classId);
-      const toggle = classIdControl[classId];
-      // If the toggle is not disabled, then it's not a toggle we want to hide the box for.
-      if (!label || !toggle) {
-        return [hiddenBoundingBoxLabelsSoFar, shownBoundingBoxLabelsSoFar];
-      }
-      if (toggle.disabled) {
-        hiddenBoundingBoxLabelsSoFar.push(label);
-      } else {
-        shownBoundingBoxLabelsSoFar.push(label);
-      }
-
-      return [hiddenBoundingBoxLabelsSoFar, shownBoundingBoxLabelsSoFar];
-    },
-    [[], []]
-  );
+  const {hiddenBoundingBoxLabels, shownBoundingBoxLabels} =
+    categorizeBoxVisibility(classIdControl, classIdToLabel);
   // AllBoundingBoxControls.styles controls how lines appear (solid, dashed/etc),
   // but that is currently not supported for 3d
   return {
