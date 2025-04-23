@@ -1504,6 +1504,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters={"project_id": req.project_id, "digest": req.digest},
             column_formats={"val_bytes": "bytes"},
         )
+
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"File with digest {req.digest} not found")
+
         n_chunks = query_result.result_rows[0][0]
         result_rows = list(query_result.result_rows)
 

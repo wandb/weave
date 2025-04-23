@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Callable
 
 import pytest
@@ -40,6 +41,7 @@ from weave.trace_server.clickhouse_trace_server_batched import (
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
+from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -2294,6 +2296,85 @@ def test_call_query_stream_columns_with_costs(client):
     assert len(calls) == 2
     assert calls[0].summary is not None
     assert calls[0].summary.get("weave", {}).get("costs") is None
+
+
+def test_read_call_start_with_cost(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    project_id = client._project_id()
+    call_id = generate_id()
+    trace_id = generate_id()
+    llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
+    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    price_effective_date = start_time - datetime.timedelta(days=1)
+
+    # --- 1. Insert Prerequisite Data ---
+    cost_data = {
+        llm_id: {
+            "prompt_token_cost": Decimal("0.00001"),  # Cost per token
+            "completion_token_cost": Decimal("0.00003"),  # Cost per token
+            "effective_date": price_effective_date,
+        }
+    }
+    cost_res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs=cost_data,
+            wb_user_id="test_user",  # Assuming a user ID is needed
+        )
+    )
+    price_id = cost_res.ids[0][0]
+
+    # Insert a call record with summary_dump=None
+    call_start_data = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="test_op_null_summary",
+        display_name="Test Operation Null Summary",
+        started_at=start_time,
+        inputs={"arg1": "no summary"},
+        summary_dump=None,  # Explicitly set to None
+        attributes={},
+    )
+    client.server.call_start(tsi.CallStartReq(start=call_start_data))
+
+    # --- 2. Call call_read with include_costs=True ---
+    res = client.server.call_read(
+        tsi.CallReadReq(
+            project_id=project_id,
+            id=call_id,
+            include_costs=True,  # Request cost calculation
+        )
+    )
+
+    # --- 3. Assert Results ---
+    assert res.call is not None, "Expected call record to be found"
+    assert res.call.id == call_id
+
+    # The summary dump should exist but be null or an empty object initially.
+    # The cost query should handle this gracefully and *not* add a costs object.
+    summary = res.call.summary
+    assert isinstance(summary, dict), "Expected summary_dump to be a dictionary"
+
+    if summary is None:
+        # If call_read returns None summary, this is fine for this case.
+        pass
+    elif isinstance(summary, dict):
+        # Check that the costs object was NOT added
+        assert (
+            COST_OBJECT_NAME not in summary.get("weave", {})
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+    else:
+        pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
+
+    # --- 4. Cleanup ---
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
+    )
+    client.purge_costs(price_id)
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
