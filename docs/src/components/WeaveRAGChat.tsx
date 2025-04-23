@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
+const BACKEND_URL = (window as any).DOCS_AGENT_BACKEND_URL || "http://localhost:8018/docs-agent";
+
 export default function WeaveRAGChat() {
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<any>(null);
+  const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const ask = async () => {
@@ -11,16 +13,20 @@ export default function WeaveRAGChat() {
     setAnswer(null);
 
     try {
-      const res = await fetch("http://localhost:8000/predict", {
+      const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          message: question,
+          input_items: [],
+          conversation_id: "weave-rag-ui", // optional static ID
+        }),
       });
       const data = await res.json();
-      setAnswer(data);
+      setAnswer(data.answer || "No response.");
     } catch (err) {
       console.error("Error:", err);
-      setAnswer({ answer: "Request failed.", source: "N/A" });
+      setAnswer("Error: Could not fetch from backend.");
     }
 
     setLoading(false);
@@ -41,26 +47,12 @@ export default function WeaveRAGChat() {
           {loading ? "Thinking..." : "Ask"}
         </button>
       </div>
-        {answer && (
+      {answer && (
         <div style={{ background: "#f6f8fa", padding: "1rem", borderRadius: 8 }}>
-            <strong>Answer:</strong>
-            <ReactMarkdown>{answer.answer}</ReactMarkdown>
-            <small>
-            <strong>Source:</strong> {answer.source}
-            </small>
-
-            {answer.retrieved && answer.retrieved.length > 0 && (
-            <div style={{ marginTop: "1rem" }}>
-                <small><strong>Top 5 Retrieved Chunks:</strong></small>
-                <ul style={{ paddingLeft: "1.2rem", marginTop: "0.25rem", fontSize: "0.85rem" }}>
-                {answer.retrieved.map((chunk, idx) => (
-                    <li key={idx}>[{chunk.score}] {chunk.source}</li>
-                ))}
-                </ul>
-            </div>
-            )}
+          <strong>Answer:</strong>
+          <ReactMarkdown>{answer}</ReactMarkdown>
         </div>
-        )}
+      )}
     </div>
   );
 }
