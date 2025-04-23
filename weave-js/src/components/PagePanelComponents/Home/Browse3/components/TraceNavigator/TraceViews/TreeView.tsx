@@ -187,7 +187,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               )}
             </div>
 
-            {statusCode === 'ERROR' || statusCode === 'DESCENDANT_ERROR' || statusCode === 'UNSET' ? (
+            {statusCode === 'ERROR' ||
+            statusCode === 'DESCENDANT_ERROR' ||
+            statusCode === 'UNSET' ? (
               <StatusChip value={statusCode} iconOnly />
             ) : AGENT_OP_NAMES.some((opName: string) =>
                 call.op_name?.toLowerCase().includes(opName.toLowerCase())
