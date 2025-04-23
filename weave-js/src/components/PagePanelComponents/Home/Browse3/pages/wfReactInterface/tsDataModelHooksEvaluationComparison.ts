@@ -492,9 +492,7 @@ const fetchEvaluationComparisonResults = async (
       summaryOps,
       scorerRefs,
       predictAndScoreOps,
-      modelRefs,
-      convertISOToDate,
-      evaluationCallIds
+      modelRefs
     );
   }
 
@@ -1004,9 +1002,7 @@ const populatePredictionsAndScoresNonImperative = (
   summaryOps: TraceCallSchema[],
   scorerRefs: Set<string>,
   predictAndScoreOps: {[id: string]: TraceCallSchema},
-  modelRefs: string[],
-  convertISOToDate: (isoString: string) => Date,
-  evaluationCallIds: string[]
+  modelRefs: string[]
 ) => {
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
