@@ -115,6 +115,7 @@ from weave.trace_server.table_query_builder import (
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_table_stats_query_with_storage_size,
 )
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -745,8 +746,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_order(sort.field, sort.direction)
         metadata_only = req.metadata_only or False
         object_query_builder.set_include_deleted(include_deleted=False)
+        object_query_builder.include_storage_size = req.include_storage_size or False
         objs = self._select_objs_query(object_query_builder, metadata_only)
-
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -1037,22 +1038,52 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 digest=row[0], val=json.loads(row[1]), original_index=row[2]
             )
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        batch_req = tsi.TableQueryStatsBatchReq(
+            project_id=req.project_id, digests=[req.digest]
+        )
+
+        res = self.table_query_stats_batch(batch_req)
+
+        if len(res.tables) != 1:
+            raise ValueError("Unexpected number of results", res)
+
+        count = res.tables[0].count
+        return tsi.TableQueryStatsRes(count=count)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
-            "digest": req.digest,
+            "digests": req.digests,
         }
 
         query = """
-        SELECT length(row_digests)
+        SELECT digest, length(row_digests)
         FROM tables
-        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        WHERE project_id = {project_id:String} AND digest IN {digests:Array(String)}
         """
 
-        query_result = self.ch_client.query(query, parameters=parameters)
-        count = query_result.result_rows[0][0] if query_result.result_rows else 0
+        if req.include_storage_size:
+            # Use an advanced query builder to get the storage size
+            pb = ParamBuilder()
+            query = make_table_stats_query_with_storage_size(
+                project_id=req.project_id,
+                table_digests=cast(list[str], req.digests),
+                pb=pb,
+            )
+            parameters = pb.get_params()
 
-        return tsi.TableQueryStatsRes(count=count)
+        query_result = self.ch_client.query(query, parameters=parameters)
+
+        tables = [
+            _ch_table_stats_to_table_stats_schema(row)
+            for row in query_result.result_rows
+        ]
+
+        return tsi.TableQueryStatsBatchRes(tables=tables)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1473,6 +1504,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters={"project_id": req.project_id, "digest": req.digest},
             column_formats={"val_bytes": "bytes"},
         )
+
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"File with digest {req.digest} not found")
+
         n_chunks = query_result.result_rows[0][0]
         result_rows = list(query_result.result_rows)
 
@@ -1951,7 +1986,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         obj_metadata_query = object_query_builder.make_metadata_query()
         parameters = object_query_builder.parameters or {}
         query_result = self._query_stream(obj_metadata_query, parameters)
-        metadata_result = format_metadata_objects_from_query_result(query_result)
+        metadata_result = format_metadata_objects_from_query_result(
+            query_result, object_query_builder.include_storage_size
+        )
 
         # -- Don't make second query for object values if metadata_only --
         if metadata_only or len(metadata_result) == 0:
@@ -2261,6 +2298,21 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
         val=json.loads(ch_obj.val_dump),
+        size_bytes=ch_obj.size_bytes,
+    )
+
+
+def _ch_table_stats_to_table_stats_schema(
+    ch_table_stats_row: Sequence[Any],
+) -> tsi.TableStatsRow:
+    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
+        *ch_table_stats_row
+    )
+
+    return tsi.TableStatsRow(
+        count=count,
+        digest=digest,
+        storage_size_bytes=storage_size_bytes,
     )
 
 
