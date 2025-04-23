@@ -402,31 +402,11 @@ export function useExampleCompareData(
       return undefined;
     }
     const digest = filteredRows[targetIndex].inputDigest;
-
-    // If we already have the data in cache, use it
-    if (cachedRowData.current[digest]) {
-      return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
-    }
-
-    // Check if we can get the data from the results directly
-    // This is specifically for imperative evaluations
-    if (state.loadableComparisonResults.result?.inputs?.[digest]) {
-      const inputData =
-        state.loadableComparisonResults.result.inputs[digest].val;
-      cachedRowData.current[digest] = inputData;
-      return flattenObjectPreservingWeaveTypes(inputData);
-    }
-
-    return undefined;
+    return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
     // Including `cacheVersion` in the dependency array ensures the memo recalculates
     // when it changes, even though it's not directly used in the calculation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    cacheVersion,
-    filteredRows,
-    targetIndex,
-    // state.loadableComparisonResults.result,
-  ]);
+  }, [cacheVersion, filteredRows, targetIndex]);
 
   useEffect(() => {
     (async () => {

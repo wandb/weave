@@ -230,11 +230,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const inputColumnKeys = useMemo(() => {
-    // Imperative evaluations
-    if (!targetRowValue) {
-      return [];
-    }
-    return Object.keys(targetRowValue);
+    return Object.keys(targetRowValue ?? {});
   }, [targetRowValue]);
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
