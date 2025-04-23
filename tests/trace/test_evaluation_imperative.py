@@ -59,6 +59,7 @@ def test_basic_evaluation(
 
     evaluate_call = calls[0]
     assert op_name_from_call(evaluate_call) == "Evaluation.evaluate"
+    assert evaluate_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
     assert evaluate_call.inputs["model"]._class_name == "Model"
     assert evaluate_call.output == {
@@ -77,6 +78,9 @@ def test_basic_evaluation(
         assert (
             op_name_from_call(predict_and_score_call) == "Evaluation.predict_and_score"
         )
+        assert (
+            predict_and_score_call.attributes["_weave_eval_meta"]["imperative"] is True
+        )
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
@@ -84,6 +88,7 @@ def test_basic_evaluation(
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
+        assert predict_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
         assert predict_call.output == outputs
@@ -95,18 +100,21 @@ def test_basic_evaluation(
 
         scorer1_call = calls[predict_index + 2]
         assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
+        assert scorer1_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert scorer1_call.inputs["output"] == outputs
         assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
         assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
+        assert scorer2_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert scorer2_call.inputs["output"] == outputs
         assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
     summarize_call = calls[13]
     assert op_name_from_call(summarize_call) == "Evaluation.summarize"
+    assert summarize_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {
         "avg_score": 1.0,
