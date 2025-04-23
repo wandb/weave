@@ -2,7 +2,7 @@ from typing import Callable, TypedDict
 
 import pytest
 
-from weave.flow.eval_imperative import ImperativeEvaluationLogger, Model, Scorer
+from weave.flow.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
@@ -33,7 +33,7 @@ def user_model():
 def test_basic_evaluation(
     client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
 ):
-    ev = ImperativeEvaluationLogger()
+    ev = EvaluationLogger()
 
     model_outputs = []
     score1_results = []
@@ -130,15 +130,15 @@ def test_evaluation_with_custom_models_and_scorers(
     model2 = {"a": 2, "b": "three"}
     model3 = "string_model"
 
-    ev1 = ImperativeEvaluationLogger(model=model1)
-    ev2 = ImperativeEvaluationLogger(model=model2)
-    ev3 = ImperativeEvaluationLogger(model=model3)
+    ev1 = EvaluationLogger(model=model1)
+    ev2 = EvaluationLogger(model=model2)
+    ev3 = EvaluationLogger(model=model3)
 
     scorer1 = MyScorer(name="gt2_scorer", c=2)
     scorer2 = {"name": "gt4_scorer", "c": 4}
     scorer3 = "gt6_scorer"
 
-    def run_evaluation(ev: ImperativeEvaluationLogger):
+    def run_evaluation(ev: EvaluationLogger):
         for row in user_dataset:
             model_output = user_model(row["a"], row["b"])
             pred = ev.log_prediction(inputs=row, output=model_output)
@@ -190,7 +190,7 @@ def test_evaluation_with_custom_models_and_scorers(
 
     # Run a new evaluation using the same scorers, but different models
     model4 = "new_string_model"
-    ev4 = ImperativeEvaluationLogger(model=model4)
+    ev4 = EvaluationLogger(model=model4)
 
     for row in user_dataset:
         model_output = user_model(row["a"], row["b"])
@@ -217,7 +217,7 @@ def test_evaluation_with_custom_models_and_scorers(
 
     # Run a new evaluation using the same models, but different scorers
     scorer4 = MyScorer(name="gt8_scorer", c=8)
-    ev5 = ImperativeEvaluationLogger(model=model4)
+    ev5 = EvaluationLogger(model=model4)
 
     for row in user_dataset:
         model_output = user_model(row["a"], row["b"])
@@ -251,7 +251,7 @@ def test_evaluation_version_reuse(
 
     # Run the same evaluation twice
     for _ in range(2):
-        ev = ImperativeEvaluationLogger(model=model, dataset=dataset_id)
+        ev = EvaluationLogger(model=model, dataset=dataset_id)
 
         for row in user_dataset:
             model_output = user_model(row["a"], row["b"])

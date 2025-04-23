@@ -156,7 +156,7 @@ def _validate_class_name(name: str) -> str:
     return name
 
 
-class ImperativeScoreLogger(BaseModel):
+class ScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
     # model_id: ID
@@ -244,7 +244,7 @@ class ImperativeScoreLogger(BaseModel):
         self._captured_scores[scorer_name] = score
 
 
-class ImperativeEvaluationLogger(BaseModel):
+class EvaluationLogger(BaseModel):
     """This class provides an imperative interface for logging evaluations.
 
     An evaluation is started automatically when the first prediction is logged
@@ -257,7 +257,7 @@ class ImperativeEvaluationLogger(BaseModel):
 
     Example:
         ```python
-        ev = ImperativeEvaluationLogger()
+        ev = EvaluationLogger()
         pred = ev.log_prediction(inputs, output)
         pred.log_score(scorer_name, score)
         ev.log_summary(summary)
@@ -296,9 +296,7 @@ class ImperativeEvaluationLogger(BaseModel):
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
-    _accumulated_predictions: list[ImperativeScoreLogger] = PrivateAttr(
-        default_factory=list
-    )
+    _accumulated_predictions: list[ScoreLogger] = PrivateAttr(default_factory=list)
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize the pseudo evaluation with the dataset from the model."""
@@ -337,7 +335,7 @@ class ImperativeEvaluationLogger(BaseModel):
                     current_predict_call.set(predict_call)
 
                 # This data is just a placeholder to give a sense of the data shape.
-                # The actual output is explicitly replaced in ImperativeScoreLogger.finish.
+                # The actual output is explicitly replaced in ScoreLogger.finish.
                 return {
                     "model_output": model_output,
                     "scores": {},
@@ -413,7 +411,7 @@ class ImperativeEvaluationLogger(BaseModel):
 
         self._is_finalized = True
 
-    def log_prediction(self, inputs: dict, output: Any) -> ImperativeScoreLogger:
+    def log_prediction(self, inputs: dict, output: Any) -> ScoreLogger:
         """Log a prediction to the Evaluation, and return a reference.
 
         The reference can be used to log scores which are attached to the specific
@@ -436,7 +434,7 @@ class ImperativeEvaluationLogger(BaseModel):
             raise ValueError("predict_call should not be None")
 
         assert self._evaluate_call is not None
-        pred = ImperativeScoreLogger(
+        pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
@@ -499,6 +497,6 @@ class ImperativeEvaluationLogger(BaseModel):
                 # Del methods should not raise exceptions.
                 # Log or handle the error appropriately if needed, but avoid propagation.
                 logger.error(
-                    "Error during implicit cleanup of ImperativeEvaluationLogger.",
+                    "Error during implicit cleanup of EvaluationLogger.",
                     exc_info=True,
                 )
