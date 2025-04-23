@@ -281,8 +281,12 @@ const fetchEvaluationSummaryData = async (
       return;
     }
 
-    const isImperative = false;
+    const isImperative = isImperativeEvalCall(
+      evaluationCallCache[evalCall.callId]
+    );
     if (isImperative) {
+      processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
+    } else {
       processEvaluationSummary(result, evalCall, evalCallId, evalObj, output);
     }
 
@@ -842,4 +846,90 @@ const processEvaluationSummary = (
 
     recursiveAddScore(score, []);
   });
+};
+
+// Process summary data specifically for imperative evaluations
+const processImperativeEvaluationSummary = (
+  result: EvaluationComparisonSummary,
+  evalCall: any,
+  evalCallId: string,
+  output: any
+): void => {
+  // In imperative evaluations, the metrics can appear directly in the output object
+  // We need to recursively process them to extract all metrics
+  const recursiveAddMetric = (metricVal: any, currPath: string[]) => {
+    if (typeof metricVal === 'boolean') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'binary',
+        metricSubPath: currPath,
+        source: 'derived', // Using 'derived' since we don't have a direct scorer reference
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (typeof metricVal === 'number') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'continuous',
+        metricSubPath: currPath,
+        source: 'derived',
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (
+      metricVal != null &&
+      typeof metricVal === 'object' &&
+      !Array.isArray(metricVal)
+    ) {
+      // Special case for auto-summarized binary scores
+      if (isBinarySummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.true_fraction,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Special case for auto-summarized continuous scores
+      else if (isContinuousSummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.mean,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Otherwise, process nested objects
+      else {
+        Object.entries(metricVal).forEach(([key, val]) => {
+          recursiveAddMetric(val, [...currPath, key]);
+        });
+      }
+    }
+  };
+
+  // Start processing from the root of the output
+  Object.entries(output).forEach(([key, val]) => {
+    recursiveAddMetric(val, [key]);
+  });
+};
+
+const isImperativeEvalCall = (call: TraceCallSchema) => {
+  return call.attributes?.['eval_type'] === 'imperative';
 };
