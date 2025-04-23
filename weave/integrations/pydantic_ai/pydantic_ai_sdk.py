@@ -1,13 +1,11 @@
-from typing import Optional, Literal, Callable, Any
+from typing import Callable, Any
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.trace import get_current_span
 import importlib
-import inspect
 from functools import wraps
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.integrations.pydantic_ai.utils import PydantiAISpanExporter
+from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter
 from weave.trace.autopatch import IntegrationSettings
 
 _pydantic_ai_patcher: MultiPatcher | None = None

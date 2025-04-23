@@ -10,7 +10,9 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.wandb_interface import wandb_api
 
 
-def dicts_to_events(event_dicts: Sequence[dict], span: trace_sdk.ReadableSpan) -> Sequence[Event]:
+def dicts_to_events(
+    event_dicts: Sequence[dict], span: trace_sdk.ReadableSpan
+) -> Sequence[Event]:
     event_objs = []
     n = len(event_dicts)
     for i, d in enumerate(event_dicts):
@@ -31,7 +33,9 @@ def dicts_to_events(event_dicts: Sequence[dict], span: trace_sdk.ReadableSpan) -
     return event_objs
 
 
-def handle_events(key: str, attrs: dict, span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
+def handle_events(
+    key: str, attrs: dict, span: trace_sdk.ReadableSpan
+) -> trace_sdk.ReadableSpan:
     if key in attrs:
         try:
             events = attrs.pop(key)
@@ -49,9 +53,11 @@ def handle_events(key: str, attrs: dict, span: trace_sdk.ReadableSpan) -> trace_
     return span
 
 
-def map_events_to_prompt_completion(span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
+def map_events_to_prompt_completion(
+    span: trace_sdk.ReadableSpan,
+) -> trace_sdk.ReadableSpan:
     messages = []
-    for event in getattr(span, "events", []):
+    for event in getattr(span, "_events", []):
         attrs = event.attributes
         if (
             event.name
@@ -86,13 +92,13 @@ def map_events_to_prompt_completion(span: trace_sdk.ReadableSpan) -> trace_sdk.R
 
 def handle_usage(span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
     if "gen_ai.usage.input_tokens" in span._attributes:
-            span._attributes["gen_ai.usage.prompt_tokens"] = span._attributes.pop(
-                "gen_ai.usage.input_tokens"
-            )
+        span._attributes["gen_ai.usage.prompt_tokens"] = span._attributes.pop(
+            "gen_ai.usage.input_tokens"
+        )
     if "gen_ai.usage.output_tokens" in span._attributes:
-            span._attributes["gen_ai.usage.completion_tokens"] = span._attributes.pop(
-                "gen_ai.usage.output_tokens"
-            )
+        span._attributes["gen_ai.usage.completion_tokens"] = span._attributes.pop(
+            "gen_ai.usage.output_tokens"
+        )
     return span
 
 
@@ -136,7 +142,7 @@ def get_otlp_headers_from_weave_context():
     return headers
 
 
-class PydantiAISpanExporter(SpanExporter):
+class PydanticAISpanExporter(SpanExporter):
 
     def __init__(self):
         endpoint = os.environ.get(
