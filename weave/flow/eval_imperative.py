@@ -44,15 +44,16 @@ _active_evaluation_loggers: WeakSet[EvaluationLogger] = WeakSet()
 # Register cleanup handler for program exit
 def _cleanup_all_evaluations() -> None:
     loggers_to_cleanup = list(_active_evaluation_loggers)
-    for logger_ref in loggers_to_cleanup:
-        try:
-            if not logger_ref._is_finalized:
-                logger_ref.finish()
-        except Exception:
-            # Log but continue with other cleanups
-            logger.error(
-                "Error during atexit cleanup of EvaluationLogger", exc_info=True
-            )
+    for eval_logger in loggers_to_cleanup:
+        _cleanup_evaluation(eval_logger)
+
+
+def _cleanup_evaluation(eval_logger: EvaluationLogger) -> None:
+    try:
+        if not eval_logger._is_finalized:
+            eval_logger.finish()
+    except Exception:
+        logger.error("Error during cleanup of EvaluationLogger", exc_info=True)
 
 
 atexit.register(_cleanup_all_evaluations)
@@ -522,13 +523,4 @@ class EvaluationLogger(BaseModel):
 
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
-        if self._eval_started and not self._is_finalized:
-            try:
-                self.finish()
-            except Exception:
-                # Del methods should not raise exceptions.
-                # Log or handle the error appropriately if needed, but avoid propagation.
-                logger.error(
-                    "Error during implicit cleanup of EvaluationLogger.",
-                    exc_info=True,
-                )
+        _cleanup_evaluation(self)
