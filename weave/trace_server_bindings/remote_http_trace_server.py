@@ -565,6 +565,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateRes,
         )
 
+    def project_check(self, req: tsi.ProjectCheckReq) -> tsi.ProjectCheckRes:
+        return self._generic_request(
+            "/project/check", req, tsi.ProjectCheckReq, tsi.ProjectCheckRes
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

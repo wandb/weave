@@ -2011,6 +2011,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
         return metadata_result
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.project_check")
+    def project_check(self, req: tsi.ProjectCheckReq) -> tsi.ProjectCheckRes:
+        query = f"""
+        SELECT id
+        FROM calls_merged
+        WHERE project_id = '{req.project_id}'
+        LIMIT 1
+        """
+        res = self._query(query, {})
+        return tsi.ProjectCheckRes(has_data=len(res.result_rows) > 0)
+
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())

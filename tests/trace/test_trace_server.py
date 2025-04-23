@@ -2,6 +2,7 @@ import urllib
 
 import pytest
 
+import weave
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -80,3 +81,26 @@ def test_robust_to_url_sensitive_chars(client):
         )
     )
     assert read_res.vals[0] == bad_val[bad_key]
+
+
+def test_project_check(client):
+    # real project, no data
+    proj = client._project_id()
+    res = client.server.project_check(tsi.ProjectCheckReq(project_id=proj))
+    assert not res.has_data
+
+    # fake project
+    res = client.server.project_check(
+        tsi.ProjectCheckReq(project_id="shawn/proj-does-not-exist")
+    )
+    assert not res.has_data
+
+    # real project w/ data
+    @weave.op
+    def log():
+        return "a"
+
+    log()
+
+    res = client.server.project_check(tsi.ProjectCheckReq(project_id=proj))
+    assert res.has_data
