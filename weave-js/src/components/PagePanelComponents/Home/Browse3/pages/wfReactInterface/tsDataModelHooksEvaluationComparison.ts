@@ -425,15 +425,13 @@ const fetchEvaluationComparisonResults = async (
   // 4. Populate the predictions and scores
   const evalTraceRes = await evalTraceResProm;
 
-  const isImperativeEval = evalTraceRes.calls.some(isImperativeEvalCall);
-  if (isImperativeEval) {
-    populatePredictionsAndScoresImperative(
-      evalTraceRes,
-      result,
-      summaryData,
-      convertISOToDate
-    );
-  }
+  const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
+  populatePredictionsAndScoresImperative(
+    {calls: imperativeEvalCalls},
+    result,
+    summaryData,
+    convertISOToDate
+  );
 
   // Create a set of all of the scorer refs
   const scorerRefs = new Set(
@@ -484,17 +482,19 @@ const fetchEvaluationComparisonResults = async (
 
   // If we have processed imperative evaluations, we can skip the following code
   // as it's meant for non-imperative evaluations
-  if (!isImperativeEval) {
-    populatePredictionsAndScoresNonImperative(
-      evalTraceRes,
-      result,
-      summaryData,
-      summaryOps,
-      scorerRefs,
-      predictAndScoreOps,
-      modelRefs
-    );
-  }
+  const nonImperativeEvalCalls = evalTraceRes.calls.filter(
+    call => !isImperativeEvalCall(call)
+  );
+
+  populatePredictionsAndScoresNonImperative(
+    {calls: nonImperativeEvalCalls},
+    result,
+    summaryData,
+    summaryOps,
+    scorerRefs,
+    predictAndScoreOps,
+    modelRefs
+  );
 
   // Filter out non-intersecting rows
   result.resultRows = Object.fromEntries(
