@@ -77,7 +77,7 @@ const VideoPlayerWithSize = ({
     entity,
     project,
     previewKey ? data.files[previewKey] : '',
-    {skip: !videoKey}
+    {skip: !previewKey || !videoKey}
   );
 
   if (!videoKey) {
@@ -89,11 +89,15 @@ const VideoPlayerWithSize = ({
   }
 
   const fileExt = videoTypes[videoKey as keyof typeof videoTypes];
+  const previewImageUrl = previewKey && imageBinary.result ? 
+    URL.createObjectURL(new Blob([imageBinary.result])) : 
+    undefined;
 
   return (
     <VideoPlayerWithData
       fileExt={fileExt}
       buffer={videoBinary.result}
+      previewImageUrl={previewImageUrl}
       containerWidth={containerWidth}
       containerHeight={containerHeight}
       title={data.custom_name || entity.split('-')[0]} // Using first part of entity as title if no custom name
@@ -104,6 +108,7 @@ const VideoPlayerWithSize = ({
 type VideoPlayerWithDataProps = {
   fileExt: 'gif' | 'mp4' | 'webm';
   buffer: ArrayBuffer;
+  previewImageUrl?: string;
   containerWidth: number;
   containerHeight: number;
   title: string;
@@ -112,6 +117,7 @@ type VideoPlayerWithDataProps = {
 const VideoPlayerWithData = ({
   fileExt,
   buffer,
+  previewImageUrl,
   containerWidth,
   containerHeight,
   title,
@@ -153,6 +159,7 @@ const VideoPlayerWithData = ({
     <VideoPlayerLoaded
       url={url}
       fileExt={fileExt}
+      previewImageUrl={previewImageUrl}
       containerWidth={containerWidth}
       containerHeight={containerHeight}
       title={title}
@@ -163,6 +170,7 @@ const VideoPlayerWithData = ({
 type VideoPlayerLoadedProps = {
   url: string;
   fileExt: 'gif' | 'mp4' | 'webm';
+  previewImageUrl?: string;
   containerWidth: number;
   containerHeight: number;
   title: string;
@@ -205,6 +213,46 @@ const VideoElement = styled.video`
   width: 100%;
   height: 100%;
   object-fit: contain;
+`;
+
+const PreviewImageContainer = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+`;
+
+const PreviewImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+`;
+
+const PlayButtonOverlay = styled.div`
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  
+  &:hover {
+    transform: scale(1.1);
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+  
+  svg {
+    width: 40px;
+    height: 40px;
+    fill: white;
+  }
 `;
 
 const CustomControls = styled.div`
@@ -313,6 +361,7 @@ const formatTime = (seconds: number): string => {
 const VideoPlayerLoaded = ({
   url,
   fileExt,
+  previewImageUrl,
   containerWidth,
   containerHeight,
   title,
@@ -324,6 +373,7 @@ const VideoPlayerLoaded = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [showPreview, setShowPreview] = useState(!!previewImageUrl);
 
   const isGif = fileExt === 'gif';
   
@@ -362,6 +412,7 @@ const VideoPlayerLoaded = ({
     if (isPlaying) {
       videoElement.pause();
     } else {
+      setShowPreview(false);
       videoElement.play();
     }
   };
@@ -449,11 +500,22 @@ const VideoPlayerLoaded = ({
       <VideoContainer>
         <VideoTitle>{title}</VideoTitle>
         <VideoWrapper>
+          {showPreview && previewImageUrl && (
+            <PreviewImageContainer onClick={togglePlay}>
+              <PreviewImage src={previewImageUrl} alt={`${title} preview`} />
+              <PlayButtonOverlay>
+                <svg viewBox="0 0 24 24" fill="white">
+                  <path d="M8 5.14v14l11-7-11-7z" />
+                </svg>
+              </PlayButtonOverlay>
+            </PreviewImageContainer>
+          )}
           <VideoElement
             ref={videoRef}
             src={url}
             onClick={togglePlay}
             playsInline
+            autoPlay={false}
           />
         </VideoWrapper>
         <CustomControls>

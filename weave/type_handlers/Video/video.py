@@ -53,18 +53,41 @@ class VideoWithPreview(BaseModel):
         """Get the filename for the preview."""
         return f"image.{self.preview_format}"
 
+def get_preview_image_video_file(clip: mp.VideoFileClip) -> Union[Image.Image, None]:
+    duration = clip.duration
+    preview_arr = clip.get_frame(duration//2)
+    preview = Image.fromarray(preview_arr) if preview_arr is not None else None
+    return preview
+
+def get_preview_image(clip: mp.VideoClip) -> Union[Image.Image, None]:
+    if isinstance(clip, mp.VideoFileClip):
+        return get_preview_image_video_file(clip)
+    # elif isinstance(clip, mp.
+    duration = clip.duration
+    fps = clip.fps
+    n_frames = int(duration * fps)
+    mid_frame = n_frames//2
+    preview_arr = clip.get_frame(mid_frame / fps)
+    preview = Image.fromarray(preview_arr) if preview_arr is not None else None
+    return preview
+
 def to_video_with_preview(obj: mp.VideoClip) -> Union[VideoWithPreview, None]:
     """Convert a VideoClip to a VideoWithPreview TypedDict.
     This is used to store the video and its preview image.
     """
     fmt = getattr(obj, "format", DEFAULT_FORMAT)
     # Check if the object is a VideoFileClip, which has a filename attribute
-    is_file_clip = hasattr(obj, "filename") and isinstance(obj, mp.VideoFileClip)
+    is_file_clip = hasattr(obj, "filename") and isinstance(obj, mp.VideoClip)
 
     # For VideoFileClip objects, use the original format when it's webm
     if is_file_clip and obj.filename:
-        preview_arr = obj.get_frame(0) if hasattr(obj, "get_frame") else None
-        preview = Image.fromarray(preview_arr) if preview_arr is not None else None
+        preview = get_preview_image(obj)
+
+        if preview:
+            preview.save('./test.png', format='png')
+        else:
+            logger.error("Failed to extract preview frame from video.")
+
         original_ext = os.path.splitext(obj.filename)[1].lower().lstrip('.')
         if original_ext not in format_to_ext:
             raise ValueError(f"Unsupported video format: {fmt} - Only gif, mp4, and webm are supported")
