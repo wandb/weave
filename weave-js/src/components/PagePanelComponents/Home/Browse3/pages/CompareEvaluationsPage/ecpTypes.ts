@@ -59,11 +59,6 @@ export type EvaluationComparisonResults = {
     };
   };
 };
-
-type DatasetRow = {
-  digest: string;
-  val: any;
-};
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
  */
