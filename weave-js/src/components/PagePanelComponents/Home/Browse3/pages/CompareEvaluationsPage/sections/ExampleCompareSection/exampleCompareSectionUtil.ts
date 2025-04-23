@@ -418,12 +418,12 @@ export function useExampleCompareData(
       const selectedRowDigest = targetRow.inputDigest;
 
       // Check if we can get the data from the results directly.
-      // This will only be true for imperative evaluations
-      const row =
-        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest];
-      const preloadedInputData = row?.rawDataRow;
-      if (!(selectedRowDigest in cachedRowData.current) && preloadedInputData) {
-        cachedRowData.current[selectedRowDigest] = preloadedInputData;
+      // This is most commonly true for imperative evaluations
+      const rawDataRow =
+        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest]
+          ?.rawDataRow;
+      if (!(selectedRowDigest in cachedRowData.current) && rawDataRow) {
+        cachedRowData.current[selectedRowDigest] = rawDataRow;
         increaseCacheVersion();
         return;
       }
