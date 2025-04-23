@@ -769,7 +769,7 @@ const processImperativeEvaluation = (
   const outputObj = call.output as any;
 
   Object.entries(outputObj).forEach(([key, value]) => {
-    // Skip non-object values
+    // Skip non-object values (these are extra summary metrics logged with `log_summary`)
     if (typeof value !== 'object') {
       return;
     }
@@ -777,15 +777,15 @@ const processImperativeEvaluation = (
     // Special handling for true_fraction if it exists
     const valueObj = value as Record<string, unknown>;
     if ('true_fraction' in valueObj && valueObj.true_fraction != null) {
-      data.push({
+      const scoreRecord: LeaderboardValueRecord = {
         ...recordPartial,
         metricType: 'scorerMetric',
         scorerName: key,
         scorerVersion: '',
         metricPath: 'true_fraction',
         metricValue: valueObj.true_fraction as number,
-      });
-      return;
+      };
+      data.push(scoreRecord);
     }
   });
 };
