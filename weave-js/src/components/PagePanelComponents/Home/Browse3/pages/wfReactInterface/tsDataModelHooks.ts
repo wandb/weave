@@ -34,8 +34,8 @@ import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
-  CacheableCallKey,
   CallFilter,
+  CallKey,
   CallSchema,
   FeedbackKey,
   Loadable,
@@ -165,15 +165,28 @@ const useMakeTraceServerEndpoint = <
 };
 
 const useCall = (
-  key: CacheableCallKey | null,
+  key: CallKey | null,
   opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? callCache.get(key) : null;
+
+  const effectiveKey = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return {
+      ...key,
+      withCosts: !!opts?.includeCosts,
+      withTotalStorageSize: !!opts?.includeTotalStorageSize,
+    };
+  }, [key, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const deepKey = useDeepMemo(effectiveKey);
+
+  const cachedCall = deepKey ? callCache.get(deepKey) : null;
+
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
       loadingRef.current = true;
@@ -203,7 +216,7 @@ const useCall = (
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (deepKey == null) {
       return {
         loading: false,
         result: null,
@@ -224,9 +237,14 @@ const useCall = (
         loading: true,
         result: null,
       };
-    } else if (result?.callId === key?.callId) {
+    } else if (result == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } else if (result?.callId === deepKey?.callId) {
       if (result) {
-        callCache.set(key, result);
+        callCache.set(deepKey, result);
       }
       return {
         loading: false,
@@ -239,7 +257,7 @@ const useCall = (
         result: null,
       };
     }
-  }, [cachedCall, callRes, key]);
+  }, [cachedCall, callRes, deepKey]);
 };
 
 const useCallsNoExpansion = (

@@ -103,7 +103,7 @@ export const useObjectVersions = (
   }
 
   const result = rootObjectVersions.result ?? [];
-  // TODO: Allow ommitting version specifier and handling other cases
+  // TODO: Allow omitting version specifier and handling other cases
   // objname => latest version - 1, latest version
   // obj1, obj2 => latest version for both
   // For now, we require a version specifier for each
