@@ -471,7 +471,8 @@ class EvaluationLogger(BaseModel):
         )
         try:
             with _set_current_summary(final_summary):
-                self._pseudo_evaluation.summarize()
+                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    self._pseudo_evaluation.summarize()
         except Exception:
             logger.error("Error during execution of summarize op.", exc_info=True)
             # Even if summarize fails, try to finalize with the calculated summary
