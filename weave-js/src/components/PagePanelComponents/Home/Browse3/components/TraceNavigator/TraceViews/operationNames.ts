@@ -110,7 +110,8 @@ export const COMPLETION_OP_NAMES = [
 export const EVAL_OP_NAMES = [
   'notdiamond.toolkit.custom_router.eval',
   'dspy.Evaluate',
-  'Evaluation.evaluate',
+  'Evaluation.predict_and_score',
+  'Evaluation.summarize',
 ];
 
 export const QUERY_OP_NAMES = [
