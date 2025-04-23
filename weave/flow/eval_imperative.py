@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -8,6 +9,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
+from weakref import WeakSet
 
 from pydantic import (
     BaseModel,
@@ -34,6 +36,26 @@ ID = str
 ScoreType = Union[float, bool, dict]
 
 logger = logging.getLogger(__name__)
+
+# Registry to track active EvaluationLogger instances
+_active_evaluation_loggers: WeakSet[EvaluationLogger] = WeakSet()
+
+
+# Register cleanup handler for program exit
+def _cleanup_all_evaluations() -> None:
+    loggers_to_cleanup = list(_active_evaluation_loggers)
+    for logger_ref in loggers_to_cleanup:
+        try:
+            if not logger_ref._is_finalized:
+                logger_ref.finish()
+        except Exception:
+            # Log but continue with other cleanups
+            logger.error(
+                "Error during atexit cleanup of EvaluationLogger", exc_info=True
+            )
+
+
+atexit.register(_cleanup_all_evaluations)
 
 # Context variable to store the current output safely between threads.  This also
 # ensures that only 1 version of the predict method is saved because the code
@@ -190,23 +212,23 @@ class ScoreLogger(BaseModel):
 
         self._has_finished = True
 
-    def log_score(self, scorer: Scorer | str, score: ScoreType) -> None:
-        """Log a score synchronously by calling the async method.
-
-        This is a convenience method for when you don't want to use async/await.
-        If called from within an existing event loop, use _alog_score instead.
-        """
+    def log_score(self, scorer: Scorer | dict | str, score: ScoreType) -> None:
+        """Log a score synchronously."""
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # If there is no running loop, run the method synchronously
-            asyncio.run(self._alog_score(scorer, score))
-        else:
-            # If there is a running loop, run the method asynchronously
-            loop.create_task(self._alog_score(scorer, score))
+            # Get event loop or create one
+            try:
+                loop = asyncio.get_running_loop()
+                # If in an event loop, run the coroutine to completion
+                loop.run_until_complete(self.alog_score(scorer, score))
+            except RuntimeError:
+                # No running loop, use asyncio.run()
+                asyncio.run(self.alog_score(scorer, score))
+        except Exception as e:
+            # Ensure exceptions are propagated
+            raise e
 
     @validate_call
-    async def _alog_score(
+    async def alog_score(
         self,
         scorer: Annotated[
             Scorer | dict | str,
@@ -302,6 +324,9 @@ class EvaluationLogger(BaseModel):
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize the pseudo evaluation with the dataset from the model."""
+        # Register this instance in the global registry for atexit cleanup
+        _active_evaluation_loggers.add(self)
+
         # At this point dataset has already been processed by the validator
         # and converted to a Dataset object
         self._pseudo_evaluation = Evaluation(
@@ -389,9 +414,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -466,9 +491,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
@@ -479,7 +504,7 @@ class EvaluationLogger(BaseModel):
 
         self._finalize_evaluation(output=final_summary)
 
-    def close(self) -> None:
+    def finish(self) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.
 
         Ensures all prediction calls and the main evaluation call are finalized.
@@ -491,11 +516,15 @@ class EvaluationLogger(BaseModel):
         # Finalize with None output, indicating closure without summary
         self._finalize_evaluation(output=None)
 
+        # Remove from global registry since we've manually finalized
+        if self in _active_evaluation_loggers:
+            _active_evaluation_loggers.discard(self)
+
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
         if self._eval_started and not self._is_finalized:
             try:
-                self.close()
+                self.finish()
             except Exception:
                 # Del methods should not raise exceptions.
                 # Log or handle the error appropriately if needed, but avoid propagation.
