@@ -53,6 +53,7 @@ export const CallSummary: React.FC<{
     )
   );
 
+  // Extract the costs from the trace call
   const costData = call.traceCall?.summary?.weave?.costs;
 
   const storageSizeBytesRow = useMemo(() => {
