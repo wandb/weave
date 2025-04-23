@@ -2126,6 +2126,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "the limit. If logging images, save them as `Image.PIL`."
                 )
             raise
+        except Exception as e:
+            # Do potentially expensive data length calculation, only on
+            # error, which should be very rare!
+            data_bytes = sum(_num_bytes(row) for row in data)
+            logger.exception(
+                "clickhouse_insert_error",
+                extra={
+                    "error_str": str(e),
+                    "table": table,
+                    "data_len": len(data),
+                    "data_bytes": data_bytes,
+                    "example_data": None if len(data) == 0 else data[0],
+                    "column_names": column_names,
+                    "settings": settings,
+                },
+            )
+            raise
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -2155,6 +2172,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         If values are larger than 1MiB replace them with placeholder values.
         """
+        stripped_count = 0
         final_batch = []
         # Set the value byte limit to be anything over 1MiB to catch
         # payloads with multiple large values that are still under the
@@ -2173,11 +2191,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # be large enough to strip... (?)
                     if _num_bytes(value) > val_byte_limit:
                         stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                        stripped_count += 1
                     else:
                         stripped_item += [value]
                 final_batch.append(stripped_item)
             else:
                 final_batch.append(item)
+
+        ddtrace.tracer.current_span().set_tags(
+            {
+                "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
+                    stripped_count
+                )
+            }
+        )
         return final_batch
 
 
