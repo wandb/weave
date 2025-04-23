@@ -283,7 +283,7 @@ const useCallsNoExpansion = (
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const makeQueryReq = useCallback((): traceServerTypes.TraceCallsQueryReq => {
+  const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
     return {
       project_id: projectIdFromParts({entity, project}),
       filter: {
@@ -322,36 +322,32 @@ const useCallsNoExpansion = (
     opts?.includeTotalStorageSize,
   ]);
 
-  // Keep track of the request str we're waiting for, so that we
+  // Keep track of the request we're waiting for, so that we
   // can ignore requests that are superceded by more recent reqs
-  const currentRequestStr = useMemo(() => {
-    return JSON.stringify(makeQueryReq());
-  }, [makeQueryReq]);
-  const expectedRequestStrRef = useRef(currentRequestStr);
+  const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {
     setCallRes(null);
     loadingRef.current = true;
-    expectedRequestStrRef.current = currentRequestStr;
+    expectedRequestRef.current = req;
 
-    const req = makeQueryReq();
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       // Only update state if this response matches our current request
-      if (expectedRequestStrRef.current === currentRequestStr) {
+      if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         setCallRes(res);
       }
     };
     const onError = (e: any) => {
       // Only update state if this response matches our current request
-      if (expectedRequestStrRef.current === currentRequestStr) {
+      if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         console.error(e);
         setCallRes({calls: []});
       }
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
-  }, [getTsClient, currentRequestStr, makeQueryReq]);
+  }, [getTsClient, req]);
 
   // register doFetch as a callback after deletion
   useEffect(() => {
