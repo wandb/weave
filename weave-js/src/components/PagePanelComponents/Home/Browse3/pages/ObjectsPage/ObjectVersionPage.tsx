@@ -3,7 +3,6 @@ import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
-import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
@@ -22,7 +21,6 @@ import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {useShowDeleteButton} from '../common/DeleteModal';
 import {
-  CallLink,
   CallsLink,
   ObjectVersionsLink,
   objectVersionText,
@@ -31,7 +29,6 @@ import {
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
-  SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
@@ -513,38 +510,11 @@ const ObjectVersionPageInner: React.FC<{
               {
                 label: 'Calls',
                 content: (
-                  <Box sx={{p: 2}}>
-                    <SimpleKeyValueTable
-                      data={{
-                        ...(producingCalls.result!.length > 0
-                          ? {
-                              [maybePluralizeWord(
-                                producingCalls.result!.length,
-                                'Producing Call'
-                              )]: (
-                                <ObjectVersionProducingCallsItem
-                                  producingCalls={producingCalls.result ?? []}
-                                  refUri={refUri}
-                                />
-                              ),
-                            }
-                          : {}),
-                        ...(consumingCalls.result!.length
-                          ? {
-                              [maybePluralizeWord(
-                                consumingCalls.result!.length,
-                                'Consuming Call'
-                              )]: (
-                                <ObjectVersionConsumingCallsItem
-                                  consumingCalls={consumingCalls.result ?? []}
-                                  refUri={refUri}
-                                />
-                              ),
-                            }
-                          : {}),
-                      }}
-                    />
-                  </Box>
+                  <CallsTabContent
+                    producingCalls={producingCalls.result ?? []}
+                    consumingCalls={consumingCalls.result ?? []}
+                    refUri={refUri}
+                  />
                 ),
               },
             ]
@@ -554,66 +524,7 @@ const ObjectVersionPageInner: React.FC<{
   );
 };
 
-const ObjectVersionProducingCallsItem: React.FC<{
-  producingCalls: CallSchema[];
-  refUri: string;
-}> = props => {
-  if (props.producingCalls.length === 1) {
-    const call = props.producingCalls[0];
-    const {opVersionRef, spanName} = call;
-    if (opVersionRef == null) {
-      return <>{spanName}</>;
-    }
-    return (
-      <CallLink
-        entityName={call.entity}
-        projectName={call.project}
-        opName={spanName}
-        callId={call.callId}
-        variant="secondary"
-      />
-    );
-  }
-  return (
-    <GroupedCalls
-      calls={props.producingCalls}
-      partialFilter={{
-        outputObjectVersionRefs: [props.refUri],
-      }}
-    />
-  );
-};
-const ObjectVersionConsumingCallsItem: React.FC<{
-  consumingCalls: CallSchema[];
-  refUri: string;
-}> = props => {
-  if (props.consumingCalls.length === 1) {
-    const call = props.consumingCalls[0];
-    const {opVersionRef, spanName} = call;
-    if (opVersionRef == null) {
-      return <>{spanName}</>;
-    }
-    return (
-      <CallLink
-        entityName={call.entity}
-        projectName={call.project}
-        opName={spanName}
-        callId={call.callId}
-        variant="secondary"
-      />
-    );
-  }
-  return (
-    <GroupedCalls
-      calls={props.consumingCalls}
-      partialFilter={{
-        inputObjectVersionRefs: [props.refUri],
-      }}
-    />
-  );
-};
-
-export const GroupedCalls: React.FC<{
+const GroupedCalls: React.FC<{
   calls: CallSchema[];
   partialFilter?: WFHighLevelCallFilter;
 }> = ({calls, partialFilter}) => {
@@ -642,29 +553,34 @@ export const GroupedCalls: React.FC<{
 
   if (calls.length === 0) {
     return <div>-</div>;
-  } else if (Object.keys(callGroups).length === 1) {
-    const key = Object.keys(callGroups)[0];
-    const val = callGroups[key];
-    return <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
   }
+
+  const isProducingCalls = partialFilter?.outputObjectVersionRefs != null;
+  const callType = isProducingCalls ? 'Producing' : 'Consuming';
+
   return (
-    <ul
-      style={{
-        margin: 0,
-        paddingInlineStart: '22px',
-      }}>
-      {Object.entries(callGroups).map(([key, val], ndx) => {
-        return (
-          <li key={key}>
-            <OpVersionCallsLink val={val} partialFilter={partialFilter} />
-          </li>
-        );
-      })}
-    </ul>
+    <Tailwind>
+      <div className="mb-8 text-[16px] font-semibold">{callType} calls</div>
+      <div>
+        <div className="w-full overflow-hidden rounded border border-[#E0E0E0]">
+          <table className="w-full text-[14px]">
+            <tbody className="divide-y divide-[#E0E0E0]">
+              {Object.entries(callGroups).map(([key, val]) => (
+                <CallGroupRow
+                  key={key}
+                  val={val}
+                  partialFilter={partialFilter}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Tailwind>
   );
 };
 
-const OpVersionCallsLink: React.FC<{
+const CallGroupRow: React.FC<{
   val: {
     opVersionRef: string;
     calls: CallSchema[];
@@ -673,34 +589,67 @@ const OpVersionCallsLink: React.FC<{
 }> = ({val, partialFilter}) => {
   const {useOpVersion} = useWFHooks();
   const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
-  if (opVersion.loading) {
-    return null;
-  } else if (opVersion.result == null) {
+
+  if (opVersion.loading || opVersion.result == null) {
     return null;
   }
+
   return (
-    <>
-      <OpVersionLink
-        entityName={opVersion.result.entity}
-        projectName={opVersion.result.project}
-        opName={opVersion.result.opId}
-        version={opVersion.result.versionHash}
-        versionIndex={opVersion.result.versionIndex}
-        variant="secondary"
-      />{' '}
-      [
-      <CallsLink
-        entity={opVersion.result.entity}
-        project={opVersion.result.project}
-        callCount={val.calls.length}
-        filter={{
-          opVersionRefs: [val.opVersionRef],
-          ...(partialFilter ?? {}),
-        }}
-        neverPeek
-        variant="secondary"
-      />
-      ]
-    </>
+    <tr>
+      <td className="align-center whitespace-nowrap border-r border-[#E0E0E0] bg-moon-50 p-[8px]">
+        <OpVersionLink
+          entityName={opVersion.result.entity}
+          projectName={opVersion.result.project}
+          opName={opVersion.result.opId}
+          version={opVersion.result.versionHash}
+          versionIndex={opVersion.result.versionIndex}
+          variant="secondary"
+        />
+      </td>
+      <td className="align-center w-full p-[8px]">
+        <CallsLink
+          entity={opVersion.result.entity}
+          project={opVersion.result.project}
+          callCount={val.calls.length}
+          filter={{
+            opVersionRefs: [val.opVersionRef],
+            ...(partialFilter ?? {}),
+          }}
+          neverPeek
+          variant="secondary"
+        />
+      </td>
+    </tr>
+  );
+};
+
+const CallsTabContent: React.FC<{
+  producingCalls: CallSchema[];
+  consumingCalls: CallSchema[];
+  refUri: string;
+}> = ({producingCalls, consumingCalls, refUri}) => {
+  return (
+    <Box sx={{p: 2}}>
+      {producingCalls.length > 0 && (
+        <Box sx={{mb: 3}}>
+          <GroupedCalls
+            calls={producingCalls}
+            partialFilter={{
+              outputObjectVersionRefs: [refUri],
+            }}
+          />
+        </Box>
+      )}
+      {consumingCalls.length > 0 && (
+        <Box>
+          <GroupedCalls
+            calls={consumingCalls}
+            partialFilter={{
+              inputObjectVersionRefs: [refUri],
+            }}
+          />
+        </Box>
+      )}
+    </Box>
   );
 };
