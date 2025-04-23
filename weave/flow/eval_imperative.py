@@ -9,7 +9,6 @@ from contextvars import ContextVar
 from datetime import datetime
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
-from weakref import WeakSet
 
 from pydantic import (
     BaseModel,
@@ -38,13 +37,12 @@ ScoreType = Union[float, bool, dict]
 logger = logging.getLogger(__name__)
 
 # Registry to track active EvaluationLogger instances
-_active_evaluation_loggers: WeakSet[EvaluationLogger] = WeakSet()
+_active_evaluation_loggers: list[EvaluationLogger] = []
 
 
 # Register cleanup handler for program exit
 def _cleanup_all_evaluations() -> None:
-    loggers_to_cleanup = list(_active_evaluation_loggers)
-    for eval_logger in loggers_to_cleanup:
+    for eval_logger in _active_evaluation_loggers:
         _cleanup_evaluation(eval_logger)
 
 
@@ -326,7 +324,7 @@ class EvaluationLogger(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         """Initialize the pseudo evaluation with the dataset from the model."""
         # Register this instance in the global registry for atexit cleanup
-        _active_evaluation_loggers.add(self)
+        _active_evaluation_loggers.append(self)
 
         # At this point dataset has already been processed by the validator
         # and converted to a Dataset object
@@ -519,7 +517,7 @@ class EvaluationLogger(BaseModel):
 
         # Remove from global registry since we've manually finalized
         if self in _active_evaluation_loggers:
-            _active_evaluation_loggers.discard(self)
+            _active_evaluation_loggers.remove(self)
 
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
