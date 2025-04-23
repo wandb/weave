@@ -11,6 +11,7 @@ from weave.integrations.pydantic_ai.utils import (
 )
 from unittest.mock import MagicMock, patch
 from opentelemetry.sdk.trace import ReadableSpan
+import json
 
 
 def test_dicts_to_events_with_empty_list():
@@ -186,21 +187,27 @@ def test_pydantic_ai_span_exporter_export(mock_otlp_exporter):
             "gen_ai.tool.call.id": "12345",
             "tool_arguments": '{"arg1": "value1"}',
             "gen_ai.tool.name": "example_tool",
+            # Set the events as a JSON string to test the full flow
+            "events": json.dumps(
+                [
+                    {
+                        "name": "gen_ai.system.message",
+                        "role": "system",
+                        "content": "System message",
+                    },
+                    {
+                        "name": "gen_ai.user.message",
+                        "role": "user",
+                        "content": "User message",
+                    },
+                    {
+                        "name": "gen_ai.choice",
+                        "role": "assistant",
+                        "content": "Assistant response",
+                    },
+                ]
+            ),
         }
-        span._events = [
-            Event(
-                name="gen_ai.system.message",
-                attributes={"role": "system", "content": "System message"},
-            ),
-            Event(
-                name="gen_ai.user.message",
-                attributes={"role": "user", "content": "User message"},
-            ),
-            Event(
-                name="gen_ai.choice",
-                attributes={"role": "assistant", "content": "Assistant response"},
-            ),
-        ]
 
         # Call export
         result = exporter.export([span])
