@@ -484,9 +484,7 @@ export function useExampleCompareData(
       // evict the obsolete cache
       const newCache: Record<string, any> = {};
       for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
-        if (cachedRowData.current[rowDigest]) {
-          newCache[rowDigest] = cachedRowData.current[rowDigest];
-        }
+        newCache[rowDigest] = cachedRowData.current[rowDigest];
       }
       cachedRowData.current = newCache;
     })();
