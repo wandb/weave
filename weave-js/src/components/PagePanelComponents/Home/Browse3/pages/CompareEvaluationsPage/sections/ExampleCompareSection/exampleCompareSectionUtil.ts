@@ -488,10 +488,6 @@ export function useExampleCompareData(
         });
 
         // Fetch remaining adjacent rows from table
-        const rowsToFetchFromTable = adjacentRowsToFetch.filter(
-          digest => !adjacentRowsFromResults.includes(digest)
-        );
-
         if (!cachedPartialTableRequest.current) {
           cachedPartialTableRequest.current = await makePartialTableReq(
             state.summary.evaluations,
