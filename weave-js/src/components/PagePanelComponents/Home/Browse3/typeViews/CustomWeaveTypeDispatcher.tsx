@@ -53,6 +53,10 @@ const customWeaveTypeRegistry: {
     component: MarkdownView,
     preferredRowHeight: 350,
   },
+  'VideoWithPreview': {
+    component: VideoPlayer,
+    preferredRowHeight: 350,
+  },
   'moviepy.video.VideoClip.VideoClip': {
     component: VideoPlayer,
     preferredRowHeight: 350,

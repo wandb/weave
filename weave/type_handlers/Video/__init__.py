@@ -1,1 +1,0 @@
-from weave.type_handlers.Video import video

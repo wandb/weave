@@ -10,6 +10,7 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
+import { PILImageImageTypePayload, imageTypes } from '../PIL.Image.Image/PILImageImage';
 
 type VideoClipTypePayload = CustomWeaveTypePayload<
   'moviepy.video.VideoClip.VideoClip',
@@ -58,6 +59,11 @@ const VideoPlayerWithSize = ({
     'video.webm': 'webm',
   } as const;
 
+  console.log(data);
+  const previewKey = Object.keys(data.files).find(key => key in imageTypes) as
+    | keyof PILImageImageTypePayload['files']
+    | undefined;
+  console.log('previewKey', previewKey);
   const videoKey = Object.keys(data.files).find(key => key in videoTypes) as
     | keyof VideoClipTypePayload['files']
     | undefined;
@@ -65,6 +71,12 @@ const VideoPlayerWithSize = ({
     entity,
     project,
     videoKey ? data.files[videoKey] : '',
+    {skip: !videoKey}
+  );
+  const imageBinary = useFileContent(
+    entity,
+    project,
+    previewKey ? data.files[previewKey] : '',
     {skip: !videoKey}
   );
 
@@ -121,7 +133,7 @@ const VideoPlayerWithData = ({
       default:
         mimeType = 'video/mp4';
     }
-    
+
     const blob = new Blob([buffer], {
       type: mimeType,
     });
