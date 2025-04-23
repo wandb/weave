@@ -446,20 +446,24 @@ export function useExampleCompareData(
 
       if (cachedPartialTableRequest.current == null) {
         // couldn't get the table digest, no way to proceed
-        setLoading(false);
         return;
       }
 
-      await loadRowDataIntoCache(
-        [selectedRowDigest],
-        cachedRowData,
-        cachedPartialTableRequest,
-        getTraceServerClient
-      );
+      if (!(selectedRowDigest in cachedRowData.current)) {
+        // immediately fetch the current row
+        setLoading(true);
 
-      // This trigger a re-calculation of the `target` and a re-render immediately
-      increaseCacheVersion();
-      setLoading(false);
+        await loadRowDataIntoCache(
+          [selectedRowDigest],
+          cachedRowData,
+          cachedPartialTableRequest,
+          getTraceServerClient
+        );
+
+        // This trigger a re-calculation of the `target` and a re-render immediately
+        increaseCacheVersion();
+        setLoading(false);
+      }
 
       // check if there is a need to fetch adjacent rows
       const adjacentRows = [];
