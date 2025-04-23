@@ -425,12 +425,10 @@ const fetchEvaluationComparisonResults = async (
   // 4. Populate the predictions and scores
   const evalTraceRes = await evalTraceResProm;
 
+  // Calculate all necessary data first
   const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
-  populatePredictionsAndScoresImperative(
-    {calls: imperativeEvalCalls},
-    result,
-    summaryData,
-    convertISOToDate
+  const nonImperativeEvalCalls = evalTraceRes.calls.filter(
+    call => !isImperativeEvalCall(call)
   );
 
   // Create a set of all of the scorer refs
@@ -480,10 +478,12 @@ const fetchEvaluationComparisonResults = async (
     evalCall => evalCall.modelRef
   );
 
-  // If we have processed imperative evaluations, we can skip the following code
-  // as it's meant for non-imperative evaluations
-  const nonImperativeEvalCalls = evalTraceRes.calls.filter(
-    call => !isImperativeEvalCall(call)
+  // Now call both populate functions side by side
+  populatePredictionsAndScoresImperative(
+    {calls: imperativeEvalCalls},
+    result,
+    summaryData,
+    convertISOToDate
   );
 
   populatePredictionsAndScoresNonImperative(
