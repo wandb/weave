@@ -471,6 +471,16 @@ export function useExampleCompareData(
         row => !(row in cachedRowData.current)
       );
 
+      if (adjacentRowsToFetch.length > 0) {
+        // we load the data into the cache, but don't trigger a re-render
+        await loadRowDataIntoCache(
+          adjacentRowsToFetch,
+          cachedRowData,
+          cachedPartialTableRequest,
+          getTraceServerClient
+        );
+      }
+
       // evict the obsolete cache
       const newCache: Record<string, any> = {};
       for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
