@@ -780,7 +780,7 @@ const processImperativeEvaluationSummary = (
 };
 
 const isImperativeEvalCall = (call: TraceCallSchema) => {
-  return call.attributes?.['eval_type'] === 'imperative';
+  return call.attributes?._weave_eval_meta?.imperative;
 };
 
 const generateStableDigest = (obj: any): string => {

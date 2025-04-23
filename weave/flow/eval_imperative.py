@@ -45,6 +45,8 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
 
+IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
+
 
 @contextmanager
 def _set_current_output(output: Any) -> Iterator[None]:
@@ -236,7 +238,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes({"eval_type": "imperative"}):
+                with weave.attributes(IMPERATIVE_EVAL_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -330,7 +332,7 @@ class EvaluationLogger(BaseModel):
                 self: Evaluation, model: Model, example: dict
             ) -> dict:
                 predict_method = cast(Op, model.get_infer_method())
-                with weave.attributes({"eval_type": "imperative"}):
+                with weave.attributes(IMPERATIVE_EVAL_MARKER):
                     model_output, predict_call = predict_method.call(model, example)
                     current_predict_call.set(predict_call)
 
@@ -365,7 +367,7 @@ class EvaluationLogger(BaseModel):
                     "self": self._pseudo_evaluation,
                     "model": self.model,
                 },
-                attributes={"eval_type": "imperative"},
+                attributes=IMPERATIVE_EVAL_MARKER,
             )
             assert self._evaluate_call is not None
             call_context.push_call(self._evaluate_call)
@@ -418,7 +420,7 @@ class EvaluationLogger(BaseModel):
         prediction instance."""
         # Make the prediction call
         with _set_current_output(output):
-            with weave.attributes({"eval_type": "imperative"}):
+            with weave.attributes(IMPERATIVE_EVAL_MARKER):
                 _, predict_and_score_call = (
                     self._pseudo_evaluation.predict_and_score.call(
                         self._pseudo_evaluation,
