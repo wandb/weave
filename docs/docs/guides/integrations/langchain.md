@@ -34,9 +34,9 @@ output = llm_chain.invoke({"number": 2})
 print(output)
 ```
 
-## Tracking Call Attributes
+## Tracking Call Metadata
 
-To track attributes for your langchain calls, you can use the [`weave.attributes`](https://weave-docs.wandb.ai/reference/python-sdk/weave/#function-attributes) context manager. This context manager allows you to set attributes for a specific block of code, such as a chain or a single request.
+To track metadata from your LangChain calls, you can use the [`weave.attributes`](https://weave-docs.wandb.ai/reference/python-sdk/weave/#function-attributes) context manager. This context manager allows you to set custom metadata for a specific block of code, such as a chain or a single request.
 
 ```python
 import weave
@@ -58,7 +58,7 @@ with weave.attributes({"my_awesome_attribute": "value"}):
 
 print(output)
 ```
-Weave automatically tracks the attributes against the trace of the LangChain call. You can view the attributes in the Weave web interface as shown below:
+Weave automatically tracks the metadat against the trace of the LangChain call. You can view the metadata in the Weave web interface as shown below:
 
 [![langchain_attributes.png](imgs/langchain_attributes.png)](https://wandb.ai/parambharat/langchain_demo/weave/traces?cols=%7B%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
 
