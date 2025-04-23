@@ -528,7 +528,38 @@ export type LeaderboardObjectEvalData = {
   };
 };
 
-const processImperativeLeaderboardEvaluation = (
+// Gets a value from an object using a dot-notation path.
+// Handles arrays, objects, and gracefully handles nulls.
+const getValueByPath = (obj: any, path: string): any => {
+  if (obj == null) {
+    return null;
+  }
+
+  // Handle special case for auto-summarized data
+  if (typeof obj === 'object' && path === 'true_fraction' && path in obj) {
+    return obj[path];
+  }
+
+  // Special case for direct property access
+  if (path in obj) {
+    return obj[path];
+  }
+
+  return path.split('.').reduce((current, part) => {
+    if (current == null) {
+      return null;
+    }
+
+    if (Array.isArray(current)) {
+      const index = parseInt(part, 10);
+      return isNaN(index) ? null : current[index] || null;
+    }
+
+    return current[part] === undefined ? null : current[part];
+  }, obj);
+};
+
+const processLeaderboardEvaluationImperative = (
   call: TraceCallSchema,
   col: LeaderboardObjectVal['columns'][number],
   evalVal: any,
@@ -543,43 +574,11 @@ const processImperativeLeaderboardEvaluation = (
     output !== null &&
     col.scorer_name in output
   ) {
-    // Found a direct match in the output object
-    let value = (output as any)[col.scorer_name];
-
-    // Special handling for auto-summarized data that might not access correctly through the path
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      // col.summary_metric_path === 'true_count' ||
-      col.summary_metric_path === 'true_fraction' &&
-      col.summary_metric_path in value
-    ) {
-      // Directly access the property instead of using path traversal
-      value = value[col.summary_metric_path];
-    } else {
-      // Regular path traversal
-      col.summary_metric_path.split('.').forEach((part: string) => {
-        if (value == null) {
-          return;
-        }
-        if (_.isArray(value)) {
-          try {
-            const index = parseInt(part, 10);
-            value = value[index];
-          } catch (e) {
-            value = null;
-          }
-        } else {
-          value = (value as any)[part];
-        }
-      });
-    }
-
+    const value = getValueByPath(output, col.summary_metric_path);
     const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
     const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
     // Fix: Use scorerName without trailing colon to match the format expected elsewhere
     const scorerGroup = `${col.scorer_name}`;
-
     const row: GroupableLeaderboardValueRecord = {
       modelGroup,
       datasetGroup,
@@ -617,11 +616,11 @@ const processImperativeLeaderboardEvaluation = (
 };
 
 const processLeaderboardEvaluation = (
-  call: any,
-  col: any,
+  call: TraceCallSchema,
+  col: LeaderboardObjectVal['columns'][number],
   evalVal: any,
-  modelRef: any,
-  datasetRef: any,
+  modelRef: WeaveObjectRef,
+  datasetRef: WeaveObjectRef,
   data: GroupableLeaderboardValueRecord[],
   evalData: LeaderboardObjectEvalData
 ) => {
@@ -633,27 +632,7 @@ const processLeaderboardEvaluation = (
   if (scorerRef?.scheme !== 'weave') {
     return;
   }
-  let value = call.output;
-  if (typeof value !== 'object' || value == null) {
-    value = null;
-  } else {
-    value = (value as any)[col.scorer_name];
-  }
-  col.summary_metric_path.split('.').forEach((part: string) => {
-    if (value == null) {
-      return;
-    }
-    if (_.isArray(value)) {
-      try {
-        const index = parseInt(part, 10);
-        value = value[index];
-      } catch (e) {
-        value = null;
-      }
-    } else {
-      value = (value as any)[part];
-    }
-  });
+  const value = getValueByPath(call.output, col.summary_metric_path);
   const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
   const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
   const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
@@ -752,7 +731,7 @@ const getLeaderboardObjectGroupableData = async (
         }
 
         if (isImperative) {
-          processImperativeLeaderboardEvaluation(
+          processLeaderboardEvaluationImperative(
             call,
             col,
             evalVal,
