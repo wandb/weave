@@ -471,33 +471,6 @@ export function useExampleCompareData(
         row => !(row in cachedRowData.current)
       );
 
-      if (adjacentRowsToFetch.length > 0) {
-        // Check if any adjacent row data is available in resultRows
-        const adjacentRowsFromResults = adjacentRowsToFetch.filter(
-          digest =>
-            state.loadableComparisonResults.result?.resultRows?.[digest]
-              ?.rawDataRow
-        );
-
-        // Add data from comparison results to cache
-        adjacentRowsFromResults.forEach(digest => {
-          const inputData =
-            state.loadableComparisonResults.result!.resultRows[digest]
-              .rawDataRow;
-          cachedRowData.current[digest] = inputData;
-        });
-
-        // Fetch remaining adjacent rows from table
-        if (!cachedPartialTableRequest.current) {
-          cachedPartialTableRequest.current = await makePartialTableReq(
-            state.summary.evaluations,
-            filteredRows,
-            targetIndex,
-            getTraceServerClient
-          );
-        }
-      }
-
       // evict the obsolete cache
       const newCache: Record<string, any> = {};
       for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {

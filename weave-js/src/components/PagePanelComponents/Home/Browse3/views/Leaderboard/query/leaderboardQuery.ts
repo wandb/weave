@@ -768,53 +768,24 @@ const processImperativeEvaluation = (
 ) => {
   const outputObj = call.output as any;
 
-  // Find all properties that aren't built-in metrics
-  const builtInMetrics = ['model_latency', 'model_output', 'scores'];
   Object.entries(outputObj).forEach(([key, value]) => {
-    // Check if the key is a scorer name and the value is a scorer result object
-    if (
-      !builtInMetrics.includes(key) &&
-      typeof value === 'object' &&
-      value !== null
-    ) {
-      // Special handling for common auto-summarized data formats (true_count, true_fraction)
-      // that might not be properly flattened
-      const valueObj = value as Record<string, unknown>;
-      if (
-        // 'true_count' in valueObj ||
-        'true_fraction' in valueObj
-      ) {
-        // Process binary score metrics if they exist
-        [
-          // 'true_count',
-          'true_fraction',
-        ].forEach(metricPath => {
-          if (metricPath in valueObj && valueObj[metricPath] != null) {
-            data.push({
-              ...recordPartial,
-              metricType: 'scorerMetric',
-              scorerName: key,
-              scorerVersion: '',
-              metricPath,
-              metricValue: valueObj[metricPath] as number,
-            });
-          }
-        });
-        return;
-      }
+    // Skip non-object values
+    if (typeof value !== 'object') {
+      return;
+    }
 
-      const flatScorePayload = flattenObjectPreservingWeaveTypes(value);
-      Object.entries(flatScorePayload).forEach(([metricPath, metricValue]) => {
-        const scoreRecord: LeaderboardValueRecord = {
-          ...recordPartial,
-          metricType: 'scorerMetric',
-          scorerName: key,
-          scorerVersion: '',
-          metricPath,
-          metricValue,
-        };
-        data.push(scoreRecord);
+    // Special handling for true_fraction if it exists
+    const valueObj = value as Record<string, unknown>;
+    if ('true_fraction' in valueObj && valueObj.true_fraction != null) {
+      data.push({
+        ...recordPartial,
+        metricType: 'scorerMetric',
+        scorerName: key,
+        scorerVersion: '',
+        metricPath: 'true_fraction',
+        metricValue: valueObj.true_fraction as number,
       });
+      return;
     }
   });
 };
