@@ -1,6 +1,7 @@
 from pathlib import Path
 import yaml
 import re
+import os
 
 def is_optional(file_path: Path) -> bool:
     """Check if file should be in Optional section."""
@@ -67,8 +68,23 @@ def generate_llms_txt(docs_dir: Path, output_file: Path):
 
     output_file.write_text('\n'.join(content))
 
+def main():
+    # Get the root directory of the project (adjust as needed)
+    script_dir = Path(__file__).resolve().parent
+    root_dir = script_dir.parent  # Assuming the script is in "docs/scripts"
+    
+    docs_dir = root_dir / "docs"
+    output_file = root_dir / "static" / "llms.txt"
+
+    # Debugging output
+    print(f"Docs directory: {docs_dir}")
+    print(f"Output file: {output_file}")
+
+    # Ensure the static directory exists
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Call the function
+    generate_llms_txt(docs_dir=docs_dir, output_file=output_file)
+
 if __name__ == "__main__":
-    generate_llms_txt(
-        docs_dir=Path("./docs"),
-        output_file=Path("./static/llms.txt")
-    )
+    main()

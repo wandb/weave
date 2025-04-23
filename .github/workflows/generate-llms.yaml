@@ -1,0 +1,40 @@
+name: Generate llms.txt
+
+on:
+  push:
+    branches:
+      - pr-3045-gh-action  
+
+jobs:
+  generate-llms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'  
+
+      - name: Create virtual environment
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install PyYAML  # Add other dependencies here if needed
+
+      - name: Generate llms.txt
+        run: |
+          source .venv/bin/activate
+          python $GITHUB_WORKSPACE/docs/scripts/generate_llmstxt.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "llms.py GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add docs/static/llms.txt
+          git diff-index --quiet HEAD || git commit -m "Auto-generate llms.txt"
+          git push origin pr-3045-gh-action
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
