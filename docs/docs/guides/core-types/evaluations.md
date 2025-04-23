@@ -81,7 +81,7 @@ See the tutorial on defining a `Scorer` class in the next chapter on [Model-Base
 
 ### Define a Model to evaluate
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have parameters that you want to experiment with and capture in weave.
 
 ```python
 from weave import Model, Evaluation
