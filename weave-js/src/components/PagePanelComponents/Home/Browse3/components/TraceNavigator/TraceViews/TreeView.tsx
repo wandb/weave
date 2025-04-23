@@ -16,14 +16,15 @@ import {
 import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {
   AGENT_OP_NAMES,
   COMPLETION_OP_NAMES,
+  EVAL_OP_NAMES,
   IMAGE_OP_NAMES,
   QUERY_OP_NAMES,
   TOOL_OP_NAMES,
 } from './operationNames';
-import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -188,10 +189,22 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
             {statusCode === 'ERROR' || statusCode === 'DESCENDANT_ERROR' || statusCode === 'UNSET' ? (
               <StatusChip value={statusCode} iconOnly />
+            ) : AGENT_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="robot-service-member" color="blue" />
+            ) : EVAL_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="baseline-alt" color="magenta" />
             ) : COMPLETION_OP_NAMES.some((opName: string) =>
                 call.op_name?.toLowerCase().includes(opName.toLowerCase())
               ) ? (
               <IconOnlyPill icon="forum-chat-bubble" color="purple" />
+            ) : QUERY_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="search" color="purple" />
             ) : TOOL_OP_NAMES.some((opName: string) =>
                 call.op_name?.toLowerCase().includes(opName.toLowerCase())
               ) ? (
@@ -200,14 +213,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 call.op_name?.toLowerCase().includes(opName.toLowerCase())
               ) ? (
               <IconOnlyPill icon="photo" color="purple" />
-            ) : AGENT_OP_NAMES.some((opName: string) =>
-                call.op_name?.toLowerCase().includes(opName.toLowerCase())
-              ) ? (
-              <IconOnlyPill icon="robot-service-member" color="blue" />
-            ) : QUERY_OP_NAMES.some((opName: string) =>
-                call.op_name?.toLowerCase().includes(opName.toLowerCase())
-              ) ? (
-              <IconOnlyPill icon="search" color="purple" />
             ) : (
               <StatusChip value="SUCCESS" iconOnly />
             )}
