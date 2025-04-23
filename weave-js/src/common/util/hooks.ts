@@ -271,3 +271,14 @@ export function useIsMounted() {
   }, []);
   return useCallback(() => isMountedRef.current, []);
 }
+
+export function useTimeout(ms: number) {
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setIsReady(true);
+    }, ms);
+    return () => clearTimeout(timeout);
+  }, [ms]);
+  return isReady;
+}

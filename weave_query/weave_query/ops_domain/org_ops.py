@@ -6,6 +6,11 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_prop_op,
     gql_root_op,
 )
+from weave_query.constants import (
+    LIMIT_ORG_PROJECTS,
+    LIMIT_ORG_REPORTS,
+    LIMIT_ORG_ARTIFACTS,
+)
 
 # Section 1/6: Tag Getters
 #
@@ -41,7 +46,7 @@ gql_connection_op(
     "projects",
     wdt.ProjectType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_ORG_PROJECTS}",
 )
 
 gql_connection_op(
@@ -50,7 +55,7 @@ gql_connection_op(
     "views",
     wdt.ReportType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_ORG_REPORTS}",
 )
 
 gql_connection_op(
@@ -59,7 +64,7 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_ORG_ARTIFACTS}",
 )
 
 # Section 6/6: Non Standard Business Logic Ops

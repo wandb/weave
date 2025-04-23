@@ -48,7 +48,7 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
             fontWeight: 600,
           }}>
           <Box sx={{flexGrow: 1}}>{title}</Box>
-          <Button size="small" variant="quiet" icon="close" onClick={onClose} />
+          <Button size="small" variant="ghost" icon="close" onClick={onClose} />
         </Box>
 
         <Box

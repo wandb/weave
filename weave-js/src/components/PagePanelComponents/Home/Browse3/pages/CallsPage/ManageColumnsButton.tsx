@@ -99,11 +99,11 @@ export const ManageColumnsButton = ({
         anchorEl={anchorEl}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         slotProps={{
           paper: {
@@ -180,7 +180,7 @@ export const ManageColumnsButton = ({
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="hide-hidden"
                 disabled={numToggleable === 0}
                 onClick={onHideAll}>
@@ -189,7 +189,7 @@ export const ManageColumnsButton = ({
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="show-visible"
                 disabled={numToggleable === 0}
                 onClick={onShowAll}>

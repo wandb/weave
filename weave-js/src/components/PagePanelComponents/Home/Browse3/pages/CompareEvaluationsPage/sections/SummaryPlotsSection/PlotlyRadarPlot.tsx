@@ -31,13 +31,13 @@ export const PlotlyRadarPlot: React.FC<{
   }, [props.data]);
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
-      height: props.height,
+      height: props.height - 40,
       showlegend: false,
       margin: {
-        l: 60,
-        r: 0,
+        l: 20,
+        r: 20,
         b: 30,
-        t: 30,
+        t: 20,
         pad: 0,
       },
       polar: {

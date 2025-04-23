@@ -2,22 +2,21 @@ from weave.flow.prompt.prompt import MessagesPrompt, StringPrompt
 
 
 def test_stringprompt_format():
-    class MyPrompt(StringPrompt):
-        def format(self, **kwargs) -> str:
-            return "Imagine a lot of complicated logic build this string."
-
-    prompt = MyPrompt()
-    assert prompt.format() == "Imagine a lot of complicated logic build this string."
+    prompt = StringPrompt("You are a pirate. Tell us your thoughts on {topic}.")
+    assert (
+        prompt.format(topic="airplanes")
+        == "You are a pirate. Tell us your thoughts on airplanes."
+    )
 
 
 def test_messagesprompt_format():
-    class MyPrompt(MessagesPrompt):
-        def format(self, **kwargs) -> list:
-            return [
-                {"role": "user", "content": "What's 23 * 42"},
-            ]
-
-    prompt = MyPrompt()
-    assert prompt.format() == [
-        {"role": "user", "content": "What's 23 * 42"},
+    prompt = MessagesPrompt(
+        [
+            {"role": "system", "content": "You are a pirate."},
+            {"role": "user", "content": "Tell us your thoughts on {topic}."},
+        ]
+    )
+    assert prompt.format(topic="airplanes") == [
+        {"role": "system", "content": "You are a pirate."},
+        {"role": "user", "content": "Tell us your thoughts on airplanes."},
     ]

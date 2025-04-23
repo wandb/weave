@@ -24,12 +24,14 @@ def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    assert len(flattened_calls) == 9
+    assert len(flattened_calls) == 11
 
     exp = [
+        ("openai.embeddings.create", 0),
         ("llama_index.query", 0),
         ("llama_index.retrieve", 1),
         ("llama_index.embedding", 2),
+        ("openai.embeddings.create", 3),
         ("llama_index.synthesize", 1),
         ("llama_index.chunking", 2),
         ("llama_index.chunking", 2),
@@ -58,7 +60,11 @@ def fake_api_key() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+        "trace.wandb.ai",
+    ],
     before_record_request=filter_body,
 )
 def test_llamaindex_quickstart(
@@ -83,7 +89,11 @@ def test_llamaindex_quickstart(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+        "trace.wandb.ai",
+    ],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio

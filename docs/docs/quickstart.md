@@ -13,7 +13,7 @@ Follow these steps to track your first call or <a class="vertical-align-colab-bu
 
 First install the weave library:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```bash
     pip install weave
@@ -43,14 +43,14 @@ To get started with tracking your first project with Weave:
 
 _In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     # highlight-next-line
     import weave
     from openai import OpenAI
 
-    client = OpenAI(api_key="...")
+    client = OpenAI()
 
     # Weave will track the inputs, outputs and code of this function
     # highlight-next-line
@@ -131,7 +131,7 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
 
 ## 3. Automated LLM library logging
 
-Calls made to OpenAI, Anthropic and [many more LLM libraries](guides/integrations/) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
+Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrations/index.md) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
 
 ## 4. See traces of your application in your project
 

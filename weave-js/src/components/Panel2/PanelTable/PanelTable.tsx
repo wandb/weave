@@ -1,6 +1,8 @@
 import 'react-base-table/lib/TableRow';
 
+import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {useRunName} from '@wandb/weave/common/hooks/useRunName';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
   callOpVeryUnsafe,
@@ -27,7 +29,6 @@ import {
   opMap,
   opPick,
   opRunId,
-  opRunName,
   Stack,
   taggedValue,
   Type,
@@ -83,6 +84,7 @@ import * as TableType from './tableType';
 import {
   BaseTableDataType,
   getColumnCellFormats,
+  getColumnVariables,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -152,7 +154,20 @@ export const PanelTable: React.FC<
   if (typedInputNodeUse.loading) {
     return <Panel2Loader />;
   } else if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
-    return <div>-</div>;
+    return (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '14px',
+        }}>
+        No items to display
+      </div>
+    );
   } else if (!nodeIsValidList(typedInputNode)) {
     console.warn(
       'PanelTable returning empty state because of Invalid input type: ',
@@ -227,6 +242,10 @@ const PanelTableInnerConfigSetter: React.FC<
     return {...config, tableState: tableState ?? autoTable};
   }, [config, tableState, autoTable]);
 
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(config.tableState ?? tableState ?? autoTable);
+  }, [config.tableState, tableState, autoTable]);
+
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
 
   if (!hasLoadedOnce) {
@@ -234,14 +253,16 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <PanelTableInner
-      {...props}
-      config={protectedConfig}
-      autoTable={autoTable}
-      updateConfig={protectedUpdateConfig}
-      showColumnSelect={showColumnSelect}
-      setShowColumnSelect={setShowColumnSelect}
-    />
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelTableInner
+        {...props}
+        config={protectedConfig}
+        autoTable={autoTable}
+        updateConfig={protectedUpdateConfig}
+        showColumnSelect={showColumnSelect}
+        setShowColumnSelect={setShowColumnSelect}
+      />
+    </PanelContextProvider>
   );
 };
 
@@ -743,22 +764,6 @@ const PanelTableInner: React.FC<
           />
         );
       },
-      headerRenderer: ({headerIndex}) => {
-        return props.config.simpleTable ? null : (
-          <S.TableAction
-            data-test="table-filter-button"
-            highlight={isFiltered ?? false}
-            onClick={() => {
-              setFilterOpen(!filterOpen);
-            }}>
-            <S.TableIcon
-              name="filter"
-              // Pass undefined when false to avoid console warning.
-              highlight={isFiltered === false ? undefined : true}
-            />
-          </S.TableAction>
-        );
-      },
     });
     if (rowActions != null && rowActions.length > 0) {
       columns.unshift({
@@ -863,16 +868,14 @@ const PanelTableInner: React.FC<
               .map(rowSize => (
                 <Tooltip
                   key={rowSize}
-                  position="top center"
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  noTriggerWrap
                   trigger={
                     <Button
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
                       onClick={() => setRowSize(RowSize[rowSize])}
                       active={config.rowSize === RowSize[rowSize]}
-                      variant={
-                        config.rowSize === RowSize[rowSize] ? 'ghost' : 'quiet'
-                      }
+                      variant="ghost"
                       size="small"
                     />
                   }
@@ -885,7 +888,7 @@ const PanelTableInner: React.FC<
           <div
             style={{flex: '0 0 auto', display: 'flex', alignItems: 'center'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="back"
               tooltip="First page"
@@ -894,7 +897,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-back"
               tooltip="Previous page"
@@ -929,7 +932,7 @@ const PanelTableInner: React.FC<
                 }
               }}
             />
-            <span style={{lineHeight: '24px'}}>
+            <span style={{lineHeight: '24px'}} data-test="pagination-info">
               &nbsp;-{' '}
               {adjustedIndexOffset +
                 nonPinnedVisibleRows -
@@ -941,7 +944,7 @@ const PanelTableInner: React.FC<
                 : totalRowCountUse.result - (useOneBasedIndex ? 0 : 1)}
             </span>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-next"
               tooltip="Next page"
@@ -951,7 +954,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="forward-next"
               tooltip="Last page"
@@ -966,7 +969,7 @@ const PanelTableInner: React.FC<
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 downloadDataAsCSV();
@@ -978,7 +981,7 @@ const PanelTableInner: React.FC<
               trigger={
                 <Button
                   data-test="select-columns"
-                  variant="quiet"
+                  variant="ghost"
                   size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
@@ -1008,7 +1011,7 @@ const PanelTableInner: React.FC<
             </Modal>
             <Button
               data-test="auto-columns"
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');
@@ -1095,6 +1098,127 @@ const PanelTableInner: React.FC<
     () => TableActions(weave, tableState.preFilterFunction, setFilterFunction),
     [weave, tableState.preFilterFunction, setFilterFunction]
   );
+
+  const [actionBarDimensions, setActionBarDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+  const actionBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (actionBarRef.current) {
+        const {width: actionBarWidth, height: actionBarHeight} =
+          actionBarRef.current.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(actionBarRef.current);
+        const marginTop = parseInt(computedStyle.marginTop, 10);
+        const marginBottom = parseInt(computedStyle.marginBottom, 10);
+
+        setActionBarDimensions({
+          width: Math.floor(actionBarWidth),
+          height: Math.floor(actionBarHeight) + marginTop + marginBottom,
+        });
+      }
+    };
+
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+
+    if (actionBarRef.current) {
+      resizeObserver.observe(actionBarRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const ActionBar = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        gap: '8px',
+        margin: '8px',
+      }}
+      ref={actionBarRef}>
+      {props.config.tableSelection?.show && (
+        <Popup
+          hoverable
+          position="bottom left"
+          on="click"
+          basic
+          style={{padding: 0, marginTop: '0px'}}
+          trigger={
+            <Button
+              variant="secondary"
+              size="small"
+              icon="table"
+              tooltip="Select table"
+              tooltipProps={{className: 'py-8 px-12'}}>
+              <>
+                Table:{' '}
+                <span
+                  style={{
+                    fontWeight: 'bold',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: 'inline-block',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'bottom',
+                  }}>
+                  {props.config.tableSelection?.currentSelection || 'Table'}
+                </span>
+              </>
+            </Button>
+          }
+          content={
+            <ModifiedDropdown
+              basic
+              selection
+              scrolling
+              multiple={false}
+              defaultOpen
+              value={props.config.tableSelection?.currentSelection}
+              data-test="table-selection"
+              closeOnBlur
+              closeOnChange
+              options={(props.config.tableSelection?.keys || []).map(key => ({
+                text: key,
+                key,
+                value: key,
+              }))}
+              onChange={(e, {value}) => {
+                props.config.tableSelection?.callback?.(value as string);
+              }}
+            />
+          }
+        />
+      )}
+      <Button
+        variant="secondary"
+        size="small"
+        data-test="table-filter-button"
+        data-dd-action-name={`${
+          filterOpen ? 'close' : 'open'
+        } query filter button`}
+        icon="filter-alt"
+        onClick={() => {
+          if (filterOpen) {
+            recordEvent('CLOSE_FILTER');
+          } else {
+            recordEvent('OPEN_FILTER');
+          }
+          setFilterOpen(!filterOpen);
+        }}
+        tooltip="Filter"
+        tooltipProps={{className: 'py-8 px-12'}}>
+        Filter
+      </Button>
+    </div>
+  );
+
   const ConfiguredTable = (
     <BaseTable
       ignoreFunctionInColumnCompare={false}
@@ -1102,7 +1226,7 @@ const PanelTableInner: React.FC<
       onColumnResizeEnd={onColumnResizeEnd}
       fixed
       width={width}
-      height={height}
+      height={height - actionBarDimensions.height}
       columns={baseTableColumns}
       data={unpinnedData}
       frozenData={pinnedData}
@@ -1117,10 +1241,12 @@ const PanelTableInner: React.FC<
       footerHeight={footerHeight}
     />
   );
+
   return (
     <GrowToParent
       data-test-weave-id="table"
-      data-test-row-count={unpinnedData.length}>
+      data-test-row-count={unpinnedData.length}
+      data-dd-action-name="query panel table">
       {filterOpen && (
         <PanelContextProvider newVars={preFilterFrame}>
           <ControlFilter
@@ -1172,7 +1298,10 @@ const PanelTableInner: React.FC<
         ConfiguredTable
       ) : (
         <WeaveActionContextProvider newActions={actions}>
-          {ConfiguredTable}
+          <div style={{display: 'flex', flexDirection: 'column'}}>
+            {ActionBar}
+            {ConfiguredTable}
+          </div>
         </WeaveActionContextProvider>
       )}
     </GrowToParent>
@@ -1209,17 +1338,18 @@ const IndexCell: React.FC<{
           }),
         })
       : constString('inherit');
-  const runNameNode =
-    props.runNode != null
-      ? opRunName({
-          run: weave.callFunction(props.runNode, {
-            row: props.rowNode as any,
-          }),
-        })
-      : constString('');
 
   const colorNodeValue = LLReact.useNodeValue(colorNode);
-  const runNameNodeValue = LLReact.useNodeValue(runNameNode);
+
+  const runNode =
+    props.runNode !== null
+      ? weave.callFunction(props.runNode, {
+          row: props.rowNode as any,
+        })
+      : null;
+
+  const runName = useRunName(runNode);
+
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
@@ -1228,7 +1358,6 @@ const IndexCell: React.FC<{
   } else {
     const isSelected =
       index.result != null && index.result === props.activeRowIndex;
-    const runName = runNameNodeValue.result ?? '';
     const basicIndexContent = (
       <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
     );

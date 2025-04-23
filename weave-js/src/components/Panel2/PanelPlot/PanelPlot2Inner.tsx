@@ -21,6 +21,7 @@ import {
   listObjectType,
   maybe,
   Node,
+  NodeOrVoidNode,
   numberBin,
   oneOrMany,
   opArray,
@@ -60,9 +61,11 @@ import {
 import * as LLReact from '../../../react';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
-import {usePanelContext} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TableState from '../PanelTable/tableState';
+import {useAutomatedTableState} from '../PanelTable/util';
+import {getColumnVariables} from '../PanelTable/util';
 import {toWeaveType} from '../toWeaveType';
 import {ensureValidSignals, useConcreteConfig, useConfig} from './config';
 import {filterTableNodeToSelection} from './filter';
@@ -274,6 +277,30 @@ const useLatestData = (
   return {latestData, loading};
 };
 */
+
+export const PanelPlot2ContextWrapper: React.FC<PanelPlotProps> = props => {
+  const {input} = props;
+  const {config} = useConfig(input, props.config);
+  const weave = useWeaveContext();
+
+  const {tableState, autoTable} = useAutomatedTableState(
+    input,
+    (config as any)?.tableState,
+    weave
+  );
+
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(
+      (props.config as any)?.tableState ?? tableState ?? autoTable
+    );
+  }, [props.config, tableState, autoTable]);
+
+  return (
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelPlot2Inner {...props} />
+    </PanelContextProvider>
+  );
+};
 
 export const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const isDash = useWeaveRedesignedPlotConfigEnabled();

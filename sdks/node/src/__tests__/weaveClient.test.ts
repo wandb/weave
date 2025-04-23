@@ -108,7 +108,7 @@ describe('WeaveClient', () => {
     beforeEach(() => {
       mockTraceServerApi = {
         call: {
-          callStartBatchCallUpsertBatchPost: jest.fn(),
+          callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
         },
       } as any;
       mockWandbServerApi = {} as any;
@@ -119,6 +119,26 @@ describe('WeaveClient', () => {
       );
       // Speed up tests by reducing batch interval
       (client as any).BATCH_INTERVAL = 10;
+    });
+
+    it('should handle oversized batch items', async () => {
+      const bigPayloadSize = 11 * 1024 * 1024;
+      const smallData = {mode: 'start', data: {id: '2', payload: 'small'}};
+      const bigData = {
+        mode: 'start',
+        data: {id: '1', payload: 'x'.repeat(bigPayloadSize)},
+      };
+      (client as any).callQueue.push(smallData, bigData);
+
+      await (client as any).processBatch();
+
+      expect(
+        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
+      ).toHaveBeenCalledWith({
+        batch: [{mode: 'start', req: smallData.data}],
+      });
+
+      expect((client as any).callQueue).toContain(bigData);
     });
 
     it('should batch multiple calls together', async () => {

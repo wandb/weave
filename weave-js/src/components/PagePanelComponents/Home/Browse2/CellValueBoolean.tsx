@@ -13,6 +13,15 @@ export const CellValueBoolean = ({value}: CellValueBooleanProps) => {
   const label = value ? 'True' : 'False';
   const icon = value ? 'checkmark' : 'close';
   return (
-    <Tooltip trigger={<Icon color={color} name={icon} />} content={label} />
+    <div
+      style={{
+        height: '100%',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Tooltip trigger={<Icon color={color} name={icon} />} content={label} />
+    </div>
   );
 };

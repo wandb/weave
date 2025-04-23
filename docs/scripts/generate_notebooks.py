@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import tempfile
@@ -97,10 +98,33 @@ def export_all_notebooks_in_primary_dir():
 
 
 def main():
-    export_all_notebooks_in_primary_dir()
-    export_notebook(
-        "./intro_notebook.ipynb", "./docs/reference/gen_notebooks/01-intro_notebook.md"
+    parser = argparse.ArgumentParser(
+        description="Convert Python notebooks to Markdown docs."
     )
+    parser.add_argument(
+        "notebook_path",
+        nargs="?",
+        help="Optional path to a single .ipynb file to convert",
+    )
+    args = parser.parse_args()
+
+    if args.notebook_path:
+        notebook_path = args.notebook_path
+        if not notebook_path.endswith(".ipynb"):
+            print("ERROR: The provided file must be a .ipynb notebook.")
+            return
+
+        base_name = os.path.basename(notebook_path).replace(".ipynb", ".md")
+        output_path = f"./docs/reference/gen_notebooks/{base_name}"
+        export_notebook(notebook_path, output_path)
+        print(f"Exported {notebook_path} to {output_path}")
+    else:
+        export_all_notebooks_in_primary_dir()
+        export_notebook(
+            "./intro_notebook.ipynb",
+            "./docs/reference/gen_notebooks/01-intro_notebook.md",
+        )
+        print("All notebooks exported.")
 
 
 if __name__ == "__main__":

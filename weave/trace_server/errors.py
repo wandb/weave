@@ -1,3 +1,6 @@
+import datetime
+
+
 class Error(Exception):
     """Base class for exceptions in this module."""
 
@@ -33,4 +36,18 @@ class MissingLLMApiKeyError(Error):
 
     def __init__(self, message: str, api_key_name: str):
         self.api_key_name = api_key_name
+        super().__init__(message)
+
+
+class NotFoundError(Error):
+    """Raised when a general not found error occurs."""
+
+    pass
+
+
+class ObjectDeletedError(Error):
+    """Raised when an object has been deleted."""
+
+    def __init__(self, message: str, deleted_at: datetime.datetime):
+        self.deleted_at = deleted_at
         super().__init__(message)

@@ -8,16 +8,17 @@ const JAN_1_2000_MS = 1000 * JAN_1_2000_S;
 const JAN_1_2100_MS = 1000 * JAN_1_2100_S;
 
 // TODO: This is only looking at value, but we could also consider the value name, e.g. "created".
+
+export const isProbablyTimestampMs = (value: number) => {
+  return JAN_1_2000_MS <= value && value <= JAN_1_2100_MS;
+};
+
+export const isProbablyTimestampSec = (value: number) => {
+  return JAN_1_2000_S <= value && value <= JAN_1_2100_S;
+};
+
 export const isProbablyTimestamp = (value: number) => {
-  const inRangeSec = JAN_1_2000_S <= value && value <= JAN_1_2100_S;
-  if (inRangeSec) {
-    return true;
-  }
-  const inRangeMs = JAN_1_2000_MS <= value && value <= JAN_1_2100_MS;
-  if (inRangeMs) {
-    return true;
-  }
-  return false;
+  return isProbablyTimestampMs(value) || isProbablyTimestampSec(value);
 };
 
 type ValueViewNumberTimestampProps = {

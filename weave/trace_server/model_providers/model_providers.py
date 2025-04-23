@@ -11,10 +11,16 @@ MODEL_PROVIDER_INFO_FILE = "model_providers.json"
 
 PROVIDER_TO_API_KEY_NAME_MAP = {
     "anthropic": "ANTHROPIC_API_KEY",
-    "gemini": "GOOGLE_API_KEY",
-    "openai": "OPENAI_API_KEY",
+    "azure": "AZURE_API_KEY",
+    "azure_ai": "AZURE_API_KEY",
+    "bedrock": "BEDROCK_API_KEY",
+    "bedrock_converse": "BEDROCK_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
     "fireworks": "FIREWORKS_API_KEY",
-    "groq": "GEMMA_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "xai": "XAI_API_KEY",
 }
 
 
@@ -61,7 +67,7 @@ def main(
             )
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     with open(full_path, "w") as f:
-        json.dump(providers, f)
+        json.dump(providers, f, indent=2)
     print(
         f"Updated model to model provider info file at: {full_path}. {len(providers)} models updated."
     )

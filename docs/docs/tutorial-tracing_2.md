@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Track data flows and app metadata
+# Tutorial: Track Application Logic
 
 In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
 
@@ -16,7 +16,7 @@ LLM-powered applications can contain multiple LLMs calls and additional data pro
 
 Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     ```python
@@ -24,7 +24,7 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     import json
     from openai import OpenAI
 
-    client = OpenAI(api_key="...")
+    client = OpenAI()
 
     # highlight-next-line
     @weave.op()
@@ -147,7 +147,7 @@ Tracking metadata can be done easily by using the `weave.attributes` context man
 
 Continuing our example from above:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -175,7 +175,7 @@ Continuing our example from above:
 :::note
 It's recommended to use metadata tracking to track metadata at run time, e.g. user ids or whether or not the call is part of the development process or is in production etc.
 
-To track system attributes, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
+To track system settings, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
 :::
 
 ## What's next?

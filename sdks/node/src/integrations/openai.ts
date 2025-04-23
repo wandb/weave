@@ -4,7 +4,7 @@ import {OpOptions} from '../opType';
 
 // exported just for testing
 export const openAIStreamReducer = {
-  initialState: {
+  initialStateFn: () => ({
     id: '',
     object: 'chat.completion',
     created: 0,
@@ -21,7 +21,7 @@ export const openAIStreamReducer = {
       },
     ],
     usage: null,
-  },
+  }),
   reduceFn: (state: any, chunk: any) => {
     if (chunk.id) state.id = chunk.id;
     if (chunk.object) state.object = chunk.object;

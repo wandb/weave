@@ -4,7 +4,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useState} from 'react';
 
-import {StyledTextArea} from '../StyledTextarea';
+import {StyledTextArea} from '../../../StyledTextarea';
 
 type FunctionDrawerProps = {
   drawerFunctionIndex: number | null;
@@ -129,11 +129,9 @@ export const FunctionDrawer: React.FC<FunctionDrawerProps> = ({
           <StyledTextArea
             value={functionJSON}
             placeholder={FUNCTION_PLACEHOLDER}
-            className="h-full"
-            style={{
-              height: '100%',
-            }}
+            startHeight="100%"
             onChange={e => setFunctionJSON(e.target.value)}
+            className="!resize-none"
           />
           {jsonValidationError && functionJSON.length > 0 && (
             <Alert severity="warning">

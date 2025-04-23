@@ -141,10 +141,7 @@ Operation = typing.Union[
     InOperation,
     ContainsOperation,
 ]
-Operand = typing.Union[
-    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
-]
-
+Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, Operation]
 
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()

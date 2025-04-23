@@ -1,5 +1,6 @@
 import _ from 'lodash';
 
+import {CachingTraceServerClient} from './traceServerCachingClient';
 import {
   CompletionsCreateReq,
   CompletionsCreateRes,
@@ -7,19 +8,24 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  TableCreateReq,
+  TableCreateRes,
+  TableUpdateReq,
+  TableUpdateRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceObjCreateReq,
   TraceObjCreateRes,
+  TraceObjDeleteReq,
+  TraceObjDeleteRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
-import {DirectTraceServerClient} from './traceServerDirectClient';
 
 const DEFAULT_BATCH_INTERVAL = 150;
 const MAX_REFS_PER_BATCH = 1000;
 
-export class TraceServerClient extends DirectTraceServerClient {
+export class TraceServerClient extends CachingTraceServerClient {
   private readBatchCollectors: Array<{
     req: TraceRefsReadBatchReq;
     resolvePromise: (res: TraceRefsReadBatchRes) => void;
@@ -115,6 +121,14 @@ export class TraceServerClient extends DirectTraceServerClient {
     return res;
   }
 
+  public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
+    return super.tableUpdate(req);
+  }
+
+  public tableCreate(req: TableCreateReq): Promise<TableCreateRes> {
+    return super.tableCreate(req);
+  }
+
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
       const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
@@ -132,6 +146,14 @@ export class TraceServerClient extends DirectTraceServerClient {
         listeners.forEach(listener => listener());
       }
       return purgeRes;
+    });
+    return res;
+  }
+
+  public objDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+    const res = super.objDelete(req).then(r => {
+      this.onObjectListeners.forEach(listener => listener());
+      return r;
     });
     return res;
   }

@@ -1,0 +1,152 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Hello!"}], "model": "meta/llama-3.1-8b-instruct",
+      "temperature": 0.0, "max_tokens": 64, "top_p": 1.0, "stream": true, "stream_options":
+      {"include_usage": true}}'
+    headers:
+      Accept:
+      - text/event-stream
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '203'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - langchain-nvidia-ai-endpoints
+    method: POST
+    uri: https://integrate.api.nvidia.com/v1/chat/completions
+  response:
+    body:
+      string: 'data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":12,"completion_tokens":0}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"Hello"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":13,"completion_tokens":1}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"!"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":14,"completion_tokens":2}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        It"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":15,"completion_tokens":3}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"''s"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":16,"completion_tokens":4}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        nice"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":17,"completion_tokens":5}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        to"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":18,"completion_tokens":6}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        meet"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":19,"completion_tokens":7}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        you"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":20,"completion_tokens":8}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"."},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":21,"completion_tokens":9}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        Is"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":22,"completion_tokens":10}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        there"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":23,"completion_tokens":11}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        something"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":24,"completion_tokens":12}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        I"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":25,"completion_tokens":13}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        can"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":26,"completion_tokens":14}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        help"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":27,"completion_tokens":15}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        you"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":28,"completion_tokens":16}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        with"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":29,"completion_tokens":17}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        or"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":30,"completion_tokens":18}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        would"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":31,"completion_tokens":19}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        you"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":32,"completion_tokens":20}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        like"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":33,"completion_tokens":21}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        to"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":34,"completion_tokens":22}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"
+        chat"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":35,"completion_tokens":23}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":"?"},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":36,"completion_tokens":24}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":""},"logprobs":null,"finish_reason":"stop","stop_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":36,"completion_tokens":24}}
+
+
+        data: {"id":"chat-ebf3fd9b28674719b66b92ebe257b8a8","object":"chat.completion.chunk","created":1735929358,"model":"meta/llama-3.1-8b-instruct","choices":[],"usage":{"prompt_tokens":12,"total_tokens":36,"completion_tokens":24}}
+
+
+        data: [DONE]
+
+
+        '
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Expose-Headers:
+      - nvcf-reqid
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Fri, 03 Jan 2025 18:35:58 GMT
+      Nvcf-Reqid:
+      - 63c6afa3-695d-46d0-b00a-367c31300aab
+      Nvcf-Status:
+      - fulfilled
+      Server:
+      - uvicorn
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - origin, access-control-request-method, access-control-request-headers
+    status:
+      code: 200
+      message: OK
+version: 1

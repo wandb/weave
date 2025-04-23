@@ -3,7 +3,12 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+)
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -118,6 +123,12 @@ class CallSchema(BaseModel):
 
     deleted_at: Optional[datetime.datetime] = None
 
+    # Size of metadata storage for this call
+    storage_size_bytes: Optional[int] = None
+
+    # Total size of metadata storage for the entire trace
+    total_storage_size_bytes: Optional[int] = None
+
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -186,17 +197,53 @@ class ObjSchema(BaseModel):
     base_object_class: Optional[str]
     val: Any
 
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    size_bytes: Optional[int] = None
+
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    set_base_object_class: Optional[str] = None
+    builtin_object_class: Optional[str] = None
+    # Keeping `set_base_object_class` here until it is successfully removed from UI client
+    set_base_object_class: Optional[str] = Field(
+        include=False, default=None, deprecated=True
+    )
+
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    def model_post_init(self, __context: Any) -> None:
+        # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
+        if self.set_base_object_class is not None and self.builtin_object_class is None:
+            self.builtin_object_class = self.set_base_object_class
 
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+
+
+class OtelExportReq(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    project_id: str
+    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
+    traces: Any
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ExportTracePartialSuccess(BaseModel):
+    rejected_spans: int
+    error_message: str
+
+
+# Spec requires that the response be of type Export<signal>ServiceResponse
+# https://opentelemetry.io/docs/specs/otlp/
+class OtelExportRes(BaseModel):
+    partial_success: Optional[ExportTracePartialSuccess] = Field(
+        default=None,
+        description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
+    )
 
 
 class CallStartReq(BaseModel):
@@ -216,10 +263,30 @@ class CallEndRes(BaseModel):
     pass
 
 
+class CallBatchStartMode(BaseModel):
+    mode: str = "start"
+    req: CallStartReq
+
+
+class CallBatchEndMode(BaseModel):
+    mode: str = "end"
+    req: CallEndReq
+
+
+class CallCreateBatchReq(BaseModel):
+    batch: list[Union[CallBatchStartMode, CallBatchEndMode]]
+
+
+class CallCreateBatchRes(BaseModel):
+    res: list[Union[CallStartRes, CallEndRes]]
+
+
 class CallReadReq(BaseModel):
     project_id: str
     id: str
     include_costs: Optional[bool] = False
+    include_storage_size: Optional[bool] = False
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
@@ -321,6 +388,16 @@ class CallsQueryReq(BaseModel):
         description="Beta, subject to change. If true, the response will"
         " include feedback for each call.",
     )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the storage size for a call.",
+    )
+    include_total_storage_size: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include the total storage size for a trace.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -408,6 +485,12 @@ class ObjReadReq(BaseModel):
     object_id: str
     digest: str
 
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
+
 
 class ObjReadRes(BaseModel):
     obj: ObjSchema
@@ -465,6 +548,23 @@ class ObjQueryReq(BaseModel):
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
     )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="If true, the `size_bytes` column is returned.",
+    )
+
+
+class ObjDeleteReq(BaseModel):
+    project_id: str
+    object_id: str
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the object will be deleted.",
+    )
+
+
+class ObjDeleteRes(BaseModel):
+    num_deleted: int
 
 
 class ObjQueryRes(BaseModel):
@@ -579,6 +679,7 @@ class TableUpdateRes(BaseModel):
 class TableRowSchema(BaseModel):
     digest: str
     val: Any
+    original_index: Optional[int] = None
 
 
 class TableCreateRes(BaseModel):
@@ -655,12 +756,40 @@ class TableQueryStatsReq(BaseModel):
     )
     digest: str = Field(
         description="The digest of the table to query",
-        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+
+
+class TableQueryStatsBatchReq(BaseModel):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+
+    digests: Optional[list[str]] = Field(
+        description="The digests of the tables to query",
+        examples=[
+            "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+            "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiераnoa",
+        ],
+        default=[],
+    )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="If true, the `storage_size_bytes` column is returned.",
     )
 
 
 class TableQueryStatsRes(BaseModel):
     count: int
+
+
+class TableStatsRow(BaseModel):
+    count: int
+    digest: str
+    storage_size_bytes: Optional[int] = None
+
+
+class TableQueryStatsBatchRes(BaseModel):
+    tables: list[TableStatsRow]
 
 
 class RefsReadBatchReq(BaseModel):
@@ -873,6 +1002,9 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
+    # OTEL API
+    def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
+
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
     def call_end(self, req: CallEndReq) -> CallEndRes: ...
@@ -882,6 +1014,7 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
+    def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
@@ -897,14 +1030,26 @@ class TraceServerInterface(Protocol):
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
+
+    # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
+    def table_query_stats_batch(
+        self, req: TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchRes: ...
+
+    # Ref API
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
+
+    # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+
+    # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...

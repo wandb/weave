@@ -1,7 +1,8 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {MOON_400} from '../../../../../../common/css/color.styles';
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {IconInfo} from '../../../../../Icon';
 import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {Tailwind} from '../../../../../Tailwind';
@@ -114,6 +115,8 @@ export const CallsCharts = ({
     columns
   );
 
+  useFireAnalyticsForMetricsPlotsViewed(entity, project, calls.loading);
+
   const chartData = useMemo(() => {
     if (calls.loading || !calls.result || calls.result.length === 0) {
       return {latency: [], errors: [], requests: []};
@@ -149,7 +152,7 @@ export const CallsCharts = ({
         data.errors.push({started_at, isError: false});
       }
 
-      if (ended_at !== undefined) {
+      if (ended_at != null) {
         const startTime = new Date(started_at).getTime();
         const endTime = new Date(ended_at).getTime();
         const latency = endTime - startTime;
@@ -182,9 +185,43 @@ export const CallsCharts = ({
   return (
     <Tailwind>
       {/* setting the width to the width of the screen minus the sidebar width because of overflow: 'hidden' properties in SimplePageLayout causing issues */}
-      <div className="md:w-[calc(100vw-56px)]">
+      <div className="w-full md:max-w-[calc(100vw-56px)]">
         <div className="mb-20 mt-10">{charts}</div>
       </div>
     </Tailwind>
   );
+};
+
+/**
+ * Fires an analytics event when the metrics plots are viewed.
+ * This is used to track the usage and latency of the metrics plots.
+ * Only fires once when opened.
+ */
+const useFireAnalyticsForMetricsPlotsViewed = (
+  entity: string,
+  project: string,
+  loading: boolean
+) => {
+  const [callsQueryStartTime, setCallsQueryStartTime] = useState<number | null>(
+    null
+  );
+  const sentEvent = useRef(false);
+  useEffect(() => {
+    if (sentEvent.current) {
+      return;
+    }
+    if (loading) {
+      const startTime = Date.now();
+      setCallsQueryStartTime(startTime);
+    } else if (!loading && callsQueryStartTime !== null) {
+      const endTime = Date.now();
+      const latency = endTime - callsQueryStartTime;
+      userEvents.metricsPlotsViewed({
+        entity,
+        project,
+        latency,
+      });
+      sentEvent.current = true;
+    }
+  }, [loading, callsQueryStartTime, entity, project]);
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
+import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 
 export const ProgrammaticScorersTab: React.FC<{
   entity: string;
@@ -11,6 +11,7 @@ export const ProgrammaticScorersTab: React.FC<{
       entity={entity}
       project={project}
       objectTitle="Scorer"
+      hideCategoryColumn
       initialFilter={{
         baseObjectClass: 'Scorer',
       }}

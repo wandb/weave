@@ -1,11 +1,10 @@
-import {Divider} from '@mui/material';
 import Box from '@mui/material/Box';
-import {MOON_600} from '@wandb/weave/common/css/color.styles';
 import {IconName} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {formatNumber} from '@wandb/weave/core/util/number';
+import classNames from 'classnames';
 import React, {ReactNode} from 'react';
 
 import {
@@ -30,15 +29,7 @@ const tooltipRowStyles = {
   gap: '16px',
 };
 
-const tooltipDivider = (
-  <Divider
-    sx={{
-      borderColor: MOON_600,
-      marginTop: '8px',
-      marginBottom: '7px',
-    }}
-  />
-);
+const tooltipDivider = <div className="mb-4 mt-5 border-t border-moon-600" />;
 
 export const TokenToolTip = (metrics: TokenTotals) => (
   <Box>
@@ -64,7 +55,7 @@ export const TokenToolTip = (metrics: TokenTotals) => (
 
 export const CostToolTip = (metrics: CostTotals) => (
   <Box>
-    <span style={{fontWeight: 600}}>Estimated Cost</span>
+    <span style={{fontWeight: 600}}>Estimated cost</span>
     {Object.keys(metrics.inputs.cost).map(model => (
       <Box key={model + 'input'} sx={tooltipRowStyles}>
         <span>{model === 'total' ? 'Input cost' : model}: </span>
@@ -130,10 +121,12 @@ export const TraceStat = ({
   icon,
   label,
   tooltip,
+  className = '',
 }: {
   icon?: IconName;
   label: string;
   tooltip?: ReactNode;
+  className?: string;
 }) => {
   const trigger = (
     <div>
@@ -141,7 +134,13 @@ export const TraceStat = ({
         icon={icon}
         label={label}
         color="moon"
-        className="bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500"
+        className={classNames(
+          'bg-transparent',
+          'text-moon-500',
+          'dark:bg-transparent',
+          'dark:text-moon-500',
+          className
+        )}
       />
     </div>
   );

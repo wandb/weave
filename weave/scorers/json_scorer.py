@@ -2,10 +2,9 @@ import json
 from typing import Any
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class ValidJSONScorer(Scorer):
+class ValidJSONScorer(weave.Scorer):
     """Validate whether a string is valid JSON."""
 
     @weave.op

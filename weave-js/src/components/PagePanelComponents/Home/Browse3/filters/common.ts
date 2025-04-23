@@ -8,11 +8,23 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRefMaybe,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
-import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
+import {
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+} from '../feedback/HumanFeedback/tsScorerFeedback';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+} from '../pages/wfReactInterface/constants';
+import {Query} from '../pages/wfReactInterface/traceServerClientInterface/query';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -20,13 +32,14 @@ export type FilterId = number | string | undefined;
 // These are columns we won't allow the user to filter on.
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
-  'op_name',
   'feedback',
-  'status',
+  'summary.weave.latency_ms',
+  'summary.weave.trace_name',
   'tokens',
   'cost',
-  'latency',
   'wb_user_id', // Option+Click works
+  'wb_run_id', // Option+Click works
+  'total_storage_size_bytes',
 ];
 
 export type ColumnInfo = {
@@ -36,12 +49,13 @@ export type ColumnInfo = {
 
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
+  'summary.weave.status': 'Status',
   started_at: 'Called',
   wb_user_id: 'User',
 };
 
 export const getFieldLabel = (field: string): string => {
-  if (field.startsWith('feedback.')) {
+  if (field.startsWith('feedback.wandb.annotation.')) {
     // Here the field is coming from convertFeedbackFieldToBackendFilter
     // so the field should start with 'feedback.' if feedback
     const parsed = parseFeedbackType(field);
@@ -49,6 +63,13 @@ export const getFieldLabel = (field: string): string => {
       return field;
     }
     return parsed.displayName;
+  }
+  if (field.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX)) {
+    const parsed = parseScorerFeedbackField(field);
+    if (parsed === null) {
+      return field;
+    }
+    return parsed.scorerName + parsed.scorePath;
   }
   return FIELD_LABELS[field] ?? field;
 };
@@ -64,64 +85,123 @@ export const getFieldType = (field: string): string => {
   return FIELD_TYPE[field] ?? 'text';
 };
 
-const allOperators = [
+export type OperatorGroup = 'string' | 'number' | 'boolean' | 'date' | 'any';
+export type SelectOperatorOption = {
+  label: string;
+  value: string;
+  group: OperatorGroup;
+};
+
+const allOperators: SelectOperatorOption[] = [
+  // String operators
   {
     value: '(string): contains',
     label: 'contains',
+    group: 'string',
   },
   {
     value: '(string): equals',
     label: 'equals',
+    group: 'string',
   },
   {
     value: '(string): in',
     label: 'in',
+    group: 'string',
   },
+  {
+    value: '(string): notEquals',
+    label: 'not equals',
+    group: 'string',
+  },
+  {
+    value: '(string): notContains',
+    label: 'does not contain',
+    group: 'string',
+  },
+  // Number operators
   {
     value: '(number): =',
     label: '=',
+    group: 'number',
   },
   {
     value: '(number): !=',
     label: '≠',
+    group: 'number',
   },
   {
     value: '(number): <',
     label: '<',
+    group: 'number',
   },
   {
     value: '(number): <=',
     label: '≤',
+    group: 'number',
   },
   {
     value: '(number): >',
     label: '>',
+    group: 'number',
   },
   {
     value: '(number): >=',
     label: '≥',
+    group: 'number',
   },
+  // Boolean operators
   {
     value: '(bool): is',
     label: 'is',
+    group: 'boolean',
   },
+  // Date operators
   {
     value: '(date): after',
     label: 'after',
+    group: 'date',
   },
   {
     value: '(date): before',
     label: 'before',
+    group: 'date',
   },
+  // Any operators
   {
     value: '(any): isEmpty',
     label: 'is empty',
+    group: 'any',
   },
   {
     value: '(any): isNotEmpty',
     label: 'is not empty',
+    group: 'any',
   },
 ];
+
+// Display labels
+const GROUP_LABELS: Record<OperatorGroup, string> = {
+  string: 'Text',
+  number: 'Number',
+  boolean: 'Boolean',
+  date: 'Date',
+  any: 'Other',
+};
+
+export function getGroupedOperatorOptions(
+  field: string
+): OperatorGroupedOption[] {
+  // Get operators / operator groups
+  const availableOperators = getOperatorOptions(field);
+  const groups = [...new Set(availableOperators.map(op => op.group))];
+  // Create grouped options
+  return groups.map(group => ({
+    label: GROUP_LABELS[group],
+    options: availableOperators.filter(op => op.group === group),
+  }));
+}
+
 const operatorLabels: Record<string, string> = allOperators.reduce(
   (acc, operator) => {
     acc[operator.value] = operator.label;
@@ -140,9 +220,8 @@ export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
 };
 
-export type SelectOperatorOption = {
-  value: string;
-  label: string;
+export const isDateOperator = (operator: string) => {
+  return operator.startsWith('(date):');
 };
 
 export const getOperatorLabel = (operatorValue: string): string => {
@@ -173,10 +252,22 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
       },
       {
         value: '(string): in',
         label: 'in',
+        group: 'string',
+      },
+      {
+        value: '(string): notEquals',
+        label: 'not equals',
+        group: 'string',
+      },
+      {
+        value: '(string): notContains',
+        label: 'does not contain',
+        group: 'string',
       },
     ];
   }
@@ -185,22 +276,21 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(date): after',
         label: 'after',
+        group: 'date',
       },
       {
         value: '(date): before',
         label: 'before',
+        group: 'date',
       },
     ];
   }
   if ('status' === fieldType) {
     return [
       {
-        value: 'is',
-        label: 'is',
-      },
-      {
-        value: 'is not',
-        label: 'is not',
+        value: '(string): in',
+        label: 'in',
+        group: 'string',
       },
     ];
   }
@@ -209,6 +299,7 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
       },
     ];
   }
@@ -237,15 +328,20 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
 
 // Create a unique symbol for RefString
 const WeaveRefStringSymbol = Symbol('WeaveRefString');
+const ArtifactRefStringSymbol = Symbol('ArtifactRefString');
 
 // Define RefString type using the unique symbol
 export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
+export type ArtifactRefString = string & {[ArtifactRefStringSymbol]: never};
 
-const isRefPrefixedString = (value: any): boolean => {
+export const isRefPrefixedString = (value: any): boolean => {
   if (typeof value !== 'string') {
     return false;
   }
-  if (value.startsWith(WEAVE_REF_PREFIX)) {
+  if (
+    value.startsWith(WEAVE_REF_PREFIX) ||
+    value.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+  ) {
     return true;
   }
   return false;
@@ -253,9 +349,9 @@ const isRefPrefixedString = (value: any): boolean => {
 
 /**
  * `isWeaveRef` is a very conservative check that will ensure the passed
- * in value is a valid ref string - capabable of being safely parsed into
+ * in value is a valid ref string - capable of being safely parsed into
  * a Weave ref object. It ensures that the value is a string with the correct
- * prefix, is parsible, and matches the latest "weave trace" style refs. It
+ * prefix, is parsable, and matches the latest "weave trace" style refs. It
  * should be used as the appropriate type guard before parsing a ref.
  */
 export const isWeaveRef = (value: any): value is WeaveRefString => {
@@ -264,6 +360,14 @@ export const isWeaveRef = (value: any): value is WeaveRefString => {
   }
   const parsed = parseRefMaybe(value);
   return parsed ? isWeaveObjectRef(parsed) : false;
+};
+
+export const isArtifactRef = (value: any): value is ArtifactRefString => {
+  if (!isRefPrefixedString(value)) {
+    return false;
+  }
+  const parsed = parseRefMaybe(value);
+  return parsed ? isWandbArtifactRef(parsed) : false;
 };
 
 export const getStringList = (value: any): string[] => {
@@ -300,4 +404,57 @@ export const upsertFilter = (
     ...model,
     items,
   };
+};
+
+export type OperatorGroupedOption = {
+  label: string;
+  options: SelectOperatorOption[];
+};
+
+export const makeRawDateFilter = (
+  days: number,
+  field: string = 'started_at'
+): Query => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  return {
+    $expr: {
+      $gt: [{$getField: field}, {$literal: d.getTime() / 1000}],
+    },
+  };
+};
+
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
+  };
+};
+
+export const makeMonthFilter = (): GridFilterItem => {
+  // Get last month
+  const curMonth = new Date().getMonth();
+  // Number of days in the previous month
+  const prevMonthDays = new Date(
+    new Date().getFullYear(),
+    curMonth,
+    0
+  ).getDate();
+  return makeDateFilter(prevMonthDays);
 };

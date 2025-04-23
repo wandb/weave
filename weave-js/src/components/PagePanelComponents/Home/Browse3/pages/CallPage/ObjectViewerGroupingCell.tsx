@@ -6,6 +6,7 @@ import React, {FC, MouseEvent} from 'react';
 import {Button} from '../../../../../Button';
 import {Tooltip} from '../../../../../Tooltip';
 import {CursorBox} from './CursorBox';
+import {maybeGetDeletedRefValuePlaceholderFromRow} from './ObjectViewer';
 
 const INSET_SPACING = 40;
 
@@ -32,7 +33,9 @@ export const ObjectViewerGroupingCell: FC<
     event.stopPropagation();
   };
 
+  const deletedRef = maybeGetDeletedRefValuePlaceholderFromRow(row);
   const tooltipContent = row.path.toString();
+  const textContent = deletedRef ?? props.value;
   const box = (
     <CursorBox
       $isClickable={isGroup || isExpandableRef}
@@ -73,7 +76,7 @@ export const ObjectViewerGroupingCell: FC<
         }}>
         {isGroup || isExpandableRef ? (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon={
               isGroup && rowNode.childrenExpanded
                 ? 'chevron-down'
@@ -109,8 +112,9 @@ export const ObjectViewerGroupingCell: FC<
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               flex: '1 1 auto',
+              textDecoration: deletedRef ? 'line-through' : 'none',
             }}>
-            {props.value}
+            {textContent}
           </Box>
         }
       />

@@ -11,6 +11,7 @@ import classNames from 'classnames';
 import React from 'react';
 
 export const TextFieldSizes = {
+  Small: 'small',
   Medium: 'medium',
   Large: 'large',
 } as const;
@@ -24,6 +25,7 @@ type TextFieldProps = {
   onChange?: (value: string) => void;
   onKeyDown?: (key: string, e: React.KeyboardEvent<HTMLInputElement>) => void;
   onBlur?: (value: string) => void;
+  onFocus?: () => void;
   autoFocus?: boolean;
   disabled?: boolean;
   icon?: IconName;
@@ -36,15 +38,19 @@ type TextFieldProps = {
   autoComplete?: string;
   dataTest?: string;
   step?: number;
+  variant?: 'default' | 'ghost';
+  isContainerNightAware?: boolean;
 };
 
 export const TextField = ({
   size,
+  variant = 'default',
   placeholder,
   value,
   onChange,
   onKeyDown,
   onBlur,
+  onFocus,
   autoFocus,
   disabled,
   icon,
@@ -57,9 +63,15 @@ export const TextField = ({
   autoComplete,
   dataTest,
   step,
+  isContainerNightAware,
 }: TextFieldProps) => {
   const textFieldSize = size ?? 'medium';
-  const leftPaddingForIcon = textFieldSize === 'medium' ? 'pl-34' : 'pl-36';
+  const leftPaddingForIcon =
+    textFieldSize === 'small'
+      ? 'pl-32'
+      : textFieldSize === 'medium'
+      ? 'pl-34'
+      : 'pl-36';
 
   const handleChange = onChange
     ? (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,22 +93,32 @@ export const TextField = ({
     <Tailwind style={{width: '100%'}}>
       <div
         className={classNames(
-          'night-aware',
-          'relative rounded-sm',
-          textFieldSize === 'medium' ? 'h-32' : 'h-40',
+          'relative rounded-[5px]',
+          textFieldSize === 'small'
+            ? 'h-30'
+            : textFieldSize === 'medium'
+            ? 'h-32'
+            : 'h-40',
           'bg-white dark:bg-moon-900',
           'text-moon-800 dark:text-moon-200',
-          'outline outline-1 outline-moon-250 dark:outline-moon-700',
+          variant === 'default' &&
+            'outline outline-1 outline-moon-250 dark:outline-moon-700',
+          variant === 'ghost' &&
+            'outline outline-1 outline-transparent dark:outline-transparent',
           {
+            // must not add "night-aware" class if already in a night-aware
+            // container, otherwise they'll cancel each other out
+            'night-aware': !isContainerNightAware,
             'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB] dark:[&:hover:not(:focus-within)]:outline-teal-650':
-              !errorState,
+              !errorState && variant === 'default',
             'focus-within:outline-2 focus-within:outline-teal-400 dark:focus-within:outline-teal-600':
-              !errorState,
-            'outline-2 outline-red-450 dark:outline-red-550': errorState,
+              !errorState && variant === 'default',
+            'outline-2 outline-red-450 dark:outline-red-550':
+              errorState && variant === 'default',
             'pointer-events-none opacity-50': disabled,
           }
         )}>
-        <div className="absolute bottom-0 top-0 flex w-full items-center rounded-sm">
+        <div className="absolute bottom-0 top-0 flex w-full items-center rounded-[5px]">
           {prefix && (
             <div
               className={classNames(
@@ -108,7 +130,7 @@ export const TextField = ({
           )}
           <input
             className={classNames(
-              'h-full w-full flex-1 rounded-sm bg-inherit pr-8',
+              'h-full w-full flex-1 rounded-[5px] bg-inherit pr-8',
               'appearance-none border-none',
               'focus:outline-none',
               'placeholder-moon-500',
@@ -123,6 +145,7 @@ export const TextField = ({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
+            onFocus={onFocus}
             autoFocus={autoFocus}
             disabled={disabled}
             readOnly={!onChange} // It would be readonly regardless but this prevents a console warning
@@ -141,7 +164,9 @@ export const TextField = ({
             name={icon}
             className={classNames(
               'absolute left-8',
-              textFieldSize === 'medium'
+              textFieldSize === 'small'
+                ? 'top-6 h-16 w-16'
+                : textFieldSize === 'medium'
                 ? 'top-8 h-18 w-18'
                 : 'top-10 h-20 w-20',
               value ? 'text-moon-800 dark:text-moon-200' : 'text-moon-500'

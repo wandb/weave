@@ -1,8 +1,15 @@
+import {
+  Dialog,
+  DialogActions as MaterialDialogActions,
+  DialogContent,
+  DialogTitle,
+} from '@material-ui/core';
 import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
-import React from 'react';
+import React, {useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
@@ -10,7 +17,6 @@ import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
-
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -20,7 +26,16 @@ type PlaygroundChatTopBarProps = {
   project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
+  isTeamAdmin: boolean;
+  onConfigureProvider: () => void;
 };
+
+const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
+  justify-content: ${({$align}) =>
+    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
+  padding: 32px 32px 32px 32px !important;
+`;
+DialogActions.displayName = 'S.DialogActions';
 
 export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   idx,
@@ -31,10 +46,13 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  isTeamAdmin,
+  onConfigureProvider,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
   const onlyOneChat = playgroundStates.length === 1;
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const clearCall = (index: number) => {
     history.push(`/${entity}/${project}/weave/playground`);
@@ -63,7 +81,30 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   ) => {
     setPlaygroundStateField(index, 'model', model);
     setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
-    setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
+    setPlaygroundStateField(index, 'maxTokens', Math.floor(maxTokens / 2));
+  };
+
+  const ConfirmClearModal: React.FC<{
+    open: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+  }> = ({open, onClose, onConfirm}) => {
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+        <DialogTitle>Clear chat history</DialogTitle>
+        <DialogContent style={{overflow: 'hidden'}}>
+          <p>Are you sure you want to clear the chat history?</p>
+        </DialogContent>
+        <DialogActions $align="left">
+          <Button variant="destructive" onClick={onConfirm}>
+            Clear history
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
   };
 
   return (
@@ -72,7 +113,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         width: '100%',
         display: 'flex',
         justifyContent: 'space-between',
-        paddingBottom: '8px',
       }}>
       <Box
         sx={{
@@ -87,6 +127,10 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           onChange={(model, maxTokens) =>
             handleModelChange(idx, model, maxTokens)
           }
+          entity={entity}
+          project={project}
+          isTeamAdmin={isTeamAdmin}
+          onConfigureProvider={onConfigureProvider}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
@@ -104,7 +148,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           icon="sweeps-broom"
           size="medium"
           variant="ghost"
-          onClick={() => clearCall(idx)}
+          onClick={() => setConfirmClear(true)}
         />
         {onlyOneChat ? (
           <Button
@@ -149,6 +193,14 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           />
         )}
       </Box>
+      <ConfirmClearModal
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={() => {
+          clearCall(idx);
+          setConfirmClear(false);
+        }}
+      />
     </Box>
   );
 };

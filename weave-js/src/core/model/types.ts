@@ -248,6 +248,7 @@ export interface ImageType {
   boxScoreKeys?: string[];
   maskLayers?: {[layerName: string]: string[]};
   classMap?: {[key: string]: string};
+  caption?: string;
 }
 
 export interface VideoType {

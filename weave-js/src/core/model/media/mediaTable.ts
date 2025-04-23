@@ -149,6 +149,7 @@ function wbTypeToMediaType(t: WBType.WBType): Types.Type {
         boxScoreKeys: t.params?.box_score_keys?.params?.val ?? [],
         maskLayers: t.params?.mask_layers?.params?.val ?? {},
         classMap: t.params?.class_map?.params?.val ?? {},
+        caption: t.params?.caption?.params?.val ?? '',
       } as Types.ImageType;
     }
   } else if (WBType.isTableWBType(t)) {

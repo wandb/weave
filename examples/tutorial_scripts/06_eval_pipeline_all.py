@@ -65,8 +65,8 @@ examples = [
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def fruit_name_score(target: dict, model_output: dict) -> dict:
-    return {"correct": target["fruit"] == model_output["fruit"]}
+def fruit_name_score(target: dict, output: dict) -> dict:
+    return {"correct": target["fruit"] == output["fruit"]}
 
 
 # Finally, we run an evaluation of this model.

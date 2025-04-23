@@ -18,31 +18,32 @@ sidebar_label: weave_client
 
 - [`weave_client.WeaveClient`](#class-weaveclient)
 - [`weave_client.Call`](#class-call): A Call represents a single operation that was executed as part of a trace.
-- [`weave_client.CallsIter`](#class-callsiter)
 
+## Functions
 
+- [`weave_client.PaginatedIterator`](#function-paginatediterator)
 
 
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L436"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L567"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `WeaveClient`
 
 
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L450"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L581"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
 ```python
 __init__(
-    entity: str,
-    project: str,
-    server: TraceServerInterface,
-    ensure_project_exists: bool = True
+    entity: 'str',
+    project: 'str',
+    server: 'TraceServerInterface',
+    ensure_project_exists: 'bool' = True
 )
 ```
 
@@ -55,19 +56,19 @@ __init__(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L901"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1043"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_cost`
 
 ```python
 add_cost(
-    llm_id: str,
-    prompt_token_cost: float,
-    completion_token_cost: float,
-    effective_date: Optional[datetime] = datetime.datetime(2024, 10, 9, 19, 25, 36, 393932, tzinfo=datetime.timezone.utc),
-    prompt_token_cost_unit: Optional[str] = 'USD',
-    completion_token_cost_unit: Optional[str] = 'USD',
-    provider_id: Optional[str] = 'default'
+    llm_id: 'str',
+    prompt_token_cost: 'float',
+    completion_token_cost: 'float',
+    effective_date: 'datetime | None' = datetime.datetime(2024, 12, 17, 4, 20, 20, 550683, tzinfo=datetime.timezone.utc),
+    prompt_token_cost_unit: 'str | None' = 'USD',
+    completion_token_cost_unit: 'str | None' = 'USD',
+    provider_id: 'str | None' = 'default'
 ) → CostCreateRes
 ```
 
@@ -102,12 +103,12 @@ Add a cost to the current project.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L590"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L726"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call`
 
 ```python
-call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
+call(call_id: 'str', include_costs: 'bool' = False) → WeaveObject
 ```
 
 
@@ -116,14 +117,14 @@ call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L566"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L700"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls`
 
 ```python
 calls(
-    filter: Optional[CallsFilter] = None,
-    include_costs: Optional[bool] = False
+    filter: 'CallsFilter | None' = None,
+    include_costs: 'bool' = False
 ) → CallsIter
 ```
 
@@ -133,18 +134,18 @@ calls(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L594"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L734"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `create_call`
 
 ```python
 create_call(
-    op: Union[str, Op],
-    inputs: dict,
-    parent: Optional[Call] = None,
-    attributes: Optional[dict] = None,
-    display_name: Optional[str, Callable[[Call], str]] = None,
-    use_stack: bool = True
+    op: 'str | Op',
+    inputs: 'dict',
+    parent: 'Call | None' = None,
+    attributes: 'dict | None' = None,
+    display_name: 'str | Callable[[Call], str] | None' = None,
+    use_stack: 'bool' = True
 ) → Call
 ```
 
@@ -168,12 +169,12 @@ Create, log, and push a call onto the runtime stack.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L804"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L946"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete_call`
 
 ```python
-delete_call(call: Call) → None
+delete_call(call: 'Call') → None
 ```
 
 
@@ -182,29 +183,62 @@ delete_call(call: Call) → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L799"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L941"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `fail_call`
 
 ```python
-fail_call(call: Call, exception: BaseException) → None
+fail_call(call: 'Call', exception: 'BaseException') → None
 ```
 
 Fail a call with an exception. This is a convenience method for finish_call. 
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L888"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1030"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback`
 
 ```python
 feedback(
-    query: Optional[Query, str] = None,
-    reaction: Optional[str] = None,
-    offset: int = 0,
-    limit: int = 100
+    query: 'Query | str | None' = None,
+    reaction: 'str | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
 ) → FeedbackQuery
+```
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L849"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `finish_call`
+
+```python
+finish_call(
+    call: 'Call',
+    output: 'Any' = None,
+    exception: 'BaseException | None' = None,
+    op: 'Op | None' = None
+) → None
+```
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L635"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `get`
+
+```python
+get(ref: 'ObjectRef') → Any
 ```
 
 
@@ -215,43 +249,10 @@ feedback(
 
 <a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L708"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
-### <kbd>method</kbd> `finish_call`
-
-```python
-finish_call(
-    call: Call,
-    output: Any = None,
-    exception: Optional[BaseException] = None,
-    op: Optional[Op] = None
-) → None
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L504"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `get`
-
-```python
-get(ref: ObjectRef) → Any
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L574"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
 ### <kbd>method</kbd> `get_call`
 
 ```python
-get_call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
+get_call(call_id: 'str', include_costs: 'bool' = False) → WeaveObject
 ```
 
 
@@ -260,14 +261,14 @@ get_call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L553"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L684"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_calls`
 
 ```python
 get_calls(
-    filter: Optional[CallsFilter] = None,
-    include_costs: Optional[bool] = False
+    filter: 'CallsFilter | None' = None,
+    include_costs: 'bool' = False
 ) → CallsIter
 ```
 
@@ -277,16 +278,16 @@ get_calls(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L813"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L955"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_feedback`
 
 ```python
 get_feedback(
-    query: Optional[Query, str] = None,
-    reaction: Optional[str] = None,
-    offset: int = 0,
-    limit: int = 100
+    query: 'Query | str | None' = None,
+    reaction: 'str | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
 ) → FeedbackQuery
 ```
 
@@ -321,12 +322,12 @@ Query project for feedback.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L948"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1090"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `purge_costs`
 
 ```python
-purge_costs(ids: Union[list[str], str]) → None
+purge_costs(ids: 'list[str] | str') → None
 ```
 
 Purge costs from the current project. 
@@ -349,16 +350,16 @@ Purge costs from the current project.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L973"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1115"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `query_costs`
 
 ```python
 query_costs(
-    query: Optional[Query, str] = None,
-    llm_ids: Optional[list[str]] = None,
-    offset: int = 0,
-    limit: int = 100
+    query: 'Query | str | None' = None,
+    llm_ids: 'list[str] | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
 ) → list[CostQueryOutput]
 ```
 
@@ -395,12 +396,12 @@ Query project for costs.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L475"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L606"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `save`
 
 ```python
-save(val: Any, name: str, branch: str = 'latest') → Any
+save(val: 'Any', name: 'str', branch: 'str' = 'latest') → Any
 ```
 
 Do not call directly, use weave.publish() instead. 
@@ -421,7 +422,7 @@ Do not call directly, use weave.publish() instead.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L168"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L305"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Call`
 A Call represents a single operation that was executed as part of a trace. 
@@ -432,25 +433,33 @@ A Call represents a single operation that was executed as part of a trace.
 
 ```python
 __init__(
-    _op_name: Union[str, Future[str]],
-    trace_id: str,
-    project_id: str,
-    parent_id: Optional[str],
-    inputs: dict,
-    id: Optional[str] = None,
-    output: Any = None,
-    exception: Optional[str] = None,
-    summary: Optional[dict] = None,
-    display_name: Optional[str, Callable[[ForwardRef('Call')], str]] = None,
-    attributes: Optional[dict] = None,
-    started_at: Optional[datetime] = None,
-    ended_at: Optional[datetime] = None,
-    deleted_at: Optional[datetime] = None,
-    _children: list['Call'] = &lt;factory&gt;,
-    _feedback: Optional[RefFeedbackQuery] = None
+    _op_name: 'str | Future[str]',
+    trace_id: 'str',
+    project_id: 'str',
+    parent_id: 'str | None',
+    inputs: 'dict',
+    id: 'str | None' = None,
+    output: 'Any' = None,
+    exception: 'str | None' = None,
+    summary: 'dict | None' = None,
+    _display_name: 'str | Callable[[Call], str] | None' = None,
+    attributes: 'dict | None' = None,
+    started_at: 'datetime | None' = None,
+    ended_at: 'datetime | None' = None,
+    deleted_at: 'datetime | None' = None,
+    _children: 'list[Call]' = &lt;factory&gt;,
+    _feedback: 'RefFeedbackQuery | None' = None
 ) → None
 ```
 
+
+
+
+
+
+---
+
+#### <kbd>property</kbd> display_name
 
 
 
@@ -482,6 +491,14 @@ This is different from `op_name` which is usually the ref of the op.
 
 ---
 
+#### <kbd>property</kbd> ref
+
+
+
+
+
+---
+
 #### <kbd>property</kbd> ui_url
 
 
@@ -492,7 +509,7 @@ This is different from `op_name` which is usually the ref of the op.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L238"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L401"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `children`
 
@@ -506,7 +523,7 @@ children() → CallsIter
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L248"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L415"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete`
 
@@ -518,7 +535,7 @@ Delete the call.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L277"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L445"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `remove_display_name`
 
@@ -532,12 +549,12 @@ remove_display_name() → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L253"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L421"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `set_display_name`
 
 ```python
-set_display_name(name: Optional[str]) → None
+set_display_name(name: 'str | None') → None
 ```
 
 Set the display name for the call. 
@@ -561,29 +578,11 @@ call.set_display_name("My Custom Display Name")
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L281"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-## <kbd>class</kbd> `CallsIter`
-
-
-
-
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L286"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `__init__`
+### <kbd>function</kbd> `PaginatedIterator`
 
 ```python
-__init__(
-    server: TraceServerInterface,
-    project_id: str,
-    filter: CallsFilter,
-    include_costs: bool = False
-) → None
+PaginatedIterator(*args, **kwargs)
 ```
-
-
-
-
 
 
 

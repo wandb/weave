@@ -2,7 +2,7 @@ import Tooltip from '@mui/material/Tooltip';
 import * as _ from 'lodash';
 import numeral from 'numeral';
 import Prism from 'prismjs';
-import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import React, {FC, memo, useCallback, useEffect, useRef, useState} from 'react';
 import TimeAgo from 'react-timeago';
 import {Header, Icon, Pagination, Segment, Table} from 'semantic-ui-react';
 
@@ -601,6 +601,10 @@ const Netron: FC<NetronProps> = ({useLoadFileUrl, file: fileToQuery}) => {
   );
 };
 
+const oneMb = 1024 * 1024;
+const numMbToPreview = 20;
+const maxPreviewSize = numMbToPreview * oneMb;
+
 interface CodePreviewProps {
   useLoadFile: UseLoadFile;
   file: FileData;
@@ -608,103 +612,118 @@ interface CodePreviewProps {
   language?: string;
 }
 
-const CodePreview: FC<CodePreviewProps> = ({useLoadFile, file, language}) => {
-  const [data, setDataVal] = useState('');
-  const [error, setErrorVal] = useState<string | undefined>(undefined);
-  const ref = useRef<HTMLDivElement>(null);
-  const setData = useCallback(
-    (d: string) => {
-      // Automatically reformat JSON
-      let lines = d.split('\n');
-      if (
-        (file.name.endsWith('.json') && lines.length === 1) ||
-        (lines.length === 2 && lines[1] === '')
-      ) {
-        try {
-          const parsed = JSON.parse(lines[0]);
-          lines = JSON.stringify(parsed, undefined, 2).split('\n');
-        } catch {
-          // ok
+const CodePreview: FC<CodePreviewProps> = memo(
+  ({useLoadFile, file, language}) => {
+    const [data, setDataVal] = useState('');
+    const [error, setErrorVal] = useState<string | undefined>(undefined);
+    const ref = useRef<HTMLDivElement>(null);
+    const setData = useCallback(
+      (d: string) => {
+        if (d.length > maxPreviewSize) {
+          // Trying to display large formatted files crashes the browser, so we don't pretty-print them,
+          // and we truncate the file to 20MB. 20 may be too big - the browser definitely chugs at that point,
+          // but it doesn't crash, so it's a compromise that lets users preview the file if they really want.
+          // This works together with the below code that won't try to use Prism to do highlighting on large files.
+          setDataVal(
+            d.slice(0, maxPreviewSize) +
+              `\n(file truncated to ${numMbToPreview}MB)`
+          );
+          return;
         }
-      }
-
-      // Truncate long lines
-      const truncated = lines
-        .map(line => {
-          if (line.length > 1000) {
-            return line.slice(0, 1000) + ' (line truncated to 1000 characters)';
-          } else {
-            return line;
+        // Automatically reformat JSON
+        let lines = d.split('\n');
+        if (
+          (file.name.endsWith('.json') && lines.length === 1) ||
+          (lines.length === 2 && lines[1] === '')
+        ) {
+          try {
+            const parsed = JSON.parse(lines[0]);
+            lines = JSON.stringify(parsed, undefined, 2).split('\n');
+          } catch {
+            // ok
           }
-        })
-        .join('\n');
+        }
 
-      setDataVal(truncated);
-    },
-    [setDataVal, file.name]
-  );
-  const setError = useCallback(
-    (errorString?: string) => setErrorVal(errorString || 'Error loading file'),
-    [setErrorVal]
-  );
+        // Truncate long lines
+        const truncated = lines
+          .map(line => {
+            if (line.length > 1000) {
+              return (
+                line.slice(0, 1000) + ' (line truncated to 1000 characters)'
+              );
+            } else {
+              return line;
+            }
+          })
+          .join('\n');
 
-  // We don't pass a fallback to allow dev mode zero byte files to render
-  const loading = useLoadFile(file, {
-    onSuccess: setData,
-    onFailure: setError,
-  });
-  useEffect(() => {
-    if (ref.current != null) {
-      Prism.highlightElement(ref.current);
+        setDataVal(truncated);
+      },
+      [setDataVal, file.name]
+    );
+    const setError = useCallback(
+      (errorString?: string) =>
+        setErrorVal(errorString || 'Error loading file'),
+      [setErrorVal]
+    );
+
+    // We don't pass a fallback to allow dev mode zero byte files to render
+    const loading = useLoadFile(file, {
+      onSuccess: setData,
+      onFailure: setError,
+    });
+
+    useEffect(() => {
+      if (ref.current != null) {
+        Prism.highlightElement(ref.current);
+      }
+    });
+
+    if (error != null) {
+      return <Segment textAlign="center">{error}</Segment>;
     }
-  });
-  if (error != null) {
-    return <Segment textAlign="center">{error}</Segment>;
-  }
-  if (loading) {
-    return <Loader name="code-preview-loader" />;
-  }
-  // HACKING TO DISPLAY VOC
-  // if (file.name.endsWith('.xml')) {
-  //   const parser = new DOMParser();
-  //   const xmlDoc = parser.parseFromString(data, 'text/xml');
-  //   const anno = xmlDoc.getElementsByTagName('annotation')[0];
-  //   if (anno != null) {
-  //     for (let i = 0; i < anno.childNodes.length; i++) {
-  //       const node = anno.childNodes[i];
-  //       if (node.nodeType !== Node.TEXT_NODE && node.nodeName === 'filename') {
-  //         const filename = node.childNodes[0].textContent;
-  //         console.log('FILE NAME', filename);
-  //         // const imageFile = (node as any).getElementsByTagName('filename')[0];
-  //         // console.log('IMAGE FILE', imageFile);
-  //       }
-  //       console.log(node);
-  //     }
-  //     // anno.childNodes[]
-  //     // console.log('VOC!');
-  //   }
-  // }
-  return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #eee',
-        padding: 16,
-      }}>
-      <pre
+    if (loading) {
+      return <Loader name="code-preview-loader" />;
+    }
+
+    return (
+      <div
         style={{
+          background: 'white',
+          border: '1px solid #eee',
+          padding: 16,
+          // The page craps out when we use the normal scroll bar in large files so having this preview scroll on its own prevents that
+          height: 'calc(100vh - 150px)',
+          overflowY: 'auto',
           maxWidth: '100%',
         }}>
-        <code
-          style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}
-          ref={ref}
-          className={language != null ? `language-${language}` : undefined}>
-          {data}
-        </code>
-      </pre>
-    </div>
-  );
-};
+        {file.sizeBytes < oneMb ? (
+          // When the file is under 1MB we use the normal code viewer with highlighting
+          <pre
+            style={{
+              maxWidth: '100%',
+            }}>
+            <code
+              style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}
+              ref={ref}
+              className={language != null ? `language-${language}` : undefined}>
+              {data}
+            </code>
+          </pre>
+        ) : (
+          // Use a div here because Prism seems to have global access and can apply highlighting
+          // whenever it wants which we don't want here.
+          <div style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+            {data}
+          </div>
+        )}
+      </div>
+    );
+  },
+  (prevProps, nextProps) => {
+    return prevProps.file.url === nextProps.file.url;
+  }
+);
 
 interface MarkdownPreviewProps {
   useLoadFile: UseLoadFile;

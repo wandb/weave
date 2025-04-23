@@ -9,7 +9,7 @@ Weave supports logging and displaying multiple first class media types. Log imag
 
 Logging type: `PIL.Image.Image`. Here is an example of logging an image with the OpenAI DALL-E API:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
   
     ```python
@@ -83,7 +83,7 @@ This image will be logged to weave and automatically displayed in the UI. The fo
 
 Logging type: `wave.Wave_read`. Here is an example of logging an audio file using openai's speech generation API.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
   
     ```python

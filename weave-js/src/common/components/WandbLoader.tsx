@@ -113,8 +113,10 @@ export const TrackedWaveLoader = ({
   onComplete,
   onStart,
   size,
+  delayBeforeShow = 0,
 }: TrackedWandbLoaderProps & {
   size: 'small' | 'huge';
+  delayBeforeShow?: number;
 }) => {
   useLifecycleProfiling(
     name,
@@ -141,5 +143,5 @@ export const TrackedWaveLoader = ({
     onStart
   );
 
-  return <WaveLoader size={size} />;
+  return <WaveLoader size={size} delayBeforeShow={delayBeforeShow} />;
 };
