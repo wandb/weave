@@ -492,20 +492,13 @@ export function useExampleCompareData(
           digest => !adjacentRowsFromResults.includes(digest)
         );
 
-        if (
-          rowsToFetchFromTable.length > 0 &&
-          cachedPartialTableRequest.current
-        ) {
-          try {
-            await loadRowDataIntoCache(
-              rowsToFetchFromTable,
-              cachedRowData,
-              cachedPartialTableRequest,
-              getTraceServerClient
-            );
-          } catch (error) {
-            console.error('Error loading adjacent rows:', error);
-          }
+        if (!cachedPartialTableRequest.current) {
+          cachedPartialTableRequest.current = await makePartialTableReq(
+            state.summary.evaluations,
+            filteredRows,
+            targetIndex,
+            getTraceServerClient
+          );
         }
       }
 
