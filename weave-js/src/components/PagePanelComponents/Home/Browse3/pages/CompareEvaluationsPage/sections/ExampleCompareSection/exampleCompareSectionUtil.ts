@@ -418,12 +418,14 @@ export function useExampleCompareData(
     }
 
     return undefined;
+    // Including `cacheVersion` in the dependency array ensures the memo recalculates
+    // when it changes, even though it's not directly used in the calculation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cacheVersion,
     filteredRows,
     targetIndex,
-    state.loadableComparisonResults.result,
+    // state.loadableComparisonResults.result,
   ]);
 
   useEffect(() => {

@@ -230,6 +230,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const inputColumnKeys = useMemo(() => {
+    // Imperative evaluations
     if (!targetRowValue) {
       return [];
     }
@@ -256,27 +257,10 @@ export const ExampleCompareSection: React.FC<{
     return <div>Filter resulted in 0 rows</div>;
   }
 
-  // Show loading state when input data is being fetched
-  if (loadingInputValue) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100%',
-        }}>
-        <LoadingDots />
-      </div>
-    );
-  }
-
   // This section contains the primary helper variable for laying out the grid
   const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
-
-  console.log('props', props);
 
   const inputRef = target.inputRef;
   const numInputProps = inputColumnKeys?.length ?? 0;

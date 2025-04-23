@@ -247,8 +247,6 @@ const fetchEvaluationSummaryData = async (
     ])
   );
 
-  console.log('evaluationCallCache', evaluationCallCache);
-
   const evalRefs = evalRes.calls.map(call => call.inputs.self);
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
   const combinedEvalAndModelObjs = await traceServerClient.readBatch({
@@ -427,7 +425,6 @@ const fetchEvaluationComparisonResults = async (
 
   // 4. Populate the predictions and scores
   const evalTraceRes = await evalTraceResProm;
-  console.log('evalTraceRes', evalTraceRes);
 
   // Check if this is an imperative evaluation
   const maybeImperativeEval = evalTraceRes.calls.find(
