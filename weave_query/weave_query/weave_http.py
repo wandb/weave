@@ -123,9 +123,12 @@ class HttpAsync:
                     span.set_metric(
                         "content_length", r.headers.get("content-length", 0), True
                     )
-                    async with self.fs.open_write(path, mode="wb") as f:
-                        async for data in r.content.iter_chunked(16 * 1024):
-                            await f.write(data)
+                    with tracer.trace("async_download_file_task.open_write"):
+                        async with self.fs.open_write(path, mode="wb") as f:
+                            with tracer.trace("async_download_file_task.iter_chunked"):
+                                async for data in r.content.iter_chunked(16 * 1024):
+                                    with tracer.trace("async_download_file_task.write"):
+                                        await f.write(data)
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status, "Download failed"
