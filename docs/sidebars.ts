@@ -102,7 +102,7 @@ const sidebars: SidebarsConfig = {
             "guides/core-types/datasets",
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
-            "guides/evaluation/weave_local_scorers",
+            "guides/evaluation/weave_local_scorers"
           ]
         },
       ],
