@@ -559,62 +559,6 @@ const getValueByPath = (obj: any, path: string): any => {
   }, obj);
 };
 
-const processLeaderboardEvaluationImperative = (
-  call: TraceCallSchema,
-  col: LeaderboardObjectVal['columns'][number],
-  evalVal: any,
-  modelRef: WeaveObjectRef,
-  datasetRef: WeaveObjectRef,
-  data: GroupableLeaderboardValueRecord[],
-  evalData: LeaderboardObjectEvalData
-) => {
-  const output = call.output;
-  if (
-    typeof output === 'object' &&
-    output !== null &&
-    col.scorer_name in output
-  ) {
-    const value = getValueByPath(output, col.summary_metric_path);
-    const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
-    const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
-    // Fix: Use scorerName without trailing colon to match the format expected elsewhere
-    const scorerGroup = `${col.scorer_name}`;
-    const row: GroupableLeaderboardValueRecord = {
-      modelGroup,
-      datasetGroup,
-      scorerGroup,
-      metricPathGroup: col.summary_metric_path,
-      sortKey: -convertISOToDate(call.started_at).getTime(),
-      row: {
-        datasetName: datasetRef.artifactName,
-        datasetVersion: datasetRef.artifactVersion,
-        metricType: 'scorerMetric',
-        scorerName: col.scorer_name,
-        scorerVersion: '',
-        metricPath: col.summary_metric_path,
-        metricValue: value as any,
-        modelName: modelRef.artifactName,
-        modelVersion: modelRef.artifactVersion,
-        modelType: modelRef.weaveKind === 'op' ? 'op' : 'object',
-        trials: evalVal.trials,
-        createdAt: convertISOToDate(call.started_at),
-        sourceEvaluationCallId: call.id,
-        sourceEvaluationObjectRef: col.evaluation_object_ref,
-        shouldMinimize: col.should_minimize ?? false,
-      },
-    };
-
-    data.push(row);
-    if (!(col.evaluation_object_ref in evalData)) {
-      evalData[col.evaluation_object_ref] = {
-        datasetGroup,
-        scorers: {},
-      };
-    }
-    evalData[col.evaluation_object_ref].scorers[col.scorer_name] = scorerGroup;
-  }
-};
-
 const processLeaderboardEvaluation = (
   call: TraceCallSchema,
   col: LeaderboardObjectVal['columns'][number],
@@ -622,20 +566,38 @@ const processLeaderboardEvaluation = (
   modelRef: WeaveObjectRef,
   datasetRef: WeaveObjectRef,
   data: GroupableLeaderboardValueRecord[],
-  evalData: LeaderboardObjectEvalData
+  evalData: LeaderboardObjectEvalData,
+  isImperative: boolean
 ) => {
-  const scorerRefUri = evalVal.scorers.find(
-    (scorer: string) =>
-      parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
-  );
-  const scorerRef = parseRefMaybe(scorerRefUri ?? '');
-  if (scorerRef?.scheme !== 'weave') {
-    return;
-  }
-  const value = getValueByPath(call.output, col.summary_metric_path);
+  const output = call.output;
+  const value = getValueByPath(output, col.summary_metric_path);
   const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
   const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
-  const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
+
+  let scorerName: string;
+  let scorerVersion: string;
+  let scorerGroup: string;
+
+  if (isImperative) {
+    // Imperative evaluation case
+    scorerName = col.scorer_name;
+    scorerVersion = '';
+    scorerGroup = `${col.scorer_name}`;
+  } else {
+    // Regular evaluation case
+    const scorerRefUri = evalVal.scorers.find(
+      (scorer: string) =>
+        parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
+    );
+    const scorerRef = parseRefMaybe(scorerRefUri ?? '');
+    if (scorerRef?.scheme !== 'weave') {
+      return;
+    }
+    scorerName = scorerRef.artifactName;
+    scorerVersion = scorerRef.artifactVersion;
+    scorerGroup = `${scorerName}:${scorerVersion}`;
+  }
+
   const row: GroupableLeaderboardValueRecord = {
     modelGroup,
     datasetGroup,
@@ -646,8 +608,8 @@ const processLeaderboardEvaluation = (
       datasetName: datasetRef.artifactName,
       datasetVersion: datasetRef.artifactVersion,
       metricType: 'scorerMetric',
-      scorerName: scorerRef.artifactName,
-      scorerVersion: scorerRef.artifactVersion,
+      scorerName,
+      scorerVersion,
       metricPath: col.summary_metric_path,
       metricValue: value as any,
       modelName: modelRef.artifactName,
@@ -660,6 +622,7 @@ const processLeaderboardEvaluation = (
       shouldMinimize: col.should_minimize ?? false,
     },
   };
+
   data.push(row);
   if (!(col.evaluation_object_ref in evalData)) {
     evalData[col.evaluation_object_ref] = {
@@ -667,8 +630,7 @@ const processLeaderboardEvaluation = (
       scorers: {},
     };
   }
-  evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
-    scorerGroup;
+  evalData[col.evaluation_object_ref].scorers[scorerName] = scorerGroup;
 };
 
 const getLeaderboardObjectGroupableData = async (
@@ -730,27 +692,16 @@ const getLeaderboardObjectGroupableData = async (
           return;
         }
 
-        if (isImperative) {
-          processLeaderboardEvaluationImperative(
-            call,
-            col,
-            evalVal,
-            modelRef,
-            datasetRef,
-            data,
-            evalData
-          );
-        } else {
-          processLeaderboardEvaluation(
-            call,
-            col,
-            evalVal,
-            modelRef,
-            datasetRef,
-            data,
-            evalData
-          );
-        }
+        processLeaderboardEvaluation(
+          call,
+          col,
+          evalVal,
+          modelRef,
+          datasetRef,
+          data,
+          evalData,
+          isImperative
+        );
       }
     });
   });
