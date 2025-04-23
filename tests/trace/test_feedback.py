@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
+from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
@@ -82,8 +83,11 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     column_name = "column_name"
     feedback_type = f"wandb.annotation.{column_name}"
     weave_ref = f"weave:///{project_id}/call/cal_id_123"
-    annotation_ref = f"weave:///{project_id}/object/{column_name}:obj_id_123"
+
     payload = {"value": 1}
+
+    ref = weave.publish(AnnotationSpec(name=column_name, field_schema=int))
+    annotation_ref = ref.uri()
 
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
@@ -342,7 +346,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     }
 
 
-def populate_feedback(client: WeaveClient) -> None:
+async def populate_feedback(client: WeaveClient) -> None:
     @weave.op
     def my_scorer(x: int, output: int) -> int:
         expected = ["a", "b", "c", "d"][x]
@@ -365,7 +369,7 @@ def populate_feedback(client: WeaveClient) -> None:
     for x in range(4):
         _, c = my_model.call(x)
         ids.append(c.id)
-        c._apply_scorer(my_scorer)
+        await c.apply_scorer(my_scorer)
 
     assert len(list(my_scorer.calls())) == 4
     assert len(list(my_model.calls())) == 4
@@ -373,13 +377,14 @@ def populate_feedback(client: WeaveClient) -> None:
     return ids, my_scorer, my_model
 
 
-def test_sort_by_feedback(client: WeaveClient) -> None:
+@pytest.mark.asyncio
+async def test_sort_by_feedback(client: WeaveClient) -> None:
     if client_is_sqlite(client):
         # Not implemented in sqlite - skip
         return pytest.skip()
 
     """Test sorting by feedback."""
-    ids, my_scorer, my_model = populate_feedback(client)
+    ids, my_scorer, my_model = await populate_feedback(client)
 
     for fields, asc_ids in [
         (
@@ -437,13 +442,14 @@ def test_sort_by_feedback(client: WeaveClient) -> None:
         ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
 
 
-def test_filter_by_feedback(client: WeaveClient) -> None:
+@pytest.mark.asyncio
+async def test_filter_by_feedback(client: WeaveClient) -> None:
     if client_is_sqlite(client):
         # Not implemented in sqlite - skip
         return pytest.skip()
 
     """Test filtering by feedback."""
-    ids, my_scorer, my_model = populate_feedback(client)
+    ids, my_scorer, my_model = await populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
         (
             "feedback.[wandb.runnable.my_scorer].payload.output.model_output",
@@ -510,13 +516,14 @@ class MatchAnyDatetime:
         return isinstance(other, datetime.datetime)
 
 
-def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
+@pytest.mark.asyncio
+async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     if client_is_sqlite(client):
         # Not implemented in sqlite - skip
         return pytest.skip()
 
     """Test filtering by feedback."""
-    ids, my_scorer, my_model = populate_feedback(client)
+    ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),

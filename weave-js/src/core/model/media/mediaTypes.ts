@@ -145,6 +145,7 @@ export type ImageFileWBType = WBType & {
     mask_layers?: ConstWBType<{[layerName: string]: string[]}>;
     class_map?: ConstWBType<{[id: string]: string}>;
     box_score_keys?: ConstWBType<string[]>;
+    caption?: ConstWBType<string>;
   };
 };
 

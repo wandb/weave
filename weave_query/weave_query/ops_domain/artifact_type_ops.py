@@ -11,6 +11,10 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_prop_op,
     gql_root_op,
 )
+from weave_query.constants import (
+    LIMIT_ARTIFACT_COLLECTIONS,
+    LIMIT_ARTIFACT_TYPES,
+)
 
 # Section 1/6: Tag Getters
 # None
@@ -37,23 +41,23 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: "first: 100",
+    lambda inputs: f"first: {LIMIT_ARTIFACT_TYPES}",
 )
 
 # Section 6/6: Non Standard Business Logic Ops
 # This is a horrible op due to the double limits - we should remove this.
-first_100_collections_alias = _make_alias("first: 100", prefix="artifactCollections")
-first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
+first_100_collections_alias = _make_alias(f"first: {LIMIT_ARTIFACT_COLLECTIONS}", prefix="artifactCollections")
+first_100_artifacts_alias = _make_alias(f"first: {LIMIT_ARTIFACT_TYPES}", prefix="artifacts")
 
 
 @op(
     name="artifactType-artifactVersions",
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-    {first_100_collections_alias}: artifactCollections(first: 100) {{
+    {first_100_collections_alias}: artifactCollections(first: {LIMIT_ARTIFACT_COLLECTIONS}) {{
         edges {{
             node {{
-                {first_100_artifacts_alias}: artifacts(first: 100) {{
+                {first_100_artifacts_alias}: artifacts(first: {LIMIT_ARTIFACT_TYPES}) {{
                     edges {{
                         node {{
                             {wdt.ArtifactVersion.REQUIRED_FRAGMENT}

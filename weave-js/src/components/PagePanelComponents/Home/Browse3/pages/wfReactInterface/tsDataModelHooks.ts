@@ -10,7 +10,12 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  refUri,
+  WeaveObjectRef,
+} from '../../../../../../react';
 import {
   callCache,
   objectVersionCache,
@@ -161,30 +166,46 @@ const useMakeTraceServerEndpoint = <
 
 const useCall = (
   key: CallKey | null,
-  opts?: {includeCosts?: boolean}
+  opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? callCache.get(key) : null;
+
+  const effectiveKey = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return {
+      ...key,
+      withCosts: !!opts?.includeCosts,
+      withTotalStorageSize: !!opts?.includeTotalStorageSize,
+    };
+  }, [key, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const deepKey = useDeepMemo(effectiveKey);
+
+  const cachedCall = deepKey ? callCache.get(deepKey) : null;
+
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
           include_costs: opts?.includeCosts,
+          ...(opts?.includeTotalStorageSize
+            ? {include_total_storage_size: true}
+            : null),
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient, opts?.includeCosts]);
+  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]);
 
   useEffect(() => {
     doFetch();
@@ -195,7 +216,7 @@ const useCall = (
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (deepKey == null) {
       return {
         loading: false,
         result: null,
@@ -216,9 +237,14 @@ const useCall = (
         loading: true,
         result: null,
       };
-    } else if (result?.callId === key?.callId) {
+    } else if (result == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } else if (result?.callId === deepKey?.callId) {
       if (result) {
-        callCache.set(key, result);
+        callCache.set(deepKey, result);
       }
       return {
         loading: false,
@@ -227,11 +253,11 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }
-  }, [cachedCall, callRes, key]);
+  }, [cachedCall, callRes, deepKey]);
 };
 
 const useCallsNoExpansion = (
@@ -248,6 +274,7 @@ const useCallsNoExpansion = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -282,6 +309,9 @@ const useCallsNoExpansion = (
       columns,
       include_costs: opts?.includeCosts,
       include_feedback: opts?.includeFeedback,
+      ...(opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -294,18 +324,27 @@ const useCallsNoExpansion = (
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
     opts?.skip,
     opts?.includeCosts,
     opts?.includeFeedback,
-    getTsClient,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter.opVersionRefs,
+    deepFilter.inputObjectVersionRefs,
+    deepFilter.outputObjectVersionRefs,
+    deepFilter.parentIds,
+    deepFilter.traceId,
+    deepFilter.callIds,
+    deepFilter.traceRootsOnly,
+    deepFilter.runIds,
+    deepFilter.userIds,
+    limit,
     offset,
     sortBy,
     query,
     columns,
+    getTsClient,
   ]);
 
   // register doFetch as a callback after deletion
@@ -392,6 +431,7 @@ const useCalls = (
     refetchOnDelete?: boolean;
     includeCosts?: boolean;
     includeFeedback?: boolean;
+    includeTotalStorageSize?: boolean;
   }
 ): Loadable<CallSchema[]> & Refetchable => {
   const calls = useCallsNoExpansion(
@@ -573,7 +613,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -595,6 +636,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -671,13 +713,15 @@ const useFeedback = (
 
 const useOpVersion = (
   // Null value skips
-  key: OpVersionKey | null
-): Loadable<OpVersionSchema | null> => {
+  key: OpVersionKey | null,
+  metadataOnly?: boolean
+): LoadableWithError<OpVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedOpVersion = key ? opVersionCache.get(key) : null;
   const [opVersionRes, setOpVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
+  const [error, setError] = useState<any>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
@@ -691,31 +735,42 @@ const useOpVersion = (
           }),
           object_id: deepKey?.opId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
+          if (res.obj == null && !metadataOnly) {
+            setError(new Error(JSON.stringify(res)));
+            // be conservative and unset the cache when there's an error
+            if (deepKey) {
+              opVersionCache.del(deepKey);
+            }
+          }
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
       return {
         loading: false,
         result: null,
+        error,
       };
     }
     if (cachedOpVersion != null) {
       return {
         loading: false,
         result: cachedOpVersion,
+        error,
       };
     }
     if (opVersionRes == null || loadingRef.current) {
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -723,6 +778,7 @@ const useOpVersion = (
       return {
         loading: false,
         result: null,
+        error,
       };
     }
 
@@ -739,6 +795,7 @@ const useOpVersion = (
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -747,18 +804,112 @@ const useOpVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     opVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
+      error,
     };
-  }, [cachedOpVersion, key, opVersionRes]);
+  }, [cachedOpVersion, key, opVersionRes, error, metadataOnly]);
 };
 
+const useOpVersions = (
+  entity: string,
+  project: string,
+  filter: OpVersionFilter,
+  limit?: number,
+  metadataOnly?: boolean,
+  orderBy?: traceServerTypes.SortBy[],
+  opts?: {skip?: boolean}
+): LoadableWithError<OpVersionSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [opVersionRes, setOpVersionRes] = useState<
+    LoadableWithError<OpVersionSchema[]>
+  >({
+    loading: false,
+    error: null,
+    result: null,
+  });
+  const deepFilter = useDeepMemo(filter);
+  const deepOrderBy = useDeepMemo(orderBy);
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setOpVersionRes({loading: true, error: null, result: null});
+    loadingRef.current = true;
+
+    const req: traceServerTypes.TraceObjQueryReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        object_ids: deepFilter.opIds,
+        latest_only: deepFilter.latestOnly,
+        is_op: true,
+      },
+      limit,
+      metadata_only: metadataOnly,
+      sort_by: deepOrderBy,
+    };
+    const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
+      loadingRef.current = false;
+      setOpVersionRes({
+        loading: false,
+        error: null,
+        result: res.objs.map(convertTraceServerObjectVersionToOpSchema),
+      });
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setOpVersionRes({loading: false, error: e, result: null});
+    };
+    getTsClient().objsQuery(req).then(onSuccess).catch(onError);
+  }, [
+    deepFilter,
+    getTsClient,
+    opts?.skip,
+    entity,
+    project,
+    limit,
+    metadataOnly,
+    deepOrderBy,
+  ]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnObjectListener(doFetch);
+  }, [getTsClient, doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, error: null, result: null};
+    }
+    if (opVersionRes == null || loadingRef.current) {
+      return {loading: true, error: null, result: null};
+    }
+    return opVersionRes;
+  }, [opVersionRes, opts?.skip]);
+};
+
+// Helper function to convert trace server object version to op schema
 const convertTraceServerObjectVersionToOpSchema = (
   obj: traceServerTypes.TraceObjSchema
 ): OpVersionSchema => {
-  const [entity, project] = obj.project_id.split('/');
+  const {entity, project} = projectIdToParts(obj.project_id);
   return {
     entity,
     project,
@@ -766,38 +917,9 @@ const convertTraceServerObjectVersionToOpSchema = (
     versionHash: obj.digest,
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
+    userId: obj.wb_user_id,
   };
 };
-
-const useOpVersions = makeTraceServerEndpointHook<
-  'objsQuery',
-  [string, string, OpVersionFilter, number?, boolean?, {skip?: boolean}?],
-  OpVersionSchema[]
->(
-  'objsQuery',
-  (
-    entity: string,
-    project: string,
-    filter: OpVersionFilter,
-    limit?: number,
-    metadataOnly?: boolean,
-    opts?: {skip?: boolean}
-  ) => ({
-    params: {
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        object_ids: filter.opIds,
-        latest_only: filter.latestOnly,
-        is_op: true,
-      },
-      limit,
-      metadata_only: metadataOnly,
-    },
-    skip: opts?.skip,
-  }),
-  (res): OpVersionSchema[] =>
-    res.objs.map(convertTraceServerObjectVersionToOpSchema)
-);
 
 const useFileContent = makeTraceServerEndpointHook<
   'fileContent',
@@ -822,13 +944,15 @@ const useFileContent = makeTraceServerEndpointHook<
 
 const useObjectVersion = (
   // Null value skips
-  key: ObjectVersionKey | null
-): Loadable<ObjectVersionSchema | null> => {
+  key: ObjectVersionKey | null,
+  metadataOnly?: boolean
+): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
   const [objectVersionRes, setObjectVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
@@ -842,31 +966,46 @@ const useObjectVersion = (
           }),
           object_id: deepKey?.objectId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
-          setObjectVersionRes(res);
+          if (res.obj == null) {
+            if ('deleted_at' in res) {
+              setError(new Error(JSON.stringify(res)));
+            } else {
+              setError(new Error('Object not found'));
+            }
+          } else {
+            setObjectVersionRes(res);
+          }
+        })
+        .catch(err => {
+          setError(new Error(JSON.stringify(err)));
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
       return {
         loading: false,
         result: null,
+        error,
       };
     }
     if (cachedObjectVersion != null) {
       return {
         loading: false,
         result: cachedObjectVersion,
+        error,
       };
     }
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -874,6 +1013,7 @@ const useObjectVersion = (
       return {
         loading: false,
         result: null,
+        error,
       };
     }
 
@@ -889,6 +1029,7 @@ const useObjectVersion = (
       return {
         loading: true,
         result: null,
+        error,
       };
     }
 
@@ -897,12 +1038,22 @@ const useObjectVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     objectVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
+      error,
     };
-  }, [cachedObjectVersion, key, objectVersionRes]);
+  }, [cachedObjectVersion, key, objectVersionRes, error, metadataOnly]);
 };
 
 export const convertTraceServerObjectVersionToSchema = <
@@ -923,6 +1074,7 @@ export const convertTraceServerObjectVersionToSchema = <
     baseObjectClass: obj.base_object_class ?? null,
     versionIndex: obj.version_index,
     val: obj.val,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -1010,6 +1162,130 @@ const useRootObjectVersions = (
     }
     return objectVersionRes;
   }, [objectVersionRes, opts?.skip]);
+};
+
+const useObjectDeleteFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const makeObjectRef = (key: ObjectVersionKey) => {
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: key.entity,
+      projectName: key.project,
+      weaveKind: 'object',
+      artifactName: key.objectId,
+      artifactVersion: key.versionHash,
+    };
+    return refUri(ref);
+  };
+
+  const makeOpRef = (key: OpVersionKey) => {
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: key.entity,
+      projectName: key.project,
+      weaveKind: 'op',
+      artifactName: key.opId,
+      artifactVersion: key.versionHash,
+    };
+    return refUri(ref);
+  };
+
+  const updateObjectCaches = useCallback((key: ObjectVersionKey) => {
+    objectVersionCache.del(key);
+    const ref = makeObjectRef(key);
+    refDataCache.del(ref);
+  }, []);
+
+  const updateOpCaches = useCallback((key: OpVersionKey) => {
+    opVersionCache.del(key);
+    const ref = makeOpRef(key);
+    refDataCache.del(ref);
+  }, []);
+
+  const objectVersionsDelete = useCallback(
+    (entity: string, project: string, objectId: string, digests: string[]) => {
+      digests.forEach(digest => {
+        updateObjectCaches({
+          scheme: 'weave',
+          weaveKind: 'object',
+          entity,
+          project,
+          objectId,
+          versionHash: digest,
+          path: '',
+        });
+      });
+      return getTsClient().objDelete({
+        project_id: projectIdFromParts({
+          entity,
+          project,
+        }),
+        object_id: objectId,
+        digests,
+      });
+    },
+    [getTsClient, updateObjectCaches]
+  );
+
+  const objectDeleteAllVersions = useCallback(
+    (key: ObjectVersionKey) => {
+      updateObjectCaches(key);
+      return getTsClient().objDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: key.objectId,
+        digests: [],
+      });
+    },
+    [getTsClient, updateObjectCaches]
+  );
+
+  const opVersionsDelete = useCallback(
+    (entity: string, project: string, opId: string, digests: string[]) => {
+      digests.forEach(digest => {
+        updateOpCaches({
+          entity,
+          project,
+          opId,
+          versionHash: digest,
+        });
+      });
+      return getTsClient().objDelete({
+        project_id: projectIdFromParts({
+          entity,
+          project,
+        }),
+        object_id: opId,
+        digests,
+      });
+    },
+    [getTsClient, updateOpCaches]
+  );
+
+  const opDeleteAllVersions = useCallback(
+    (key: OpVersionKey) => {
+      updateOpCaches(key);
+      return getTsClient().objDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: key.opId,
+        digests: [],
+      });
+    },
+    [getTsClient, updateOpCaches]
+  );
+
+  return {
+    objectVersionsDelete,
+    objectDeleteAllVersions,
+    opVersionsDelete,
+    opDeleteAllVersions,
+  };
 };
 
 const useRefsReadBatch = makeTraceServerEndpointHook<
@@ -1675,22 +1951,24 @@ export const privateRefToSimpleName = (ref: string) => {
   }
 };
 
+export const parseSpanName = (opName: string) => {
+  if (
+    opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    opName.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return opVersionRefOpName(opName);
+  }
+  if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+    return privateRefToSimpleName(opName);
+  }
+  return opName;
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  const parseSpanName = (opName: string) => {
-    if (
-      opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      opName.startsWith(WEAVE_REF_PREFIX)
-    ) {
-      return opVersionRefOpName(opName);
-    }
-    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
-      return privateRefToSimpleName(opName);
-    }
-    return opName;
-  };
+
   return {
     entity,
     project,
@@ -1710,7 +1988,76 @@ export const traceCallToUICallSchema = (
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
     traceCall,
+    totalStorageSizeBytes: traceCall.total_storage_size_bytes ?? null,
   };
+};
+
+export const useObjCreate = (): ((
+  projectId: string,
+  objectId: string,
+  val: any,
+  baseObjectClass?: string
+) => Promise<string>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (
+      projectId: string,
+      objectId: string,
+      val: any,
+      baseObjectClass?: string
+    ) => {
+      return getTsClient()
+        .objCreate({
+          obj: {
+            project_id: projectId,
+            object_id: objectId,
+            val,
+            builtin_object_class: baseObjectClass,
+          },
+        })
+        .then(res => {
+          return res.digest;
+        });
+    },
+    [getTsClient]
+  );
+};
+
+export const useTableUpdate = (): ((
+  projectId: string,
+  digest: string,
+  updates: traceServerTypes.TableUpdateSpec[]
+) => Promise<traceServerTypes.TableUpdateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (
+      projectId: string,
+      baseDigest: string,
+      updates: traceServerTypes.TableUpdateSpec[]
+    ) => {
+      return getTsClient().tableUpdate({
+        project_id: projectId,
+        base_digest: baseDigest,
+        updates,
+      });
+    },
+    [getTsClient]
+  );
+};
+
+export const useTableCreate = (): ((
+  table: traceServerTypes.TableCreateReq
+) => Promise<traceServerTypes.TableCreateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (table: traceServerTypes.TableCreateReq) => {
+      return getTsClient().tableCreate(table);
+    },
+    [getTsClient]
+  );
 };
 
 /// Utility Functions ///
@@ -1719,8 +2066,6 @@ export const convertISOToDate = (iso: string): Date => {
   return new Date(iso);
 };
 
-// Export //
-
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
@@ -1728,9 +2073,11 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCallsDeleteFunc,
   useCallUpdateFunc,
   useCallsExport,
+  useObjCreate,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
+  useObjectDeleteFunc,
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
@@ -1738,6 +2085,8 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,
+  useTableUpdate,
+  useTableCreate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

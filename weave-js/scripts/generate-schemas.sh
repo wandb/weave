@@ -3,20 +3,23 @@
 # Exit on error
 set -e
 
-SCHEMA_INPUT_PATH="../weave/trace_server/interface/base_object_classes/generated/generated_base_object_class_schemas.json"
-SCHEMA_OUTPUT_PATH="./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts"
+SCHEMA_PATH="../weave/trace_server/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json"
+OUTPUT_PATH="./src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts"
 
 echo "Generating schemas..."
 
+# First resolve circular references in the schema
+python3 "$(dirname "$0")/resolve_schema_circular_refs.py" "$SCHEMA_PATH"
+
 # Generate TypeScript-Zod types from schema
-yarn quicktype -s schema "$SCHEMA_INPUT_PATH" -o "$SCHEMA_OUTPUT_PATH" --lang typescript-zod
+yarn quicktype -s schema "$SCHEMA_PATH" -o "$OUTPUT_PATH" --lang typescript-zod
 
 # Transform the schema to extract the type map
 sed -i.bak '
-  # Find the GeneratedBaseObjectClassesZodSchema definition and capture its contents
-  /export const GeneratedBaseObjectClassesZodSchema = z.object({/,/});/ {
+  # Find the GeneratedBuiltinObjectClassesZodSchema definition and capture its contents
+  /export const GeneratedBuiltinObjectClassesZodSchema = z.object({/,/});/ {
     # Replace the opening line with typeMap declaration
-    s/export const GeneratedBaseObjectClassesZodSchema = z.object({/export const baseObjectClassRegistry = ({/
+    s/export const GeneratedBuiltinObjectClassesZodSchema = z.object({/export const builtinObjectClassRegistry = ({/
     # Store the pattern
     h
     # If this is the last line (with closing brace), append the schema definition
@@ -27,15 +30,15 @@ sed -i.bak '
       s/.*//
       i\
 \
-export const GeneratedBaseObjectClassesZodSchema = z.object(baseObjectClassRegistry)
+export const GeneratedBuiltinObjectClassesZodSchema = z.object(builtinObjectClassRegistry)
     }
   }
-' "$SCHEMA_OUTPUT_PATH"
+' "$OUTPUT_PATH"
 
 # Remove backup file
-rm "${SCHEMA_OUTPUT_PATH}.bak"
+rm "${OUTPUT_PATH}.bak"
 
 # Format the generated file
-yarn direct-prettier --write "$SCHEMA_OUTPUT_PATH"
+yarn direct-prettier --write "$OUTPUT_PATH"
 
 echo "Schema generation completed successfully" 

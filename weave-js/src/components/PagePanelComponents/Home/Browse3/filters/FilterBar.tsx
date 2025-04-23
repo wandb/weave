@@ -4,7 +4,8 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import React, {useCallback, useRef} from 'react';
+import _ from 'lodash';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
@@ -25,10 +26,15 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
+import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
+const DEBOUNCE_MS = 1_000;
+
 type FilterBarProps = {
+  entity: string;
+  project: string;
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
   columnInfo: ColumnInfo;
@@ -42,11 +48,15 @@ type FilterBarProps = {
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
   return (
     filter.field === undefined ||
+    // Empty string is never valid
+    filter.value === '' ||
     (filter.value === undefined && !isValuelessOperator(filter.operator))
   );
 };
 
 export const FilterBar = ({
+  entity,
+  project,
   filterModel,
   setFilterModel,
   columnInfo,
@@ -57,6 +67,31 @@ export const FilterBar = ({
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  // local filter model is used to avoid triggering a re-render of the trace
+  // table on every keystroke. debounced DEBOUNCE_MS ms
+  const [localFilterModel, setLocalFilterModel] = useState(filterModel);
+  const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
+
+  // Keep track of incomplete filters that should be preserved during state sync
+  const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
+    []
+  );
+
+  // Merge the parent filter model with our incomplete filters
+  useEffect(() => {
+    const newItems = [...filterModel.items];
+
+    // Add incomplete filters that aren't in the parent model
+    incompleteFilters.forEach(incompleteFilter => {
+      if (!newItems.some(item => item.id === incompleteFilter.id)) {
+        newItems.push(incompleteFilter);
+      }
+    });
+
+    setLocalFilterModel({...filterModel, items: newItems});
+  }, [filterModel, incompleteFilters]);
+
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : refBar.current);
   };
@@ -135,7 +170,9 @@ export const FilterBar = ({
   });
 
   const onRemoveAll = () => {
-    setFilterModel({items: []});
+    const emptyModel = {items: []};
+    setLocalFilterModel(emptyModel);
+    setFilterModel(emptyModel);
     setAnchorEl(null);
   };
 
@@ -143,29 +180,51 @@ export const FilterBar = ({
     (field: string) => {
       const defaultOperator = getOperatorOptions(field)[0].value;
       const newModel = {
-        ...filterModel,
+        ...localFilterModel,
         items: [
-          ...filterModel.items,
+          ...localFilterModel.items,
           {
-            id: filterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field,
             operator: defaultOperator,
           },
         ],
       };
-      setFilterModel(newModel);
+      setLocalFilterModel(newModel);
     },
-    [filterModel, setFilterModel]
+    [localFilterModel]
+  );
+
+  // Only send complete filters to the parent component
+  const applyCompletedFilters = useCallback(
+    (model: GridFilterModel) => {
+      const completeFilters = model.items.filter(
+        item => !isFilterIncomplete(item)
+      );
+      setFilterModel({...model, items: completeFilters});
+      setIncompleteFilters(model.items.filter(isFilterIncomplete));
+    },
+    [setFilterModel]
+  );
+
+  const debouncedSetFilterModel = useMemo(
+    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
+    [applyCompletedFilters]
   );
 
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
-      const oldItems = filterModel.items;
+      debouncedSetFilterModel.cancel();
+      const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
+      // Set this filter as active edit, highlighting filter bar children in teal
+      setActiveEditId(item.id);
+
       if (index === -1) {
-        const newModel2 = {...filterModel, items: [item]};
-        setFilterModel(newModel2);
+        const newModel = {...localFilterModel, items: [item]};
+        setLocalFilterModel(newModel);
+        debouncedSetFilterModel(newModel);
         return;
       }
 
@@ -174,45 +233,69 @@ export const FilterBar = ({
         item,
         ...oldItems.slice(index + 1),
       ];
-      const newModel = {...filterModel, items: newItems};
-      setFilterModel(newModel);
+      const newItemsModel = {...localFilterModel, items: newItems};
+      setLocalFilterModel(newItemsModel);
+      debouncedSetFilterModel(newItemsModel);
     },
-    [filterModel, setFilterModel]
+    [localFilterModel, debouncedSetFilterModel]
   );
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
-      const items = filterModel.items.filter(f => f.id !== filterId);
-      const newModel = {...filterModel, items};
-      setFilterModel(newModel);
+      const items = localFilterModel.items.filter(f => f.id !== filterId);
+      const newModel = {...localFilterModel, items};
+      setLocalFilterModel(newModel);
+      applyCompletedFilters(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterId) {
+        setActiveEditId(null);
+      }
     },
-    [filterModel, setFilterModel]
+    [localFilterModel, applyCompletedFilters, activeEditId]
   );
 
   const onSetSelected = useCallback(() => {
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: filterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: filterModel.items.length,
+            id: getNextFilterId(localFilterModel.items),
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
           };
     const newModel = upsertFilter(
-      filterModel,
+      localFilterModel,
       newFilter,
       f => f.field === 'id'
     );
-    setFilterModel(newModel);
+
+    // Apply filter immediately (won't be incomplete)
+    setLocalFilterModel(newModel);
+    applyCompletedFilters(newModel);
+
     clearSelectedCalls();
     setAnchorEl(null);
-  }, [filterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
+
+    // Clear active edit when popover is closed
+    setActiveEditId(null);
+  }, [
+    localFilterModel,
+    applyCompletedFilters,
+    selectedCalls,
+    clearSelectedCalls,
+  ]);
+
+  const onFilterTagClick = useCallback((filterId: FilterId) => {
+    setActiveEditId(filterId);
+    setAnchorEl(refBar.current);
+  }, []);
 
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
@@ -221,26 +304,44 @@ export const FilterBar = ({
   const labelW = refLabel.current?.offsetWidth ?? 0;
   const availableWidth = width - outlineW - paddingW - iconW - labelW - gapW;
 
-  const completeItems = filterModel.items.filter(f => !isFilterIncomplete(f));
+  const completeItems = localFilterModel.items.filter(
+    f => !isFilterIncomplete(f)
+  );
+
+  // Determine if we should show a border based on whether there are active filters
+  const hasBorder = completeItems.length > 0;
+
+  const {combinedItems, activeEditIds} = useMemo(() => {
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    return {combinedItems: items, activeEditIds: activeIds};
+  }, [completeItems, activeEditId]);
 
   return (
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+          hasBorder
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:hover:border-2 dark:hover:border-teal-400'
+            : ''
+        } ${
+          !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
+        }`}
         onClick={onClick}>
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none">
+        <div ref={refLabel} className="select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
               onRemoveFilter={onRemoveFilter}
+              isEditing={activeEditIds.has(f.id) || f.id === activeEditId}
+              onClick={() => onFilterTagClick(f.id)}
             />
           ))}
         </VariableChildrenDisplay>
@@ -265,7 +366,10 @@ export const FilterBar = ({
             },
           },
         }}
-        onClose={() => setAnchorEl(null)}
+        onClose={() => {
+          setAnchorEl(null);
+          setActiveEditId(null); // Clear active edit when popover is closed
+        }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="p-12">
@@ -273,26 +377,31 @@ export const FilterBar = ({
               <div className="handle flex items-center pb-12">
                 <div className="flex-auto font-semibold">Filters</div>
                 {selectedCalls.length > 0 && (
-                  <Button size="small" variant="quiet" onClick={onSetSelected}>
+                  <Button size="small" variant="ghost" onClick={onSetSelected}>
                     {`Selected rows (${selectedCalls.length})`}
                   </Button>
                 )}
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {filterModel.items.map(item => (
+              {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
+                  entity={entity}
+                  project={project}
                   item={item}
                   options={options}
                   onAddFilter={onAddFilter}
                   onUpdateFilter={onUpdateFilter}
                   onRemoveFilter={onRemoveFilter}
+                  activeEditId={activeEditId}
                 />
               ))}
             </div>
-            {filterModel.items.length === 0 && (
+            {localFilterModel.items.length === 0 && (
               <FilterRow
+                entity={entity}
+                project={project}
                 item={{
                   id: undefined,
                   field: '',
@@ -303,23 +412,24 @@ export const FilterBar = ({
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
+                activeEditId={activeEditId}
               />
             )}
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="add-new"
-                disabled={filterModel.items.length === 0}
+                disabled={localFilterModel.items.length === 0}
                 onClick={() => onAddFilter('')}>
                 Add filter
               </Button>
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="delete"
-                disabled={filterModel.items.length === 0}
+                disabled={localFilterModel.items.length === 0}
                 onClick={onRemoveAll}>
                 Remove all
               </Button>

@@ -33,11 +33,10 @@ export const StopSequenceEditor: React.FC<StopSequenceEditorProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '4px',
         width: '100%',
-        pb: '4px',
       }}>
-      <span>Stop sequences</span>
+      <span style={{fontSize: '14px'}}>Stop sequences</span>
       <Box
         sx={{
           display: 'flex',
@@ -74,7 +73,6 @@ export const StopSequenceEditor: React.FC<StopSequenceEditorProps> = ({
           }}
           sx={{
             fontFamily: 'Source Sans Pro',
-            fontSize: '16px',
             '& .MuiInputBase-root': {
               border: 'none',
               '&:before, &:after': {
@@ -87,7 +85,6 @@ export const StopSequenceEditor: React.FC<StopSequenceEditorProps> = ({
             '& .MuiInputBase-input': {
               padding: '8px',
               fontFamily: 'Source Sans Pro',
-              fontSize: '16px',
             },
           }}
         />

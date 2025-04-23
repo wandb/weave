@@ -1,4 +1,4 @@
-import {isAssignableTo, maybe} from '@wandb/weave/core';
+import {isAssignableTo, maybe, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -17,12 +17,13 @@ import {IconAddNew, IconDelete} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
-import {usePanelContext} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import * as TableState from '../PanelTable/tableState';
 import * as TableType from '../PanelTable/tableType';
+import {getColumnVariables, useAutomatedTableState} from '../PanelTable/util';
 import {useConfig} from './config';
 import {ConfigDimComponent} from './ConfigDimComponent';
-import {PanelPlot2Inner} from './PanelPlot2Inner';
+import {PanelPlot2ContextWrapper} from './PanelPlot2Inner';
 import * as PlotState from './plotState';
 import {isValidConfig} from './plotState';
 import {ScaleConfigOption} from './ScaleConfigOption';
@@ -51,8 +52,32 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   } else if (typedInputNodeUse.result.nodeType === 'void') {
     return <></>;
   } else {
-    return <PanelPlotConfigInner {...newProps} />;
+    return <PanelPlotConfigContextWrapper {...newProps} />;
   }
+};
+
+const PanelPlotConfigContextWrapper: React.FC<PanelPlotProps> = props => {
+  const {input} = props;
+  const {config} = useConfig(input, props.config);
+  const weave = useWeaveContext();
+
+  const {tableState, autoTable} = useAutomatedTableState(
+    input,
+    (config as any)?.tableState,
+    weave
+  );
+
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(
+      (props.config as any)?.tableState ?? tableState ?? autoTable
+    );
+  }, [props.config, tableState, autoTable]);
+
+  return (
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelPlotConfigInner {...props} />
+    </PanelContextProvider>
+  );
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
@@ -613,7 +638,7 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   } else {
     return (
       <div style={{height: '100%', width: '100%'}}>
-        <PanelPlot2Inner {...newProps} />
+        <PanelPlot2ContextWrapper {...newProps} />
       </div>
     );
   }

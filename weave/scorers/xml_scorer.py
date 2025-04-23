@@ -2,10 +2,9 @@ import xml.etree.ElementTree as ET
 from typing import Union
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class ValidXMLScorer(Scorer):
+class ValidXMLScorer(weave.Scorer):
     """Score an XML string."""
 
     @weave.op

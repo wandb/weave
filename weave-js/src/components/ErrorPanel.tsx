@@ -1,7 +1,19 @@
-import React, {forwardRef, useEffect, useRef, useState} from 'react';
+import copyToClipboard from 'copy-to-clipboard';
+import _ from 'lodash';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
+import {toast} from '../common/components/elements/Toast';
 import {hexToRGB, MOON_300, MOON_600} from '../common/css/globals.styles';
+import {useViewerInfo} from '../common/hooks/useViewerInfo';
+import {getCookieBool, getFirebaseCookie} from '../common/util/cookie';
+import {Button} from './Button';
 import {Icon} from './Icon';
 import {Tooltip} from './Tooltip';
 
@@ -14,6 +26,11 @@ type ErrorPanelProps = {
   title?: string;
   subtitle?: string;
   subtitle2?: string;
+
+  // These props are for error details object
+  uuid?: string;
+  timestamp?: Date;
+  error?: Error;
 };
 
 export const Centered = styled.div`
@@ -74,7 +91,6 @@ export const ErrorPanelSmall = ({
   const subtitle2Str = subtitle2 ?? DEFAULT_SUBTITLE2;
   return (
     <Tooltip
-      position="top center"
       trigger={
         <Circle $size={22} $hoverHighlight={true}>
           <Icon name="warning" width={16} height={16} />
@@ -85,11 +101,87 @@ export const ErrorPanelSmall = ({
   );
 };
 
+const getDateObject = (timestamp?: Date): Record<string, any> | null => {
+  if (!timestamp) {
+    return null;
+  }
+  return {
+    // e.g. "2024-12-12T06:10:19.475Z",
+    iso: timestamp.toISOString(),
+    // e.g. "Thursday, December 12, 2024 at 6:10:19 AM Coordinated Universal Time"
+    long: timestamp.toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric', // Full year
+      month: 'long', // Full month name
+      day: 'numeric', // Day of the month
+      hour: 'numeric', // Hour (12-hour or 24-hour depending on locale)
+      minute: 'numeric',
+      second: 'numeric',
+      timeZone: 'UTC', // Ensures it's in UTC
+      timeZoneName: 'long', // Full time zone name
+    }),
+    user: timestamp.toLocaleString('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'full',
+    }),
+  };
+};
+
+const getErrorObject = (error?: Error): Record<string, any> | null => {
+  if (!error) {
+    return null;
+  }
+
+  // Error object properties are not enumerable so we have to copy them manually
+  const stack = (error.stack ?? '').split('\n');
+  return {
+    message: error.message,
+    stack,
+  };
+};
+
 export const ErrorPanelLarge = forwardRef<HTMLDivElement, ErrorPanelProps>(
-  ({title, subtitle, subtitle2}, ref) => {
+  ({title, subtitle, subtitle2, uuid, timestamp, error}, ref) => {
     const titleStr = title ?? DEFAULT_TITLE;
     const subtitleStr = subtitle ?? DEFAULT_SUBTITLE;
     const subtitle2Str = subtitle2 ?? DEFAULT_SUBTITLE2;
+
+    const {userInfo} = useViewerInfo();
+
+    const onClick = useCallback(() => {
+      const betaVersion = getFirebaseCookie('betaVersion');
+      const isUsingAdminPrivileges = getCookieBool('use_admin_privileges');
+      const {location, navigator, screen} = window;
+      const {userAgent, language} = navigator;
+      const details = {
+        uuid,
+        url: location.href,
+        error: getErrorObject(error),
+        timestamp_err: getDateObject(timestamp),
+        timestamp_copied: getDateObject(new Date()),
+        user: _.pick(userInfo, ['id', 'username']), // Skipping teams and admin
+        cookies: {
+          ...(betaVersion && {betaVersion}),
+          ...(isUsingAdminPrivileges && {use_admin_privileges: true}),
+        },
+        browser: {
+          userAgent,
+          language,
+          screenSize: {
+            width: screen.width,
+            height: screen.height,
+          },
+          viewportSize: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+        },
+      };
+      const detailsText = JSON.stringify(details, null, 2);
+      copyToClipboard(detailsText);
+      toast('Copied to clipboard');
+    }, [uuid, timestamp, error, userInfo]);
+
     return (
       <Large ref={ref}>
         <Circle $size={40} $hoverHighlight={false}>
@@ -98,6 +190,14 @@ export const ErrorPanelLarge = forwardRef<HTMLDivElement, ErrorPanelProps>(
         <Title>{titleStr}</Title>
         <Subtitle>{subtitleStr}</Subtitle>
         <Subtitle>{subtitle2Str}</Subtitle>
+        <Button
+          style={{marginTop: 16}}
+          size="small"
+          variant="secondary"
+          icon="copy"
+          onClick={onClick}>
+          Copy error details
+        </Button>
       </Large>
     );
   }

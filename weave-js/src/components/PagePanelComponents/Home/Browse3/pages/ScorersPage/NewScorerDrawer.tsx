@@ -10,7 +10,6 @@ import React, {
   useState,
 } from 'react';
 
-import {useShowRunnableUI} from '../CallPage/CallPage';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import * as AnnotationScorerForm from './AnnotationScorerForm';
@@ -50,7 +49,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     onSave: AnnotationScorerForm.onAnnotationScorerSave,
   },
   LLM_JUDGE: {
-    label: LLM_JUDGE_LABEL + ' (W&B Admin Preview)',
+    label: LLM_JUDGE_LABEL,
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
     Component: LLMJudgeScorerForm.LLMJudgeScorerForm,
@@ -127,22 +126,24 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
   }, [selectedScorerType, entity, project, formData, getClient, onClose]);
 
   const ScorerFormComponent = scorerTypeRecord[selectedScorerType].Component;
-  const showRunnableUI = useShowRunnableUI();
 
   // Here, we hide the LLM judge option from non-admins since the
   // feature is in active development. We want to be able to get
   // feedback without enabling for all users.
   const options = useMemo(() => {
-    return scorerTypeOptions.filter(
-      opt => showRunnableUI || opt.value !== LLM_JUDGE_VALUE
-    );
-  }, [showRunnableUI]);
+    return scorerTypeOptions.filter(opt => opt.value !== LLM_JUDGE_VALUE);
+  }, []);
+
+  const handleClose = () => {
+    setFormData(null);
+    onClose();
+  };
 
   return (
     <SaveableDrawer
       open={open}
       title="Create scorer"
-      onClose={onClose}
+      onClose={handleClose}
       onSave={onSave}
       saveDisabled={!isFormValid}>
       <AutocompleteWithLabel
@@ -208,12 +209,22 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
           sx={{
             flex: '0 0 auto',
             borderBottom: '1px solid #e0e0e0',
-            p: '10px',
+            px: '24px',
+            py: '20px',
             display: 'flex',
             fontWeight: 600,
+            fontSize: '24px',
+            lineHeight: '40px',
           }}>
           <Box sx={{flexGrow: 1}}>{title}</Box>
-          <Button size="small" variant="quiet" icon="close" onClick={onClose} />
+          <Box>
+            <Button
+              size="large"
+              variant="ghost"
+              icon="close"
+              onClick={onClose}
+            />
+          </Box>
         </Box>
 
         <Box
@@ -230,11 +241,13 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
             display: 'flex',
             flex: '0 0 auto',
             borderTop: '1px solid #e0e0e0',
-            p: '10px',
+            px: '24px',
+            py: '20px',
           }}>
           <Button
             onClick={onSave}
             color="primary"
+            size="large"
             disabled={saveDisabled}
             className="w-full">
             Create scorer

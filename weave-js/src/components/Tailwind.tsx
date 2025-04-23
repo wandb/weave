@@ -24,12 +24,14 @@ export const Tailwind: React.FC<TailwindProps> = ({
   style,
   className,
   children,
+  ...props
 }) => {
   return (
     <div
       className={classNames('tw-style', className)}
       data-testid="tailwind-wrapper"
-      style={style}>
+      style={style}
+      {...props}>
       {children}
     </div>
   );
@@ -42,6 +44,7 @@ export const TailwindContents: React.FC<TailwindProps> = ({
   children,
   className,
   style,
+  ...props
 }) => {
   const styles = React.useMemo(
     () => ({
@@ -52,7 +55,7 @@ export const TailwindContents: React.FC<TailwindProps> = ({
   );
 
   return (
-    <Tailwind style={styles} className={className}>
+    <Tailwind style={styles} className={className} {...props}>
       {children}
     </Tailwind>
   );

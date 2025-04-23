@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 ## Adding a custom cost
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.
     The three required fields are `llm_id`, `prompt_token_cost`, and `completion_token_cost`.
@@ -45,7 +45,7 @@ import TabItem from '@theme/TabItem';
 
 ## Querying for costs
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can query for costs by using the [`query_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-query_costs) method.
     There are a few ways to query for costs, you can pass in a singular cost id, or a list of LLM model names.
@@ -72,7 +72,7 @@ import TabItem from '@theme/TabItem';
 
 ## Purging a custom cost
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can purge a custom cost by using the [`purge_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-purge_costs) method. You pass in a list of cost ids, and the costs with those ids are purged.
 
@@ -95,7 +95,7 @@ import TabItem from '@theme/TabItem';
 
 ## Calculating costs for a Project
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can calculate costs for a project by using our `calls_query` and adding `include_costs=True` with a little bit of setup.
 

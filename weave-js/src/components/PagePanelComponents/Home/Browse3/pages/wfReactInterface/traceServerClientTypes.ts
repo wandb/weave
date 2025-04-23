@@ -73,11 +73,13 @@ export type TraceCallSchema = {
   summary?: SummaryMap;
   wb_run_id?: string;
   wb_user_id?: string;
+  total_storage_size_bytes?: number;
 };
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
   include_costs?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -112,6 +114,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallsQueryRes = {
@@ -165,6 +168,7 @@ export type FeedbackQueryReq = {
 
 export type Feedback = {
   id: string;
+  project_id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
   creator: string | null; // display name
@@ -216,12 +220,14 @@ export interface TraceObjSchema<
   project_id: string;
   object_id: string;
   created_at: string;
+  deleted_at: string | null;
   digest: string;
   version_index: number;
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: OBC;
   val: T;
+  wb_user_id?: string;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {
@@ -232,6 +238,7 @@ export type TraceObjReadReq = {
   project_id: string;
   object_id: string;
   digest: string;
+  metadata_only?: boolean;
 };
 
 export type TraceObjReadRes = {
@@ -243,12 +250,22 @@ export type TraceObjCreateReq<T extends any = any> = {
     project_id: string;
     object_id: string;
     val: T;
-    set_base_object_class?: string;
+    builtin_object_class?: string;
   };
 };
 
 export type TraceObjCreateRes = {
   digest: string;
+};
+
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digests?: string[];
+};
+
+export type TraceObjDeleteRes = {
+  num_deleted?: number;
 };
 
 export type TraceRefsReadBatchReq = {
@@ -283,6 +300,7 @@ export type TraceTableQueryRes = {
   rows: Array<{
     digest: string;
     val: any;
+    original_index?: number;
   }>;
 };
 
@@ -299,7 +317,6 @@ export type CompletionsCreateInputs = {
   model: string;
   messages: any[];
   temperature: number;
-  max_tokens: number;
 
   // These are optional, depending on the LLM provider some accept these some dont
   stop?: string[];
@@ -311,6 +328,9 @@ export type CompletionsCreateInputs = {
     type: string;
   };
   tools?: any[];
+  // These are optional, o3 accepts max_completion_tokens, others accept max_tokens
+  max_tokens?: number;
+  max_completion_tokens?: number;
 };
 
 export type CompletionsCreateReq = {
@@ -347,3 +367,49 @@ export type ActionsExecuteBatchReq = {
 };
 
 export type ActionsExecuteBatchRes = {};
+
+export type TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec;
+
+export interface TableAppendSpec {
+  append: {
+    row: Record<string, any>;
+  };
+}
+
+export interface TablePopSpec {
+  pop: {
+    index: number;
+  };
+}
+
+export interface TableInsertSpec {
+  insert: {
+    index: number;
+    row: Record<string, any>;
+  };
+}
+
+export type TableUpdateReq = {
+  project_id: string;
+  base_digest: string;
+  updates: TableUpdateSpec[];
+};
+
+export type TableUpdateRes = {
+  digest: string;
+  updated_row_digests: string[];
+};
+
+export type TableCreateReq = {
+  table: TableSchemaForInsert;
+};
+
+export type TableSchemaForInsert = {
+  project_id: string;
+  rows: Array<Record<string, any>>;
+};
+
+export type TableCreateRes = {
+  digest: string;
+  row_digests: string[];
+};

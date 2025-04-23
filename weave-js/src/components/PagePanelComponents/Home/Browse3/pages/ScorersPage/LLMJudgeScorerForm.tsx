@@ -10,9 +10,9 @@ import _ from 'lodash';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
-import {LlmJudgeActionSpecSchema} from '../wfReactInterface/baseObjectClasses.zod';
-import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
-import {ActionSpecSchema} from '../wfReactInterface/generatedBaseObjectClasses.zod';
+import {LlmJudgeActionSpecSchema} from '../wfReactInterface/builtinObjectClasses.zod';
+import {ActionSpecSchema} from '../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {createBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {AutocompleteWithLabel} from './FormComponents';
@@ -185,7 +185,7 @@ export const onLLMJudgeScorerSave = async (
     config: judgeAction,
   });
 
-  return createBaseObjectInstance(client, 'ActionSpec', {
+  return createBuiltinObjectInstance(client, 'ActionSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
       object_id: objectId,

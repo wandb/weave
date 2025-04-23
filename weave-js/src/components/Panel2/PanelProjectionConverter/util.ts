@@ -51,13 +51,19 @@ export const processConfig: <U extends Type>(
   let inputColumnNames = config?.inputColumnNames ?? [];
   if (inputCardinality === 'single') {
     if (
+      _.isArray(inputColumnNames) &&
       inputColumnNames.length >= 1 &&
-      validEmbeddingColumns.indexOf(inputColumnNames[0]) === -1
+      validEmbeddingColumns.indexOf(inputColumnNames[0]) !== -1
     ) {
-      inputColumnNames = [];
-    }
-    if (inputColumnNames.length === 0 && validEmbeddingColumns.length > 0) {
-      inputColumnNames = [validEmbeddingColumns[0]];
+      inputColumnNames = [inputColumnNames[0]];
+    } else if (
+      _.isString(inputColumnNames) &&
+      validEmbeddingColumns.indexOf(inputColumnNames) !== -1
+    ) {
+      inputColumnNames = [inputColumnNames];
+    } else {
+      inputColumnNames =
+        validEmbeddingColumns.length > 0 ? [validEmbeddingColumns[0]] : [];
     }
   } else {
     if (

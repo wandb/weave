@@ -11,7 +11,7 @@ import FancyPageSidebarSection from './FancyPageSidebarSection';
 
 const Sidebar = styled.div`
   background-color: ${WHITE};
-  box-sizing: content-box;
+  box-sizing: border-box;
   border-right: 1px solid ${MOON_250};
   width: 56px;
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
@@ -53,6 +53,7 @@ export type FancyPageSidebarItemButton = {
   name: string;
   nameTooltip?: string;
   slug: string;
+  search?: string;
 
   // Some buttons should get active highlighting for multiple different slugs.
   additionalSlugs?: string[];

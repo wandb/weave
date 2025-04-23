@@ -5,7 +5,7 @@
             "output_path": "./static/img/screenshots/basic_call.png",
             "selector": "body",
             "viewport_size": [1920, 1080],
-            "clicks": ["#onetrust-reject-all-handler", "[data-testid='KeyboardArrowRightIcon']", "[data-testid='KeyboardArrowRightIcon']", "body"],
+            "clicks": ["#onetrust-reject-all-handler", "span[data-testid='KeyboardArrowRightIcon']", "span[data-testid='KeyboardArrowRightIcon']", "body"],
             "delay": 5,
             "local_storage": {
                 "weaveflow-tracetree-width-number": 345

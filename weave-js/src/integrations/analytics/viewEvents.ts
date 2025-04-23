@@ -47,7 +47,7 @@ export const traceViewed = makeTrackEvent<
   },
   {
     _description: `User viewed the detail view of a trace`;
-    _location: '/calls/:itemName';
+    _location: '/traces/:itemName';
     _motivation: 'Used for object views';
     traceId: {
       description: 'ID of trace viewed';
@@ -80,7 +80,7 @@ export const evaluationViewed = makeTrackEvent<
   },
   {
     _description: `User viewed the detail view of an evaluation`;
-    _location: '/calls/:itemName';
+    _location: '/traces/:itemName';
     _motivation: 'Used for object views';
     traceId: {
       description: 'ID of evaluation viewed';
@@ -115,7 +115,7 @@ export const annotationsViewed = makeTrackEvent<
   },
   {
     _description: `User viewed the annotations of a trace`;
-    _location: '/calls/:itemName';
+    _location: '/traces/:itemName';
     _motivation: 'Used for annotations views';
     traceId: {
       description: 'ID of trace viewed';

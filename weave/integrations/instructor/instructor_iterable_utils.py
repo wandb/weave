@@ -4,7 +4,8 @@ from typing import Any, Callable, Optional
 from pydantic import BaseModel
 
 import weave
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.autopatch import OpSettings
+from weave.trace.op import _add_accumulator
 
 
 def instructor_iterable_accumulator(
@@ -27,11 +28,11 @@ def should_accumulate_iterable(inputs: dict) -> bool:
     return False
 
 
-def instructor_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
+def instructor_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(fn)
-        op.name = name  # type: ignore
-        return add_accumulator(
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_iterable_accumulator,
             should_accumulate=should_accumulate_iterable,
@@ -40,7 +41,7 @@ def instructor_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def instructor_wrapper_async(name: str) -> Callable[[Callable], Callable]:
+def instructor_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -49,10 +50,9 @@ def instructor_wrapper_async(name: str) -> Callable[[Callable], Callable]:
 
             return _async_wrapper
 
-        "We need to do this so we can check if `stream` is used"
-        op = weave.op(_fn_wrapper(fn))
-        op.name = name  # type: ignore
-        return add_accumulator(
+        op_kwargs = settings.model_dump()
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_iterable_accumulator,
             should_accumulate=should_accumulate_iterable,

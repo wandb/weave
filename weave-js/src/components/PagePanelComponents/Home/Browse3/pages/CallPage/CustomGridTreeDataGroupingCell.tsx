@@ -1,4 +1,3 @@
-import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import Box from '@mui/material/Box';
 import MuiButton from '@mui/material/Button';
@@ -7,10 +6,10 @@ import _ from 'lodash';
 import React, {FC, MouseEvent, useMemo} from 'react';
 import styled from 'styled-components';
 
-import {MOON_500} from '../../../../../../common/css/color.styles';
-import {IconParentBackUp} from '../../../../../Icon';
+import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
+import {Icon, IconParentBackUp} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCostStats} from './cost/TraceCostStats';
@@ -18,7 +17,7 @@ import {CursorBox} from './CursorBox';
 
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
-const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
+const BORDER_STYLE = `1px solid ${MOON_250}`;
 
 const CallOrCountRow = styled.div`
   width: 100%;
@@ -88,11 +87,9 @@ export const CustomGridTreeDataGroupingCell: FC<
     <IconParentBackUp color={MOON_500} width={18} height={18} />
   ) : null;
 
-  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
-
-  if (call == null) {
-    return <div />;
-  }
+  const isHiddenChildCount =
+    typeof id === 'string' && id.endsWith('_HIDDEN_CHILDREN_COUNT');
+  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT' || isHiddenChildCount;
 
   const box = (
     <CursorBox
@@ -157,7 +154,9 @@ export const CustomGridTreeDataGroupingCell: FC<
               color: TREE_COLOR,
               marginTop: '8px',
             }}>
-            {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
+            <Icon
+              name={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
+            />
           </MuiButton>
         ) : (
           <Box
@@ -173,7 +172,7 @@ export const CustomGridTreeDataGroupingCell: FC<
             <Box
               sx={{
                 width: '100%',
-                height: '100%',
+                height: '34px',
                 borderBottom: BORDER_STYLE,
               }}></Box>
             <Box sx={{width: '100%', height: '100%'}}></Box>
@@ -183,7 +182,7 @@ export const CustomGridTreeDataGroupingCell: FC<
       <CallOrCountRow>
         {isHiddenCount ? (
           <Box>{row.count.toLocaleString()} hidden calls</Box>
-        ) : (
+        ) : call != null ? (
           <>
             <Box
               sx={{
@@ -216,11 +215,17 @@ export const CustomGridTreeDataGroupingCell: FC<
               />
             )}
           </>
+        ) : (
+          <Box />
         )}
-        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
       </CallOrCountRow>
+      {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
     </CursorBox>
   );
 
-  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
+  return tooltip ? (
+    <Tooltip content={tooltip} noTriggerWrap trigger={box} />
+  ) : (
+    box
+  );
 };

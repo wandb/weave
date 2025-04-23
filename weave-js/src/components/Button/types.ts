@@ -9,7 +9,6 @@ export const ButtonVariants = {
   Primary: 'primary',
   Secondary: 'secondary',
   Ghost: 'ghost',
-  Quiet: 'quiet',
   Destructive: 'destructive',
   Outline: 'outline',
 } as const;

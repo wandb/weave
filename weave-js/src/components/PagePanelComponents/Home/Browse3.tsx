@@ -1,15 +1,5 @@
 import {ApolloProvider} from '@apollo/client';
-import {Home} from '@mui/icons-material';
-import {
-  AppBar,
-  Box,
-  Breadcrumbs,
-  Drawer,
-  IconButton,
-  Link as MaterialLink,
-  Toolbar,
-  Typography,
-} from '@mui/material';
+import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
@@ -21,9 +11,8 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import _ from 'lodash';
+import {debounce} from 'lodash';
 import React, {
-  ComponentProps,
   FC,
   useCallback,
   useEffect,
@@ -33,7 +22,6 @@ import React, {
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
-  Link as RouterLink,
   Redirect,
   Route,
   Switch,
@@ -45,14 +33,15 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  PATH_PARAM,
+  DESCENDENT_CALL_ID_PARAM,
+  HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
+  SHOW_FEEDBACK_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -67,32 +56,35 @@ import {
 } from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
-import {BoardPage} from './Browse3/pages/BoardPage';
-import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
+  filterHasCalledAfterDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
+import {WFHighLevelCallFilter} from './Browse3/pages/CallsPage/callsTableFilter';
+import {
+  DEFAULT_FILTER_CALLS,
+  useMakeInitialDatetimeFilter,
+} from './Browse3/pages/CallsPage/callsTableQuery';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
+import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
-import {ObjectPage} from './Browse3/pages/ObjectPage';
-import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
-import {
-  ObjectVersionsPage,
-  WFHighLevelObjectVersionFilter,
-} from './Browse3/pages/ObjectVersionsPage';
-import {OpPage} from './Browse3/pages/OpPage';
-import {OpsPage} from './Browse3/pages/OpsPage';
-import {OpVersionPage} from './Browse3/pages/OpVersionPage';
-import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {ModsPage} from './Browse3/pages/ModsPage';
+import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
+import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
+import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
+import {ObjectVersionsPage} from './Browse3/pages/ObjectsPage/ObjectVersionsPage';
+import {OpPage} from './Browse3/pages/OpsPage/OpPage';
+import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
+import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
+import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
@@ -103,6 +95,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -157,6 +150,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'mods',
   'scorers',
 ];
 const tabs = tabOptions.join('|');
@@ -197,7 +191,6 @@ export const Browse3: FC<{
               `/${URL_BROWSE3}`,
             ]}>
             <Browse3Mounted
-              hideHeader={props.hideHeader}
               headerOffset={props.headerOffset}
               navigateAwayFromProject={props.navigateAwayFromProject}
             />
@@ -209,7 +202,6 @@ export const Browse3: FC<{
 };
 
 const Browse3Mounted: FC<{
-  hideHeader?: boolean;
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
@@ -223,37 +215,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {!props.hideHeader && (
-        <AppBar
-          sx={{
-            zIndex: theme => theme.zIndex.drawer + 1,
-            height: '60px',
-            flex: '0 0 auto',
-            position: 'static',
-          }}>
-          <Toolbar
-            sx={{
-              backgroundColor: '#1976d2',
-              minHeight: '30px',
-            }}>
-            <IconButton
-              component={RouterLink}
-              to={`/`}
-              sx={{
-                color: theme =>
-                  theme.palette.getContrastText(theme.palette.primary.main),
-                '&:hover': {
-                  color: theme =>
-                    theme.palette.getContrastText(theme.palette.primary.dark),
-                },
-                marginRight: theme => theme.spacing(2),
-              }}>
-              <Home />
-            </IconButton>
-            <Browse3Breadcrumbs />
-          </Toolbar>
-        </AppBar>
-      )}
       <Switch>
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
@@ -279,19 +240,6 @@ const Browse3Mounted: FC<{
         ) : (
           <Empty {...EMPTY_NO_TRACE_SERVER} />
         )}
-
-        <Route>
-          <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Switch>
-              <Route path={`/${URL_BROWSE3}/:entity`}>
-                <Browse2EntityPage />
-              </Route>
-              <Route path={`/${URL_BROWSE3}`}>
-                <Browse2HomePage />
-              </Route>
-            </Switch>
-          </Box>
-        </Route>
       </Switch>
     </Box>
   );
@@ -470,10 +418,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(datasets)`}>
+          <DatasetsPageBinding />
         </Route>
         {/* OPS */}
         <Route path={`${projectRoot}/ops/:itemName/versions/:version?`}>
@@ -509,24 +460,17 @@ const Browse3ProjectRoot: FC<{
           ]}>
           <LeaderboardPageBinding />
         </Route>
-        {/* BOARDS */}
-        <Route
-          path={[
-            `${projectRoot}/boards/_new_board_`,
-            `${projectRoot}/boards/:boardId`,
-            `${projectRoot}/boards/:boardId/version/:versionId`,
-          ]}>
-          <BoardPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/boards`}>
-          <BoardsPageBinding />
-        </Route>
         {/* TABLES */}
         <Route path={`${projectRoot}/tables/:tableId`}>
           <TablePage />
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        {/* MODS */}
+        <Route
+          path={[`${projectRoot}/mods/:itemName`, `${projectRoot}/:tab(mods)`]}>
+          <ModsPageBinding />
         </Route>
         {/* PLAYGROUND */}
         <Route
@@ -535,6 +479,9 @@ const Browse3ProjectRoot: FC<{
             `${projectRoot}/playground`,
           ]}>
           <PlaygroundPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/compare`}>
+          <ComparePageBinding />
         </Route>
       </Switch>
     </Box>
@@ -677,18 +624,135 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
+const getOptionalBoolean = (
+  dict: Record<string, string>,
+  key: string
+): boolean | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value === '1';
+};
+
+const getOptionalString = (
+  dict: Record<string, string>,
+  key: string
+): string | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value;
+};
+
+const useURLBackedCallPageState = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+  const [rootCallId, setRootCallId] = useState(params.itemName);
+  useEffect(() => {
+    setRootCallId(params.itemName);
+  }, [params.itemName]);
+
+  const [descendentCallId, setDescendentCallId] = useState<string | undefined>(
+    getOptionalString(query, DESCENDENT_CALL_ID_PARAM)
+  );
+  useEffect(() => {
+    setDescendentCallId(getOptionalString(query, DESCENDENT_CALL_ID_PARAM));
+  }, [query]);
+
+  const [showFeedback, setShowFeedback] = useState<boolean | undefined>(
+    getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
+  );
+  useEffect(() => {
+    setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
+  }, [query]);
+
+  const [hideTraceTree, setHideTraceTree] = useState<boolean | undefined>(
+    getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
+  );
+  useEffect(() => {
+    setHideTraceTree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
+  }, [query]);
+
+  const debouncedHistoryPush = useMemo(() => {
+    return debounce((path: string) => {
+      if (history.location.pathname + history.location.search !== path) {
+        history.push(path);
+      }
+    }, 500);
+  }, [history]);
+
+  useEffect(() => {
+    debouncedHistoryPush(
+      currentRouter.callUIUrl(
+        params.entity,
+        params.project,
+        '',
+        rootCallId,
+        descendentCallId,
+        hideTraceTree,
+        showFeedback
+      )
+    );
+    return () => {
+      debouncedHistoryPush.cancel();
+    };
+  }, [
+    currentRouter,
+    debouncedHistoryPush,
+    params.entity,
+    params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+  ]);
+
+  return {
+    entity: params.entity,
+    project: params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  };
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
-  const params = useParamsDecoded<Browse3TabItemParams>();
-  const query = useURLSearchParamsDict();
+  const {
+    entity,
+    project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTraceTree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTraceTree,
+  } = useURLBackedCallPageState();
 
   return (
     <CallPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
-      path={query[PATH_PARAM]}
+      entity={entity}
+      project={project}
+      rootCallId={rootCallId}
+      setRootCallId={setRootCallId}
+      focusedCallId={descendentCallId}
+      setFocusedCallId={setDescendentCallId}
+      hideTraceTree={hideTraceTree}
+      setHideTraceTree={setHideTraceTree}
+      showFeedback={showFeedback}
+      setShowFeedback={setShowFeedback}
     />
   );
 };
@@ -697,8 +761,9 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
+  const isEvaluationsTab = tab === 'evaluations';
+  const initialFilter: WFHighLevelCallFilter = useMemo(() => {
+    if (isEvaluationsTab) {
       return {
         frozen: true,
         opVersionRefs: [
@@ -720,9 +785,17 @@ const CallsPageBinding = () => {
       console.log(e);
       return {};
     }
-  }, [query.filter, entity, project, tab]);
+  }, [query.filter, entity, project, isEvaluationsTab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
+
+  const {initialDatetimeFilter} = useMakeInitialDatetimeFilter(
+    entity,
+    project,
+    initialFilter,
+    isEvaluationsTab
+  );
+
   const onFilterUpdate = useCallback(
     filter => {
       history.push(routerContext.callsUIUrl(entity, project, filter));
@@ -757,14 +830,31 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  // Track if the user has explicitly removed the date filter
+  const hasRemovedDateFilter = useRef(false);
+
+  // Only show the date filter if not evals and we haven't explicitly removed it
+  const defaultFilter =
+    isEvaluationsTab || hasRemovedDateFilter.current
+      ? DEFAULT_FILTER_CALLS
+      : initialDatetimeFilter;
+
   const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
-    [query.filters]
+    () => getValidFilterModel(query.filters, defaultFilter),
+    [query.filters, defaultFilter]
   );
+
   const setFilterModel = (newModel: GridFilterModel) => {
+    // If there was a date filter and now there isn't, mark it as explicitly removed
+    // so we don't add it back on subsequent navigations
+    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
+    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
+      hasRemovedDateFilter.current = true;
+    }
+
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
-      newQuery.delete('filters');
+      newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));
     }
@@ -872,6 +962,41 @@ const ObjectVersionsPageBinding = () => {
   );
 };
 
+// New DatasetsPageBinding component for the dedicated datasets page
+const DatasetsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(routerContext.objectVersionsUIUrl(entity, project, filter));
+    },
+    [history, entity, project, routerContext]
+  );
+
+  return (
+    <DatasetsPage
+      entity={entity}
+      project={project}
+      initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
+    />
+  );
+};
+
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionsPageBinding = () => {
   const params = useParamsDecoded<Browse3TabParams>();
@@ -904,20 +1029,6 @@ const OpVersionsPageBinding = () => {
       project={params.project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
-    />
-  );
-};
-
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const BoardPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemVersionParams>();
-
-  return (
-    <BoardPage
-      entity={params.entity}
-      project={params.project}
-      boardId={params.itemName}
-      versionId={params.version}
     />
   );
 };
@@ -1027,10 +1138,15 @@ const OpsPageBinding = () => {
   return <OpsPage entity={params.entity} project={params.project} />;
 };
 
-const BoardsPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
-
-  return <BoardsPage entity={params.entity} project={params.project} />;
+const ModsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
+  return (
+    <ModsPage
+      entity={params.entity}
+      project={params.project}
+      itemName={params.itemName}
+    />
+  );
 };
 
 const TablesPageBinding = () => {
@@ -1039,19 +1155,11 @@ const TablesPageBinding = () => {
   return <TablesPage entity={params.entity} project={params.project} />;
 };
 
-const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
-  <MaterialLink
-    sx={{
-      color: theme => theme.palette.getContrastText(theme.palette.primary.main),
-      '&:hover': {
-        color: theme =>
-          theme.palette.getContrastText(theme.palette.primary.dark),
-      },
-    }}
-    {...props}
-    component={RouterLink}
-  />
-);
+const ComparePageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return <ComparePage entity={params.entity} project={params.project} />;
+};
 
 const PlaygroundPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
@@ -1061,141 +1169,5 @@ const PlaygroundPageBinding = () => {
       project={params.project}
       callId={params.itemName}
     />
-  );
-};
-
-const Browse3Breadcrumbs: FC = props => {
-  const params = useParamsDecoded<Browse3Params>();
-  const query = useURLSearchParamsDict();
-  const filePathParts = query.path?.split('/') ?? [];
-  const refFields = query.extra?.split('/') ?? [];
-
-  return (
-    <Breadcrumbs>
-      {params.entity && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}`}>
-          {params.entity}
-        </AppBarLink>
-      )}
-      {params.project && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}/${params.project}`}>
-          {params.project}
-        </AppBarLink>
-      )}
-      {params.tab && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}`}>
-          {params.tab}
-        </AppBarLink>
-      )}
-      {params.itemName && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
-          {params.itemName}
-        </AppBarLink>
-      )}
-      {params.version && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
-          {params.version}
-        </AppBarLink>
-      )}
-      {filePathParts.map((part, idx) => (
-        <AppBarLink
-          key={idx}
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-            params.tab
-          }/${params.itemName}/versions/${
-            params.version
-          }?path=${encodeURIComponent(
-            filePathParts.slice(0, idx + 1).join('/')
-          )}`}>
-          {part}
-        </AppBarLink>
-      ))}
-      {_.range(0, refFields.length, 2).map(idx => (
-        <React.Fragment key={idx}>
-          <Typography
-            sx={{
-              color: theme =>
-                theme.palette.getContrastText(theme.palette.primary.main),
-            }}>
-            {refFields[idx]}
-          </Typography>
-          <AppBarLink
-            to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-              params.tab
-            }/${params.itemName}/versions/${
-              params.version
-            }?path=${encodeURIComponent(
-              filePathParts.join('/')
-            )}&extra=${encodeURIComponent(
-              refFields.slice(0, idx + 2).join('/')
-            )}`}>
-            {refFields[idx + 1]}
-          </AppBarLink>
-        </React.Fragment>
-      ))}
-    </Breadcrumbs>
-  );
-};
-
-export const TableRowSelectionContext = React.createContext<{
-  rowIdsConfigured: boolean;
-  rowIdInTable: (id: string) => boolean;
-  setRowIds?: (rowIds: string[]) => void;
-  getNextRowId?: (currentId: string) => string | null;
-  getPreviousRowId?: (currentId: string) => string | null;
-}>({
-  rowIdsConfigured: false,
-  rowIdInTable: (id: string) => false,
-  setRowIds: () => {},
-  getNextRowId: () => null,
-  getPreviousRowId: () => null,
-});
-
-const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
-  children,
-}) => {
-  const [rowIds, setRowIds] = useState<string[]>([]);
-  const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
-  const rowIdInTable = useCallback(
-    (currentId: string) => rowIds.includes(currentId),
-    [rowIds]
-  );
-
-  const getNextRowId = useCallback(
-    (currentId: string) => {
-      const currentIndex = rowIds.indexOf(currentId);
-      if (currentIndex !== -1) {
-        return rowIds[currentIndex + 1];
-      }
-      return null;
-    },
-    [rowIds]
-  );
-
-  const getPreviousRowId = useCallback(
-    (currentId: string) => {
-      const currentIndex = rowIds.indexOf(currentId);
-      if (currentIndex !== -1) {
-        return rowIds[currentIndex - 1];
-      }
-      return null;
-    },
-    [rowIds]
-  );
-
-  return (
-    <TableRowSelectionContext.Provider
-      value={{
-        rowIdsConfigured,
-        rowIdInTable,
-        setRowIds,
-        getNextRowId,
-        getPreviousRowId,
-      }}>
-      {children}
-    </TableRowSelectionContext.Provider>
   );
 };

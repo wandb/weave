@@ -62,7 +62,7 @@ describe('OpenAI Integration', () => {
 
   describe('openAIStreamReducer', () => {
     it('should correctly reduce stream chunks for basic chat completion', () => {
-      const state = {...openAIStreamReducer.initialState};
+      const state = openAIStreamReducer.initialStateFn();
 
       const chunks = [
         {
@@ -128,7 +128,7 @@ describe('OpenAI Integration', () => {
     });
 
     it('should handle function calls in stream chunks', () => {
-      const state = {...openAIStreamReducer.initialState};
+      const state = openAIStreamReducer.initialStateFn();
 
       const chunks = [
         {

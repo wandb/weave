@@ -87,6 +87,7 @@ export const ValueViewImage = ({value}: ValueViewImageProps) => {
           buttonNext: () => null,
         }}
         carousel={{finite: true}}
+        zoom={{maxZoomPixelRatio: 5}}
       />
     </>
   );

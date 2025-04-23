@@ -573,6 +573,7 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
   return showControls || fullscreen ? (
     <S.ControlWrapper
+      data-test="panel-control-wrapper"
       hovering={hovering}
       onMouseEnter={() => {
         // onExpressionHover();
@@ -607,7 +608,7 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
           <Modal.Content
             style={{
               height: 'calc(90vh - 73px)',
-              overflow: 'hidden',
+              overflow: 'auto',
               display: 'flex',
             }}>
             <div

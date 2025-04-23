@@ -1,4 +1,7 @@
 import asyncio
+import os
+import time
+from unittest.mock import patch
 
 import pytest
 
@@ -286,3 +289,201 @@ def test_scorer_name_sanitization(scorer_name):
 
     result = asyncio.run(evaluation.evaluate(model))
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
+
+
+def test_sync_eval_parallelism(client):
+    @weave.op()
+    def sync_op(a):
+        time.sleep(1)
+        return a
+
+    @weave.op()
+    def score(output):
+        return 1
+
+    dataset = [
+        {"a": 1},
+        {"a": 2},
+        {"a": 3},
+        {"a": 4},
+        {"a": 5},
+        {"a": 6},
+        {"a": 7},
+        {"a": 8},
+        {"a": 9},
+        {"a": 10},
+    ]
+
+    # 10 rows, should complete in <5 seconds. if sync, 10+
+
+    now = time.time()
+
+    evaluation = Evaluation(dataset=dataset, scorers=[score])
+    result = asyncio.run(evaluation.evaluate(sync_op))
+    assert result == {
+        "output": {"mean": 5.5},
+        "score": {"mean": 1.0},
+        "model_latency": {"mean": pytest.approx(1, abs=1)},
+    }
+    assert time.time() - now < 5
+
+
+def test_evaluation_from_weaveobject_missing_evaluation_name(client):
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+    dataset = Dataset(rows=dataset_rows)
+
+    class EvalModel(Model):
+        @weave.op()
+        async def predict(self, input) -> str:
+            return eval(input)
+
+    @weave.op()
+    def score(target, output):
+        return target == output
+
+    # Create and save an Evaluation object
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score],
+        name="test-eval",
+    )
+    ref = weave.publish(evaluation)
+
+    # To simulate it being an older object, we delete the evaluation_name attribute from
+    # the gotten weave object.
+    eval_obj = ref.get(objectify=False)
+    delattr(eval_obj._val, "evaluation_name")
+
+    # We should still be able to load the Evaluation object even if this attr doesn't exist
+    # and it should continue to work and produce expected results
+    evaluation = Evaluation.from_obj(eval_obj)
+    model = EvalModel()
+
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result == expected_eval_result
+
+
+def test_evaluate_table_lazy_iter(client):
+    """
+    The intention of this test is to show that an evaluation harness
+    lazily fetches rows from a table rather than eagerly fetching all
+    rows up front.
+    """
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    ref = weave.publish(dataset)
+    dataset = ref.get()
+
+    @weave.op()
+    async def model_predict(input) -> int:
+        return input * 1
+
+    @weave.op()
+    def score_simple(input, output):
+        return input == output
+
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == [
+        "ensure_project_exists",
+        "table_create",
+        "obj_create",
+        "obj_read",
+    ]
+    client.server.attribute_access_log = []
+
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score_simple],
+    )
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == []
+
+    # Make sure we have deterministic results
+    with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
+        result = asyncio.run(evaluation.evaluate(model_predict))
+        assert result["output"] == {"mean": 149.5}
+        assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
+
+    log = client.server.attribute_access_log
+    log = [l for l in log if not l.startswith("_")]
+
+    # Make sure that the length was figured out deterministically
+    assert "table_query_stats" in log
+
+    counts_split_by_table_query = [0]
+    for log_entry in log:
+        if log_entry == "table_query":
+            counts_split_by_table_query.append(0)
+        else:
+            counts_split_by_table_query[-1] += 1
+
+    # Note: these exact numbers might change if we change the way eval traces work.
+    # However, the key part is that we have basically X + 2 splits, with the middle X
+    # being equal. We want to ensure that the table_query is not called in sequence,
+    # but rather lazily after each batch.
+    assert counts_split_by_table_query[0] <= 13
+    # Note: if this test suite is ran in a different order, then the low level eval ops will already be saved
+    # so the first count can be different.
+    count = counts_split_by_table_query[0]
+    assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
+
+
+def test_evaluate_table_order(client):
+    """
+    Test that evaluation results maintain the original order of the dataset
+    when using a published dataset with images.
+    """
+    import random
+
+    from PIL import Image
+
+    def make_image(i):
+        return Image.new(
+            "RGB",
+            (1024, 1024),
+            (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+        )
+
+    # Create a dataset with ordered values
+    dataset_rows = [
+        {"input": i, "target": i, "image": make_image(i)} for i in range(100)
+    ]
+    dataset = Dataset(rows=dataset_rows)
+    ref = weave.publish(dataset)
+    dataset = ref.get()
+
+    @weave.op()
+    async def model_predict(input) -> int:
+        return input
+
+    @weave.op()
+    def score_simple(input, output, target):
+        return input == output == target
+
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score_simple],
+    )
+
+    # Get all prediction and score calls to verify order
+    result = asyncio.run(evaluation.evaluate(model_predict))
+
+    # Verify the overall results
+    assert result["output"] == {"mean": 49.5}  # Average of 0-99
+    assert result["score_simple"] == {"true_count": 100, "true_fraction": 1.0}
+
+    # Get all prediction calls and verify order
+    predict_and_score_calls = list(evaluation.predict_and_score.calls())
+    assert len(predict_and_score_calls) == 100
+
+    # Extract inputs and outputs to verify order
+    inputs = [c.inputs["example"]["input"] for c in predict_and_score_calls]
+    outputs = [c.output["output"] for c in predict_and_score_calls]
+
+    # Verify inputs and outputs are in order 0-99
+    assert inputs == list(range(100))
+    assert outputs == list(range(100))
+
+    # Verify scores are all True and in order
+    scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
+    assert all(scores)
+    assert len(scores) == 100

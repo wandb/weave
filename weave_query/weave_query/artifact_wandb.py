@@ -163,6 +163,8 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
                 "clientID": art_id,
             },
         )
+    if not (res and res['clientIDMapping']):
+        raise errors.WeaveArtifactCollectionNotFound
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
@@ -992,7 +994,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and likely_commit_hash(self.version):
+        if self.version and (likely_commit_hash(self.version) or is_valid_version_index(self.version)):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"

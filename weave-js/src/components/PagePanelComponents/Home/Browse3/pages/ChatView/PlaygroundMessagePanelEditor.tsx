@@ -3,8 +3,8 @@ import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
-import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
@@ -13,7 +13,7 @@ type PlaygroundMessagePanelEditorProps = {
   pendingToolResponseId?: string;
   message: Message;
   index: number;
-  isChoice: boolean;
+  choiceIndex?: number;
   setEditorHeight: (height: number | null) => void;
 };
 
@@ -21,7 +21,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
 > = ({
   index,
-  isChoice,
+  choiceIndex,
   setEditorHeight,
   editorHeight,
   isNested,
@@ -45,10 +45,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
   }, [initialContent]);
 
   const handleSave = () => {
-    if (isChoice) {
-      editChoice?.(index, {
+    if (choiceIndex !== undefined) {
+      editChoice?.(choiceIndex, {
+        ...message,
         content: editedContent,
-        role: message.role,
       });
     } else {
       editMessage?.(index, {
@@ -67,23 +67,22 @@ export const PlaygroundMessagePanelEditor: React.FC<
   return (
     <div
       className={classNames(
-        'w-full pt-16 text-sm',
-        isNested ? 'px-2' : 'px-16'
+        'w-full pt-[6px]',
+        isNested ? 'px-[4px]' : 'px-[16px]'
       )}>
       <StyledTextArea
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
-        style={{
-          minHeight: `${editorHeight}px`,
-        }}
+        startHeight={320}
       />
-      <div className="z-100 mt-8 flex justify-end gap-8">
-        <Button variant="quiet" size="small" onClick={handleCancel}>
+      {/* 6px vs. 8px to make up for extra padding from textarea field */}
+      <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
+        <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
         <Button
           variant="primary"
-          size="small"
+          size="medium"
           onClick={
             pendingToolResponseId
               ? () =>

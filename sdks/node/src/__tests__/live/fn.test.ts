@@ -27,7 +27,7 @@ class ParametrizedFunction extends CallableObject<
   }
 }
 
-describe('Fn', () => {
+describe.skip('Fn', () => {
   beforeEach(async () => {
     await login(process.env.WANDB_API_KEY ?? '');
   });

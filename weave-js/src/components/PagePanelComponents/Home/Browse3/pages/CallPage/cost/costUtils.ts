@@ -66,25 +66,21 @@ export const FORMAT_NUMBER_NO_DECIMALS = new Intl.NumberFormat('en-US', {
 
 // Number formatting function that formats numbers in the thousands and millions with 3 sigfigs
 export const formatTokenCount = (num: number): string => {
-  if (num < 10000) {
+  if (num < 1000000) {
     return FORMAT_NUMBER_NO_DECIMALS.format(num);
-  } else if (num >= 10000 && num < 1000000) {
-    // Format numbers in the thousands
-    const thousands = (num / 1000).toFixed(1);
-    return parseFloat(thousands).toString() + 'k';
   }
   // Format numbers in the millions
   const millions = (num / 1000000).toFixed(2);
   return parseFloat(millions).toString() + 'm';
 };
 
+const MIN_COST = 0.0001;
+const COST_PRECISION = 4;
 export const formatTokenCost = (cost: number): string => {
-  if (cost === 0) {
-    return '$0.00';
-  } else if (cost < 0.01) {
-    return '$<0.01';
+  if (cost !== 0 && cost < MIN_COST) {
+    return '<$' + MIN_COST.toFixed(COST_PRECISION);
   }
-  return `$${cost.toFixed(2)}`;
+  return `$${cost.toFixed(COST_PRECISION)}`;
 };
 
 // TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
@@ -102,7 +98,22 @@ export const addCostsToCallResults = (
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
-      return {...call, ...costDict[call.callId]};
+      if (!call.traceCall) {
+        return call;
+      }
+      return {
+        ...call,
+        traceCall: {
+          ...call.traceCall,
+          summary: {
+            ...call.traceCall?.summary,
+            weave: {
+              ...call.traceCall?.summary?.weave,
+              costs: costDict[call.callId].traceCall?.summary?.weave?.costs,
+            },
+          },
+        },
+      };
     }
     return call;
   });

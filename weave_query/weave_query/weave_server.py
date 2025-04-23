@@ -116,7 +116,7 @@ def import_ecosystem():
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave_query.ecosystem import langchain, replicate
+        from weave_query.ecosystem import langchain
     except ImportError:
         pass
 

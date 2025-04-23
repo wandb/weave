@@ -45,6 +45,7 @@ interface CardImageProps {
     path: string;
     width: number;
     height: number;
+    caption?: string;
   };
   imageFileNode: Node;
   masks?: Array<{loadedFrom: Node; path: string}>;
@@ -77,6 +78,9 @@ export const CardImage: FC<CardImageProps> = ({
     position: 'absolute',
     height: '100%',
     width: '100%',
+    top: 0,
+    left: 0,
+    objectFit: 'contain',
   } as const;
 
   return (
@@ -84,57 +88,81 @@ export const CardImage: FC<CardImageProps> = ({
       data-test="card-image"
       style={{
         height: '100%',
-        width: '100%',
-        position: 'relative',
+        overflow: 'auto',
       }}>
       {signedUrl == null ? (
         <div />
       ) : (
         <>
           {!hideImage && (
-            <img
-              style={{...imageStyle, objectFit: 'contain'}}
-              alt={image.path}
-              src={signedUrl}
-            />
-          )}
-          {masks != null &&
-            maskControls?.map((maskControl, i) => {
-              const mask = masks[i];
-              if (maskControl != null) {
-                const classSet = (classSets ?? {})[maskControl.classSetID];
-                return (
-                  <SegmentationMaskFromCG
-                    key={i}
-                    style={imageStyle}
-                    filePath={mask}
-                    mediaSize={{width: image.width, height: image.height}}
-                    maskControls={maskControl as Controls.MaskControlState}
-                    classSet={classSet}
-                  />
-                );
-              }
-              return undefined;
-            })}
+            <>
+              <div
+                style={{
+                  position: 'relative',
+                  height: image.caption ? '80%' : '100%',
+                }}>
+                <img style={imageStyle} alt={image.path} src={signedUrl} />
+                {masks != null &&
+                  maskControls?.map((maskControl, i) => {
+                    const mask = masks[i];
+                    if (maskControl != null) {
+                      const classSet = (classSets ?? {})[
+                        maskControl.classSetID
+                      ];
+                      return (
+                        <SegmentationMaskFromCG
+                          key={i}
+                          style={imageStyle}
+                          filePath={mask}
+                          mediaSize={{
+                            width: image.width,
+                            height: image.height,
+                          }}
+                          maskControls={
+                            maskControl as Controls.MaskControlState
+                          }
+                          classSet={classSet}
+                        />
+                      );
+                    }
+                    return undefined;
+                  })}
 
-          {boundingBoxes != null &&
-            boxControls?.map((boxControl, i) => {
-              if (boxControl != null) {
-                const classSet = classSets?.[boxControl.classSetID];
-                return (
-                  <BoundingBoxes
-                    key={i}
-                    style={imageStyle}
-                    bboxControls={boxControl as Controls.BoxControlState}
-                    boxData={boundingBoxes[i]}
-                    mediaSize={{width: image.width, height: image.height}}
-                    classSet={classSet}
-                    sliderControls={boxSliders}
-                  />
-                );
-              }
-              return undefined;
-            })}
+                {boundingBoxes != null &&
+                  boxControls?.map((boxControl, i) => {
+                    if (boxControl != null) {
+                      const classSet = classSets?.[boxControl.classSetID];
+                      return (
+                        <BoundingBoxes
+                          key={i}
+                          style={imageStyle}
+                          bboxControls={boxControl as Controls.BoxControlState}
+                          boxData={boundingBoxes[i]}
+                          mediaSize={{
+                            width: image.width,
+                            height: image.height,
+                          }}
+                          classSet={classSet}
+                          sliderControls={boxSliders}
+                        />
+                      );
+                    }
+                    return undefined;
+                  })}
+              </div>
+
+              {image.caption && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: 'gray',
+                    padding: '8px 0',
+                  }}>
+                  {image.caption}
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
     </div>
@@ -192,7 +220,7 @@ const OverlayCanvas = styled.canvas`
 interface SegmentationCanvasProps {
   segmentation: ImageData;
   classState: Record<string, ClassState>;
-  classOverlay: Record<string, Controls.OverlayClassState>;
+  classOverlay: Partial<Record<string, Controls.OverlayClassState>>;
 }
 
 /**
@@ -214,8 +242,11 @@ const SegmentationCanvas: FC<SegmentationCanvasProps> = ({
       _.map(classState, ({color}, classId) => {
         const classToggle = classOverlay[classId] ?? DEFAULT_CLASS_MASK_CONTROL;
 
-        const {disabled, opacity} = classToggle;
-        const isDisabled = allToggle.disabled || disabled;
+        const {opacity} = classToggle;
+        const isDisabled =
+          classOverlay[classId]?.disabled ??
+          classOverlay.all?.disabled ??
+          DEFAULT_CLASS_MASK_CONTROL.disabled;
 
         const rgb = colorFromString(color);
         const alpha = isDisabled ? 0 : allToggle.opacity * opacity * 255;

@@ -1,10 +1,12 @@
 import 'prismjs/components/prism-markup-templating';
 
+import _ from 'lodash';
 import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {MessagePart} from './types';
+import {ToolCalls} from './ToolCalls';
+import {MessagePart, ToolCall} from './types';
 
 type MessagePanelPartProps = {value: MessagePart; isStructuredOutput?: boolean};
 
@@ -42,11 +44,42 @@ export const MessagePanelPart = ({
       </div>
     );
   }
-  if ('name' in value) {
+  if (value.type === 'tool_use' && 'name' in value && 'id' in value) {
+    const toolCall: ToolCall = {
+      id: value.id || '',
+      type: value.type,
+      function: {
+        name: value.name || '',
+        arguments: JSON.stringify(value.input) || '',
+      },
+    };
+    return <ToolCalls toolCalls={[toolCall]} />;
+  }
+
+  if (value.type === 'tool_result' && 'content' in value) {
+    // value.content can be a string or an array of content blocks
+    const contentArray = Array.isArray(value.content)
+      ? value.content
+      : [value.content];
     return (
-      <span>
-        <b>{value.name}</b>
-      </span>
+      <>
+        {contentArray.map(content => {
+          const stringContent =
+            _.isObject(content) && 'text' in content ? content.text : content;
+          try {
+            const jsonContent = JSON.stringify(
+              JSON.parse(stringContent as string),
+              null,
+              2
+            );
+            return <CodeEditor language="json" value={jsonContent} readOnly />;
+          } catch (error) {
+            return (
+              <span className="whitespace-break-spaces">{stringContent}</span>
+            );
+          }
+        })}
+      </>
     );
   }
   return null;

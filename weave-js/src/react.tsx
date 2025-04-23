@@ -516,7 +516,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    '([^\\#?%:]{1,128})', // Artifact name
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
@@ -544,7 +544,7 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '/',
     PATTERN_PROJECT,
     '/call/',
-    '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
+    '([0-9a-fA-F-]+)', // Match any ID with or without dashes to support OTEL style ID strings
     '/?', // Ref extra portion is optional
     PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
@@ -561,15 +561,15 @@ export const parseRefMaybe = (s: string): ObjectRef | null => {
 
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
-  let splitLimit: number;
+  let maxSplitsToMake: number;
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
-    splitLimit = 4;
+    maxSplitsToMake = 3;
   } else if (isLocalArtifact) {
-    splitLimit = 2;
+    maxSplitsToMake = 2;
   } else if (isWeaveRef) {
     return parseWeaveRef(ref);
   } else {
@@ -579,22 +579,22 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (splitUri.length !== splitLimit) {
+  if (maxSplitsToMake !== splitUri.length) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
   if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    const [entityName, projectName, artifactName] = splitUri;
+    const [artifactCollection, artifactVersion] = artifactName.split(':', 2);
     return {
       scheme: 'wandb-artifact',
       entityName,
       projectName,
-      artifactName: artifactNamePart,
+      artifactName: artifactCollection,
       artifactVersion,
-      artifactPath: artifactPathPart,
+      artifactPath: ref,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
   }
@@ -708,6 +708,15 @@ export const refUri = (ref: ObjectRef): string => {
   } else {
     return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
   }
+};
+
+export const createWeaveTableRef = (
+  entity: string,
+  project: string,
+  tableDigest: string
+): string => {
+  const projectId = `${entity}/${project}`;
+  return `weave:///${projectId}/table/${tableDigest}`;
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
@@ -1235,10 +1244,15 @@ export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirec
   };
 
 export const useExpandedNode = (
-  node: NodeOrVoidNode
+  node: NodeOrVoidNode,
+  newVars?: {[key: string]: Node} | null
 ): {loading: boolean; result: NodeOrVoidNode} => {
   const [error, setError] = useState();
-  const {stack} = usePanelContext();
+  const {stack: origStack} = usePanelContext();
+
+  const stack = useMemo(() => {
+    return pushFrame(origStack, newVars ?? {});
+  }, [newVars, origStack]);
 
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
@@ -1270,7 +1284,7 @@ export const useExpandedNode = (
     if (error != null) {
       // rethrow in render thread
       console.error('useExpanded error', error);
-      throw new Error(error);
+      throw error;
     }
     return {
       loading: node.nodeType !== 'output' ? false : node !== result.node,

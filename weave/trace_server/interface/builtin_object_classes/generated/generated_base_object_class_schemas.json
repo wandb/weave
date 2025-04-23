@@ -1,0 +1,403 @@
+{
+  "$defs": {
+    "ActionSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "config": {
+          "discriminator": {
+            "mapping": {
+              "contains_words": "#/$defs/ContainsWordsActionConfig",
+              "llm_judge": "#/$defs/LlmJudgeActionConfig"
+            },
+            "propertyName": "action_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LlmJudgeActionConfig"
+            },
+            {
+              "$ref": "#/$defs/ContainsWordsActionConfig"
+            }
+          ],
+          "title": "Config"
+        }
+      },
+      "required": [
+        "config"
+      ],
+      "title": "ActionSpec",
+      "type": "object"
+    },
+    "AnnotationSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "field_schema": {
+          "default": {},
+          "description": "Expected to be valid JSON Schema. Can be provided as a dict or a Pydantic model class",
+          "examples": [
+            {
+              "max_length": 100,
+              "type": "string"
+            },
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "enum": [
+                "option1",
+                "option2"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Field Schema",
+          "type": "object"
+        },
+        "unique_among_creators": {
+          "default": false,
+          "title": "Unique Among Creators",
+          "type": "boolean"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
+          "title": "Op Scope"
+        }
+      },
+      "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "ContainsWordsActionConfig": {
+      "properties": {
+        "action_type": {
+          "const": "contains_words",
+          "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "target_words": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Words",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target_words"
+      ],
+      "title": "ContainsWordsActionConfig",
+      "type": "object"
+    },
+    "Leaderboard": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/LeaderboardColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "Leaderboard",
+      "type": "object"
+    },
+    "LeaderboardColumn": {
+      "properties": {
+        "evaluation_object_ref": {
+          "title": "Evaluation Object Ref",
+          "type": "string"
+        },
+        "scorer_name": {
+          "title": "Scorer Name",
+          "type": "string"
+        },
+        "summary_metric_path": {
+          "title": "Summary Metric Path",
+          "type": "string"
+        },
+        "should_minimize": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Should Minimize"
+        }
+      },
+      "required": [
+        "evaluation_object_ref",
+        "scorer_name",
+        "summary_metric_path"
+      ],
+      "title": "LeaderboardColumn",
+      "type": "object"
+    },
+    "LlmJudgeActionConfig": {
+      "properties": {
+        "action_type": {
+          "const": "llm_judge",
+          "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "model": {
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "response_schema": {
+          "title": "Response Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "model",
+        "prompt",
+        "response_schema"
+      ],
+      "title": "LlmJudgeActionConfig",
+      "type": "object"
+    },
+    "TestOnlyExample": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "primitive": {
+          "title": "Primitive",
+          "type": "integer"
+        },
+        "nested_base_model": {
+          "$ref": "#/$defs/TestOnlyNestedBaseModel"
+        },
+        "nested_base_object": {
+          "title": "Nested Base Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "primitive",
+        "nested_base_model",
+        "nested_base_object"
+      ],
+      "title": "TestOnlyExample",
+      "type": "object"
+    },
+    "TestOnlyNestedBaseModel": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "TestOnlyNestedBaseModel",
+      "type": "object"
+    },
+    "TestOnlyNestedBaseObject": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "b": {
+          "title": "B",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "TestOnlyNestedBaseObject",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "TestOnlyExample": {
+      "$ref": "#/$defs/TestOnlyExample"
+    },
+    "TestOnlyNestedBaseObject": {
+      "$ref": "#/$defs/TestOnlyNestedBaseObject"
+    },
+    "Leaderboard": {
+      "$ref": "#/$defs/Leaderboard"
+    },
+    "ActionSpec": {
+      "$ref": "#/$defs/ActionSpec"
+    },
+    "AnnotationSpec": {
+      "$ref": "#/$defs/AnnotationSpec"
+    }
+  },
+  "required": [
+    "TestOnlyExample",
+    "TestOnlyNestedBaseObject",
+    "Leaderboard",
+    "ActionSpec",
+    "AnnotationSpec"
+  ],
+  "title": "CompositeBaseObject",
+  "type": "object"
+}

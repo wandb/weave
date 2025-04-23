@@ -5,7 +5,7 @@ import moment from 'moment';
 import React, {useContext, useEffect, useState} from 'react';
 
 import {parseRefMaybe} from '../../../../../../react';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../smallRef/SmallRef';
 import {isPrimitive} from './util';
 
 const VALUE_SPACE = 4;
