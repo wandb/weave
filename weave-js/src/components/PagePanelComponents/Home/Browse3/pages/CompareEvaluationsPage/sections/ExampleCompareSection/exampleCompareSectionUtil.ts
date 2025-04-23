@@ -417,23 +417,16 @@ export function useExampleCompareData(
 
       const selectedRowDigest = targetRow.inputDigest;
 
-      // If we already have the data in cache, no need to fetch
-      if (selectedRowDigest in cachedRowData.current) {
-        return;
-      }
-
       // Check if we can get the data from the results directly
       // This is specifically for imperative evaluations
-      if (state.loadableComparisonResults.result?.inputs?.[selectedRowDigest]) {
-        const inputData =
-          state.loadableComparisonResults.result.inputs[selectedRowDigest].val;
+      const preloadedDataRow =
+        state.loadableComparisonResults.result?.inputs?.[selectedRowDigest];
+      if (!(selectedRowDigest in cachedRowData.current) && preloadedDataRow) {
+        const inputData = preloadedDataRow.val;
         cachedRowData.current[selectedRowDigest] = inputData;
         increaseCacheVersion();
         return;
       }
-
-      // For regular evaluations, need to fetch from table
-      setLoading(true);
 
       if (!cachedPartialTableRequest.current) {
         cachedPartialTableRequest.current = await makePartialTableReq(
