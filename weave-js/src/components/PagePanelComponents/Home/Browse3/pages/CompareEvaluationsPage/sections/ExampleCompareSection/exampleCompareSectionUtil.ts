@@ -435,36 +435,31 @@ export function useExampleCompareData(
       // For regular evaluations, need to fetch from table
       setLoading(true);
 
-      try {
-        if (!cachedPartialTableRequest.current) {
-          cachedPartialTableRequest.current = await makePartialTableReq(
-            state.summary.evaluations,
-            filteredRows,
-            targetIndex,
-            getTraceServerClient
-          );
-        }
-
-        if (cachedPartialTableRequest.current == null) {
-          // couldn't get the table digest, no way to proceed
-          setLoading(false);
-          return;
-        }
-
-        await loadRowDataIntoCache(
-          [selectedRowDigest],
-          cachedRowData,
-          cachedPartialTableRequest,
+      if (!cachedPartialTableRequest.current) {
+        cachedPartialTableRequest.current = await makePartialTableReq(
+          state.summary.evaluations,
+          filteredRows,
+          targetIndex,
           getTraceServerClient
         );
-
-        // This trigger a re-calculation of the `target` and a re-render immediately
-        increaseCacheVersion();
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        setLoading(false);
       }
+
+      if (cachedPartialTableRequest.current == null) {
+        // couldn't get the table digest, no way to proceed
+        setLoading(false);
+        return;
+      }
+
+      await loadRowDataIntoCache(
+        [selectedRowDigest],
+        cachedRowData,
+        cachedPartialTableRequest,
+        getTraceServerClient
+      );
+
+      // This trigger a re-calculation of the `target` and a re-render immediately
+      increaseCacheVersion();
+      setLoading(false);
 
       // check if there is a need to fetch adjacent rows
       const adjacentRows = [];
