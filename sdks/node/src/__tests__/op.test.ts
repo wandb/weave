@@ -1,28 +1,38 @@
-import * as weave from 'weave';
+import { op } from '../op';
 import type {Op} from '../opType';
-import {getGlobalClient} from '../clientApi';
+// Import the actual module
+import * as clientApi from '../clientApi';
 
-// Mock the client to capture callDisplayName
-let capturedDisplayName: string | undefined;
-jest.mock('../clientApi', () => ({
-  getGlobalClient: jest.fn(() => ({
-    pushNewCall: () => ({currentCall: {}, parentCall: null, newStack: []}),
-    createCall: (_: any, __: any, ___: any, ____: any, _____: any, ______: any, _______: any, displayName: string) => {
-      capturedDisplayName = displayName;
+// Function to create a fresh mock client for each call
+const createFreshMockClient = () => ({
+    pushNewCall: jest.fn(() => ({currentCall: {callId: 'mockCallId', traceId: 'mockTraceId'}, parentCall: null, newStack: []})),
+    createCall: jest.fn((_, __, ___, ____, _____, ______, _______, displayName: string) => {
+      // We still need a way to capture this if tests rely on it.
+      // Maybe pass a shared object or use a different mechanism?
+      // For now, let's remove the direct capture here.
+      // capturedDisplayName = displayName;
       return Promise.resolve();
-    },
-    runWithCallStack: async (stack: any, fn: () => any) => fn(),
-    finishCall: () => Promise.resolve(),
-    finishCallWithException: () => Promise.resolve(),
+    }),
+    runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
+    finishCall: jest.fn(() => Promise.resolve()),
+    finishCallWithException: jest.fn(() => Promise.resolve()),
     settings: {shouldPrintCallLink: false},
-    waitForBatchProcessing: () => Promise.resolve()
-  }))
-}));
+    waitForBatchProcessing: jest.fn(() => Promise.resolve()),
+});
 
 describe('op wrappers', () => {
+  let getGlobalClientSpy: jest.SpyInstance;
+
   beforeEach(() => {
-    capturedDisplayName = undefined;
-    (getGlobalClient as jest.Mock).mockClear();
+    // Spy on the actual getGlobalClient
+    getGlobalClientSpy = jest.spyOn(clientApi, 'getGlobalClient');
+    // Default implementation returns a fresh mock client each time
+    getGlobalClientSpy.mockImplementation(createFreshMockClient);
+  });
+
+  afterEach(() => {
+    // Restore the original implementation after each test
+    getGlobalClientSpy.mockRestore();
   });
 
   it('works with method binding in constructor', async () => {
@@ -54,7 +64,7 @@ describe('op wrappers', () => {
 
       constructor() {
         super();
-        this.invoke = weave.op(this, super.invoke);
+        this.invoke = op(this, super.invoke);
       }
     }
 
@@ -64,7 +74,7 @@ describe('op wrappers', () => {
 
     // Verify op properties were set correctly
     expect((model.invoke as Op<any>).__isOp).toBe(true);
-    expect((model.invoke as Op<any>).__name).toBe('WeaveModel.invoke');
+    expect((model.invoke as Op<any>).__name).toBe("WeaveModel.invoke");
     expect(typeof (model.invoke as Op<any>).__wrappedFunction).toBe('function');
     expect((model.invoke as Op<any>).__boundThis).toBe(model);
   });
@@ -82,7 +92,7 @@ describe('op wrappers', () => {
           }
         };
 
-        this.invoke = weave.op(this, this.invoke);
+        this.invoke = op(this, this.invoke);
       }
 
       async invoke(prompt: string): Promise<string> {
@@ -101,17 +111,84 @@ describe('op wrappers', () => {
     const result = await model.invoke('test prompt');
     expect(result).toBe('test prompt');
 
-    // Verify op properties were set correctly
     expect(model.invoke.__isOp).toBe(true);
     expect(model.invoke.__name).toBe('Model.invoke');
     expect(typeof model.invoke.__wrappedFunction).toBe('function');
     expect(model.invoke.__boundThis).toBe(model);
 
-    // Verify we can still reassign if needed (matches original descriptor behavior)
     const newImpl = async (prompt: string) => `Modified: ${prompt}`;
-    model.invoke = weave.op(model, newImpl);
+    model.invoke = op(model, newImpl);
     const modifiedResult = await model.invoke('test prompt');
     expect(modifiedResult).toBe('Modified: test prompt');
+  });
+
+  it('correctly names directly wrapped functions', () => {
+    async function myStandaloneFunction() {
+      return 42;
+    }
+    const wrappedFn = op(myStandaloneFunction);
+    expect((wrappedFn as Op<any>).__name).toBe('myStandaloneFunction');
+
+    const wrappedAnon = op(async () => {});
+    expect((wrappedAnon as Op<any>).__name).toBe('anonymous');
+  });
+
+  it('correctly names bound functions', async () => {
+    class MyClass {
+      value = 10;
+      async instanceMethod(factor: number) {
+        return this.value * factor;
+      }
+    }
+    const instance = new MyClass();
+    const boundMethod = op(instance, instance.instanceMethod);
+    expect((boundMethod as Op<any>).__name).toBe('MyClass.instanceMethod');
+    await expect(boundMethod(3)).resolves.toBe(30);
+  });
+
+  it('runs original function without tracking if weave not initialized', async () => {
+    // Override the spy implementation for this test *only*
+    getGlobalClientSpy.mockImplementationOnce(() => null);
+
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+    async function testFunc(a: number) { return a * 2; }
+    const wrapped = op(testFunc);
+    const result = await wrapped(5); // This call will use the mockImplementationOnce
+
+    expect(result).toBe(10);
+    // Verify the spy was called once
+    expect(getGlobalClientSpy).toHaveBeenCalledTimes(1);
+    // Verify console warning
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('WARNING: Weave is not initialized'));
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('handles errors correctly in wrapped functions', async () => {
+    const error = new Error('Test error');
+    async function errorFunc() { throw error; }
+
+    // Ensure we get a fresh mock client via the spy for this call
+    const mockClientInstance = createFreshMockClient();
+    getGlobalClientSpy.mockImplementationOnce(() => mockClientInstance);
+
+    const wrapped = op(errorFunc);
+
+    await expect(wrapped()).rejects.toThrow('Test error');
+
+    // Verify the spy was called
+    expect(getGlobalClientSpy).toHaveBeenCalledTimes(1);
+
+    // Assertions on the specific mock instance returned for this test
+    expect(mockClientInstance.finishCallWithException).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({ callId: 'mockCallId' }), // currentCall
+      null, // parentCall
+      expect.any(Date), // endTime
+      expect.any(Promise) // startCallPromise
+    );
+    expect(mockClientInstance.finishCall).not.toHaveBeenCalled();
   });
 });
 
@@ -135,7 +212,7 @@ describe('op streaming', () => {
         id: chunk.id,
       }),
     };
-    const streamOp = weave.op(numberStream, {streamReducer});
+    const streamOp = op(numberStream, {streamReducer});
 
     // Define a few streams to run concurrently
     const testCases = [
