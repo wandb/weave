@@ -423,3 +423,20 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, sco
     client.flush()
     calls = client.get_calls()
     assert len(calls) == total_calls * 2  # including the previous one
+
+
+def test_passing_dict_requires_name_with_scorer(client):
+    ev = weave.EvaluationLogger()
+    pred = ev.log_prediction(inputs={}, output=None)
+    with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
+        pred.log_score(scorer={"something": "else"}, score=0.5)
+
+    pred.log_score(scorer={"name": "my_scorer"}, score=0.5)
+
+
+@pytest.mark.disable_logging_error_check
+def test_passing_dict_requires_name_with_model(client):
+    with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
+        weave.EvaluationLogger(model={"something": "else"})
+
+    weave.EvaluationLogger(model={"name": "my_model"})
