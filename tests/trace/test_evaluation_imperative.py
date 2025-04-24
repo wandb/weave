@@ -312,7 +312,7 @@ def generate_evaluation_logger_kwargs_permutations():
     models = [
         NOT_SPECIFIED,
         "string_model",
-        {"config": "model_def"},
+        {"name": "dict_model"},
         MyModel(const_value=42),
         MyModelAsync(const_value=420),
     ]
@@ -348,7 +348,7 @@ def scorer(request):
     if request.param == "string":
         return "string_scorer"
     elif request.param == "dict":
-        return {"config": "scorer_def"}
+        return {"name": "dict_scorer"}
     elif request.param == "weave-scorer":
 
         class MyScorer(weave.Scorer):
