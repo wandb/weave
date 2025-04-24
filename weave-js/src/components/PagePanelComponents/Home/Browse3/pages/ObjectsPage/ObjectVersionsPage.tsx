@@ -32,7 +32,6 @@ export const ObjectVersionsPage: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const history = useHistory();
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -43,6 +42,7 @@ export const ObjectVersionsPage: React.FC<{
   const onCompare = () => {
     history.push(router.compareObjectsUri(entity, project, selectedVersions));
   };
+  const notReadOnly = useShowDeleteButton(props.entity);
 
   const title = useMemo(() => {
     if (filter.objectName) {
@@ -53,16 +53,9 @@ export const ObjectVersionsPage: React.FC<{
     return 'All Objects';
   }, [filter.objectName, filter.baseObjectClass]);
 
-  if (loadingUserInfo) {
-    return <Loading />;
-  }
-
   const filteredOnObject = filter.objectName != null;
   const hasComparison = filteredOnObject;
-  const viewer = userInfo ? userInfo.id : null;
-  const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
-  const isAdmin = userInfo?.admin;
-  const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
+  const showDeleteButton = filteredOnObject && notReadOnly;
 
   return (
     <SimplePageLayout
