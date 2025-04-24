@@ -843,8 +843,6 @@ const populatePredictionsAndScoresImperative = (
           evaluations: {},
           // Store the original input data directly in the resultRows
           rawDataRow: example,
-          scores: {},
-          originalRows: [],
         };
       } else if (!result.resultRows[digest].rawDataRow) {
         // If the row exists but doesn't have originalInput yet, add it
@@ -1033,8 +1031,6 @@ const populatePredictionsAndScoresNonImperative = (
             if (result.resultRows[rowDigest] == null) {
               result.resultRows[rowDigest] = {
                 evaluations: {},
-                scores: {},
-                originalRows: [],
               };
             }
             const digestCollection = result.resultRows[rowDigest];

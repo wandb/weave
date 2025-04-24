@@ -6,7 +6,6 @@
  * Comparing Evaluations.
  */
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
-import {PivotedRow} from './sections/ExampleCompareSection/exampleCompareSectionUtil';
 
 export type EvaluationComparisonSummary = {
   // Entity and Project are constant across all calls
@@ -58,14 +57,6 @@ export type EvaluationComparisonResults = {
           };
         };
       };
-      // Flattened scores for easy access in the UI
-      scores?: {
-        [metricId: string]: {
-          [evaluationCallId: string]: number | boolean;
-        };
-      };
-      // Original rows for each call
-      originalRows?: PivotedRow[];
     };
   };
 };
