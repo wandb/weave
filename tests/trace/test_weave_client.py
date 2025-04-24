@@ -3295,6 +3295,8 @@ def test_calls_query_filter_by_root_refs(client):
     root_op(1)
     root_op(2)
 
+    client.flush()
+
     # basic trace roots only filter
     calls = client.get_calls(filter={"trace_roots_only": True})
     assert len(calls) == 2
