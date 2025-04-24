@@ -416,14 +416,10 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, sco
     )
     do_sync_eval()
     client.flush()
-    calls = list(client.get_calls())
-    for call in calls:
-        print(call.op_name)
+    calls = client.get_calls()
     assert len(calls) == total_calls
 
     await do_async_eval()
     client.flush()
-    calls = list(client.get_calls())
-    for call in calls:
-        print(call.op_name)
+    calls = client.get_calls()
     assert len(calls) == total_calls * 2  # including the previous one
