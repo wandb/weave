@@ -128,6 +128,8 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
             return cast(T, cls())
 
         elif isinstance(value, type_):
+            if hasattr(value, "name") and not value.name:
+                value.name = _default_memorable_class_name(value)
             return value
 
         raise TypeError("Unsupported type for casting")
@@ -150,6 +152,11 @@ def _default_dataset_name() -> str:
     date = datetime.now().strftime("%Y-%m-%d")
     unique_name = make_memorable_name()
     return f"{date}-{unique_name}-dataset"
+
+
+def _default_memorable_class_name(cls: type[T]) -> str:
+    date = datetime.now().strftime("%Y-%m-%d")
+    return f"{cls.__name__}-{date}-{make_memorable_name()}"
 
 
 def _validate_class_name(name: str) -> str:
