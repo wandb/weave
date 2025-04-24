@@ -407,22 +407,26 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, sco
             await pred.alog_score(scorer=scorer, score=score)
         ev.log_summary({"gpus_melted": 8})
 
-    total_calls = (
+    expected_num_calls = (
         1  # Evaluation.evaluate
-        + 3  # Evaluation.predict_and_score
-        + 3  # Model.predict
-        + 3  # Scorer.score
+        + 3  # (three predictions)
+        * (
+            1  # Evaluation.predict_and_score
+            + 1  # Model.predict
+            + 1  # Scorer.score
+        )
         + 1  # Evaluation.summarize
     )
     do_sync_eval()
     client.flush()
     calls = client.get_calls()
-    assert len(calls) == total_calls
+    assert len(calls) == expected_num_calls
 
     await do_async_eval()
     client.flush()
     calls = client.get_calls()
-    assert len(calls) == total_calls * 2  # including the previous one
+    # including the previous set of sync calls
+    assert len(calls) == expected_num_calls * 2
 
 
 def test_passing_dict_requires_name_with_scorer(client):
