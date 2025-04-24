@@ -417,9 +417,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -494,9 +494,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
@@ -526,3 +526,19 @@ class EvaluationLogger(BaseModel):
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
         _cleanup_evaluation(self)
+
+
+class ImperativeEvaluationLogger(EvaluationLogger):
+    """Legacy class name for EvaluationLogger.
+
+    This class is maintained for backward compatibility.
+    Please use EvaluationLogger instead.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        logger.warning(
+            "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"
+            "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will"
+            "be removed in a future version."
+        )
+        super().__init__(*args, **kwargs)
