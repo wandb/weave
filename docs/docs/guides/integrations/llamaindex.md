@@ -177,7 +177,7 @@ evaluator = CorrectnessEvaluator(llm=llm_judge)
 
 # highlight-next-line
 @weave.op()
-def correctness_evaluator(query: str, ground_truth: str, model_output: dict):
+def correctness_evaluator(query: str, ground_truth: str, output: dict):
     result = evaluator.evaluate(
         query=query, reference=ground_truth, response=model_output["response"]
     )
