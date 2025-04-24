@@ -72,8 +72,8 @@ describe('ObjectPath.parseString', () => {
     }).toThrow();
   });
   it('handles complex cases', () => {
-    expect(ObjectPath.parseString('fo\\.o[1].bar.baz.bim[3][5].wat')).toEqual([
-      'fo.o',
+    expect(ObjectPath.parseString('foo\\.o[1].bar.baz.bim[3][5].wat')).toEqual([
+      'foo.o',
       1,
       'bar',
       'baz',
