@@ -24,6 +24,7 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
+from weave.trace.context import call_context
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -3279,7 +3280,7 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[7] == uuidv7_calls[3].id
 
 
-def test_calls_query_filter_by_root_refs(client, clickhouse_client):
+def test_calls_query_filter_by_root_refs(client):
     @weave.op()
     def root_op(x: int):
         return {"n": x, "child": child_op(x)}
@@ -3292,19 +3293,9 @@ def test_calls_query_filter_by_root_refs(client, clickhouse_client):
     def grandchild_op(x: int):
         return x + 3
 
-    root_op(1)
-    root_op(2)
-
-    client.flush()
-
-    out = clickhouse_client.query("""
-    SELECT id, started_at, ended_at, parent_id, op_name
-    FROM calls_merged
-    """)
-    from pprint import pprint
-
-    for row in out.result_rows:
-        pprint(dict(zip(out.column_names, row)))
+    with call_context.set_call_stack([]):
+        root_op(1)
+        root_op(2)
 
     # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
     all_calls = list(client.get_calls())
