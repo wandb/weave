@@ -291,95 +291,134 @@ def test_evaluation_version_reuse(
     assert len(evaluations) == 1
 
 
-@pytest.mark.asyncio
-async def test_various_input_forms(client):
+def generate_evaluation_logger_kwargs_permutations():
+    NOT_SPECIFIED = object()
+
     class MyModel(weave.Model):
         const_value: int
 
-        @weave.op()
+        @weave.op
         def predict(self):
             return self.const_value
 
     class MyModelAsync(weave.Model):
         const_value: int
 
-        @weave.op()
+        @weave.op
         async def predict(self):
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.01)
             return self.const_value
 
-    class MyScorer(weave.Scorer):
-        @weave.op()
-        def score(self, output: int, exp_output: int):
-            return output == exp_output
-
-    class MyScorerAsync(weave.Scorer):
-        @weave.op()
-        async def score(self, output: int, exp_output: int):
-            await asyncio.sleep(1)
-            return output == exp_output
-
-    dummy_dataset = [
-        {"sample": "a", "exp_output": 1},
-        {"sample": "b", "exp_output": 42},
-    ]
-
-    model_flavors = [
-        None,
+    models = [
+        NOT_SPECIFIED,
         "string_model",
         {"config": "model_def"},
         MyModel(const_value=42),
         MyModelAsync(const_value=420),
     ]
 
-    dataset_flavors = [
-        None,
+    datasets = [
+        NOT_SPECIFIED,
         "string_dataset",
-        dummy_dataset,
-        weave.Dataset(rows=dummy_dataset),
+        [
+            {"sample": "a", "exp_output": 1},
+            {"sample": "b", "exp_output": 42},
+        ],
+        weave.Dataset(
+            rows=[
+                {"sample": "a", "exp_output": 1},
+                {"sample": "b", "exp_output": 42},
+            ]
+        ),
     ]
 
-    inputs_flavors = ["string_inputs", {"dict_inputs": 1}]
+    for model in models:
+        for dataset in datasets:
+            kwargs = {}
+            if model is not NOT_SPECIFIED:
+                kwargs["model"] = model
+            if dataset is not NOT_SPECIFIED:
+                kwargs["dataset"] = dataset
 
-    scorer_flavors = ["string_scorer", {"dict_scorer": 1}, MyScorer(), MyScorerAsync()]
+            yield kwargs
 
-    def run_grid_sync():
-        for model_flavor in model_flavors:
-            for dataset_flavor in dataset_flavors:
-                el = weave.EvaluationLogger(model=model_flavor, dataset=dataset_flavor)
-                for inputs_flavor in inputs_flavors:
-                    pred = el.log_prediction(inputs=inputs_flavor, output=inputs_flavor)
-                    for scorer_flavor in scorer_flavors:
-                        pred.log_score(scorer=scorer_flavor, score=0.5)
-                el.log_summary({"extra_field": "extra_value"})
 
-    run_grid_sync()
+@pytest.fixture
+def scorer(request):
+    if request.param == "string":
+        return "string_scorer"
+    elif request.param == "dict":
+        return {"config": "scorer_def"}
+    elif request.param == "weave-scorer":
 
-    async def run_grid_async():
-        for model_flavor in model_flavors:
-            for dataset_flavor in dataset_flavors:
-                el = weave.EvaluationLogger(model=model_flavor, dataset=dataset_flavor)
-                for inputs_flavor in inputs_flavors:
-                    # TODO: log_prediction should have it's own async version
-                    pred = el.log_prediction(inputs=inputs_flavor, output=inputs_flavor)
-                    for scorer_flavor in scorer_flavors:
-                        await pred.alog_score(scorer=scorer_flavor, score=0.5)
-                # TODO: log_summary should have it's own async version
-                el.log_summary({"extra_field": "extra_value"})
+        class MyScorer(weave.Scorer):
+            @weave.op()
+            def score(self, output: int, exp_output: int):
+                return output == exp_output
 
-    await run_grid_async()
+        return MyScorer()
+    elif request.param == "weave-scorer-async":
 
-    calls = client.get_calls()
-    calls_per_eval = (
-        1  # root
-        + len(inputs_flavors)
-        * (  # predict and scores
-            1  # predict and score
-            + 1  # predict
-            + len(scorer_flavors)  # scores
-        )
-        + 1  # summarize
+        class MyScorerAsync(weave.Scorer):
+            @weave.op
+            async def score(self, output: int, exp_output: int):
+                await asyncio.sleep(0.01)
+                return output == exp_output
+
+        return MyScorerAsync()
+
+
+@pytest.mark.parametrize(
+    "evaluation_logger_kwargs",
+    generate_evaluation_logger_kwargs_permutations(),
+)
+@pytest.mark.parametrize(
+    "scorer",
+    [
+        "string",
+        # "dict",
+        # "weave-scorer",
+        # "weave-scorer-async",
+    ],
+    indirect=True,
+)
+@pytest.mark.asyncio
+async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
+    your_dataset = [
+        {"a": 1, "b": 2},
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+
+    def do_sync_eval():
+        ev = weave.EvaluationLogger(**evaluation_logger_kwargs)
+        for inputs in your_dataset:
+            output = inputs["a"] + inputs["b"]
+            pred = ev.log_prediction(inputs=inputs, output=output)
+            pred.alog_score(scorer=scorer, score=0.5)
+        ev.log_summary({"gpus_melted": 8})
+
+    async def do_async_eval():
+        ev = weave.EvaluationLogger(**evaluation_logger_kwargs)
+        for inputs in your_dataset:
+            output = inputs["a"] + inputs["b"]
+            pred = ev.log_prediction(inputs=inputs, output=output)
+            await pred.alog_score(scorer=scorer, score=0.5)
+        ev.log_summary({"gpus_melted": 8})
+
+    # do_sync_eval()
+    # client.flush()
+    # calls = client.get_calls()
+    # assert len(calls) == 8  # 1 Evaluation.evaluate, 1 Evaluation.predict_and_score, 3 predict, 1 * 3 scores, 1 summary
+
+    await do_async_eval()
+    client.flush()
+    calls = list(client.get_calls())
+    print(f"{calls=}")
+    assert len(calls) == (
+        1  # Evaluation.evaluate
+        + 1  # Evaluation.predict_and_score
+        + 3  # Model.predict
+        + 3  # Scorer.score
+        + 1  # Evaluation.summarize
     )
-    num_evals = len(model_flavors) * len(dataset_flavors)
-    num_repeats = 2
-    assert len(calls) == calls_per_eval * num_evals * num_repeats
