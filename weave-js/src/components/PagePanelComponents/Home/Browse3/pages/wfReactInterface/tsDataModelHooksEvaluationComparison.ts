@@ -482,8 +482,7 @@ const fetchEvaluationComparisonResults = async (
   populatePredictionsAndScoresImperative(
     {calls: imperativeEvalCalls},
     result,
-    summaryData,
-    convertISOToDate
+    summaryData
   );
 
   populatePredictionsAndScoresNonImperative(
@@ -815,8 +814,7 @@ const generateStableDigest = (obj: any): string => {
 const populatePredictionsAndScoresImperative = (
   evalTraceRes: {calls: TraceCallSchema[]},
   result: EvaluationComparisonResults,
-  summaryData: EvaluationComparisonSummary,
-  convertISOToDate: (isoString: string) => Date
+  summaryData: EvaluationComparisonSummary
 ) => {
   const predictAndScoreCalls = evalTraceRes.calls.filter(call =>
     call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
