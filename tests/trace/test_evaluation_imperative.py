@@ -382,8 +382,9 @@ def scorer(request):
     ],
     indirect=True,
 )
+@pytest.mark.parametrize("score", [0.5, {"value": 0.5, "reason": "woah"}])
 @pytest.mark.asyncio
-async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
+async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, score):
     your_dataset = [
         {"a": 1, "b": 2},
         {"a": 3, "b": 4},
@@ -395,7 +396,7 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
         for inputs in your_dataset:
             output = inputs["a"] + inputs["b"]
             pred = ev.log_prediction(inputs=inputs, output=output)
-            pred.log_score(scorer=scorer, score=0.5)
+            pred.log_score(scorer=scorer, score=score)
         ev.log_summary({"gpus_melted": 8})
 
     async def do_async_eval():
@@ -403,7 +404,7 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
         for inputs in your_dataset:
             output = inputs["a"] + inputs["b"]
             pred = ev.log_prediction(inputs=inputs, output=output)
-            await pred.alog_score(scorer=scorer, score=0.5)
+            await pred.alog_score(scorer=scorer, score=score)
         ev.log_summary({"gpus_melted": 8})
 
     total_calls = (
