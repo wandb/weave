@@ -14,7 +14,7 @@ The imperative approach described on this page offers more flexibility for compl
 
 :::
 
-## Basic Usage
+## Basic usage
 
 1.  **Initialize the logger:** Create an instance of `EvaluationLogger`. You can optionally provide strings or dictionaries as metadata for the `Model` and `Dataset` being evaluated. If omitted, default placeholders are used.
 2.  **Log Predictions:** For each input/output pair from your model or system, call `log_prediction`. This method returns an `ScoreLogger` object tied to that specific prediction event.
