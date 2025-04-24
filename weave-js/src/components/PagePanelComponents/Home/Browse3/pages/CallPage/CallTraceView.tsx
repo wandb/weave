@@ -124,7 +124,7 @@ export const CallTraceView: FC<{
         traceId: rowCall.traceId,
         path: params.row.path,
         isParentRow: params.row.isParentRow,
-        heirarchyDepth: params.row.hierarchy.length,
+        hierarchyDepth: params.row.hierarchy.length,
       });
     },
     [

@@ -266,9 +266,9 @@ class CodeGenerationPipeline(weave.Model):
 This `CodeGenerationPipeline` class encapsulates our code generation logic as a Weave Model, providing several key benefits:
 
 1. Automatic experiment tracking: Weave captures inputs, outputs, and parameters for each run of the model.
-2. Versioning: Changes to the model's attributes or code are automatically versioned, creating a clear history of how your code generation pipeline evolves over time.
+2. Versioning: Changes to the model's parameters or code are automatically versioned, creating a clear history of how your code generation pipeline evolves over time.
 3. Reproducibility: The versioning and tracking make it easy to reproduce any previous result or configuration of your code generation pipeline.
-4. Hyperparameter management: Model attributes (like `model_name`) are clearly defined and tracked across different runs, facilitating experimentation.
+4. Hyperparameter management: Model parameters (like `model_name`) are clearly defined and tracked across different runs, facilitating experimentation.
 5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
 ## Implement evaluation metrics

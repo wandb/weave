@@ -373,9 +373,11 @@ def test_query_light_column_with_costs() -> None:
                     *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(
-                        if(usage_raw != '',
-                        JSONExtractKeysAndValuesRaw(usage_raw),
-                        [('weave_dummy_llm_id', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
+                        if(
+                            usage_raw != '' and usage_raw != '{}',
+                            JSONExtractKeysAndValuesRaw(usage_raw),
+                            [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')]
+                        )
                     ) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
@@ -494,7 +496,6 @@ def test_query_with_simple_feedback_sort() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_4:String}
-            AND calls_merged.project_id = {pb_4:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -567,7 +568,6 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_1:String}
-            AND calls_merged.project_id = {pb_1:String}
             AND (calls_merged.id IN filtered_calls)
         GROUP BY
             (calls_merged.project_id,
@@ -630,7 +630,6 @@ def test_query_with_simple_feedback_filter() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_3:String}
-            AND calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -682,7 +681,6 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_6:String}
-            AND calls_merged.project_id = {pb_6:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -1956,7 +1954,6 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         FROM calls_merged
         LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
         WHERE calls_merged.project_id = {pb_2:String}
-            AND calls_merged.project_id = {pb_2:String}
             AND (calls_merged.id IN filtered_calls)
             AND ((calls_merged.inputs_dump LIKE {pb_8:String}
                 OR calls_merged.inputs_dump IS NULL))

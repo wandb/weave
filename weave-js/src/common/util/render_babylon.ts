@@ -38,6 +38,7 @@ import {add, mag, mul, sub} from './vec3';
 
 export type Position = [x: number, y: number, z: number];
 export type RgbColor = [r: number, g: number, b: number];
+export type RgbaColor = {r: number; g: number; b: number; a: number};
 
 export interface Vector {
   start: Position;
@@ -232,7 +233,8 @@ function getSize(request: RenderRequest<unknown>): Size {
 export function renderJsonPoints<T>(
   pointCloud: BabylonPointCloud,
   request: RenderRequest<T>,
-  meta?: Camera3DControl
+  meta?: Camera3DControl,
+  backgroundColor?: RgbaColor
 ): RenderResult<T> {
   const context = request.fullscreen
     ? getFullscreenContext()
@@ -242,7 +244,14 @@ export function renderJsonPoints<T>(
 
   const size = getSize(request);
 
-  const scene = pointCloudScene(pointCloud, canvas, context, size, meta);
+  const scene = pointCloudScene(
+    pointCloud,
+    canvas,
+    context,
+    size,
+    meta,
+    backgroundColor
+  );
   const cleanup = () => scene.dispose();
   const camera = scene.cameras[0];
 
@@ -256,13 +265,22 @@ const pointCloudScene = (
   canvas: HTMLCanvasElement,
   {engine}: RenderContext,
   {width, height}: {width: number; height: number},
-  meta?: Camera3DControl
+  meta?: Camera3DControl,
+  backgroundColor?: RgbaColor
 ): Scene => {
   // these dimensions did not have a lot of thought put into them,
   // so they may need fine tuning. The idea is that table & media previews
   // are smaller than these dimensions.
   const isSmallView = width < 400 || height < 400;
   const scene = new Babylon.Scene(engine);
+  if (backgroundColor) {
+    scene.clearColor = new Babylon.Color4(
+      backgroundColor.r / 255,
+      backgroundColor.g / 255,
+      backgroundColor.b / 255,
+      backgroundColor.a
+    );
+  }
 
   const target = [0, 0, 0];
 

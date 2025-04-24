@@ -280,11 +280,23 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         # I am not sure the best way to cache the iterator here. TODO
         return self._next_trace_server.table_query_stream(req)
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
             self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
+        )
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        if any(not digest_is_cacheable(digest) for digest in req.digests or []):
+            return self._next_trace_server.table_query_stats_batch(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.table_query_stats_batch,
+            req,
+            tsi.TableQueryStatsBatchRes,
         )
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
