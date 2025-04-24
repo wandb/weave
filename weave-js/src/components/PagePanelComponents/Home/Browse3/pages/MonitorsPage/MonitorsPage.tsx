@@ -3,15 +3,22 @@ import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {CellValue} from '../../../Browse2/CellValue';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {EMPTY_PROPS_MONITORS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
-import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionKey,
+  ObjectVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CreateMonitorDrawer} from './CreateMonitorDrawer';
+import {useWFHooks} from '../wfReactInterface/context';
+import {Query} from '../wfReactInterface/traceServerClientInterface/query';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 
 export const MonitorsPage = ({
   entity,
@@ -139,7 +146,7 @@ export const MonitorsPage = ({
               },
               renderCell: params => (
                 <CallCountCell
-                  id={params.value}
+                  monitorRef={params.value}
                   entity={entity}
                   project={project}
                 />
@@ -160,24 +167,37 @@ export const MonitorsPage = ({
 };
 
 const CallCountCell = ({
-  id,
+  monitorRef,
   entity,
   project,
 }: {
-  id: string;
+  monitorRef: string;
   entity: string;
   project: string;
 }) => {
-  /*const {useCallsStats} = useWFHooks();
-  const callsStats = useCallsStats(
-    'entity',
-    'project',
-    {},
-    {$expr: {$eq: [{$getField: 'feedback.[*].trigger_ref'}, {$literal: id}]}}
-  );
-  console.log(callsStats);
+  const {useCallsStats} = useWFHooks();
+  const query: Query = useMemo(() => {
+    return {
+      $expr: {
+        $contains: {
+          input: {$getField: 'feedback.[*].trigger_ref'},
+          substr: {
+            $literal: `${monitorRef.split(':').slice(0, -1).join(':')}:`,
+          },
+        },
+      },
+    };
+  }, [monitorRef]);
+  const callsStats = useCallsStats(entity, project, {}, query);
   if (callsStats.loading) {
     return <LoadingDots />;
-  }*/
-  return <CellValue value={`123 calls`} />;
+  }
+  return (
+    <CellValue
+      value={`${callsStats.result?.count} ${maybePluralizeWord(
+        callsStats.result?.count || 0,
+        'call'
+      )}`}
+    />
+  );
 };
