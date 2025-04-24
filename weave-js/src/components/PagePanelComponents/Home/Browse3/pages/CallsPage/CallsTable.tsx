@@ -387,7 +387,6 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
-          const strVal = JSON.stringify(value);
 
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
@@ -395,7 +394,7 @@ export const CallsTable: FC<{
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === strVal
+              JSON.stringify(item.value) === JSON.stringify(value)
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
@@ -416,7 +415,7 @@ export const CallsTable: FC<{
             const newItems = [...filterModel.items];
             newItems[existingFieldOpMatchIndex] = {
               ...newItems[existingFieldOpMatchIndex],
-              value: strVal,
+              value,
             };
             setFilterModel({
               ...filterModel,
@@ -434,7 +433,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value: strVal,
+                value,
               },
             ],
           };
