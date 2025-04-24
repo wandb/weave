@@ -13,6 +13,7 @@ from typing import Any, Callable, Optional
 from unittest.mock import patch
 
 import pytest
+from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
@@ -26,6 +27,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     ScopeSpans,
     Span,
 )
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExportResult
 
 from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter
@@ -163,96 +165,10 @@ def convert_readable_span_to_proto_span(readable_span: Any) -> Span:
     return proto_span
 
 
-@pytest.fixture
-def pydantic_ai_client(client: Any, monkeypatch: Any) -> Any:
-    """
-    Fixture that provides a client with mocked PydanticAISpanExporter for testing.
-
-    This avoids making real OTLP HTTP requests during tests while preserving
-    the original processing logic of the PydanticAISpanExporter. The fixture
-    attaches a process_otel_spans method to the client for manual span export.
-
-    Args:
-        client: The test client instance.
-        monkeypatch: The pytest monkeypatch fixture.
-
-    Returns:
-        Any: The patched client with a process_otel_spans method.
-    """
-    mock_otlp_exporter = MockOTLPExporter()
-
-    with patch(
-        "weave.integrations.pydantic_ai.utils.get_otlp_headers_from_weave_context"
-    ) as mock_get_headers:
-        mock_get_headers.return_value = {
-            "Authorization": "test_auth_token",
-            "project_id": "test/test-project",
-        }
-
-        original_init = PydanticAISpanExporter.__init__
-
-        def patched_init(self: Any) -> None:
-            self._otlp_exporter = mock_otlp_exporter
-
-        monkeypatch.setattr(PydanticAISpanExporter, "__init__", patched_init)
-
-        def process_spans(project_id: Optional[str] = None) -> None:
-            """
-            Convert and send spans to the server using the mock exporter.
-
-            Args:
-                project_id: Optional project ID to use for the export.
-            """
-            if not project_id:
-                project_id = client._project_id()
-
-            # Only process if there are spans to export
-            if not mock_otlp_exporter.exported_spans:
-                return
-
-            # --- Build OTLP protobuf structures for export ---
-            scope = InstrumentationScope()
-            scope.name = "pydantic_ai_test"
-            scope.version = "1.0.0"
-
-            scope_spans = ScopeSpans()
-            scope_spans.scope.CopyFrom(scope)
-
-            for readable_span in mock_otlp_exporter.exported_spans:
-                proto_span = convert_readable_span_to_proto_span(readable_span)
-                scope_spans.spans.append(proto_span)
-
-            resource = Resource()
-            service_kv = KeyValue()
-            service_kv.key = "service.name"
-            service_kv.value.string_value = "pydantic_ai_test_service"
-            resource.attributes.append(service_kv)
-
-            resource_spans = ResourceSpans()
-            resource_spans.resource.CopyFrom(resource)
-            resource_spans.scope_spans.append(scope_spans)
-
-            request = ExportTraceServiceRequest()
-            request.resource_spans.append(resource_spans)
-
-            export_req = tsi.OtelExportReq(
-                project_id=project_id, traces=request, wb_user_id=None
-            )
-
-            client.server.otel_export(export_req)
-            mock_otlp_exporter.exported_spans = []
-
-        client.process_otel_spans = process_spans
-
-        yield client
-
-        monkeypatch.setattr(PydanticAISpanExporter, "__init__", original_init)
-
-
-@pytest.fixture
+@pytest.fixture(scope="function")
 def pydantic_ai_client_creator(
-    request: Any, monkeypatch: Any
-) -> Callable[..., contextlib._GeneratorContextManager[Any]]:
+    client_creator: Callable[..., contextlib._GeneratorContextManager[Any]],
+) -> Callable[..., Generator[Any, None, None]]:
     """
     Fixture that provides a client creator function for pydantic-ai testing.
 
@@ -262,16 +178,14 @@ def pydantic_ai_client_creator(
     manual span export.
 
     Args:
-        request: The pytest request fixture.
-        monkeypatch: The pytest monkeypatch fixture.
+        client_creator: The original client creator fixture to wrap.
 
     Returns:
-        Callable[..., contextlib._GeneratorContextManager[Any]]: A context manager
-            for creating a patched client.
+        Callable[..., Generator[Any, None, None]]: A context manager for creating a patched client.
     """
 
     @contextlib.contextmanager
-    def create_client(
+    def create_pydantic_ai_client(
         autopatch_settings: Any = None, global_attributes: Any = None
     ) -> Generator[Any, None, None]:
         """
@@ -284,10 +198,7 @@ def pydantic_ai_client_creator(
         Yields:
             Any: The patched client instance.
         """
-        from tests.conftest import create_client as original_create_client
-
         mock_otlp_exporter = MockOTLPExporter()
-
         with patch(
             "weave.integrations.pydantic_ai.utils.get_otlp_headers_from_weave_context"
         ) as mock_get_headers:
@@ -295,71 +206,55 @@ def pydantic_ai_client_creator(
                 "Authorization": "test_auth_token",
                 "project_id": "test/test-project",
             }
-
             original_init = PydanticAISpanExporter.__init__
 
             def patched_init(self: Any) -> None:
                 self._otlp_exporter = mock_otlp_exporter
 
-            monkeypatch.setattr(PydanticAISpanExporter, "__init__", patched_init)
+            with patch.object(PydanticAISpanExporter, "__init__", patched_init):
+                with client_creator(autopatch_settings, global_attributes) as client:
 
-            inited_client = original_create_client(
-                request, autopatch_settings, global_attributes
-            )
-            client = inited_client.client
+                    def process_spans(project_id: Optional[str] = None) -> None:
+                        """
+                        Convert and send spans to the server using the mock exporter.
 
-            def process_spans(project_id: Optional[str] = None) -> None:
-                """
-                Convert and send spans to the server using the mock exporter.
+                        Args:
+                            project_id: Optional project ID to use for the export.
+                        """
+                        if not project_id:
+                            project_id = client._project_id()
+                        if not mock_otlp_exporter.exported_spans:
+                            return
+                        # --- Build OTLP protobuf structures for export ---
+                        scope = InstrumentationScope()
+                        scope.name = "pydantic_ai_test"
+                        scope.version = "1.0.0"
+                        scope_spans = ScopeSpans()
+                        scope_spans.scope.CopyFrom(scope)
+                        for readable_span in mock_otlp_exporter.exported_spans:
+                            proto_span = convert_readable_span_to_proto_span(
+                                readable_span
+                            )
+                            scope_spans.spans.append(proto_span)
+                        resource = Resource()
+                        service_kv = KeyValue()
+                        service_kv.key = "service.name"
+                        service_kv.value.string_value = "pydantic_ai_test_service"
+                        resource.attributes.append(service_kv)
+                        resource_spans = ResourceSpans()
+                        resource_spans.resource.CopyFrom(resource)
+                        resource_spans.scope_spans.append(scope_spans)
+                        request = ExportTraceServiceRequest()
+                        request.resource_spans.append(resource_spans)
+                        export_req = tsi.OtelExportReq(
+                            project_id=project_id, traces=request, wb_user_id=None
+                        )
+                        client.server.otel_export(export_req)
+                        mock_otlp_exporter.exported_spans = []
 
-                Args:
-                    project_id: Optional project ID to use for the export.
-                """
-                if not project_id:
-                    project_id = client._project_id()
+                    client.process_otel_spans = process_spans
+                    provider = TracerProvider()
+                    trace.set_tracer_provider(provider)
+                    yield client
 
-                # Only process if there are spans to export
-                if not mock_otlp_exporter.exported_spans:
-                    return
-
-                # --- Build OTLP protobuf structures for export ---
-                scope = InstrumentationScope()
-                scope.name = "pydantic_ai_test"
-                scope.version = "1.0.0"
-
-                scope_spans = ScopeSpans()
-                scope_spans.scope.CopyFrom(scope)
-
-                for readable_span in mock_otlp_exporter.exported_spans:
-                    proto_span = convert_readable_span_to_proto_span(readable_span)
-                    scope_spans.spans.append(proto_span)
-
-                resource = Resource()
-                service_kv = KeyValue()
-                service_kv.key = "service.name"
-                service_kv.value.string_value = "pydantic_ai_test_service"
-                resource.attributes.append(service_kv)
-
-                resource_spans = ResourceSpans()
-                resource_spans.resource.CopyFrom(resource)
-                resource_spans.scope_spans.append(scope_spans)
-
-                request = ExportTraceServiceRequest()
-                request.resource_spans.append(resource_spans)
-
-                export_req = tsi.OtelExportReq(
-                    project_id=project_id, traces=request, wb_user_id=None
-                )
-
-                client.server.otel_export(export_req)
-                mock_otlp_exporter.exported_spans = []
-
-            client.process_otel_spans = process_spans
-
-            try:
-                yield client
-            finally:
-                inited_client.reset()
-                monkeypatch.setattr(PydanticAISpanExporter, "__init__", original_init)
-
-    return create_client
+    return create_pydantic_ai_client
