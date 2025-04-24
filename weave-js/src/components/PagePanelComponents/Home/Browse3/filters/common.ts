@@ -111,7 +111,7 @@ const allOperators: SelectOperatorOption[] = [
   },
   {
     value: '(string): notEquals',
-    label: 'not equals',
+    label: 'does not equal',
     group: 'string',
   },
   {
@@ -261,7 +261,7 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       },
       {
         value: '(string): notEquals',
-        label: 'not equals',
+        label: 'does not equal',
         group: 'string',
       },
       {

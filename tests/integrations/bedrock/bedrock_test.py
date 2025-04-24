@@ -11,6 +11,8 @@ import weave
 from weave.integrations.bedrock import patch_client
 
 model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+inference_profile_id = "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
+
 system_message = "You are an expert software engineer that knows a lot of programming. You prefer short answers."
 messages = [
     {
@@ -226,7 +228,10 @@ def mock_apply_guardrail_make_api_call(
 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
-def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
+def test_bedrock_converse(
+    client: weave.trace.weave_client.WeaveClient, model_identifier: str
+) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -234,7 +239,7 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
         "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
     ):
         response = bedrock_client.converse(
-            modelId=model_id,
+            modelId=model_identifier,
             system=[{"text": system_message}],
             messages=messages,
             inferenceConfig={"maxTokens": 30},
@@ -266,7 +271,7 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     # Check usage in a style similar to mistral tests
     summary = call.summary
     assert summary is not None, "Summary should not be None"
-    # We'll reference usage by the model_id
+    # We'll reference usage by the model_id, even if we used an inference profile
     model_usage = summary["usage"][model_id]
     assert model_usage["requests"] == 1, "Expected exactly one request increment"
     # Map the tokens to pydantic usage fields
@@ -278,7 +283,10 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
-def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
+def test_bedrock_converse_stream(
+    client: weave.trace.weave_client.WeaveClient, model_identifier: str
+) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -286,7 +294,7 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
         "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
     ):
         response = bedrock_client.converse_stream(
-            modelId=model_id,
+            modelId=model_identifier,
             system=[{"text": system_message}],
             messages=messages,
             inferenceConfig={"maxTokens": 30},
