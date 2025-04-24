@@ -388,19 +388,39 @@ export const ExampleCompareSection: React.FC<{
   ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
+    const dimension = lookupDimension(scorerIndex, metricIndex);
     const resolvedScoreId = resolvePeerDimension(
       compositeScoreMetrics,
       currEvalCallId,
-      lookupDimension(scorerIndex, metricIndex)
+      dimension
     );
-
-    if (resolvedScoreId == null) {
-      return undefined;
+    // If we get a valid resolution through the normal path, use that
+    if (resolvedScoreId != null) {
+      const metricId = metricDefinitionId(resolvedScoreId);
+      // Check if the scores object has the metric ID key
+      if (targetTrial.scores && metricId in targetTrial.scores) {
+        // Check if the evaluation call ID exists for this metric
+        if (currEvalCallId in targetTrial.scores[metricId]) {
+          const value = targetTrial.scores[metricId][currEvalCallId];
+          // Return the value even if it's falsy (0 or false)
+          return value;
+        }
+      }
     }
 
-    return targetTrial.scores[metricDefinitionId(resolvedScoreId)][
-      currEvalCallId
-    ];
+    // Fallback: try direct lookup using the original dimension's metric ID
+    // This is needed for imperative evaluations that don't get properly resolved
+    const originalMetricId = metricDefinitionId(dimension);
+
+    // Use the same non-falsy checking pattern for the fallback
+    if (targetTrial.scores && originalMetricId in targetTrial.scores) {
+      if (currEvalCallId in targetTrial.scores[originalMetricId]) {
+        const value = targetTrial.scores[originalMetricId][currEvalCallId];
+        return value;
+      }
+    }
+
+    return undefined;
   };
 
   const lookupAggScorerMetricValue = (

@@ -66,6 +66,7 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
 )
 
 IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
+IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
 
 
 @contextmanager
@@ -265,7 +266,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                with weave.attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -417,9 +418,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -494,9 +495,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
