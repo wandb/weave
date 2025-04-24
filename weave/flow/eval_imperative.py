@@ -126,7 +126,10 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
             return cast(T, cls())
 
         elif isinstance(value, type_):
-            return value
+            instance = value
+            if isinstance(instance, weave.Object) and not instance.name:
+                instance.name = instance.__class__.__name__
+            return instance
 
         raise TypeError("Unsupported type for casting")
 
