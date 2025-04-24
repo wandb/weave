@@ -331,8 +331,6 @@ class EvaluationLogger(BaseModel):
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_evaluation: Evaluation = PrivateAttr()
 
-    # These properties forward useful properties of the Evaluate call onto
-    # the EvaluationLogger object
     @property
     def ui_url(self) -> str | None:
         # In normal usage, _evaluate_call will never be None because it's set
