@@ -34,8 +34,8 @@ import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
-  CacheableCallKey,
   CallFilter,
+  CallKey,
   CallSchema,
   FeedbackKey,
   Loadable,
@@ -165,15 +165,28 @@ const useMakeTraceServerEndpoint = <
 };
 
 const useCall = (
-  key: CacheableCallKey | null,
+  key: CallKey | null,
   opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? callCache.get(key) : null;
+
+  const effectiveKey = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return {
+      ...key,
+      withCosts: !!opts?.includeCosts,
+      withTotalStorageSize: !!opts?.includeTotalStorageSize,
+    };
+  }, [key, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const deepKey = useDeepMemo(effectiveKey);
+
+  const cachedCall = deepKey ? callCache.get(deepKey) : null;
+
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
       loadingRef.current = true;
@@ -203,7 +216,7 @@ const useCall = (
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (deepKey == null) {
       return {
         loading: false,
         result: null,
@@ -224,9 +237,14 @@ const useCall = (
         loading: true,
         result: null,
       };
-    } else if (result?.callId === key?.callId) {
+    } else if (result == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } else if (result?.callId === deepKey?.callId) {
       if (result) {
-        callCache.set(key, result);
+        callCache.set(deepKey, result);
       }
       return {
         loading: false,
@@ -239,7 +257,7 @@ const useCall = (
         result: null,
       };
     }
-  }, [cachedCall, callRes, key]);
+  }, [cachedCall, callRes, deepKey]);
 };
 
 const useCallsNoExpansion = (
@@ -265,13 +283,8 @@ const useCallsNoExpansion = (
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(() => {
-    if (opts?.skip) {
-      return;
-    }
-    setCallRes(null);
-    loadingRef.current = true;
-    const req: traceServerTypes.TraceCallsQueryReq = {
+  const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
+    return {
       project_id: projectIdFromParts({entity, project}),
       filter: {
         op_names: deepFilter.opVersionRefs,
@@ -295,39 +308,46 @@ const useCallsNoExpansion = (
         ? {include_total_storage_size: true}
         : null),
     };
-    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
-      loadingRef.current = false;
-      setCallRes(res);
-    };
-    const onError = (e: any) => {
-      loadingRef.current = false;
-      console.error(e);
-      setCallRes({calls: []});
-    };
-    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    opts?.skip,
-    opts?.includeCosts,
-    opts?.includeFeedback,
-    opts?.includeTotalStorageSize,
     entity,
     project,
-    deepFilter.opVersionRefs,
-    deepFilter.inputObjectVersionRefs,
-    deepFilter.outputObjectVersionRefs,
-    deepFilter.parentIds,
-    deepFilter.traceId,
-    deepFilter.callIds,
-    deepFilter.traceRootsOnly,
-    deepFilter.runIds,
-    deepFilter.userIds,
+    deepFilter,
     limit,
     offset,
     sortBy,
     query,
     columns,
-    getTsClient,
+    opts?.includeCosts,
+    opts?.includeFeedback,
+    opts?.includeTotalStorageSize,
   ]);
+
+  // Keep track of the request we're waiting for, so that we
+  // can ignore requests that are superceded by more recent reqs
+  const expectedRequestRef = useRef(req);
+
+  const doFetch = useCallback(() => {
+    setCallRes(null);
+    loadingRef.current = true;
+    expectedRequestRef.current = req;
+
+    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        loadingRef.current = false;
+        setCallRes(res);
+      }
+    };
+    const onError = (e: any) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        loadingRef.current = false;
+        console.error(e);
+        setCallRes({calls: []});
+      }
+    };
+    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
+  }, [getTsClient, req]);
 
   // register doFetch as a callback after deletion
   useEffect(() => {
