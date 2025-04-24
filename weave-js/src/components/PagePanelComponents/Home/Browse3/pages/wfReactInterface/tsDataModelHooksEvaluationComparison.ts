@@ -1090,13 +1090,6 @@ const populatePredictionsAndScoresNonImperative = (
                 sourceCallId: traceCall.id,
               };
 
-              // Add to scores structure
-              if (!digestCollection.scores![modelLatencyMetricId]) {
-                digestCollection.scores![modelLatencyMetricId] = {};
-              }
-              digestCollection.scores![modelLatencyMetricId][evaluationCallId] =
-                latency;
-
               // Add total tokens
               const totalTokensMetricId = metricDefinitionId(
                 totalTokensMetricDimension
@@ -1106,18 +1099,10 @@ const populatePredictionsAndScoresNonImperative = (
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
-
               predictAndScoreFinal.scoreMetrics[totalTokensMetricId] = {
                 value: totalTokens,
                 sourceCallId: traceCall.id,
               };
-
-              // Add to scores structure
-              if (!digestCollection.scores![totalTokensMetricId]) {
-                digestCollection.scores![totalTokensMetricId] = {};
-              }
-              digestCollection.scores![totalTokensMetricId][evaluationCallId] =
-                totalTokens;
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               const results = traceCall.output as any;
               let scorerRef = traceCall.op_name;
@@ -1139,13 +1124,6 @@ const populatePredictionsAndScoresNonImperative = (
                     sourceCallId: traceCall.id,
                     value: scoreVal,
                   };
-
-                  // Add to scores structure for direct access by ExampleCompareSection
-                  if (!digestCollection.scores![metricId]) {
-                    digestCollection.scores![metricId] = {};
-                  }
-                  digestCollection.scores![metricId][evaluationCallId] =
-                    scoreVal;
                 } else if (isContinuousScore(scoreVal)) {
                   const metricDimension: MetricDefinition = {
                     scoreType: 'continuous',
@@ -1180,42 +1158,6 @@ const populatePredictionsAndScoresNonImperative = (
 
               recursiveAddScore(results, []);
             }
-
-            // Create PivotedRow objects for the trial and add to originalRows
-            // Make sure this is only added once
-            // const existingRows =
-            //   digestCollection.originalRows?.filter(
-            //     row =>
-            //       row.evaluationCallId === evaluationCallId &&
-            //       row.predictAndScore.callId === parentPredictAndScore.id
-            //   ) || [];
-
-            // if (existingRows.length === 0) {
-            //   // Create a PivotedRow and add it to originalRows
-            //   const pivotedRow: PivotedRow = {
-            //     id: parentPredictAndScore.id,
-            //     evaluationCallId,
-            //     inputDigest: rowDigest,
-            //     inputRef: exampleRef,
-            //     path: [rowDigest, evaluationCallId, parentPredictAndScore.id],
-            //     predictAndScore: predictAndScoreFinal,
-            //     scores: digestCollection.scores!,
-            //     output: {},
-            //   };
-
-            //   // Add the output data if it's a predict call with output
-            //   if (isProbablyPredictCall && traceCall.output) {
-            //     const outputData = traceCall.output;
-            //     Object.entries(outputData).forEach(([key, value]) => {
-            //       if (!pivotedRow.output[`output.${key}`]) {
-            //         pivotedRow.output[`output.${key}`] = {};
-            //       }
-            //       pivotedRow.output[`output.${key}`][evaluationCallId] = value;
-            //     });
-            //   }
-
-            //   digestCollection.originalRows!.push(pivotedRow);
-            // }
           }
         }
       }
