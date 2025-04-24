@@ -387,7 +387,12 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
-          const strVal = JSON.stringify(value);
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
 
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
