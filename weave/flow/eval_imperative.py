@@ -66,6 +66,7 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
 )
 
 IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
+IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
 
 
 @contextmanager
@@ -265,7 +266,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                with weave.attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
