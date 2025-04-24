@@ -49,10 +49,6 @@ def get_pydantic_ai_patcher(
     if _pydantic_ai_patcher is not None:
         return _pydantic_ai_patcher
 
-    tracer_provider = trace_sdk.TracerProvider()
-    span_processor = SimpleSpanProcessor(PydanticAISpanExporter())
-    tracer_provider.add_span_processor(span_processor)
-
     def agent_init_wrapper(original_init: Callable[..., None]) -> Callable[..., None]:
         """
         Wrap the Agent.__init__ method to inject Weave's instrumentation settings.
@@ -68,6 +64,9 @@ def get_pydantic_ai_patcher(
         def wrapped_init(self: Any, *args: Any, **kwargs: Any) -> None:
             # Only inject instrumentation if not already provided
             if "instrument" not in kwargs or kwargs["instrument"] is None:
+                tracer_provider = trace_sdk.TracerProvider()
+                span_processor = SimpleSpanProcessor(PydanticAISpanExporter())
+                tracer_provider.add_span_processor(span_processor)
                 from pydantic_ai.agent import InstrumentationSettings
 
                 instrumentation_settings = InstrumentationSettings(
@@ -96,6 +95,9 @@ def get_pydantic_ai_patcher(
         def wrapped_instrument_all(instrument: Any = True) -> None:
             # If instrument is True (default), replace it with our instrumentation settings
             if instrument is True:
+                tracer_provider = trace_sdk.TracerProvider()
+                span_processor = SimpleSpanProcessor(PydanticAISpanExporter())
+                tracer_provider.add_span_processor(span_processor)
                 from pydantic_ai.agent import InstrumentationSettings
 
                 instrument = InstrumentationSettings(
