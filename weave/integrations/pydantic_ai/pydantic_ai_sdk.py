@@ -1,3 +1,12 @@
+"""
+PydanticAI integration patcher for Weave tracing.
+
+This module provides a patcher for the PydanticAI Agent class, enabling automatic
+instrumentation and OpenTelemetry tracing for PydanticAI calls. The patcher injects
+Weave's tracer provider and span exporter, ensuring that all agent runs and instrumented
+calls are traced and exported in a way compatible with Weave's trace server.
+"""
+
 from typing import Callable, Any
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -17,12 +26,17 @@ def get_pydantic_ai_patcher(
     """
     Get a patcher for PydanticAI integration.
 
+    This function returns a patcher that instruments the PydanticAI Agent class
+    to use Weave's OpenTelemetry tracer provider and span exporter. If integration
+    is disabled in the settings, a NoOpPatcher is returned.
+
     Args:
         settings: Optional integration settings to configure the patcher.
             If None, default settings will be used.
 
     Returns:
-        A patcher that can be used to patch and unpatch the PydanticAI integration.
+        MultiPatcher or NoOpPatcher: A patcher that can be used to patch and unpatch
+        the PydanticAI integration.
     """
     if settings is None:
         settings = IntegrationSettings()
@@ -34,18 +48,25 @@ def get_pydantic_ai_patcher(
     if _pydantic_ai_patcher is not None:
         return _pydantic_ai_patcher
 
-    # Create a tracer provider and span processor for PydanticAI
     tracer_provider = trace_sdk.TracerProvider()
     span_processor = SimpleSpanProcessor(PydanticAISpanExporter())
     tracer_provider.add_span_processor(span_processor)
 
-    # Create a wrapper function for Agent.__init__
-    def agent_init_wrapper(original_init: Callable) -> Callable:
+    def agent_init_wrapper(original_init: Callable[..., None]) -> Callable[..., None]:
+        """
+        Wrap the Agent.__init__ method to inject Weave's instrumentation settings.
+
+        Args:
+            original_init: The original __init__ method of the Agent class.
+
+        Returns:
+            Callable: The wrapped __init__ method.
+        """
+
         @wraps(original_init)
         def wrapped_init(self: Any, *args: Any, **kwargs: Any) -> None:
-            # Check if instrument is already set in kwargs
+            # Only inject instrumentation if not already provided
             if "instrument" not in kwargs or kwargs["instrument"] is None:
-                # Create instrumentation settings using our tracer provider
                 from pydantic_ai.agent import InstrumentationSettings
 
                 instrumentation_settings = InstrumentationSettings(
@@ -53,16 +74,25 @@ def get_pydantic_ai_patcher(
                     event_mode="attributes",
                 )
                 kwargs["instrument"] = instrumentation_settings
-
-            # Call the original __init__ method
             original_init(self, *args, **kwargs)
 
         return wrapped_init
 
-    # Create a wrapper function for Agent.instrument_all
-    def agent_instrument_all_wrapper(original_method: Callable) -> Callable:
+    def agent_instrument_all_wrapper(
+        original_method: Callable[..., None],
+    ) -> Callable[..., None]:
+        """
+        Wrap the Agent.instrument_all method to inject Weave's instrumentation settings.
+
+        Args:
+            original_method: The original instrument_all method of the Agent class.
+
+        Returns:
+            Callable: The wrapped instrument_all method.
+        """
+
         @wraps(original_method)
-        def wrapped_instrument_all(instrument=True) -> None:
+        def wrapped_instrument_all(instrument: Any = True) -> None:
             # If instrument is True (default), replace it with our instrumentation settings
             if instrument is True:
                 from pydantic_ai.agent import InstrumentationSettings
@@ -71,13 +101,11 @@ def get_pydantic_ai_patcher(
                     tracer_provider=tracer_provider,
                     event_mode="attributes",
                 )
-
-            # Call the original method
             original_method(instrument)
 
         return wrapped_instrument_all
 
-    # Create patchers for the Agent class
+    # Patch both __init__ and instrument_all of the Agent class
     _pydantic_ai_patcher = MultiPatcher(
         [
             SymbolPatcher(
