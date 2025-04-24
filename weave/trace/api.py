@@ -195,11 +195,24 @@ def ref(location: str) -> weave_client.ObjectRef:
 def get(uri: str) -> Any:
     """A convenience function for getting an object from a URI.
 
+    Many objects logged by Weave are automatically registered with the Weave
+    server. This function allows you to retrieve those objects by their URI.
+
     Args:
         uri: A fully-qualified weave ref URI.
 
     Returns:
         The object.
+
+    Example:
+
+    ```python
+    weave.init("weave_get_example")
+    dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
+    ref = weave.publish(dataset)
+
+    dataset2 = weave.get(ref.uri())  # same as dataset!
+    ```
     """
     return ref(uri).get()
 
