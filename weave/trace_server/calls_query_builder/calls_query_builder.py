@@ -770,11 +770,7 @@ class CallsQuery(BaseModel):
         # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
-        feedback_where_sql = ""
         if needs_feedback:
-            feedback_where_sql = (
-                f" AND calls_merged.project_id = {param_slot(project_param, 'String')}"
-            )
             feedback_join_sql = f"""
             LEFT JOIN feedback
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
@@ -811,7 +807,6 @@ class CallsQuery(BaseModel):
         {storage_size_sql}
         {total_storage_size_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
-        {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
