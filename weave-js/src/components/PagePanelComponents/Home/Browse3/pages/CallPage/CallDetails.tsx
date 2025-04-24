@@ -95,6 +95,7 @@ export const CallDetails: FC<{
     call.entity,
     call.project,
     {
+      traceId: call.traceId,
       parentIds: [call.callId],
     },
     undefined,
@@ -222,6 +223,7 @@ export const CallDetails: FC<{
               project={call.project}
               allowedColumnPatterns={ALLOWED_COLUMN_PATTERNS}
               paginationModel={isPeeking ? {page: 0, pageSize: 10} : undefined}
+              columnVisibilityModel={{CustomCheckbox: false}}
             />
           );
           if (isPeeking) {

@@ -122,6 +122,14 @@ describe('PointCloudFiltering', () => {
     const result = runApplyFilter({hideAllBoxes: true});
     expect(result).toEqual(expected);
   });
+  it('blocks all boxes except the ones that are manually shown', () => {
+    const expected = {...getTestData(), boxes: [Boxes.A]};
+    const result = runApplyFilter({
+      hideAllBoxes: true,
+      shownBoundingBoxLabels: ['First label'],
+    });
+    expect(result).toEqual(expected);
+  });
   describe('score', () => {
     it('ignores disabled filters', () => {
       const result = runApplyFilter({
