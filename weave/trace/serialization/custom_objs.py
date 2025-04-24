@@ -31,7 +31,6 @@ KNOWN_TYPES = {
     "datetime.datetime",
     "rich.markdown.Markdown",
     "moviepy.video.VideoClip.VideoClip",
-    "moviepy.video.VideoFileClip.VideoFileClip"
 }
 
 
