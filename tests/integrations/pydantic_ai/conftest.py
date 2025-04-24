@@ -8,7 +8,8 @@ with patched exporters to avoid real network calls during tests.
 """
 
 import contextlib
-from typing import Any, Callable, Generator, Optional
+from collections.abc import Generator
+from typing import Any, Callable, Optional
 from unittest.mock import patch
 
 import pytest
@@ -16,8 +17,8 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 from opentelemetry.proto.common.v1.common_pb2 import (
-    KeyValue,
     InstrumentationScope,
+    KeyValue,
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.trace.v1.trace_pb2 import (

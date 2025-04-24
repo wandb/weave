@@ -15,12 +15,12 @@ import pytest
 from opentelemetry.sdk.trace import Event, ReadableSpan, TracerProvider
 
 from weave.integrations.pydantic_ai.utils import (
+    PydanticAISpanExporter,
     dicts_to_events,
     handle_events,
-    map_events_to_prompt_completion,
-    handle_usage,
     handle_tool_call,
-    PydanticAISpanExporter,
+    handle_usage,
+    map_events_to_prompt_completion,
 )
 
 

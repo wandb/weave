@@ -7,11 +7,12 @@ Weave's tracer provider and span exporter, ensuring that all agent runs and inst
 calls are traced and exported in a way compatible with Weave's trace server.
 """
 
-from typing import Callable, Any
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 import importlib
 from functools import wraps
+from typing import Any, Callable
+
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter

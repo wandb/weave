@@ -153,6 +153,7 @@ def test_pydantic_ai_agent_patching(pydantic_ai_client_creator: Any) -> None:
     """
     with pydantic_ai_client_creator() as client:
         from pydantic_ai import Agent
+
         from weave.integrations.openai.openai_sdk import get_openai_patcher
 
         get_openai_patcher().undo_patch()

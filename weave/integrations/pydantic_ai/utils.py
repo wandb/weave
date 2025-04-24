@@ -10,7 +10,8 @@ with the OpenTelemetry SDK.
 import base64
 import json
 import os
-from typing import Sequence, Any
+from collections.abc import Sequence
+from typing import Any
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk import trace as trace_sdk
@@ -243,9 +244,7 @@ class PydanticAISpanExporter(SpanExporter):
         return self._otlp_exporter.export(spans)
 
     def shutdown(self) -> None:
-        """
-        Shut down the underlying OTLPSpanExporter.
-        """
+        """Shut down the underlying OTLPSpanExporter."""
         self._otlp_exporter.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
