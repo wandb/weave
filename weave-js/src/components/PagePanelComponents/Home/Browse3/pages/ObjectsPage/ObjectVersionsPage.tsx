@@ -8,15 +8,14 @@
  * [ ] Add the ability to sort / filter on expanded values (blocked by general support for expansion operations)
  * [ ] Add sort / filter state to URL
  */
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {Loading} from '../../../../../Loading';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {useShowDeleteButton} from '../common/DeleteModal';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
 import {DeleteObjectVersionsButtonWithModal} from './ObjectDeleteButtons';
