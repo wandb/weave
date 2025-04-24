@@ -339,78 +339,76 @@ class EvaluationLogger(BaseModel):
             scorers=[],
         )
 
-        if not self._eval_started:
-            self._eval_started = True
+        # The following section is a "hacky" way to create Model and Evaluation
+        # objects that "look right" to our object saving system.
 
-            # The following section is a "hacky" way to create Model and Evaluation
-            # objects that "look right" to our object saving system.
+        # --- Setup the model object ---
+        @weave.op(name="Model.predict", enable_code_capture=False)
+        def predict(self: Model, inputs: dict) -> Any:
+            # Get the output from the context variable
+            return current_output.get()
 
-            # --- Setup the model object ---
-            @weave.op(name="Model.predict", enable_code_capture=False)
-            def predict(self: Model, inputs: dict) -> Any:
-                # Get the output from the context variable
-                return current_output.get()
+        self.model.__dict__["predict"] = MethodType(predict, self.model)
 
-            self.model.__dict__["predict"] = MethodType(predict, self.model)
+        # --- Setup the evaluation object ---
+        @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
+        def evaluate(self: Evaluation, model: Model) -> None: ...
 
-            # --- Setup the evaluation object ---
-            @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
-            def evaluate(self: Evaluation, model: Model) -> None: ...
+        @weave.op(name="Evaluation.predict_and_score", enable_code_capture=False)
+        def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
+            predict_method = cast(Op, model.get_infer_method())
+            with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                output, predict_call = predict_method.call(model, example)
+                current_predict_call.set(predict_call)
 
-            @weave.op(name="Evaluation.predict_and_score", enable_code_capture=False)
-            def predict_and_score(
-                self: Evaluation, model: Model, example: dict
-            ) -> dict:
-                predict_method = cast(Op, model.get_infer_method())
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
-                    output, predict_call = predict_method.call(model, example)
-                    current_predict_call.set(predict_call)
+            # This data is just a placeholder to give a sense of the data shape.
+            # The actual output is explicitly replaced in ScoreLogger.finish.
+            return {
+                "output": output,
+                "scores": {},
+                "model_latency": None,
+            }
 
-                # This data is just a placeholder to give a sense of the data shape.
-                # The actual output is explicitly replaced in ScoreLogger.finish.
-                return {
-                    "output": output,
-                    "scores": {},
-                    "model_latency": None,
-                }
+        @weave.op(name="Evaluation.summarize", enable_code_capture=False)
+        def summarize(self: Evaluation) -> dict:
+            return cast(dict, current_summary.get())
 
-            @weave.op(name="Evaluation.summarize", enable_code_capture=False)
-            def summarize(self: Evaluation) -> dict:
-                return cast(dict, current_summary.get())
+        self._pseudo_evaluation.__dict__.update(
+            {
+                "evaluate": MethodType(evaluate, self._pseudo_evaluation),
+                "predict_and_score": MethodType(
+                    predict_and_score, self._pseudo_evaluation
+                ),
+                "summarize": MethodType(summarize, self._pseudo_evaluation),
+            }
+        )
 
-            self._pseudo_evaluation.__dict__.update(
-                {
-                    "evaluate": MethodType(evaluate, self._pseudo_evaluation),
-                    "predict_and_score": MethodType(
-                        predict_and_score, self._pseudo_evaluation
-                    ),
-                    "summarize": MethodType(summarize, self._pseudo_evaluation),
-                }
-            )
-
-            # Create the evaluation call
-            wc = require_weave_client()
-            self._evaluate_call = wc.create_call(
-                display_name=default_evaluation_display_name,
-                op=self._pseudo_evaluation.evaluate,
-                inputs={
-                    "self": self._pseudo_evaluation,
-                    "model": self.model,
-                },
-                attributes=IMPERATIVE_EVAL_MARKER,
-            )
-            assert self._evaluate_call is not None
-            call_context.push_call(self._evaluate_call)
+        # Create the evaluation call
+        wc = require_weave_client()
+        self._evaluate_call = wc.create_call(
+            display_name=default_evaluation_display_name,
+            op=self._pseudo_evaluation.evaluate,
+            inputs={
+                "self": self._pseudo_evaluation,
+                "model": self.model,
+            },
+            attributes=IMPERATIVE_EVAL_MARKER,
+        )
+        assert self._evaluate_call is not None
+        call_context.push_call(self._evaluate_call)
 
     def _cleanup_predictions(self) -> None:
-        if self._eval_started and not self._is_finalized:
-            for pred in self._accumulated_predictions:
-                if not pred._has_finished:
-                    try:
-                        pred.finish()
-                    except Exception:
-                        # This is best effort.  If we fail, just swallow the error.
-                        pass
+        if self._is_finalized:
+            return
+
+        for pred in self._accumulated_predictions:
+            if pred._has_finished:
+                continue
+            try:
+                pred.finish()
+            except Exception:
+                # This is best effort.  If we fail, just swallow the error.
+                pass
 
     def _finalize_evaluation(self, output: Any = None) -> None:
         """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
