@@ -23,6 +23,14 @@ The imperative approach described on this page offers more flexibility for compl
 
 ## Example
 
+The following example shows how to use `ImperativeEvaluationLogger` to log predictions and scores inline with your existing Python code.
+
+The `user_model` model function is defined and applied to a list of inputs. For each example:
+- The input and output are logged using `log_prediction`.
+- A simple correctness score (`correctness_score`) is logged via `log_score`.
+- `finish()` finalizes logging for that prediction.
+
+Finally, `log_summary` records any aggregate metrics and triggers automatic score summarization in Weave.
 ```python
 import weave
 from openai import OpenAI
