@@ -941,7 +941,8 @@ const populatePredictionsAndScoresImperative = (
             };
             const metricId = metricDefinitionId(metricDef);
 
-            // Store the binary metric ID in summary.scoreMetrics - very important to ensure it gets included in the composite metrics map
+            // Store the binary metric ID in summary.scoreMetrics
+            // very important to ensure it gets included in the composite metrics map
             summaryData.scoreMetrics[metricId] = metricDef;
 
             predictAndScoreEntry.scoreMetrics[metricId] = {
@@ -1078,15 +1079,13 @@ const populatePredictionsAndScoresNonImperative = (
               const modelLatencyMetricId = metricDefinitionId(
                 modelLatencyMetricDimension
               );
-              const latency =
-                (convertISOToDate(
-                  traceCall.ended_at ?? traceCall.started_at
-                ).getTime() -
-                  convertISOToDate(traceCall.started_at).getTime()) /
-                1000;
-
               predictAndScoreFinal.scoreMetrics[modelLatencyMetricId] = {
-                value: latency,
+                value:
+                  (convertISOToDate(
+                    traceCall.ended_at ?? traceCall.started_at
+                  ).getTime() -
+                    convertISOToDate(traceCall.started_at).getTime()) /
+                  1000,
                 sourceCallId: traceCall.id,
               };
 
@@ -1138,13 +1137,6 @@ const populatePredictionsAndScoresNonImperative = (
                     sourceCallId: traceCall.id,
                     value: scoreVal,
                   };
-
-                  // Add to scores structure for direct access by ExampleCompareSection
-                  if (!digestCollection.scores![metricId]) {
-                    digestCollection.scores![metricId] = {};
-                  }
-                  digestCollection.scores![metricId][evaluationCallId] =
-                    scoreVal;
                 } else if (
                   scoreVal != null &&
                   typeof scoreVal === 'object' &&
