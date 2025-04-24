@@ -3279,7 +3279,7 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[7] == uuidv7_calls[3].id
 
 
-def test_calls_query_filter_by_root_refs(client):
+def test_calls_query_filter_by_root_refs(client, clickhouse_client):
     @weave.op()
     def root_op(x: int):
         return {"n": x, "child": child_op(x)}
@@ -3296,6 +3296,19 @@ def test_calls_query_filter_by_root_refs(client):
     root_op(2)
 
     client.flush()
+
+    out = clickhouse_client.query("""
+    SELECT id, started_at, ended_at, inputs_dump, output_dump
+    FROM calls_merged
+    """)
+    from pprint import pprint
+
+    for row in out.result_rows:
+        pprint(dict(zip(out.column_names, row)))
+
+    # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) == 6
 
     # basic trace roots only filter
     calls = client.get_calls(filter={"trace_roots_only": True})
