@@ -32,4 +32,5 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'EvaluationResults',
   'Provider',
   'ProviderModel',
+  'Monitor',
 ] as const;

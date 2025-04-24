@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import * as Tabs from '@wandb/weave/components/Tabs';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -33,6 +34,7 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Tailwind} from '../../Tailwind';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -77,6 +79,7 @@ import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
+import {MonitorsPage} from './Browse3/pages/MonitorsPage/MonitorsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
 import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
@@ -444,8 +447,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
+        <Route path={`${projectRoot}/:tab(traces|calls)`}>
           <CallsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/evaluations/:tab(evals|monitors)`}>
+          <EvaluationsPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
@@ -755,6 +761,56 @@ const CallPageBinding = () => {
       setShowFeedback={setShowFeedback}
     />
   );
+};
+
+const EvaluationsPageBinding = () => {
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  const tabs: Record<string, {label: string; content: React.ReactNode}> = {
+    evals: {
+      label: 'Evals',
+      content: <CallsPageBinding />,
+    },
+    monitors: {
+      label: 'Monitors',
+      content: <MonitorsPageBinding />,
+    },
+  };
+
+  const history = useHistory();
+
+  const navigateToTab = useCallback(
+    (clickedTab: string) => {
+      history.push(`/${entity}/${project}/weave/evaluations/${clickedTab}`);
+    },
+    [entity, project, history]
+  );
+
+  return (
+    <>
+      <Tabs.Root
+        value={tab}
+        onValueChange={navigateToTab}
+        className="mx-16 mt-12">
+        <Tabs.List className="border-b-0">
+          {Object.entries(tabs).map(([key, tab]) => (
+            <Tabs.Trigger value={key} className="border-b-4 text-lg" key={key}>
+              {tab.label}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+      </Tabs.Root>
+      <Tailwind>
+        <Box className="pt-8">
+          <ErrorBoundary>{tabs[tab].content}</ErrorBoundary>
+        </Box>
+      </Tailwind>
+    </>
+  );
+};
+
+const MonitorsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <MonitorsPage entity={entity} project={project} />;
 };
 
 // TODO(tim/weaveflow_improved_nav): Generalize this

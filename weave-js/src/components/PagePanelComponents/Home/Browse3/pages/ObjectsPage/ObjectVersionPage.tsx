@@ -35,6 +35,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
+import {MonitorPage} from '../MonitorsPage/MonitorPage';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -70,8 +71,9 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   SavedView: 'view-glasses',
   Provider: 'model',
   ProviderModel: 'model',
+  Monitor: 'job-automation',
 };
-const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
+export const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
     const iconName = OBJECT_ICONS[baseObjectClass];
     return (
@@ -117,6 +119,10 @@ export const ObjectVersionPage: React.FC<{
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
   }
+  if (objectVersion.result.baseObjectClass === 'Monitor') {
+    return <MonitorPage {...props} />;
+  }
+
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
   );

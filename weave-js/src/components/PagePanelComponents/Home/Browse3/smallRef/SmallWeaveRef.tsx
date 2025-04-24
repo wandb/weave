@@ -15,6 +15,7 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
 import {useWFHooks} from '../pages/wfReactInterface/context';
+import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRefLoaded} from './SmallRefLoaded';
 
 export const objectRefDisplayName = (
@@ -66,9 +67,10 @@ const ICON_MAP: Record<string, IconName> = {
   Op: IconNames.JobProgramCode,
   Prompt: IconNames.ForumChatBubble,
   Scorer: IconNames.TypeNumberAlt,
+  Monitor: IconNames.JobAutomation,
 };
 
-const getObjectVersionLabel = (
+export const getObjectVersionLabel = (
   objRef: ObjectRef,
   versionIndex: number
 ): string => {
@@ -141,6 +143,54 @@ export const SmallWeaveRef = ({
       <SmallRefLoaded
         icon={icon}
         label={label}
+        url={url}
+        error={error}
+        noLink={noLink}
+      />
+    </TailwindContents>
+  );
+};
+
+export const SmallObjectVersionsRef = ({
+  objRef,
+  iconOnly,
+  noLink,
+}: SmallWeaveRefProps) => {
+  const {useRootObjectVersions} = useWFHooks();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const objectVersions = useRootObjectVersions(
+    objRef.entityName,
+    objRef.projectName,
+    {objectIds: [objRef.artifactName]}
+  );
+
+  const error =
+    objectVersions?.error ??
+    (objectVersions.result?.length === 0 ? new Error('Not found') : null);
+  if (objectVersions.loading && !error) {
+    return <LoadingDots />;
+  }
+
+  const objVersion = objectVersions.result?.[0] ?? {
+    baseObjectClass: undefined,
+    versionIndex: -1,
+  };
+  const baseObjectClass =
+    objVersion.baseObjectClass as KnownBaseObjectClassType;
+  const rootTypeName = baseObjectClass ?? 'Object';
+
+  const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
+
+  const url = peekingRouter.objectVersionsUIUrl(
+    objRef.entityName,
+    objRef.projectName,
+    {baseObjectClass, objectName: objRef.artifactName}
+  );
+  return (
+    <TailwindContents>
+      <SmallRefLoaded
+        icon={icon}
+        label={objRef.artifactName}
         url={url}
         error={error}
         noLink={noLink}

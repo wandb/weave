@@ -168,6 +168,10 @@ export const FilterBar = ({
     value: 'id',
     label: 'Call ID',
   });
+  (options[0] as GroupedOption).options.push({
+    value: 'feedback.[*].trigger_ref',
+    label: 'Monitored',
+  });
 
   const onRemoveAll = () => {
     const emptyModel = {items: []};

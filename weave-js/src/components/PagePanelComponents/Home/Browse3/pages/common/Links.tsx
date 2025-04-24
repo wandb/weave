@@ -163,9 +163,6 @@ export const ObjectVersionLink: React.FC<{
   hideVersionSuffix?: boolean;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  // const text = props.hideName
-  //   ? props.version
-  //   : props.objectName + ': ' + truncateID(props.version);
   const text = props.hideVersionSuffix
     ? props.objectName
     : objectVersionText(props.objectName, props.versionIndex);

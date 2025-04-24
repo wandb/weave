@@ -168,7 +168,11 @@ export const useProjectSidebar = (
           {
             type: 'button' as const,
             name: 'Evals',
-            slug: 'weave/evaluations',
+            slug: 'weave/evaluations/evals',
+            additionalSlugs: [
+              'weave/evaluations/monitors',
+              'weave/evaluations',
+            ],
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
           },

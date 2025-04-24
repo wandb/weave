@@ -52,6 +52,7 @@ export const FIELD_LABELS: Record<string, string> = {
   'summary.weave.status': 'Status',
   started_at: 'Called',
   wb_user_id: 'User',
+  'feedback.[*].trigger_ref': 'Monitored',
 };
 
 export const getFieldLabel = (field: string): string => {
@@ -79,6 +80,7 @@ export const FIELD_TYPE: Record<string, string> = {
   'summary.weave.status': 'status',
   wb_user_id: 'user',
   started_at: 'datetime',
+  'feedback.[*].trigger_ref': 'monitor',
 };
 
 export const getFieldType = (field: string): string => {
@@ -299,6 +301,15 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
+      },
+    ];
+  }
+  if ('monitor' === fieldType) {
+    return [
+      {
+        value: '(string): by',
+        label: 'by',
         group: 'string',
       },
     ];
