@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import atexit
 import logging
 from collections.abc import Callable, Iterator
@@ -213,18 +212,24 @@ class ScoreLogger(BaseModel):
 
     def log_score(self, scorer: Scorer | dict | str, score: ScoreType) -> None:
         """Log a score synchronously."""
+        import asyncio
+
+        # When in an active asyncio test environment (like pytest.mark.asyncio),
+        # we need special handling to avoid "already running" errors
         try:
-            # Get event loop or create one
-            try:
-                loop = asyncio.get_running_loop()
-                # If in an event loop, run the coroutine to completion
-                loop.run_until_complete(self.alog_score(scorer, score))
-            except RuntimeError:
-                # No running loop, use asyncio.run()
-                asyncio.run(self.alog_score(scorer, score))
-        except Exception as e:
-            # Ensure exceptions are propagated
-            raise e
+            loop = asyncio.get_running_loop()
+            if asyncio.current_task() is not None:
+                # We're in an async context, just run the coroutine synchronously
+                import nest_asyncio
+
+                nest_asyncio.apply()
+                return loop.run_until_complete(self.alog_score(scorer, score))
+            else:
+                # We're not in an async context, but a loop exists
+                return loop.run_until_complete(self.alog_score(scorer, score))
+        except RuntimeError:
+            # No event loop exists, create one with asyncio.run
+            return asyncio.run(self.alog_score(scorer, score))
 
     @validate_call
     async def alog_score(

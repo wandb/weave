@@ -376,9 +376,9 @@ def scorer(request):
     "scorer",
     [
         "string",
-        # "dict",
-        # "weave-scorer",
-        # "weave-scorer-async",
+        "dict",
+        "weave-scorer",
+        "weave-scorer-async",
     ],
     indirect=True,
 )
@@ -395,7 +395,7 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
         for inputs in your_dataset:
             output = inputs["a"] + inputs["b"]
             pred = ev.log_prediction(inputs=inputs, output=output)
-            pred.alog_score(scorer=scorer, score=0.5)
+            pred.log_score(scorer=scorer, score=0.5)
         ev.log_summary({"gpus_melted": 8})
 
     async def do_async_eval():
@@ -406,19 +406,23 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer):
             await pred.alog_score(scorer=scorer, score=0.5)
         ev.log_summary({"gpus_melted": 8})
 
-    # do_sync_eval()
-    # client.flush()
-    # calls = client.get_calls()
-    # assert len(calls) == 8  # 1 Evaluation.evaluate, 1 Evaluation.predict_and_score, 3 predict, 1 * 3 scores, 1 summary
-
-    await do_async_eval()
-    client.flush()
-    calls = list(client.get_calls())
-    print(f"{calls=}")
-    assert len(calls) == (
+    total_calls = (
         1  # Evaluation.evaluate
-        + 1  # Evaluation.predict_and_score
+        + 3  # Evaluation.predict_and_score
         + 3  # Model.predict
         + 3  # Scorer.score
         + 1  # Evaluation.summarize
     )
+    do_sync_eval()
+    client.flush()
+    calls = list(client.get_calls())
+    for call in calls:
+        print(call.op_name)
+    assert len(calls) == total_calls
+
+    await do_async_eval()
+    client.flush()
+    calls = list(client.get_calls())
+    for call in calls:
+        print(call.op_name)
+    assert len(calls) == total_calls * 2  # including the previous one
