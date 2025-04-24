@@ -387,6 +387,10 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
           let strVal: string;
           if (typeof value !== 'string') {
             strVal = JSON.stringify(value);
