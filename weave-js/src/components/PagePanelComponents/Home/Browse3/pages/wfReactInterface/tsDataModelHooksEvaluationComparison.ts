@@ -89,7 +89,6 @@ import {
   getScoreKeyNameFromScorerRef,
   metricDefinitionId,
 } from '../CompareEvaluationsPage/ecpUtil';
-import {PivotedRow} from '../CompareEvaluationsPage/sections/ExampleCompareSection/exampleCompareSectionUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
@@ -843,7 +842,6 @@ const populatePredictionsAndScoresImperative = (
         result.resultRows[digest] = {
           evaluations: {},
           // Store the original input data directly in the resultRows
-          // Make sure we store the entire example so it can be properly parsed
           rawDataRow: example,
           scores: {},
           originalRows: [],
@@ -911,14 +909,6 @@ const populatePredictionsAndScoresImperative = (
             value: duration,
             sourceCallId: predictCalls[0].id,
           };
-
-          // Add to scores structure
-          if (!result.resultRows[digest].scores![modelLatencyMetricId]) {
-            result.resultRows[digest].scores![modelLatencyMetricId] = {};
-          }
-          result.resultRows[digest].scores![modelLatencyMetricId][
-            evaluationCallId
-          ] = duration;
         }
 
         // Add token metrics
@@ -935,14 +925,6 @@ const populatePredictionsAndScoresImperative = (
           value: totalTokens,
           sourceCallId: predictCalls[0].id,
         };
-
-        // Add to scores structure
-        if (!result.resultRows[digest].scores![totalTokensMetricId]) {
-          result.resultRows[digest].scores![totalTokensMetricId] = {};
-        }
-        result.resultRows[digest].scores![totalTokensMetricId][
-          evaluationCallId
-        ] = totalTokens;
       }
 
       // Find and add score calls
@@ -975,13 +957,6 @@ const populatePredictionsAndScoresImperative = (
               sourceCallId: scoreCall.id,
               value: output,
             };
-
-            // Add to scores structure for direct access by ExampleCompareSection
-            if (!result.resultRows[digest].scores![metricId]) {
-              result.resultRows[digest].scores![metricId] = {};
-            }
-            result.resultRows[digest].scores![metricId][evaluationCallId] =
-              output;
           } else if (typeof output === 'number') {
             // Similar update for continuous metrics
             const metricDef: MetricDefinition = {
@@ -1026,31 +1001,31 @@ const populatePredictionsAndScoresImperative = (
       ] = predictAndScoreEntry;
 
       // Create a PivotedRow and add it to originalRows
-      const pivotedRow: PivotedRow = {
-        id: predictAndScoreEntry.callId,
-        evaluationCallId,
-        inputDigest: digest,
-        inputRef: example,
-        path: [digest, evaluationCallId, predictAndScoreEntry.callId],
-        predictAndScore: predictAndScoreEntry,
-        scores: result.resultRows[digest].scores!,
-        output: {},
-      };
+      // const pivotedRow: PivotedRow = {
+      //   id: predictAndScoreEntry.callId,
+      //   evaluationCallId,
+      //   inputDigest: digest,
+      //   inputRef: example,
+      //   path: [digest, evaluationCallId, predictAndScoreEntry.callId],
+      //   predictAndScore: predictAndScoreEntry,
+      //   scores: result.resultRows[digest].scores!,
+      //   output: {},
+      // };
 
       // Add the output data
-      if (predictCalls.length > 0 && predictCalls[0].output) {
-        // For each output property, store it in a format accessible by the UI
-        const outputData = predictCalls[0].output;
-        Object.entries(outputData).forEach(([key, value]) => {
-          if (!pivotedRow.output[`output.${key}`]) {
-            pivotedRow.output[`output.${key}`] = {};
-          }
-          pivotedRow.output[`output.${key}`][evaluationCallId] = value;
-        });
-      }
+      // if (predictCalls.length > 0 && predictCalls[0].output) {
+      //   // For each output property, store it in a format accessible by the UI
+      //   const outputData = predictCalls[0].output;
+      //   Object.entries(outputData).forEach(([key, value]) => {
+      //     if (!pivotedRow.output[`output.${key}`]) {
+      //       pivotedRow.output[`output.${key}`] = {};
+      //     }
+      //     pivotedRow.output[`output.${key}`][evaluationCallId] = value;
+      //   });
+      // }
 
       // Add this pivoted row to originalRows
-      result.resultRows[digest].originalRows!.push(pivotedRow);
+      // result.resultRows[digest].originalRows!.push(pivotedRow);
     } catch (e) {
       console.warn('Error processing imperative evaluation:', e);
     }
@@ -1266,39 +1241,39 @@ const populatePredictionsAndScoresNonImperative = (
 
             // Create PivotedRow objects for the trial and add to originalRows
             // Make sure this is only added once
-            const existingRows =
-              digestCollection.originalRows?.filter(
-                row =>
-                  row.evaluationCallId === evaluationCallId &&
-                  row.predictAndScore.callId === parentPredictAndScore.id
-              ) || [];
+            // const existingRows =
+            //   digestCollection.originalRows?.filter(
+            //     row =>
+            //       row.evaluationCallId === evaluationCallId &&
+            //       row.predictAndScore.callId === parentPredictAndScore.id
+            //   ) || [];
 
-            if (existingRows.length === 0) {
-              // Create a PivotedRow and add it to originalRows
-              const pivotedRow: PivotedRow = {
-                id: parentPredictAndScore.id,
-                evaluationCallId,
-                inputDigest: rowDigest,
-                inputRef: exampleRef,
-                path: [rowDigest, evaluationCallId, parentPredictAndScore.id],
-                predictAndScore: predictAndScoreFinal,
-                scores: digestCollection.scores!,
-                output: {},
-              };
+            // if (existingRows.length === 0) {
+            //   // Create a PivotedRow and add it to originalRows
+            //   const pivotedRow: PivotedRow = {
+            //     id: parentPredictAndScore.id,
+            //     evaluationCallId,
+            //     inputDigest: rowDigest,
+            //     inputRef: exampleRef,
+            //     path: [rowDigest, evaluationCallId, parentPredictAndScore.id],
+            //     predictAndScore: predictAndScoreFinal,
+            //     scores: digestCollection.scores!,
+            //     output: {},
+            //   };
 
-              // Add the output data if it's a predict call with output
-              if (isProbablyPredictCall && traceCall.output) {
-                const outputData = traceCall.output;
-                Object.entries(outputData).forEach(([key, value]) => {
-                  if (!pivotedRow.output[`output.${key}`]) {
-                    pivotedRow.output[`output.${key}`] = {};
-                  }
-                  pivotedRow.output[`output.${key}`][evaluationCallId] = value;
-                });
-              }
+            //   // Add the output data if it's a predict call with output
+            //   if (isProbablyPredictCall && traceCall.output) {
+            //     const outputData = traceCall.output;
+            //     Object.entries(outputData).forEach(([key, value]) => {
+            //       if (!pivotedRow.output[`output.${key}`]) {
+            //         pivotedRow.output[`output.${key}`] = {};
+            //       }
+            //       pivotedRow.output[`output.${key}`][evaluationCallId] = value;
+            //     });
+            //   }
 
-              digestCollection.originalRows!.push(pivotedRow);
-            }
+            //   digestCollection.originalRows!.push(pivotedRow);
+            // }
           }
         }
       }
