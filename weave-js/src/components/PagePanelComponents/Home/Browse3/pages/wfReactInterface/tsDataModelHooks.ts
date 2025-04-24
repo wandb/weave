@@ -166,14 +166,27 @@ const useMakeTraceServerEndpoint = <
 
 const useCall = (
   key: CallKey | null,
-  opts?: {includeCosts?: boolean}
+  opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? callCache.get(key) : null;
+
+  const effectiveKey = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return {
+      ...key,
+      withCosts: !!opts?.includeCosts,
+      withTotalStorageSize: !!opts?.includeTotalStorageSize,
+    };
+  }, [key, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const deepKey = useDeepMemo(effectiveKey);
+
+  const cachedCall = deepKey ? callCache.get(deepKey) : null;
+
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
       loadingRef.current = true;
@@ -183,13 +196,16 @@ const useCall = (
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
           include_costs: opts?.includeCosts,
+          ...(opts?.includeTotalStorageSize
+            ? {include_total_storage_size: true}
+            : null),
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient, opts?.includeCosts]);
+  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]);
 
   useEffect(() => {
     doFetch();
@@ -200,7 +216,7 @@ const useCall = (
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (deepKey == null) {
       return {
         loading: false,
         result: null,
@@ -221,9 +237,14 @@ const useCall = (
         loading: true,
         result: null,
       };
-    } else if (result?.callId === key?.callId) {
+    } else if (result == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } else if (result?.callId === deepKey?.callId) {
       if (result) {
-        callCache.set(key, result);
+        callCache.set(deepKey, result);
       }
       return {
         loading: false,
@@ -236,7 +257,7 @@ const useCall = (
         result: null,
       };
     }
-  }, [cachedCall, callRes, key]);
+  }, [cachedCall, callRes, deepKey]);
 };
 
 const useCallsNoExpansion = (

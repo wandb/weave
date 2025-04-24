@@ -13,9 +13,12 @@ export type PlaygroundState = {
   trackLLMCall: boolean;
   loading: boolean;
   model: LLMMaxTokensKey;
-  baseModel: LLMMaxTokensKey | null;
   selectedChoiceIndex: number;
   maxTokensLimit: number;
+  savedModel: {
+    name: string | null;
+    savedModelParams: OptionalSavedPlaygroundModelParams | null;
+  };
 } & PlaygroundModelParams;
 
 export type PlaygroundModelParams = {

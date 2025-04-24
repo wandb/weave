@@ -387,6 +387,7 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+          const strVal = JSON.stringify(value);
 
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
@@ -394,7 +395,7 @@ export const CallsTable: FC<{
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === JSON.stringify(value)
+              JSON.stringify(item.value) === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
@@ -415,7 +416,7 @@ export const CallsTable: FC<{
             const newItems = [...filterModel.items];
             newItems[existingFieldOpMatchIndex] = {
               ...newItems[existingFieldOpMatchIndex],
-              value,
+              value: strVal,
             };
             setFilterModel({
               ...filterModel,
@@ -433,7 +434,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value,
+                value: strVal,
               },
             ],
           };
@@ -867,13 +868,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCallIds={selectedCalls}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton

@@ -13,6 +13,7 @@ import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
 import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {
   OptionalSavedPlaygroundModelParams,
@@ -37,10 +38,13 @@ type PlaygroundChatTopBarProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
   isTeamAdmin: boolean;
-  allOptions: ProviderOption[];
-  overallLoading: boolean;
-  refetch: () => void;
-  customProvidersResult: Provider[];
+  refetchConfiguredProviders: () => void;
+  refetchCustomLLMs: () => void;
+  llmDropdownOptions: ProviderOption[];
+  areProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
+  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[];
+  savedModelsLoading: boolean;
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -60,10 +64,13 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   playgroundStates,
   setPlaygroundStates,
   isTeamAdmin,
-  allOptions,
-  overallLoading,
-  refetch,
+  refetchConfiguredProviders,
+  refetchCustomLLMs,
+  llmDropdownOptions,
+  areProvidersLoading,
   customProvidersResult,
+  savedModelsResult,
+  savedModelsLoading,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -93,9 +100,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   const handleModelChange = (
     index: number,
     model: LLMMaxTokensKey,
-    maxTokens: number,
-    baseModel: LLMMaxTokensKey | null,
-    params: OptionalSavedPlaygroundModelParams
+    maxTokens: number
   ) => {
     setPlaygroundStates(
       playgroundStates.map((state, i) => {
@@ -103,25 +108,26 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           return {
             ...state,
             model,
-            baseModel,
             maxTokensLimit: maxTokens,
             maxTokens: Math.floor(maxTokens / 2),
-            traceCall: {
-              ...state.traceCall,
-              inputs: {
-                ...state.traceCall?.inputs,
-                messages:
-                  params.messagesTemplate || state.traceCall?.inputs?.messages,
-              },
-              // If we have a messagesTemplate(ie prompt), we need to clear the output
-              output: {
-                ...(state.traceCall?.output as TraceCallOutput),
-                choices: params.messagesTemplate
-                  ? []
-                  : (state.traceCall?.output as TraceCallOutput)?.choices,
-              },
-            },
-            ...params,
+          };
+        }
+        return state;
+      })
+    );
+  };
+
+  const handleSavedModelChange = (
+    index: number,
+    model: string,
+    params: OptionalSavedPlaygroundModelParams
+  ) => {
+    setPlaygroundStates(
+      playgroundStates.map((state, i) => {
+        if (i === index) {
+          return {
+            ...state,
+            savedModel: {name: model, savedModelParams: params},
           };
         }
         return state;
@@ -167,23 +173,24 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           backgroundColor: 'transparent',
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
+        <SavedModelDropdown
+          value={playgroundStates[idx].savedModel.name}
+          onChange={(model, params) =>
+            handleSavedModelChange(idx, model, params)
+          }
+        />
         <LLMDropdown
           value={playgroundStates[idx].model}
-          onChange={(model, maxTokens, baseModel, params) =>
-            handleModelChange(
-              idx,
-              model as LLMMaxTokensKey,
-              maxTokens,
-              baseModel,
-              params
-            )
+          onChange={(model, maxTokens) =>
+            handleModelChange(idx, model as LLMMaxTokensKey, maxTokens)
           }
           entity={entity}
           project={project}
           isTeamAdmin={isTeamAdmin}
-          allOptions={allOptions}
-          overallLoading={overallLoading}
-          refetch={refetch}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          refetchCustomLLMs={refetchCustomLLMs}
+          llmDropdownOptions={llmDropdownOptions}
+          areProvidersLoading={areProvidersLoading}
           customProvidersResult={customProvidersResult}
         />
         {playgroundStates[idx].traceCall?.id && (
@@ -257,4 +264,11 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
       />
     </Box>
   );
+};
+
+const SavedModelDropdown: React.FC<{
+  value: string | null;
+  onChange: (model: string, params: OptionalSavedPlaygroundModelParams) => void;
+}> = ({value, onChange}) => {
+  return <div>SavedModelDropdown</div>;
 };

@@ -16,8 +16,14 @@ import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
 import {Link} from '../../common/Links';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {OptionalSavedPlaygroundModelParams} from '../types';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
+import {
+  LLM_MAX_TOKENS,
+  LLM_PROVIDER_LABELS,
+  LLMMaxTokensKey,
+} from '../llmMaxTokens';
+
 export interface LLMOption {
   label: string;
   value: LLMMaxTokensKey | string;
@@ -25,6 +31,8 @@ export interface LLMOption {
   baseModelId?: LLMMaxTokensKey | null;
   defaultParams?: OptionalSavedPlaygroundModelParams;
 }
+
+import {ProviderStatus} from '../useConfiguredProviders';
 
 export interface ProviderOption {
   label: string | React.ReactNode;
@@ -34,12 +42,7 @@ export interface ProviderOption {
 }
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
-  onChange: (
-    value: LLMMaxTokensKey,
-    maxTokens: number,
-    baseModel: LLMMaxTokensKey | null,
-    params: OptionalSavedPlaygroundModelParams
-  ) => void;
+  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
   entity: string;
   project: string;
   isAdmin?: boolean;
@@ -98,12 +101,7 @@ const SubMenu = ({
   onSelect,
 }: {
   llms: Array<LLMOption>;
-  onChange: (
-    value: LLMMaxTokensKey,
-    maxTokens: number,
-    baseModel: LLMMaxTokensKey | null,
-    params: OptionalSavedPlaygroundModelParams
-  ) => void;
+  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
   position: {top: number; left: number};
   onSelect: () => void;
 }) => {
@@ -121,6 +119,7 @@ const SubMenu = ({
         overflowY: 'auto',
         border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
         p: '6px',
+        zIndex: 1,
       }}>
       {llms.map((llm, index) => (
         <Box
@@ -128,12 +127,7 @@ const SubMenu = ({
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
-            onChange(
-              llm.value as LLMMaxTokensKey,
-              llm.max_tokens,
-              llm.baseModelId as LLMMaxTokensKey | null,
-              llm.defaultParams ?? ({} as OptionalSavedPlaygroundModelParams)
-            );
+            onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
             onSelect();
           }}
           sx={{
@@ -339,13 +333,7 @@ export const CustomOption = ({
             <Box
               key={llm.value}
               onClick={() => {
-                onChange(
-                  llm.value as LLMMaxTokensKey,
-                  llm.max_tokens,
-                  llm.baseModelId as LLMMaxTokensKey | null,
-                  llm.defaultParams ??
-                    ({} as OptionalSavedPlaygroundModelParams)
-                );
+                onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
                 props.selectProps.onInputChange?.('', {
                   action: 'set-value',
                   prevInputValue: props.selectProps.inputValue,
@@ -401,4 +389,89 @@ export const addProviderOption: ProviderOption = {
   ),
   value: 'add-provider',
   llms: [],
+};
+
+export const getLLMDropdownOptions = (
+  configuredProviders: Record<string, ProviderStatus>,
+  configuredProvidersLoading: boolean,
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],
+  customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[],
+  customLoading: boolean
+) => {
+  const options: ProviderOption[] = [];
+  const disabledOptions: ProviderOption[] = [];
+
+  if (configuredProvidersLoading) {
+    options.push({
+      label: 'Loading providers...',
+      value: 'loading',
+      llms: [],
+    });
+  } else {
+    Object.entries(configuredProviders).forEach(([provider, {status}]) => {
+      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
+        .filter(([_, config]) => config.provider === provider)
+        .map(([llmKey]) => ({
+          label: llmKey,
+          value: llmKey as LLMMaxTokensKey,
+          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+        }));
+
+      const option = {
+        label:
+          LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
+        value: provider,
+        llms: status ? providerLLMs : [],
+        isDisabled: !status,
+      };
+
+      if (!status) {
+        disabledOptions.push(option);
+      } else {
+        options.push(option);
+      }
+    });
+  }
+
+  // Add custom providers
+  if (!customLoading) {
+    customProvidersResult?.forEach(provider => {
+      const providerName = provider.val.name || '';
+      const currentProviderModels =
+        customProviderModelsResult?.filter(
+          obj => obj.val.provider === provider.digest
+        ) || [];
+
+      const shortenedProviderLabel =
+        providerName.length > 20
+          ? providerName.slice(0, 2) + '...' + providerName.slice(-4)
+          : providerName;
+
+      const llmOptions = currentProviderModels.map(model => ({
+        label: shortenedProviderLabel + '/' + model.val.name,
+        value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
+        max_tokens: model.val.max_tokens,
+      }));
+
+      if (llmOptions.length > 0) {
+        options.push({
+          label: providerName,
+          value: providerName,
+          llms: llmOptions,
+        });
+      }
+    });
+  }
+
+  // Combine enabled and disabled options
+  // Add a divider option before the add provider option
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allOptions = [
+    ...options,
+    ...disabledOptions,
+    dividerOption,
+    addProviderOption,
+  ];
+
+  return allOptions;
 };

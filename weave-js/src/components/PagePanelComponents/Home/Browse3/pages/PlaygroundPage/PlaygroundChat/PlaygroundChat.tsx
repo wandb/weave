@@ -13,12 +13,12 @@ import {
   EMPTY_PROPS_NO_LLM_PROVIDERS,
   EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
 } from '../../common/EmptyContent';
-import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
-import {ProviderOption} from './LLMDropdownOptions';
+import {getLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -82,13 +82,15 @@ export type PlaygroundChatProps = {
   setSettingsTab: (callIndex: number | null) => void;
   settingsTab: number | null;
   isOpenInPlayground?: boolean;
-  allOptions: ProviderOption[];
-  overallLoading: boolean;
-  refetch: () => void;
-  configuredProviders: Record<string, ProviderStatus>;
-  configuredProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
+  customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[];
+  areCustomProvidersLoading: boolean;
+  refetchCustomLLMs: () => void;
   refetchConfiguredProviders: () => void;
-  customProvidersResult: Provider[];
+  configuredProvidersLoading: boolean;
+  configuredProviders: Record<string, ProviderStatus>;
+  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[];
+  savedModelsLoading: boolean;
 };
 
 export const PlaygroundChat = ({
@@ -100,13 +102,15 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
   isOpenInPlayground = false,
-  allOptions,
-  overallLoading,
-  refetch,
-  configuredProviders,
-  configuredProvidersLoading,
-  refetchConfiguredProviders,
   customProvidersResult,
+  customProviderModelsResult,
+  areCustomProvidersLoading,
+  refetchCustomLLMs,
+  refetchConfiguredProviders,
+  configuredProvidersLoading,
+  configuredProviders,
+  savedModelsResult,
+  savedModelsLoading,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
 
@@ -135,6 +139,14 @@ export const PlaygroundChat = ({
     userInfo && 'username' in userInfo ? userInfo.username : ''
   );
   const isTeamAdmin = maybeTeamAdmin ?? false;
+
+  const llmDropdownOptions = getLLMDropdownOptions(
+    configuredProviders,
+    configuredProvidersLoading,
+    customProvidersResult,
+    customProviderModelsResult,
+    areCustomProvidersLoading
+  );
 
   // Check if any chat is loading
   const isAnyLoading = useMemo(
@@ -200,10 +212,15 @@ export const PlaygroundChat = ({
                 entity={entity}
                 project={project}
                 isTeamAdmin={isTeamAdmin}
-                allOptions={allOptions}
-                overallLoading={overallLoading}
-                refetch={refetch}
+                refetchConfiguredProviders={refetchConfiguredProviders}
+                refetchCustomLLMs={refetchCustomLLMs}
+                llmDropdownOptions={llmDropdownOptions}
+                areProvidersLoading={
+                  configuredProvidersLoading || areCustomProvidersLoading
+                }
                 customProvidersResult={customProvidersResult}
+                savedModelsResult={savedModelsResult}
+                savedModelsLoading={savedModelsLoading}
               />
             </Box>
             <Box
@@ -317,10 +334,15 @@ export const PlaygroundChat = ({
                   entity={entity}
                   project={project}
                   isTeamAdmin={isTeamAdmin}
-                  allOptions={allOptions}
-                  overallLoading={overallLoading}
-                  refetch={refetch}
+                  refetchConfiguredProviders={refetchConfiguredProviders}
+                  refetchCustomLLMs={refetchCustomLLMs}
+                  llmDropdownOptions={llmDropdownOptions}
+                  areProvidersLoading={
+                    configuredProvidersLoading || areCustomProvidersLoading
+                  }
                   customProvidersResult={customProvidersResult}
+                  savedModelsResult={savedModelsResult}
+                  savedModelsLoading={savedModelsLoading}
                 />
               </Box>
               <Box

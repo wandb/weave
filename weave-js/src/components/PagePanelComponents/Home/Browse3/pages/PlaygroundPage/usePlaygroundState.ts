@@ -46,7 +46,10 @@ const DEFAULT_PLAYGROUND_STATE = {
   maxTokensLimit: 16384,
   model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
-  baseModel: null,
+  savedModel: {
+    name: null,
+    savedModelParams: null,
+  },
 };
 
 type NumericPlaygroundStateKey =
@@ -187,7 +190,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
-    model: state.baseModel ?? state.model,
+    model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
     stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,
