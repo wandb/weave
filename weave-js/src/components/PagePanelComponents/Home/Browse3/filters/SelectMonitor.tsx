@@ -1,7 +1,11 @@
 import {Select} from '@wandb/weave/components/Form/Select';
+import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useMemo, useState} from 'react';
 
 import {useWFHooks} from '../pages/wfReactInterface/context';
+import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
+import {ObjectVersionFilter} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRefIcon} from '../smallRef/SmallRefIcon';
 
 type SelectMonitorOption = {
   label: string;
@@ -10,7 +14,21 @@ type SelectMonitorOption = {
 
 const OptionLabel = (props: SelectMonitorOption) => {
   const {label} = props;
-  return <span className="whitespace-nowrap">{label}</span>;
+  return (
+    <span className="flex items-center gap-4 whitespace-nowrap">
+      <SmallRefIcon icon={IconNames.JobAutomation} />
+      {label}
+    </span>
+  );
+};
+
+const OBJECT_VERSIONS_SORT_BY: SortBy[] = [
+  {field: 'createdAtMs', direction: 'desc'},
+];
+
+const OBJECT_VERSIONS_FILTER: ObjectVersionFilter = {
+  baseObjectClasses: ['Monitor'],
+  latestOnly: true,
 };
 
 export const SelectMonitor = ({
@@ -30,45 +48,42 @@ export const SelectMonitor = ({
   const [loading, setLoading] = useState(true);
   const {useRootObjectVersions} = useWFHooks();
 
-  const latestMonitors = useRootObjectVersions(
+  const monitorsResult = useRootObjectVersions(
     entity,
     project,
-    {
-      baseObjectClasses: ['Monitor'],
-      latestOnly: false,
-    },
+    OBJECT_VERSIONS_FILTER,
     undefined,
     false,
     undefined,
-    [{field: 'createdAtMs', direction: 'desc'}]
+    OBJECT_VERSIONS_SORT_BY
   );
 
   const placeholder = useMemo(() => {
     if (loading) {
       return 'Loading monitors...';
     }
-    if (latestMonitors.result?.length === 0) {
+    if (monitorsResult.result?.length === 0) {
       return 'No monitors found';
     }
-    if (latestMonitors.error) {
+    if (monitorsResult.error) {
       return 'Error loading monitors';
     }
     return 'Select a monitor';
-  }, [loading, latestMonitors.result, latestMonitors.error]);
+  }, [loading, monitorsResult.result, monitorsResult.error]);
 
   useMemo(() => {
-    if (latestMonitors.result) {
+    if (monitorsResult.result) {
       setMonitors(
-        latestMonitors.result
+        monitorsResult.result
           .filter(monitor => monitor.val['active'])
           .map(monitor => ({
-            label: `${monitor.val['name']}:v${monitor.versionIndex}`,
-            value: `weave:///${entity}/${project}/object/${monitor.objectId}:${monitor.versionHash}`,
+            label: monitor.val['name'],
+            value: `weave:///${entity}/${project}/object/${monitor.objectId}:*`,
           }))
       );
       setLoading(false);
     }
-  }, [latestMonitors.result, entity, project]);
+  }, [monitorsResult.result, entity, project]);
 
   const selectedValue = useMemo(() => {
     return monitors.find(monitor => monitor.value === value);

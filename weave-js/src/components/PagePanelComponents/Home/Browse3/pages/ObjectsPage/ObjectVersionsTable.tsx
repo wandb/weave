@@ -421,6 +421,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   actionMenu?: (obj: ObjectVersionSchema) => React.JSX.Element;
   keepNestedVal?: string[];
   hidePeerVersionsColumn?: boolean;
+  hideVersionSuffix?: boolean;
 }> = props => {
   const {useRootObjectVersions} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -495,6 +496,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         customColumns={props.customColumns}
         actionMenu={props.actionMenu}
         keepNestedVal={props.keepNestedVal}
+        hideVersionSuffix={props.hideVersionSuffix}
       />
     </FilterLayoutTemplate>
   );

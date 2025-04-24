@@ -5,9 +5,12 @@ import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
+import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
+import {v4 as uuidv4} from 'uuid';
 
+import {parseRef} from '../../../../../../react';
 import {TextArea} from '../../../../../Form/TextArea';
 import {TextField} from '../../../../../Form/TextField';
 import {validateDatasetName} from '../../datasets/datasetNameValidation';
@@ -22,7 +25,11 @@ import {getFilterByRaw, useFilterSortby} from '../CallsPage/callsTableQuery';
 import {Autocomplete, OpSelector} from '../CallsPage/OpSelector';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useObjCreate} from '../wfReactInterface/tsDataModelHooks';
-import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {
+  ObjectVersionSchema,
+  WeaveObjectVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {queryToGridFilterModel} from './saveViewUtil';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
@@ -59,18 +66,24 @@ export const CreateMonitorDrawer = ({
   const [filter, setFilter] = useState<WFHighLevelCallFilter>({});
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<BuiltInScorers[]>([]);
+  const [scorers, setScorers] = useState<{name: string; refUri?: string}[]>([]);
   const [active, setActive] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
   useMemo(() => {
+    const existingScorers = (monitor?.val['scorers'] || []).map(
+      (scorerRefUri: string) => ({
+        refUri: scorerRefUri,
+        name: parseRef(scorerRefUri).artifactName,
+      })
+    );
     setMonitorName(monitor?.val['name'] || '');
     setDescription(monitor?.val['description'] || '');
     setSamplingRate((monitor?.val['sampling_rate'] || 0.1) * 100);
     setFilter({opVersionRefs: monitor?.val['op_names'] || []});
-    setScorers(monitor?.val['scorers'] || []);
+    setScorers(existingScorers);
     setActive(monitor?.val['active'] || false);
     setFilterModel(
       queryToGridFilterModel(monitor?.val['query']) || {
@@ -132,32 +145,88 @@ export const CreateMonitorDrawer = ({
 
   const objCreate = useObjCreate();
 
+  const createScorer = useCallback(
+    async ({
+      name: scorerName,
+      refUri,
+    }: {
+      name: string;
+      refUri?: string;
+    }): Promise<WeaveObjectVersionKey> => {
+      let scorerDigest: string;
+      if (refUri) {
+        // If the scorer already exists (this is an edit) we do not recreate it.
+        scorerDigest = parseRef(refUri).artifactVersion;
+      } else {
+        // If refUri is undefined the scorer needs to be create.
+        const scorerClassName = scorerName;
+        scorerName = `${scorerName}-${uuidv4().split('-')[0]}`;
+
+        const scorerObj = {
+          _type: scorerName,
+          name: scorerName,
+          description: `${scorerName} created from the UI.`,
+          ref: null,
+          column_map: null,
+          _class_name: scorerClassName,
+          _bases: ['Scorer', 'Object', 'BaseModel'],
+        };
+
+        scorerDigest = await objCreate(
+          `${entity}/${project}`,
+          scorerName,
+          scorerObj
+        );
+      }
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: scorerName,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [entity, objCreate, project]
+  );
+
   const createMonitor = useCallback(async () => {
     if (!enableCreateButton) {
       return;
     }
 
     setIsCreating(true);
-
-    const mongoQuery = getFilterByRaw(filterModel);
-
-    const monitorObj = {
-      _type: 'Monitor',
-      name: monitorName,
-      description,
-      ref: null,
-      _class_name: 'Monitor',
-      _bases: ['Object', 'BaseModel'],
-      op_names: selectedOpVersionOption,
-      query: {$expr: mongoQuery},
-      sampling_rate: samplingRate / 100,
-      scorers,
-      active: active,
-    };
-
     try {
+      const scorerRefs = await Promise.all(
+        scorers.map(async scorer => await createScorer(scorer))
+      );
+
+      const mongoQuery = getFilterByRaw(filterModel);
+
+      const monitorObj = {
+        _type: 'Monitor',
+        name: monitorName,
+        description,
+        ref: null,
+        _class_name: 'Monitor',
+        _bases: ['Object', 'BaseModel'],
+        op_names: selectedOpVersionOption,
+        query: mongoQuery ? {$expr: mongoQuery} : null,
+        sampling_rate: samplingRate / 100,
+        scorers: scorerRefs.map(scorerRef =>
+          objectVersionKeyToRefUri(scorerRef)
+        ),
+        active: active,
+      };
+
       await objCreate(`${entity}/${project}`, monitorName, monitorObj);
+
       setIsCreating(false);
+
       toast.success(
         `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
         {
@@ -183,6 +252,7 @@ export const CreateMonitorDrawer = ({
     entity,
     objCreate,
     project,
+    createScorer,
   ]);
 
   return (
@@ -355,10 +425,25 @@ export const CreateMonitorDrawer = ({
                         multiple
                         options={Object.values(BuiltInScorers)}
                         sx={{width: '100%'}}
-                        value={scorers}
-                        onChange={(_, newScorers: string | string[] | null) =>
-                          setScorers((newScorers as BuiltInScorers[]) ?? [])
-                        }
+                        value={scorers.map(scorer => scorer.name)}
+                        onChange={(
+                          unused,
+                          newScorers: string | string[] | null
+                        ) => {
+                          console.log(newScorers);
+                          if (newScorers === null) {
+                            setScorers([]);
+                            return;
+                          }
+                          const newScorerArray = _.isArray(newScorers)
+                            ? (newScorers as string[])
+                            : [newScorers as string];
+                          setScorers(
+                            newScorerArray.map(newScorer => ({
+                              name: newScorer,
+                            }))
+                          );
+                        }}
                       />
                     </Box>
                   </Box>

@@ -214,7 +214,7 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
 };
 
 export const EMPTY_PROPS_MONITORS: EmptyProps = {
-  icon: 'table',
+  icon: 'job-automation' as const,
   heading: 'No monitors yet',
   description: 'Use monitors to automatically run scorers on incoming traces.',
   moreInformation: (

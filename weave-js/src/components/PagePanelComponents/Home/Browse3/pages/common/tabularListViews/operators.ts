@@ -19,14 +19,18 @@ export const operationConverter = (
         },
       ],
     };
-  } else if (
-    item.operator === '(string): contains' ||
-    item.operator === '(string): by'
-  ) {
+  } else if (item.operator === '(string): contains') {
     return {
       $contains: {
         input: {$getField: item.field},
         substr: {$literal: item.value},
+      },
+    };
+  } else if (item.operator === '(string): by') {
+    return {
+      $contains: {
+        input: {$getField: item.field},
+        substr: {$literal: item.value.split('*')[0]},
       },
     };
   } else if (item.operator === '(string): equals') {

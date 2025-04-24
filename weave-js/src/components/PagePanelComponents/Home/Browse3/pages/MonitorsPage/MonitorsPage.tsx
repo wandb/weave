@@ -5,7 +5,9 @@ import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {CellValue} from '../../../Browse2/CellValue';
+import {SmallRef} from '../../smallRef/SmallRef';
 import {EMPTY_PROPS_MONITORS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -50,6 +52,7 @@ export const MonitorsPage = ({
           propsEmpty={EMPTY_PROPS_MONITORS}
           keepNestedVal={['query']}
           hidePeerVersionsColumn
+          hideVersionSuffix
           actionMenu={obj => (
             <PopupDropdown
               sections={[
@@ -93,7 +96,7 @@ export const MonitorsPage = ({
                 const opRefs: string[] = params.value;
                 return opRefs.length > 0 ? (
                   <div className="flex items-center gap-2">
-                    <CellValue value={opRefs[0]} />
+                    <SmallRef objRef={parseRef(opRefs[0]) as WeaveObjectRef} />
                     {opRefs.length > 1 ? (
                       <span>{`+${opRefs.length - 1}`}</span>
                     ) : null}
