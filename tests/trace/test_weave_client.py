@@ -3276,3 +3276,63 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[5] == uuidv7_calls[1].id
     assert call_ids[6] == uuidv7_calls[2].id
     assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_filter_calls_by_ref(client):
+    obj = {"a": 1}
+    ref = client.save(obj, "obj").ref
+    ref2 = client.save(obj, "obj2").ref
+    ref3 = client.save(obj, "obj3").ref
+
+    @weave.op
+    def log_obj(ref: str):
+        return {
+            "ref2": ref2,
+            "ref3": ref3,
+        }
+
+    log_obj(ref)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for input ref
+    calls = client.get_calls(filter={"input_refs": [ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for output ref
+    calls = client.get_calls(filter={"output_refs": [ref2.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by both input and output ref
+    calls = client.get_calls(
+        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
+    assert len(calls) == 0
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"output_refs": [ref.uri()]})
+    assert len(calls) == 0
+
+    # filter by duplicate refs
+    calls = client.get_calls(filter={"input_refs": [ref.uri(), ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by empty refs, this is ambiguously defined, currently we treat
+    # this as "no filter"
+    calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
+    assert len(calls) == 1
