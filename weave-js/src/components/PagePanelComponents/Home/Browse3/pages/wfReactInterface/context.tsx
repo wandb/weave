@@ -57,28 +57,15 @@ export const useProjectHasTraceServerData = (
       noAutoRefresh: true,
     }
   );
-  const columns = useMemo(() => ['id'], []);
+  const projectId = useMemo(() => `${entity}/${project}`, [entity, project]);
+  const hasCalls = tsWFDataModelHooks.useProjectCheck(projectId);
 
-  const calls = tsWFDataModelHooks.useCalls(
-    entity,
-    project,
-    {},
-    1,
-    undefined,
-    undefined,
-    undefined,
-    columns,
-    undefined,
-    {
-      skip: !hasTraceServer,
-    }
-  );
-  const loading = objs.loading || calls.loading;
+  const loading = objs.loading || hasCalls.loading;
   return useMemo(
     () => ({
       loading,
-      result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
+      result: hasCalls.result?.has_data || (objs.result ?? []).length > 0,
     }),
-    [loading, objs.result, calls.result]
+    [loading, objs.result, hasCalls.result]
   );
 };

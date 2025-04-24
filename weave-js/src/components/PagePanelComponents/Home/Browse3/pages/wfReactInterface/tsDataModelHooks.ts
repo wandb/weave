@@ -2060,6 +2060,12 @@ export const useTableCreate = (): ((
   );
 };
 
+export const useProjectCheck = makeTraceServerEndpointHook(
+  'projectCheck',
+  (projectId: string) => ({params: {project_id: projectId}}),
+  (res: traceServerTypes.ProjectCheckRes) => res
+);
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2087,6 +2093,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableQueryStats,
   useTableUpdate,
   useTableCreate,
+  useProjectCheck,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

@@ -27,6 +27,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  ProjectCheckReq,
+  ProjectCheckRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -359,6 +361,13 @@ export class DirectTraceServerClient {
       }
       return Promise.reject(error);
     }
+  }
+
+  public projectCheck(req: ProjectCheckReq): Promise<ProjectCheckRes> {
+    return this.makeRequest<ProjectCheckReq, ProjectCheckRes>(
+      '/project/check',
+      req
+    );
   }
 
   private makeRequest = async <QT, ST>(

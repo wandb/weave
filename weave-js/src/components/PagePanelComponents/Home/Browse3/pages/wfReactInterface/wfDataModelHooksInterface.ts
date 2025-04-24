@@ -318,6 +318,9 @@ export type WFDataModelHooksInterface = {
   useTableCreate: () => (
     table: traceServerClientTypes.TableCreateReq
   ) => Promise<traceServerClientTypes.TableCreateRes>;
+  useProjectCheck: (
+    projectId: string
+  ) => Loadable<traceServerClientTypes.ProjectCheckRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
