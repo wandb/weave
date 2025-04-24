@@ -851,15 +851,6 @@ const populatePredictionsAndScoresImperative = (
         result.resultRows[digest].rawDataRow = example;
       }
 
-      // Initialize scores and originalRows if they don't exist
-      if (!result.resultRows[digest].scores) {
-        result.resultRows[digest].scores = {};
-      }
-
-      if (!result.resultRows[digest].originalRows) {
-        result.resultRows[digest].originalRows = [];
-      }
-
       // Add evaluation entry if it doesn't exist
       if (!result.resultRows[digest].evaluations[evaluationCallId]) {
         result.resultRows[digest].evaluations[evaluationCallId] = {
