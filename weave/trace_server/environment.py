@@ -2,6 +2,22 @@ import os
 from typing import Optional
 
 
+# Kafka Settings
+
+
+def wf_kafka_broker_host() -> str:
+    """The host of the kafka broker."""
+    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+
+
+def wf_kafka_broker_port() -> int:
+    """The port of the kafka broker."""
+    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+
+
+# Clickhouse Settings
+
+
 def wf_clickhouse_host() -> str:
     """The host of the clickhouse server."""
     return os.environ.get("WF_CLICKHOUSE_HOST", "localhost")

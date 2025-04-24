@@ -137,6 +137,8 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.kafka import KafkaProducer
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -314,6 +316,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        kafka_producer = KafkaProducer.from_env()
+        kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
