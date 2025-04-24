@@ -146,3 +146,15 @@ title: Head Metadata
 ---
 docusaurus_head_meta::end -->
 ```
+
+### Playground Model List Sync
+
+The [playground model list in `playground.md`](https://weave-docs.wandb.ai/guides/tools/playground#select-an-llm) is generated via `update_playground_models.py`.
+
+To run this update manually:
+
+```bash
+make update_playground_models
+```
+
+This will regenerate the model list and update the appropriate section in `playground.md`. You don’t need to manually edit that section.

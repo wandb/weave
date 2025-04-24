@@ -18,7 +18,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 
@@ -74,7 +74,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 ```
@@ -87,7 +87,7 @@ See the tutorial on defining a `Scorer` class in the next chapter on [Model-Base
 
 ### Define a Model to evaluate
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have parameters that you want to experiment with and capture in weave.
 
 ```python
 from weave import Model, Evaluation
@@ -165,11 +165,11 @@ examples = [
 ]
 
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()
-def match_score2(expected: dict, model_output: dict) -> dict:
+def match_score2(expected: dict, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 class MyModel(Model):
@@ -226,7 +226,7 @@ def preprocess_example(example):
     }
 
 @weave.op()
-def match_score(expected: str, model_output: dict) -> dict:
+def match_score(expected: str, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()

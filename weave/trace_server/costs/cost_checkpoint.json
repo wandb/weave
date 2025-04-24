@@ -6840,5 +6840,133 @@
       "output": 4.4e-06,
       "created_at": "2025-04-16 12:44:16"
     }
+  ],
+  "azure/computer-use-preview": [
+    {
+      "provider": "azure",
+      "input": 3e-06,
+      "output": 1.2e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4o-audio-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4o-mini-audio-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1": [
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-mini": [
+    {
+      "provider": "azure",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-nano": [
+    {
+      "provider": "azure",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o3": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o3-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o4-mini": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o4-mini-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-04-17": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini-2.5-flash-preview-04-17": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini-2.5-pro-preview-03-25": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
   ]
 }

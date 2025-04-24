@@ -66,12 +66,6 @@ Modify the following parameters:
 W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see the [Setting `clusterName`](#setting-clustername) section for more information.
 
 ```yaml
-# Stable version
-image:
-  registry: docker.io
-  repository: bitnami/clickhouse
-  tag: 24.8
-
 ## @param clusterName ClickHouse cluster name
 clusterName: weave_cluster
 
@@ -81,8 +75,10 @@ shards: 1
 ## @param replicaCount Number of ClickHouse replicas per shard to deploy
 ## if keeper enable, same as keeper count, keeper cluster by shards.
 replicaCount: 3
+
 persistence:
-  enabled: false
+  enabled: true
+  size: 30G # this size must be larger than cache size.
 
 ## ClickHouse resource requests and limits
 resources:
@@ -225,7 +221,8 @@ defaultConfigurationOverrides: |
   	      <type>cache</type>
           <disk>s3_disk</disk>
           <path>/var/lib/clickhouse/s3_disk_cache/cache/</path>
-          <max_size>100Gi</max_size>
+          <!-- THE CACHE SIZE MUST BE LOWER THAN PERSISTENT VOLUME -->
+          <max_size>20Gi</max_size>
           <cache_on_write_operations>1</cache_on_write_operations>
           <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations> 
         </s3_disk_cache>
@@ -291,22 +288,22 @@ You can find more details on this at [ClickHouse: Separation of Storage and Comp
 
 ## 2. Install and deploy ClickHouse
 
-:::important
-If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
-:::
-
 With the repositories set up and the `values.yaml` file prepared, the next step is to install ClickHouse.
 
 ```bash
-helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
+helm install clickhouse bitnami/clickhouse -f values.yaml --version 8.0.10
 ```
+
+:::important
+Ensure you're using the version `8.0.10`. The latest chart version (`9.0.0`) doesn't work with the configuration proposed in this document.
+:::
 
 ## 3. Confirm ClickHouse deployment
 
 Confirm that ClickHouse is deployed using the following command:
 
 ```bash
-kubectl get pods -n <NAMESPACE>
+kubectl get pods
 ```
 
 You should see the following pods:
@@ -464,7 +461,7 @@ This has the same effect of `replicated: true` which in preview.
 4. With the Custom Resource (CR) prepared, apply the new configuration:
 
     ```bash
-    kubectl apply -n <NAMESPACE> -f wandb.yaml
+    kubectl apply -f wandb.yaml
     ```
 
 ## 6. Access Weave
