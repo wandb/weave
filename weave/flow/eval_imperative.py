@@ -203,7 +203,7 @@ class ScoreLogger(BaseModel):
         wc.finish_call(
             self.predict_and_score_call,
             output={
-                "model_output": self.predict_call.output,
+                "output": self.predict_call.output,
                 "scores": scores,
                 "model_latency": None,
             },
@@ -363,13 +363,13 @@ class EvaluationLogger(BaseModel):
             ) -> dict:
                 predict_method = cast(Op, model.get_infer_method())
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
-                    model_output, predict_call = predict_method.call(model, example)
+                    output, predict_call = predict_method.call(model, example)
                     current_predict_call.set(predict_call)
 
                 # This data is just a placeholder to give a sense of the data shape.
                 # The actual output is explicitly replaced in ScoreLogger.finish.
                 return {
-                    "model_output": model_output,
+                    "output": output,
                     "scores": {},
                     "model_latency": None,
                 }
