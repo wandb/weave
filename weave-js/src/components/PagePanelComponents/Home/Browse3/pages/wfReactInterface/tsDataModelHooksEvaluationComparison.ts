@@ -965,13 +965,6 @@ const populatePredictionsAndScoresImperative = (
               sourceCallId: scoreCall.id,
               value: output,
             };
-
-            // Add to scores structure for direct access by ExampleCompareSection
-            if (!result.resultRows[digest].scores![metricId]) {
-              result.resultRows[digest].scores![metricId] = {};
-            }
-            result.resultRows[digest].scores![metricId][evaluationCallId] =
-              output;
           } else if (
             output &&
             typeof output === 'object' &&
@@ -990,33 +983,6 @@ const populatePredictionsAndScoresImperative = (
       result.resultRows[digest].evaluations[evaluationCallId].predictAndScores[
         call.id
       ] = predictAndScoreEntry;
-
-      // Create a PivotedRow and add it to originalRows
-      // const pivotedRow: PivotedRow = {
-      //   id: predictAndScoreEntry.callId,
-      //   evaluationCallId,
-      //   inputDigest: digest,
-      //   inputRef: example,
-      //   path: [digest, evaluationCallId, predictAndScoreEntry.callId],
-      //   predictAndScore: predictAndScoreEntry,
-      //   scores: result.resultRows[digest].scores!,
-      //   output: {},
-      // };
-
-      // Add the output data
-      // if (predictCalls.length > 0 && predictCalls[0].output) {
-      //   // For each output property, store it in a format accessible by the UI
-      //   const outputData = predictCalls[0].output;
-      //   Object.entries(outputData).forEach(([key, value]) => {
-      //     if (!pivotedRow.output[`output.${key}`]) {
-      //       pivotedRow.output[`output.${key}`] = {};
-      //     }
-      //     pivotedRow.output[`output.${key}`][evaluationCallId] = value;
-      //   });
-      // }
-
-      // Add this pivoted row to originalRows
-      // result.resultRows[digest].originalRows!.push(pivotedRow);
     } catch (e) {
       console.warn('Error processing imperative evaluation:', e);
     }
@@ -1068,23 +1034,8 @@ const populatePredictionsAndScoresNonImperative = (
                 evaluations: {},
                 scores: {},
                 originalRows: [],
-                // Add rawDataRow even for non-imperative evaluations
-                rawDataRow:
-                  typeof exampleRef === 'string'
-                    ? {input: exampleRef}
-                    : exampleRef,
               };
             }
-
-            // Ensure scores and originalRows exist
-            if (!result.resultRows[rowDigest].scores) {
-              result.resultRows[rowDigest].scores = {};
-            }
-
-            if (!result.resultRows[rowDigest].originalRows) {
-              result.resultRows[rowDigest].originalRows = [];
-            }
-
             const digestCollection = result.resultRows[rowDigest];
 
             if (digestCollection.evaluations[evaluationCallId] == null) {
