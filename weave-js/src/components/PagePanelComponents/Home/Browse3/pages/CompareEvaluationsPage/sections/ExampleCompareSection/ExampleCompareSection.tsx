@@ -397,27 +397,24 @@ export const ExampleCompareSection: React.FC<{
     // If we get a valid resolution through the normal path, use that
     if (resolvedScoreId != null) {
       const metricId = metricDefinitionId(resolvedScoreId);
-      // Check if the scores object has the metric ID key
-      if (targetTrial.scores && metricId in targetTrial.scores) {
-        // Check if the evaluation call ID exists for this metric
-        if (currEvalCallId in targetTrial.scores[metricId]) {
-          const value = targetTrial.scores[metricId][currEvalCallId];
-          // Return the value even if it's falsy (0 or false)
-          return value;
-        }
+      if (
+        targetTrial.scores &&
+        metricId in targetTrial.scores &&
+        currEvalCallId in targetTrial.scores[metricId]
+      ) {
+        return targetTrial.scores[metricId][currEvalCallId];
       }
     }
 
     // Fallback: try direct lookup using the original dimension's metric ID
     // This is needed for imperative evaluations that don't get properly resolved
     const originalMetricId = metricDefinitionId(dimension);
-
-    // Use the same non-falsy checking pattern for the fallback
-    if (targetTrial.scores && originalMetricId in targetTrial.scores) {
-      if (currEvalCallId in targetTrial.scores[originalMetricId]) {
-        const value = targetTrial.scores[originalMetricId][currEvalCallId];
-        return value;
-      }
+    if (
+      targetTrial.scores &&
+      originalMetricId in targetTrial.scores &&
+      currEvalCallId in targetTrial.scores[originalMetricId]
+    ) {
+      return targetTrial.scores[originalMetricId][currEvalCallId];
     }
 
     return undefined;
