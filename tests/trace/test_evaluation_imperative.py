@@ -37,17 +37,17 @@ def test_basic_evaluation(
 ):
     ev = EvaluationLogger()
 
-    model_outputs = []
+    outputs = []
     score1_results = []
     score2_results = []
     for row in user_dataset:
-        model_outputs.append(model_output := user_model(row["a"], row["b"]))
-        pred = ev.log_prediction(inputs=row, output=model_output)
+        outputs.append(output := user_model(row["a"], row["b"]))
+        pred = ev.log_prediction(inputs=row, output=output)
 
-        score1_results.append(score1_result := model_output > 2)
+        score1_results.append(score1_result := output > 2)
         pred.log_score(scorer="greater_than_2_scorer", score=score1_result)
 
-        score2_results.append(score2_result := model_output > 2)
+        score2_results.append(score2_result := output > 2)
         pred.log_score(scorer="greater_than_4_scorer", score=score2_result)
 
         pred.finish()
@@ -72,7 +72,7 @@ def test_basic_evaluation(
     }
 
     for i, (inputs, outputs, score1, score2) in enumerate(
-        zip(user_dataset, model_outputs, score1_results, score2_results)
+        zip(user_dataset, outputs, score1_results, score2_results)
     ):
         predict_index = 1 + i * 4
 
@@ -86,7 +86,7 @@ def test_basic_evaluation(
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
-        assert predict_and_score_call.output["model_output"] == outputs
+        assert predict_and_score_call.output["output"] == outputs
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
@@ -137,7 +137,7 @@ def test_evaluation_with_custom_models_and_scorers(
         c: int
 
     model1 = MyModel(a=1, b="two")
-    model2 = {"a": 2, "b": "three"}
+    model2 = {"name": "dict_model", "a": 2, "b": "three"}
     model3 = "string_model"
 
     ev1 = EvaluationLogger(model=model1)
@@ -150,15 +150,15 @@ def test_evaluation_with_custom_models_and_scorers(
 
     def run_evaluation(ev: EvaluationLogger):
         for row in user_dataset:
-            model_output = user_model(row["a"], row["b"])
-            pred = ev.log_prediction(inputs=row, output=model_output)
-            score1_result = model_output > 2
+            output = user_model(row["a"], row["b"])
+            pred = ev.log_prediction(inputs=row, output=output)
+            score1_result = output > 2
             pred.log_score(scorer=scorer1, score=score1_result)
 
-            score2_result = model_output > 4
+            score2_result = output > 4
             pred.log_score(scorer=scorer2, score=score2_result)
 
-            score3_result = model_output > 6
+            score3_result = output > 6
             pred.log_score(scorer=scorer3, score=score3_result)
 
             pred.finish()
@@ -173,7 +173,7 @@ def test_evaluation_with_custom_models_and_scorers(
         )
         assert len(models) == 3
         assert models[0].object_id == "MyModel"
-        assert models[1].object_id == "DynamicModel"
+        assert models[1].object_id == "dict_model"
         assert models[2].object_id == "string_model"
 
         scorers = client._objects(
@@ -203,12 +203,12 @@ def test_evaluation_with_custom_models_and_scorers(
     ev4 = EvaluationLogger(model=model4)
 
     for row in user_dataset:
-        model_output = user_model(row["a"], row["b"])
-        pred = ev4.log_prediction(inputs=row, output=model_output)
-        score1_result = model_output > 2
+        output = user_model(row["a"], row["b"])
+        pred = ev4.log_prediction(inputs=row, output=output)
+        score1_result = output > 2
         pred.log_score(scorer=scorer1, score=score1_result)
 
-        score2_result = model_output > 4
+        score2_result = output > 4
         pred.log_score(scorer=scorer2, score=score2_result)
 
         pred.finish()
@@ -230,9 +230,9 @@ def test_evaluation_with_custom_models_and_scorers(
     ev5 = EvaluationLogger(model=model4)
 
     for row in user_dataset:
-        model_output = user_model(row["a"], row["b"])
-        pred = ev5.log_prediction(inputs=row, output=model_output)
-        score3_result = model_output > 8
+        output = user_model(row["a"], row["b"])
+        pred = ev5.log_prediction(inputs=row, output=output)
+        score3_result = output > 8
         pred.log_score(scorer=scorer4, score=score3_result)
 
         pred.finish()
@@ -256,7 +256,7 @@ def test_evaluation_version_reuse(
     client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
 ):
     """Test that running the same evaluation twice results in only one version."""
-    model = {"a": 1, "b": "two"}
+    model = {"name": "test_model", "a": 1, "b": "two"}
     dataset_id = "test_dataset_unique_identifier"
 
     # Run the same evaluation twice
@@ -264,12 +264,12 @@ def test_evaluation_version_reuse(
         ev = EvaluationLogger(model=model, dataset=dataset_id)
 
         for row in user_dataset:
-            model_output = user_model(row["a"], row["b"])
+            output = user_model(row["a"], row["b"])
             # Convert TypedDict to dict to avoid type errors
             inputs_dict = dict(row)
-            pred = ev.log_prediction(inputs=inputs_dict, output=model_output)
+            pred = ev.log_prediction(inputs=inputs_dict, output=output)
 
-            score_result = model_output > 2
+            score_result = output > 2
             pred.log_score(scorer="greater_than_2_scorer", score=score_result)
             pred.finish()
 
