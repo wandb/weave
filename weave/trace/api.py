@@ -192,6 +192,18 @@ def ref(location: str) -> weave_client.ObjectRef:
     return uri
 
 
+def get(uri: str) -> Any:
+    """A convenience function for getting an object from a URI.
+
+    Args:
+        uri: A fully-qualified weave ref URI.
+
+    Returns:
+        The object.
+    """
+    return ref(uri).get()
+
+
 def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
     return weave_client.get_ref(obj)
 
@@ -261,4 +273,5 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "get",
 ]
