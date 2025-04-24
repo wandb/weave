@@ -22,7 +22,9 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
+from weave.trace.context import call_context
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -3276,3 +3278,74 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[5] == uuidv7_calls[1].id
     assert call_ids[6] == uuidv7_calls[2].id
     assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_calls_query_filter_by_root_refs(client):
+    @weave.op()
+    def root_op(x: int):
+        return {"n": x, "child": child_op(x)}
+
+    @weave.op()
+    def child_op(x: int):
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int):
+        return x + 3
+
+    with call_context.set_call_stack([]):
+        root_op(1)
+        root_op(2)
+
+    # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) == 6
+
+    # basic trace roots only filter
+    calls = client.get_calls(filter={"trace_roots_only": True})
+    assert len(calls) == 2  # tests the stats query
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+    root_op_ref = calls[0].op_name
+
+    # basic trace roots only filter = false, this should be everything
+    calls = client.get_calls(filter={"trace_roots_only": False})
+    assert len(calls) == 6
+
+    # trace roots only + inputs query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
+                    {"$literal": 1},
+                ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + output query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
+                    {"$literal": 2},
+                ],
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + op filter
+    calls = client.get_calls(
+        filter={"trace_roots_only": True, "op_names": [root_op_ref]},
+    )
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
