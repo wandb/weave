@@ -1,6 +1,6 @@
 # Imperative Evaluations
 
-The `ImperativeEvaluationLogger` provides a flexible way to log evaluation data directly from your Python code. You don't need deep knowledge of Weave's internal data types; simply instantiate a logger and use its methods (`log_prediction`, `log_score`, `log_summary`) to record evaluation steps.
+The `EvaluationLogger` provides a flexible way to log evaluation data directly from your Python code. You don't need deep knowledge of Weave's internal data types; simply instantiate a logger and use its methods (`log_prediction`, `log_score`, `log_summary`) to record evaluation steps.
 
 This approach is particularly helpful in complex workflows where the entire dataset or all scorers might not be defined upfront.
 
@@ -16,20 +16,20 @@ The imperative approach described on this page offers more flexibility for compl
 
 ## Basic Usage
 
-1.  **Initialize the logger:** Create an instance of `ImperativeEvaluationLogger`. You can optionally provide strings or dictionaries as metadata for the `Model` and `Dataset` being evaluated. If omitted, default placeholders are used.
-2.  **Log Predictions:** For each input/output pair from your model or system, call `log_prediction`. This method returns an `ImperativeScoreLogger` object tied to that specific prediction event.
-3.  **Log Scores:** Use the `ImperativeScoreLogger` object obtained in the previous step to log scores via the `log_score` method. You can log multiple scores from different conceptual scorers (identified by string names or `Scorer` objects) for the same prediction. Call `finish()` on the score logger when you're done logging scores for that prediction to finalize it. _Note: After calling `finish()`, the `ImperativeScoreLogger` instance cannot be used to log additional scores._
-4.  **Log Summary:** After processing all your examples and logging their predictions and scores, call `log_summary` on the main `ImperativeEvaluationLogger` instance. This action finalizes the overall evaluation. Weave automatically calculates summaries for common score types (like counts and fractions for boolean scores) and merges these with any custom summary dictionary you provide. You can include metrics not logged as row-level scores, such as total elapsed time or other aggregate measures, in this summary dictionary.
+1.  **Initialize the logger:** Create an instance of `EvaluationLogger`. You can optionally provide strings or dictionaries as metadata for the `Model` and `Dataset` being evaluated. If omitted, default placeholders are used.
+2.  **Log Predictions:** For each input/output pair from your model or system, call `log_prediction`. This method returns an `ScoreLogger` object tied to that specific prediction event.
+3.  **Log Scores:** Use the `ScoreLogger` object obtained in the previous step to log scores via the `log_score` method. You can log multiple scores from different conceptual scorers (identified by string names or `Scorer` objects) for the same prediction. Call `finish()` on the score logger when you're done logging scores for that prediction to finalize it. _Note: After calling `finish()`, the `ScoreLogger` instance cannot be used to log additional scores._
+4.  **Log Summary:** After processing all your examples and logging their predictions and scores, call `log_summary` on the main `EvaluationLogger` instance. This action finalizes the overall evaluation. Weave automatically calculates summaries for common score types (like counts and fractions for boolean scores) and merges these with any custom summary dictionary you provide. You can include metrics not logged as row-level scores, such as total elapsed time or other aggregate measures, in this summary dictionary.
 
 ## Example
 
 ```python
 import weave
 from openai import OpenAI
-from weave.flow.eval_imperative import ImperativeEvaluationLogger
+from weave.flow.eval_imperative import EvaluationLogger
 
 # Initialize the logger (model/dataset names are optional metadata)
-eval_logger = ImperativeEvaluationLogger(
+eval_logger = EvaluationLogger(
     model="my-model",
     dataset="my-dataset"
 )
