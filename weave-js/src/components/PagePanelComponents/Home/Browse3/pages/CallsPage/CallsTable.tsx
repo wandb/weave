@@ -404,7 +404,7 @@ export const CallsTable: FC<{
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === strVal
+              item.value === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
