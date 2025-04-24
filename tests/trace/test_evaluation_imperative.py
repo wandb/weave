@@ -306,7 +306,7 @@ def generate_evaluation_logger_kwargs_permutations():
 
         @weave.op
         async def predict(self):
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.001)
             return self.const_value
 
     models = [
@@ -362,7 +362,7 @@ def scorer(request):
         class MyScorerAsync(weave.Scorer):
             @weave.op
             async def score(self, output: int, exp_output: int):
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.001)
                 return output == exp_output
 
         return MyScorerAsync()
@@ -382,7 +382,15 @@ def scorer(request):
     ],
     indirect=True,
 )
-@pytest.mark.parametrize("score", [0.5, {"value": 0.5, "reason": "woah"}])
+@pytest.mark.parametrize(
+    "score",
+    [
+        0.5,
+        {"value": 0.5, "reason": "float"},
+        {"value": 1, "reason": "int"},
+        {"value": True, "reason": "bool"},
+    ],
+)
 @pytest.mark.asyncio
 async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, score):
     your_dataset = [
