@@ -221,9 +221,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
                 "model_config": span.span_data.model_config,
             },
             metrics={
-                "tokens": span.data_usage.usage.get("total_tokens"),
-                "prompt_tokens": span.data_usage.usage.get("prompt_tokens"),
-                "completion_tokens": span.data_usage.usage.get("completion_tokens"),
+                "tokens": span.span_data.usage.get("total_tokens"),
+                "prompt_tokens": span.span_data.usage.get("prompt_tokens"),
+                "completion_tokens": span.span_data.usage.get("completion_tokens"),
             },
             error=None,
         )

@@ -73,11 +73,13 @@ export type TraceCallSchema = {
   summary?: SummaryMap;
   wb_run_id?: string;
   wb_user_id?: string;
+  total_storage_size_bytes?: number;
 };
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
   include_costs?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -112,6 +114,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallsQueryRes = {

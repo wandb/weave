@@ -10,10 +10,11 @@ import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {
   CallData,
+  createTargetSchemaFromDenested,
+  denestData,
   extractSourceSchema,
   FieldMapping,
-  getNestedValue,
-  inferSchema,
+  generateFieldPreviews,
 } from './schemaUtils';
 
 export interface SchemaMappingStepProps {
@@ -82,12 +83,23 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     10 // This is an arbitrary limit to prevent loading too much data.
   );
 
-  const targetSchema = useMemo(() => {
-    if (!tableRowsQuery.result) {
+  // Memoize denested row data to avoid redundant processing
+  const denestedRows = useMemo(() => {
+    if (!tableRowsQuery.result?.rows) {
       return [];
     }
-    return inferSchema(tableRowsQuery.result.rows.map(row => row.val));
-  }, [tableRowsQuery.result]);
+
+    return tableRowsQuery.result.rows.map(row => {
+      return denestData(row.val);
+    });
+  }, [tableRowsQuery.result?.rows]);
+
+  const targetSchema = useMemo(() => {
+    if (!denestedRows.length) {
+      return [];
+    }
+    return createTargetSchemaFromDenested(denestedRows);
+  }, [denestedRows]);
 
   // Update target schema in context
   useEffect(() => {
@@ -135,30 +147,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   );
 
   const fieldPreviews = useMemo(() => {
-    const previews = new Map<string, Array<Record<string, any>>>();
-
-    sourceSchema.forEach(field => {
-      const fieldData = selectedCalls.map(call => {
-        let value: any;
-        if (field.name.startsWith('inputs.')) {
-          const path = field.name.slice(7).split('.');
-          value = getNestedValue(call.val.inputs, path);
-        } else if (field.name.startsWith('output.')) {
-          if (typeof call.val.output === 'object' && call.val.output !== null) {
-            const path = field.name.slice(7).split('.');
-            value = getNestedValue(call.val.output, path);
-          } else {
-            value = call.val.output;
-          }
-        } else {
-          const path = field.name.split('.');
-          value = getNestedValue(call.val, path);
-        }
-        return {[field.name]: value};
-      });
-      previews.set(field.name, fieldData);
-    });
-    return previews;
+    return generateFieldPreviews(sourceSchema, selectedCalls);
   }, [sourceSchema, selectedCalls]);
 
   const formatOptionLabel = useCallback(
@@ -193,14 +182,12 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   const renderTargetField = useCallback(
     (fieldName: string) => {
-      const previewData = tableRowsQuery.result?.rows.slice(0, 5).map(row => {
-        // Handle nested paths by splitting on dots and traversing the object
-        const value = fieldName.includes('.')
-          ? getNestedValue(row.val, fieldName.split('.'))
-          : row.val[fieldName];
-
+      // Use the denested data array for previews
+      const previewData = denestedRows.slice(0, 5).map(denested => {
+        // Get only the top-level field we're interested in
+        const topLevelKey = fieldName.split('.')[0];
         return {
-          [fieldName]: value,
+          [fieldName]: denested[topLevelKey],
         };
       });
 
@@ -254,7 +241,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         </DataPreviewTooltip>
       );
     },
-    [tableRowsQuery.result]
+    [denestedRows]
   );
 
   if (

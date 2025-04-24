@@ -26,7 +26,7 @@ const typographyStyle = {fontFamily: 'Source Sans Pro'};
 interface CreateDatasetDrawerProps {
   open: boolean;
   onClose: () => void;
-  onSaveDataset: (dataset: any) => void;
+  onSaveDataset: (name: string, rows: any[]) => void;
   isCreating?: boolean;
 }
 

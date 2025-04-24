@@ -11,7 +11,7 @@ interactions:
       User-Agent:
       - python-requests/2.32.3
       X-Amzn-Trace-Id:
-      - 0d421599-1ce5-45ec-8558-4387c2e111b9
+      - 98b2d481-ae2c-498d-a6a0-00ae1da93e1f
     method: GET
     uri: https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png
   response:
@@ -465,7 +465,7 @@ interactions:
       Content-Type:
       - image/png
       Date:
-      - Thu, 20 Feb 2025 06:28:12 GMT
+      - Tue, 01 Apr 2025 14:29:40 GMT
       ETag:
       - '"78f9c64a3ffcfc436d52d523f3e3c5ad26c14b95"'
       Referrer-Policy:
@@ -473,11 +473,11 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 11449dc59e84720c51d6a0c2548907ec.cloudfront.net (CloudFront)
+      - 1.1 bc6b48b827972edf65bcecd505a2ecfe.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - HnRW-TY7k5O-YsQLUzM3vrmNeu4KRG8xiVKsJk9RvXJ_onqxlBjhHA==
+      - 5HKbj_hOvmbUt_oVtU7TfpaLmoRDwVHeQ4azL8aamv-9-yRg_V8laA==
       X-Amz-Cf-Pop:
-      - CCU50-P1
+      - BOM78-P10
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
@@ -485,7 +485,65 @@ interactions:
       X-Repo-Commit:
       - 2359223c1837a7587402bda0f2643382a6eefeab
       X-Request-Id:
-      - Root=1-67b6cb7c-0119a0a853250f8b6bc780d0;0d421599-1ce5-45ec-8558-4387c2e111b9
+      - Root=1-67ebf854-2f75d6810866ccad2c8944ae;98b2d481-ae2c-498d-a6a0-00ae1da93e1f
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 6cac1943-e561-47dd-8b92-c8fb24d5621f
+      user-agent:
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
+    method: GET
+    uri: https://huggingface.co/api/models/impira/layoutlm-document-qa
+  response:
+    body:
+      string: '{"_id":"62f02987e57174582cd334e3","id":"impira/layoutlm-document-qa","private":false,"pipeline_tag":"document-question-answering","library_name":"transformers","tags":["transformers","pytorch","tf","safetensors","layoutlm","document-question-answering","pdf","en","license:mit","endpoints_compatible","region:us"],"downloads":40424,"likes":1091,"modelId":"impira/layoutlm-document-qa","author":"impira","sha":"beed3c4d02d86017ebca5bd0fdf210046b907aa6","lastModified":"2023-03-18T00:54:24.000Z","gated":false,"disabled":false,"widgetData":[{"text":"What
+        is the invoice number?","src":"https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"},{"text":"What
+        is the purchase amount?","src":"https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/contract.jpeg"}],"model-index":null,"config":{"architectures":["LayoutLMForQuestionAnswering"],"model_type":"layoutlm","tokenizer_config":{"unk_token":"<unk>","bos_token":"<s>","eos_token":"</s>","sep_token":"</s>","cls_token":"<s>","pad_token":"<pad>","mask_token":"<mask>"}},"cardData":{"language":"en","license":"mit","pipeline_tag":"document-question-answering","tags":["layoutlm","document-question-answering","pdf"],"widget":[{"text":"What
+        is the invoice number?","src":"https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"},{"text":"What
+        is the purchase amount?","src":"https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/contract.jpeg"}]},"transformersInfo":{"auto_model":"AutoModelForDocumentQuestionAnswering","pipeline_tag":"document-question-answering","processor":"AutoTokenizer"},"siblings":[{"rfilename":".gitattributes"},{"rfilename":"README.md"},{"rfilename":"config.json"},{"rfilename":"merges.txt"},{"rfilename":"model.safetensors"},{"rfilename":"pyproject.toml"},{"rfilename":"pytorch_model.bin"},{"rfilename":"setup.cfg"},{"rfilename":"special_tokens_map.json"},{"rfilename":"tf_model.h5"},{"rfilename":"tokenizer.json"},{"rfilename":"tokenizer_config.json"},{"rfilename":"vocab.json"}],"spaces":["microsoft/HuggingGPT","gunship999/SexyImages","impira/docquery","Yntec/ToyWorld","llamameta/flux-pro-uncensored","Nymbo/Compare-6","Yntec/PrintingPress","Uthar/SexyReality","llamameta/fluxproV2","freddyaboulton/gradio_pdf","Yntec/ToyWorldXL","phenixrhyder/NSFW-ToyWorld","Yntec/blitz_diffusion","Sarath0x8f/Document-QA-bot","gaunernst/layoutlm-docvqa-paddleocr","John6666/Diffusion80XX4sg","John6666/PrintingPress4","llamameta/fast-sd3.5-large","Yntec/Image-Models-Test-April-2024","DemiPoto/TestDifs","Abinivesh/Multi-models-prompt-to-image-generation","Yntec/Image-Models-Test-2024","martynka/TasiaExperiment","Illia56/Ask_PDF_anything","Yntec/Image-Models-Test","yergyerg/ImgGenClone","John6666/hfd_test_nostopbutton","Yntec/Image-Models-Test-May-2024","taesiri/HuggingGPT-Lite","Nymbo/Diffusion80XX4sg","Yntec/Image-Models-Test-September-2024","DemiPoto/testSortModels","Msp/Document_Parser","Aeon-Avinash/GenAI_Document_QnA_with_Vision","itsanurag/Invoice_reader2","Yntec/MiniToyWorld","kaleidoskop-hug/PrintingPress","John6666/ToyWorld4","John6666/Diffusion80XX4g","SAITAN666/StableDiffusion35Large-Image-Models-Test-November-2024","NativeAngels/HuggingfaceDiffusion","Yntec/Image-Models-Test-December-2024","huggingfacejs/doc-vis-qa","vincentclaes/DocumentQAComparator","John6666/Diffusion80XX4","K00B404/HuggingfaceDiffusion_custom","John6666/blitz_diffusion4","John6666/blitz_diffusion_builtin","K00B404/SimpleBrothel","os1187/docquery","abidlabs/docquery","Gokul14/impira-layoutlm-document-qa","rishabh062/DocumentQuestionAnswerModel","Yntec/Image-Models-Test-July-2024","Blane187/multi-diffusion","Uthar/LewdExperiments","Uthar/BodyPaint","Uthar/HighFashion","NativeAngels/Compare-6","Yntec/open-craiyon","king007/docquery","TensoraCO/docquery","freddyaboulton/document-analyzer","awacke1/Gradio-PDF-Document-QA-PDF-UI","krishnapal2308/DocVQA-Sanctum","freddyaboulton/gradiopdf","NativeAngels/ToyWorld","Uthar/Harvester","Yntec/Image-Models-Test-January-2025","Yeeezus/SexyImages","John6666/MiniToyWorld","ccarr0807/HuggingGPT","theholycityweb/HuggingGPT","avin1103/SLAM","tribe-ai/document-qa-comparator","awacke1/HEDIS.Dash.Component.Top.Clinical.Terminology.Vocabulary","dog/fastapi-document-qa","Alfasign/HuggingGPT-Lite","aaravlovescodes/fastapi-document-qa","kevinbednarek/docquery","sysopo/impira-layoutlm-document-qa","Faizanshaikh/pdf-chatbot","harsha70/docquery-test","saurshaz/HuggingGPT","Ekittl01/impira-layoutlm-document-qa","dolo650/QA_my_PDF","IAMTFRMZA/Ask_PDF_anything","Tomoniai/DocChat","umair894/fastapi-document-qa_semantic","nasirbloch323/chatpdf","awacke1/Document-Image-Search-and-Query","McCoasta/docReader","NativeAngels/blitz_diffusion","NativeAngels/PrintingPress4","NativeAngels/PrintingPress","Uthar/HRGiger","dehua68/ToyWorld","tushar888/Zeinural.ai","JarvisOnSolana/Jarvis","Yntec/Image-Models-Test-February-2025"],"createdAt":"2022-08-07T21:07:19.000Z","safetensors":{"parameters":{"I64":514,"F32":127792898},"total":127793412},"inference":"warm","usedStorage":4090788015}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '5168'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 01 Apr 2025 14:29:40 GMT
+      ETag:
+      - W/"1430-P8rOCRwovOo+yZ3LzNEKIvBI32M"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 a254b804a514a03398ee1399ef3d47c6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 6tfNev6XjakDz4rCICaMjYZUQmfbuuSkuvAt7Yk7Pa5HNZ8DSZo_ng==
+      X-Amz-Cf-Pop:
+      - BOM78-P10
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ebf854-5c3fc0aa68b2eadf28b4d663;6cac1943-e561-47dd-8b92-c8fb24d5621f
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -506,9 +564,9 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - a97e0ab7-d0db-4aa4-97f0-3cedba4f064e
+      - a79acde3-1c5a-4eca-bbf6-9c2a761770c8
       user-agent:
-      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: POST
     uri: https://router.huggingface.co/hf-inference/models/impira/layoutlm-document-qa
   response:
@@ -526,19 +584,21 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 20 Feb 2025 06:28:12 GMT
+      - Tue, 01 Apr 2025 14:29:41 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Via:
-      - 1.1 f3774474598dd2c32211295e787adf8e.cloudfront.net (CloudFront)
+      - 1.1 90b5eb2570c2a8ecfb2cf2f93e5818da.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - Nu1163cFH4G13aGf4BsWkyIhMmprRiCBWEk9l15wDmPJtQzRQHKMOQ==
+      - GlrtCLqr3r2DVe_BqrRcd6KKhRsZnyYkwUGNWj4yPp9-wa6clrH8zA==
       X-Amz-Cf-Pop:
-      - CCU50-P4
+      - HYD57-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
+      X-Robots-Tag:
+      - none
       access-control-allow-credentials:
       - 'true'
       cross-origin-opener-policy:
@@ -546,11 +606,13 @@ interactions:
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       x-compute-time:
-      - '0.478'
+      - '1.124'
       x-compute-type:
       - cache
+      x-inference-id:
+      - gg1WNHPEUP5eE1ecdL86r
       x-request-id:
-      - Root=1-67b6cb7c-41b34dbd7b1bbef97cd92ce0;a97e0ab7-d0db-4aa4-97f0-3cedba4f064e
+      - Root=1-67ebf855-7919630b78545f7d3d7d0345;a79acde3-1c5a-4eca-bbf6-9c2a761770c8
       x-sha:
       - beed3c4d02d86017ebca5bd0fdf210046b907aa6
     status:

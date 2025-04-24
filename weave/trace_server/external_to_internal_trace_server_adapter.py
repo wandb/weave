@@ -99,6 +99,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.otel_export, req)
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
@@ -283,9 +289,16 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             self._internal_trace_server.table_query_stream, req
         )
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_query_stats, req)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.table_query_stats_batch, req)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         return self._ref_apply(self._internal_trace_server.refs_read_batch, req)

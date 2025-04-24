@@ -19,6 +19,7 @@ import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
+import {ValueInputStatus} from './ValueInputStatus';
 
 type SelectValueProps = {
   entity: string;
@@ -54,6 +55,9 @@ export const SelectValue = ({
 
   if (fieldType === 'id' && operator.endsWith('in')) {
     return <IdList ids={getStringList(value)} type="Call" />;
+  }
+  if (fieldType === 'status') {
+    return <ValueInputStatus value={value} onSetValue={onSetValue} />;
   }
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;

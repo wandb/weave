@@ -8,6 +8,7 @@ import {
   TEAL_500,
 } from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
+import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useRef, useState} from 'react';
@@ -15,7 +16,13 @@ import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
 import {Link} from '../../common/Links';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
+import {
+  LLM_MAX_TOKENS,
+  LLM_PROVIDER_LABELS,
+  LLMMaxTokensKey,
+} from '../llmMaxTokens';
+import {ProviderStatus} from '../useConfiguredProviders';
 
 export interface ProviderOption {
   label: string | React.ReactNode;
@@ -33,6 +40,7 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   entity: string;
   project: string;
   isAdmin?: boolean;
+  onConfigureProvider?: (provider: string) => void;
 }
 
 export const DisabledProviderTooltip: React.FC<{
@@ -105,6 +113,7 @@ const SubMenu = ({
         overflowY: 'auto',
         border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
         p: '6px',
+        zIndex: 1,
       }}>
       {llms.map((llm, index) => (
         <Box
@@ -141,6 +150,7 @@ const SubMenuOption = ({
   entity,
   project,
   isAdmin,
+  onConfigureProvider,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -171,7 +181,12 @@ const SubMenuOption = ({
         }}>
         <Box sx={{position: 'relative', zIndex: 1}}>
           <components.Option {...props}>
-            <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
               <Box
                 sx={{
                   wordBreak: 'break-all',
@@ -181,7 +196,23 @@ const SubMenuOption = ({
                 }}>
                 {children}
               </Box>
-              {llms.length > 0 && <Icon name="chevron-next" color="moon_500" />}
+              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+                {isAdmin && isDisabled && (
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onConfigureProvider?.(props.data.value);
+                    }}>
+                    Configure
+                  </Button>
+                )}
+                {llms.length > 0 && (
+                  <Icon name="chevron-next" color="moon_500" />
+                )}
+              </Box>
             </Box>
           </components.Option>
         </Box>
@@ -201,7 +232,17 @@ const SubMenuOption = ({
         )}
       </Box>
     ),
-    [children, isDisabled, isHovered, llms, onChange, position, props]
+    [
+      isAdmin,
+      children,
+      isDisabled,
+      isHovered,
+      llms,
+      onChange,
+      position,
+      props,
+      onConfigureProvider,
+    ]
   );
 
   if (props.data.value === 'divider') {
@@ -215,7 +256,7 @@ const SubMenuOption = ({
     );
   }
 
-  return isDisabled ? (
+  return isDisabled && !isAdmin ? (
     <DisabledProviderTooltip entity={entity} isAdmin={isAdmin}>
       {optionContent}
     </DisabledProviderTooltip>
@@ -230,10 +271,10 @@ export const CustomOption = ({
   entity,
   project,
   isAdmin,
+  onConfigureProvider,
   ...props
 }: CustomOptionProps) => {
   const {inputValue} = props.selectProps;
-
   // If searching, show nested structure
   if (inputValue) {
     const {llms, isDisabled} = props.data;
@@ -256,11 +297,24 @@ export const CustomOption = ({
             borderRadius: '4px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             wordBreak: 'break-all',
             wordWrap: 'break-word',
             whiteSpace: 'normal',
           }}>
-          {props.data.label}
+          <span>{props.data.label}</span>
+          {isAdmin && isDisabled && (
+            <Button
+              variant="ghost"
+              size="small"
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                onConfigureProvider?.(props.data.value);
+              }}>
+              Configure
+            </Button>
+          )}
         </Box>
         <Box
           sx={{
@@ -302,7 +356,8 @@ export const CustomOption = ({
       onChange={onChange}
       entity={entity}
       project={project}
-      isAdmin={isAdmin}>
+      isAdmin={isAdmin}
+      onConfigureProvider={onConfigureProvider}>
       {children}
     </SubMenuOption>
   );
@@ -328,4 +383,89 @@ export const addProviderOption: ProviderOption = {
   ),
   value: 'add-provider',
   llms: [],
+};
+
+export const getLLMDropdownOptions = (
+  configuredProviders: Record<string, ProviderStatus>,
+  configuredProvidersLoading: boolean,
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],
+  customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[],
+  customLoading: boolean
+) => {
+  const options: ProviderOption[] = [];
+  const disabledOptions: ProviderOption[] = [];
+
+  if (configuredProvidersLoading) {
+    options.push({
+      label: 'Loading providers...',
+      value: 'loading',
+      llms: [],
+    });
+  } else {
+    Object.entries(configuredProviders).forEach(([provider, {status}]) => {
+      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
+        .filter(([_, config]) => config.provider === provider)
+        .map(([llmKey]) => ({
+          label: llmKey,
+          value: llmKey as LLMMaxTokensKey,
+          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+        }));
+
+      const option = {
+        label:
+          LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
+        value: provider,
+        llms: status ? providerLLMs : [],
+        isDisabled: !status,
+      };
+
+      if (!status) {
+        disabledOptions.push(option);
+      } else {
+        options.push(option);
+      }
+    });
+  }
+
+  // Add custom providers
+  if (!customLoading) {
+    customProvidersResult?.forEach(provider => {
+      const providerName = provider.val.name || '';
+      const currentProviderModels =
+        customProviderModelsResult?.filter(
+          obj => obj.val.provider === provider.digest
+        ) || [];
+
+      const shortenedProviderLabel =
+        providerName.length > 20
+          ? providerName.slice(0, 2) + '...' + providerName.slice(-4)
+          : providerName;
+
+      const llmOptions = currentProviderModels.map(model => ({
+        label: shortenedProviderLabel + '/' + model.val.name,
+        value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
+        max_tokens: model.val.max_tokens,
+      }));
+
+      if (llmOptions.length > 0) {
+        options.push({
+          label: providerName,
+          value: providerName,
+          llms: llmOptions,
+        });
+      }
+    });
+  }
+
+  // Combine enabled and disabled options
+  // Add a divider option before the add provider option
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allOptions = [
+    ...options,
+    ...disabledOptions,
+    dividerOption,
+    addProviderOption,
+  ];
+
+  return allOptions;
 };

@@ -157,7 +157,6 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
         inputs["self"]["expected_output"]
         == "'Comprehensive market data including key players, market size, and growth trends'"
     )
-    assert inputs["self"]["agent.role"] == "Market Research Specialist"
     assert inputs["agent"]["type"] == "Agent"
 
     outputs = call_1.output

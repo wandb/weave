@@ -21,3 +21,4 @@ gha-creds-*.json
 tests/weave_models/
 tools/codegen/generate_config.yaml
 .cursor
+pyrightconfig.json

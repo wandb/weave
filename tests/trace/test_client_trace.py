@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Callable
 
 import pytest
@@ -30,13 +31,17 @@ from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
+from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ENTITY_TOO_LARGE_PAYLOAD,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
+from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -181,6 +186,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -227,6 +234,8 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_id": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
     }
 
 
@@ -2189,6 +2198,28 @@ def test_call_query_stream_columns(client):
     assert calls[0].attributes == {}
     assert calls[0].inputs == {"a": 0, "b": 0}
 
+    # now get summary
+    calls2 = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+    calls2 = list(calls2)
+    assert len(calls2) == 2
+    # assert derived summary fields are included when getting summary
+    assert calls2[0].summary["weave"]["status"] == "success"
+    assert isinstance(calls2[0].summary["weave"]["latency_ms"], int)
+    assert calls2[0].summary["weave"]["trace_name"] == "calculate"
+    # this means other fields on the call should be set
+    assert calls2[0].started_at is not None
+    assert calls2[0].ended_at is not None
+    assert calls2[0].op_name is not None
+    # but not other big fields
+    assert calls2[0].attributes == {}
+    assert calls2[0].inputs == {}
+    assert calls2[0].output is None
+
 
 def test_call_query_stream_columns_with_costs(client):
     if client_is_sqlite(client):
@@ -2219,6 +2250,11 @@ def test_call_query_stream_columns_with_costs(client):
     assert len(calls) == 2
     assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
+
+    # also assert that derived summary fields are included when getting costs
+    assert calls[0].summary["weave"]["status"] == "success"
+    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
     # Test that costs are returned if we include the summary_dump field
@@ -2260,6 +2296,85 @@ def test_call_query_stream_columns_with_costs(client):
     assert len(calls) == 2
     assert calls[0].summary is not None
     assert calls[0].summary.get("weave", {}).get("costs") is None
+
+
+def test_read_call_start_with_cost(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    project_id = client._project_id()
+    call_id = generate_id()
+    trace_id = generate_id()
+    llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
+    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    price_effective_date = start_time - datetime.timedelta(days=1)
+
+    # --- 1. Insert Prerequisite Data ---
+    cost_data = {
+        llm_id: {
+            "prompt_token_cost": Decimal("0.00001"),  # Cost per token
+            "completion_token_cost": Decimal("0.00003"),  # Cost per token
+            "effective_date": price_effective_date,
+        }
+    }
+    cost_res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs=cost_data,
+            wb_user_id="test_user",  # Assuming a user ID is needed
+        )
+    )
+    price_id = cost_res.ids[0][0]
+
+    # Insert a call record with summary_dump=None
+    call_start_data = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="test_op_null_summary",
+        display_name="Test Operation Null Summary",
+        started_at=start_time,
+        inputs={"arg1": "no summary"},
+        summary_dump=None,  # Explicitly set to None
+        attributes={},
+    )
+    client.server.call_start(tsi.CallStartReq(start=call_start_data))
+
+    # --- 2. Call call_read with include_costs=True ---
+    res = client.server.call_read(
+        tsi.CallReadReq(
+            project_id=project_id,
+            id=call_id,
+            include_costs=True,  # Request cost calculation
+        )
+    )
+
+    # --- 3. Assert Results ---
+    assert res.call is not None, "Expected call record to be found"
+    assert res.call.id == call_id
+
+    # The summary dump should exist but be null or an empty object initially.
+    # The cost query should handle this gracefully and *not* add a costs object.
+    summary = res.call.summary
+    assert isinstance(summary, dict), "Expected summary_dump to be a dictionary"
+
+    if summary is None:
+        # If call_read returns None summary, this is fine for this case.
+        pass
+    elif isinstance(summary, dict):
+        # Check that the costs object was NOT added
+        assert (
+            COST_OBJECT_NAME not in summary.get("weave", {})
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+    else:
+        pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
+
+    # --- 4. Cleanup ---
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
+    )
+    client.purge_costs(price_id)
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
@@ -3471,3 +3586,325 @@ def test_call_stream_query_heavy_query_batch(client):
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
+
+
+def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def test_op(x: dict):
+        return x
+
+    # Create a call with some data
+    result = test_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client), include_storage_size=True
+            )
+        )
+    )
+    assert len(calls) == 1
+    call = calls[0]
+
+    # Verify storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert call.storage_size_bytes is not None
+
+
+def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_total_storage_size=True,
+            )
+        )
+    )
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the total storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert (
+        parent_call.total_storage_size_bytes is not None
+    )  # Parent should have total size
+    assert child_call.storage_size_bytes is None
+    assert (
+        child_call.total_storage_size_bytes is None
+    )  # Child should not have total size
+
+
+def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_storage_size=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the storage sizes are present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert parent_call.storage_size_bytes is not None
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is not None
+    # Child should not have total size
+    assert child_call.total_storage_size_bytes is None
+
+
+def test_calls_hydrated(client):
+    nested = {"hi": {"there": {"foo": "bar"}}}
+    nested_ref = weave.publish(nested)
+
+    @weave.op
+    def nest(input_ref: str):
+        my_obj = {
+            "woahhhh": input_ref,
+        }
+        ref = weave.publish(my_obj)
+        return ref
+
+    nest(nested_ref)
+    nest(nested_ref)
+    nest(nested_ref)
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["inputs", "output", "output.woahhhh"],
+                expand_columns=[
+                    "inputs",
+                    "inputs.input_ref",
+                    "output",
+                    "output.woahhhh",
+                ],
+            )
+        )
+    )
+
+    assert len(calls) == 3
+    assert calls[0].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[0].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+
+
+def test_obj_query_with_storage_size_clickhouse(client):
+    """Test querying objects with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create a test object with some data to ensure it has size
+    dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
+    weave.publish(dataset)
+
+    # Query the object with storage size included
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            include_storage_size=True,
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Verify that storage size is present
+    assert queried_obj.size_bytes is not None
+    assert queried_obj.size_bytes == 270  # Should have some size due to the test data
+
+    # Test that a table is created and its size is correct
+    table_ref = parse_uri(queried_obj.val["rows"])
+    res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
+            project_id=client._project_id(),
+            digests=[table_ref.digest],
+            include_storage_size=True,
+        )
+    )
+
+    assert res.tables[0].storage_size_bytes == 5011
+
+    # Query without storage size (default behavior)
+    res_without_size = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res_without_size.objs) == 1
+    queried_obj_without_size = res_without_size.objs[0]
+
+    # Verify that storage size is not included when not requested
+    assert queried_obj_without_size.size_bytes is None
+
+
+def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def child_op(a: int, b: int) -> dict[str, Any]:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x["a"], x["b"])  # Call child op to create a trace
+
+    parent_op({"a": 1, "b": 2})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged FINAL",
+    )
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Test that "include_costs" and "include_total_storage_size" can be used together
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["id", "summary", "total_storage_size_bytes"],
+                include_costs=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if "parent_op" in c.op_name)
+    child_call = next(c for c in calls if "child_op" in c.op_name)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    assert parent_call.summary["usage"] is not None
+    assert child_call.summary["usage"] is not None
+
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is None
+
+
+def test_call_query_stream_with_invalid_filter_field(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    with pytest.raises(InvalidFieldError):
+        res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "total_storage_size_bytes"},
+                                "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
+                            }
+                        }
+                    },
+                }
+            )
+        )

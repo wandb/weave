@@ -11,7 +11,7 @@ interactions:
       User-Agent:
       - python-requests/2.32.3
       X-Amzn-Trace-Id:
-      - 6ebea4d7-6ce2-4b18-8c1e-b3e348e0b4ce
+      - f81a7771-3ebe-40ec-a0a7-ea642220ea1b
     method: GET
     uri: https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png
   response:
@@ -465,7 +465,7 @@ interactions:
       Content-Type:
       - image/png
       Date:
-      - Thu, 20 Feb 2025 06:28:14 GMT
+      - Tue, 01 Apr 2025 14:29:42 GMT
       ETag:
       - '"78f9c64a3ffcfc436d52d523f3e3c5ad26c14b95"'
       Referrer-Policy:
@@ -473,11 +473,11 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 95a64b916cc7062be796d476a3fd8d74.cloudfront.net (CloudFront)
+      - 1.1 89faf07e4e8786ed37541c47de012ab4.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - BkHqJVyer91gm6h_VHauY2kXEJYy--V5n-gtfwvyA7efSsDdjG_D5w==
+      - 6fUmKqnrn-t5l7EH3Qmm3HZLHk7bwBAqjRpCYHmoxYCkvNk7NpQszQ==
       X-Amz-Cf-Pop:
-      - CCU50-P1
+      - BOM78-P10
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
@@ -485,7 +485,7 @@ interactions:
       X-Repo-Commit:
       - 2359223c1837a7587402bda0f2643382a6eefeab
       X-Request-Id:
-      - Root=1-67b6cb7e-2e55d0f15ff5649967bf998f;6ebea4d7-6ce2-4b18-8c1e-b3e348e0b4ce
+      - Root=1-67ebf856-553e8a196c1d344910f59357;f81a7771-3ebe-40ec-a0a7-ea642220ea1b
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -495,7 +495,7 @@ interactions:
     body: null
     headers:
       user-agent:
-      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: POST
     uri: https://router.huggingface.co/hf-inference/models/impira/layoutlm-document-qa
   response:
@@ -515,29 +515,33 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 20 Feb 2025 06:28:15 GMT
+      - Tue, 01 Apr 2025 14:29:43 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       Via:
-      - 1.1 f881b3dd31ab6286675d899fd085a370.cloudfront.net (CloudFront)
+      - 1.1 2dd685def3177b31ca37906704b5f400.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - SViXEeDjUJyjXMDaYzd8wuOze8CrUUz1J-AG035x831UCyVpRbK9aQ==
+      - 40ZfNnT7pkird0UPwJkK3VjkZwT0BqfzIPDAuzYKt4qdiim4BbfiCg==
       X-Amz-Cf-Pop:
-      - CCU50-P4
+      - HYD57-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
+      X-Robots-Tag:
+      - none
       cross-origin-opener-policy:
       - same-origin
       x-compute-time:
-      - '0.478'
+      - '1.124'
       x-compute-type:
       - cache
+      x-inference-id:
+      - Q-DStN7kceurfgoZHjDtr
       x-request-id:
-      - Root=1-67b6cb7f-7848656f7319498e7e083317
+      - Root=1-67ebf857-5e4533a44e8dd0c7064789ae
       x-sha:
       - beed3c4d02d86017ebca5bd0fdf210046b907aa6
     status:

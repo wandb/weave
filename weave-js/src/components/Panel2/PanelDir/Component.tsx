@@ -155,6 +155,13 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
 
   return (
     <Table.Row
+      style={
+        !isDownloadable
+          ? {
+              pointerEvents: 'none',
+            }
+          : undefined
+      }
       onClick={() => {
         if (file.ref) {
           if (file.ref.startsWith('http://')) {

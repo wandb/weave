@@ -1,7 +1,7 @@
 import {ApolloProvider} from '@apollo/client';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {useIsViewerTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
@@ -16,7 +16,6 @@ import {WFDataModelAutoProvider} from '../wfReactInterface/context';
 import {AddProviderDrawer} from './AddProviderDrawer';
 import {ProviderTable} from './ProviderTable';
 import {useCustomProviders} from './useCustomProviders';
-
 const ProviderStatus = ({isActive}: {isActive: boolean}) => {
   return (
     <div className="flex items-center">
@@ -130,9 +129,8 @@ export const ProvidersTabInner: React.FC<{
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<any>(null);
   const [deletingProvider, setDeletingProvider] = useState<any>(null);
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const isAdmin = !loadingUserInfo && userInfo?.roles[entityName] === 'admin';
 
+  const isAdmin = useIsViewerTeamAdmin(entityName);
   const {result: configuredProviders, loading: configuredProvidersLoading} =
     useConfiguredProviders(entityName);
 

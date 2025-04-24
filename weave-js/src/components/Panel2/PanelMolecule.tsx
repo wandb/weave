@@ -23,8 +23,10 @@ type PanelMoleculeProps = Panel2.PanelProps<typeof inputType, MoleculeConfig>;
 const PanelMolecule: React.FC<PanelMoleculeProps> = props => {
   const inputNode = props.input;
   const assetResult = useAssetURLFromArtifact(inputNode);
-  const isMolecule =
-    !assetResult.loading && assetResult.asset.path.endsWith('.pdb');
+  const extension = !assetResult.loading
+    ? assetResult.asset.path.split('.').pop() ?? 'pdb'
+    : 'pdb';
+  const isMolecule = !assetResult.loading && ['pdb', 'cif'].includes(extension);
 
   return (
     <div style={{height: '100%', width: '100%', overflow: 'hidden'}}>
@@ -48,7 +50,7 @@ const PanelMolecule: React.FC<PanelMoleculeProps> = props => {
                   representationType={
                     props.config?.representationType ?? 'default'
                   }
-                  extension="pdb"
+                  extension={extension}
                 />
               </div>
             );

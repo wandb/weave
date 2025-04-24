@@ -12,10 +12,12 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
+import {ProviderOption} from './LLMDropdownOptions';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
 type PlaygroundChatTopBarProps = {
@@ -27,6 +29,12 @@ type PlaygroundChatTopBarProps = {
   project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
+  isTeamAdmin: boolean;
+  refetchConfiguredProviders: () => void;
+  refetchCustomLLMs: () => void;
+  llmDropdownOptions: ProviderOption[];
+  areProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -45,6 +53,12 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  isTeamAdmin,
+  refetchConfiguredProviders,
+  refetchCustomLLMs,
+  llmDropdownOptions,
+  areProvidersLoading,
+  customProvidersResult,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -126,6 +140,12 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           }
           entity={entity}
           project={project}
+          isTeamAdmin={isTeamAdmin}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          refetchCustomLLMs={refetchCustomLLMs}
+          llmDropdownOptions={llmDropdownOptions}
+          areProvidersLoading={areProvidersLoading}
+          customProvidersResult={customProvidersResult}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />

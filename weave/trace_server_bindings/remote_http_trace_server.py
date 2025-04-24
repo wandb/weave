@@ -232,6 +232,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
 
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        # TODO: Add docs link (DOCS-1390)
+        raise NotImplementedError("Sending otel traces directly is not yet supported.")
+
     # Call API
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
@@ -445,6 +449,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableQueryStatsRes:
         return self._generic_request(
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
+        )
+
+    def table_query_stats_batch(
+        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
+    ) -> tsi.TableQueryStatsRes:
+        return self._generic_request(
+            "/table/query_stats_batch",
+            req,
+            tsi.TableQueryStatsBatchReq,
+            tsi.TableQueryStatsBatchRes,
         )
 
     def refs_read_batch(

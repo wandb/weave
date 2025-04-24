@@ -1,12 +1,13 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import {Pill} from '@wandb/weave/components/Tag/Pill';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
+import {useConfiguredProviders} from './useConfiguredProviders';
 import {
   DEFAULT_SYSTEM_MESSAGE,
   parseTraceCall,
@@ -25,7 +26,6 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
       title={
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           Playground
-          <Pill label="Preview" color="moon" />
         </Box>
       }
       hideTabsIfSingle
@@ -81,6 +81,42 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       includeCosts: true,
     }
   );
+
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(props.entity);
+
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+    refetch: refetchCustomProviders,
+  } = useBaseObjectInstances('Provider', {
+    project_id: `${props.entity}/${props.project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+    refetch: refetchCustomProviderModels,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: `${props.entity}/${props.project}`,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const refetchCustomLLMs = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+  }, [refetchCustomProviders, refetchCustomProviderModels]);
+
+  const areCustomProvidersLoading =
+    customProvidersLoading || customProviderModelsLoading;
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -155,6 +191,14 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           project={props.project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
+          isOpenInPlayground={!!call.result}
+          configuredProvidersLoading={configuredProvidersLoading}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          areCustomProvidersLoading={areCustomProvidersLoading}
+          refetchCustomLLMs={refetchCustomLLMs}
+          customProvidersResult={customProvidersResult || []}
+          customProviderModelsResult={customProviderModelsResult || []}
+          configuredProviders={configuredProviders}
         />
       )}
       {settingsTab !== null && (

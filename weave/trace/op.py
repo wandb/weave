@@ -204,6 +204,11 @@ class Op(Protocol):
     # it disables child ops as well.
     _tracing_enabled: bool
 
+    # `_code_capture_enabled` is a  flag that can be used to disable code capture
+    # for an op.  This is currently used in imperative evaluations to prevent
+    # unwanted code versioning using our code capture system.
+    _code_capture_enabled: bool
+
     tracing_sample_rate: float
 
 
@@ -297,17 +302,19 @@ def _create_call(
     )
 
 
-def _should_skip_tracing(op: Op) -> bool:
+def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
     if weave_client_context.get_weave_client() is None:
         log_once(logger.warn, UNINITIALIZED_MSG)
         return True
-    if not op._tracing_enabled:
-        return True
     if not get_tracing_enabled():
         return True
     return False
+
+
+def should_skip_tracing_for_op(op: Op) -> bool:
+    return not op._tracing_enabled
 
 
 def _should_sample_traces(op: Op) -> bool:
@@ -320,17 +327,17 @@ def _should_sample_traces(op: Op) -> bool:
     return False
 
 
-def _placeholder_call() -> Call:
+def placeholder_call() -> Call:
     # Import here to avoid circular dependency
-    from weave.trace.weave_client import Call
+    from weave.trace.weave_client import NoOpCall
 
-    return Call(
-        _op_name="",
-        trace_id="",
-        project_id="",
-        parent_id=None,
-        inputs={},
-    )
+    return NoOpCall()
+
+
+def is_placeholder_call(call: Call) -> bool:
+    from weave.trace.weave_client import NoOpCall
+
+    return isinstance(call, NoOpCall)
 
 
 def _call_sync_func(
@@ -338,13 +345,17 @@ def _call_sync_func(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    # When this param is True, calls do not automatically "finish" when the function
+    # returns.  The user must explicitly call `finish` on the call object.  This is
+    # included to support the imperative evaluation logging interface.
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if _should_skip_tracing(op):
+    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = func(*args, **kwargs)
         call.output = res
         return res, call
@@ -377,6 +388,9 @@ def _call_sync_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -426,13 +440,14 @@ async def _call_async_func(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if _should_skip_tracing(op):
+    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = await func(*args, **kwargs)
         call.output = res
         return res, call
@@ -463,6 +478,9 @@ async def _call_async_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -512,6 +530,10 @@ def call(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    # When this param is True, calls do not automatically "finish" when the function
+    # returns.  The user must explicitly call `finish` on the call object.  This is
+    # included to support the imperative evaluation logging interface.
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
     """
@@ -536,6 +558,7 @@ def call(
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
+            __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
     else:
@@ -544,6 +567,7 @@ def call(
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
+            __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
 
@@ -595,6 +619,14 @@ def op(
 ) -> Callable[[Callable], Op]: ...
 
 
+@overload
+def op(
+    *,
+    name: str | None = None,
+    enable_code_capture: bool = True,
+) -> Callable[[Callable], Op]: ...
+
+
 def op(
     func: Callable | None = None,
     *,
@@ -603,6 +635,7 @@ def op(
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
+    enable_code_capture: bool = True,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -674,6 +707,7 @@ def op(
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+            wrapper._code_capture_enabled = enable_code_capture  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
