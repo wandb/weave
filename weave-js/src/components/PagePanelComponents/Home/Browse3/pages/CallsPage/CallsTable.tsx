@@ -388,13 +388,23 @@ export const CallsTable: FC<{
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
 
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
+
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
           const existingFullMatchIndex = filterModel.items.findIndex(
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === JSON.stringify(value)
+              item.value === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
@@ -415,7 +425,7 @@ export const CallsTable: FC<{
             const newItems = [...filterModel.items];
             newItems[existingFieldOpMatchIndex] = {
               ...newItems[existingFieldOpMatchIndex],
-              value,
+              value: strVal,
             };
             setFilterModel({
               ...filterModel,
@@ -433,7 +443,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value,
+                value: strVal,
               },
             ],
           };
