@@ -2013,14 +2013,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.project_check")
     def project_check(self, req: tsi.ProjectCheckReq) -> tsi.ProjectCheckRes:
-        query = f"""
+        query = """
         SELECT id
         FROM calls_merged
-        WHERE project_id = '{req.project_id}'
+        WHERE project_id = {project_id: String}
         LIMIT 1
         """
-        res = self._query(query, {})
-        return tsi.ProjectCheckRes(has_data=len(res.result_rows) > 0)
+        res = self._query(query, {"project_id": req.project_id})
+        has_data = len(res.result_rows) > 0
+        return tsi.ProjectCheckRes(has_data=has_data)
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
