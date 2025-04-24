@@ -1,7 +1,9 @@
+import asyncio
 from typing import Callable, TypedDict
 
 import pytest
 
+import weave
 from weave.flow.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
@@ -287,3 +289,97 @@ def test_evaluation_version_reuse(
         filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
     )
     assert len(evaluations) == 1
+
+
+@pytest.mark.asyncio
+async def test_various_input_forms(client):
+    class MyModel(weave.Model):
+        const_value: int
+
+        @weave.op()
+        def predict(self):
+            return self.const_value
+
+    class MyModelAsync(weave.Model):
+        const_value: int
+
+        @weave.op()
+        async def predict(self):
+            await asyncio.sleep(1)
+            return self.const_value
+
+    class MyScorer(weave.Scorer):
+        @weave.op()
+        def score(self, output: int, exp_output: int):
+            return output == exp_output
+
+    class MyScorerAsync(weave.Scorer):
+        @weave.op()
+        async def score(self, output: int, exp_output: int):
+            await asyncio.sleep(1)
+            return output == exp_output
+
+    dummy_dataset = [
+        {"sample": "a", "exp_output": 1},
+        {"sample": "b", "exp_output": 42},
+    ]
+
+    model_flavors = [
+        None,
+        "string_model",
+        {"config": "model_def"},
+        MyModel(const_value=42),
+        MyModelAsync(const_value=420),
+    ]
+
+    dataset_flavors = [
+        None,
+        "string_dataset",
+        dummy_dataset,
+        weave.Dataset(rows=dummy_dataset),
+    ]
+
+    inputs_flavors = ["string_inputs", {"dict_inputs": 1}]
+
+    scorer_flavors = ["string_scorer", {"dict_scorer": 1}, MyScorer(), MyScorerAsync()]
+
+    def run_grid_sync():
+        for model_flavor in model_flavors:
+            for dataset_flavor in dataset_flavors:
+                el = weave.EvaluationLogger(model=model_flavor, dataset=dataset_flavor)
+                for inputs_flavor in inputs_flavors:
+                    pred = el.log_prediction(inputs=inputs_flavor, output=inputs_flavor)
+                    for scorer_flavor in scorer_flavors:
+                        pred.log_score(scorer=scorer_flavor, score=0.5)
+                el.log_summary({"extra_field": "extra_value"})
+
+    run_grid_sync()
+
+    async def run_grid_async():
+        for model_flavor in model_flavors:
+            for dataset_flavor in dataset_flavors:
+                el = weave.EvaluationLogger(model=model_flavor, dataset=dataset_flavor)
+                for inputs_flavor in inputs_flavors:
+                    # TODO: log_prediction should have it's own async version
+                    pred = el.log_prediction(inputs=inputs_flavor, output=inputs_flavor)
+                    for scorer_flavor in scorer_flavors:
+                        await pred.alog_score(scorer=scorer_flavor, score=0.5)
+                # TODO: log_summary should have it's own async version
+                el.log_summary({"extra_field": "extra_value"})
+
+    await run_grid_async()
+
+    calls = client.get_calls()
+    calls_per_eval = (
+        1  # root
+        + len(inputs_flavors)
+        * (  # predict and scores
+            1  # predict and score
+            + 1  # predict
+            + len(scorer_flavors)  # scores
+        )
+        + 1  # summarize
+    )
+    num_evals = len(model_flavors) * len(dataset_flavors)
+    num_repeats = 2
+    assert len(calls) == calls_per_eval * num_evals * num_repeats
