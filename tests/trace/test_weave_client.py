@@ -3298,7 +3298,7 @@ def test_calls_query_filter_by_root_refs(client, clickhouse_client):
     client.flush()
 
     out = clickhouse_client.query("""
-    SELECT id, started_at, ended_at, inputs_dump, output_dump
+    SELECT id, started_at, ended_at, parent_id, op_name
     FROM calls_merged
     """)
     from pprint import pprint
