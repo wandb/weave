@@ -3318,6 +3318,13 @@ def test_filter_calls_by_ref(client):
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
 
+    # filter by two output refs
+    calls = client.get_calls(filter={"output_refs": [ref2.uri(), ref3.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+    assert calls[0].output["ref3"] == obj
+
     # filter by the wrong ref
     calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
     assert len(calls) == 0
