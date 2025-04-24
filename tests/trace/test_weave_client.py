@@ -22,6 +22,7 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
@@ -3276,3 +3277,54 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[5] == uuidv7_calls[1].id
     assert call_ids[6] == uuidv7_calls[2].id
     assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_calls_query_filter_by_root_refs(client):
+    @weave.op()
+    def root_op(x: int):
+        return child_op(x)
+
+    @weave.op()
+    def child_op(x: int):
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int):
+        return x + 3
+
+    root_op(1)
+    root_op(2)
+
+    # basic trace roots only filter
+    calls = client.get_calls(filter={"trace_roots_only": True})
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+    root_op_ref = calls[0].op_name
+
+    # basic trace roots only filter = false, this should be everything
+    calls = client.get_calls(filter={"trace_roots_only": False})
+    assert len(calls) == 6
+
+    # trace roots only + query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
+                    {"$literal": 1},
+                ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + op filter
+    calls = client.get_calls(
+        filter={"trace_roots_only": True, "op_names": [root_op_ref]},
+    )
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
