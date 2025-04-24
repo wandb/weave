@@ -281,9 +281,9 @@ class EvaluationLogger(BaseModel):
     using the `log_prediction` method, and finished when the `log_summary` method
     is called.
 
-    Each time you log a prediction, you will get back an `ImperativePredictionLogger`
-    object.  You can use this object to log scores and metadata for that specific
-    prediction (see that class for more details).
+    Each time you log a prediction, you will get back a `ScoreLogger` object.
+    You can use this object to log scores and metadata for that specific
+    prediction. For more information, see the `ScoreLogger` class.
 
     Example:
         ```python
