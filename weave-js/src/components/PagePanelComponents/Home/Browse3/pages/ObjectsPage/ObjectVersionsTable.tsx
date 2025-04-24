@@ -23,6 +23,7 @@ import {
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
+  EMPTY_PROPS_OBJECT_VERSIONS,
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
@@ -403,6 +404,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     return {...props.initialFilter, ...props.frozenFilter};
   }, [props.initialFilter, props.frozenFilter]);
 
+  const isOneObject = effectiveFilter.objectName != null;
   const effectivelyLatestOnly = !effectiveFilter.objectName;
 
   const filteredObjectVersions = useRootObjectVersions(
@@ -432,7 +434,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   const objectVersions = filteredObjectVersions.result ?? [];
   const isEmpty = objectVersions.length === 0;
   if (isEmpty) {
-    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    let propsEmpty = isOneObject
+      ? EMPTY_PROPS_OBJECT_VERSIONS
+      : EMPTY_PROPS_OBJECTS;
     const base = props.initialFilter?.baseObjectClass;
     if ('Prompt' === base) {
       propsEmpty = EMPTY_PROPS_PROMPTS;
