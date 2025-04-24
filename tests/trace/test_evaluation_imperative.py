@@ -444,11 +444,13 @@ def test_passing_dict_requires_name_with_scorer(client):
         pred.log_score(scorer={"something": "else"}, score=0.5)
 
     pred.log_score(scorer={"name": "my_scorer"}, score=0.5)
+    ev.finish()
 
 
 @pytest.mark.disable_logging_error_check
 def test_passing_dict_requires_name_with_model(client):
     with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
-        weave.EvaluationLogger(model={"something": "else"})
+        ev = weave.EvaluationLogger(model={"something": "else"})
 
-    weave.EvaluationLogger(model={"name": "my_model"})
+    ev2 = weave.EvaluationLogger(model={"name": "my_model"})
+    ev2.finish()
