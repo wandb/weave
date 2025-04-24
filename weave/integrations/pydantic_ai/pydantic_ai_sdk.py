@@ -36,7 +36,7 @@ def get_pydantic_ai_patcher(
 
     # Create a tracer provider and span processor for PydanticAI
     tracer_provider = trace_sdk.TracerProvider()
-    span_processor = SimpleSpanProcessor(PydantiAISpanExporter())
+    span_processor = SimpleSpanProcessor(PydanticAISpanExporter())
     tracer_provider.add_span_processor(span_processor)
 
     # Create a wrapper function for Agent.__init__
