@@ -316,3 +316,6 @@ commit_args = ""
 [tool.bumpversion.parts.pre_l]
 values = ["dev", "final"]
 optional_value = "final"
+
+[tool.typos.default.extend-words]
+fasion = "fasion" # Wandb lore

@@ -409,7 +409,7 @@ const isBoundingBoxHidden = (
   const allDisabled =
     classOverlayStates.all?.disabled ?? DEFAULT_ALL_MASK_CONTROL.disabled;
 
-  if (allDisabled) {
+  if (allDisabled && classOverlayStates?.[box.class_id]?.disabled !== false) {
     return true;
   }
 

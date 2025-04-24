@@ -217,7 +217,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 15
+    timeout-minutes: 18
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -5,7 +5,6 @@ import {
   GridPagination,
   GridPaginationModel,
   GridRenderCellParams,
-  GridRenderEditCellParams,
   GridRowModel,
   GridSortModel,
   useGridApiRef,
@@ -36,9 +35,8 @@ import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {
   CELL_COLORS,
-  CellEditingRenderer,
-  CellViewingRenderer,
   ControlCell,
+  DatasetCellRenderer,
   DELETED_CELL_STYLES,
 } from './CellRenderers';
 import {useDatasetEditContext} from './DatasetEditorContext';
@@ -419,7 +417,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       width: columnWidths[field as string] ?? undefined,
       flex: columnWidths[field as string] ? undefined : 1,
       minWidth: 100,
-      editable: isEditing,
+      editable: false,
       sortable: true,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
@@ -438,7 +436,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         const rowIndex = params.row.___weave?.index;
 
         return (
-          <CellViewingRenderer
+          <DatasetCellRenderer
             {...params}
             isEdited={
               rowIndex != null && !params.row.___weave?.isNew
@@ -452,19 +450,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               field as string
             )}
             disableNewRowHighlight={disableNewRowHighlight}
-          />
-        );
-      },
-      renderEditCell: (params: GridRenderEditCellParams) => {
-        const rowIndex = params.row.___weave?.index;
-        const serverValue =
-          rowIndex != null && !params.row.___weave?.isNew
-            ? get(loadedRows[rowIndex - offset]?.val ?? {}, params.field)
-            : '';
-        return (
-          <CellEditingRenderer
-            {...params}
-            serverValue={serverValue}
             preserveFieldOrder={preserveFieldOrder}
           />
         );
@@ -552,7 +537,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         sortingMode="server"
         sortModel={sortModel}
         onSortModelChange={onSortModelChange}
-        editMode="cell"
         pagination
         paginationMode="server"
         paginationModel={paginationModel}

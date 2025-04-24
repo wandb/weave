@@ -11,7 +11,7 @@ import LRUCache from 'lru-cache';
 
 import {Node} from '../../../../../../core';
 import {
-  CallKey,
+  CacheableCallKey,
   CallSchema,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -42,11 +42,13 @@ const makeSpecificCache = <K, V>(
   };
 };
 
-export const callCache = makeSpecificCache<CallKey, CallSchema>(key => {
-  const {entity, project, callId, ...rest} = key;
-  const meta = isEmpty(rest) ? '' : `?meta=${JSON.stringify(rest)}`;
-  return `call:${entity}/${project}/${callId}${meta}`;
-});
+export const callCache = makeSpecificCache<CacheableCallKey, CallSchema>(
+  key => {
+    const {entity, project, callId, ...rest} = key;
+    const meta = isEmpty(rest) ? '' : `?meta=${JSON.stringify(rest)}`;
+    return `call:${entity}/${project}/${callId}${meta}`;
+  }
+);
 
 export const opVersionCache = makeSpecificCache<OpVersionKey, OpVersionSchema>(
   key => {
