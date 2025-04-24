@@ -3282,7 +3282,7 @@ def test_calls_query_with_non_uuidv7_ids(client):
 def test_calls_query_filter_by_root_refs(client):
     @weave.op()
     def root_op(x: int):
-        return child_op(x)
+        return {"n": x, "child": child_op(x)}
 
     @weave.op()
     def child_op(x: int):
@@ -3299,7 +3299,7 @@ def test_calls_query_filter_by_root_refs(client):
 
     # basic trace roots only filter
     calls = client.get_calls(filter={"trace_roots_only": True})
-    assert len(calls) == 2
+    assert len(calls) == 2  # tests the stats query
     assert op_name_from_call(calls[0]) == "root_op"
     assert op_name_from_call(calls[1]) == "root_op"
     root_op_ref = calls[0].op_name
@@ -3308,7 +3308,7 @@ def test_calls_query_filter_by_root_refs(client):
     calls = client.get_calls(filter={"trace_roots_only": False})
     assert len(calls) == 6
 
-    # trace roots only + query
+    # trace roots only + inputs query
     calls = client.get_calls(
         filter={"trace_roots_only": True},
         query={
@@ -3317,6 +3317,21 @@ def test_calls_query_filter_by_root_refs(client):
                     {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
                     {"$literal": 1},
                 ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + output query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
+                    {"$literal": 2},
+                ],
             }
         },
     )
