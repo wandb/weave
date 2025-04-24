@@ -40,8 +40,8 @@ from weave.flow.eval_imperative import EvaluationLogger
 
 # Initialize the logger (model/dataset names are optional metadata)
 eval_logger = EvaluationLogger(
-    model="my-model",
-    dataset="my-dataset"
+    model="my_model",
+    dataset="my_dataset"
 )
 
 # Example input data (this can be any data structure you want)
