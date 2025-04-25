@@ -93,6 +93,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
@@ -137,8 +138,6 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
-from weave.trace_server.kafka import KafkaProducer
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

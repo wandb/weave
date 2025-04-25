@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -11,6 +10,7 @@ import sys
 import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
@@ -1471,9 +1471,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime | None = datetime.now(
-            timezone.utc
-        ),
+        effective_date: datetime | None = datetime.now(timezone.utc),
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",

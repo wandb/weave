@@ -1,8 +1,10 @@
 import json
 from typing import Any
-from weave.trace.objectify import register_object
-from weave.flow.scorer import BuiltInScorer
+
 import weave
+from weave.flow.scorer import BuiltInScorer
+from weave.trace.objectify import register_object
+
 
 @register_object
 class ValidJSONScorer(BuiltInScorer):

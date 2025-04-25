@@ -1,13 +1,11 @@
 import asyncio
 import inspect
 import logging
+import os
 from datetime import datetime
 from typing import Any
-import sentry_sdk
-import os
 
-# This import is used to register built-in scorers so they can be deserialized from the DB
-import weave.scorers  # noqa: F401
+import sentry_sdk
 from confluent_kafka import KafkaError, Message
 from tenacity import (
     before_log,
@@ -16,6 +14,9 @@ from tenacity import (
     stop_after_attempt,
     wait_fixed,
 )
+
+# This import is used to register built-in scorers so they can be deserialized from the DB
+import weave.scorers  # noqa: F401
 from weave.flow.monitor import Monitor
 from weave.flow.scorer import Scorer, get_scorer_attributes
 from weave.trace.box import box
@@ -56,10 +57,10 @@ def get_trace_server() -> TraceServerInterface:
 
 
 # This should be cached to avoid hitting ClickHouse for each ended call.
-def get_active_monitors(project_id: str) -> list[tuple[Monitor, str]]:
-    """
-    Returns active monitors for a given project.
-    """
+def get_active_monitors(
+    project_id: str,
+) -> list[tuple[Monitor, InternalObjectRef, str | None]]:
+    """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
         project_id=project_id,
         filter=tsi.ObjectVersionFilter(
@@ -97,9 +98,7 @@ def get_active_monitors(project_id: str) -> list[tuple[Monitor, str]]:
 
 
 def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Scorer]:
-    """
-    Resolves scorer references to Scorer objects.
-    """
+    """Resolves scorer references to Scorer objects."""
     server = get_trace_server()
 
     scorer_refs = [
@@ -118,7 +117,7 @@ def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Sco
     for scorer, scorer_ref in zip(scorers, scorer_refs):
         scorer.__dict__["internal_ref"] = scorer_ref
 
-    return scorers
+    return scorers  # type: ignore
 
 
 class CallNotWrittenError(Exception):
@@ -133,11 +132,11 @@ class CallNotWrittenError(Exception):
     before=before_log(logger, logging.INFO),
 )
 def get_filtered_call(
-    op_names: list[str], query: tsi.Query | None, ended_call: tsi.EndedCallSchemaForInsert
+    op_names: list[str],
+    query: tsi.Query | None,
+    ended_call: tsi.EndedCallSchemaForInsert,
 ) -> Call | None:
-    """
-    Looks up the call based on a monitor's call filter.
-    """
+    """Looks up the call based on a monitor's call filter."""
     server = get_trace_server()
 
     # We do this two-step querying to circumvent the absence of write->read consistency in ClickHouse.
@@ -169,19 +168,19 @@ def get_filtered_call(
 
     if len(calls) == 0:
         logger.warning("No matching calls found for call id %s", ended_call.id)
-        return
+        return None
 
     if len(calls) > 1:
         logger.warning("Multiple calls found for call id %s", ended_call.id)
-        return
+        return None
 
     call = calls[0]
 
     if not call.ended_at:
-        return
+        return None
 
     if call.exception:
-        return
+        return None
 
     logger.info("Found call %s", call.id)
 
@@ -189,9 +188,7 @@ def get_filtered_call(
 
 
 def build_client_call(server_call: tsi.CallSchema) -> Call:
-    """
-    Converts a server call to a client call.
-    """
+    """Converts a server call to a client call."""
     server = get_trace_server()
 
     return Call(
@@ -217,10 +214,8 @@ async def process_monitor(
     monitor_internal_ref: InternalObjectRef,
     ended_call: tsi.EndedCallSchemaForInsert,
     wb_user_id: str,
-):
-    """
-    Actually apply the monitor's scorers for an ended call.
-    """
+) -> None:
+    """Actually apply the monitor's scorers for an ended call."""
     if (call := get_filtered_call(monitor.op_names, monitor.query, ended_call)) is None:
         return
 
@@ -284,9 +279,7 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
 
 
 def _get_score_call(score_call_id: str, project_id: str) -> Call:
-    """
-    Gets a score call from the DB.
-    """
+    """Gets a score call from the DB."""
     server = get_trace_server()
 
     call_req = tsi.CallsQueryReq(
@@ -304,18 +297,16 @@ async def apply_scorer(
     call: Call,
     project_id: str,
     wb_user_id: str,
-):
-    """
-    Actually apply the scorer to the call.
-    """
+) -> None:
+    """Actually apply the scorer to the call."""
     score_call_id, result = _do_score_call(scorer, call, project_id)
 
     score_call = _get_score_call(score_call_id, project_id)
 
-    call_ref = InternalCallRef(project_id=project_id, id=call.id)
-    score_call_ref = InternalCallRef(project_id=project_id, id=score_call.id)
+    call_ref = InternalCallRef(project_id=project_id, id=call.id)  # type: ignore
+    score_call_ref = InternalCallRef(project_id=project_id, id=score_call.id)  # type: ignore
 
-    results_json = to_json(result, project_id, None)
+    results_json = to_json(result, project_id, None)  # type: ignore
     payload = {"output": results_json}
 
     server = get_trace_server()
@@ -323,7 +314,7 @@ async def apply_scorer(
     feedback_req = FeedbackCreateReq(
         project_id=project_id,
         weave_ref=call_ref.uri(),
-        feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + scorer.name,
+        feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + scorer.name,  # type: ignore
         payload=payload,
         runnable_ref=scorer.__dict__["internal_ref"].uri(),
         call_ref=score_call_ref.uri(),
@@ -334,13 +325,13 @@ async def apply_scorer(
     server.feedback_create(feedback_req)
 
 
-async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert):
+async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert) -> None:
     project_id = ended_call.project_id
 
     active_monitors_ref_user_ids = get_active_monitors(project_id)
 
     for monitor, monitor_internal_ref, wb_user_id in active_monitors_ref_user_ids:
-        await process_monitor(monitor, monitor_internal_ref, ended_call, wb_user_id)
+        await process_monitor(monitor, monitor_internal_ref, ended_call, wb_user_id)  # type: ignore
 
 
 def _call_processor_done_callback(
@@ -355,15 +346,15 @@ def _call_processor_done_callback(
         task.result()
         consumer.commit(msg)
     except Exception as e:
-        logger.error(f"Error processing message: {e.__class__.__name__} {e}")
+        logger.exception(
+            f"Error processing message: {e.__class__.__name__} {e}", exc_info=e
+        )
 
 
 async def process_kafka_message(
     msg: Message, consumer: KafkaConsumer, call_processors: set[asyncio.Task]
 ) -> bool:
-    """
-    Process a single Kafka message and create a task for it.
-    """
+    """Process a single Kafka message and create a task for it."""
     try:
         ended_call = tsi.EndedCallSchemaForInsert.model_validate_json(
             msg.value().decode("utf-8")
@@ -376,16 +367,14 @@ async def process_kafka_message(
             lambda t: _call_processor_done_callback(t, msg, consumer, call_processors)
         )
 
-        return True
+        return True  # noqa: TRY300
     except Exception as e:
-        logger.error("Error processing message: %s", e)
+        logger.exception("Error processing message: %s", e, exc_info=e)
         return False
 
 
 async def handle_kafka_errors(msg: Message) -> bool:
-    """
-    Handle Kafka-specific errors.
-    """
+    """Handle Kafka-specific errors."""
     if msg.error():
         if msg.error().code() == KafkaError._PARTITION_EOF:
             logger.error(
@@ -393,7 +382,7 @@ async def handle_kafka_errors(msg: Message) -> bool:
                 % (msg.topic(), msg.partition(), msg.offset())
             )
         else:
-            logger.error("Kafka error: %s", msg.error())
+            logger.exception("Kafka error: %s", msg.error())
 
         return False
 
@@ -401,9 +390,7 @@ async def handle_kafka_errors(msg: Message) -> bool:
 
 
 async def cleanup_tasks(call_processors: set[asyncio.Task]) -> set[asyncio.Task]:
-    """
-    Clean up completed tasks and wait for pending ones.
-    """
+    """Clean up completed tasks and wait for pending ones."""
     call_processors = {t for t in call_processors if not t.done()}
 
     if call_processors:
@@ -415,12 +402,10 @@ async def cleanup_tasks(call_processors: set[asyncio.Task]) -> set[asyncio.Task]
     return set()
 
 
-async def run_consumer():
-    """
-    This is the main loop consuming the ended calls from the Kafka topic.
-    """
+async def run_consumer() -> None:
+    """This is the main loop consuming the ended calls from the Kafka topic."""
     consumer = KafkaConsumer.from_env()
-    call_processors = set()
+    call_processors: set[asyncio.Task] = set()
 
     consumer.subscribe([CALL_ENDED_TOPIC])
     logger.info("Subscribed to %s", CALL_ENDED_TOPIC)
@@ -442,15 +427,15 @@ async def run_consumer():
         consumer.close()
 
 
-def init_sentry():
+def init_sentry() -> None:
     sentry_sdk.init(
         dsn="https://8ed9a67d68481736b1bc4e815a2a8901@o151352.ingest.us.sentry.io/4509210797277185",
         environment=os.environ.get("WEAVE_SENTRY_ENV", "dev"),
-        release=weave.version.VERSION
+        release=weave.version.VERSION,
     )
 
 
-async def main():
+async def main() -> None:
     init_sentry()
 
     await run_consumer()
