@@ -53,6 +53,7 @@ import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
+import {TabUseSavedView} from './Tabs/TabUseSavedView';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -429,7 +430,9 @@ const ObjectVersionPageInner: React.FC<{
           content: (
             <ScrollableTabContent>
               <Tailwind>
-                {baseObjectClass === 'Prompt' ? (
+                {baseObjectClass === 'SavedView' ? (
+                  <TabUseSavedView name={objectName} uri={refUri} />
+                ) : baseObjectClass === 'Prompt' ? (
                   <TabUsePrompt
                     name={objectName}
                     uri={refUri}
