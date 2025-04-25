@@ -166,16 +166,16 @@ This will start the client, which will connect to and interact with the server. 
 - `demo` - Run demos for all features
 - `q` - Exit the session
 
-If you type `demo`, the client will run through all the features. Typing `q` will close the process. If you want to play with the available features, try individual commands listed above.
+If you type `demo`, the client will run through all the features. The image shown above is the trace timeline you should get by doing so.Typing `q` will close the process. If you want to play with the available features, try individual commands listed above.
 
 :::Tip
 By default, you will just see the `run_client` traces. Click on the Ops selection box and select "All Calls"
 
-[!mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)]
+[!mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)
 
 Doing so will show you `FastMCP` methods (tools, resources, prompts) traced by the integration. You can see the arguments given to the tools and returned values.
 
-[!mcp_fastmcp.png](imgs/mcp/mcp_fastmcp.png)](https://wandb.ai/ayut/mcp_example/weave/traces?peekPath=%2Fayut%2Fmcp_example%2Fcalls%2F01966bc2-aca1-7021-a626-aecfe677b1b4%3FhideTraceTree%3D0)
+[!mcp_fastmcp.png](imgs/mcp/mcp_fastmcp.png)(https://wandb.ai/ayut/mcp_example/weave/traces?peekPath=%2Fayut%2Fmcp_example%2Fcalls%2F01966bc2-aca1-7021-a626-aecfe677b1b4%3FhideTraceTree%3D0)
 :::
 
 ### Understanding the Example
