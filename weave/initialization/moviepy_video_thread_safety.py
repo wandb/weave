@@ -3,14 +3,14 @@ This file exposes functions to make moviepy VideoFileClip thread-safe and revert
 - `apply_threadsafe_patch_to_moviepy_video`
 - `undo_threadsafe_patch_to_moviepy_video`
 
-Similar to Pillow's ImageFile, moviepy's VideoFileClip may not be thread-safe when 
+Similar to Pillow's ImageFile, moviepy's VideoFileClip may not be thread-safe when
 loading and processing video content across multiple threads, which can lead to race conditions
 and unpredictable behavior.
 
 Inside Weave, we use threads to parallelize work which may involve Videos. This thread-safety
 patch helps prevent issues when video files are accessed across threads.
 
-We call `apply_threadsafe_patch_to_moviepy_video` in the `__init__.py` file to ensure thread-safety 
+We call `apply_threadsafe_patch_to_moviepy_video` in the `__init__.py` file to ensure thread-safety
 for VideoFileClip loading operations.
 """
 
@@ -87,7 +87,7 @@ def _apply_threadsafe_patch() -> None:
             # If anything goes wrong with the locking mechanism,
             # fall back to the global lock for safety
             lock = _fallback_load_lock
-            
+
         # Acquire the instance-specific lock before initializing the video
         # This ensures thread-safety during the entire initialization process
         with lock:
