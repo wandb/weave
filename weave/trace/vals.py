@@ -42,6 +42,8 @@ from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
 
+REMOTE_ITER_PAGE_SIZE = 100
+
 
 @dataclasses.dataclass
 class MutationSetitem:
@@ -465,7 +467,7 @@ class WeaveTable(Traceable):
         wc = require_weave_client()
 
         page_index = 0
-        page_size = 100
+        page_size = REMOTE_ITER_PAGE_SIZE
         while True:
             response = self.server.table_query(
                 TableQueryReq(
