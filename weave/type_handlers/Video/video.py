@@ -2,29 +2,27 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import shutil
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
-from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from PIL import Image
     from moviepy.editor import (
-        VideoFileClip,
         VideoClip,
+        VideoFileClip,
     )
+    from PIL import Image
 try:
-    from PIL import Image
     from moviepy.editor import (
-        VideoFileClip,
         VideoClip,
+        VideoFileClip,
     )
+    from PIL import Image
 
 except ImportError:
     dependencies_met = False
@@ -33,6 +31,7 @@ else:
 
 SUPPORTED_FORMATS = ["gif", "mp4", "webm"]
 DEFAULT_VIDEO_FORMAT = "gif"
+
 
 class VideoWithPreview(BaseModel):
     """TypedDict for video with preview.
@@ -62,14 +61,13 @@ def get_preview_image(clip: VideoClip) -> Image.Image | None:
     We get the middle frame since even slightly edited videos will have different mid frames
     but often the same first frame. If we return none, the clip is empty or invalid
     """
-
     # elif isinstance(clip, mp.
     duration = clip.duration
     # fps = clip.fps
     # n_frames = int(duration * fps)
     # mid_frame = n_frames // 2
 
-    preview_arr = clip.get_frame(duration//2)
+    preview_arr = clip.get_frame(duration // 2)
     preview = Image.fromarray(preview_arr) if preview_arr is not None else None
     return preview
 
@@ -79,6 +77,7 @@ def get_format_from_filename(filename: str) -> str | None:
     if len(split) > 1 and len(split[1]) > 1:
         return split[1][1:]  # Get the extension without the dot
     return None
+
 
 def save(
     obj: VideoClip,
@@ -105,7 +104,9 @@ def save(
     preview = get_preview_image(obj)
 
     if preview is None:
-        raise ValueError("Failed to read frames from video. Please ensure the video is not corrupted.")
+        raise ValueError(
+            "Failed to read frames from video. Please ensure the video is not corrupted."
+        )
 
     # Save the video file
     with artifact.writeable_file_path(f"video.{video_format}") as fp:
@@ -124,10 +125,11 @@ def save(
             except Exception as e:
                 raise ValueError(f"Failed to write video file with error: {e}")
 
-    with artifact.writeable_file_path(f"image.png") as fp:
+    with artifact.writeable_file_path("image.png") as fp:
         preview.save(fp)
 
     return
+
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> VideoWithPreview:
     """Load a VideoClip from the artifact.
@@ -158,13 +160,18 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoWithPreview:
                 raise ValueError(f"Unsupported image format: {ext}")
     if video and video_ext and preview_ext:
         return VideoWithPreview(
-            video=video, preview=preview, video_format=video_ext, preview_format=preview_ext
+            video=video,
+            preview=preview,
+            video_format=video_ext,
+            preview_format=preview_ext,
         )
     raise ValueError("No video or preview extension found for artifact")
+
 
 def is_instance(obj: Any) -> bool:
     """Check if the object is any subclass of VideoClip."""
     return isinstance(obj, VideoClip)
+
 
 def register() -> None:
     """Register the video type handler with the serializer."""
