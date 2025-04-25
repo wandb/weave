@@ -201,9 +201,9 @@ const sidebars: SidebarsConfig = {
           collapsible: true,
           collapsed: false,
           label: "Protocols",
-          link: { type: "doc", id: "guides/protocols/index" },
+          link: { type: "doc", id: "guides/integrations/index"},
           items: [
-            "guides/integrations/mcp",
+            {type: "doc", id: "guides/integrations/mcp", label: "MCP"},
           ],
         },
       ],
