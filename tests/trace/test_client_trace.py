@@ -3945,3 +3945,81 @@ def test_get_object_from_uri_non_registered_object(client):
     assert res._class_name == "MyModel"
     assert res._bases == ["Model", "Object", "BaseModel"]
     assert res.predict(5) == 6
+
+
+def test_dedupe_ref_in_calls_stream(client):
+    nested_obj = {"nested": 123}
+    nested_ref = weave.publish(nested_obj)
+
+    obj = {
+        "my_dataset1": nested_ref,
+        "my_dataset2": nested_ref,
+        "my_dataset3": nested_ref,
+        "my_dataset4": nested_ref,
+        "my_dataset5": nested_ref,
+        "ref_list": {
+            "1": nested_ref,
+            "2": nested_ref,
+            "3": nested_ref,
+        },
+    }
+    obj_ref = weave.publish(obj)
+
+    @weave.op
+    def log():
+        return obj_ref
+
+    log()
+
+    def call_stream(columns, expand_columns):
+        return list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=client._project_id(),
+                    columns=columns,
+                    expand_columns=expand_columns,
+                )
+            )
+        )
+
+    calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
+    assert len(calls_hydrated) == 1
+    assert calls_hydrated[0].output == {
+        "_ref": obj_ref.uri(),
+        "my_dataset1": nested_ref.uri(),
+        "my_dataset2": nested_ref.uri(),
+        "my_dataset3": nested_ref.uri(),
+        "my_dataset4": nested_ref.uri(),
+        "my_dataset5": nested_ref.uri(),
+        "ref_list": {
+            "1": nested_ref.uri(),
+            "2": nested_ref.uri(),
+            "3": nested_ref.uri(),
+        },
+    }
+
+    cols = [
+        "output",
+        "output.my_dataset1",
+        "output.my_dataset2",
+        "output.my_dataset3",
+        "output.my_dataset4",
+        "output.my_dataset5",
+        "output.ref_list",
+        "output.ref_list.1",
+        "output.ref_list.2",
+        "output.ref_list.3",
+    ]
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    calls_all_columns = call_stream(columns=cols, expand_columns=cols)
+    assert len(calls_all_columns) == 1
+    assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset2"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset3"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset4"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset5"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["ref_list"] == {
+        "1": nested_obj_with_ref,
+        "2": nested_obj_with_ref,
+        "3": nested_obj_with_ref,
+    }
