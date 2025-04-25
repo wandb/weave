@@ -61,7 +61,7 @@ In successful `yarn start` output, you'll see a port number where you can previe
 
 6. Commit the changes:
    ```bash
-   git commit -m 'chore(docs): Useful commit message.'
+   git commit -m 'docs(weave): Useful commit message.'
    ```
 7. Push your branch:
    ```bash
