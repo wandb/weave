@@ -11,20 +11,38 @@ import base64
 import json
 import os
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Optional, Union, TYPE_CHECKING
 
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace import Event
-from opentelemetry.sdk.trace.export import SpanExporter
+# Import for type checking only
+if TYPE_CHECKING:
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk import trace as trace_sdk
+    from opentelemetry.sdk.trace import Event
+    from opentelemetry.sdk.trace.export import SpanExporter
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.wandb_interface import wandb_api
 
 
+# Safely try to import OpenTelemetry modules
+def _import_opentelemetry():
+    """Safely import OpenTelemetry modules."""
+    try:
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+        from opentelemetry.sdk import trace as trace_sdk
+        from opentelemetry.sdk.trace import Event
+        from opentelemetry.sdk.trace.export import SpanExporter
+
+        return OTLPSpanExporter, trace_sdk, Event, SpanExporter
+    except ImportError:
+        return None, None, None, None
+
+
 def dicts_to_events(
-    event_dicts: Sequence[dict[str, Any]], span: trace_sdk.ReadableSpan
-) -> Sequence[Event]:
+    event_dicts: Sequence[dict[str, Any]], span: "trace_sdk.ReadableSpan"
+) -> Sequence["Event"]:
     """
     Convert a sequence of event dictionaries into OpenTelemetry Event objects.
 
@@ -38,6 +56,11 @@ def dicts_to_events(
     Returns:
         Sequence[Event]: A sequence of OpenTelemetry Event objects created from the input dictionaries.
     """
+    # Import the required modules
+    _, trace_sdk, Event, _ = _import_opentelemetry()
+    if Event is None:
+        return []  # Return empty list if imports fail
+
     event_objs: list[Event] = []
     n = len(event_dicts)
     for i, d in enumerate(event_dicts):
@@ -59,8 +82,8 @@ def dicts_to_events(
 
 
 def handle_events(
-    key: str, attrs: dict[str, Any], span: trace_sdk.ReadableSpan
-) -> trace_sdk.ReadableSpan:
+    key: str, attrs: dict[str, Any], span: "trace_sdk.ReadableSpan"
+) -> "trace_sdk.ReadableSpan":
     """
     Process and attach events to a given OpenTelemetry span.
 
@@ -90,8 +113,8 @@ def handle_events(
 
 
 def map_events_to_prompt_completion(
-    span: trace_sdk.ReadableSpan,
-) -> trace_sdk.ReadableSpan:
+    span: "trace_sdk.ReadableSpan",
+) -> "trace_sdk.ReadableSpan":
     """
     Map events from a span to generate a prompt and completion for generative AI usage.
 
@@ -135,7 +158,7 @@ def map_events_to_prompt_completion(
     return span
 
 
-def handle_usage(span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
+def handle_usage(span: "trace_sdk.ReadableSpan") -> "trace_sdk.ReadableSpan":
     """
     Rename input/output token attributes to prompt/completion tokens for Weave schema.
 
@@ -156,7 +179,7 @@ def handle_usage(span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
     return span
 
 
-def handle_tool_call(span: trace_sdk.ReadableSpan) -> trace_sdk.ReadableSpan:
+def handle_tool_call(span: "trace_sdk.ReadableSpan") -> "trace_sdk.ReadableSpan":
     """
     Update tool call attributes to match Weave's internal schema.
 
@@ -209,7 +232,7 @@ def get_otlp_headers_from_weave_context() -> dict[str, str]:
     return headers
 
 
-class PydanticAISpanExporter(SpanExporter):
+class PydanticAISpanExporter:
     """
     Custom OpenTelemetry SpanExporter for PydanticAI that injects Weave context headers.
 
@@ -218,14 +241,23 @@ class PydanticAISpanExporter(SpanExporter):
     """
 
     def __init__(self) -> None:
+        # Try to import OpenTelemetry modules
+        OTLPSpanExporter, _, _, _ = _import_opentelemetry()
+        if OTLPSpanExporter is None:
+            self._otlp_exporter = None
+            return
+
         endpoint = os.environ.get(
             "OTEL_EXPORTER_OTLP_ENDPOINT", "https://trace.wandb.ai/otel/v1/traces"
         )
-        self._otlp_exporter = OTLPSpanExporter(
-            endpoint=endpoint, headers=get_otlp_headers_from_weave_context()
-        )
+        try:
+            self._otlp_exporter = OTLPSpanExporter(
+                endpoint=endpoint, headers=get_otlp_headers_from_weave_context()
+            )
+        except Exception:
+            self._otlp_exporter = None
 
-    def export(self, spans: Sequence[trace_sdk.ReadableSpan]) -> Any:
+    def export(self, spans: Sequence["trace_sdk.ReadableSpan"]) -> Any:
         """
         Process and export spans using the OTLPSpanExporter.
 
@@ -235,6 +267,9 @@ class PydanticAISpanExporter(SpanExporter):
         Returns:
             Any: The result of the underlying OTLPSpanExporter export call.
         """
+        if self._otlp_exporter is None:
+            return None
+
         for span in spans:
             for key in ["all_messages_events", "events"]:
                 span = handle_events(key, span._attributes, span)
@@ -245,7 +280,8 @@ class PydanticAISpanExporter(SpanExporter):
 
     def shutdown(self) -> None:
         """Shut down the underlying OTLPSpanExporter."""
-        self._otlp_exporter.shutdown()
+        if self._otlp_exporter is not None:
+            self._otlp_exporter.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """
@@ -257,4 +293,6 @@ class PydanticAISpanExporter(SpanExporter):
         Returns:
             bool: True if flush was successful, False otherwise.
         """
+        if self._otlp_exporter is None:
+            return False
         return self._otlp_exporter.force_flush(timeout_millis)

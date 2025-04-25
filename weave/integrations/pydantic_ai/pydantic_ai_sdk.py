@@ -9,16 +9,30 @@ calls are traced and exported in a way compatible with Weave's trace server.
 
 import importlib
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union, TYPE_CHECKING
 
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+# Define types for type checking only, not for runtime imports
+if TYPE_CHECKING:
+    from opentelemetry.sdk import trace as trace_sdk
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter
 from weave.trace.autopatch import IntegrationSettings
 
 _pydantic_ai_patcher: Union[MultiPatcher, None] = None
+
+
+# Safely try to import OpenTelemetry modules
+def _import_opentelemetry_sdk():
+    """Safely import OpenTelemetry SDK modules."""
+    try:
+        from opentelemetry.sdk import trace as trace_sdk
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+        return trace_sdk, SimpleSpanProcessor
+    except ImportError:
+        return None, None
 
 
 def get_pydantic_ai_patcher(
@@ -43,6 +57,12 @@ def get_pydantic_ai_patcher(
         settings = IntegrationSettings()
 
     if not settings.enabled:
+        return NoOpPatcher()
+
+    # Try to import the OpenTelemetry modules
+    trace_sdk, SimpleSpanProcessor = _import_opentelemetry_sdk()
+    if trace_sdk is None or SimpleSpanProcessor is None:
+        # OpenTelemetry SDK is not available, return NoOpPatcher
         return NoOpPatcher()
 
     global _pydantic_ai_patcher
@@ -109,19 +129,23 @@ def get_pydantic_ai_patcher(
         return wrapped_instrument_all
 
     # Patch both __init__ and instrument_all of the Agent class
-    _pydantic_ai_patcher = MultiPatcher(
-        [
-            SymbolPatcher(
-                lambda: importlib.import_module("pydantic_ai").Agent,
-                "__init__",
-                agent_init_wrapper,
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("pydantic_ai").Agent,
-                "instrument_all",
-                agent_instrument_all_wrapper,
-            ),
-        ]
-    )
+    try:
+        _pydantic_ai_patcher = MultiPatcher(
+            [
+                SymbolPatcher(
+                    lambda: importlib.import_module("pydantic_ai").Agent,
+                    "__init__",
+                    agent_init_wrapper,
+                ),
+                SymbolPatcher(
+                    lambda: importlib.import_module("pydantic_ai").Agent,
+                    "instrument_all",
+                    agent_instrument_all_wrapper,
+                ),
+            ]
+        )
+    except ImportError:
+        # pydantic_ai is not available
+        return NoOpPatcher()
 
     return _pydantic_ai_patcher
