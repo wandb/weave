@@ -1,5 +1,9 @@
 # Model Context Protocol (MCP)
 
+<a target="_blank" href="https://colab.research.google.com/drive/174VzXlU5Qcgvjt4OoIWN-guTxJcOefAh?usp=sharing">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 The Model Context Protocol (MCP) serves as a unified communication standard that enables AI applications to exchange information with Large Language Models (LLMs). Similar to how universal connectors revolutionized hardware connectivity, MCP promises to create a consistent interface for LLMs to access various data sources and interact with external tools, eliminating the need for custom integrations for each new service.
 
 The weave integration allows you to trace your MCP Client and MCP Server. This integration provides detailed visibility into tool calls, resource access, and prompt generation within MCP-based systems.
@@ -111,7 +115,21 @@ This will start the client, which will connect to and interact with the server. 
 - `code-review <code>` - Get code review prompt
 - `debug <error>` - Get debug error prompt
 - `demo` - Run demos for all features
-- `quit` - Exit the session
+- `q` - Exit the session
+
+If you type `demo`, the client will run through all the features. Typing `q` will close the process. If you want to play with the available features, try individual commands listed above.
+
+You will find a trace timeline as shown below:
+
+[![mcp_trace_timeline.png](imgs/mcp/mcp_trace_timeline.png)](https://wandb.ai/ayut/mcp_example/weave/traces?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fayut%2Fmcp_example%2Fop%2Frun_client%3A*%22%5D%7D&peekPath=%2Fayut%2Fmcp_example%2Fcalls%2F01966bbe-cc5e-7012-b45f-bf10617d8c1e%3FhideTraceTree%3D0)
+
+By default, you will just see the `run_client` traces. Click on the Ops selection box and select "All Calls"
+
+[!mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)]
+
+Doing so will show you `FastMCP` methods (tools, resources, prompts) traced by the integration. You can see the arguments give to the tools and returned values.
+
+[!mcp_fastmcp.png](imgs/mcp/mcp_fastmcp.png)](https://wandb.ai/ayut/mcp_example/weave/traces?peekPath=%2Fayut%2Fmcp_example%2Fcalls%2F01966bc2-aca1-7021-a626-aecfe677b1b4%3FhideTraceTree%3D0)
 
 ### Understanding the Example
 
@@ -164,8 +182,7 @@ async with stdio_client(server_params) as (read, write):
         resource = await session.read_resource("greeting://user")
         
         # Get a prompt (this will be traced)
-        prompt = await session.get_prompt("review_code", 
-                                        arguments={"code": "print('Hello')"})
+        prompt = await session.get_prompt("review_code", arguments={"code": "print('Hello')"})
 ```
 
 ### Server-Side Integration
@@ -210,9 +227,6 @@ The MCP integration can be configured through environment variables:
 
 - `MCP_TRACE_LIST_OPERATIONS`: Set to "true" to trace list operations (`list_tools`, `list_resources`, etc.)
 
-## Further Resources
+## Conclusion
 
-- [MCP Protocol Website](https://modelcontextprotocol.io)
-- [MCP GitHub Organization](https://github.com/modelcontextprotocol)
-- [Weave Documentation](https://docs.wandb.ai/weave)
-- [Example MCP Applications](https://github.com/wandb/weave/tree/master/examples/mcp_demo)
+
