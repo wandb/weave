@@ -1,6 +1,6 @@
 # Model Context Protocol (MCP)
 
-The Model Context Protocol (MCP) serves as a unified communication standard that enables AI applications to exchange information with Large Language Models (LLMs). Similar to how universal connectors revolutionized hardware connectivity, MCP promised to create a consistent interface for LLMs to access various data sources and interact with external tools, eliminating the need for custom integrations for each new service.
+The Model Context Protocol (MCP) serves as a unified communication standard that enables AI applications to exchange information with Large Language Models (LLMs). Similar to how universal connectors revolutionized hardware connectivity, MCP promises to create a consistent interface for LLMs to access various data sources and interact with external tools, eliminating the need for custom integrations for each new service.
 
 The weave integration allows you to trace your MCP Client and MCP Server. This integration provides detailed visibility into tool calls, resource access, and prompt generation within MCP-based systems.
 
@@ -10,7 +10,7 @@ Currently our integration captures client-side and server-side operations separa
 
 ## What is MCP?
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to Large Language Models (LLMs).
+The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to generative models (LLMs, VLMs, etc.).
 
 MCP follows a client-server architecture where a host application can connect to multiple servers:
 
@@ -29,11 +29,11 @@ MCP servers provide three main types of capabilities:
 
 As a developer you can fall in one of the three buckets:
 
-- MCP server-side developer: You want to expose multiple tools, resources and prompts to the MCP client. You expose your existing application's tools, resources, etc. or you have built agents or have multiple agents orchestrated by an orchetrator agent. 
+- **MCP server-side developer**: You want to expose multiple tools, resources and prompts to the MCP client. You expose your existing application's tools, resources, etc. or you have built agents or have multiple agents orchestrated by an orchetrator agent. 
 
-- MCP client-side developer: You might want to plug your client-side application to multiple MCP servers. A core part of your client-side logic is to make LLM calls to decide on which tool to be called or which resource to be fetched, etc.
+- **MCP client-side developer**: You might want to plug your client-side application to multiple MCP servers. A core part of your client-side logic is to make LLM calls to decide on which tool to be called or which resource to be fetched, etc.
 
-- MCP server and client developer: You are developing both the server and the client.
+- **MCP server and client developer**: You are developing both the server and the client.
 
 If you fall into the first two bucket, you want to know which tool is called when, what is the execution flow, the token count, latency of different components in your server or client side logics and more. 
 
@@ -45,18 +45,11 @@ With an observability layer you can:
 - audit the workflow or execution logic
 - and identify bottlenecks.
 
-
 ## How the Weave Integration Works?
 
-We automatically patch the key methods of `mcp.server.fastmcp.FastMCP` and `mcp.ClientSession` class.
+We automatically patch the key methods of [`mcp.server.fastmcp.FastMCP`](https://github.com/modelcontextprotocol/python-sdk/blob/b4c7db6a50a5c88bae1db5c1f7fba44d16eebc6e/src/mcp/server/fastmcp/server.py#L109) and [`mcp.ClientSession`](https://github.com/modelcontextprotocol/python-sdk/blob/b4c7db6a50a5c88bae1db5c1f7fba44d16eebc6e/src/mcp/client/session.py#L84) class with a [`weave.op()`](../tracking/ops.md) decorator.
 
-We trace the following key components:
-
-- **Tools**: Function calls with their input arguments, return values, execution time, errors (if any), etc.
-
-- **Resources**: Data access with URI parameters, retrieved content, access time, errors (if any), etc.
-
-- **Prompts**: Template generation with template parameters, generated content, generation time, errors (if any), etc.
+We trace the following key components -- [**Tools**](https://modelcontextprotocol.io/docs/concepts/tools), [**Resources**](https://modelcontextprotocol.io/docs/concepts/resources), [**Prompts**](https://modelcontextprotocol.io/docs/concepts/prompts)
 
 ## Installation
 
