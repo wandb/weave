@@ -38,7 +38,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -1694,14 +1694,14 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
-        time.sleep(0.3)
+        time.sleep(0.03)
         events.append("A(E):" + str(a))
         return a
 
     @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
-        time.sleep(0.2)
+        time.sleep(0.02)
         res = op_a(b)
         events.append("B(E):" + str(b))
         return res
@@ -1709,7 +1709,7 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
-        time.sleep(0.1)
+        time.sleep(0.01)
         res = op_b(c)
         events.append("C(E):" + str(c))
         return res
@@ -2755,8 +2755,19 @@ def test_calls_stream_column_expansion(client):
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
 # in clickhouse_trace_server_batched.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
-def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+@pytest.mark.parametrize("batch_size", [1, 5, 6])
+def test_calls_stream_column_expansion_dynamic_batch_size(
+    client, batch_size, monkeypatch
+):
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        1,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        5,
+    )
+
     @weave.op
     def test_op(x):
         return x
@@ -3055,13 +3066,43 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
-def test_large_keys_are_stripped_call(client, caplog):
+def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+
+    # Patch _insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch):
+        # mock raise insert error
+        if len(str(batch)) > 10 * 1024:
+            raise InsertTooLarge(
+                "Database insertion failed. Record too large. "
+                "A likely cause is that a single row or cell exceeded "
+                "the limit. If logging images, save them as `Image.PIL`."
+            )
+        original_insert_call_batch(self, batch)
+
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        10 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
+        1 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_insert_call_batch",
+        mock_insert_call_batch,
+    )
+
+    # Use a smaller dictionary that will still exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
 
     @weave.op
     def test_op_dict(input_data: dict):

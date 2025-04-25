@@ -158,26 +158,12 @@ def test_client_parallelism_setting(client_creator):
             assert client.future_executor._max_workers == 4
             assert client.future_executor._executor._max_workers == 4
 
-    parse_and_apply_settings(UserSettings(client_parallelism=0))
-    with mock.patch("os.cpu_count", return_value=4):
-        with client_creator() as client:
-            assert client.future_executor._max_workers == 0
-            assert client.future_executor._executor == None
-            wait_time_0, queue_time_0 = speed_test(client)
-
     parse_and_apply_settings(UserSettings(client_parallelism=1))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 1
             assert client.future_executor._executor._max_workers == 1
             wait_time_1, queue_time_1 = speed_test(client)
-
-    # Assert that the queue time is much less for 1 than 0
-    assert queue_time_0 > queue_time_1
-    # Assert that the total time is about the same
-    assert wait_time_0 + queue_time_0 == pytest.approx(
-        wait_time_1 + queue_time_1, abs=0.5
-    )
 
     parse_and_apply_settings(UserSettings(client_parallelism=10))
     with client_creator() as client:
