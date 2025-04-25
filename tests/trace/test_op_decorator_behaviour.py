@@ -1,5 +1,5 @@
 import inspect
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -419,3 +419,37 @@ def test_op_name(client):
 
     parsed = parse_uri(call.op_name)
     assert parsed.name == "custom_name"
+
+
+def test_op_preserves_type_information():
+    """Test that @op decorator preserves type information of the original function."""
+
+    def typed_func(
+        a: int,
+        b: str,
+        c: float | None,
+        d: list[int],
+        e: dict[str, float],
+        f: tuple[str, int],
+        g: bool,
+    ) -> dict[str, Any]:
+        """A function with type annotations."""
+        return {"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g}
+
+    decorated_func = op(typed_func)
+
+    # Check that the type hints and signatures are preserved
+    assert get_type_hints(typed_func) == get_type_hints(decorated_func)
+    assert inspect.signature(decorated_func) == inspect.signature(typed_func)
+
+    values = {
+        "a": 1,
+        "b": "hello",
+        "c": None,
+        "d": [1, 2, 3],
+        "e": {"a": 1.0, "b": 2.0},
+        "f": ("hello", 1),
+        "g": True,
+    }
+    # Check that the function can be called with the correct types
+    assert typed_func(**values) == decorated_func(**values) == values
