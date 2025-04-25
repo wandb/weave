@@ -11,6 +11,8 @@ import {CodeEditor} from '../../../../../CodeEditor';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {DocLink} from '../common/Links';
+import {TabUseBannerError} from '../common/TabUseBanner';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
@@ -26,6 +28,7 @@ type ObjectViewerSectionProps = {
   data: Data;
   noHide?: boolean;
   isExpanded?: boolean;
+  error?: string;
 };
 
 const TitleRow = styled.div`
@@ -195,6 +198,7 @@ export const ObjectViewerSection = ({
   data,
   noHide,
   isExpanded,
+  error,
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
@@ -216,7 +220,11 @@ export const ObjectViewerSection = ({
         <TitleRow>
           <Title>{title}</Title>
         </TitleRow>
-        <Alert>None</Alert>
+        {error ? (
+          <ErrorBanner error={error} section={title} />
+        ) : (
+          <Alert>None</Alert>
+        )}
       </>
     );
   }
@@ -291,4 +299,25 @@ export const ObjectViewerSection = ({
       isExpanded={isExpanded}
     />
   );
+};
+
+const EXCEEDS_LIMIT_ERROR = '<EXCEEDS_LIMITS>';
+const ErrorBanner = ({error, section}: {error: string; section: string}) => {
+  if (!error) {
+    return null;
+  }
+  if (error === EXCEEDS_LIMIT_ERROR) {
+    return (
+      <TabUseBannerError>
+        At log time, this trace exceeded the single-trace size limit (3.5MB).
+        The {section} were not captured. To log objects of any size, see the{' '}
+        <DocLink
+          path="guides/core-types/media#images"
+          text="Weave docs on logging media"
+        />
+        .
+      </TabUseBannerError>
+    );
+  }
+  return <TabUseBannerError>Error: {error}</TabUseBannerError>;
 };

@@ -766,11 +766,3 @@ export const maybeGetDeletedRefValuePlaceholderFromRow = (
 ): string | undefined => {
   return row.value?.[DELETED_REF_KEY];
 };
-
-const isWeaveErrorPayload = (context: TraverseContext): boolean => {
-  return (
-    context.path?.length() === 1 &&
-    context.path?.toStringArray()[0] === '_weave' &&
-    context.value?.error
-  );
-};

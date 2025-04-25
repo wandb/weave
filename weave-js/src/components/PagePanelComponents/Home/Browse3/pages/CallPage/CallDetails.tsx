@@ -9,7 +9,8 @@ import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
-import {CallLink} from '../common/Links';
+import {CallLink, DocLink} from '../common/Links';
+import {TabUseBanner, TabUseBannerError} from '../common/TabUseBanner';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
@@ -113,7 +114,12 @@ export const CallDetails: FC<{
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();
 
-  console.log;
+  const inputError = useMemo(() => {
+    return weaveErrorPayload(call.rawSpan.inputs);
+  }, [call.rawSpan.inputs]);
+  const outputError = useMemo(() => {
+    return weaveErrorPayload(call.rawSpan.output);
+  }, [call.rawSpan.output]);
 
   return (
     <Box
@@ -145,7 +151,11 @@ export const CallDetails: FC<{
               project: call.project,
               mode: 'object_viewer',
             }}>
-            <ObjectViewerSection title="Inputs" data={inputs} />
+            <ObjectViewerSection
+              title="Inputs"
+              data={inputs}
+              error={inputError}
+            />
           </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
@@ -171,7 +181,12 @@ export const CallDetails: FC<{
                 project: call.project,
                 mode: 'object_viewer',
               }}>
-              <ObjectViewerSection title="Output" data={output} isExpanded />
+              <ObjectViewerSection
+                title="Output"
+                data={output}
+                isExpanded
+                error={outputError}
+              />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
@@ -293,34 +308,19 @@ const getDisplayOtelSpan = (call: CallSchema) => {
   return {};
 };
 
-const INPUT_KEYS_TO_INCLUDE = ['_type', '_weave'];
-const filterInputKeys = (inputKeys: string[]) => {
-  return inputKeys.filter(
-    k => !k.startsWith('_') || INPUT_KEYS_TO_INCLUDE.includes(k)
-  );
-};
-
-const OUTPUT_KEYS_TO_INCLUDE = ['_result', '_type', '_weave'];
-const filterOutputKeys = (outputKeys: string[]) => {
-  return outputKeys.filter(
-    k =>
-      k === '_result' ||
-      !k.startsWith('_') ||
-      OUTPUT_KEYS_TO_INCLUDE.includes(k)
-  );
-};
-
 const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
-  const inputKeys = filterInputKeys(
-    span.inputs._keys ?? Object.keys(span.inputs)
-  );
+  const inputKeys =
+    span.inputs._keys ??
+    Object.keys(span.inputs).filter(k => !k.startsWith('_') || k === '_type');
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
-  const outputKeys = filterOutputKeys(
-    callOutput._keys ?? Object.keys(callOutput)
-  );
+  const outputKeys =
+    callOutput._keys ??
+    Object.keys(callOutput).filter(
+      k => k === '_result' || !k.startsWith('_') || k === '_type'
+    );
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };
@@ -352,4 +352,17 @@ const callGrouping = (childCalls: CallSchema[]) => {
   );
 
   return {singularChildCalls, multipleChildCallOpRefs};
+};
+
+const weaveErrorPayload = (val: any): string | undefined => {
+  const isError =
+    val != null &&
+    typeof val === 'object' &&
+    '_weave' in val &&
+    val._weave.error;
+
+  if (isError) {
+    return val._weave.error;
+  }
+  return undefined;
 };
