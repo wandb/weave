@@ -38,6 +38,7 @@ def lint(session):
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
         "custom",
         "trace",
+        "flow",
         "trace_server",
         "anthropic",
         "cerebras",
@@ -114,6 +115,7 @@ def tests(session, shard):
     test_dirs_dict = {
         "custom": [],
         "trace": ["trace/"],
+        "flow": ["flow/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
@@ -128,6 +130,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
+        "--durations=20",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",

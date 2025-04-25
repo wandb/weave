@@ -286,7 +286,7 @@ class WeaveObject(Traceable):
 
 
 class WeaveTable(Traceable):
-    filter: TableRowFilter
+    filter: Optional[TableRowFilter] = None
     _known_length: Optional[int] = None
     _rows: Optional[Sequence[dict]] = None
     # _prefetched_rows is a local cache of rows that can be used to
@@ -295,11 +295,11 @@ class WeaveTable(Traceable):
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: TableRowFilter,
-        root: Optional[Traceable],
+        table_ref: Optional[TableRef] = None,
+        ref: Optional[RefWithExtra] = None,
+        filter: Optional[TableRowFilter] = None,
+        root: Optional[Traceable] = None,
         parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
