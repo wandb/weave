@@ -658,10 +658,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 filter=req.filter,
                 query=req.query,
                 limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
         return tsi.CallsQueryStatsRes(
             count=len(calls),
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:

@@ -419,10 +419,12 @@ class CallsQueryStatsReq(BaseModel):
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
     limit: Optional[int] = None
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+    total_storage_size_bytes: Optional[int] = None
 
 
 class CallUpdateReq(BaseModel):
