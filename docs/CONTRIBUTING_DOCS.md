@@ -30,7 +30,6 @@ Set up your environment to build and serve the Weave documentation locally:
     ```bash
     playwright install
     ```
-
 6. Build and run the docs locally:
     ```bash
     cd docs
