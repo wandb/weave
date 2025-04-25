@@ -113,6 +113,8 @@ export const CallDetails: FC<{
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();
 
+  console.log;
+
   return (
     <Box
       style={{
@@ -291,19 +293,34 @@ const getDisplayOtelSpan = (call: CallSchema) => {
   return {};
 };
 
+const INPUT_KEYS_TO_INCLUDE = ['_type', '_weave'];
+const filterInputKeys = (inputKeys: string[]) => {
+  return inputKeys.filter(
+    k => !k.startsWith('_') || INPUT_KEYS_TO_INCLUDE.includes(k)
+  );
+};
+
+const OUTPUT_KEYS_TO_INCLUDE = ['_result', '_type', '_weave'];
+const filterOutputKeys = (outputKeys: string[]) => {
+  return outputKeys.filter(
+    k =>
+      k === '_result' ||
+      !k.startsWith('_') ||
+      OUTPUT_KEYS_TO_INCLUDE.includes(k)
+  );
+};
+
 const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
-  const inputKeys =
-    span.inputs._keys ??
-    Object.keys(span.inputs).filter(k => !k.startsWith('_') || k === '_type');
+  const inputKeys = filterInputKeys(
+    span.inputs._keys ?? Object.keys(span.inputs)
+  );
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
-  const outputKeys =
-    callOutput._keys ??
-    Object.keys(callOutput).filter(
-      k => k === '_result' || !k.startsWith('_') || k === '_type'
-    );
+  const outputKeys = filterOutputKeys(
+    callOutput._keys ?? Object.keys(callOutput)
+  );
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };

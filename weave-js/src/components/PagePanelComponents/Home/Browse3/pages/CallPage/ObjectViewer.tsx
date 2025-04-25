@@ -98,6 +98,8 @@ export const ObjectViewer = ({
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
+  console.log('data', data);
+
   // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless we have specifically added more rows to the array
   // `truncatedStore` is used to store the additional rows that we can add to the array when the user clicks "Show more"
   const {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore} =
@@ -316,6 +318,8 @@ export const ObjectViewer = ({
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
     return {rows: rowsInner};
   }, [resolvedData]);
+
+  console.log('rows', rows);
 
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
