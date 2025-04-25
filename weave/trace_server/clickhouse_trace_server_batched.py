@@ -1185,7 +1185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
                 ref_digests.add(ref.version)
-                root_val_cache[make_root_ref_cache_key(ref)] = None
+                root_val_cache[cache_key] = None
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
