@@ -29,27 +29,27 @@ MCP servers provide three main types of capabilities:
 - **Resources**: Static and dynamic data that can be read by clients
 - **Prompts**: Templated messages for consistent interactions
 
-## Why need tracing ability?
+## Why is tracing ability needed?
 
-As a developer you can fall in one of the three buckets:
+As a developer you can fall into one of three categories:
 
-- **MCP server-side developer**: You want to expose multiple tools, resources and prompts to the MCP client. You expose your existing application's tools, resources, etc. or you have built agents or have multiple agents orchestrated by an orchetrator agent. 
+- **MCP server-side developer**: You want to expose multiple tools, resources and prompts to the MCP client. You expose your existing application's tools, resources, etc. or you have built agents or have multiple agents orchestrated by an orchestrator agent. 
 
-- **MCP client-side developer**: You might want to plug your client-side application to multiple MCP servers. A core part of your client-side logic is to make LLM calls to decide on which tool to be called or which resource to be fetched, etc.
+- **MCP client-side developer**: You might want to plug your client-side application into multiple MCP servers. A core part of your client-side logic is making LLM calls to decide which tool to call or which resource to fetch.
 
 - **MCP server and client developer**: You are developing both the server and the client.
 
-If you fall into the first two bucket, you want to know which tool is called when, what is the execution flow, the token count, latency of different components in your server or client side logics and more. 
+If you fall into the first two categories, you want to know when each tool is called, what the execution flow looks like, the token count, and latency of different components in your server or client side logic. 
 
 If you are developing both the server and client, the ability to see a unified trace timeline (we don't yet capture server-client interaction) can help you quickly iterate through both server and client side logic. 
 
 With an observability layer you can:
 
-- quickly iterate through your application
-- audit the workflow or execution logic
-- and identify bottlenecks.
+- Quickly iterate through your application
+- Audit the workflow or execution logic
+- Identify bottlenecks
 
-## How the Weave Integration Works?
+## How the Weave Integration Works
 
 We automatically patch the key methods of [`mcp.server.fastmcp.FastMCP`](https://github.com/modelcontextprotocol/python-sdk/blob/b4c7db6a50a5c88bae1db5c1f7fba44d16eebc6e/src/mcp/server/fastmcp/server.py#L109) and [`mcp.ClientSession`](https://github.com/modelcontextprotocol/python-sdk/blob/b4c7db6a50a5c88bae1db5c1f7fba44d16eebc6e/src/mcp/client/session.py#L84) class with a [`weave.op()`](../tracking/ops.md) decorator.
 
@@ -127,7 +127,7 @@ By default, you will just see the `run_client` traces. Click on the Ops selectio
 
 [!mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)]
 
-Doing so will show you `FastMCP` methods (tools, resources, prompts) traced by the integration. You can see the arguments give to the tools and returned values.
+Doing so will show you `FastMCP` methods (tools, resources, prompts) traced by the integration. You can see the arguments given to the tools and returned values.
 
 [!mcp_fastmcp.png](imgs/mcp/mcp_fastmcp.png)](https://wandb.ai/ayut/mcp_example/weave/traces?peekPath=%2Fayut%2Fmcp_example%2Fcalls%2F01966bc2-aca1-7021-a626-aecfe677b1b4%3FhideTraceTree%3D0)
 
@@ -229,4 +229,8 @@ The MCP integration can be configured through environment variables:
 
 ## Conclusion
 
+The Weave integration for MCP provides powerful observability for both client and server-side MCP applications.
 
+While the current integration traces client and server operations separately, we're working toward full end-to-end tracing support. This will provide even deeper insights into how MCP clients and servers interact.
+
+For more information on building with MCP, visit the [Model Context Protocol documentation](https://modelcontextprotocol.io/). To learn more about other Weave integrations, check out our [integrations guides](../).
