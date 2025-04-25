@@ -44,7 +44,7 @@ In successful `yarn start` output, you'll see a port number where you can previe
 1. Navigate to your local `weave` repo and pull the latest changes:
    ```bash
    cd docs
-   git pull origin main
+   git pull origin master
    ```
 2. Create a feature branch off `main`:
    ```bash
