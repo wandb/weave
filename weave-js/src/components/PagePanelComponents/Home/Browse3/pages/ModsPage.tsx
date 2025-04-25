@@ -174,7 +174,7 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       iframe.src = modUrl;
       return () => window.removeEventListener('message', authListener);
     },
-    [modUrl, history]
+    [modUrl, history, entity, project]
   );
 
   useEffect(() => {
