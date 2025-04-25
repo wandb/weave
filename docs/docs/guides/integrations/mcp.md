@@ -6,7 +6,7 @@
 
 The Model Context Protocol (MCP) serves as a unified communication standard that enables AI applications to exchange information with Large Language Models (LLMs). Similar to how universal connectors revolutionized hardware connectivity, MCP promises to create a consistent interface for LLMs to access various data sources and interact with external tools, eliminating the need for custom integrations for each new service.
 
-The weave integration allows you to trace your MCP Client and MCP Server. This integration provides detailed visibility into tool calls, resource access, and prompt generation within MCP-based systems.
+The Weave integration allows you to trace your MCP Client and MCP Server. This integration provides detailed visibility into tool calls, resource access, and prompt generation within MCP-based systems.
 
 :::Note
 Currently our integration captures client-side and server-side operations separately, but does not provide visibility into their interaction. There's an ongoing proposal created by us to add OpenTelemetry trace support to MCP that would enable end-to-end observability - see [GitHub discussion #269](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/269).
@@ -33,15 +33,15 @@ MCP servers provide three main types of capabilities:
 
 As a developer you can fall into one of three categories:
 
-- **MCP server-side developer**: You want to expose multiple tools, resources and prompts to the MCP client. You expose your existing application's tools, resources, etc. or you have built agents or have multiple agents orchestrated by an orchestrator agent. 
+- **MCP server-side developer**: You want to expose multiple tools, resources, and prompts to the MCP client. You expose your existing application's tools, resources, etc., or you have built agents or have multiple agents orchestrated by an orchestrator agent. 
 
 - **MCP client-side developer**: You might want to plug your client-side application into multiple MCP servers. A core part of your client-side logic is making LLM calls to decide which tool to call or which resource to fetch.
 
 - **MCP server and client developer**: You are developing both the server and the client.
 
-If you fall into the first two categories, you want to know when each tool is called, what the execution flow looks like, the token count, and latency of different components in your server or client side logic. 
+If you fall into the first two categories, you want to know when each tool is called, what the execution flow looks like, the token count, and latency of different components in your server or client-side logic. 
 
-If you are developing both the server and client, the ability to see a unified trace timeline (we don't yet capture server-client interaction) can help you quickly iterate through both server and client side logic. 
+If you are developing both the server and client, the ability to see a unified trace timeline (we don't yet capture server-client interaction) can help you quickly iterate through both server and client-side logic. 
 
 With an observability layer you can:
 
