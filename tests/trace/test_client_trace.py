@@ -3908,3 +3908,40 @@ def test_call_query_stream_with_invalid_filter_field(client):
                 }
             )
         )
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        weave.Dataset(rows=[{"a": 1, "b": 2}]),
+        weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
+    ],
+)
+def test_get_object_from_uri(client, obj):
+    ref = weave.publish(obj)
+    uri = ref.uri()
+
+    assert weave.get(uri) == obj
+
+
+def test_get_object_from_uri_non_registered_object(client):
+    class MyModel(weave.Model):
+        a: int
+        b: float = 2.0
+
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x + 1
+
+    model = MyModel(name="example", description="fancy", a=1)
+    ref = weave.publish(model)
+    uri = ref.uri()
+
+    res = weave.get(uri)
+    assert res.name == "example"
+    assert res.description == "fancy"
+    assert res.a == 1
+    assert res.b == 2.0
+    assert res._class_name == "MyModel"
+    assert res._bases == ["Model", "Object", "BaseModel"]
+    assert res.predict(5) == 6
