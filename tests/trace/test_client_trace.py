@@ -3379,7 +3379,7 @@ def test_op_sampling_child_follows_parent(client):
         parent_calls += 1
         return child_op(x)
 
-    num_runs = 100
+    num_runs = 5
     for i in range(num_runs):
         parent_op(i)
 

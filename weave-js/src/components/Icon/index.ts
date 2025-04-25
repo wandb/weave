@@ -266,6 +266,7 @@ export {
   IconWeave,
   IconWeaveGroupBoard,
   IconWebhook,
+  IconWrap,
   IconXAxiAlt,
   IconXAxis,
   IconYoutubeSocial,
