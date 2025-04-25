@@ -120,15 +120,36 @@ class HttpAsync:
                 yarl.URL(url, encoded=True), headers=headers, cookies=cookies, auth=auth
             ) as r:
                 if r.status == 200:
-                    span.set_metric(
-                        "content_length", r.headers.get("content-length", 0), True
-                    )
+                    content_length = r.headers.get("content-length", 0)
+                    span.set_metric("content_length", content_length, True)
                     with tracer.trace("async_download_file_task.open_write"):
                         async with self.fs.open_write(path, mode="wb") as f:
                             with tracer.trace("async_download_file_task.iter_chunked"):
-                                async for data in r.content.iter_chunked(16 * 1024):
-                                    with tracer.trace("async_download_file_task.write"):
-                                        await f.write(data)
+                                chunk_size = 8 * 1024 * 1024
+
+                                if content_length and content_length > 0:
+                                    buffer = bytearray(content_length)
+                                    total_read = 0
+                                    async for chunk in r.content.iter_chunked(
+                                        chunk_size
+                                    ):
+                                        buffer[total_read : total_read + len(chunk)] = (
+                                            chunk
+                                        )
+                                        total_read += len(chunk)
+                                    await f.write(buffer[:total_read])
+                                else:
+                                    buffer = bytearray()
+                                    BUFFER_MAX_SIZE = 56 * 1024 * 1024
+                                    async for data in r.content.iter_chunked(
+                                        chunk_size
+                                    ):
+                                        buffer.extend(data)
+                                        if len(buffer) >= BUFFER_MAX_SIZE:
+                                            await f.write(buffer)
+                                            buffer = bytearray()
+                                    if buffer:
+                                        await f.write(buffer)
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status, "Download failed"
