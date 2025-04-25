@@ -88,6 +88,8 @@ docs = [
   "nbconvert",
   "weave[trace_server]",
 ]
+# Pin until next release with pillow version bump: https://github.com/Zulko/moviepy/commit/e9559d8c3ebf12bb6986a2ba26a85b04dd335dd6
+video_support = ["moviepy<=1.0.3", "pillow"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
@@ -161,6 +163,7 @@ test = [
   "flask",
   "uvicorn>=0.27.0",
   "pillow",
+  "moviepy<=1.0.3",
   "filelock",
   "httpx",
 
