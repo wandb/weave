@@ -335,6 +335,8 @@ export const ModsPage: React.FC<{
   useEffect(() => {
     const fetchModCats = async () => {
       try {
+        // MOD_MANIFEST_URL will always be absolute either to github or modsctl.wandb.tools
+        // eslint-disable-line wandb/no-unprefixed-urls
         const response = await fetch(MOD_MANIFEST_URL);
         if (!response.ok) {
           throw new Error(`Failed to fetch mods: ${response.status}`);
