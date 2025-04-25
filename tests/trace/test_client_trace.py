@@ -122,20 +122,6 @@ def test_simple_op(client):
     )
 
 
-def test_dataset(client):
-    from weave.flow.dataset import Dataset
-
-    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
-
-    # This might seem redundant, but it is useful to ensure that the
-    # dataset can be re-iterated over multiple times and equality is preserved.
-    assert list(d2.rows) == list(d2.rows)
-    assert list(d.rows) == list(d2.rows)
-    assert list(d.rows) == list(d.rows)
-
-
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     trace_id = generate_id()
@@ -3908,3 +3894,40 @@ def test_call_query_stream_with_invalid_filter_field(client):
                 }
             )
         )
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        weave.Dataset(rows=[{"a": 1, "b": 2}]),
+        weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
+    ],
+)
+def test_get_object_from_uri(client, obj):
+    ref = weave.publish(obj)
+    uri = ref.uri()
+
+    assert weave.get(uri) == obj
+
+
+def test_get_object_from_uri_non_registered_object(client):
+    class MyModel(weave.Model):
+        a: int
+        b: float = 2.0
+
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x + 1
+
+    model = MyModel(name="example", description="fancy", a=1)
+    ref = weave.publish(model)
+    uri = ref.uri()
+
+    res = weave.get(uri)
+    assert res.name == "example"
+    assert res.description == "fancy"
+    assert res.a == 1
+    assert res.b == 2.0
+    assert res._class_name == "MyModel"
+    assert res._bases == ["Model", "Object", "BaseModel"]
+    assert res.predict(5) == 6
