@@ -38,7 +38,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -3069,13 +3069,43 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
-def test_large_keys_are_stripped_call(client, caplog):
+def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+
+    # Patch _insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch):
+        # mock raise insert error
+        if len(str(batch)) > 10 * 1024:
+            raise InsertTooLarge(
+                "Database insertion failed. Record too large. "
+                "A likely cause is that a single row or cell exceeded "
+                "the limit. If logging images, save them as `Image.PIL`."
+            )
+        original_insert_call_batch(self, batch)
+
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        10 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
+        1 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_insert_call_batch",
+        mock_insert_call_batch,
+    )
+
+    # Use a smaller dictionary that will still exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
