@@ -1527,17 +1527,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Similarly, the inner select statement in the query above (partitioned and keep row 1) does the same thing.
             #
             # As a result, the resulting query gives you all the chunks from batch 3, then any "extra" chunks from previous batches.
-            # |--------- Insert Batch 3 --------| |-------------------------- Extra Chunks from Batch 2 -----------------------------------| 
+            # |--------- Insert Batch 3 --------| |-------------------------- Extra Chunks from Batch 2 -----------------------------------|
             # C0(0-199), C1(200-399), C2(400-499), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
-            # 
+            #
             #
             # Those "extra" chunks are no long valid, but will be returned be yhe query. By design, we include the expected number of chunks in the response
             # and since the last insert batch is the valid one, we can truncate the response to the expected number of chunks to isolate the valid chunks.
             #
             #
-            # Now, practically, we have never changed the `FILE_CHUNK_SIZE` - nor should we! 
+            # Now, practically, we have never changed the `FILE_CHUNK_SIZE` - nor should we!
             # However, with bucket storage, we don't chunk at all - storing the data effectively as a single chunk.
-            # This effectively means that `FILE_CHUNK_SIZE` for these cases is the size of the file!. Therefore, 
+            # This effectively means that `FILE_CHUNK_SIZE` for these cases is the size of the file!. Therefore,
             # in such cases where a file was written before bucket storage (using chunking) and then after, we will
             # reach a situation that matches the general case above.
             #
