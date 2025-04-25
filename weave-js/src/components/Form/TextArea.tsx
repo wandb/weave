@@ -1,5 +1,6 @@
 /**
  * A form multi-line text input.
+ * Imported from core
  */
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';

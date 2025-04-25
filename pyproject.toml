@@ -164,6 +164,8 @@ test = [
   "filelock",
   "httpx",
 
+  "confluent-kafka",
+
   "weave[trace_server]",
   "weave[trace_server_tests]",
 ]

@@ -59,6 +59,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     if (!children && !hasIcon) {
       console.error('Button: requires either children or an icon.');
     }
+
     const isSmall = size === 'small';
     const isMedium = size === 'medium';
     const isLarge = size === 'large';
