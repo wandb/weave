@@ -42,6 +42,17 @@ export const operationConverter = (
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: item.value}]}],
     };
+  } else if (item.operator === '(string): notContains') {
+    return {
+      $not: [
+        {
+          $contains: {
+            input: {$getField: item.field},
+            substr: {$literal: item.value},
+          },
+        },
+      ],
+    };
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
       return null;
@@ -131,19 +142,19 @@ export const operationConverter = (
     if (item.value === '') {
       return null;
     }
-    const secs = new Date(item.value).getTime();
+    const millisecs = new Date(item.value).getTime();
     return {
-      $gt: [{$getField: item.field}, {$literal: secs / 1000}],
+      $gt: [{$getField: item.field}, {$literal: millisecs / 1000}],
     };
   } else if (item.operator === '(date): before') {
     if (item.value === '') {
       return null;
     }
-    const secs = new Date(item.value).getTime();
+    const millisecs = new Date(item.value).getTime();
     return {
       $not: [
         {
-          $gt: [{$getField: item.field}, {$literal: secs / 1000}],
+          $gt: [{$getField: item.field}, {$literal: millisecs / 1000}],
         },
       ],
     };

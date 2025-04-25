@@ -217,7 +217,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -233,6 +233,7 @@ jobs:
         nox-shard:
           [
             "trace",
+            "flow",
             "trace_server",
             "anthropic",
             "bedrock",

@@ -21,7 +21,8 @@ DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
     '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
 )
-DUMMY_LLM_USAGE_TUPLE = (DUMMY_LLM_ID, DUMMY_LLM_USAGE)
+ESCAPED_DUMMY_LLM_USAGE = DUMMY_LLM_USAGE.replace('"', '\\"')
+
 
 # Org is currently not implemented
 PRICING_LEVELS = {"ORG": "org", "PROJECT": "project", "DEFAULT": "default"}
@@ -128,10 +129,12 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     # This arrayJoin is used to split the usage data into rows each usage instance their own row
     # Here to handle the case where usage_raw is empty, we use a dummy tuple, to ensure that we always have a row
     # We wont return a cost object in the final select if we have a dummy llm_id
+    # Note: The dummy tuple needs explicit string formatting for ClickHouse array literal syntax.
+    # We escape the inner JSON quotes for the SQL string literal.
     kv = f"""arrayJoin(
-                if(usage_raw != '',
+                if(usage_raw != '' and usage_raw != '{{}}',
                 JSONExtractKeysAndValuesRaw(usage_raw),
-                [{DUMMY_LLM_USAGE_TUPLE}])
+                [('{DUMMY_LLM_ID}', '{ESCAPED_DUMMY_LLM_USAGE}')])
             ) AS kv"""
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"

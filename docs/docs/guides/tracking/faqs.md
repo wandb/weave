@@ -27,7 +27,7 @@ A function can be designated as a Weave [Op](/guides/tracking/ops) either manual
 
 - **Derived information** - Weave may compute derived information from the raw information logged, for example a cost estimate may be calculated based on token usage and knowledge of the model used. Weave also aggregates some information over calls.
 
-- **Additional information you choose** - You can choose to log [custom attributes](/guides/core-types/models#track-production-calls) as part of your call or attach [feedback](/guides/tracking/feedback#add-feedback-to-a-call) to a call.
+- **Additional information you choose** - You can choose to log [custom metadata with `weave.attributes`](/guides/core-types/models#track-production-calls) as part of your call or attach [feedback](/guides/tracking/feedback#add-feedback-to-a-call) to a call.
 
 ## How can I disable code capture?
 

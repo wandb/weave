@@ -93,6 +93,7 @@ export type SelectOperatorOption = {
 };
 
 const allOperators: SelectOperatorOption[] = [
+  // String operators
   {
     value: '(string): contains',
     label: 'contains',
@@ -110,9 +111,15 @@ const allOperators: SelectOperatorOption[] = [
   },
   {
     value: '(string): notEquals',
-    label: 'not equals',
+    label: 'does not equal',
     group: 'string',
   },
+  {
+    value: '(string): notContains',
+    label: 'does not contain',
+    group: 'string',
+  },
+  // Number operators
   {
     value: '(number): =',
     label: '=',
@@ -143,11 +150,13 @@ const allOperators: SelectOperatorOption[] = [
     label: '≥',
     group: 'number',
   },
+  // Boolean operators
   {
     value: '(bool): is',
     label: 'is',
     group: 'boolean',
   },
+  // Date operators
   {
     value: '(date): after',
     label: 'after',
@@ -158,6 +167,7 @@ const allOperators: SelectOperatorOption[] = [
     label: 'before',
     group: 'date',
   },
+  // Any operators
   {
     value: '(any): isEmpty',
     label: 'is empty',
@@ -251,7 +261,12 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       },
       {
         value: '(string): notEquals',
-        label: 'not equals',
+        label: 'does not equal',
+        group: 'string',
+      },
+      {
+        value: '(string): notContains',
+        label: 'does not contain',
         group: 'string',
       },
     ];
