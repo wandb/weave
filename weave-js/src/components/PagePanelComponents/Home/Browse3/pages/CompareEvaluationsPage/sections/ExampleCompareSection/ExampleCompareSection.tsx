@@ -254,9 +254,9 @@ export const ExampleCompareSection: React.FC<{
   }
 
   // This section contains the primary helper variable for laying out the grid
-  const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
-    k => k !== DERIVED_SCORER_REF_PLACEHOLDER
-  );
+  const metricGroupNames = Object.keys(compositeScoreMetrics)
+    .filter(k => k !== DERIVED_SCORER_REF_PLACEHOLDER)
+    .sort((groupNameA, groupNameB) => groupNameA.localeCompare(groupNameB));
 
   const inputRef = target.inputRef;
   const numInputProps = inputColumnKeys?.length ?? 0;
@@ -270,15 +270,19 @@ export const ExampleCompareSection: React.FC<{
   // Get derived scores, then filter out any not in the selected metrics
   const derivedScores = Object.values(
     getMetricIds(props.state.summary, 'score', 'derived')
-  ).filter(
-    score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
-  );
+  )
+    .filter(score => props.state.selectedMetrics?.[flattenedDimensionPath(score)])
+    .sort((dimensionA, dimensionB) => 
+      flattenedDimensionPath(dimensionA).localeCompare(flattenedDimensionPath(dimensionB))
+    );
 
   const numMetricScorers = metricGroupNames.length;
   const numDerivedScores = derivedScores.length;
   const numMetricsPerScorer = [
     ...metricGroupNames.map(groupName => {
-      return Object.keys(compositeScoreMetrics[groupName].metrics).length;
+      return Object.keys(compositeScoreMetrics[groupName].metrics)
+        .sort((a, b) => a.localeCompare(b))
+        .length;
     }),
     numDerivedScores,
   ];
@@ -352,9 +356,9 @@ export const ExampleCompareSection: React.FC<{
     if (isDerivedMetric) {
       return derivedScores;
     }
-    return Object.values(
-      lookupScoreGroupMetricsForScorerIndex(scorerIndex)
-    ).map(lookupAnyDimensionForMetric);
+    return Object.entries(lookupScoreGroupMetricsForScorerIndex(scorerIndex))
+      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+      .map(([, value]) => lookupAnyDimensionForMetric(value));
   };
 
   const lookupDimension = (

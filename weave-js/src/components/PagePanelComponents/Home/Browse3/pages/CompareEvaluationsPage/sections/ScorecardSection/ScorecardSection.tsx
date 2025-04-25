@@ -334,7 +334,9 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(compositeSummaryMetrics).map(([groupName, group]) => {
+        {Object.entries(compositeSummaryMetrics)
+          .sort(([groupNameA], [groupNameB]) => groupNameA.localeCompare(groupNameB))
+          .map(([groupName, group]) => {
           const evalCallIdToScorerRef = evalCallIdToScorerRefs(group);
           const uniqueScorerRefs = Array.from(
             new Set(Object.values(evalCallIdToScorerRef))
@@ -397,14 +399,16 @@ export const ScorecardSection: React.FC<{
                   })}
                 </>
               )}
-              {Object.keys(group.metrics).map((metricKey, metricNdx) => {
+              {Object.keys(group.metrics)
+                .sort((metricKeyA, metricKeyB) => metricKeyA.localeCompare(metricKeyB))
+                .map((metricKey, metricNdx, sortedKeys) => {
                 return (
                   <React.Fragment key={metricKey}>
                     <GridCell
                       style={{
                         gridColumnEnd: 'span 2',
                         borderBottom:
-                          metricNdx === Object.keys(group.metrics).length - 1
+                          metricNdx === sortedKeys.length - 1
                             ? '1px solid #ccc'
                             : '',
                         fontWeight: 'bold',
@@ -445,7 +449,7 @@ export const ScorecardSection: React.FC<{
                           style={{
                             borderBottom:
                               metricNdx ===
-                              Object.keys(group.metrics).length - 1
+                              sortedKeys.length - 1
                                 ? '1px solid #ccc'
                                 : '',
                           }}
