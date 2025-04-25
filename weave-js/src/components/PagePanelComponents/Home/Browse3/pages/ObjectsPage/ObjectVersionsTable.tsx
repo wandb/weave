@@ -398,6 +398,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
+  const {setSelectedVersions} = props;
   const {useRootObjectVersions} = useWFHooks();
 
   const effectiveFilter = useMemo(() => {
@@ -422,6 +423,15 @@ export const FilterableObjectVersionsTable: React.FC<{
     undefined,
     effectivelyLatestOnly // metadata only when getting latest
   );
+
+  // When the table reloads, clear any selected versions.
+  // This is because we may be reloading because of a deletion, and
+  // we don't want the deleted version to remain in the selected state if it is there.
+  useEffect(() => {
+    if (filteredObjectVersions.loading && setSelectedVersions) {
+      setSelectedVersions([]);
+    }
+  }, [filteredObjectVersions.loading, setSelectedVersions]);
 
   if (filteredObjectVersions.loading) {
     return <Loading centered />;
