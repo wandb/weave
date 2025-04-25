@@ -369,7 +369,7 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
-    monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 2)
+    monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
 
     dataset = Dataset(rows=[{"input": i} for i in range(10)])
     ref = weave.publish(dataset)
@@ -426,7 +426,7 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
     # Note: if this test suite is ran in a different order, then the low level eval ops will already be saved
     # so the first count can be different.
     count = counts_split_by_table_query[0]
-    assert counts_split_by_table_query == [count, 14, 14, 14, 14, 14, 5], log
+    assert counts_split_by_table_query == [count, 28, 28, 14 + 5], log
 
 
 def test_evaluate_table_order(client):
