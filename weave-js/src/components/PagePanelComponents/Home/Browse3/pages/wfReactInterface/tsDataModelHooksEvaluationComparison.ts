@@ -78,7 +78,6 @@ import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
   PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
   PREDICT_OP_NAME,
-  SCORE_OP_NAME,
 } from '../common/heuristics';
 import {
   EvaluationComparisonResults,
@@ -919,7 +918,7 @@ const populatePredictionsAndScoresImperative = (
 
       // Find and add score calls
       const scoreCalls = evalTraceRes.calls.filter(
-        c => c.parent_id === call.id && c.op_name.includes(SCORE_OP_NAME)
+        c => c.parent_id === call.id && c.attributes?._weave_eval_meta?.score
       );
 
       scoreCalls.forEach(scoreCall => {
@@ -932,38 +931,34 @@ const populatePredictionsAndScoresImperative = (
 
         const processScoreOutput = (output: any, path: string[] = []) => {
           if (typeof output === 'boolean') {
-            const metricId = metricDefinitionId({
-              scoreType: 'binary',
-              metricSubPath: path,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            });
-
-            summaryData.scoreMetrics[metricId] = {
+            const metricDef: MetricDefinition = {
               scoreType: 'binary',
               metricSubPath: path,
               source: 'scorer',
               scorerOpOrObjRef: scorerRef,
             };
+            const metricId = metricDefinitionId(metricDef);
+
+            // Store the binary metric ID in summary.scoreMetrics
+            // very important to ensure it gets included in the composite metrics map
+            summaryData.scoreMetrics[metricId] = metricDef;
 
             predictAndScoreEntry.scoreMetrics[metricId] = {
               sourceCallId: scoreCall.id,
               value: output,
             };
           } else if (typeof output === 'number') {
-            const metricId = metricDefinitionId({
-              scoreType: 'continuous',
-              metricSubPath: path,
-              source: 'scorer',
-              scorerOpOrObjRef: scorerRef,
-            });
-
-            summaryData.scoreMetrics[metricId] = {
+            // Similar update for continuous metrics
+            const metricDef: MetricDefinition = {
               scoreType: 'continuous',
               metricSubPath: path,
               source: 'scorer',
               scorerOpOrObjRef: scorerRef,
             };
+            const metricId = metricDefinitionId(metricDef);
+
+            // Store the continuous metric ID in summary.scoreMetrics
+            summaryData.scoreMetrics[metricId] = metricDef;
 
             predictAndScoreEntry.scoreMetrics[metricId] = {
               sourceCallId: scoreCall.id,
@@ -1086,12 +1081,12 @@ const populatePredictionsAndScoresNonImperative = (
                     traceCall.ended_at ?? traceCall.started_at
                   ).getTime() -
                     convertISOToDate(traceCall.started_at).getTime()) /
-                  1000, // why is this different than the predictandscore model latency?
+                  1000,
                 sourceCallId: traceCall.id,
               };
 
               // Add total tokens
-              const totalTokensmetricId = metricDefinitionId(
+              const totalTokensMetricId = metricDefinitionId(
                 totalTokensMetricDimension
               );
               const totalTokens = sum(
@@ -1099,13 +1094,12 @@ const populatePredictionsAndScoresNonImperative = (
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
-              predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
+              predictAndScoreFinal.scoreMetrics[totalTokensMetricId] = {
                 value: totalTokens,
                 sourceCallId: traceCall.id,
               };
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               const results = traceCall.output as any;
-
               let scorerRef = traceCall.op_name;
               if (isProbablyBoundScoreCall) {
                 scorerRef = traceCall.inputs.self;
@@ -1151,8 +1145,6 @@ const populatePredictionsAndScoresNonImperative = (
               };
 
               recursiveAddScore(results, []);
-            } else {
-              // pass
             }
           }
         }

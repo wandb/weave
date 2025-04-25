@@ -282,7 +282,7 @@ const getFilterBy = (
   return {$expr: filterByRaw} as Query;
 };
 
-const convertHighLevelFilterToLowLevelFilter = (
+export const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   return {
@@ -294,6 +294,33 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+// Warning: This is a lossy conversion, there are things we
+// can represent in a low level filter that we cannot represent
+// in a high level filter.
+export const convertLowLevelFilterToHighLevelFilter = (
+  lowLevelFilter: CallFilter
+): WFHighLevelCallFilter => {
+  const highLevelFilter: WFHighLevelCallFilter = {};
+  if (lowLevelFilter.opVersionRefs) {
+    highLevelFilter.opVersionRefs = lowLevelFilter.opVersionRefs;
+  }
+  if (lowLevelFilter.inputObjectVersionRefs) {
+    highLevelFilter.inputObjectVersionRefs =
+      lowLevelFilter.inputObjectVersionRefs;
+  }
+  if (lowLevelFilter.outputObjectVersionRefs) {
+    highLevelFilter.outputObjectVersionRefs =
+      lowLevelFilter.outputObjectVersionRefs;
+  }
+  if (lowLevelFilter.parentIds) {
+    highLevelFilter.parentId = lowLevelFilter.parentIds[0];
+  }
+  if (lowLevelFilter.traceRootsOnly) {
+    highLevelFilter.traceRootsOnly = lowLevelFilter.traceRootsOnly;
+  }
+  return highLevelFilter;
 };
 
 const getFeedbackMerged = (calls: CallSchema[]) => {

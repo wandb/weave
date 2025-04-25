@@ -66,6 +66,7 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
 )
 
 IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
+IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
 
 
 @contextmanager
@@ -265,7 +266,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                with weave.attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -280,9 +281,9 @@ class EvaluationLogger(BaseModel):
     using the `log_prediction` method, and finished when the `log_summary` method
     is called.
 
-    Each time you log a prediction, you will get back an `ImperativePredictionLogger`
-    object.  You can use this object to log scores and metadata for that specific
-    prediction (see that class for more details).
+    Each time you log a prediction, you will get back a `ScoreLogger` object.
+    You can use this object to log scores and metadata for that specific
+    prediction. For more information, see the `ScoreLogger` class.
 
     Example:
         ```python
@@ -293,12 +294,20 @@ class EvaluationLogger(BaseModel):
         ```
     """
 
+    name: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="(Optional): A name for the evaluation call."
+            "If not provided, a default name will be generated.",
+        ),
+    ]
     model: Annotated[
         Model | dict | str,
         BeforeValidator(_cast_to_cls(Model)),
         Field(
             default_factory=Model,
-            description="A metadata-only Model used for comparisons."
+            description="(Optional): A metadata-only Model used for comparisons."
             "Alternatively, you can pass a dict of attributes or just a string"
             "representing the ID of your model.",
         ),
@@ -310,7 +319,7 @@ class EvaluationLogger(BaseModel):
             default_factory=lambda: Dataset(
                 rows=weave.Table([{"dataset_id": _default_dataset_name()}]),
             ),
-            description="A metadata-only Dataset used for comparisons."
+            description="(Optional): A metadata-only Dataset used for comparisons."
             "If you already know your rows ahead of time, you can pass either"
             "a Dataset or list[dict]."
             "If you don't, you can just pass any string as a unique identifier",
@@ -322,6 +331,14 @@ class EvaluationLogger(BaseModel):
     _is_finalized: bool = PrivateAttr(False)
     _evaluate_call: Call | None = PrivateAttr(None)
     _pseudo_evaluation: Evaluation = PrivateAttr()
+
+    @property
+    def ui_url(self) -> str | None:
+        # In normal usage, _evaluate_call will never be None because it's set
+        # at init time.
+        if self._evaluate_call is None:
+            return None
+        return self._evaluate_call.ui_url
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
@@ -386,7 +403,7 @@ class EvaluationLogger(BaseModel):
         # Create the evaluation call
         wc = require_weave_client()
         self._evaluate_call = wc.create_call(
-            display_name=default_evaluation_display_name,
+            display_name=self.name or default_evaluation_display_name,
             op=self._pseudo_evaluation.evaluate,
             inputs={
                 "self": self._pseudo_evaluation,
