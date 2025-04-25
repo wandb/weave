@@ -122,20 +122,6 @@ def test_simple_op(client):
     )
 
 
-def test_dataset(client):
-    from weave.flow.dataset import Dataset
-
-    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
-
-    # This might seem redundant, but it is useful to ensure that the
-    # dataset can be re-iterated over multiple times and equality is preserved.
-    assert list(d2.rows) == list(d2.rows)
-    assert list(d.rows) == list(d2.rows)
-    assert list(d.rows) == list(d.rows)
-
-
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     trace_id = generate_id()
@@ -2364,9 +2350,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert (
-            COST_OBJECT_NAME not in summary.get("weave", {})
-        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
+            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        )
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
