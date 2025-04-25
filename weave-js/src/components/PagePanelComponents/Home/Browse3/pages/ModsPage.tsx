@@ -355,7 +355,7 @@ export const ModsPage: React.FC<{
   const mod = itemName
     ? Object.values(modCats)
         .flat()
-        .find((m: Mod) => m.id === itemName)
+        .find((m: Mod) => m.name === itemName)
     : undefined;
   const secrets = mod?.secrets ?? [];
 
