@@ -9,7 +9,7 @@ calls are traced and exported in a way compatible with Weave's trace server.
 
 import importlib
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -18,12 +18,12 @@ from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter
 from weave.trace.autopatch import IntegrationSettings
 
-_pydantic_ai_patcher: MultiPatcher | None = None
+_pydantic_ai_patcher: Union[MultiPatcher, None] = None
 
 
 def get_pydantic_ai_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
+    settings: Union[IntegrationSettings, None] = None,
+) -> Union[MultiPatcher, NoOpPatcher]:
     """
     Get a patcher for PydanticAI integration.
 
