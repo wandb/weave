@@ -345,7 +345,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        cq = CallsQuery(project_id=req.project_id)
+        cq = CallsQuery(
+            project_id=req.project_id,
+            include_total_storage_size=req.include_total_storage_size,
+        )
 
         cq.add_field("id")
         if req.filter is not None:
@@ -353,17 +356,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
+        aggregated_columns = {"count": "count()"}
+        if req.include_total_storage_size:
+            aggregated_columns["total_storage_size_bytes"] = (
+                "sum(coalesce(total_storage_size_bytes, 0))"
+            )
+            cq.add_field("total_storage_size_bytes")
+
         pb = ParamBuilder()
         inner_query = cq.as_sql(pb)
+
         raw_res = self._query(
-            f"SELECT count() FROM ({inner_query})",
+            f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)}"
+            f" FROM ({inner_query})",
             pb.get_params(),
         )
-        rows = raw_res.result_rows
-        count = 0
-        if rows and len(rows) == 1 and len(rows[0]) == 1:
-            count = rows[0][0]
-        return tsi.CallsQueryStatsRes(count=count)
+
+        res_dict = (
+            dict(zip(aggregated_columns.keys(), raw_res.result_rows[0]))
+            if raw_res.result_rows
+            else {}
+        )
+        return tsi.CallsQueryStatsRes(
+            count=res_dict.get("count", 0),
+            total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+        )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
