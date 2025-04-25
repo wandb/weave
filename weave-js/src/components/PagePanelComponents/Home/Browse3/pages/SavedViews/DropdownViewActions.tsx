@@ -9,6 +9,9 @@ import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 import {ConfirmDeleteDialog} from './ConfirmDeleteDialog';
 import {SavedViewsInfo} from './savedViewUtil';
 
+// TODO: We may want to refine this feature and expose to users.
+const ENABLE_DEBUG_ACTIONS = false;
+
 type DropdownViewActionsProps = {
   savedViewsInfo: SavedViewsInfo;
 };
@@ -44,10 +47,14 @@ export const DropdownViewActions = ({
             <DropdownMenu.Item onClick={savedViewsInfo.onSaveNewView}>
               <Icon name="add-new" /> Save as new view
             </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item onClick={onCopy}>
-              <Icon name="copy" /> Copy code
-            </DropdownMenu.Item>
+            {ENABLE_DEBUG_ACTIONS && (
+              <>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item onClick={onCopy}>
+                  <Icon name="copy" /> Copy code
+                </DropdownMenu.Item>
+              </>
+            )}
             <DropdownMenu.Separator />
             <DropdownMenu.Item
               disabled={savedViewsInfo.isDefault}

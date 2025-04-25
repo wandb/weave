@@ -240,9 +240,12 @@ export const CallsPage: FC<{
   };
   const activeName = baseView.val.label ?? 'Untitled view';
   const [isEditingName, setIsEditingName] = useState(false);
+  const canEditName = !props.isReadonly && !savedViewsInfo.isDefault;
   const title = (
     <Tailwind>
-      {isEditingName ? (
+      {!canEditName ? (
+        <ViewName value={activeName} />
+      ) : isEditingName ? (
         <ViewNameEditing
           value={activeName}
           onChanged={onNameChanged}

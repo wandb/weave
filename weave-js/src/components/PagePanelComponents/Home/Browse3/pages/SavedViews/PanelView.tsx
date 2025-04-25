@@ -4,6 +4,7 @@
 import React from 'react';
 
 import {IconCheckmark} from '../../../../../Icon';
+import {Pill} from '../../../../../Tag';
 import {UserName} from '../../../../../UserName';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 
@@ -54,7 +55,10 @@ export const PanelView = ({
       className="flex w-full cursor-pointer gap-10 px-16 py-8 hover:bg-moon-100 dark:hover:bg-moon-800"
       onClick={onClick}>
       <div className="flex-auto">
-        <div>{resolvedName}</div>
+        <div className="flex items-center gap-8">
+          {resolvedName}
+          {!creatorUserId && <Pill label="default" color="moon" />}
+        </div>
         <div className="text-sm text-moon-500">
           {saveTime && <>Saved on {saveTime} </>}
           {by}
