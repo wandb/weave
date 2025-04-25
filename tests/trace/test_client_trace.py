@@ -1708,14 +1708,14 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
-        time.sleep(0.3)
+        time.sleep(0.03)
         events.append("A(E):" + str(a))
         return a
 
     @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
-        time.sleep(0.2)
+        time.sleep(0.02)
         res = op_a(b)
         events.append("B(E):" + str(b))
         return res
@@ -1723,7 +1723,7 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
-        time.sleep(0.1)
+        time.sleep(0.01)
         res = op_b(c)
         events.append("C(E):" + str(c))
         return res
