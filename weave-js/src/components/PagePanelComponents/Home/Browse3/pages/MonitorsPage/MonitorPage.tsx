@@ -1,6 +1,27 @@
 import {Box, Typography} from '@mui/material';
 import {GridFilterItem} from '@mui/x-data-grid-pro';
+import {Button, ButtonVariants} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
+import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
+import {useWeaveflowRouteContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {FilterTagItem} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterTagItem';
+import {NotFoundPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotFoundPanel';
+import {CallsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
+import {
+  ScrollableTabContent,
+  SimpleKeyValueTable,
+  SimplePageLayoutWithHeader,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/SimplePageLayout';
+import {DeleteObjectButtonWithModal} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectDeleteButtons';
+import {ObjectIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionPage';
+import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
+import {SortBy} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientTypes';
+import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallOpVersionsRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallOpVersionsRef';
+import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
@@ -8,28 +29,6 @@ import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
-
-import {Button, ButtonVariants} from '../../../../../Button';
-import {BooleanIcon} from '../../../Browse2/CellValueBoolean';
-import {useWeaveflowRouteContext} from '../../context';
-import {FilterTagItem} from '../../filters/FilterTagItem';
-import {NotFoundPanel} from '../../NotFoundPanel';
-import {SmallOpVersionsRef} from '../../smallRef/SmallOpVersionsRef';
-import {SmallRef} from '../../smallRef/SmallRef';
-import {CallsTable} from '../CallsPage/CallsTable';
-import {
-  ScrollableTabContent,
-  SimpleKeyValueTable,
-  SimplePageLayoutWithHeader,
-} from '../common/SimplePageLayout';
-import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
-import {ObjectIcon} from '../ObjectsPage/ObjectVersionPage';
-import {useWFHooks} from '../wfReactInterface/context';
-import {Query} from '../wfReactInterface/traceServerClientInterface/query';
-import {SortBy} from '../wfReactInterface/traceServerClientTypes';
-import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {queryToGridFilterModel} from './saveViewUtil';
 
 const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
   {field: 'created_at', direction: 'desc'},

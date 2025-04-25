@@ -2,35 +2,40 @@ import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
 import {Button} from '@wandb/weave/components/Button';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
+import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
+import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
+import {useCallsTableColumns} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableColumns';
+import {
+  useOpVersionOptions,
+  WFHighLevelCallFilter,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
+import {
+  getFilterByRaw,
+  useFilterSortby,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableQuery';
+import {
+  Autocomplete,
+  OpSelector,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
+import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {useObjCreate} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
+import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {
+  ObjectVersionSchema,
+  WeaveObjectVersionKey,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
 import {v4 as uuidv4} from 'uuid';
-
-import {parseRef} from '../../../../../../react';
-import {TextArea} from '../../../../../Form/TextArea';
-import {TextField} from '../../../../../Form/TextField';
-import {validateDatasetName} from '../../datasets/datasetNameValidation';
-import {FilterPanel} from '../../filters/FilterPanel';
-import {prepareFlattenedCallDataForTable} from '../CallsPage/CallsTable';
-import {useCallsTableColumns} from '../CallsPage/callsTableColumns';
-import {
-  useOpVersionOptions,
-  WFHighLevelCallFilter,
-} from '../CallsPage/callsTableFilter';
-import {getFilterByRaw, useFilterSortby} from '../CallsPage/callsTableQuery';
-import {Autocomplete, OpSelector} from '../CallsPage/OpSelector';
-import {useWFHooks} from '../wfReactInterface/context';
-import {useObjCreate} from '../wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {
-  ObjectVersionSchema,
-  WeaveObjectVersionKey,
-} from '../wfReactInterface/wfDataModelHooksInterface';
-import {queryToGridFilterModel} from './saveViewUtil';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 

@@ -3,19 +3,18 @@ import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
+import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
+import {CreateMonitorDrawer} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
+import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
-
-import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {CellValue} from '../../../Browse2/CellValue';
-import {SmallRef} from '../../smallRef/SmallRef';
-import {EMPTY_PROPS_MONITORS} from '../common/EmptyContent';
-import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
-import {useWFHooks} from '../wfReactInterface/context';
-import {Query} from '../wfReactInterface/traceServerClientInterface/query';
-import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CreateMonitorDrawer} from './CreateMonitorDrawer';
 
 export const MonitorsPage = ({
   entity,
