@@ -17,7 +17,7 @@ Integrate Weave with your existing development stack via the:
 - [TypeScript SDK](./reference/typescript-sdk/weave/README.md)
 - [Service API](./reference/service-api/call-start-call-start-post)
 
-Weave supports [numerous LLM providers, local models, frameworks, protocols and third-party services](./guides/integrations/index.md).
+Weave supports [numerous LLM providers, local models, frameworks, protocols, and third-party services](./guides/integrations/index.md).
 
 ## Get started
 
