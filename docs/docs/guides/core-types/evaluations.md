@@ -262,3 +262,7 @@ We are continuously improving our integrations with third-party services and lib
 While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
