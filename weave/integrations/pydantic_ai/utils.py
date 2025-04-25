@@ -11,44 +11,29 @@ import base64
 import json
 import os
 from collections.abc import Sequence
-from typing import Any, Optional, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk import trace as trace_sdk
     from opentelemetry.sdk.trace import Event
-    from opentelemetry.sdk.trace.export import SpanExporter
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.wandb_interface import wandb_api
 
-
 # Type definitions
 if TYPE_CHECKING:
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk import trace as trace_sdk
     from opentelemetry.sdk.trace import Event
-    from opentelemetry.sdk.trace.export import SpanExporter
-
-    # Define type aliases
-    OTLPExporterType = OTLPSpanExporter
-    TraceSdkType = trace_sdk
-    EventType = Event
-    SpanExporterType = SpanExporter
-else:
-    # Define placeholders for runtime
-    OTLPExporterType = Any
-    TraceSdkType = Any
-    EventType = Any
-    SpanExporterType = Any
 
 
-def _import_opentelemetry() -> Tuple[
-    Optional[OTLPExporterType],
-    Optional[Any],
-    Optional[EventType],
-    Optional[SpanExporterType],
-]:
+def _import_opentelemetry() -> (
+    tuple[
+        Optional[Any],
+        Optional[Any],
+        Optional[Any],
+        Optional[Any],
+    ]
+):
     """Safely import OpenTelemetry modules."""
     try:
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -84,7 +69,7 @@ def dicts_to_events(
     if Event is None:
         return []  # Return empty list if imports fail
 
-    event_objs: list["Event"] = []
+    event_objs: list[Any] = []
     n = len(event_dicts)
     for i, d in enumerate(event_dicts):
         name = d.get("event.name") or d.get("name") or "event"

@@ -9,11 +9,7 @@ calls are traced and exported in a way compatible with Weave's trace server.
 
 import importlib
 from functools import wraps
-from typing import Any, Callable, Optional, Union, TYPE_CHECKING, Tuple
-
-if TYPE_CHECKING:
-    from opentelemetry.sdk import trace as trace_sdk
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from typing import Any, Callable, Optional, Union
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.pydantic_ai.utils import PydanticAISpanExporter
@@ -23,7 +19,7 @@ _pydantic_ai_patcher: Union[MultiPatcher, None] = None
 
 
 # Safely try to import OpenTelemetry modules
-def _import_opentelemetry_sdk() -> Tuple[Optional[Any], Optional[Any]]:
+def _import_opentelemetry_sdk() -> tuple[Optional[Any], Optional[Any]]:
     """Safely import OpenTelemetry SDK modules."""
     try:
         from opentelemetry.sdk import trace as trace_sdk
