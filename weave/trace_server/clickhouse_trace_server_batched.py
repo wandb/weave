@@ -185,6 +185,7 @@ ObjRefListType = list[ri.InternalObjectRef]
 
 
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
@@ -2177,7 +2178,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Set the value byte limit to be anything over 1MiB to catch
         # payloads with multiple large values that are still under the
         # single row insert limit.
-        val_byte_limit = 1 * 1024 * 1024
         for item in batch:
             bytes_size = _num_bytes(str(item))
             # If bytes_size > the limit, this item is too large,
@@ -2189,7 +2189,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # all the values should be json dumps, there are no
                     # non json fields controlled by the user that can
                     # be large enough to strip... (?)
-                    if _num_bytes(value) > val_byte_limit:
+                    if _num_bytes(value) > CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT:
                         stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
                         stripped_count += 1
                     else:
