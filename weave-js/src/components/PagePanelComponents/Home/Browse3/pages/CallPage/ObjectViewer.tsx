@@ -97,9 +97,6 @@ export const ObjectViewer = ({
   setExpandedIds,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
-
-  console.log('data', data);
-
   // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless we have specifically added more rows to the array
   // `truncatedStore` is used to store the additional rows that we can add to the array when the user clicks "Show more"
   const {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore} =
@@ -768,4 +765,12 @@ export const maybeGetDeletedRefValuePlaceholderFromRow = (
   row: any
 ): string | undefined => {
   return row.value?.[DELETED_REF_KEY];
+};
+
+const isWeaveErrorPayload = (context: TraverseContext): boolean => {
+  return (
+    context.path?.length() === 1 &&
+    context.path?.toStringArray()[0] === '_weave' &&
+    context.value?.error
+  );
 };
