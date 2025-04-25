@@ -3,7 +3,7 @@ import inspect
 import logging
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import sentry_sdk
 from confluent_kafka import KafkaError, Message
@@ -44,7 +44,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-_TRACE_SERVER: TraceServerInterface | None = None
+_TRACE_SERVER: Optional[TraceServerInterface] = None
 
 
 def get_trace_server() -> TraceServerInterface:
@@ -59,7 +59,7 @@ def get_trace_server() -> TraceServerInterface:
 # This should be cached to avoid hitting ClickHouse for each ended call.
 def get_active_monitors(
     project_id: str,
-) -> list[tuple[Monitor, InternalObjectRef, str | None]]:
+) -> list[tuple[Monitor, InternalObjectRef, Optional[str]]]:
     """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
         project_id=project_id,
@@ -133,9 +133,9 @@ class CallNotWrittenError(Exception):
 )
 def get_filtered_call(
     op_names: list[str],
-    query: tsi.Query | None,
+    query: Optional[tsi.Query],
     ended_call: tsi.EndedCallSchemaForInsert,
-) -> Call | None:
+) -> Optional[Call]:
     """Looks up the call based on a monitor's call filter."""
     server = get_trace_server()
 
