@@ -306,16 +306,14 @@ const ErrorBanner = ({error, section}: {error: string; section: string}) => {
   if (!error) {
     return null;
   }
+  const sectionText = section === 'Inputs' ? 'inputs were' : 'output was';
   if (error === EXCEEDS_LIMIT_ERROR) {
     return (
       <TabUseBannerError>
-        At log time, this trace exceeded the single-trace size limit (3.5MB).
-        The {section} were not captured. To log objects of any size, see the{' '}
-        <DocLink
-          path="guides/core-types/media#images"
-          text="Weave docs on logging media"
-        />
-        .
+        This trace exceeded the single-trace size limit (3.5MB). The{' '}
+        {sectionText} not captured. To log objects of any size, see the{' '}
+        <DocLink path="guides/core-types/media#images" text="Weave docs" /> on
+        logging media.
       </TabUseBannerError>
     );
   }
