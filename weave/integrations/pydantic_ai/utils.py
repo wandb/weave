@@ -13,7 +13,6 @@ import os
 from collections.abc import Sequence
 from typing import Any, Optional, Union, TYPE_CHECKING
 
-# Import for type checking only
 if TYPE_CHECKING:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk import trace as trace_sdk
@@ -34,10 +33,10 @@ def _import_opentelemetry():
         from opentelemetry.sdk import trace as trace_sdk
         from opentelemetry.sdk.trace import Event
         from opentelemetry.sdk.trace.export import SpanExporter
-
-        return OTLPSpanExporter, trace_sdk, Event, SpanExporter
     except ImportError:
         return None, None, None, None
+    else:
+        return OTLPSpanExporter, trace_sdk, Event, SpanExporter
 
 
 def dicts_to_events(
@@ -61,7 +60,7 @@ def dicts_to_events(
     if Event is None:
         return []  # Return empty list if imports fail
 
-    event_objs: list[Event] = []
+    event_objs: list["Event"] = []
     n = len(event_dicts)
     for i, d in enumerate(event_dicts):
         name = d.get("event.name") or d.get("name") or "event"

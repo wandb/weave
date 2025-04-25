@@ -29,10 +29,10 @@ def _import_opentelemetry_sdk():
     try:
         from opentelemetry.sdk import trace as trace_sdk
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-
-        return trace_sdk, SimpleSpanProcessor
     except ImportError:
         return None, None
+    else:
+        return trace_sdk, SimpleSpanProcessor
 
 
 def get_pydantic_ai_patcher(
