@@ -895,7 +895,7 @@ export const ExampleCompareSection: React.FC<{
                     overflow: 'visible',
                   }}>
                   {/* TRIALS HEADER */}
-                  <GridCell 
+                  <GridCell
                     style={{
                       ...stickySidebarHeaderMixin,
                       position: 'sticky',
