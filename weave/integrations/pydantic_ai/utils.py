@@ -11,7 +11,7 @@ import base64
 import json
 import os
 from collections.abc import Sequence
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import Any, Optional, Union, TypeAlias, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -23,8 +23,32 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.wandb_interface import wandb_api
 
 
-# Safely try to import OpenTelemetry modules
-def _import_opentelemetry():
+# Type definitions
+if TYPE_CHECKING:
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk import trace as trace_sdk
+    from opentelemetry.sdk.trace import Event
+    from opentelemetry.sdk.trace.export import SpanExporter
+
+    # Define type aliases
+    OTLPExporterType = OTLPSpanExporter
+    TraceSdkType = trace_sdk
+    EventType = Event
+    SpanExporterType = SpanExporter
+else:
+    # Define placeholders for runtime
+    OTLPExporterType = Any
+    TraceSdkType = Any
+    EventType = Any
+    SpanExporterType = Any
+
+
+def _import_opentelemetry() -> Tuple[
+    Optional[OTLPExporterType],
+    Optional[Any],
+    Optional[EventType],
+    Optional[SpanExporterType],
+]:
     """Safely import OpenTelemetry modules."""
     try:
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
