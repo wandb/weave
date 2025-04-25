@@ -95,7 +95,7 @@ def test_project_check(client):
     )
     assert not res.has_data
 
-    # real project w/ data
+    # real project w/ just calls data
     @weave.op
     def log():
         return "a"
@@ -103,4 +103,27 @@ def test_project_check(client):
     log()
 
     res = client.server.project_check(tsi.ProjectCheckReq(project_id=proj))
+    assert res.has_data
+
+    # new project, no data
+    client.project = "new-project"
+    project2 = f"{client.entity}/{client.project}"
+    res = client.server.project_check(tsi.ProjectCheckReq(project_id=project2))
+    assert not res.has_data
+
+    # real project w/ just object data
+    obj = {"a": 1}
+    client.save(obj, "o")
+
+    res = client.server.project_check(tsi.ProjectCheckReq(project_id=project2))
+    assert res.has_data
+
+    # both
+    @weave.op
+    def log2():
+        return "a"
+
+    log2()
+
+    res = client.server.project_check(tsi.ProjectCheckReq(project_id=project2))
     assert res.has_data
