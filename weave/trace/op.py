@@ -27,7 +27,6 @@ from typing import (
     runtime_checkable,
 )
 
-# Add ParamSpec import
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
 else:
@@ -52,28 +51,27 @@ if TYPE_CHECKING:
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
 except ImportError:
-    OPENAI_NOT_GIVEN = None
+    OPENAI_NOT_GIVEN = object()  # Use a sentinel object instead of None
 
 try:
     from cohere.base_client import COHERE_NOT_GIVEN
 except ImportError:
-    COHERE_NOT_GIVEN = None
+    COHERE_NOT_GIVEN = object()  # Use a sentinel object instead of None
 
 try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
+    ANTHROPIC_NOT_GIVEN = object()  # Use a sentinel object instead of None
 
 try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
-    CEREBRAS_NOT_GIVEN = None
+    CEREBRAS_NOT_GIVEN = object()  # Use a sentinel object instead of None
 
 
 S = TypeVar("S")
 V = TypeVar("V")
 
-# Define TypeVars for function signatures
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -202,8 +200,7 @@ class Op(Protocol[P, R]):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
 
-    # The critical field that preserves the callable signature
-    __call__: Callable[P, R]
+    __call__: Callable[..., Any]
     __self__: Any
 
     # `_tracing_enabled` is a runtime-only flag that can be used to disable
