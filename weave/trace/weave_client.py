@@ -125,9 +125,12 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     SortBy,
     StartedCallSchemaForInsert,
+    TableAppendSpec,
+    TableAppendSpecPayload,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
+    TableUpdateReq,
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
@@ -1908,10 +1911,13 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_table(self, table: Table) -> TableRef:
+    def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
         """
+        # Skip saving the table if it is already persisted.
+        if isinstance(table, WeaveTable) and table.table_ref is not None:
+            return table.table_ref
 
         def send_table_create() -> TableCreateRes:
             rows = to_json(table.rows, self._project_id(), self)
@@ -1941,6 +1947,23 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
+        payloads = [TableAppendSpecPayload(row=row) for row in rows]
+        table_update_req = TableUpdateReq(
+            project_id=self._project_id(),
+            base_digest=table_digest,
+            updates=[TableAppendSpec(append=payload) for payload in payloads],
+        )
+        res = self.server.table_update(table_update_req)
+        return WeaveTable(
+            table_ref=TableRef(
+                entity=self.entity,
+                project=self.project,
+                _digest=res.digest,
+            ),
+            server=self.server,
+        )
 
     ################ Internal Helpers ################
 

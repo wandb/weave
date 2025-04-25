@@ -283,13 +283,8 @@ const useCallsNoExpansion = (
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const doFetch = useCallback(() => {
-    if (opts?.skip) {
-      return;
-    }
-    setCallRes(null);
-    loadingRef.current = true;
-    const req: traceServerTypes.TraceCallsQueryReq = {
+  const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
+    return {
       project_id: projectIdFromParts({entity, project}),
       filter: {
         op_names: deepFilter.opVersionRefs,
@@ -313,39 +308,46 @@ const useCallsNoExpansion = (
         ? {include_total_storage_size: true}
         : null),
     };
-    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
-      loadingRef.current = false;
-      setCallRes(res);
-    };
-    const onError = (e: any) => {
-      loadingRef.current = false;
-      console.error(e);
-      setCallRes({calls: []});
-    };
-    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
-    opts?.skip,
-    opts?.includeCosts,
-    opts?.includeFeedback,
-    opts?.includeTotalStorageSize,
     entity,
     project,
-    deepFilter.opVersionRefs,
-    deepFilter.inputObjectVersionRefs,
-    deepFilter.outputObjectVersionRefs,
-    deepFilter.parentIds,
-    deepFilter.traceId,
-    deepFilter.callIds,
-    deepFilter.traceRootsOnly,
-    deepFilter.runIds,
-    deepFilter.userIds,
+    deepFilter,
     limit,
     offset,
     sortBy,
     query,
     columns,
-    getTsClient,
+    opts?.includeCosts,
+    opts?.includeFeedback,
+    opts?.includeTotalStorageSize,
   ]);
+
+  // Keep track of the request we're waiting for, so that we
+  // can ignore requests that are superceded by more recent reqs
+  const expectedRequestRef = useRef(req);
+
+  const doFetch = useCallback(() => {
+    setCallRes(null);
+    loadingRef.current = true;
+    expectedRequestRef.current = req;
+
+    const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        loadingRef.current = false;
+        setCallRes(res);
+      }
+    };
+    const onError = (e: any) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        loadingRef.current = false;
+        console.error(e);
+        setCallRes({calls: []});
+      }
+    };
+    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
+  }, [getTsClient, req]);
 
   // register doFetch as a callback after deletion
   useEffect(() => {

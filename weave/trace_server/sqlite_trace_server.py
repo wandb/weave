@@ -1136,7 +1136,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         res = self.table_query_stats_batch(batch_req)
 
         if len(res.tables) != 1:
-            raise ValueError("Unexpected number of results", res)
+            raise RuntimeError("Unexpected number of results", res)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)

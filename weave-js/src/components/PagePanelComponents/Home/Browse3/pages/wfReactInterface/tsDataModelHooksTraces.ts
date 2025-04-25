@@ -27,35 +27,33 @@ export const useBareTraceCalls = (
       try {
         const client = getClient();
         const resProm = fetchBareTraceCalls(client, entity, project, traceId);
-        // The backend has a bug where calls that are unfinished do not return at all
-        // when requesting costs. Therefore, we have to do a second fetch to get costs
-        // and zip the results together - BAD!. FIXME.
-        resProm.then(res => {
-          if (mounted) {
-            setTraceCalls(res);
+        const resWithCostsProm = fetchBareTraceCallsWithCosts(
+          client,
+          entity,
+          project,
+          traceId
+        );
+
+        let firstDone = false;
+
+        // Create a race between the two promises
+        Promise.race([resProm, resWithCostsProm]).then(firstResult => {
+          // Only use result if nothing else has completed and component is mounted
+          if (!firstDone && mounted) {
+            firstDone = true;
+            setTraceCalls(firstResult);
             setLoading(false);
             setError(null);
-            const resWithCostsProm = fetchBareTraceCallsWithCosts(
-              client,
-              entity,
-              project,
-              traceId
-            );
-            resWithCostsProm.then(resWithCosts => {
-              if (mounted) {
-                setTraceCalls(currCalls => {
-                  // First, make a map of the calls with cost by id:
-                  const callsWithCosts = new Map<string, TraceCallSchema>();
-                  resWithCosts.forEach(call => {
-                    callsWithCosts.set(call.id, call);
-                  });
-                  // Then, update the calls in the current list with the costs:
-                  return currCalls.map(call => {
-                    return callsWithCosts.get(call.id) ?? call;
-                  });
-                });
-              }
-            });
+          }
+        });
+
+        // Always wait for costs version to complete
+        resWithCostsProm.then(withCostsResult => {
+          if (mounted) {
+            firstDone = true;
+            setTraceCalls(withCostsResult);
+            setLoading(false);
+            setError(null);
           }
         });
       } catch (err) {

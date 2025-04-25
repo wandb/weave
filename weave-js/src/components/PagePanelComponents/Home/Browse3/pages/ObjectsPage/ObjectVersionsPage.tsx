@@ -8,18 +8,20 @@
  * [ ] Add the ability to sort / filter on expanded values (blocked by general support for expansion operations)
  * [ ] Add sort / filter state to URL
  */
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {Loading} from '../../../../../Loading';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {useShowDeleteButton} from '../common/DeleteModal';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
-import {DeleteObjectVersionsButtonWithModal} from './ObjectDeleteButtons';
+import {
+  DeleteObjectsButtonWithModal,
+  DeleteObjectVersionsButtonWithModal,
+} from './ObjectDeleteButtons';
 import {WFHighLevelObjectVersionFilter} from './objectsPageTypes';
 import {FilterableObjectVersionsTable} from './ObjectVersionsTable';
 
@@ -32,7 +34,6 @@ export const ObjectVersionsPage: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const history = useHistory();
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -53,16 +54,9 @@ export const ObjectVersionsPage: React.FC<{
     return 'All Objects';
   }, [filter.objectName, filter.baseObjectClass]);
 
-  if (loadingUserInfo) {
-    return <Loading />;
-  }
-
+  const showDeleteButton = useShowDeleteButton(props.entity);
   const filteredOnObject = filter.objectName != null;
   const hasComparison = filteredOnObject;
-  const viewer = userInfo ? userInfo.id : null;
-  const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
-  const isAdmin = userInfo?.admin;
-  const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
 
   return (
     <SimplePageLayout
@@ -90,7 +84,9 @@ export const ObjectVersionsPage: React.FC<{
               onFilterUpdate={setFilter}
               selectedVersions={selectedVersions}
               setSelectedVersions={
-                hasComparison ? setSelectedVersions : undefined
+                hasComparison || showDeleteButton
+                  ? setSelectedVersions
+                  : undefined
               }
             />
           ),
@@ -125,14 +121,24 @@ const ObjectVersionsPageHeaderExtra: React.FC<{
     </Button>
   ) : undefined;
   const deleteButton = showDeleteButton ? (
-    <DeleteObjectVersionsButtonWithModal
-      entity={entity}
-      project={project}
-      objectName={objectName ?? ''}
-      objectVersions={selectedVersions}
-      disabled={selectedVersions.length === 0 || !objectName}
-      onSuccess={() => setSelectedVersions([])}
-    />
+    objectName ? (
+      <DeleteObjectVersionsButtonWithModal
+        entity={entity}
+        project={project}
+        objectName={objectName}
+        objectVersions={selectedVersions}
+        disabled={selectedVersions.length === 0}
+        onSuccess={() => setSelectedVersions([])}
+      />
+    ) : (
+      <DeleteObjectsButtonWithModal
+        entity={entity}
+        project={project}
+        objectIds={selectedVersions.map(v => v.split(':')[0])}
+        disabled={selectedVersions.length === 0}
+        onSuccess={() => setSelectedVersions([])}
+      />
+    )
   ) : undefined;
 
   return (

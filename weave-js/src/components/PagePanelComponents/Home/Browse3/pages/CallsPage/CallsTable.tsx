@@ -387,7 +387,16 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
-          const strVal = JSON.stringify(value);
+
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
 
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
@@ -395,7 +404,7 @@ export const CallsTable: FC<{
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === strVal
+              item.value === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
