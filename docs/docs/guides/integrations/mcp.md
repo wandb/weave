@@ -171,7 +171,7 @@ If you type `demo`, the client will run through all the features. The image show
 :::Tip
 By default, you will just see the `run_client` traces. Click on the Ops selection box and select "All Calls"
 
-[![mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)]
+![mcp_all_calls.png](imgs/mcp/mcp_all_calls.png)
 
 Doing so will show you `FastMCP` methods (tools, resources, prompts) traced by the integration. You can see the arguments given to the tools and returned values.
 
