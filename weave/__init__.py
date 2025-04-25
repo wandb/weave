@@ -16,6 +16,7 @@ from weave.flow.model import Model
 from weave.flow.monitor import Monitor
 from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
+from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.initialization import *
 from weave.trace.util import Thread as Thread
@@ -50,4 +51,5 @@ __docspec__ = [
     AnnotationSpec,
     Markdown,
     Monitor,
+    SavedView,
 ]
