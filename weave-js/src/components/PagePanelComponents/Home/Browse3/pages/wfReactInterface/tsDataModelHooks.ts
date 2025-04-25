@@ -2062,7 +2062,10 @@ export const useTableCreate = (): ((
 
 export const useProjectCheck = makeTraceServerEndpointHook(
   'projectCheck',
-  (projectId: string) => ({params: {project_id: projectId}}),
+  (projectId: string, opts?: {skip?: boolean}) => ({
+    params: {project_id: projectId},
+    skip: opts?.skip,
+  }),
   (res: traceServerTypes.ProjectCheckRes) => res
 );
 
