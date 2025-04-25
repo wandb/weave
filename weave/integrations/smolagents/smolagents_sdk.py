@@ -40,32 +40,35 @@ def smolagents_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
 def get_symbol_patcher(
     base_symbol: str, attribute_name: str, settings: OpSettings
 ) -> SymbolPatcher | None:
-    module = importlib.import_module(base_symbol)
-    class_name, _, method_name = attribute_name.partition(".")
+    try:
+        module = importlib.import_module(base_symbol)
+        class_name, _, method_name = attribute_name.partition(".")
 
-    # Check if the class exists in the module
-    if not hasattr(module, class_name):
+        # Check if the class exists in the module
+        if not hasattr(module, class_name):
+            return None
+
+        cls = getattr(module, class_name)
+
+        # Check if the method exists in the class
+        if method_name and not hasattr(cls, method_name):
+            return None
+
+        display_name = base_symbol + "." + attribute_name
+        display_name = (
+            display_name.replace(".__call__", "")
+            if attribute_name.endswith(".__call__")
+            else display_name
+        )
+        return SymbolPatcher(
+            lambda: module,
+            attribute_name,
+            smolagents_wrapper(
+                settings.model_copy(update={"name": settings.name or display_name})
+            ),
+        )
+    except ImportError:
         return None
-
-    cls = getattr(module, class_name)
-
-    # Check if the method exists in the class
-    if method_name and not hasattr(cls, method_name):
-        return None
-
-    display_name = base_symbol + "." + attribute_name
-    display_name = (
-        display_name.replace(".__call__", "")
-        if attribute_name.endswith(".__call__")
-        else display_name
-    )
-    return SymbolPatcher(
-        lambda: module,
-        attribute_name,
-        smolagents_wrapper(
-            settings.model_copy(update={"name": settings.name or display_name})
-        ),
-    )
 
 
 def get_multi_step_agent_patchers(
