@@ -11,7 +11,7 @@ import base64
 import json
 import os
 from collections.abc import Sequence
-from typing import Any, Optional, Union, TypeAlias, TYPE_CHECKING, Tuple
+from typing import Any, Optional, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
