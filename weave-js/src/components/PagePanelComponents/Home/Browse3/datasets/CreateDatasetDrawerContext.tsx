@@ -110,7 +110,7 @@ const CreateDatasetContext = createContext<
 // Provider component
 export const CreateDatasetProvider: React.FC<{
   children: React.ReactNode;
-  onPublishDataset: (dataset: any) => void;
+  onPublishDataset: (name: string, rows: any[]) => void;
 }> = ({children, onPublishDataset}) => {
   return (
     <DatasetEditProvider>
@@ -124,7 +124,7 @@ export const CreateDatasetProvider: React.FC<{
 // Inner provider that has access to the editor context
 const CreateDatasetProviderInner: React.FC<{
   children: React.ReactNode;
-  onPublishDataset: (dataset: any) => void;
+  onPublishDataset: (name: string, rows: any[]) => void;
 }> = ({children, onPublishDataset}) => {
   const [state, dispatch] = useReducer(createDatasetReducer, initialState);
   const editorContext = useDatasetEditContext();
@@ -237,16 +237,8 @@ const CreateDatasetProviderInner: React.FC<{
       // Get the updated rows from the editor context
       const rows = editorContext.getRowsNoMeta();
 
-      // Update the dataset with the edited rows and mark it for publication
-      const updatedDataset = {
-        ...state.parsedData,
-        name: state.datasetName,
-        rows: JSON.stringify(rows),
-        publishNow: true,
-      };
-
-      // Call the onSaveDataset callback with the publish flag
-      onPublishDataset(updatedDataset);
+      // Call the onPublishDataset callback with just the name and rows
+      onPublishDataset(state.datasetName, rows);
 
       // Reset the state
       dispatch({type: CREATE_DATASET_ACTIONS.RESET});

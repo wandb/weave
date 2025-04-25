@@ -177,7 +177,6 @@ jobs:
           yarn install --frozen-lockfile
           yarn generate
           yarn eslint --max-warnings=0
-          yarn tslint
           yarn prettier
           yarn run tsc
           yarn testci
@@ -218,7 +217,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -231,8 +230,10 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace",
+            "flow",
             "trace_server",
             "anthropic",
             "bedrock",

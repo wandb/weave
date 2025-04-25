@@ -1,14 +1,22 @@
 import {Box} from '@mui/material';
 import React, {useState} from 'react';
+import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
+import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
+    entity,
+    project,
+    onSaveComplete: () => setIsDrawerOpen(false),
+  });
 
   return (
     <>
@@ -21,10 +29,8 @@ const NewDatasetButton: React.FC = () => {
       <CreateDatasetDrawer
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onSaveDataset={() => {
-          setIsDrawerOpen(false);
-          // Refresh the page or update the list as needed
-        }}
+        onSaveDataset={handleSaveDataset}
+        isCreating={isCreatingDataset}
       />
     </>
   );
@@ -213,6 +219,21 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_OBJECT_VERSIONS: EmptyProps = {
+  icon: 'cube-container' as const,
+  heading: 'No object versions',
+  description:
+    'The requested object does not exist or all versions of it have been deleted.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_objects">
+        object basics
+      </TargetBlank>
+      .
+    </>
+  ),
+};
 export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
   icon: 'weave' as const,
   heading: 'Weave coming soon!',

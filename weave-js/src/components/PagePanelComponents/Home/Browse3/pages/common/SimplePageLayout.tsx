@@ -100,7 +100,8 @@ export const SimplePageLayout: FC<{
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-            }}>
+            }}
+            data-testid="page-title">
             {props.title}
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
@@ -254,7 +255,8 @@ export const SimplePageLayoutWithHeader: FC<{
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-          }}>
+          }}
+          data-testid="page-title">
           {props.title}
         </Box>
         {props.headerExtra}

@@ -18,6 +18,8 @@ import {
   CallData,
   createProcessedRowsMap,
   createTargetSchema,
+  FIELD_NAME,
+  FIELD_PREFIX,
   FieldMapping,
   mapCallsToDatasetRows,
   suggestFieldMappings,
@@ -639,10 +641,24 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
         rows: [],
         schema: state.fieldConfigs
           .filter(config => config.included)
-          .map(config => ({
-            name: config.targetField,
-            type: 'string', // Default type
-          })),
+          .map(config => {
+            // Determine field type based on prefix if possible
+            let fieldType = 'string'; // Default type
+            if (
+              config.sourceField.startsWith(FIELD_PREFIX.ANNOTATIONS) ||
+              config.sourceField === FIELD_NAME.NOTES ||
+              config.sourceField === FIELD_NAME.REACTIONS
+            ) {
+              fieldType = 'string';
+            } else if (config.sourceField.startsWith(FIELD_PREFIX.SCORER)) {
+              fieldType = 'object';
+            }
+
+            return {
+              name: config.targetField,
+              type: fieldType,
+            };
+          }),
       };
       dispatch({
         type: ACTION_TYPES.SET_DATASET_OBJECT,

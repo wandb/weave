@@ -53,7 +53,7 @@ def test_pythonic_creation(client: WeaveClient):
     nested_obj = base_objects.TestOnlyNestedBaseObject(b=3)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object=weave.publish(nested_obj).uri(),
     )
     ref = weave.publish(top_obj)
@@ -61,7 +61,7 @@ def test_pythonic_creation(client: WeaveClient):
     top_obj_gotten = weave.ref(ref.uri()).get()
 
     assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
-    assert top_obj_gotten.model_dump() == top_obj.model_dump()
+    assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
@@ -78,10 +78,11 @@ def test_pythonic_creation(client: WeaveClient):
         objs[0].val
         == {
             **with_base_object_class_annotations(
-                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+                top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"
             ),
             "nested_base_model": with_base_object_class_annotations(
-                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+                top_obj.nested_base_model.model_dump(by_alias=True),
+                "TestOnlyNestedBaseModel",
             ),
         }
         == {
@@ -92,6 +93,7 @@ def test_pythonic_creation(client: WeaveClient):
             "nested_base_model": {
                 "_type": "TestOnlyNestedBaseModel",
                 "a": 2,
+                "aliased_property_alias": 3,
                 "_class_name": "TestOnlyNestedBaseModel",
                 "_bases": ["BaseModel"],
             },
@@ -115,7 +117,9 @@ def test_pythonic_creation(client: WeaveClient):
     assert (
         objs[0].val
         == with_base_object_class_annotations(
-            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+            nested_obj.model_dump(by_alias=True),
+            "TestOnlyNestedBaseObject",
+            "BaseObject",
         )
         == {
             "_type": "TestOnlyNestedBaseObject",
@@ -138,7 +142,7 @@ def test_interface_creation(client):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
-                    "val": nested_obj.model_dump(),
+                    "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
                 }
             }
@@ -154,7 +158,7 @@ def test_interface_creation(client):
     top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
@@ -163,7 +167,7 @@ def test_interface_creation(client):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
-                    "val": top_obj.model_dump(),
+                    "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
                 }
             }
@@ -178,11 +182,13 @@ def test_interface_creation(client):
 
     top_obj_gotten = weave.ref(top_obj_ref.uri()).get()
 
-    assert top_obj_gotten.model_dump() == top_obj.model_dump()
+    assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
     nested_obj_gotten = weave.ref(nested_obj_ref.uri()).get()
 
-    assert nested_obj_gotten.model_dump() == nested_obj.model_dump()
+    assert nested_obj_gotten.model_dump(by_alias=True) == nested_obj.model_dump(
+        by_alias=True
+    )
 
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
@@ -199,10 +205,11 @@ def test_interface_creation(client):
         objs[0].val
         == {
             **with_base_object_class_annotations(
-                top_obj.model_dump(), "TestOnlyExample", "BaseObject"
+                top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"
             ),
             "nested_base_model": with_base_object_class_annotations(
-                top_obj.nested_base_model.model_dump(), "TestOnlyNestedBaseModel"
+                top_obj.nested_base_model.model_dump(by_alias=True),
+                "TestOnlyNestedBaseModel",
             ),
         }
         == {
@@ -213,6 +220,7 @@ def test_interface_creation(client):
             "nested_base_model": {
                 "_type": "TestOnlyNestedBaseModel",
                 "a": 2,
+                "aliased_property_alias": 3,
                 "_class_name": "TestOnlyNestedBaseModel",
                 "_bases": ["BaseModel"],
             },
@@ -235,7 +243,9 @@ def test_interface_creation(client):
     assert (
         objs[0].val
         == with_base_object_class_annotations(
-            nested_obj.model_dump(), "TestOnlyNestedBaseObject", "BaseObject"
+            nested_obj.model_dump(by_alias=True),
+            "TestOnlyNestedBaseObject",
+            "BaseObject",
         )
         == {
             "_type": "TestOnlyNestedBaseObject",
@@ -254,7 +264,7 @@ def test_digest_equality(client):
     nested_ref = weave.publish(nested_obj)
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object=nested_ref.uri(),
     )
     ref = weave.publish(top_obj)
@@ -270,7 +280,7 @@ def test_digest_equality(client):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
-                    "val": nested_obj.model_dump(),
+                    "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
                 }
             }
@@ -290,7 +300,7 @@ def test_digest_equality(client):
     top_level_obj_id = "TestOnlyExample"
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
-        nested_base_model=TestOnlyNestedBaseModel(a=2),
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
         nested_base_object=nested_obj_ref.uri(),
     )
     top_obj_res = client.server.obj_create(
@@ -299,7 +309,7 @@ def test_digest_equality(client):
                 "obj": {
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
-                    "val": top_obj.model_dump(),
+                    "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
                 }
             }
@@ -321,7 +331,7 @@ def test_schema_validation(client):
                         "project_id": client._project_id(),
                         "object_id": "nested_obj",
                         # Incorrect schema, should raise!
-                        "val": {"a": 2},
+                        "val": {"a": 2, "aliased_property_alias": 3},
                         "builtin_object_class": "TestOnlyNestedBaseObject",
                     }
                 }

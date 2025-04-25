@@ -107,11 +107,27 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "o3": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-2025-04-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "o3-mini": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
   "o3-mini-2025-01-31": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini-2025-04-16": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -359,6 +375,54 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "azure/computer-use-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-audio-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-mini-audio-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1-mini-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4.1-nano-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o3-2025-04-16": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o4-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-4o-mini-realtime-preview-2024-12-17": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -392,6 +456,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/eu/gpt-4o-realtime-preview-2024-10-01": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o4-mini-2025-04-16": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1023,129 +1091,133 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "gemini/gemini-2.5-flash-preview-04-17": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-2.0-pro-exp-02-05": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-lite": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-pro-preview-03-25": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-exp": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-lite-preview-02-05": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-thinking-exp": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.0-flash-thinking-exp-01-21": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemma-3-27b-it": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/learnlm-1.5-pro-experimental": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-002": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-latest": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-8b": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-8b-exp-0924": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-exp-1114": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-exp-1206": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-flash-8b-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-pro": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro-002": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro-exp-0801": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-1.5-pro-latest": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-pro-vision": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-gemma-2-27b-it": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-gemma-2-9b-it": {
     "litellm_provider": "gemini",
-    "api_key_name": "GOOGLE_API_KEY"
+    "api_key_name": "GEMINI_API_KEY"
   },
   "ai21.j2-mid-v1": {
     "litellm_provider": "bedrock",

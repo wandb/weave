@@ -156,3 +156,4 @@ class SelectableCHObjSchema(BaseModel):
     version_index: int
     is_latest: int
     deleted_at: Optional[datetime.datetime] = None
+    size_bytes: Optional[int] = None

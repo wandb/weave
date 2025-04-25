@@ -611,6 +611,8 @@ class CallsQuery(BaseModel):
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
+        # Additionally: This condition is also REQUIRED for proper functioning
+        # when using the op_name and trace_id pre-group by optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -709,7 +711,29 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        op_name_sql = process_op_name_filter_to_conditions(
+        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
+        # started_at field after grouping in the HAVING clause. These filters remove
+        # call starts before grouping, creating orphan call ends. By conditioning
+        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start.
+        op_name_sql = process_op_name_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        # ref filters also have group by filters, because output_refs exist on the
+        # call end parts.
+        ref_filter_opt_sql = process_ref_filters_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -758,11 +782,7 @@ class CallsQuery(BaseModel):
         # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
-        feedback_where_sql = ""
         if needs_feedback:
-            feedback_where_sql = (
-                f" AND calls_merged.project_id = {param_slot(project_param, 'String')}"
-            )
             feedback_join_sql = f"""
             LEFT JOIN feedback
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
@@ -799,12 +819,14 @@ class CallsQuery(BaseModel):
         {storage_size_sql}
         {total_storage_size_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
-        {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {trace_roots_only_sql}
         {op_name_sql}
+        {trace_id_sql}
         {str_filter_opt_sql}
+        {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -847,6 +869,8 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
 }
+
+DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -1020,7 +1044,11 @@ def process_query_to_conditions(
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
+            if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
+                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+
             structured_field = get_field_by_name(operand.get_field_)
+
             if isinstance(structured_field, CallsMergedDynamicField):
                 field = structured_field.as_sql(
                     param_builder, table_alias, use_agg_fn=use_agg_fn
@@ -1058,7 +1086,7 @@ def process_query_to_conditions(
     )
 
 
-def process_op_name_filter_to_conditions(
+def process_op_name_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1109,6 +1137,100 @@ def process_op_name_filter_to_conditions(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
+def process_trace_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_ids = hardcoded_filter.filter.trace_ids
+
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+
+    trace_id_field = get_field_by_name("trace_id")
+    if not isinstance(trace_id_field, CallsMergedAggField):
+        raise TypeError("trace_id is not an aggregate field")
+    trace_id_field_sql = trace_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one trace_id, use an equality condition for performance
+    if len(trace_ids) == 1:
+        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
+    elif len(trace_ids) > 1:
+        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
+def process_trace_roots_only_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_ref_filters_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Adds a ref filter optimization to the query.
+
+    To be used before group by. This filter is NOT guaranteed to return
+    the correct results, as it can operate on call ends (output_refs) so it
+    should be used in addition to the existing ref filters after group by
+    generated in process_calls_filter_to_conditions."""
+    if hardcoded_filter is None or (
+        not hardcoded_filter.filter.output_refs
+        and not hardcoded_filter.filter.input_refs
+    ):
+        return ""
+
+    def process_ref_filter(field_name: str, refs: list[str]) -> str:
+        field = get_field_by_name(field_name)
+        if not isinstance(field, CallsMergedAggField):
+            raise TypeError(f"{field_name} is not an aggregate field")
+
+        field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
+        param = param_builder.add_param(refs)
+        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        return f"{ref_filter_sql} OR length({field_sql}) = 0"
+
+    ref_filters = []
+    if hardcoded_filter.filter.input_refs:
+        ref_filters.append(
+            process_ref_filter("input_refs", hardcoded_filter.filter.input_refs)
+        )
+    if hardcoded_filter.filter.output_refs:
+        ref_filters.append(
+            process_ref_filter("output_refs", hardcoded_filter.filter.output_refs)
+        )
+
+    if not ref_filters:
+        return ""
+
+    return " AND " + combine_conditions(ref_filters, "AND")
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
@@ -1120,6 +1242,9 @@ def process_calls_filter_to_conditions(
     """
     conditions: list[str] = []
 
+    # technically not required, as we are now doing a pre-groupby optimization
+    # that should filter out 100% of non-matching rows. However, we can't remove
+    # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
@@ -1138,21 +1263,10 @@ def process_calls_filter_to_conditions(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
-    if filter.trace_ids:
-        assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
-        conditions.append(
-            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
-        )
-
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
-
-    if filter.trace_roots_only:
-        conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IS NULL"
         )
 
     if filter.wb_user_ids:

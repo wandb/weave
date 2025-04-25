@@ -58,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -124,9 +125,12 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     SortBy,
     StartedCallSchemaForInsert,
+    TableAppendSpec,
+    TableAppendSpecPayload,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
+    TableUpdateReq,
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
@@ -423,37 +427,6 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> ObjectRef | None:
-    return getattr(obj, "ref", None)
-
-
-def remove_ref(obj: Any) -> None:
-    if get_ref(obj) is not None:
-        if "ref" in obj.__dict__:  # for methods
-            obj.__dict__["ref"] = None
-        else:
-            obj.ref = None
-
-
-def set_ref(obj: Any, ref: Ref | None) -> None:
-    """Try to set the ref on "any" object.
-
-    We use increasingly complex methods to try to set the ref
-    to support different kinds of objects. This will still
-    fail for python primitives, but those can't be traced anyway.
-    """
-    try:
-        obj.ref = ref
-    except:
-        try:
-            setattr(obj, "ref", ref)
-        except:
-            try:
-                obj.__dict__["ref"] = ref
-            except:
-                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
-
-
 def _get_direct_ref(obj: Any) -> Ref | None:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -461,7 +434,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
         # the "container ref", ie a ref to the root object that the WeaveTable
         # is within, with extra pointing to the table.
         return obj.table_ref
-    return getattr(obj, "ref", None)
+    return get_ref(obj)
 
 
 def map_to_refs(obj: Any) -> Any:
@@ -1938,10 +1911,13 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_table(self, table: Table) -> TableRef:
+    def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
         """
+        # Skip saving the table if it is already persisted.
+        if isinstance(table, WeaveTable) and table.table_ref is not None:
+            return table.table_ref
 
         def send_table_create() -> TableCreateRes:
             rows = to_json(table.rows, self._project_id(), self)
@@ -1971,6 +1947,23 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
+        payloads = [TableAppendSpecPayload(row=row) for row in rows]
+        table_update_req = TableUpdateReq(
+            project_id=self._project_id(),
+            base_digest=table_digest,
+            updates=[TableAppendSpec(append=payload) for payload in payloads],
+        )
+        res = self.server.table_update(table_update_req)
+        return WeaveTable(
+            table_ref=TableRef(
+                entity=self.entity,
+                project=self.project,
+                _digest=res.digest,
+            ),
+            server=self.server,
+        )
 
     ################ Internal Helpers ################
 
