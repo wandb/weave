@@ -2755,8 +2755,19 @@ def test_calls_stream_column_expansion(client):
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
 # in clickhouse_trace_server_batched.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
-def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+@pytest.mark.parametrize("batch_size", [1, 5, 6])
+def test_calls_stream_column_expansion_dynamic_batch_size(
+    client, batch_size, monkeypatch
+):
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        1,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        5,
+    )
+
     @weave.op
     def test_op(x):
         return x
