@@ -46,7 +46,7 @@ In successful `yarn start` output, you'll see a port number where you can previe
    cd docs
    git pull origin master
    ```
-2. Create a feature branch off `main`:
+2. Create a feature branch off `master`:
    ```bash
    git checkout -b <your-feature-branch>
    ```
