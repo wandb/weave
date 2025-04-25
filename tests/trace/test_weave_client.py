@@ -22,7 +22,9 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
+from weave.trace.context import call_context
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -3276,3 +3278,141 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[5] == uuidv7_calls[1].id
     assert call_ids[6] == uuidv7_calls[2].id
     assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_calls_query_filter_by_root_refs(client):
+    @weave.op()
+    def root_op(x: int):
+        return {"n": x, "child": child_op(x)}
+
+    @weave.op()
+    def child_op(x: int):
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int):
+        return x + 3
+
+    with call_context.set_call_stack([]):
+        root_op(1)
+        root_op(2)
+
+    # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) == 6
+
+    # basic trace roots only filter
+    calls = client.get_calls(filter={"trace_roots_only": True})
+    assert len(calls) == 2  # tests the stats query
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+    root_op_ref = calls[0].op_name
+
+    # basic trace roots only filter = false, this should be everything
+    calls = client.get_calls(filter={"trace_roots_only": False})
+    assert len(calls) == 6
+
+    # trace roots only + inputs query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
+                    {"$literal": 1},
+                ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + output query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
+                    {"$literal": 2},
+                ],
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + op filter
+    calls = client.get_calls(
+        filter={"trace_roots_only": True, "op_names": [root_op_ref]},
+    )
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+
+
+def test_filter_calls_by_ref(client):
+    obj = {"a": 1}
+    ref = client.save(obj, "obj").ref
+    ref2 = client.save(obj, "obj2").ref
+    ref3 = client.save(obj, "obj3").ref
+
+    @weave.op
+    def log_obj(ref: str):
+        return {
+            "ref2": ref2,
+            "ref3": ref3,
+        }
+
+    log_obj(ref)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for input ref
+    calls = client.get_calls(filter={"input_refs": [ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for output ref
+    calls = client.get_calls(filter={"output_refs": [ref2.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by both input and output ref
+    calls = client.get_calls(
+        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by two output refs
+    calls = client.get_calls(filter={"output_refs": [ref2.uri(), ref3.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+    assert calls[0].output["ref3"] == obj
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
+    assert len(calls) == 0
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"output_refs": [ref.uri()]})
+    assert len(calls) == 0
+
+    # filter by duplicate refs
+    calls = client.get_calls(filter={"input_refs": [ref.uri(), ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by empty refs, this is ambiguously defined, currently we treat
+    # this as "no filter"
+    calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
+    assert len(calls) == 1
