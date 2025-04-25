@@ -2,7 +2,9 @@ import {Box} from '@mui/material';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {useMemo, useState} from 'react';
 
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
@@ -10,15 +12,10 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {EMPTY_PROPS_MONITORS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
-import {
-  ObjectVersionKey,
-  ObjectVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CreateMonitorDrawer} from './CreateMonitorDrawer';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CreateMonitorDrawer} from './CreateMonitorDrawer';
 
 export const MonitorsPage = ({
   entity,
