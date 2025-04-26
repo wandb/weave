@@ -1973,7 +1973,7 @@ def test_flush_progress_bar(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -1990,7 +1990,7 @@ def test_flush_callback(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -2010,7 +2010,7 @@ def test_repeated_flushing(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
     client.flush()
@@ -2057,7 +2057,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(10):
+    for i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
@@ -2402,13 +2402,13 @@ def test_calls_query_sort_by_latency(client):
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.1)
+    time.sleep(0.05)
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.2)
+    time.sleep(0.1)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2520,12 +2520,12 @@ def test_calls_filter_by_latency(client):
 
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    time.sleep(0.1)  # Add delay to increase latency
+    time.sleep(0.01)  # Add delay to increase latency
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    time.sleep(0.2)  # Add more delay to further increase latency
+    time.sleep(0.02)  # Add more delay to further increase latency
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2815,25 +2815,25 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     # Create calls with different timestamps
     # Call 1: Start at t=0, end at t=1
     call1 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     client.finish_call(call1, "result1")
 
     # Call 2: Start at t=1, end at t=2
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call2 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call2, "result2")
 
     # Call 3: Start at t=2, end at t=3
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call3 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call3, "result3")
 
     # Call 4: Start at t=3, end at t=4
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call4 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call4, "result4")
 
     # Flush to make sure all calls are committed
@@ -3097,16 +3097,16 @@ def test_calls_query_with_non_uuidv7_ids(client):
 
     # Create calls with timestamps
     call1 = _make_call(client, non_uuidv7_id1)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call2 = _make_call(client, non_uuidv7_id2)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call3 = _make_call(client, non_uuidv7_id3)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call4 = _make_call(client, non_uuidv7_id4)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     client.flush()
 
@@ -3190,7 +3190,7 @@ def test_calls_query_with_non_uuidv7_ids(client):
     # Add UUIDv7 calls and test mixed filtering
     uuidv7_calls = []
     for i in range(4):
-        time.sleep(0.1)
+        time.sleep(0.01)
         call = client.create_call("x", {"test_id": f"uuidv7_{i}", "special": "true"})
         client.finish_call(call, "result")
         uuidv7_calls.append(call)
