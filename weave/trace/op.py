@@ -51,7 +51,7 @@ except ImportError:
     OPENAI_NOT_GIVEN = None  # type: ignore
 
 try:
-    from cohere.base_client import COHERE_NOT_GIVEN
+    from cohere.base_client import COHERE_NOT_GIVEN  # type: ignore
 except ImportError:
     COHERE_NOT_GIVEN = None
 
