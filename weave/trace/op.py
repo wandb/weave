@@ -27,10 +27,7 @@ from typing import (
     runtime_checkable,
 )
 
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
@@ -51,22 +48,22 @@ if TYPE_CHECKING:
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
 except ImportError:
-    OPENAI_NOT_GIVEN = object()  # Use a sentinel object instead of None
+    OPENAI_NOT_GIVEN = None  # type: ignore
 
 try:
     from cohere.base_client import COHERE_NOT_GIVEN
 except ImportError:
-    COHERE_NOT_GIVEN = object()  # Use a sentinel object instead of None
+    COHERE_NOT_GIVEN = None
 
 try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
-    ANTHROPIC_NOT_GIVEN = object()  # Use a sentinel object instead of None
+    ANTHROPIC_NOT_GIVEN = None
 
 try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
 except ImportError:
-    CEREBRAS_NOT_GIVEN = object()  # Use a sentinel object instead of None
+    CEREBRAS_NOT_GIVEN = None
 
 
 S = TypeVar("S")
