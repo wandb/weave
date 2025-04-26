@@ -199,6 +199,8 @@ class Op(Protocol[P, R]):
 
     # __call__: Callable[..., Any]
     @overload
+    def __call__(*args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
     @overload
     def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
