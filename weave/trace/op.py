@@ -784,10 +784,7 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
 
 
 def is_op(obj: Any) -> bool:
-    """Check if an object is an Op.
-
-    Works with both old-style Op instances and new-style generic Ops.
-    """
+    """Check if an object is an Op."""
     if sys.version_info < (3, 12):
         return isinstance(obj, Op)
 
