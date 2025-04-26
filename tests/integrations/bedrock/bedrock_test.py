@@ -406,7 +406,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         new=mock_apply_guardrail_make_api_call,
     ):
         result = scorer.score(
-            "How should I think about retirement planning in general?"
+            output="How should I think about retirement planning in general?"
         )
 
         # Verify the result
@@ -443,7 +443,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         new=mock_apply_guardrail_make_api_call,
     ):
         result = scorer.score(
-            "Give me specific investment advice for my retirement to generate $5,000 monthly."
+            output="Give me specific investment advice for my retirement to generate $5,000 monthly."
         )
 
         # Verify the result shows intervention
