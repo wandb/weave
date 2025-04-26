@@ -197,7 +197,12 @@ class Op(Protocol[P, R]):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
 
-    __call__: Callable[..., Any]
+    # __call__: Callable[..., Any]
+    @overload
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
+
     __self__: Any
 
     # `_tracing_enabled` is a runtime-only flag that can be used to disable
