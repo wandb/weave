@@ -1379,6 +1379,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        print("files_stats is not implemented for SQLite trace server", req)
+        return tsi.FilesStatsRes(total_size_bytes=-1)
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
         return tsi.CostCreateRes()

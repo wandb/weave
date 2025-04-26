@@ -898,8 +898,16 @@ class FileContentReadReq(BaseModel):
     digest: str
 
 
+class FilesStatsReq(BaseModel):
+    project_id: str
+
+
 class FileContentReadRes(BaseModel):
     content: bytes
+
+
+class FilesStatsRes(BaseModel):
+    total_size_bytes: int
 
 
 class EnsureProjectExistsRes(BaseModel):
@@ -1051,6 +1059,7 @@ class TraceServerInterface(Protocol):
     # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...

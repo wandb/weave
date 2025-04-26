@@ -1589,6 +1589,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise FileStorageReadError("File storage client is not configured")
         return read_from_bucket(client, file_storage_uri)
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        pb = ParamBuilder()
+
+        project_id_param = pb.add_param(req.project_id)
+
+        query = f"""
+        SELECT sum(size_bytes) as total_size_bytes
+        FROM files_stats
+        WHERE project_id = {{{project_id_param}: String}}
+        """
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
+            raise RuntimeError("No results found")
+
+        return tsi.FilesStatsRes(total_size_bytes=result.result_rows[0][0])
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
