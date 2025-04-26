@@ -13,8 +13,6 @@ PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "dspy",
     "notdiamond",
-    # "bedrock",
-    # "scorers",
     "crewai",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
