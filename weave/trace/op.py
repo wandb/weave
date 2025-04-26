@@ -48,10 +48,10 @@ if TYPE_CHECKING:
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
 except ImportError:
-    OPENAI_NOT_GIVEN = None  # type: ignore
+    OPENAI_NOT_GIVEN = None
 
 try:
-    from cohere.base_client import COHERE_NOT_GIVEN  # type: ignore
+    from cohere.base_client import COHERE_NOT_GIVEN
 except ImportError:
     COHERE_NOT_GIVEN = None
 
