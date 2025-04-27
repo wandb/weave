@@ -17,6 +17,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Concatenate,
     Generic,
     Optional,
     Protocol,
@@ -197,13 +198,7 @@ class Op(Protocol[P, R]):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
 
-    # __call__: Callable[..., Any]
-    @overload
-    def __call__(*args: P.args, **kwargs: P.kwargs) -> R: ...
-    @overload
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    @overload
-    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
 
     __self__: Any
 
@@ -222,6 +217,10 @@ class Op(Protocol[P, R]):
     _code_capture_enabled: bool
 
     tracing_sample_rate: float
+
+
+class BoundOp(Op[P, R]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
 def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
@@ -742,6 +741,13 @@ def op(
     if func is None:
         return op_deco
     return op_deco(func)
+
+
+Self = TypeVar("Self", bound=Callable[..., Any])
+
+
+def bound_op(func: Callable[Concatenate[Self, P], R], **kwargs: Any) -> BoundOp[P, R]:
+    return op(func, **kwargs)
 
 
 def get_captured_code(op: Op) -> str:
