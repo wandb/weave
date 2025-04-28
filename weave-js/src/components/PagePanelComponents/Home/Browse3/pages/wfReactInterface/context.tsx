@@ -50,11 +50,12 @@ export const useProjectHasTraceServerData = (
   const hasCalls = tsWFDataModelHooks.useProjectCheck(projectId, {
     skip: !hasTraceServer,
   });
+  const hasData = hasCalls.result?.has_data ?? false;
   return useMemo(
     () => ({
       loading: hasCalls.loading,
-      result: hasCalls.result?.has_data,
+      result: hasData,
     }),
-    [hasCalls.loading, hasCalls.result]
+    [hasCalls.loading, hasData]
   );
 };
