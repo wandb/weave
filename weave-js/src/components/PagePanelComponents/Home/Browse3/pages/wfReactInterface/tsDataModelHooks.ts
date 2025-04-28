@@ -471,6 +471,7 @@ const useCallsStats = (
   project: string,
   filter: CallFilter,
   query?: Query,
+  limit?: number,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -503,6 +504,7 @@ const useCallsStats = (
         wb_user_ids: deepFilter.userIds,
       },
       query,
+      limit,
     };
 
     getTsClient()
@@ -515,7 +517,7 @@ const useCallsStats = (
         loadingRef.current = false;
         setCallStatsRes({loading: false, result: null, error: err});
       });
-  }, [deepFilter, entity, project, query, opts?.skip, getTsClient]);
+  }, [deepFilter, entity, project, query, limit, opts?.skip, getTsClient]);
 
   useEffect(() => {
     doFetch();
@@ -2074,15 +2076,6 @@ export const useTableCreate = (): ((
   );
 };
 
-export const useProjectCheck = makeTraceServerEndpointHook(
-  'projectCheck',
-  (projectId: string, opts?: {skip?: boolean}) => ({
-    params: {project_id: projectId},
-    skip: opts?.skip,
-  }),
-  (res: traceServerTypes.ProjectCheckRes) => res
-);
-
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2110,7 +2103,6 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableQueryStats,
   useTableUpdate,
   useTableCreate,
-  useProjectCheck,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

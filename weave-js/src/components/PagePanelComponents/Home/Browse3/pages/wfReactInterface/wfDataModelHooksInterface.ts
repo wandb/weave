@@ -196,6 +196,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     query?: Query,
+    limit?: number,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
@@ -323,10 +324,6 @@ export type WFDataModelHooksInterface = {
   useTableCreate: () => (
     table: traceServerClientTypes.TableCreateReq
   ) => Promise<traceServerClientTypes.TableCreateRes>;
-  useProjectCheck: (
-    projectId: string,
-    opts?: {skip?: boolean}
-  ) => Loadable<traceServerClientTypes.ProjectCheckRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

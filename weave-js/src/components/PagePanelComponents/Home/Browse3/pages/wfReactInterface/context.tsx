@@ -11,7 +11,7 @@
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {useHasTraceServerClientContext} from './traceServerClientContext';
-import {projectIdFromParts, tsWFDataModelHooks} from './tsDataModelHooks';
+import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
@@ -46,16 +46,33 @@ export const useProjectHasTraceServerData = (
   project: string
 ) => {
   const hasTraceServer = useHasTraceServerClientContext();
-  const projectId = projectIdFromParts({entity, project});
-  const hasCalls = tsWFDataModelHooks.useProjectCheck(projectId, {
-    skip: !hasTraceServer,
-  });
-  const hasData = !!hasCalls.result?.has_data;
+  const objs = tsWFDataModelHooks.useRootObjectVersions(
+    entity,
+    project,
+    {},
+    1,
+    true, // metadata only
+    {
+      skip: !hasTraceServer,
+      noAutoRefresh: true,
+    }
+  );
+  const calls = tsWFDataModelHooks.useCallsStats(
+    entity,
+    project,
+    {},
+    undefined,
+    1, // limit
+    {
+      skip: !hasTraceServer,
+    }
+  );
+  const loading = objs.loading || calls.loading;
   return useMemo(
     () => ({
-      loading: hasCalls.loading,
-      result: hasData,
+      loading,
+      result: (objs.result ?? []).length > 0 || (calls.result?.count ?? 0) > 0,
     }),
-    [hasCalls.loading, hasData]
+    [loading, objs.result, calls.result]
   );
 };

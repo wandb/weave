@@ -125,6 +125,7 @@ export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   query?: Query;
+  limit?: number;
 };
 
 export type TraceCallsQueryStatsRes = {
@@ -419,12 +420,4 @@ export type TableSchemaForInsert = {
 export type TableCreateRes = {
   digest: string;
   row_digests: string[];
-};
-
-export type ProjectCheckReq = {
-  project_id: string;
-};
-
-export type ProjectCheckRes = {
-  has_data: boolean;
 };
