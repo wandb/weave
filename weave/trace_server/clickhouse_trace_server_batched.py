@@ -1531,7 +1531,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # C0(0-199), C1(200-399), C2(400-499), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
             #
             #
-            # Those "extra" chunks are no long valid, but will be returned be yhe query. By design, we include the expected number of chunks in the response
+            # Those "extra" chunks are no long valid, but will be returned by the query. By design, we include the expected number of chunks in the response
             # and since the last insert batch is the valid one, we can truncate the response to the expected number of chunks to isolate the valid chunks.
             #
             #
