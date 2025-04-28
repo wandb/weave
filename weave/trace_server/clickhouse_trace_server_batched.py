@@ -358,8 +358,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_limit(req.limit)
 
         pb = ParamBuilder()
-        # Special case for the frontend, when limit=1 and there is no filter
-        # we can construct a much more efficient raw filter
+        # Special case when limit=1 and there is no filter or query,
+        # construct highly optimized query that returns early
         if req.limit == 1 and req.filter is None and req.query is None:
             query = optimized_project_contains_call_query(req.project_id, pb)
         else:
