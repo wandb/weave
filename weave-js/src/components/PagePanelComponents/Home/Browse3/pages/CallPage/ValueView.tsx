@@ -62,8 +62,6 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return null;
   }
 
-  console.log('data', data);
-
   if (data.value === undefined) {
     return null;
   }

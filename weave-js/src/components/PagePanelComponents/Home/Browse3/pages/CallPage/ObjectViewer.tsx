@@ -316,8 +316,6 @@ export const ObjectViewer = ({
     return {rows: rowsInner};
   }, [resolvedData]);
 
-  console.log('rows', rows);
-
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
   // in the case that we have an expanded ref, then we want to set the base
