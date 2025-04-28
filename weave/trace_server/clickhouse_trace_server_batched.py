@@ -1047,8 +1047,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         res = self.table_query_stats_batch(batch_req)
 
-        # if len(res.tables) != 1:
-        #     raise RuntimeError("Unexpected number of results", res)
+        if len(res.tables) != 1:
+            logger.exception(RuntimeError("Unexpected number of results", res))
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
@@ -1062,9 +1062,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
 
         query = """
-        SELECT digest, length(row_digests)
+        SELECT digest, any(length(row_digests))
         FROM tables
         WHERE project_id = {project_id:String} AND digest IN {digests:Array(String)}
+        GROUP BY digest
         """
 
         if req.include_storage_size:

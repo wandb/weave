@@ -2402,13 +2402,13 @@ def test_calls_query_sort_by_latency(client):
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.01)
+    time.sleep(0.05)
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.02)
+    time.sleep(0.1)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
