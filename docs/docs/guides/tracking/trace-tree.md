@@ -18,6 +18,8 @@ The Traces page is composed of three core panels:
 - _Center panel_: Interactive [trace view](#trace-view-navigation) showing the stack and ops hierarchy for a selected trace. 
 - _Right panel_: Detailed view for a selected op (Call, Code, Feedback, Scores, Summary, Use).
 
+![Trace page panels](imgs/trace-tree-full.png)
+
 ## Trace view navigation
 
 - _Breadcrumbs_: At the top of the center panel, navigate up and down the trace stack via the breadcrumb trail.
@@ -30,6 +32,8 @@ The Traces page is composed of three core panels:
 - _Filter an op by name_: Use the input bar above the trace tree to search for ops of a specific type (e.g., `tool`, `openai.response.create`).
 - _Filter persistence_: Selecting ops across traces retains the sub-path context for easier comparison.
 
+![Filter an op by name](imgs/trace-tree-filter.png)
+
 ### Scrubbers and contextual navigation
 
 The panel below the tree includes multiple scrubbers for navigating across calls:
@@ -39,7 +43,11 @@ The panel below the tree includes multiple scrubbers for navigating across calls
 - **Siblings**: Ops with the same parent.
 - **Stack**: Traverse up/down the call stack.
 
+To view the available scrubbers, click the **^** button at the bottom of the panel.
+
 Each scrubber has a slider and **>** jump buttons to move step-by-step.
+
+![Trace panel scrubbers](imgs/trace-tree-scrubbers.png)
 
 ### Alternate trace tree views
 
@@ -53,9 +61,13 @@ The default view showing, stack hierarchy, cost per op, execution time, and stat
 
 In the code view, boxes represent ops and their nested calls. This is helpful for visualizing flow of function calls. In this view, you can click on a box to drill into that op and filter the call path.
 
+![Trace panel code view](imgs/trace-tree-code-view.png)
+
 #### Flame graph
 
 The flame graph view provides a timeline-based visualization of execution depth and duration. This is helpful for when trying to understand performance diagnostics over time. You can click into frames to isolate sub-traces.
+
+![Trace panel flame graph](imgs/trace-tree-flame-view.png)
 
 #### Graph view
 
