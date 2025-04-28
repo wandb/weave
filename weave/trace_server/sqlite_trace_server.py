@@ -641,6 +641,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
