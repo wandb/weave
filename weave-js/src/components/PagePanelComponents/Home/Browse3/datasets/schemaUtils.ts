@@ -32,6 +32,7 @@ export const WEAVE_EXPANDED_REF_PROPS = {
 
 // Common field name constants
 export const FIELD_NAMES = {
+  TRACE: 'trace',
   FEEDBACK_TYPE: 'feedback_type',
   PAYLOAD: 'payload',
   VALUE: 'value',
@@ -285,7 +286,12 @@ interface WeaveRow {
  * top-level fields under inputs and output, without deep flattening.
  */
 export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
-  const allFields: SchemaField[] = [];
+  const allFields: SchemaField[] = [
+    {
+      name: FIELD_NAMES.TRACE,
+      type: 'string',
+    },
+  ];
 
   if (!calls || !Array.isArray(calls)) {
     return allFields;
@@ -486,9 +492,8 @@ export const mapCallsToDatasetRows = (
   const resolveValue = (obj: any, path: string): any => {
     const parts = path.split('.');
 
-    // Handle the standard "output" field directly
-    if (path === FIELD_NAMES.OUTPUT) {
-      return unwrapRefValue(obj.output);
+    if (path === FIELD_NAMES.TRACE) {
+      return `weave:///${obj.project_id}/call/${obj.digest}`;
     }
 
     // Special handling for feedback fields (annotations, notes, reactions, and runnables)
@@ -574,7 +579,13 @@ export const mapCallsToDatasetRows = (
         sourceValue = output;
       } else {
         sourceValue = resolveValue(
-          {inputs, output, summary},
+          {
+            inputs,
+            output,
+            summary,
+            project_id: call.val.project_id,
+            digest: call.digest,
+          },
           mapping.sourceField
         );
       }
@@ -1072,6 +1083,8 @@ export const generateFieldPreviews = (
       // Handle standard input/output fields first
       if (field.name === FIELD_NAMES.OUTPUT) {
         value = unwrapRefValue(call.val.output);
+      } else if (field.name === FIELD_NAMES.TRACE) {
+        value = `weave:///${call.val.project_id}/call/${call.digest}`;
       } else if (field.name.startsWith(FIELD_PREFIX.INPUTS)) {
         const path = field.name.slice(FIELD_PREFIX.INPUTS.length).split('.');
         value = getNestedValue(call.val.inputs, path);
