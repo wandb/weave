@@ -11,7 +11,7 @@
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {useHasTraceServerClientContext} from './traceServerClientContext';
-import {tsWFDataModelHooks} from './tsDataModelHooks';
+import {projectIdFromParts, tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
@@ -46,7 +46,7 @@ export const useProjectHasTraceServerData = (
   project: string
 ) => {
   const hasTraceServer = useHasTraceServerClientContext();
-  const projectId = useMemo(() => `${entity}/${project}`, [entity, project]);
+  const projectId = projectIdFromParts({entity, project});
   const hasCalls = tsWFDataModelHooks.useProjectCheck(projectId, {
     skip: !hasTraceServer,
   });
