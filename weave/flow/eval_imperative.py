@@ -9,8 +9,14 @@ from contextvars import ContextVar
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
-from pydantic import (BaseModel, BeforeValidator, ConfigDict, Field,
-                      PrivateAttr, validate_call)
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    validate_call,
+)
 
 import weave
 from weave.flow.dataset import Dataset
