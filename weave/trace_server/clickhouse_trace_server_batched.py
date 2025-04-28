@@ -56,6 +56,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     combine_conditions,
+    optimized_project_contains_call_query,
 )
 from weave.trace_server.clickhouse_schema import (
     CallDeleteCHInsertable,
@@ -353,13 +354,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
+        if req.limit is not None:
+            cq.set_limit(req.limit)
 
         pb = ParamBuilder()
-        inner_query = cq.as_sql(pb)
-        raw_res = self._query(
-            f"SELECT count() FROM ({inner_query})",
-            pb.get_params(),
-        )
+        # Special case for the frontend, when limit=1 and there is no filter
+        # we can construct a much more efficient raw filter
+        if req.limit == 1 and req.filter is None and req.query is None:
+            query = optimized_project_contains_call_query(req.project_id, pb)
+        else:
+            query = f"SELECT count() FROM ({cq.as_sql(pb)})"
+        raw_res = self._query(query, pb.get_params())
         rows = raw_res.result_rows
         count = 0
         if rows and len(rows) == 1 and len(rows[0]) == 1:

@@ -1280,3 +1280,24 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def optimized_project_contains_call_query(
+    project_id: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Returns a query that checks if the project contains any calls."""
+    return safely_format_sql(
+        f"""SELECT
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {param_slot(param_builder.add_param(project_id), 'String')}
+        )
+        THEN 1
+        ELSE 0
+        END as has_any
+    """,
+        logger,
+    )

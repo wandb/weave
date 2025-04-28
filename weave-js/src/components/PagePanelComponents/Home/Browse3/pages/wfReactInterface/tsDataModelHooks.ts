@@ -471,6 +471,7 @@ const useCallsStats = (
   project: string,
   filter: CallFilter,
   query?: Query,
+  limit?: number,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -503,6 +504,7 @@ const useCallsStats = (
         wb_user_ids: deepFilter.userIds,
       },
       query,
+      limit,
     };
 
     getTsClient()
@@ -515,7 +517,7 @@ const useCallsStats = (
         loadingRef.current = false;
         setCallStatsRes({loading: false, result: null, error: err});
       });
-  }, [deepFilter, entity, project, query, opts?.skip, getTsClient]);
+  }, [deepFilter, entity, project, query, limit, opts?.skip, getTsClient]);
 
   useEffect(() => {
     doFetch();
