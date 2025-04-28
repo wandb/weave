@@ -197,6 +197,16 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/smolagents",
           ],
         },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Protocols",
+          link: { type: "doc", id: "guides/integrations/index"},
+          items: [
+            {type: "doc", id: "guides/integrations/mcp", label: "MCP"},
+          ],
+        },
       ],
     },
     {
