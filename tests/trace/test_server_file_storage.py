@@ -103,6 +103,59 @@ class TestS3Storage:
         assert obj_response["Body"].read() == TEST_CONTENT
 
 
+    def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
+        # This test is critical in that it ensures that the system works correctly for large files. Both
+        # before and after the migration to file storage, we should be able to read the file correctly.
+        def _run_single_test():
+            chunk_size = 100000
+            num_chunks = 3
+            file_part = b"1234567890"
+            large_file = file_part * (chunk_size * num_chunks // len(file_part))
+
+            # Create a new trace
+            res = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=large_file,
+                )
+            )
+            assert res.digest is not None
+            assert res.digest != ""
+
+            # Get the file
+            file = client.server.file_content_read(
+                FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+            )
+            assert file.content == large_file
+            return res.digest
+
+        def _run_test():
+            # Run with disabled storage:
+            d1 = _run_single_test()
+            # Now "enable" bucket storage:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+                    "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+                    "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+                    "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+                },
+            ):
+                # This line would error before the fix
+                d2 = _run_single_test()
+            # Run again with disabled storage:
+            d3 = _run_single_test()
+            assert d1 == d2 == d3
+
+        
+        if client_is_sqlite(client):
+            pytest.skip("Not implemented in SQLite")
+        
+        _run_test()
+
+
 class TestGCSStorage:
     """Tests for Google Cloud Storage implementation."""
 
