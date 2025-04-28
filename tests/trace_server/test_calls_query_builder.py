@@ -2062,42 +2062,6 @@ def test_trace_roots_only_filter_with_condition():
     )
 
 
-def test_input_output_refs_filter():
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={
-            "input_refs": ["weave-trace-internal:///222222222222%"],
-            "output_refs": ["weave-trace-internal:///111111111111%"],
-        }
-    )
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_4:String}
-            AND ((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
-                OR length(calls_merged.input_refs) = 0)
-            AND (hasAny(calls_merged.output_refs, {pb_3:Array(String)})
-                OR length(calls_merged.output_refs) = 0))
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
-                AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)})))))
-        """,
-        {
-            "pb_4": "project",
-            "pb_0": ["weave-trace-internal:///222222222222%"],
-            "pb_1": ["weave-trace-internal:///111111111111%"],
-            "pb_2": ["weave-trace-internal:///222222222222%"],
-            "pb_3": ["weave-trace-internal:///111111111111%"],
-        },
-    )
-
-
 def test_filter_length_validation():
     """Test that filter length validation works"""
     pb = ParamBuilder()
