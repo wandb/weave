@@ -511,7 +511,6 @@ const operandToFilter = (operand: any): Filter => {
     } else if (filter.operator === '(any): isNotEmpty') {
       filter.operator = '(any): isEmpty';
     } else {
-      debugger;
       throw new Error(
         `Could not parse "not" operand: ${JSON.stringify(
           operand

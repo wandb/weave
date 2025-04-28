@@ -193,7 +193,7 @@ export const CallsPage: FC<{
       onSaveNewView();
       return;
     }
-    onUpsertView(view, null, 'Successfully saved view.', false);
+    onUpsertView(view, null, 'Successfully saved view.', true);
   };
 
   const onRenameView = (newName: string) => {

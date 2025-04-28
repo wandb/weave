@@ -688,6 +688,19 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData]);
 
+  // MUI data grid is unhappy if you pass it a sort model
+  // that references columns that aren't in the grid - it triggers an
+  // infinite loop.
+  const sortModelFiltered = useMemo(() => {
+    // Get all valid column fields from muiColumns
+    const validColumnFields = new Set(muiColumns.map(col => col.field));
+
+    // Filter out any sort items that reference columns not in muiColumns
+    return sortModelResolved.filter(sortItem =>
+      validColumnFields.has(sortItem.field)
+    );
+  }, [muiColumns, sortModelResolved]);
+
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -1002,7 +1015,7 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={sortModelFiltered}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START

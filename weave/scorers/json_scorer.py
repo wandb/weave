@@ -11,7 +11,7 @@ class ValidJSONScorer(BuiltInScorer):
     """Validate whether a string is valid JSON."""
 
     @weave.op
-    def score(self, output: Any) -> dict:
+    def score(self, *, output: Any, **kwargs: Any) -> dict:
         try:
             _ = json.loads(output)
         except json.JSONDecodeError:

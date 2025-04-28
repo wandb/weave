@@ -1235,7 +1235,7 @@ def process_ref_filters_to_sql(
     if not ref_filters:
         return ""
 
-    return " AND " + combine_conditions(ref_filters, "AND")
+    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
 
 
 def process_calls_filter_to_conditions(

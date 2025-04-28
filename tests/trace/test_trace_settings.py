@@ -136,7 +136,7 @@ def test_should_capture_code_env(client):
 
 
 def slow_operation():
-    time.sleep(1)
+    time.sleep(0.1)
 
 
 def speed_test(client, count=5):
