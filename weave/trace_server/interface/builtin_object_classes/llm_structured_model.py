@@ -17,6 +17,10 @@ class ResponseFormat(str, Enum):
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
+    # Could use Prompt objects for the message template
+    # This is a list of dicts, where each dict is a message
+    messages_template: list[dict]
+
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     max_tokens: Optional[int] = None
@@ -24,19 +28,19 @@ class LLMStructuredCompletionModelDefaultParams(BaseModel):
     frequency_penalty: Optional[float] = None
     stop: Optional[list[str]] = None
     n_times: Optional[int] = None
-    response_format: Optional[ResponseFormat] = None
     functions: Optional[list[dict]] = None
 
-
-class LLMStructuredCompletionModel(Model):
-    # <provider>/<model> or ref to a provider model
-    llm_model_id: Union[str, base_object_def.RefStr]
-
-    # Could use Prompt objects for the message template
-    messages_template: list[dict]
+    # Either json, text, or json_schema
+    response_format: Optional[ResponseFormat] = None
 
     # TODO: Currently not used. Fast follow up with json_schema
-    response_format_schema: dict
+    # if default_params.response_format is set to JSON_SCHEMA, this will be used
+    # response_format_schema: dict | None = None
+
+
+class LLMStructuredCompletionModel(base_object_def.BaseObject):
+    # <provider>/<model> or ref to a provider model
+    llm_model_id: Union[str, base_object_def.RefStr]
 
     default_params: LLMStructuredCompletionModelDefaultParams = Field(
         default_factory=LLMStructuredCompletionModelDefaultParams

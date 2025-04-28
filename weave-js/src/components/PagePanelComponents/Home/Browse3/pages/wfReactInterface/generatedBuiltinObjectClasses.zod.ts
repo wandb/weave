@@ -47,6 +47,7 @@ export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
     .union([z.array(z.record(z.string(), z.any())), z.null()])
     .optional(),
   max_tokens: z.union([z.number(), z.null()]).optional(),
+  messages_template: z.array(z.record(z.string(), z.any())),
   n_times: z.union([z.number(), z.null()]).optional(),
   presence_penalty: z.union([z.number(), z.null()]).optional(),
   response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
@@ -57,15 +58,6 @@ export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
 export type LlmStructuredCompletionModelDefaultParams = z.infer<
   typeof LlmStructuredCompletionModelDefaultParamsSchema
 >;
-
-export const ObjectRefSchema = z.object({
-  _digest: z.string(),
-  _extra: z.array(z.string()).optional(),
-  entity: z.string(),
-  name: z.string(),
-  project: z.string(),
-});
-export type ObjectRef = z.infer<typeof ObjectRefSchema>;
 
 export const ProviderSchema = z.object({
   api_key_name: z.string(),
@@ -159,10 +151,7 @@ export const LlmStructuredCompletionModelSchema = z.object({
   default_params: LlmStructuredCompletionModelDefaultParamsSchema.optional(),
   description: z.union([z.null(), z.string()]).optional(),
   llm_model_id: z.string(),
-  messages_template: z.array(z.record(z.string(), z.any())),
   name: z.union([z.null(), z.string()]).optional(),
-  ref: z.union([ObjectRefSchema, z.null()]).optional(),
-  response_format_schema: z.record(z.string(), z.any()),
 });
 export type LlmStructuredCompletionModel = z.infer<
   typeof LlmStructuredCompletionModelSchema

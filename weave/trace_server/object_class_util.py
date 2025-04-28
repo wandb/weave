@@ -103,7 +103,7 @@ def process_incoming_object_val(
                 raise ValueError(
                     f"Unexpected error: could not get object classes for {dict_val}"
                 )
-            if new_val_object_classes["object_class"] != req_builtin_object_class:
+            if new_val_object_classes["base_object_class"] != req_builtin_object_class:
                 raise ValueError(
                     f"Unexpected error: base object class does not match requested object class: {new_val_object_classes['object_class']} != {req_builtin_object_class}"
                 )

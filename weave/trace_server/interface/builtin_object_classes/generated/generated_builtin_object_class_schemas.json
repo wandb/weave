@@ -956,7 +956,6 @@
       "type": "object"
     },
     "LLMStructuredCompletionModel": {
-      "additionalProperties": false,
       "properties": {
         "name": {
           "anyOf": [
@@ -982,21 +981,22 @@
           "default": null,
           "title": "Description"
         },
-        "ref": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ObjectRef"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "llm_model_id": {
           "title": "Llm Model Id",
           "type": "string"
         },
+        "default_params": {
+          "$ref": "#/$defs/LLMStructuredCompletionModelDefaultParams"
+        }
+      },
+      "required": [
+        "llm_model_id"
+      ],
+      "title": "LLMStructuredCompletionModel",
+      "type": "object"
+    },
+    "LLMStructuredCompletionModelDefaultParams": {
+      "properties": {
         "messages_template": {
           "items": {
             "type": "object"
@@ -1004,24 +1004,6 @@
           "title": "Messages Template",
           "type": "array"
         },
-        "response_format_schema": {
-          "title": "Response Format Schema",
-          "type": "object"
-        },
-        "default_params": {
-          "$ref": "#/$defs/LLMStructuredCompletionModelDefaultParams"
-        }
-      },
-      "required": [
-        "llm_model_id",
-        "messages_template",
-        "response_format_schema"
-      ],
-      "title": "LLMStructuredCompletionModel",
-      "type": "object"
-    },
-    "LLMStructuredCompletionModelDefaultParams": {
-      "properties": {
         "temperature": {
           "anyOf": [
             {
@@ -1109,17 +1091,6 @@
           "default": null,
           "title": "N Times"
         },
-        "response_format": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResponseFormat"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "functions": {
           "anyOf": [
             {
@@ -1134,8 +1105,22 @@
           ],
           "default": null,
           "title": "Functions"
+        },
+        "response_format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResponseFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
+      "required": [
+        "messages_template"
+      ],
       "title": "LLMStructuredCompletionModelDefaultParams",
       "type": "object"
     },
@@ -1343,42 +1328,6 @@
         "$not"
       ],
       "title": "NotOperation",
-      "type": "object"
-    },
-    "ObjectRef": {
-      "properties": {
-        "entity": {
-          "title": "Entity",
-          "type": "string"
-        },
-        "project": {
-          "title": "Project",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "_digest": {
-          "title": " Digest",
-          "type": "string"
-        },
-        "_extra": {
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "title": " Extra",
-          "type": "array"
-        }
-      },
-      "required": [
-        "entity",
-        "project",
-        "name",
-        "_digest"
-      ],
-      "title": "ObjectRef",
       "type": "object"
     },
     "OrOperation": {
