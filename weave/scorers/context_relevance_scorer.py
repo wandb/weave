@@ -155,6 +155,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         self,
         query: str,
         output: Union[str, list[str]],  # Pass the context to the `output` parameter
+        **kwargs: Any,
     ) -> WeaveScorerResult:
         all_spans: list[dict[str, Any]] = []
         total_weighted_score = 0.0
