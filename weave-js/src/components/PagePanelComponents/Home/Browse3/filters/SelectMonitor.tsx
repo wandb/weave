@@ -74,12 +74,10 @@ export const SelectMonitor = ({
   useMemo(() => {
     if (monitorsResult.result) {
       setMonitors(
-        monitorsResult.result
-          .filter(monitor => monitor.val['active'])
-          .map(monitor => ({
-            label: monitor.val['name'],
-            value: `weave:///${entity}/${project}/object/${monitor.objectId}:*`,
-          }))
+        monitorsResult.result.map(monitor => ({
+          label: monitor.val['name'],
+          value: `weave:///${entity}/${project}/object/${monitor.objectId}:*`,
+        }))
       );
       setLoading(false);
     }
