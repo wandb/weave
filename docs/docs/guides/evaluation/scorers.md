@@ -354,6 +354,18 @@ For more information on how to use the `.call()` method, see the [Calling Ops](.
   </TabItem>
 </Tabs>
 
+### Use `preprocess_model_input` 
+
+You can use the `preprocess_model_input` parameter to modify dataset examples before they reach your model during evaluation. 
+
+:::important
+The `preprocess_model_input` function only transforms inputs before they are passed to the model’s prediction function.
+
+Scorer functions always receive the original dataset examples, without any preprocessing applied.
+:::
+
+For usage information and an example, see [Using `preprocess_model_input` to format dataset rows before evaluating](../core-types/evaluations.md#using-preprocess_model_input-to-format-dataset-rows-before-evaluating).
+
 ## Score Analysis
 
 In this section, we'll show you how to analyze the scores for a single call, multiple calls, and all calls scored by a specific scorer.
