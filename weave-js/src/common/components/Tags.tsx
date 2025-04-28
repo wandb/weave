@@ -58,7 +58,7 @@ function colorIndexToName(showColor: boolean, index?: number): string {
 function nounToIconName(noun: string): string {
   switch (noun) {
     case 'tag':
-      return 'tag-latest';
+      return 'tag';
     case 'alias':
       return 'email-at';
     case 'protected-alias':
@@ -100,15 +100,7 @@ export const Tag: React.FC<TagProps> = React.memo(
         }
         key={tag.name}
         onClick={onClick}>
-        {noun === 'protected-alias' ? (
-          <S.ProtectedAliasIcon
-            name={nounToIconName(noun)}
-            size={size}
-            $pos="left"
-          />
-        ) : (
-          <S.StyledIcon name={nounToIconName(noun)} size={size} $pos="left" />
-        )}
+        <S.StyledIcon name={nounToIconName(noun)} size={size} $pos="left" />
         <SingleLineText alignSelf={'center'}>
           {highlightedText
             ? regexMatchHighlight(tag.name, new RegExp(highlightedText, 'i'), {
@@ -120,7 +112,7 @@ export const Tag: React.FC<TagProps> = React.memo(
         {canDelete && onDelete && (
           <S.StyledIcon
             className="delete-tag"
-            name="close-latest"
+            name="close"
             size={size}
             onClick={(e: React.MouseEvent<HTMLElement>) => {
               e.stopPropagation();

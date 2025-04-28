@@ -1,49 +1,35 @@
-import {WBIcon} from '@wandb/ui';
 import {Icon} from '@wandb/weave/components/Icon';
 import styled, {css} from 'styled-components';
 
 const IconVariants = {
   small: css`
-    font-size: 12px;
+    width: 12px;
+    height: 12px;
   `,
   medium: css`
-    font-size: 14px;
+    width: 14px;
+    height: 14px;
   `,
   large: css`
-    font-size: 16px;
+    width: 16px;
+    height: 16px;
   `,
 };
 
-export const StyledIcon = styled(WBIcon)<{
+export const StyledIcon = styled(Icon)<{
   size: keyof typeof IconVariants;
   $pos: string;
   $opacity?: number;
   $cursor?: string;
 }>`
   ${props => IconVariants[props.size]};
-  margin: 4px 4px 4px 4px;
+  margin: auto 4px;
   ${props =>
     props.$pos === 'left' ? `margin-left: -4px;` : `margin-right: -4px;`}
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   opacity: ${props => props.$opacity};
   ${props => (props.$cursor ? `cursor: ${props.$cursor};` : '')}
-`;
-
-export const ProtectedAliasIcon = styled(Icon)<{
-  size: keyof typeof IconVariants;
-  $pos: string;
-  $opacity?: number;
-  $cursor?: string;
-}>`
-  ${props => IconVariants[props.size]};
-  margin: 4px 4px 4px 4px;
-  ${props =>
-    props.$pos === 'left' ? `margin-left: -4px;` : `margin-right: -4px;`}
-  display: flex;
-  align-items: center;
-  opacity: ${props => props.$opacity};
-  ${props => (props.$cursor ? `cursor: ${props.$cursor};` : '')}
-  width: 16px;
-  height: 16px;
 `;
