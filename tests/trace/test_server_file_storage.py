@@ -17,6 +17,7 @@ from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -291,3 +292,48 @@ class TestAzureStorage:
             f"weave/projects/{project}/files/{res.digest}"
         )
         assert blob_client.download_blob().readall() == TEST_CONTENT
+
+
+def test_support_for_variable_length_chunks(client: WeaveClient):
+    """Test that the system supports variable length chunks.
+    We don't actually want to change this often, but we need to make sure it works.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    def create_and_read_file(content: bytes):
+        res = client.server.file_create(
+            FileCreateReq(
+                project_id=client._project_id(), name="test.txt", content=content
+            )
+        )
+        assert res.digest is not None
+        assert res.digest != ""
+
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+        )
+        assert file.content == content
+
+        return res.digest
+
+    base_chunk_size = 100000
+    num_chunks = 3
+    file_part = b"1234567890"
+    large_file = file_part * (base_chunk_size * num_chunks // len(file_part))
+    large_digest = create_and_read_file(large_file)
+
+    #  Test increasing and decreasing chunk sizes
+    for size in [
+        base_chunk_size,
+        2 * base_chunk_size,
+        3 * base_chunk_size,
+        4 * base_chunk_size,
+        base_chunk_size,
+        base_chunk_size // 2,
+    ]:
+        with mock.patch.object(
+            clickhouse_trace_server_batched, "FILE_CHUNK_SIZE", size
+        ):
+            digest = create_and_read_file(large_file)
+            assert digest == large_digest
