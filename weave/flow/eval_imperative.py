@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import atexit
+import datetime
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import datetime
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
@@ -149,7 +149,7 @@ def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
 
 
 def _default_dataset_name() -> str:
-    date = datetime.now().strftime("%Y-%m-%d")
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
     unique_name = make_memorable_name()
     return f"{date}-{unique_name}-dataset"
 
