@@ -24,7 +24,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ## Documentation
 
-The official Weave documentation can be found at [https://weave-docs.wandb.ai/](https://weave-docs.wandb.ai/).
+Our documentation site can be found [here](https://wandb.me/weave).
 
 ## Installation
 ```
