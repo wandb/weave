@@ -996,23 +996,11 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
-class ProjectCheckReq(BaseModel):
-    project_id: str
-
-
-class ProjectCheckRes(BaseModel):
-    has_data: bool
-
-
 class TraceServerInterface(Protocol):
-    # Check for gorilla project existence
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
-
-    # Project API
-    def project_check(self, req: ProjectCheckReq) -> ProjectCheckRes: ...
 
     # OTEL API
     def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...

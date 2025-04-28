@@ -1518,14 +1518,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         results = self.table_query(req)
         yield from results.rows
 
-    def project_check(self, req: tsi.ProjectCheckReq) -> tsi.ProjectCheckRes:
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(
-            "SELECT id FROM calls WHERE project_id = ? LIMIT 1", (req.project_id,)
-        )
-        res = cursor.fetchone()
-        return tsi.ProjectCheckRes(has_data=res is not None)
-
 
 def get_type(val: Any) -> str:
     if val == None:

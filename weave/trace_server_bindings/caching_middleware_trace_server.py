@@ -448,6 +448,3 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         return self._next_trace_server.completions_create(req)
-
-    def project_check(self, req: tsi.ProjectCheckReq) -> tsi.ProjectCheckRes:
-        return self._next_trace_server.project_check(req)
