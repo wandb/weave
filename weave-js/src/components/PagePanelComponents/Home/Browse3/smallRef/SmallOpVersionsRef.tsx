@@ -1,10 +1,9 @@
 import {IconNames} from '@wandb/weave/components/Icon';
+import {useWeaveflowRouteContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {SmallRefLoaded} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRefLoaded';
+import {getObjectVersionLabel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallWeaveRef';
+import {WeaveObjectRef} from '@wandb/weave/react';
 import React from 'react';
-
-import {WeaveObjectRef} from '../../../../../react';
-import {useWeaveflowRouteContext} from '../context';
-import {SmallRefLoaded} from './SmallRefLoaded';
-import {getObjectVersionLabel} from './SmallWeaveRef';
 
 export const SmallOpVersionsRef = ({objRef}: {objRef: WeaveObjectRef}) => {
   const {peekingRouter} = useWeaveflowRouteContext();

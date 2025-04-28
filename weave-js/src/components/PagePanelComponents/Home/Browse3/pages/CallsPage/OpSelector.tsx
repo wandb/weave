@@ -6,15 +6,14 @@ import {
 } from '@mui/material';
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import React, {useCallback} from 'react';
-
-import {StyledPaper} from '../../StyledAutocomplete';
-import {StyledTextField} from '../../StyledTextField';
-import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   ALL_TRACES_OR_CALLS_REF_KEY,
   WFHighLevelCallFilter,
-} from './callsTableFilter';
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
+import {OpVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {StyledPaper} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/StyledAutocomplete';
+import {StyledTextField} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/StyledTextField';
+import React, {useCallback} from 'react';
 
 export const OpSelector = ({
   frozenFilter,
