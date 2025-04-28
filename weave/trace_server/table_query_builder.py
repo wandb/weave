@@ -130,7 +130,7 @@ def make_table_stats_query_with_storage_size(
         SELECT digest as tb_digest, length(row_digests) as length, row_digests
         FROM tables
         WHERE project_id = {{{project_id_name}: String}} AND digest in {{{digest_ids}: Array(String)}}
-    ) ARRAY JOIN row_digests as row_digest
+    ) AS sub ARRAY JOIN row_digests as row_digest
     LEFT JOIN
     (
         SELECT * FROM table_rows_stats WHERE table_rows_stats.project_id = {{{project_id_name}: String}}

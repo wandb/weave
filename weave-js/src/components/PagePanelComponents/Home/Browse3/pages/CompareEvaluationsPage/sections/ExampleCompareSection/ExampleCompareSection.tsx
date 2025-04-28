@@ -11,11 +11,7 @@ import {
   MOON_300,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {
-  parseRef,
-  parseRefMaybe,
-  WeaveObjectRef,
-} from '../../../../../../../../react';
+import {parseRef, parseRefMaybe} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
@@ -262,7 +258,7 @@ export const ExampleCompareSection: React.FC<{
     k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
-  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
+  const inputRef = target.inputRef;
   const numInputProps = inputColumnKeys?.length ?? 0;
   const numOutputKeys = outputColumnKeys?.length ?? 0;
 
@@ -392,19 +388,36 @@ export const ExampleCompareSection: React.FC<{
   ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
+    const dimension = lookupDimension(scorerIndex, metricIndex);
     const resolvedScoreId = resolvePeerDimension(
       compositeScoreMetrics,
       currEvalCallId,
-      lookupDimension(scorerIndex, metricIndex)
+      dimension
     );
-
-    if (resolvedScoreId == null) {
-      return undefined;
+    // If we get a valid resolution through the normal path, use that
+    if (resolvedScoreId != null) {
+      const metricId = metricDefinitionId(resolvedScoreId);
+      if (
+        targetTrial.scores &&
+        metricId in targetTrial.scores &&
+        currEvalCallId in targetTrial.scores[metricId]
+      ) {
+        return targetTrial.scores[metricId][currEvalCallId];
+      }
     }
 
-    return targetTrial.scores[metricDefinitionId(resolvedScoreId)][
-      currEvalCallId
-    ];
+    // Fallback: try direct lookup using the original dimension's metric ID
+    // This is needed for imperative evaluations that don't get properly resolved
+    const originalMetricId = metricDefinitionId(dimension);
+    if (
+      targetTrial.scores &&
+      originalMetricId in targetTrial.scores &&
+      currEvalCallId in targetTrial.scores[originalMetricId]
+    ) {
+      return targetTrial.scores[originalMetricId][currEvalCallId];
+    }
+
+    return undefined;
   };
 
   const lookupAggScorerMetricValue = (
@@ -640,7 +653,7 @@ export const ExampleCompareSection: React.FC<{
       inner = null;
     } else if (scorerRefs.length === 1) {
       const parsedRef = parseRef(scorerRefs[0]);
-      inner = <SmallRef objRef={parsedRef as WeaveObjectRef} iconOnly />;
+      inner = <SmallRef objRef={parsedRef} iconOnly />;
     } else {
       inner = (
         <Tooltip
@@ -695,7 +708,7 @@ export const ExampleCompareSection: React.FC<{
           style={{
             flex: 0,
           }}>
-          <SmallRef objRef={inputRef} iconOnly />
+          {inputRef && <SmallRef objRef={inputRef} iconOnly />}
         </Box>
         <Box
           style={{
