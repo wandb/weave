@@ -40,8 +40,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 :::info Looking for a less opinionated approach?
 
-If you prefer a more flexible evaluation framework, check out Weave's [Imperative Evaluations](../evaluation/imperative_evaluations.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
-
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
 :::
 
 ## Create an Evaluation
