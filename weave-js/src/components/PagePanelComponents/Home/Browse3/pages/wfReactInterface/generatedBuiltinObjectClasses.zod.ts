@@ -41,23 +41,18 @@ export const LeaderboardColumnSchema = z.object({
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
 
-export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
-  frequency_penalty: z.union([z.number(), z.null()]).optional(),
-  functions: z
-    .union([z.array(z.record(z.string(), z.any())), z.null()])
-    .optional(),
-  max_tokens: z.union([z.number(), z.null()]).optional(),
-  messages_template: z.array(z.record(z.string(), z.any())),
-  n_times: z.union([z.number(), z.null()]).optional(),
-  presence_penalty: z.union([z.number(), z.null()]).optional(),
-  response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
-  stop: z.union([z.array(z.string()), z.null()]).optional(),
-  temperature: z.union([z.number(), z.null()]).optional(),
-  top_p: z.union([z.number(), z.null()]).optional(),
+export const MessageSchema = z.object({
+  content: z.union([
+    z.array(z.record(z.string(), z.any())),
+    z.null(),
+    z.string(),
+  ]),
+  function_call: z.union([z.record(z.string(), z.any()), z.null()]),
+  name: z.union([z.null(), z.string()]),
+  role: z.string(),
+  tool_call_id: z.union([z.null(), z.string()]),
 });
-export type LlmStructuredCompletionModelDefaultParams = z.infer<
-  typeof LlmStructuredCompletionModelDefaultParamsSchema
->;
+export type Message = z.infer<typeof MessageSchema>;
 
 export const ProviderSchema = z.object({
   api_key_name: z.string(),
@@ -148,14 +143,22 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
-export const LlmStructuredCompletionModelSchema = z.object({
-  default_params: LlmStructuredCompletionModelDefaultParamsSchema.optional(),
-  description: z.union([z.null(), z.string()]).optional(),
-  llm_model_id: z.string(),
-  name: z.union([z.null(), z.string()]).optional(),
+export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
+  frequency_penalty: z.union([z.number(), z.null()]).optional(),
+  functions: z
+    .union([z.array(z.record(z.string(), z.any())), z.null()])
+    .optional(),
+  max_tokens: z.union([z.number(), z.null()]).optional(),
+  messages_template: z.array(MessageSchema),
+  n_times: z.union([z.number(), z.null()]).optional(),
+  presence_penalty: z.union([z.number(), z.null()]).optional(),
+  response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
+  stop: z.union([z.array(z.string()), z.null()]).optional(),
+  temperature: z.union([z.number(), z.null()]).optional(),
+  top_p: z.union([z.number(), z.null()]).optional(),
 });
-export type LlmStructuredCompletionModel = z.infer<
-  typeof LlmStructuredCompletionModelSchema
+export type LlmStructuredCompletionModelDefaultParams = z.infer<
+  typeof LlmStructuredCompletionModelDefaultParamsSchema
 >;
 
 export const ExprSchema = z.object({
@@ -178,6 +181,16 @@ export const TestOnlyExampleSchema = z.object({
   primitive: z.number(),
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
+
+export const LlmStructuredCompletionModelSchema = z.object({
+  default_params: LlmStructuredCompletionModelDefaultParamsSchema.optional(),
+  description: z.union([z.null(), z.string()]).optional(),
+  llm_model_id: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
+});
+export type LlmStructuredCompletionModel = z.infer<
+  typeof LlmStructuredCompletionModelSchema
+>;
 
 export const QuerySchema = z.object({
   $expr: ExprSchema,
