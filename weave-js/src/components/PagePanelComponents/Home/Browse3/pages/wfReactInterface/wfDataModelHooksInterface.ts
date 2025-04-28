@@ -118,6 +118,7 @@ export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   createdAtMs: number;
   val: T;
   userId?: string;
+  sizeBytes?: number;
 };
 
 export type ObjectVersionFilter = {
@@ -258,16 +259,20 @@ export type WFDataModelHooksInterface = {
   useTableQueryStats: (
     entity: string,
     project: string,
-    digest: string,
-    opts?: {skip?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
+    digests: string[],
+    opts?: {skip?: boolean; includeStorageSize?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsBatchRes>;
   useRootObjectVersions: (
     entity: string,
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
-    opts?: {skip?: boolean; noAutoRefresh?: boolean}
+    opts?: {
+      skip?: boolean;
+      noAutoRefresh?: boolean;
+      includeStorageSize?: boolean;
+    }
   ) => LoadableWithError<ObjectVersionSchema[]>;
   useObjectDeleteFunc: () => {
     objectVersionsDelete: (

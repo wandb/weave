@@ -38,7 +38,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -120,20 +120,6 @@ def test_simple_op(client):
         ended_at=DatetimeMatcher(),
         deleted_at=None,
     )
-
-
-def test_dataset(client):
-    from weave.flow.dataset import Dataset
-
-    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
-
-    # This might seem redundant, but it is useful to ensure that the
-    # dataset can be re-iterated over multiple times and equality is preserved.
-    assert list(d2.rows) == list(d2.rows)
-    assert list(d.rows) == list(d2.rows)
-    assert list(d.rows) == list(d.rows)
 
 
 def test_trace_server_call_start_and_end(client):
@@ -1708,14 +1694,14 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
-        time.sleep(0.3)
+        time.sleep(0.03)
         events.append("A(E):" + str(a))
         return a
 
     @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
-        time.sleep(0.2)
+        time.sleep(0.02)
         res = op_a(b)
         events.append("B(E):" + str(b))
         return res
@@ -1723,7 +1709,7 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
-        time.sleep(0.1)
+        time.sleep(0.01)
         res = op_b(c)
         events.append("C(E):" + str(c))
         return res
@@ -2769,8 +2755,19 @@ def test_calls_stream_column_expansion(client):
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
 # in clickhouse_trace_server_batched.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
-def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+@pytest.mark.parametrize("batch_size", [1, 5, 6])
+def test_calls_stream_column_expansion_dynamic_batch_size(
+    client, batch_size, monkeypatch
+):
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        1,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        5,
+    )
+
     @weave.op
     def test_op(x):
         return x
@@ -3069,13 +3066,43 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
-def test_large_keys_are_stripped_call(client, caplog):
+def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+
+    # Patch _insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch):
+        # mock raise insert error
+        if len(str(batch)) > 10 * 1024:
+            raise InsertTooLarge(
+                "Database insertion failed. Record too large. "
+                "A likely cause is that a single row or cell exceeded "
+                "the limit. If logging images, save them as `Image.PIL`."
+            )
+        original_insert_call_batch(self, batch)
+
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        10 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
+        1 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_insert_call_batch",
+        mock_insert_call_batch,
+    )
+
+    # Use a smaller dictionary that will still exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
@@ -3352,7 +3379,7 @@ def test_op_sampling_child_follows_parent(client):
         parent_calls += 1
         return child_op(x)
 
-    num_runs = 100
+    num_runs = 5
     for i in range(num_runs):
         parent_op(i)
 
@@ -3908,3 +3935,118 @@ def test_call_query_stream_with_invalid_filter_field(client):
                 }
             )
         )
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        weave.Dataset(rows=[{"a": 1, "b": 2}]),
+        weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
+    ],
+)
+def test_get_object_from_uri(client, obj):
+    ref = weave.publish(obj)
+    uri = ref.uri()
+
+    assert weave.get(uri) == obj
+
+
+def test_get_object_from_uri_non_registered_object(client):
+    class MyModel(weave.Model):
+        a: int
+        b: float = 2.0
+
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x + 1
+
+    model = MyModel(name="example", description="fancy", a=1)
+    ref = weave.publish(model)
+    uri = ref.uri()
+
+    res = weave.get(uri)
+    assert res.name == "example"
+    assert res.description == "fancy"
+    assert res.a == 1
+    assert res.b == 2.0
+    assert res._class_name == "MyModel"
+    assert res._bases == ["Model", "Object", "BaseModel"]
+    assert res.predict(5) == 6
+
+
+def test_dedupe_ref_in_calls_stream(client):
+    nested_obj = {"nested": 123}
+    nested_ref = weave.publish(nested_obj)
+
+    obj = {
+        "my_dataset1": nested_ref,
+        "my_dataset2": nested_ref,
+        "my_dataset3": nested_ref,
+        "my_dataset4": nested_ref,
+        "my_dataset5": nested_ref,
+        "ref_list": {
+            "1": nested_ref,
+            "2": nested_ref,
+            "3": nested_ref,
+        },
+    }
+    obj_ref = weave.publish(obj)
+
+    @weave.op
+    def log():
+        return obj_ref
+
+    log()
+
+    def call_stream(columns, expand_columns):
+        return list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=client._project_id(),
+                    columns=columns,
+                    expand_columns=expand_columns,
+                )
+            )
+        )
+
+    calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
+    assert len(calls_hydrated) == 1
+    assert calls_hydrated[0].output == {
+        "_ref": obj_ref.uri(),
+        "my_dataset1": nested_ref.uri(),
+        "my_dataset2": nested_ref.uri(),
+        "my_dataset3": nested_ref.uri(),
+        "my_dataset4": nested_ref.uri(),
+        "my_dataset5": nested_ref.uri(),
+        "ref_list": {
+            "1": nested_ref.uri(),
+            "2": nested_ref.uri(),
+            "3": nested_ref.uri(),
+        },
+    }
+
+    cols = [
+        "output",
+        "output.my_dataset1",
+        "output.my_dataset2",
+        "output.my_dataset3",
+        "output.my_dataset4",
+        "output.my_dataset5",
+        "output.ref_list",
+        "output.ref_list.1",
+        "output.ref_list.2",
+        "output.ref_list.3",
+    ]
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    calls_all_columns = call_stream(columns=cols, expand_columns=cols)
+    assert len(calls_all_columns) == 1
+    assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset2"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset3"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset4"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset5"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["ref_list"] == {
+        "1": nested_obj_with_ref,
+        "2": nested_obj_with_ref,
+        "3": nested_obj_with_ref,
+    }

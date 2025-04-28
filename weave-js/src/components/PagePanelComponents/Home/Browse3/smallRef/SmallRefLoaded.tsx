@@ -17,6 +17,7 @@ type SmallRefLoadedProps = {
   label?: string;
   error: Error | null;
   noLink?: boolean;
+  suffix?: React.ReactNode;
 };
 
 export const SmallRefLoaded = ({
@@ -25,6 +26,7 @@ export const SmallRefLoaded = ({
   label,
   error,
   noLink = false,
+  suffix,
 }: SmallRefLoadedProps) => {
   const content = (
     <div
@@ -42,6 +44,7 @@ export const SmallRefLoaded = ({
           {label}
         </div>
       )}
+      {suffix && <div className="ml-2 flex-shrink-0">{suffix}</div>}
     </div>
   );
   if (error) {

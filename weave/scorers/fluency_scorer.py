@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import Field, validate_call
 
 import weave
@@ -55,7 +57,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
 
     @validate_call
     @weave.op
-    def score(self, output: str) -> WeaveScorerResult:
+    def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         assert self._pipeline is not None
         pipeline_output = self._pipeline(output)[0]
         fluency_score = next(
