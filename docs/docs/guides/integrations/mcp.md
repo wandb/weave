@@ -34,14 +34,14 @@ The Weave integration works with both the MCP server and client. Once installed,
 Before you begin, install the required packages:
 
 ```bash
-pip install -qq mcp[cli] weave
+pip install -qq "mcp[cli]" weave
 ```
 
 ### Configuration
 
 The MCP integration can be configured through environment variables:
 
-- `MCP_TRACE_LIST_OPERATIONS`: Set to `true` to trace list operations (`list_tools`, `list_resources`, etc.)
+- `MCP_TRACE_LIST_OPERATIONS`: Set to `true` to trace list operations (`list_tools`, `list_resources`, and `list_prompts`) on both server and client sides.
 
 ### Server-side integration
 
@@ -178,6 +178,7 @@ The `example_client.py` client demonstrates how to:
 - Call tools with parameters
 - Read from resource URIs
 - Generate prompts with arguments
+- Show usage of [`weave.op()`](../tracking/ops.md) with custom methods/functions.
 
 Weave traces all client-side calls to provide a complete view of interactions between the client and server.
 
