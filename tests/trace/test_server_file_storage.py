@@ -102,7 +102,6 @@ class TestS3Storage:
         obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
         assert obj_response["Body"].read() == TEST_CONTENT
 
-
     def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
         # This test is critical in that it ensures that the system works correctly for large files. Both
         # before and after the migration to file storage, we should be able to read the file correctly.
@@ -149,10 +148,9 @@ class TestS3Storage:
             d3 = _run_single_test()
             assert d1 == d2 == d3
 
-        
         if client_is_sqlite(client):
             pytest.skip("Not implemented in SQLite")
-        
+
         _run_test()
 
 
