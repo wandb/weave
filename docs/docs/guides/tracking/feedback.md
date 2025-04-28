@@ -56,6 +56,10 @@ To add a comment:
 2. In the text box, add your note.
 3. To save the note, press the **Enter** key. You can add additional notes.
 
+:::important
+The maximum number of characters in a feedback note is 1024. If a note exceeds this limit, it will not be created.
+:::
+
 ![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
 
 ## Provide feedback via the SDK
@@ -118,6 +122,10 @@ You can add feedback to a call using the call's UUID. To use the UUID to get a p
 - `call.feedback.add_reaction("<reaction_type>")`: Add one of the supported `<reaction_types>` (emojis), such as 👍.
 - `call.feedback.add_note("<note>")`: Add a note.
 - `call.feedback.add("<label>", <object>)`: Add a custom feedback `<object>` specified by `<label>`.
+
+:::important
+The maximum number of characters in a feedback note is 1024. If a note exceeds this limit, it will not be created.
+:::
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
