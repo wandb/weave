@@ -76,7 +76,7 @@ type TraceServerClientPromiseKeys = {
 const makeTraceServerEndpointHook = <
   FN extends TraceServerClientPromiseKeys,
   Input extends any[],
-  Output,
+  Output
 >(
   traceServerFnName: FN,
   preprocessFn: (...input: Input) => {
@@ -140,7 +140,7 @@ const makeTraceServerEndpointHook = <
 const useMakeTraceServerEndpoint = <
   FN extends TraceServerClientPromiseKeys,
   Input extends any[],
-  Output,
+  Output
 >(
   traceServerFnName: FN,
   preprocessFn: (
@@ -1060,7 +1060,7 @@ const useObjectVersion = (
 };
 
 export const convertTraceServerObjectVersionToSchema = <
-  T extends traceServerTypes.TraceObjSchema,
+  T extends traceServerTypes.TraceObjSchema
 >(
   obj: T
 ): ObjectVersionSchema<T['val']> => {
@@ -1325,7 +1325,7 @@ const useTableQuery = makeTraceServerEndpointHook<
     traceServerTypes.TraceTableQueryReq['limit'],
     traceServerTypes.TraceTableQueryReq['offset'],
     traceServerTypes.TraceTableQueryReq['sort_by'],
-    {skip?: boolean}?,
+    {skip?: boolean}?
   ],
   any[]
 >(
