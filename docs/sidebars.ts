@@ -104,7 +104,7 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
             "guides/evaluation/weave_local_scorers",
-            "guides/evaluation/imperative_evaluations",
+            "guides/evaluation/evaluation_logger",
           ]
         },
       ],
@@ -195,6 +195,16 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/instructor",
             "guides/integrations/crewai",
             "guides/integrations/smolagents",
+          ],
+        },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Protocols",
+          link: { type: "doc", id: "guides/integrations/index"},
+          items: [
+            {type: "doc", id: "guides/integrations/mcp", label: "MCP"},
           ],
         },
       ],
