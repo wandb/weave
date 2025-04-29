@@ -33,7 +33,7 @@ class VideoFormat(str, Enum):
 
 
 SUPPORTED_FORMATS = [format.value for format in VideoFormat]
-DEFAULT_VIDEO_FORMAT = VideoFormat.GIF.value
+DEFAULT_VIDEO_FORMAT = VideoFormat.MP4.value
 
 
 def get_format_from_filename(filename: str) -> str | None:
