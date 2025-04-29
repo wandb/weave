@@ -440,7 +440,19 @@ function buildCallsTableColumns(
           },
           valueGetter: (unused: any, row: any) => {
             const value = row[c];
-            if (value == null) return '';
+            if (value == null) {
+              return '';
+            }
+            
+            // Filter feedback for current user
+            if (Array.isArray(value)) {
+              const userFeedback = value.find(f => f.creator === currentUserId);
+              return userFeedback?.payload?.value ?? null;
+            } else if (typeof value === 'object' && value.creator === currentUserId) {
+              return value.payload?.value ?? null;
+            }
+            
+            // If it's a direct value (not feedback object/array), return as is
             return value;
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
