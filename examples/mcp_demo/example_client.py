@@ -80,7 +80,6 @@ class MCPClient:
                 "Not connected to a server. Call connect_to_server first."
             )
 
-        # with weave.attributes({"mcp_component": "client", "mcp_method": "call_tool", "tool": tool_name}):
         print(f"Calling tool: {tool_name} with arguments: {arguments}")
         result = await self.session.call_tool(tool_name, arguments)
         content = result.content
@@ -104,7 +103,6 @@ class MCPClient:
                 "Not connected to a server. Call connect_to_server first."
             )
 
-        # with weave.attributes({"mcp_component": "client", "mcp_method": "read_resource", "uri": uri}):
         print(f"Reading resource: {uri}")
         result = await self.session.read_resource(AnyUrl(uri))
         return result
@@ -122,7 +120,6 @@ class MCPClient:
                 "Not connected to a server. Call connect_to_server first."
             )
 
-        # with weave.attributes({"mcp_component": "client", "mcp_method": "get_prompt", "prompt": prompt_name}):
         print(f"Getting prompt: {prompt_name} with arguments: {arguments}")
         result = await self.session.get_prompt(prompt_name, arguments)
         return result.messages

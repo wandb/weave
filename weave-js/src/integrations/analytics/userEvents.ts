@@ -109,7 +109,7 @@ export const callTreeCellClicked = makeTrackEvent<
     traceId: string;
     path: string;
     isParentRow: boolean;
-    heirarchyDepth: number;
+    hierarchyDepth: number;
   },
   {
     _description: `User clicked a call tree cell`;
@@ -139,8 +139,8 @@ export const callTreeCellClicked = makeTrackEvent<
       description: 'Whether the cell clicked is a parent row';
       exampleValues: [true, false];
     };
-    heirarchyDepth: {
-      description: 'Depth of the heirarchy';
+    hierarchyDepth: {
+      description: 'Depth of the hierarchy';
       exampleValues: [1, 2, 3];
     };
   }

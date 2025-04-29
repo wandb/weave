@@ -7,10 +7,13 @@ from typing_extensions import Self
 import weave
 from weave.flow.obj import Object
 from weave.flow.util import short_str
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
-from weave.trace.weave_client import Call
+from weave.trace.weave_client import (
+    Call,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -70,6 +73,48 @@ class Dataset(Object):
             raise ImportError("pandas is required to use this method")
 
         return pd.DataFrame(self.rows)
+
+    def add_rows(self, rows: Iterable[dict]) -> "Dataset":
+        """Create a new dataset version by appending rows to the existing dataset.
+
+        This is useful for adding examples to large datasets without having to
+        load the entire dataset into memory.
+
+        Args:
+            rows: The rows to add to the dataset.
+
+        Returns:
+            The updated dataset.
+        """
+        client = require_weave_client()
+        if not isinstance(self.rows, WeaveTable) or not self.rows.table_ref:
+            raise TypeError(
+                "This dataset is not saved to weave. Call weave.publish(dataset) "
+                "to save the dataset before adding rows."
+            )
+        if self.rows.table_ref.project != client.project:
+            raise ValueError(
+                "This dataset is not saved to the same project as the current weave client. "
+                "Client is in project:  "
+                + client.project
+                + " but dataset is in project: "
+                + self.rows.table_ref.project
+            )
+        if self.rows.table_ref.entity != client.entity:
+            raise ValueError(
+                "This dataset is not saved to the same entity as the current weave client. "
+                "Client is in entity: "
+                + client.entity
+                + " but dataset is in entity: "
+                + self.rows.table_ref.entity
+            )
+
+        new_table = client._append_to_table(self.rows.table_ref.digest, list(rows))
+        new_dataset = Dataset(
+            name=self.name, description=self.description, rows=new_table
+        )
+        weave.publish(new_dataset, name=self.name)
+        return new_dataset
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:

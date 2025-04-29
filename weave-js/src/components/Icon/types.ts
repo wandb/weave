@@ -265,6 +265,7 @@ export const IconNames = {
   Weave: 'weave',
   WeaveGroupBoard: 'weave-group-board',
   Webhook: 'webhook',
+  Wrap: 'wrap',
   XAxiAlt: 'x-axi-alt',
   XAxis: 'x-axis',
   YoutubeSocial: 'youtube-social',

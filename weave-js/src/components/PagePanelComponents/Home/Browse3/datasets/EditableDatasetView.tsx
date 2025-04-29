@@ -155,9 +155,16 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const numRowsQuery = useTableQueryStats(
     lookupKey?.entity ?? '',
     lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
+    lookupKey?.digest ? [lookupKey?.digest] : [],
     {skip: lookupKey == null}
   );
+
+  const totalRows = useMemo(() => {
+    if (numRowsQuery.result == null) {
+      return 0;
+    }
+    return numRowsQuery.result.tables?.[0]?.count ?? 0;
+  }, [numRowsQuery.result]);
 
   const numAddedRows = useMemo(
     () => Array.from(addedRows.values()).length,
@@ -541,9 +548,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        rowCount={
-          (numRowsQuery.result?.count ?? 0) + (isEditing ? numAddedRows : 0)
-        }
+        rowCount={totalRows + (isEditing ? numAddedRows : 0)}
         disableMultipleColumnsSorting
         loading={!fetchQueryLoaded}
         disableRowSelectionOnClick

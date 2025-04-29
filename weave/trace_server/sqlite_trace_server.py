@@ -641,6 +641,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
@@ -1136,7 +1138,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         res = self.table_query_stats_batch(batch_req)
 
         if len(res.tables) != 1:
-            raise ValueError("Unexpected number of results", res)
+            raise RuntimeError("Unexpected number of results", res)
 
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
