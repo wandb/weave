@@ -32,6 +32,23 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def configure_xdist_database():
+    """Configure unique database for each pytest-xdist worker.
+
+    This ensures that parallel test workers don't interfere with each other's
+    database operations, which can cause failures when one worker drops a database
+    that another worker is using.
+    """
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+    if worker_id != "master":
+        # Strip 'gw' prefix to get a numeric ID (gw0 -> 0, gw1 -> 1, etc.)
+        worker_num = worker_id[2:] if worker_id.startswith("gw") else worker_id
+        os.environ["WF_CLICKHOUSE_DATABASE"] = f"default_worker_{worker_num}"
+    yield
+    # No need to clean up as the environment variable will be gone when the process ends
+
+
 @pytest.fixture(autouse=True)
 def disable_datadog():
     """
@@ -569,10 +586,10 @@ def create_client(
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+        # Use the worker-specific database name to avoid conflicts between workers
+        db_name = ts_env.wf_clickhouse_database()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
-        )
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_name}")
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity
