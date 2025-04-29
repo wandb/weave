@@ -6,7 +6,10 @@ import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React from 'react';
 import {Loader, StrictLoaderProps} from 'semantic-ui-react';
 
-import {WBLogoLoader} from '../../components/Loaders/WBLogoLoader';
+import {
+  WBLogoLoader,
+  WBLogoLoaderProps,
+} from '../../components/Loaders/WBLogoLoader';
 import {
   ProfileData,
   useLifecycleProfiling,
