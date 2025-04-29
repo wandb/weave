@@ -801,7 +801,7 @@ export const CallsTable: FC<{
     if (calls.primaryError) {
       return (
         <ErrorPanel
-          title="Oh no! Unable to load traces!..."
+          title="Oh no! Unable to load traces..."
           error={calls.primaryError}
         />
       );
