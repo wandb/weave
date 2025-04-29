@@ -30,9 +30,22 @@ DEFAULT_VIDEO_FORMAT = "gif"
 
 
 def get_format_from_filename(filename: str) -> str | None:
-    split = os.path.splitext(filename)
-    if len(split) > 1 and len(split[1]) > 1:
-        return split[1][1:]  # Get the extension without the dot
+    """Get the file format from a filename.
+    
+    Args:
+        filename: The filename to extract the format from
+        
+    Returns:
+        The format string or None if no extension is found
+    """
+    # Handle special case for just a file extension (like ".mp4")
+    if filename.startswith(".") and len(filename) > 1:
+        return filename[1:]
+        
+    # Use splitext which handles correctly the last extension
+    _, ext = os.path.splitext(filename)
+    if ext and len(ext) > 1:
+        return ext[1:]  # Get the extension without the dot
     return None
 
 
@@ -52,7 +65,7 @@ def save(
     if is_video_file:
         video_format = get_format_from_filename(obj.filename) or DEFAULT_VIDEO_FORMAT
     else:
-        video_format = getattr(obj, "format") or DEFAULT_VIDEO_FORMAT
+        video_format = getattr(obj, "format", DEFAULT_VIDEO_FORMAT)
 
     video_format = video_format.lower()
     if video_format not in SUPPORTED_FORMATS:
@@ -71,12 +84,14 @@ def save(
             try:
                 # Use appropriate writing method based on format
                 if video_format == "webm" or video_format == "mp4":
-                    obj.write_videofile(fp, fps=fps)
+                    # Add codec and verbose=False to ensure consistent behavior
+                    codec = "libvpx" if video_format == "webm" else "libx264"
+                    obj.write_videofile(fp, fps=fps, codec=codec, audio=False, verbose=False, logger=None)
                 else:
                     # Gif is the default
                     obj.write_gif(fp, fps=fps)
             except Exception as e:
-                raise ValueError(f"Failed to write video file with error: {e}")
+                raise ValueError(f"Failed to write video file with format {video_format} with error: {e}")
 
     return
 
