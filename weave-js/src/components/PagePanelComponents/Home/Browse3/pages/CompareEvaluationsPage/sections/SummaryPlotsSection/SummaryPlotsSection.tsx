@@ -425,7 +425,7 @@ const usePaginatedPlots = (
   const totalPlotWidth = radarPlotWidth + totalBarPlots;
   const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
 
-  const plotsToShow = React.useMemo(() => {
+  const plotsToShow = useMemo(() => {
     // First page always shows radar plot
     if (currentPage === 0) {
       const availableSpace = plotsPerPage - radarPlotWidth;
