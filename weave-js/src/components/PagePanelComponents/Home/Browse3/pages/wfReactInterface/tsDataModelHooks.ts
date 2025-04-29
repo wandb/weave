@@ -281,6 +281,7 @@ const useCallsNoExpansion = (
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const deepFilter = useDeepMemo(filter);
 
   const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
@@ -343,6 +344,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         console.error(e);
+        setError(e);
         setCallRes({calls: []});
       }
     };
@@ -413,9 +415,10 @@ const useCallsNoExpansion = (
         loading: false,
         result,
         refetch,
+        error,
       };
     }
-  }, [opts?.skip, callRes, columns, refetch, entity, project]);
+  }, [opts?.skip, callRes, columns, refetch, entity, project, error]);
 };
 
 const useCalls = (
@@ -462,8 +465,9 @@ const useCalls = (
       loading,
       result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
       refetch: calls.refetch,
+      error: calls.error,
     };
-  }, [calls.refetch, expandedCalls, loading]);
+  }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
 const useCallsStats = (

@@ -4050,3 +4050,41 @@ def test_dedupe_ref_in_calls_stream(client):
         "2": nested_obj_with_ref,
         "3": nested_obj_with_ref,
     }
+
+
+def test_calls_query_stats_with_limit(client):
+    def calls_stats(limit=None, filter=None):
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                limit=limit,
+                filter=filter,
+            )
+        )
+
+    @weave.op
+    def child_op():
+        return 1
+
+    @weave.op
+    def parent_op():
+        return child_op()
+
+    assert calls_stats().count == 0
+
+    parent_op()
+    assert calls_stats().count == 2
+
+    trace_id = client.get_calls()[0].trace_id
+
+    # test limit, uses special optimization
+    assert calls_stats(limit=1).count == 1
+    # test limit, does not use special optimization
+    assert calls_stats(limit=2).count == 2
+    # test limit and filter, should use limit but not special optimization
+    assert calls_stats(limit=1, filter={"trace_roots_only": True}).count == 1
+    # test filter, should not use special optimization
+    assert calls_stats(filter={"trace_id": trace_id}).count == 2
+
+    with pytest.raises(ValueError):
+        calls_stats(limit=-1)
