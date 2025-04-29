@@ -25,7 +25,7 @@ Calls:
         {"format": "gif"},
         {"format": "mp4"},
         # Skip webm due to compatibility issues with FFMPEG
-        # {"format": "webm"},
+        {"format": "webm"},
         {"format": "unsupported", "should_fail": True},
     ]
 )
@@ -54,8 +54,11 @@ def test_video(request) -> VideoClip:
     # Write the clip to the temp file
     if request.param["format"] == "gif":
         clip.write_gif(tmp_path)
+    elif request.param["format"] == "webm":
+        clip.write_videofile(
+            tmp_path, codec="libvpx", audio=False, verbose=False, logger=None
+        )
     else:
-        # Use libx264 codec for mp4
         clip.write_videofile(
             tmp_path, codec="libx264", audio=False, verbose=False, logger=None
         )
