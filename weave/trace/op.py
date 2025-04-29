@@ -27,6 +27,8 @@ from typing import (
     runtime_checkable,
 )
 
+from typing_extensions import ParamSpec
+
 from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
@@ -66,6 +68,9 @@ except ImportError:
 
 S = TypeVar("S")
 V = TypeVar("V")
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 if sys.version_info < (3, 10):
@@ -154,7 +159,7 @@ class WeaveKwargs(TypedDict):
 
 
 @runtime_checkable
-class Op(Protocol):
+class Op(Protocol[P, R]):
     """
     The interface for Op-ified functions and methods.
 
@@ -174,7 +179,7 @@ class Op(Protocol):
     name: str
     call_display_name: str | Callable[[Call], str]
     ref: ObjectRef | None
-    resolve_fn: Callable
+    resolve_fn: Callable[P, R]
 
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None
     postprocess_output: Callable[..., Any] | None
@@ -192,7 +197,12 @@ class Op(Protocol):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
 
-    __call__: Callable[..., Any]
+    # __call__: Callable[..., Any]
+    @overload
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
+
     __self__: Any
 
     # `_tracing_enabled` is a runtime-only flag that can be used to disable
@@ -600,13 +610,13 @@ PostprocessOutputFunc = Callable[..., Any]
 
 @overload
 def op(
-    func: Callable,
+    func: Callable[P, R],
     *,
     name: str | None = None,
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
-) -> Op: ...
+) -> Op[P, R]: ...
 
 
 @overload
@@ -616,7 +626,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
-) -> Callable[[Callable], Op]: ...
+) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 
 
 @overload
@@ -624,11 +634,11 @@ def op(
     *,
     name: str | None = None,
     enable_code_capture: bool = True,
-) -> Callable[[Callable], Op]: ...
+) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 
 
 def op(
-    func: Callable | None = None,
+    func: Callable[P, R] | None = None,
     *,
     name: str | None = None,
     call_display_name: str | CallDisplayNameFunc | None = None,
@@ -636,7 +646,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
     enable_code_capture: bool = True,
-) -> Callable[[Callable], Op] | Op:
+) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
@@ -646,7 +656,7 @@ def op(
     if not 0 <= tracing_sample_rate <= 1:
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
-    def op_deco(func: Callable) -> Op:
+    def op_deco(func: Callable[P, R]) -> Op[P, R]:
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
@@ -654,23 +664,23 @@ def op(
         is_async_generator = inspect.isasyncgenfunction(func)
 
         # Create the appropriate wrapper based on function type
-        def create_wrapper(func: Callable) -> Op:
+        def create_wrapper(func: Callable[P, R]) -> Op[P, R]:
             if is_async:
 
                 @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
+                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
-                    return res
+                    return cast(R, res)
             else:
 
                 @wraps(func)
-                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
-                    return res
+                    return cast(R, res)
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
@@ -722,7 +732,7 @@ def op(
             wrapper._is_generator = is_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
-            return cast(Op, wrapper)
+            return cast(Op[P, R], wrapper)
 
         # Create the wrapper
         return create_wrapper(func)
@@ -779,13 +789,14 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
 
 
 def is_op(obj: Any) -> bool:
+    """Check if an object is an Op."""
     if sys.version_info < (3, 12):
         return isinstance(obj, Op)
 
     return all(hasattr(obj, attr) for attr in Op.__annotations__)
 
 
-def as_op(fn: Callable) -> Op:
+def as_op(fn: Callable[P, R]) -> Op[P, R]:
     """Given a @weave.op() decorated function, return its Op.
 
     @weave.op() decorated functions are instances of Op already, so this
@@ -803,7 +814,7 @@ def as_op(fn: Callable) -> Op:
 
     # The unbinding is necessary for methods because `MethodType` is applied after the
     # func is decorated into an Op.
-    return maybe_unbind_method(cast(Op, fn))
+    return cast(Op[P, R], maybe_unbind_method(cast(Op, fn)))
 
 
 _OnYieldType = Callable[[V], None]

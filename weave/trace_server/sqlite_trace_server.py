@@ -641,6 +641,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
@@ -1127,26 +1129,49 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        parameters: list[Any] = [req.project_id, req.digest]
+        batch_req = tsi.TableQueryStatsBatchReq(
+            project_id=req.project_id, digests=[req.digest]
+        )
 
-        query = """
-        SELECT json_array_length(row_digests)
+        res = self.table_query_stats_batch(batch_req)
+
+        if len(res.tables) != 1:
+            raise RuntimeError("Unexpected number of results", res)
+
+        count = res.tables[0].count
+        return tsi.TableQueryStatsRes(count=count)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        parameters: list[Any] = [req.project_id] + list(req.digests or [])
+
+        placeholders = ",".join(["?" for _ in (req.digests or [])])
+
+        query = f"""
+        SELECT digest, json_array_length(row_digests)
         FROM
             tables
         WHERE
             tables.project_id = ? AND
-            tables.digest = ?
+            tables.digest in ({placeholders})
         """
 
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(query, parameters)
-        row = cursor.fetchone()
-        count = 0
-        if row is not None:
-            count = row[0]
 
-        return tsi.TableQueryStatsRes(count=count)
+        query_result = cursor.fetchall()
+
+        tables = []
+
+        for row in query_result:
+            count = row[1]
+            digest = row[0]
+            tables.append(tsi.TableStatsRow(count=count, digest=digest))
+
+        return tsi.TableQueryStatsBatchRes(tables=tables)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches

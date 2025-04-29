@@ -6,12 +6,22 @@ export const FIELD_PREFIX = {
   OUTPUT: 'output.',
   ANNOTATIONS: 'annotations.',
   SCORER: 'scorer.',
+  NOTES: 'notes.',
+  REACTIONS: 'reactions.',
+};
+
+// Field name constants (without dots)
+export const FIELD_NAME = {
+  NOTES: 'notes',
+  REACTIONS: 'reactions',
 };
 
 // Feedback type constants
 export const FEEDBACK_TYPE = {
   ANNOTATION_PREFIX: 'wandb.annotation.',
   RUNNABLE_PREFIX: 'wandb.runnable.',
+  NOTE_PREFIX: 'wandb.note.',
+  REACTION_PREFIX: 'wandb.reaction.',
 };
 
 // Special object property constants
@@ -22,6 +32,7 @@ export const WEAVE_EXPANDED_REF_PROPS = {
 
 // Common field name constants
 export const FIELD_NAMES = {
+  TRACE: 'trace',
   FEEDBACK_TYPE: 'feedback_type',
   PAYLOAD: 'payload',
   VALUE: 'value',
@@ -216,14 +227,45 @@ export const createTargetSchemaFromDenested = (data: any[]): SchemaField[] => {
 };
 
 // Type for feedback items to resolve TypeScript errors
-interface FeedbackItem {
+interface BaseFeedbackItem {
   feedback_type: string;
-  payload?: {
-    output?: Record<string, any>;
-    value?: any;
-  };
+  created_at?: string;
   [key: string]: any;
 }
+
+interface AnnotationFeedback extends BaseFeedbackItem {
+  payload: {
+    value?: any;
+    [key: string]: any;
+  };
+}
+
+interface NoteFeedback extends BaseFeedbackItem {
+  payload: {
+    note?: string;
+    [key: string]: any;
+  };
+}
+
+interface ReactionFeedback extends BaseFeedbackItem {
+  payload: {
+    emoji?: string;
+    [key: string]: any;
+  };
+}
+
+interface ScorerFeedback extends BaseFeedbackItem {
+  payload: {
+    output?: Record<string, any>;
+    [key: string]: any;
+  };
+}
+
+type FeedbackItem =
+  | AnnotationFeedback
+  | NoteFeedback
+  | ReactionFeedback
+  | ScorerFeedback;
 
 // Type for weave metadata
 interface WeaveMetadata {
@@ -244,7 +286,12 @@ interface WeaveRow {
  * top-level fields under inputs and output, without deep flattening.
  */
 export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
-  const allFields: SchemaField[] = [];
+  const allFields: SchemaField[] = [
+    {
+      name: FIELD_NAMES.TRACE,
+      type: 'string',
+    },
+  ];
 
   if (!calls || !Array.isArray(calls)) {
     return allFields;
@@ -286,7 +333,7 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
       }
     }
 
-    // Extract feedback fields (annotations and runnables) from summary.weave.feedback
+    // Extract feedback fields (annotations, notes, reactions, and runnables) from summary.weave.feedback
     const summary = call.val.summary || {};
     const weave = summary.weave || {};
     const feedback = weave.feedback;
@@ -306,8 +353,7 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
             );
 
             if (fieldName) {
-              // We've already filtered out runnables in getFieldNameFromFeedbackType
-              // Add field to schema (only for annotations now)
+              // Add field to schema for all supported feedback types
               allFields.push({
                 name: fieldName,
                 type: inferType(feedbackItem.payload?.value),
@@ -325,10 +371,9 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
             typeof feedbackItem === 'object' &&
             feedbackItem !== null
           ) {
-            // We've already filtered out runnables in getFieldNameFromFeedbackType
             const typedFeedbackItem = feedbackItem as FeedbackItem;
 
-            // Add field to schema (only for annotations now)
+            // Add field to schema for all supported feedback types
             allFields.push({
               name: fieldName,
               type: inferType(typedFeedbackItem.payload?.value),
@@ -447,12 +492,11 @@ export const mapCallsToDatasetRows = (
   const resolveValue = (obj: any, path: string): any => {
     const parts = path.split('.');
 
-    // Handle the standard "output" field directly
-    if (path === FIELD_NAMES.OUTPUT) {
-      return unwrapRefValue(obj.output);
+    if (path === FIELD_NAMES.TRACE) {
+      return `weave:///${obj.project_id}/call/${obj.digest}`;
     }
 
-    // Special handling for feedback fields (annotations and runnables)
+    // Special handling for feedback fields (annotations, notes, reactions, and runnables)
     if (isFeedbackField(path)) {
       const summary = obj.summary || {};
       const weave = summary.weave || {};
@@ -535,7 +579,13 @@ export const mapCallsToDatasetRows = (
         sourceValue = output;
       } else {
         sourceValue = resolveValue(
-          {inputs, output, summary},
+          {
+            inputs,
+            output,
+            summary,
+            project_id: call.val.project_id,
+            digest: call.digest,
+          },
           mapping.sourceField
         );
       }
@@ -665,6 +715,10 @@ const removeFieldPrefixes = (fieldName: string): string => {
     return fieldName.replace(FIELD_PREFIX.ANNOTATIONS, '');
   } else if (fieldName.startsWith(FIELD_PREFIX.SCORER)) {
     return fieldName.replace(FIELD_PREFIX.SCORER, '');
+  } else if (fieldName.startsWith(FIELD_PREFIX.NOTES)) {
+    return fieldName.replace(FIELD_PREFIX.NOTES, '');
+  } else if (fieldName.startsWith(FIELD_PREFIX.REACTIONS)) {
+    return fieldName.replace(FIELD_PREFIX.REACTIONS, '');
   }
   return fieldName;
 };
@@ -768,6 +822,8 @@ export const suggestFieldMappings = (
  * Extracts the field name from a feedback_type string.
  * For annotations: "wandb.annotation.Quality" -> "annotations.Quality"
  * For runnables: "wandb.runnable.toxicity" -> "scorer.toxicity" (currently disabled)
+ * For notes: "wandb.note.1" -> "notes" (removes numeric ID)
+ * For reactions: "wandb.reaction.1" -> "reactions" (removes numeric ID)
  */
 export const getFieldNameFromFeedbackType = (
   feedbackType: string
@@ -786,12 +842,25 @@ export const getFieldNameFromFeedbackType = (
     return null;
   }
 
+  if (feedbackType.startsWith(FEEDBACK_TYPE.NOTE_PREFIX)) {
+    // For notes, we don't include the ID number in the field name
+    // We just return "notes" as the field name
+    return FIELD_NAME.NOTES;
+  }
+
+  if (feedbackType.startsWith(FEEDBACK_TYPE.REACTION_PREFIX)) {
+    // For reactions, we don't include the ID number in the field name
+    // We just return "reactions" as the field name
+    return FIELD_NAME.REACTIONS;
+  }
+
   return null;
 };
 
 /**
  * Determines if a field name might represent a feedback field (annotation or runnable).
  * Uses prefixed format: "annotations.*" for annotations, "scorer.*" for runnable scorers.
+ * Also handles "notes" and "reactions" as exact field names.
  */
 export const isFeedbackField = (fieldName: string): boolean => {
   // Check for annotation fields
@@ -804,13 +873,55 @@ export const isFeedbackField = (fieldName: string): boolean => {
     return true;
   }
 
+  // Check for note fields (exact match for "notes")
+  if (fieldName === FIELD_NAME.NOTES) {
+    return true;
+  }
+
+  // Check for reaction fields (exact match for "reactions")
+  if (fieldName === FIELD_NAME.REACTIONS) {
+    return true;
+  }
+
   return false;
+};
+
+/**
+ * Extract the most appropriate display value from a feedback payload.
+ * This helper extracts a simple string/primitive value from various payload formats.
+ */
+const extractSimpleValue = (payload: any): any => {
+  if (!payload) {
+    return undefined;
+  }
+
+  // Try various possible locations for the content in order of preference
+  if (payload.note) {
+    return payload.note;
+  } else if (payload.emoji) {
+    return payload.emoji;
+  } else if (payload.value !== undefined && typeof payload.value !== 'object') {
+    return payload.value;
+  } else if (
+    typeof payload === 'string' ||
+    typeof payload === 'number' ||
+    typeof payload === 'boolean'
+  ) {
+    return payload;
+  }
+  throw new Error(
+    `No simple value found in feedback payload: ${JSON.stringify(payload)}`
+  );
 };
 
 /**
  * Extracts a feedback value from feedback data for a given field name.
  * Works with both array and object formats of feedback data.
- * Handles prefixed field names: "annotations.*" for annotations, "scorer.*" for runnable scorers.
+ *
+ * Handles different feedback types differently:
+ * - Annotations: Returns the most recent annotation of each type
+ * - Notes: Returns a list of all notes
+ * - Reactions: Returns a list of all reactions
  */
 export const getFeedbackValue = (feedback: any, fieldName: string): any => {
   if (!feedback) {
@@ -827,96 +938,138 @@ export const getFeedbackValue = (feedback: any, fieldName: string): any => {
   } else if (fieldName.startsWith(FIELD_PREFIX.SCORER)) {
     prefix = 'scorer';
     actualName = fieldName.substring(FIELD_PREFIX.SCORER.length);
+  } else if (fieldName === FIELD_NAME.NOTES) {
+    prefix = 'notes';
+    actualName = '';
+  } else if (fieldName === FIELD_NAME.REACTIONS) {
+    prefix = 'reactions';
+    actualName = '';
   }
 
-  if (!prefix || !actualName) {
+  if (!prefix) {
     return undefined;
   }
 
-  // For annotation fields
-  if (prefix === 'annotations') {
-    // Handle array format
-    if (Array.isArray(feedback)) {
-      const annotationItem = feedback.find(item => {
-        const feedbackItem = item as FeedbackItem;
-        return (
-          feedbackItem &&
-          typeof feedbackItem === 'object' &&
-          feedbackItem.feedback_type ===
-            `${FEEDBACK_TYPE.ANNOTATION_PREFIX}${actualName}`
-        );
+  // Convert feedback to array format if it's not already
+  const feedbackArray = Array.isArray(feedback)
+    ? feedback
+    : Object.entries(feedback).map(([key, value]) => {
+        const item = value as FeedbackItem;
+        item.feedback_type = key;
+        return item;
       });
 
-      if (annotationItem) {
-        const typedItem = annotationItem as FeedbackItem;
-        return typedItem.payload?.value;
-      }
-      return undefined;
-    }
+  // Handle annotations - return most recent annotation for the specified type
+  if (prefix === 'annotations') {
+    const matchingAnnotations = feedbackArray
+      .filter(
+        item =>
+          item &&
+          typeof item === 'object' &&
+          item.feedback_type ===
+            `${FEEDBACK_TYPE.ANNOTATION_PREFIX}${actualName}`
+      )
+      .sort((a, b) => {
+        // Sort by created_at date, most recent first
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
 
-    // Handle object format (post-processed)
-    if (typeof feedback === 'object' && feedback !== null) {
-      const annotationKey = `${FEEDBACK_TYPE.ANNOTATION_PREFIX}${actualName}`;
-      if (feedback[annotationKey]) {
-        const typedItem = feedback[annotationKey] as FeedbackItem;
-        return typedItem.payload?.value;
-      }
+    if (matchingAnnotations.length > 0) {
+      const mostRecentAnnotation = matchingAnnotations[0];
+      return extractSimpleValue(mostRecentAnnotation.payload);
     }
+    return undefined;
   }
 
-  // For scorer fields (not currently used since we're returning null for scorers)
+  // Handle notes - collect all notes into a list
+  if (prefix === 'notes') {
+    const notes = feedbackArray
+      .filter(
+        item =>
+          item &&
+          typeof item === 'object' &&
+          item.feedback_type.startsWith(FEEDBACK_TYPE.NOTE_PREFIX)
+      )
+      .sort((a, b) => {
+        // Sort by created_at date, most recent first
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .map(note => extractSimpleValue(note.payload));
+
+    if (notes.length > 0) {
+      return notes;
+    }
+    return undefined;
+  }
+
+  // Handle reactions - collect all reactions into a list
+  if (prefix === 'reactions') {
+    const reactions = feedbackArray
+      .filter(
+        item =>
+          item &&
+          typeof item === 'object' &&
+          item.feedback_type.startsWith(FEEDBACK_TYPE.REACTION_PREFIX)
+      )
+      .sort((a, b) => {
+        // Sort by created_at date, most recent first
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .map(reaction => extractSimpleValue(reaction.payload));
+
+    if (reactions.length > 0) {
+      return reactions;
+    }
+    return undefined;
+  }
+
+  // For scorer fields (handle separately from other types)
   if (prefix === 'scorer') {
-    // Handle array format
-    if (Array.isArray(feedback)) {
-      const scorerItem = feedback.find(item => {
-        const feedbackItem = item as FeedbackItem;
-        return (
-          feedbackItem &&
-          typeof feedbackItem === 'object' &&
-          feedbackItem.feedback_type ===
-            `${FEEDBACK_TYPE.RUNNABLE_PREFIX}${actualName}`
-        );
+    const matchingScorers = feedbackArray
+      .filter(
+        item =>
+          item &&
+          typeof item === 'object' &&
+          item.feedback_type === `${FEEDBACK_TYPE.RUNNABLE_PREFIX}${actualName}`
+      )
+      .sort((a, b) => {
+        // Sort by created_at date, most recent first
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
       });
 
-      if (scorerItem) {
-        const typedItem = scorerItem as FeedbackItem;
-        if (
-          typedItem.payload?.output &&
-          typeof typedItem.payload.output === 'object'
-        ) {
-          return typedItem.payload.output;
-        }
-        return typedItem.payload?.value;
+    if (matchingScorers.length > 0) {
+      const mostRecentScorer = matchingScorers[0];
+      if (
+        mostRecentScorer.payload?.output &&
+        typeof mostRecentScorer.payload.output === 'object'
+      ) {
+        return mostRecentScorer.payload.output;
       }
-      return undefined;
+      return extractSimpleValue(mostRecentScorer.payload);
     }
-
-    // Handle object format (post-processed)
-    if (typeof feedback === 'object' && feedback !== null) {
-      const scorerKey = `${FEEDBACK_TYPE.RUNNABLE_PREFIX}${actualName}`;
-      if (feedback[scorerKey]) {
-        const typedItem = feedback[scorerKey] as FeedbackItem;
-        if (
-          typedItem.payload?.output &&
-          typeof typedItem.payload.output === 'object'
-        ) {
-          return typedItem.payload.output;
-        }
-        return typedItem.payload?.value;
-      }
-    }
+    return undefined;
   }
 
   return undefined;
 };
 
 /**
- * Generates preview data for fields across all calls
- *
- * @param sourceSchema - Schema fields to generate previews for
- * @param selectedCalls - Call data to extract values from
- * @returns A Map where keys are field names and values are arrays of records with field values
- */
+   * Generates preview data for fields across all calls
+  /**
+   * Generates preview data for fields across all calls
+   *
+   * @param sourceSchema - Schema fields to generate previews for
+   * @param selectedCalls - Call data to extract values from
+   * @returns A Map where keys are field names and values are arrays of records with field values
+   */
 export const generateFieldPreviews = (
   sourceSchema: SchemaField[],
   selectedCalls: CallData[]
@@ -930,6 +1083,8 @@ export const generateFieldPreviews = (
       // Handle standard input/output fields first
       if (field.name === FIELD_NAMES.OUTPUT) {
         value = unwrapRefValue(call.val.output);
+      } else if (field.name === FIELD_NAMES.TRACE) {
+        value = `weave:///${call.val.project_id}/call/${call.digest}`;
       } else if (field.name.startsWith(FIELD_PREFIX.INPUTS)) {
         const path = field.name.slice(FIELD_PREFIX.INPUTS.length).split('.');
         value = getNestedValue(call.val.inputs, path);
@@ -941,7 +1096,7 @@ export const generateFieldPreviews = (
           value = unwrapRefValue(call.val.output);
         }
       }
-      // Special handling for feedback fields (annotations and runnables)
+      // Special handling for feedback fields (annotations, notes, reactions, and runnables)
       else if (isFeedbackField(field.name)) {
         const summary = call.val.summary || {};
         const weave = summary.weave || {};

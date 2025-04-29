@@ -29,7 +29,7 @@ export const ConfigComponent: React.FC<
     | 'applyEditingConfig'
     | 'calledExpanded'
     | 'configurableNodeSettings'
-    | 'curPanelName'
+    | 'curPanelId'
     | 'deleteTailPanelOps'
     | 'discardEditingConfig'
     | 'editingConfigIsModified'
@@ -58,7 +58,7 @@ export const ConfigComponent: React.FC<
   calledExpanded,
   configurableNodeSettings,
   context,
-  curPanelName,
+  curPanelId,
   deleteTailPanelOps,
   discardEditingConfig,
   editingConfigIsModified,
@@ -118,12 +118,13 @@ export const ConfigComponent: React.FC<
         <ConfigOption label="Render As">
           <ModifiedDropdownConfigField
             selection
+            search
             disabled={isLoading}
             scrolling
             item
             direction="left"
             options={panelOptions}
-            text={curPanelName}
+            value={curPanelId}
             selectOnBlur={false}
             onChange={handlePanelChange}
             data-test="panel-select"

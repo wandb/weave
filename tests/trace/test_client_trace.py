@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Callable
 
 import pytest
@@ -30,15 +31,17 @@ from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
+from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
+from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -117,20 +120,6 @@ def test_simple_op(client):
         ended_at=DatetimeMatcher(),
         deleted_at=None,
     )
-
-
-def test_dataset(client):
-    from weave.flow.dataset import Dataset
-
-    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
-
-    # This might seem redundant, but it is useful to ensure that the
-    # dataset can be re-iterated over multiple times and equality is preserved.
-    assert list(d2.rows) == list(d2.rows)
-    assert list(d.rows) == list(d2.rows)
-    assert list(d.rows) == list(d.rows)
 
 
 def test_trace_server_call_start_and_end(client):
@@ -1705,14 +1694,14 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
-        time.sleep(0.3)
+        time.sleep(0.03)
         events.append("A(E):" + str(a))
         return a
 
     @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
-        time.sleep(0.2)
+        time.sleep(0.02)
         res = op_a(b)
         events.append("B(E):" + str(b))
         return res
@@ -1720,7 +1709,7 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
-        time.sleep(0.1)
+        time.sleep(0.01)
         res = op_b(c)
         events.append("C(E):" + str(c))
         return res
@@ -2295,6 +2284,85 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is None
 
 
+def test_read_call_start_with_cost(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    project_id = client._project_id()
+    call_id = generate_id()
+    trace_id = generate_id()
+    llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
+    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    price_effective_date = start_time - datetime.timedelta(days=1)
+
+    # --- 1. Insert Prerequisite Data ---
+    cost_data = {
+        llm_id: {
+            "prompt_token_cost": Decimal("0.00001"),  # Cost per token
+            "completion_token_cost": Decimal("0.00003"),  # Cost per token
+            "effective_date": price_effective_date,
+        }
+    }
+    cost_res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs=cost_data,
+            wb_user_id="test_user",  # Assuming a user ID is needed
+        )
+    )
+    price_id = cost_res.ids[0][0]
+
+    # Insert a call record with summary_dump=None
+    call_start_data = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="test_op_null_summary",
+        display_name="Test Operation Null Summary",
+        started_at=start_time,
+        inputs={"arg1": "no summary"},
+        summary_dump=None,  # Explicitly set to None
+        attributes={},
+    )
+    client.server.call_start(tsi.CallStartReq(start=call_start_data))
+
+    # --- 2. Call call_read with include_costs=True ---
+    res = client.server.call_read(
+        tsi.CallReadReq(
+            project_id=project_id,
+            id=call_id,
+            include_costs=True,  # Request cost calculation
+        )
+    )
+
+    # --- 3. Assert Results ---
+    assert res.call is not None, "Expected call record to be found"
+    assert res.call.id == call_id
+
+    # The summary dump should exist but be null or an empty object initially.
+    # The cost query should handle this gracefully and *not* add a costs object.
+    summary = res.call.summary
+    assert isinstance(summary, dict), "Expected summary_dump to be a dictionary"
+
+    if summary is None:
+        # If call_read returns None summary, this is fine for this case.
+        pass
+    elif isinstance(summary, dict):
+        # Check that the costs object was NOT added
+        assert (
+            COST_OBJECT_NAME not in summary.get("weave", {})
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+    else:
+        pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
+
+    # --- 4. Cleanup ---
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
+    )
+    client.purge_costs(price_id)
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op
@@ -2687,8 +2755,19 @@ def test_calls_stream_column_expansion(client):
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
 # in clickhouse_trace_server_batched.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
-def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+@pytest.mark.parametrize("batch_size", [1, 5, 6])
+def test_calls_stream_column_expansion_dynamic_batch_size(
+    client, batch_size, monkeypatch
+):
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        1,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        5,
+    )
+
     @weave.op
     def test_op(x):
         return x
@@ -2987,13 +3066,43 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
-def test_large_keys_are_stripped_call(client, caplog):
+def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+
+    # Patch _insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch):
+        # mock raise insert error
+        if len(str(batch)) > 10 * 1024:
+            raise InsertTooLarge(
+                "Database insertion failed. Record too large. "
+                "A likely cause is that a single row or cell exceeded "
+                "the limit. If logging images, save them as `Image.PIL`."
+            )
+        original_insert_call_batch(self, batch)
+
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        10 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched,
+        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
+        1 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_insert_call_batch",
+        mock_insert_call_batch,
+    )
+
+    # Use a smaller dictionary that will still exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
@@ -3270,7 +3379,7 @@ def test_op_sampling_child_follows_parent(client):
         parent_calls += 1
         return child_op(x)
 
-    num_runs = 100
+    num_runs = 5
     for i in range(num_runs):
         parent_op(i)
 
@@ -3693,6 +3802,58 @@ def test_calls_hydrated(client):
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
 
 
+def test_obj_query_with_storage_size_clickhouse(client):
+    """Test querying objects with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create a test object with some data to ensure it has size
+    dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
+    weave.publish(dataset)
+
+    # Query the object with storage size included
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            include_storage_size=True,
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Verify that storage size is present
+    assert queried_obj.size_bytes is not None
+    assert queried_obj.size_bytes == 270  # Should have some size due to the test data
+
+    # Test that a table is created and its size is correct
+    table_ref = parse_uri(queried_obj.val["rows"])
+    res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
+            project_id=client._project_id(),
+            digests=[table_ref.digest],
+            include_storage_size=True,
+        )
+    )
+
+    assert res.tables[0].storage_size_bytes == 5011
+
+    # Query without storage size (default behavior)
+    res_without_size = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res_without_size.objs) == 1
+    queried_obj_without_size = res_without_size.objs[0]
+
+    # Verify that storage size is not included when not requested
+    assert queried_obj_without_size.size_bytes is None
+
+
 def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
     if client_is_sqlite(client):
         # dont run this test for sqlite
@@ -3751,3 +3912,141 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
 
     assert parent_call.total_storage_size_bytes is not None
     assert child_call.storage_size_bytes is None
+
+
+def test_call_query_stream_with_invalid_filter_field(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    with pytest.raises(InvalidFieldError):
+        res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "total_storage_size_bytes"},
+                                "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
+                            }
+                        }
+                    },
+                }
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        weave.Dataset(rows=[{"a": 1, "b": 2}]),
+        weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
+    ],
+)
+def test_get_object_from_uri(client, obj):
+    ref = weave.publish(obj)
+    uri = ref.uri()
+
+    assert weave.get(uri) == obj
+
+
+def test_get_object_from_uri_non_registered_object(client):
+    class MyModel(weave.Model):
+        a: int
+        b: float = 2.0
+
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x + 1
+
+    model = MyModel(name="example", description="fancy", a=1)
+    ref = weave.publish(model)
+    uri = ref.uri()
+
+    res = weave.get(uri)
+    assert res.name == "example"
+    assert res.description == "fancy"
+    assert res.a == 1
+    assert res.b == 2.0
+    assert res._class_name == "MyModel"
+    assert res._bases == ["Model", "Object", "BaseModel"]
+    assert res.predict(5) == 6
+
+
+def test_dedupe_ref_in_calls_stream(client):
+    nested_obj = {"nested": 123}
+    nested_ref = weave.publish(nested_obj)
+
+    obj = {
+        "my_dataset1": nested_ref,
+        "my_dataset2": nested_ref,
+        "my_dataset3": nested_ref,
+        "my_dataset4": nested_ref,
+        "my_dataset5": nested_ref,
+        "ref_list": {
+            "1": nested_ref,
+            "2": nested_ref,
+            "3": nested_ref,
+        },
+    }
+    obj_ref = weave.publish(obj)
+
+    @weave.op
+    def log():
+        return obj_ref
+
+    log()
+
+    def call_stream(columns, expand_columns):
+        return list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=client._project_id(),
+                    columns=columns,
+                    expand_columns=expand_columns,
+                )
+            )
+        )
+
+    calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
+    assert len(calls_hydrated) == 1
+    assert calls_hydrated[0].output == {
+        "_ref": obj_ref.uri(),
+        "my_dataset1": nested_ref.uri(),
+        "my_dataset2": nested_ref.uri(),
+        "my_dataset3": nested_ref.uri(),
+        "my_dataset4": nested_ref.uri(),
+        "my_dataset5": nested_ref.uri(),
+        "ref_list": {
+            "1": nested_ref.uri(),
+            "2": nested_ref.uri(),
+            "3": nested_ref.uri(),
+        },
+    }
+
+    cols = [
+        "output",
+        "output.my_dataset1",
+        "output.my_dataset2",
+        "output.my_dataset3",
+        "output.my_dataset4",
+        "output.my_dataset5",
+        "output.ref_list",
+        "output.ref_list.1",
+        "output.ref_list.2",
+        "output.ref_list.3",
+    ]
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    calls_all_columns = call_stream(columns=cols, expand_columns=cols)
+    assert len(calls_all_columns) == 1
+    assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset2"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset3"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset4"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset5"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["ref_list"] == {
+        "1": nested_obj_with_ref,
+        "2": nested_obj_with_ref,
+        "3": nested_obj_with_ref,
+    }

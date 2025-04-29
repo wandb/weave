@@ -115,6 +115,7 @@ from weave.trace_server.table_query_builder import (
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_table_stats_query_with_storage_size,
 )
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -184,6 +185,7 @@ ObjRefListType = list[ri.InternalObjectRef]
 
 
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
@@ -745,8 +747,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_order(sort.field, sort.direction)
         metadata_only = req.metadata_only or False
         object_query_builder.set_include_deleted(include_deleted=False)
+        object_query_builder.include_storage_size = req.include_storage_size or False
         objs = self._select_objs_query(object_query_builder, metadata_only)
-
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -1037,22 +1039,53 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 digest=row[0], val=json.loads(row[1]), original_index=row[2]
             )
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        batch_req = tsi.TableQueryStatsBatchReq(
+            project_id=req.project_id, digests=[req.digest]
+        )
+
+        res = self.table_query_stats_batch(batch_req)
+
+        if len(res.tables) != 1:
+            logger.exception(RuntimeError("Unexpected number of results", res))
+
+        count = res.tables[0].count
+        return tsi.TableQueryStatsRes(count=count)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
-            "digest": req.digest,
+            "digests": req.digests,
         }
 
         query = """
-        SELECT length(row_digests)
+        SELECT digest, any(length(row_digests))
         FROM tables
-        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        WHERE project_id = {project_id:String} AND digest IN {digests:Array(String)}
+        GROUP BY digest
         """
 
-        query_result = self.ch_client.query(query, parameters=parameters)
-        count = query_result.result_rows[0][0] if query_result.result_rows else 0
+        if req.include_storage_size:
+            # Use an advanced query builder to get the storage size
+            pb = ParamBuilder()
+            query = make_table_stats_query_with_storage_size(
+                project_id=req.project_id,
+                table_digests=cast(list[str], req.digests),
+                pb=pb,
+            )
+            parameters = pb.get_params()
 
-        return tsi.TableQueryStatsRes(count=count)
+        query_result = self.ch_client.query(query, parameters=parameters)
+
+        tables = [
+            _ch_table_stats_to_table_stats_schema(row)
+            for row in query_result.result_rows
+        ]
+
+        return tsi.TableQueryStatsBatchRes(tables=tables)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1154,6 +1187,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
                 ref_digests.add(ref.version)
+                root_val_cache[cache_key] = None
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
@@ -1358,10 +1392,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
+        set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+        set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
@@ -1397,6 +1433,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
+        set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
@@ -1470,6 +1507,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters={"project_id": req.project_id, "digest": req.digest},
             column_formats={"val_bytes": "bytes"},
         )
+
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"File with digest {req.digest} not found")
+
         n_chunks = query_result.result_rows[0][0]
         result_rows = list(query_result.result_rows)
 
@@ -1487,15 +1528,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
                 )
-                client = self.file_storage_client
-                if client is None:
-                    raise FileStorageReadError("File storage client is not configured")
-                bytes += read_from_bucket(client, file_storage_uri)
+                bytes += self._file_read_bucket(file_storage_uri)
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
+                set_root_span_dd_tags({"storage_provider": "clickhouse"})
 
+        set_root_span_dd_tags({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
+    def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
+        set_root_span_dd_tags({"storage_provider": "bucket"})
+        client = self.file_storage_client
+        if client is None:
+            raise FileStorageReadError("File storage client is not configured")
+        return read_from_bucket(client, file_storage_uri)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
@@ -1941,7 +1989,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         obj_metadata_query = object_query_builder.make_metadata_query()
         parameters = object_query_builder.parameters or {}
         query_result = self._query_stream(obj_metadata_query, parameters)
-        metadata_result = format_metadata_objects_from_query_result(query_result)
+        metadata_result = format_metadata_objects_from_query_result(
+            query_result, object_query_builder.include_storage_size
+        )
 
         # -- Don't make second query for object values if metadata_only --
         if metadata_only or len(metadata_result) == 0:
@@ -2079,6 +2129,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "the limit. If logging images, save them as `Image.PIL`."
                 )
             raise
+        except Exception as e:
+            # Do potentially expensive data length calculation, only on
+            # error, which should be very rare!
+            data_bytes = sum(_num_bytes(row) for row in data)
+            logger.exception(
+                "clickhouse_insert_error",
+                extra={
+                    "error_str": str(e),
+                    "table": table,
+                    "data_len": len(data),
+                    "data_bytes": data_bytes,
+                    "example_data": None if len(data) == 0 else data[0],
+                    "column_names": column_names,
+                    "settings": settings,
+                },
+            )
+            raise
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -2108,11 +2175,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         If values are larger than 1MiB replace them with placeholder values.
         """
+        stripped_count = 0
         final_batch = []
         # Set the value byte limit to be anything over 1MiB to catch
         # payloads with multiple large values that are still under the
         # single row insert limit.
-        val_byte_limit = 1 * 1024 * 1024
         for item in batch:
             bytes_size = _num_bytes(str(item))
             # If bytes_size > the limit, this item is too large,
@@ -2124,13 +2191,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # all the values should be json dumps, there are no
                     # non json fields controlled by the user that can
                     # be large enough to strip... (?)
-                    if _num_bytes(value) > val_byte_limit:
+                    if _num_bytes(value) > CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT:
                         stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                        stripped_count += 1
                     else:
                         stripped_item += [value]
                 final_batch.append(stripped_item)
             else:
                 final_batch.append(item)
+
+        ddtrace.tracer.current_span().set_tags(
+            {
+                "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
+                    stripped_count
+                )
+            }
+        )
         return final_batch
 
 
@@ -2251,6 +2327,21 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
         val=json.loads(ch_obj.val_dump),
+        size_bytes=ch_obj.size_bytes,
+    )
+
+
+def _ch_table_stats_to_table_stats_schema(
+    ch_table_stats_row: Sequence[Any],
+) -> tsi.TableStatsRow:
+    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
+        *ch_table_stats_row
+    )
+
+    return tsi.TableStatsRow(
+        count=count,
+        digest=digest,
+        storage_size_bytes=storage_size_bytes,
     )
 
 
@@ -2397,3 +2488,11 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     hash_obj = hashlib.md5(input_string.encode())
     hash_int = int(hash_obj.hexdigest(), 16)
     return hash_int % range_max
+
+
+def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
+    root_span = ddtrace.tracer.current_root_span()
+    if root_span is None:
+        logger.debug("No root span")
+    else:
+        root_span.set_tags(tags)

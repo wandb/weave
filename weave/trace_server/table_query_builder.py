@@ -113,3 +113,29 @@ def make_standard_table_query(
     {sql_safe_offset}
     """
     return query
+
+
+def make_table_stats_query_with_storage_size(
+    project_id: str,
+    table_digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query for table stats with storage size and length(num of rows)."""
+    project_id_name = pb.add_param(project_id)
+    digest_ids = pb.add_param(table_digests)
+
+    query = f"""
+    SELECT tb_digest, any(length), sum(size_bytes) FROM
+    (
+        SELECT digest as tb_digest, length(row_digests) as length, row_digests
+        FROM tables
+        WHERE project_id = {{{project_id_name}: String}} AND digest in {{{digest_ids}: Array(String)}}
+    ) AS sub ARRAY JOIN row_digests as row_digest
+    LEFT JOIN
+    (
+        SELECT * FROM table_rows_stats WHERE table_rows_stats.project_id = {{{project_id_name}: String}}
+    ) as table_rows_stats ON table_rows_stats.digest = row_digest
+
+    GROUP BY tb_digest
+    """
+    return query
