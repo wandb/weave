@@ -23,6 +23,7 @@ export type KnownBaseObjectClassType =
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
+  error?: Error | null;
 };
 
 export type LoadableWithError<T> = {

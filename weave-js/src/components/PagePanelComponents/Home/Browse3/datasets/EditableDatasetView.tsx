@@ -524,6 +524,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
       <StyledDataGrid
+        data-testid="dataset-table"
         apiRef={apiRef}
         initialState={{
           pinnedColumns: {

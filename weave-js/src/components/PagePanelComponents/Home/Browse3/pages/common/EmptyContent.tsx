@@ -23,7 +23,8 @@ const NewDatasetButton: React.FC = () => {
       <Button
         variant="primary"
         icon="add-new"
-        onClick={() => setIsDrawerOpen(true)}>
+        onClick={() => setIsDrawerOpen(true)}
+        data-testid="create-dataset-button">
         New dataset
       </Button>
       <CreateDatasetDrawer
@@ -31,6 +32,7 @@ const NewDatasetButton: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSaveDataset={handleSaveDataset}
         isCreating={isCreatingDataset}
+        data-testid="create-dataset-drawer"
       />
     </>
   );
