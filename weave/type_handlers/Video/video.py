@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -46,15 +45,15 @@ def get_format_from_filename(filename: str) -> str | None:
     Returns:
         The format string or None if no extension is found
     """
-    # Handle special case for just a file extension (like ".mp4")
-    if filename.startswith(".") and len(filename) > 1:
-        return filename[1:]
+    # Get last dot position
+    last_dot = filename.rfind(".")
 
-    # Use splitext which handles correctly the last extension
-    _, ext = os.path.splitext(filename)
-    if ext and len(ext) > 1:
-        return ext[1:]  # Get the extension without the dot
-    return None
+    # If there's no dot or it's the last character, return None
+    if last_dot == -1 or last_dot == len(filename) - 1:
+        return None
+
+    # Get the extension without the dot
+    return filename[last_dot + 1 :]
 
 
 def save(
