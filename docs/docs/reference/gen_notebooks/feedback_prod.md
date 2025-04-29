@@ -152,7 +152,7 @@ def display_chat_prompt():
         ]
 
         with st.chat_message("assistant"):
-            # Use `weave.attributes` to track conversation instances
+            # Attach Weave attributes for tracking of conversation instances
             with weave.attributes(
                 {"session": st.session_state["session_id"], "env": "prod"}
             ):
@@ -225,7 +225,7 @@ We can use it as usual to deliver some model response to the user:
 ```python
 with weave.attributes(
     {"session": "123abc", "env": "prod"}
-):  # attach arbitrary metadata to the call alongside inputs & outputs
+):  # attach arbitrary attributes to the call alongside inputs & outputs
     result = predict(input_data="your data here")  # user question through the App UI
 ```
 

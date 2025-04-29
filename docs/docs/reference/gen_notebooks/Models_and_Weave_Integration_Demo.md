@@ -1,6 +1,4 @@
----
-title: Weave with W&B Models
----
+
 
 :::tip[This is a notebook]
 
@@ -56,27 +54,33 @@ First, install the necessary libraries, set up API keys, log in to W&B, and crea
 
 ```python
 import os
+
 from google.colab import userdata
 
-os.environ["WANDB_API_KEY"] = userdata.get('WANDB_API_KEY')  # W&B Models and Weave
-os.environ["OPENAI_API_KEY"] = userdata.get('OPENAI_API_KEY') # OpenAI - for retrieval embeddings
-os.environ["GEMINI_API_KEY"] = userdata.get('GEMINI_API_KEY') # Gemini - for the base chat model
+os.environ["WANDB_API_KEY"] = userdata.get("WANDB_API_KEY")  # W&B Models and Weave
+os.environ["OPENAI_API_KEY"] = userdata.get(
+    "OPENAI_API_KEY"
+)  # OpenAI - for retrieval embeddings
+os.environ["GEMINI_API_KEY"] = userdata.get(
+    "GEMINI_API_KEY"
+)  # Gemini - for the base chat model
 ```
 
 3. Log in to W&B, and create a new project.
 
 
 ```python
-import wandb
-import weave
 import pandas as pd
+import wandb
+
+import weave
 
 wandb.login()
 
 PROJECT = "weave-cookboook-demo"
 ENTITY = "wandb-smle"
 
-weave.init(ENTITY+"/"+PROJECT)
+weave.init(ENTITY + "/" + PROJECT)
 ```
 
 ##  Download `ChatModel` from Models Registry and implement `UnslothLoRAChatModel`
@@ -94,17 +98,20 @@ The code below defines the `UnslothLoRAChatModel` class to manage, initialize, a
 
 
 ```python
-import weave
+from typing import Any
+
 from pydantic import PrivateAttr
-from typing import Any, List, Dict, Optional
 from unsloth import FastLanguageModel
-import torch
+
+import weave
+
 
 class UnslothLoRAChatModel(weave.Model):
     """
     We define an extra ChatModel class to be able store and version more parameters than just the model name.
     Especially, relevant if we consider fine-tuning (locally or aaS) because of specific parameters.
     """
+
     chat_model: str
     cm_temperature: float
     cm_max_new_tokens: int
@@ -116,61 +123,72 @@ class UnslothLoRAChatModel(weave.Model):
     _tokenizer: Any = PrivateAttr()
 
     def model_post_init(self, __context):
-      # we can simply paste this from the "Use" tab from the registry
-      run = wandb.init(project=PROJECT, job_type="model_download")
-      artifact = run.use_artifact(f"{self.chat_model}")
-      model_path = artifact.download()
+        # we can simply paste this from the "Use" tab from the registry
+        run = wandb.init(project=PROJECT, job_type="model_download")
+        artifact = run.use_artifact(f"{self.chat_model}")
+        model_path = artifact.download()
 
-      # unsloth version (enable native 2x faster inference)
-      self._model, self._tokenizer = FastLanguageModel.from_pretrained(
-          model_name = model_path,
-          max_seq_length = self.cm_max_new_tokens,
-          dtype = self.dtype,
-          load_in_4bit = self.cm_quantize,
-      )
-      FastLanguageModel.for_inference(self._model)
+        # unsloth version (enable native 2x faster inference)
+        self._model, self._tokenizer = FastLanguageModel.from_pretrained(
+            model_name=model_path,
+            max_seq_length=self.cm_max_new_tokens,
+            dtype=self.dtype,
+            load_in_4bit=self.cm_quantize,
+        )
+        FastLanguageModel.for_inference(self._model)
 
     @weave.op()
-    async def predict(self, query: List[str]) -> dict:
-      # add_generation_prompt = true - Must add for generation
-      input_ids = self._tokenizer.apply_chat_template(
-          query, tokenize = True, add_generation_prompt = True, return_tensors = "pt",
-      ).to("cuda")
+    async def predict(self, query: list[str]) -> dict:
+        # add_generation_prompt = true - Must add for generation
+        input_ids = self._tokenizer.apply_chat_template(
+            query,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_tensors="pt",
+        ).to("cuda")
 
-      output_ids = self._model.generate(
-          input_ids = input_ids, max_new_tokens = 64, use_cache = True, temperature = 1.5, min_p = 0.1
-      )
+        output_ids = self._model.generate(
+            input_ids=input_ids,
+            max_new_tokens=64,
+            use_cache=True,
+            temperature=1.5,
+            min_p=0.1,
+        )
 
-      decoded_outputs = self._tokenizer.batch_decode(
-          output_ids[0][input_ids.shape[1]:], skip_special_tokens=True
-      )
+        decoded_outputs = self._tokenizer.batch_decode(
+            output_ids[0][input_ids.shape[1] :], skip_special_tokens=True
+        )
 
-      return ''.join(decoded_outputs).strip()
+        return "".join(decoded_outputs).strip()
 ```
 
 
 ```python
 MODEL_REG_URL = "wandb32/wandb-registry-RAG Chat Models/Finetuned Llama-3.2:v3"
 
-max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
-dtype = None          # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
-load_in_4bit = True   # Use 4bit quantization to reduce memory usage. Can be False.
+max_seq_length = 2048  # Choose any! We auto support RoPE Scaling internally!
+dtype = (
+    None  # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
+)
+load_in_4bit = True  # Use 4bit quantization to reduce memory usage. Can be False.
 
 new_chat_model = UnslothLoRAChatModel(
-    name = "UnslothLoRAChatModelRag",
-    chat_model = MODEL_REG_URL,
-    cm_temperature = 1.0,
-    cm_max_new_tokens = max_seq_length,
-    cm_quantize = load_in_4bit,
-    inference_batch_size = max_seq_length,
-    dtype = dtype,
-    device = "auto",
+    name="UnslothLoRAChatModelRag",
+    chat_model=MODEL_REG_URL,
+    cm_temperature=1.0,
+    cm_max_new_tokens=max_seq_length,
+    cm_quantize=load_in_4bit,
+    inference_batch_size=max_seq_length,
+    dtype=dtype,
+    device="auto",
 )
 ```
 
 
 ```python
-await new_chat_model.predict([{"role": "user", "content": "What is the capital of Germany?"}])
+await new_chat_model.predict(
+    [{"role": "user", "content": "What is the capital of Germany?"}]
+)
 ```
 
 ## Integrate the new `ChatModel` version into `RagModel`
@@ -182,7 +200,9 @@ The code below retrieves the `RagModel` object using a reference from the Weave 
 
 
 ```python
-RagModel = weave.ref("weave:///wandb-smle/weave-cookboook-demo/object/RagModel:cqRaGKcxutBWXyM0fCGTR1Yk2mISLsNari4wlGTwERo").get()
+RagModel = weave.ref(
+    "weave:///wandb-smle/weave-cookboook-demo/object/RagModel:cqRaGKcxutBWXyM0fCGTR1Yk2mISLsNari4wlGTwERo"
+).get()
 ```
 
 
@@ -241,16 +261,18 @@ climate_rag_eval = weave.ref(WEAVE_EVAL).get()
 
 
 ```python
-with weave.attributes({'wandb-run-id': wandb.run.id}):
-  # use .call attribute to retrieve both the result and the call in order to save eval trace to Models
-  summary, call = await climate_rag_eval.evaluate.call(climate_rag_eval, RagModel)
+with weave.attributes({"wandb-run-id": wandb.run.id}):
+    # use .call attribute to retrieve both the result and the call in order to save eval trace to Models
+    summary, call = await climate_rag_eval.evaluate.call(climate_rag_eval, RagModel)
 ```
 
 
 ```python
 # log to models
-wandb.run.log(pd.json_normalize(summary, sep='/').to_dict(orient="records")[0])
-wandb.run.config.update({"weave_url": f"https://wandb.ai/wandb-smle/weave-cookboook-demo/r/call/{call.id}"})
+wandb.run.log(pd.json_normalize(summary, sep="/").to_dict(orient="records")[0])
+wandb.run.config.update(
+    {"weave_url": f"https://wandb.ai/wandb-smle/weave-cookboook-demo/r/call/{call.id}"}
+)
 wandb.run.finish()
 ```
 
@@ -265,28 +287,32 @@ Before running the code, ensure the `ENTITY` and `PROJECT` variables match your 
 
 
 ```python
-MODELS_OBJECT_VERSION = PUB_REFERENCE.digest # weave object version
-MODELS_OBJECT_NAME = PUB_REFERENCE.name # weave object name
+MODELS_OBJECT_VERSION = PUB_REFERENCE.digest  # weave object version
+MODELS_OBJECT_NAME = PUB_REFERENCE.name  # weave object name
 ```
 
 
 ```python
 models_url = f"https://wandb.ai/{ENTITY}/{PROJECT}/weave/objects/{MODELS_OBJECT_NAME}/versions/{MODELS_OBJECT_VERSION}"
-models_link = f"weave:///{ENTITY}/{PROJECT}/object/{MODELS_OBJECT_NAME}:{MODELS_OBJECT_VERSION}"
+models_link = (
+    f"weave:///{ENTITY}/{PROJECT}/object/{MODELS_OBJECT_NAME}:{MODELS_OBJECT_VERSION}"
+)
 
 with wandb.init(project=PROJECT, entity=ENTITY) as run:
-  # create new Artifact
-  artifact_model = wandb.Artifact(
-      name = "RagModel", type = "model", description="Models Link from RagModel in Weave", metadata={'url':models_url}
-  )
-  artifact_model.add_reference(models_link, name = "model", checksum = False)
+    # create new Artifact
+    artifact_model = wandb.Artifact(
+        name="RagModel",
+        type="model",
+        description="Models Link from RagModel in Weave",
+        metadata={"url": models_url},
+    )
+    artifact_model.add_reference(models_link, name="model", checksum=False)
 
-  # log new artifact
-  run.log_artifact(artifact_model, aliases=[MODELS_OBJECT_VERSION])
+    # log new artifact
+    run.log_artifact(artifact_model, aliases=[MODELS_OBJECT_VERSION])
 
-  # link to registry
-  run.link_artifact(
-    artifact_model,
-    target_path="wandb32/wandb-registry-RAG Models/RAG Model"
-  )
+    # link to registry
+    run.link_artifact(
+        artifact_model, target_path="wandb32/wandb-registry-RAG Models/RAG Model"
+    )
 ```
