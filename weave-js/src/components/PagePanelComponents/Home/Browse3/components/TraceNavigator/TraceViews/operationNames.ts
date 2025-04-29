@@ -1,4 +1,5 @@
 export const AGENT_OP_NAMES = [
+  'agent.',
   'langchain.Chain.',
   'openai_agent_trace',
   'openai_agent_function',
