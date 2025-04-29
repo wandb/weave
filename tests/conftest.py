@@ -44,9 +44,12 @@ def configure_xdist_database():
     if worker_id != "master":
         # Strip 'gw' prefix to get a numeric ID (gw0 -> 0, gw1 -> 1, etc.)
         worker_num = worker_id[2:] if worker_id.startswith("gw") else worker_id
-        os.environ["WF_CLICKHOUSE_DATABASE"] = f"default_worker_{worker_num}"
+        worker_suffix = f"_worker_{worker_num}"
+        os.environ["WF_CLICKHOUSE_DATABASE"] = f"default{worker_suffix}"
+        # Also need to make db_management unique per worker
+        os.environ["WEAVE_DB_MANAGEMENT_DATABASE"] = f"db_management{worker_suffix}"
     yield
-    # No need to clean up as the environment variable will be gone when the process ends
+    # No need to clean up as the environment variables will be gone when the process ends
 
 
 @pytest.fixture(autouse=True)
@@ -588,8 +591,14 @@ def create_client(
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         # Use the worker-specific database name to avoid conflicts between workers
         db_name = ts_env.wf_clickhouse_database()
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        db_management_name = os.environ.get(
+            "WEAVE_DB_MANAGEMENT_DATABASE", "db_management"
+        )
+
+        # Drop both the worker's database and management database
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_management_name}")
         ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {db_name}")
+
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
             ch_server, DummyIdConverter(), entity

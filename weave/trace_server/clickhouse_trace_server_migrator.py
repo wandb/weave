@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
+DEFAULT_DB_MANAGEMENT = "db_management"
 
 
 class MigrationError(RuntimeError):
@@ -25,6 +26,7 @@ class ClickHouseTraceServerMigrator:
     replicated: bool
     replicated_path: str
     replicated_cluster: str
+    db_management: str
 
     def __init__(
         self,
@@ -32,6 +34,7 @@ class ClickHouseTraceServerMigrator:
         replicated: Optional[bool] = None,
         replicated_path: Optional[str] = None,
         replicated_cluster: Optional[str] = None,
+        db_management: Optional[str] = None,
     ):
         super().__init__()
         self.ch_client = ch_client
@@ -43,6 +46,11 @@ class ClickHouseTraceServerMigrator:
             DEFAULT_REPLICATED_CLUSTER
             if replicated_cluster is None
             else replicated_cluster
+        )
+        self.db_management = (
+            os.environ.get("WEAVE_DB_MANAGEMENT_DATABASE", DEFAULT_DB_MANAGEMENT)
+            if db_management is None
+            else db_management
         )
         self._initialize_migration_db()
 
@@ -121,9 +129,9 @@ class ClickHouseTraceServerMigrator:
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        self.ch_client.command(self._create_db_sql("db_management"))
-        create_table_sql = """
-            CREATE TABLE IF NOT EXISTS db_management.migrations
+        self.ch_client.command(self._create_db_sql(self.db_management))
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.db_management}.migrations
             (
                 db_name String,
                 curr_version UInt64,
@@ -138,13 +146,13 @@ class ClickHouseTraceServerMigrator:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
-            SELECT {select_columns} FROM db_management.migrations WHERE db_name = '{db_name}'
+            SELECT {select_columns} FROM {self.db_management}.migrations WHERE db_name = '{db_name}'
         """
         res = self.ch_client.query(query)
         result_rows = res.result_rows
         if res is None or len(result_rows) == 0:
             self.ch_client.insert(
-                "db_management.migrations",
+                f"{self.db_management}.migrations",
                 data=[[db_name, 0, None]],
                 column_names=column_names,
             )
@@ -263,11 +271,11 @@ class ClickHouseTraceServerMigrator:
         """Update the migration status in db_management.migrations table."""
         if is_start:
             self.ch_client.command(
-                f"ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
+                f"ALTER TABLE {self.db_management}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
             )
         else:
             self.ch_client.command(
-                f"ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
+                f"ALTER TABLE {self.db_management}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
             )
 
     def _apply_migration(

@@ -1,5 +1,5 @@
 import types
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -8,25 +8,23 @@ from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
 
 
 @pytest.fixture
-def mock_costs():
-    with patch(
-        "weave.trace_server.costs.insert_costs.should_insert_costs", return_value=False
-    ) as mock_should_insert:
-        with patch(
-            "weave.trace_server.costs.insert_costs.get_current_costs", return_value=[]
-        ) as mock_get_costs:
-            yield
+def mock_costs(monkeypatch):
+    # Mock the cost insertion function to avoid side effects in tests
+    monkeypatch.setattr(
+        trace_server_migrator, "insert_costs", lambda ch_client, db_name: None
+    )
+    monkeypatch.setattr(
+        trace_server_migrator,
+        "should_insert_costs",
+        lambda curr_version, target_version: False,
+    )
 
 
 @pytest.fixture
 def migrator():
-    ch_client = Mock()
+    ch_client = MagicMock()
     migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
-    migrator._get_migration_status = Mock()
-    migrator._get_migrations = Mock()
-    migrator._determine_migrations_to_apply = Mock()
-    migrator._update_migration_status = Mock()
-    ch_client.command.reset_mock()
+    migrator._initialize_migration_db = MagicMock()  # Skip initialization
     return migrator
 
 
@@ -108,13 +106,13 @@ def test_update_migration_status(mock_costs, migrator):
     # Test start of migration
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
+        f"ALTER TABLE {migrator.db_management}.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
+        f"ALTER TABLE {migrator.db_management}.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
     )
 
 
