@@ -32,18 +32,19 @@ export const CallsPageLoadViewWithUser = ({
   const savedViewInstances = useSavedViewInstances(projectId, table);
   if (savedViewInstances.loading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100%',
-        width: '100%',
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
-        zIndex: 1,
-      }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          width: '100%',
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          zIndex: 1,
+        }}>
         <WaveLoader size="small" />
       </div>
     );
