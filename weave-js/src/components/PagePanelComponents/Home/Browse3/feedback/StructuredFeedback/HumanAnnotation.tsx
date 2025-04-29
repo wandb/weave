@@ -119,7 +119,7 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
     () => extractFeedbackValues(foundFeedback, props.viewer, feedbackSpecRef),
     [foundFeedback, props.viewer, feedbackSpecRef]
   );
-  const {rawValues, mostRecentVal, viewerFeedbackVal} = extractedValues;
+  const {viewerFeedbackVal} = extractedValues;
 
   const type = useMemo(
     () => inferTypeFromJsonSchema(props.hfSpec.field_schema ?? {}),

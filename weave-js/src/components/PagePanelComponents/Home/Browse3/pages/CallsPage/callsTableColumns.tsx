@@ -8,7 +8,6 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import type {UserInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
@@ -96,7 +95,7 @@ export const useCallsTableColumns = (
     Record<string, number>
   >({});
 
-  const {loading: viewerLoading, userInfo} = useViewerInfo();
+  const {userInfo} = useViewerInfo();
   const currentUserId = userInfo && 'id' in userInfo ? userInfo.id : null;
 
   // Determine which columns have refs to expand. Followup: this might want
@@ -202,7 +201,7 @@ export const useCallsTableColumns = (
       storageSizeLoading,
       storageHasError,
       costsHasError,
-      currentUserId
+      currentUserId,
     ]
   );
 
@@ -442,8 +441,8 @@ function buildCallsTableColumns(
           valueGetter: (unused: any, row: any) => {
             // The feedback data is directly in the field, not in a nested structure
             const value = row[c];
-            if (value == null) return "";
-            
+            if (value == null) return '';
+
             // The value is already the payload value for the current user
             return value;
           },
