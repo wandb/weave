@@ -142,19 +142,19 @@ export const operationConverter = (
     if (item.value === '') {
       return null;
     }
-    const secs = new Date(item.value).getTime();
+    const millisecs = new Date(item.value).getTime();
     return {
-      $gt: [{$getField: item.field}, {$literal: secs / 1000}],
+      $gt: [{$getField: item.field}, {$literal: millisecs / 1000}],
     };
   } else if (item.operator === '(date): before') {
     if (item.value === '') {
       return null;
     }
-    const secs = new Date(item.value).getTime();
+    const millisecs = new Date(item.value).getTime();
     return {
       $not: [
         {
-          $gt: [{$getField: item.field}, {$literal: secs / 1000}],
+          $gt: [{$getField: item.field}, {$literal: millisecs / 1000}],
         },
       ],
     };
