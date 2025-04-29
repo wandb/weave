@@ -95,6 +95,7 @@ export const CallDetails: FC<{
     call.entity,
     call.project,
     {
+      traceId: call.traceId,
       parentIds: [call.callId],
     },
     undefined,
