@@ -335,7 +335,16 @@ export const ScorecardSection: React.FC<{
         </GridCell>
         {/* Score Rows */}
         {Object.entries(compositeSummaryMetrics)
-          .sort(([groupNameA], [groupNameB]) => groupNameA.localeCompare(groupNameB))
+          .sort(([groupNameA], [groupNameB]) => {
+            // Put DERIVED_SCORER_REF_PLACEHOLDER (ex. latency, tokens) at the end
+            if (groupNameA === DERIVED_SCORER_REF_PLACEHOLDER) {
+              return 1;
+            }
+            if (groupNameB === DERIVED_SCORER_REF_PLACEHOLDER) {
+              return -1;
+            }
+            return groupNameA.localeCompare(groupNameB);
+          })
           .map(([groupName, group]) => {
           const evalCallIdToScorerRef = evalCallIdToScorerRefs(group);
           const uniqueScorerRefs = Array.from(
