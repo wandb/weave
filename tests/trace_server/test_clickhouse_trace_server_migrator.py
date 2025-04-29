@@ -22,9 +22,19 @@ def mock_costs(monkeypatch):
 
 @pytest.fixture
 def migrator():
+    # Create a MagicMock for the client
     ch_client = MagicMock()
+
+    # When we create the migrator instance, it calls _initialize_migration_db in __init__
+    # which results in calls to ch_client.command before our tests run
     migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
-    migrator._initialize_migration_db = MagicMock()  # Skip initialization
+
+    # Mock _initialize_migration_db to prevent it from being called again
+    migrator._initialize_migration_db = MagicMock()
+
+    # Reset the call count on ch_client.command to ignore initialization calls
+    ch_client.command.reset_mock()
+
     return migrator
 
 
