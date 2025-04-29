@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from weave.trace.serialization import serializer
@@ -25,8 +26,15 @@ if TYPE_CHECKING:
         VideoFileClip,
     )
 
-SUPPORTED_FORMATS = ["gif", "mp4", "webm"]
-DEFAULT_VIDEO_FORMAT = "gif"
+
+class VideoFormat(str, Enum):
+    GIF = "gif"
+    MP4 = "mp4"
+    WEBM = "webm"
+
+
+SUPPORTED_FORMATS = [format.value for format in VideoFormat]
+DEFAULT_VIDEO_FORMAT = VideoFormat.GIF.value
 
 
 def get_format_from_filename(filename: str) -> str | None:
@@ -70,7 +78,7 @@ def save(
     video_format = video_format.lower()
     if video_format not in SUPPORTED_FORMATS:
         raise ValueError(
-            f"Unsupported video format: {video_format} - Only gif, mp4, and webm are supported"
+            f"Unsupported video format: {video_format} - Only {', '.join(SUPPORTED_FORMATS)} are supported"
         )
 
     # Save the video file
@@ -83,9 +91,16 @@ def save(
             fps = obj.fps or None
             try:
                 # Use appropriate writing method based on format
-                if video_format == "webm" or video_format == "mp4":
+                if (
+                    video_format == VideoFormat.WEBM.value
+                    or video_format == VideoFormat.MP4.value
+                ):
                     # Add codec and verbose=False to ensure consistent behavior
-                    codec = "libvpx" if video_format == "webm" else "libx264"
+                    codec = (
+                        "libvpx"
+                        if video_format == VideoFormat.WEBM.value
+                        else "libx264"
+                    )
                     obj.write_videofile(
                         fp,
                         fps=fps,
