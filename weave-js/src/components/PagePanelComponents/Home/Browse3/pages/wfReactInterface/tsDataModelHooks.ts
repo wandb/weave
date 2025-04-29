@@ -221,6 +221,11 @@ const useCall = (
         loading: true,
         result: null,
       };
+    } else if (result == null) {
+      return {
+        loading: false,
+        result: null,
+      };
     } else if (result?.callId === key?.callId) {
       if (result) {
         callCache.set(key, result);

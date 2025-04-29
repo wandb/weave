@@ -1,11 +1,12 @@
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {parseRefMaybe} from '../../../../../../react';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';
 import {ObjectViewerSection} from './ObjectViewerSection';
@@ -19,6 +20,7 @@ const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
 export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const {useCall} = useWFHooks();
   const span = call.rawSpan;
   // Process attributes, only filtering out null values and keys starting with '_'
   const attributes = _.fromPairs(
@@ -35,7 +37,24 @@ export const CallSummary: React.FC<{
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
-  const costData = call.traceCall?.summary?.weave?.costs;
+
+  // TODO: Once the server responds with costs even for unfinished calls,
+  // we can remove this second call. See the comment in CallPage.tsx.
+  // with `(This results in a second query in CallSummary.tsx)`
+  const callWithCosts = useCall(
+    {
+      entity: call.entity,
+      project: call.project,
+      callId: call.callId,
+    },
+    {
+      includeCosts: true,
+    }
+  );
+
+  const costData = useMemo(() => {
+    return callWithCosts.result?.traceCall?.summary?.weave?.costs;
+  }, [callWithCosts.result]);
 
   return (
     <div className="overflow-auto px-16 pt-12">
