@@ -1,3 +1,5 @@
+// this component is heavy on the animations and uses many keyframes,
+// so opting for .less file rather than tailwind for styling
 import './WBLogoLoader.less';
 
 import React, {useEffect, useState} from 'react';
