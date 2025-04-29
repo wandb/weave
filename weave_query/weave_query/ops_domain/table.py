@@ -114,6 +114,42 @@ class JoinedTableType(types.ObjectType):
             "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
             "_file": artifact_fs.FilesystemArtifactFileType(),
         }
+    
+@dataclasses.dataclass(frozen=True)
+class IncrementalTableType(types.ObjectType):
+    name = "incremental-table"
+
+    def property_types(self):
+        return {
+            "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        }
+    
+@weave_class(weave_type=IncrementalTableType)
+class IncrementalTable:
+    def __init__(self, _rows):
+        self._rows = _rows
+
+    @op(
+        name="incrementaltable-rowsType",
+        input_type={"incrementaltable": types.optional(IncrementalTableType())},
+        output_type=types.TypeType(),
+        hidden=True,
+    )
+    def incremental_rows_type(incrementaltable):
+        if incrementaltable == None:
+            return types.NoneType()
+        ttype = types.TypeRegistry.type_of(incrementaltable._rows)
+        return ttype
+
+    @op(
+        name="incrementaltable-rows",
+        input_type={"incrementaltable": IncrementalTableType()},
+        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        refine_output_type=incremental_rows_type,
+    )
+    def rows(incrementaltable):
+        return incrementaltable._rows
+
 
 
 @weave_class(weave_type=JoinedTableType)
@@ -681,6 +717,35 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
             data = json.load(f)
     return data
 
+def _get_incremental_table_awl_from_file(
+    data: dict,
+    file: artifact_fs.FilesystemArtifactFile
+) -> ops_arrow.ArrowWeaveList:
+    from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
+    all_awls: list[ops_arrow.ArrowWeaveList] = []
+    files = []
+    if "prev_increment_paths" in data:
+        escaped_paths = [escape_artifact_path(path) for path in data["prev_increment_paths"]]
+        files = [_filesystem_artifact_file_from_artifact_path(path) for path in escaped_paths]
+    files.append(file)
+
+    asyncio.run(ensure_files(files))
+    rrows: list[list] = []
+    object_types: list[types.Type] = []
+    for incremental_file in files:
+        incremental_data = _get_table_data_from_file(incremental_file)
+        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+        rrows.append(rows)
+        object_types.append(object_type)
+    object_type = types.union(*object_types)
+
+    for rows, file in zip(rrows, files):
+        all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
+    arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_awls)
+    return arrow_weave_list
+
+
+
 
 def _get_table_like_awl_from_file(
     file: typing.Union[
@@ -691,7 +756,9 @@ def _get_table_like_awl_from_file(
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
-    if file.path.endswith(".joined-table.json"):
+    if "prev_increment_paths" in data:
+        awl = _get_incremental_table_awl_from_file(data, file)
+    elif file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
     elif file.path.endswith(".partitioned-table.json"):
         awl = _get_partitioned_table_awl_from_file(data, file)
@@ -794,14 +861,14 @@ def _get_partitioned_table_awl_from_file(
 
 # Download files in a `FilesystemArtifactDir` in parallel.
 # This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
-async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
+async def ensure_files(files: typing.Union[typing.Dict[str, artifact_fs.FilesystemArtifactFile], typing.List[artifact_fs.FilesystemArtifactFile]]):
     client = io_service.get_async_client()
-
     loop = asyncio.get_running_loop()
-
     tasks = set()
+    
     async with client.connect() as conn:
-        for file in files.values():
+        file_list = files.values() if isinstance(files, dict) else files
+        for file in file_list:
             if (
                 isinstance(file.artifact, artifact_wandb.WandbArtifact)
                 and file.artifact._read_artifact_uri
@@ -888,3 +955,23 @@ def joined_table(
         return JoinedTable(_get_table_like_awl_from_file(file).awl, file)
     except FileNotFoundError as e:
         return None
+
+@op(name="file-incrementalTable")
+def incremental_table(
+    file: artifact_fs.FilesystemArtifactFile,
+) -> typing.Optional[IncrementalTable]:
+    # TODO(dom): Handle failure more granularly-- this code is really meant for one table file, not many.
+    try:
+        return IncrementalTable(_get_table_like_awl_from_file(file).awl)
+    except FileNotFoundError as e:
+        return None
+    # Prevent a panel crash from stale file handle errors
+    # There are rare stale file handle errors that cause panel crashes as noted:
+    # https://wandb.atlassian.net/browse/WB-22355
+    except OSError as e:
+        import errno
+
+        if e.errno == errno.ESTALE:
+            return None
+        raise  
+

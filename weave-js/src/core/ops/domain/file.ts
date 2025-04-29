@@ -481,6 +481,42 @@ export const opFilePartitionedTable = makeFileOp({
   },
 });
 
+export const opFileIncrementalTable = makeTagConsumingStandardOp({
+  name: 'file-incrementalTable',
+  argTypes: fileArgTypes,
+  description: `Returns the contents of the ${docType('file')} as a ${docType(
+    'table'
+  )}`,
+  argDescriptions: {
+    file: fileArgDescription,
+  },
+  returnValueDescription: `The contents of the ${docType(
+    'file'
+  )} as a ${docType('incremental-table')}`,
+  returnType: inputTypes =>
+    taggedValue(
+      isTaggedValue(inputTypes.file)
+        ? (inputTypes.file as TaggedValueType).tag
+        : null,
+      withFileTag(maybe({type: 'incremental-table', columnTypes: {}}), {
+        type: 'file',
+        extension: 'json',
+        wbObjectType: {type: 'incremental-table', columnTypes: {}},
+      })
+    ),
+  resolver: async (
+    {file},
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context,
+    engine
+  ) => {
+    throw new Error('Not implemented in weave0');
+  },
+});
+
 export const opFileContents = makeFileOp({
   name: 'file-contents',
   argTypes: fileArgTypes,

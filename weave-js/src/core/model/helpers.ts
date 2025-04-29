@@ -373,6 +373,12 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
     ) {
       // TODO: not true! Check column types!
       return true;
+    } else if (
+      type.type === 'incremental-table' &&
+      toType.type === 'incremental-table'
+    ) {
+      // TODO: not true! Check column types!
+      return true;
     } else if (type.type === 'typedDict' && toType.type === 'typedDict') {
       // Must have all keys in toType and types must match
       for (const key of Object.keys(toType.propertyTypes)) {
@@ -1027,6 +1033,10 @@ export function isFunction(t: Type): t is FunctionType {
 
 export function isTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'table';
+}
+
+export function isIncrementalTable(t: Type): t is TableType {
+  return !isSimpleTypeShape(t) && t?.type === 'incremental-table';
 }
 
 export function isPartitionedTable(t: Type): t is TableType {
