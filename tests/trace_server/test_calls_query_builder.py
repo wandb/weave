@@ -386,7 +386,7 @@ def test_query_light_column_with_costs() -> None:
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
             -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS 
+            ranked_prices AS
                 (SELECT
                     *,
                     llm_token_prices.id,
