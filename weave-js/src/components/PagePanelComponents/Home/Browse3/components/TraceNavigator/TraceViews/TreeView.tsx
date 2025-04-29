@@ -1,8 +1,17 @@
+import {Popover} from '@mui/material';
 import {MOON_900, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {
+  DraggableGrow,
+  DraggableHandle,
+} from '@wandb/weave/components/DraggablePopups';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import * as Switch from '@wandb/weave/components/Switch';
+import {IconOnlyPill} from '@wandb/weave/components/Tag/Pill';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer, List} from 'react-virtualized';
@@ -16,6 +25,12 @@ import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
+import {
+  AGENT_OP_NAMES,
+  COMPLETION_OP_NAMES,
+  IMAGE_OP_NAMES,
+  TOOL_OP_NAMES,
+} from './operationNames';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -39,6 +54,11 @@ interface TreeNodeProps {
   onToggleExpand: (id: string) => void;
   deemphasizeCallIds?: string[];
   searchQuery?: string;
+  visibleColumns: {
+    tokens: boolean;
+    cost: boolean;
+    duration: boolean;
+  };
 }
 
 const TreeNode: React.FC<TreeNodeProps> = ({
@@ -50,6 +70,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onToggleExpand,
   deemphasizeCallIds,
   searchQuery,
+  visibleColumns,
 }) => {
   const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
@@ -150,34 +171,134 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
 
           <div className="ml-8 flex shrink-0 items-center gap-4 text-xs text-moon-400">
-            <div className="flex items-center gap-2 text-right">
-              {cost !== undefined && (
-                <TraceStat
-                  label={cost}
-                  tooltip={
-                    <div className="text-white-800">
-                      {costToolTipContent}
-                      {tokens && (
-                        <>
-                          <br />
+            <div className="flex items-center gap-4 text-right">
+              {/* Overflow tooltip for non-visible metrics */}
+              {((tokens !== undefined && !visibleColumns.tokens) ||
+                (cost !== undefined && !visibleColumns.cost) ||
+                (duration !== null && !visibleColumns.duration)) && (
+                <Tooltip
+                  content={
+                    <div className="flex flex-col gap-[8px]">
+                      {tokens !== undefined && !visibleColumns.tokens && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Token usage</p>
+                          <p>{tokens}</p>
+                        </div>
+                      )}
+                      {cost !== undefined && !visibleColumns.cost && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Estimated cost</p>
+                          <p>{cost}</p>
+                        </div>
+                      )}
+                      {duration !== null && !visibleColumns.duration && (
+                        <div className="flex flex-col">
+                          <p className="font-semibold">Duration</p>
+                          <p>{formatDuration(duration)}</p>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  trigger={
+                    <div className="cursor-pointer">
+                      <Icon
+                        name="overflow-horizontal"
+                        size="small"
+                        className="text-moon-400"
+                      />
+                    </div>
+                  }
+                />
+              )}
+
+              {/* Visible metrics */}
+              <div className="flex items-center gap-4">
+                {visibleColumns.tokens &&
+                  (tokens !== undefined ? (
+                    <TraceStat
+                      label={tokens}
+                      tooltip={
+                        <div className="text-white-800">
                           <span style={{fontWeight: 600}}>
                             Estimated tokens
                           </span>
-                        </>
-                      )}
-                      {tokens && tokenToolTipContent}
+                          {tokenToolTipContent}
+                        </div>
+                      }
+                      className="min-w-[36px] justify-end px-0 text-xs text-moon-400"
+                    />
+                  ) : (
+                    <span className="min-w-[36px] px-0 text-xs text-transparent">
+                      -
+                    </span>
+                  ))}
+                {visibleColumns.cost &&
+                  (cost !== undefined ? (
+                    <TraceStat
+                      label={cost}
+                      tooltip={
+                        <div className="text-white-800">
+                          {costToolTipContent}
+                        </div>
+                      }
+                      className="ml-[4px] min-w-[46px] justify-end px-0 text-xs text-moon-400"
+                    />
+                  ) : (
+                    <span className="ml-[4px] min-w-[46px] px-0 text-xs text-transparent">
+                      -
+                    </span>
+                  ))}
+                {visibleColumns.duration &&
+                  (duration !== null ? (
+                    <div className="flex items-center gap-1">
+                      <span className="min-w-[36px] px-0 text-moon-400">
+                        {formatDuration(duration)}
+                      </span>
                     </div>
-                  }
-                  className="text-xs text-moon-400"
-                />
-              )}
-              {duration !== null && (
-                <span className="min-w-[32px] text-moon-400">
-                  {formatDuration(duration)}
-                </span>
-              )}
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span className="min-w-[36px] px-0 text-transparent">
+                        -
+                      </span>
+                    </div>
+                  ))}
+              </div>
             </div>
-            <StatusChip value={statusCode} iconOnly />
+            {statusCode === 'ERROR' || statusCode === 'UNSET' ? (
+              <StatusChip value={statusCode} iconOnly />
+            ) : statusCode === 'DESCENDANT_ERROR' && !isExpanded ? (
+              <Tooltip
+                content={
+                  <span>
+                    This call succeeded, but one or more descendants failed.
+                  </span>
+                }
+                trigger={
+                  <div className="flex h-[22px] w-[22px] items-center justify-center">
+                    <div className="h-[5px] w-[5px] rounded-full bg-red-550" />
+                  </div>
+                }
+              />
+            ) : COMPLETION_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="forum-chat-bubble" color="purple" />
+            ) : TOOL_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="code-alt" color="purple" />
+            ) : IMAGE_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="photo" color="purple" />
+            ) : AGENT_OP_NAMES.some(opName =>
+                node.call.op_name?.toLowerCase().includes(opName)
+              ) ? (
+              <IconOnlyPill icon="robot-service-member" color="blue" />
+            ) : (
+              // Else show spacer placeholder
+              <div className="w-[22px]" />
+            )}
           </div>
         </div>
       </div>
@@ -190,6 +311,14 @@ interface TreeViewHeaderProps {
   onSearchChange: (value: string) => void;
   strictSearch: boolean;
   onToggleStrictSearch: () => void;
+  visibleColumns: {
+    tokens: boolean;
+    cost: boolean;
+    duration: boolean;
+  };
+  onToggleColumnVisibility: (
+    column: keyof TreeViewHeaderProps['visibleColumns']
+  ) => void;
 }
 
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
@@ -197,7 +326,24 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   onSearchChange,
   strictSearch,
   onToggleStrictSearch,
+  visibleColumns,
+  onToggleColumnVisibility,
 }) => {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(anchorEl ? null : buttonRef.current);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+  const open = Boolean(anchorEl);
+  const columnLabels: Record<keyof typeof visibleColumns, string> = {
+    tokens: 'Token usage',
+    cost: 'Cost',
+    duration: 'Duration',
+  };
+
   return (
     <div className="flex items-center p-8 text-sm">
       <TextField
@@ -232,6 +378,68 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
           )
         }
       />
+      <div ref={buttonRef} className="ml-4">
+        <Button
+          variant="ghost"
+          icon="column"
+          tooltip="Manage fields"
+          onClick={handleClick}
+        />
+      </div>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        onClose={handleClose}
+        slotProps={{
+          paper: {
+            sx: {
+              overflow: 'visible',
+            },
+          },
+        }}
+        TransitionComponent={DraggableGrow}>
+        <Tailwind>
+          <div className="min-w-[150px] p-12">
+            <DraggableHandle>
+              <div className="flex items-center pb-8">
+                <div className="flex-auto font-semibold">Manage fields</div>
+              </div>
+            </DraggableHandle>
+            <div className="max-h-[300px] overflow-auto">
+              {Object.entries(visibleColumns).map(([column, isVisible]) => {
+                const idSwitch = `toggle-vis_${column}`;
+                const columnKey = column as keyof typeof visibleColumns;
+                return (
+                  <div key={column}>
+                    <div className="flex items-center py-2">
+                      <Switch.Root
+                        id={idSwitch}
+                        size="small"
+                        checked={isVisible}
+                        onCheckedChange={() =>
+                          onToggleColumnVisibility(columnKey)
+                        }>
+                        <Switch.Thumb size="small" checked={isVisible} />
+                      </Switch.Root>
+                      <label htmlFor={idSwitch} className="ml-6 cursor-pointer">
+                        {columnLabels[columnKey]}
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Tailwind>
+      </Popover>
     </div>
   );
 };
@@ -239,6 +447,23 @@ const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
   const [strictSearch, setStrictSearch] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useLocalStorage(
+    'traceViewVisibleColumns',
+    {
+      tokens: false,
+      cost: false,
+      duration: false,
+    }
+  );
+
+  const handleToggleColumnVisibility = (
+    column: keyof typeof visibleColumns
+  ) => {
+    setVisibleColumns({
+      ...visibleColumns,
+      [column]: !visibleColumns[column],
+    });
+  };
 
   const [matchedCallIds, filteredCallIds, deemphasizeCallIds] = useMemo(() => {
     // First find direct matches
@@ -329,6 +554,8 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         onSearchChange={setSearchQuery}
         strictSearch={strictSearch}
         onToggleStrictSearch={() => setStrictSearch(!strictSearch)}
+        visibleColumns={visibleColumns}
+        onToggleColumnVisibility={handleToggleColumnVisibility}
       />
       <div className="flex-1 overflow-hidden">
         <TreeView
@@ -336,6 +563,7 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
           filterCallIds={filteredCallIds}
           deemphasizeCallIds={deemphasizeCallIds}
           searchQuery={searchQuery}
+          visibleColumns={visibleColumns}
         />
       </div>
       <TraceScrubber
@@ -352,6 +580,11 @@ export const TreeView: React.FC<
     filterCallIds?: string[];
     deemphasizeCallIds?: string[];
     searchQuery?: string;
+    visibleColumns: {
+      tokens: boolean;
+      cost: boolean;
+      duration: boolean;
+    };
   }
 > = ({
   traceTreeFlat,
@@ -361,6 +594,7 @@ export const TreeView: React.FC<
   deemphasizeCallIds,
   setRootCallId,
   searchQuery,
+  visibleColumns,
 }) => {
   // Initialize expandedNodes with all node IDs
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(
@@ -459,6 +693,7 @@ export const TreeView: React.FC<
         onToggleExpand={handleToggleExpand}
         deemphasizeCallIds={deemphasizeCallIds}
         searchQuery={searchQuery}
+        visibleColumns={visibleColumns}
       />
     );
   };
