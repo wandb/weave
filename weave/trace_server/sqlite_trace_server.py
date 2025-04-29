@@ -641,6 +641,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
@@ -648,11 +650,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        if req.limit is not None and req.limit < 1:
+            raise ValueError("Limit must be a positive integer")
         calls = self.calls_query(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=req.filter,
                 query=req.query,
+                limit=req.limit,
             )
         ).calls
         return tsi.CallsQueryStatsRes(

@@ -51,12 +51,14 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tools/playground",
             "guides/integrations/index",
+            "guides/tools/saved-views",
             {
               type: "doc",
               label: "Compare Traces",
               id: "guides/tools/comparison",
             },
-            "guides/tracking/trace-tree"
+            "guides/tracking/trace-tree",
+            "guides/tracking/otel",
           ]
         },
         {
@@ -103,7 +105,7 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
             "guides/evaluation/weave_local_scorers",
-            "guides/evaluation/imperative_evaluations",
+            "guides/evaluation/evaluation_logger",
           ]
         },
       ],
@@ -149,7 +151,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tools/otel"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
@@ -194,6 +196,16 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/instructor",
             "guides/integrations/crewai",
             "guides/integrations/smolagents",
+          ],
+        },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Protocols",
+          link: { type: "doc", id: "guides/integrations/index"},
+          items: [
+            {type: "doc", id: "guides/integrations/mcp", label: "MCP"},
           ],
         },
       ],

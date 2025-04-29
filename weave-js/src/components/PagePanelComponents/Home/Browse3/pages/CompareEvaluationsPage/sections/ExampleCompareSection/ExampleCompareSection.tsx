@@ -1028,7 +1028,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
       style={{
         whiteSpace: 'pre-wrap',
         textAlign: 'left',
-        wordBreak: 'break-all',
+        overflowWrap: 'break-word',
         padding: 0,
         margin: 0,
         fontFamily: 'Inconsolata',

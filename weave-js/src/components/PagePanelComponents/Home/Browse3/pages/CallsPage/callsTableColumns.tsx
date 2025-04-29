@@ -84,9 +84,11 @@ export const useCallsTableColumns = (
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
   costsLoading: boolean = false,
+  costsHasError: boolean = false,
   includeTotalStorageSizeBytes: boolean = false,
   storageSizeResults: Map<string, number> | null = null,
-  storageSizeLoading: boolean = false
+  storageSizeLoading: boolean = false,
+  storageHasError: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -164,12 +166,14 @@ export const useCallsTableColumns = (
         allowedColumnPatterns,
         onAddFilter,
         costsLoading,
+        costsHasError,
         includeTotalStorageSizeBytes
           ? {
               storageSizeResults,
               storageSizeLoading,
             }
-          : null
+          : null,
+        storageHasError
       ),
     [
       entity,
@@ -190,6 +194,8 @@ export const useCallsTableColumns = (
       includeTotalStorageSizeBytes,
       storageSizeResults,
       storageSizeLoading,
+      storageHasError,
+      costsHasError,
     ]
   );
 
@@ -251,10 +257,12 @@ function buildCallsTableColumns(
   allowedColumnPatterns?: string[],
   onAddFilter?: OnAddFilter,
   costsLoading: boolean = false,
+  costsHasError: boolean = false,
   storageSizeInfo: {
     storageSizeResults: Map<string, number> | null;
     storageSizeLoading: boolean;
-  } | null = null
+  } | null = null,
+  storageHasError: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -654,6 +662,16 @@ function buildCallsTableColumns(
       if (costsLoading) {
         return <LoadingDots />;
       }
+      if (costsHasError) {
+        return (
+          <div className="flex h-full w-full items-center justify-center">
+            <StatusChip
+              value="ERROR"
+              tooltipOverride="There was an error fetching the cost for this call."
+            />
+          </div>
+        );
+      }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
       return (
         <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
@@ -703,6 +721,16 @@ function buildCallsTableColumns(
       renderCell: cellParams => {
         if (storageSizeInfo.storageSizeLoading) {
           return <LoadingDots />;
+        }
+        if (storageHasError) {
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <StatusChip
+                value="ERROR"
+                tooltipOverride="There was an error fetching the storage size for this call."
+              />
+            </div>
+          );
         }
         const storageSize =
           storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;

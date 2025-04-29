@@ -26,6 +26,7 @@ import {
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
   Icon,
   IconNotVisible,
@@ -464,9 +465,11 @@ export const CallsTable: FC<{
     allowedColumnPatterns,
     onAddFilter,
     calls.costsLoading,
+    !!calls.costsError,
     shouldIncludeTotalStorageSize,
     shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
-    shouldIncludeTotalStorageSize && calls.storageSizeLoading
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading,
+    !!calls.storageSizeError
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -700,6 +703,19 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData]);
 
+  // MUI data grid is unhappy if you pass it a sort model
+  // that references columns that aren't in the grid - it triggers an
+  // infinite loop.
+  const sortModelFiltered = useMemo(() => {
+    // Get all valid column fields from muiColumns
+    const validColumnFields = new Set(muiColumns.map(col => col.field));
+
+    // Filter out any sort items that reference columns not in muiColumns
+    return sortModelResolved.filter(sortItem =>
+      validColumnFields.has(sortItem.field)
+    );
+  }, [muiColumns, sortModelResolved]);
+
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -780,6 +796,41 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const noRowsOverlay = useCallback(() => {
+    if (calls.primaryError) {
+      return (
+        <ErrorPanel
+          title="Oh no! Unable to load traces..."
+          error={calls.primaryError}
+        />
+      );
+    }
+    return (
+      <CallsTableNoRowsOverlay
+        entity={entity}
+        project={project}
+        callsLoading={callsLoading}
+        callsResult={callsResult}
+        isEvaluateTable={isEvaluateTable}
+        effectiveFilter={effectiveFilter}
+        filterModelResolved={filterModelResolved}
+        clearFilters={clearFilters}
+        setFilterModel={setFilterModel}
+      />
+    );
+  }, [
+    calls.primaryError,
+    callsLoading,
+    callsResult,
+    clearFilters,
+    effectiveFilter,
+    filterModelResolved,
+    isEvaluateTable,
+    setFilterModel,
+    entity,
+    project,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -1014,12 +1065,12 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={sortModelFiltered}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
         pagination
-        rowCount={callsTotal}
+        rowCount={calls.primaryError ? 0 : callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
@@ -1053,19 +1104,7 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => (
-            <CallsTableNoRowsOverlay
-              entity={entity}
-              project={project}
-              callsLoading={callsLoading}
-              callsResult={callsResult}
-              isEvaluateTable={isEvaluateTable}
-              effectiveFilter={effectiveFilter}
-              filterModelResolved={filterModelResolved}
-              clearFilters={clearFilters}
-              setFilterModel={setFilterModel}
-            />
-          ),
+          noRowsOverlay,
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
@@ -1076,6 +1115,7 @@ export const CallsTable: FC<{
           ),
           columnMenuPinRightIcon: IconPinToRight,
         }}
+        className="tw-style"
       />
     </FilterLayoutTemplate>
   );
