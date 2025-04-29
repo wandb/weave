@@ -124,13 +124,11 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
+    if shard in ["llamaindex", "trace", "flow"]:
         session.posargs.insert(0, "-n4")
 
     session.run(
         "pytest",
-        "-n4",
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
