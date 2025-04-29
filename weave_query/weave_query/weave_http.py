@@ -126,7 +126,8 @@ class HttpAsync:
                     with tracer.trace("async_download_file_task.open_write"):
                         async with self.fs.open_write(path, mode="wb") as f:
                             with tracer.trace("async_download_file_task.iter_chunked"):
-                                async for data in r.content.iter_chunked(16 * 1024):
+                                chunk_size = 8 * 1024 * 1024
+                                async for data in r.content.iter_chunked(chunk_size):
                                     with tracer.trace("async_download_file_task.write"):
                                         await f.write(data)
                 else:
