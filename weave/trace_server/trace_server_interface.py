@@ -417,6 +417,7 @@ class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
+    limit: Optional[int] = None
 
 
 class CallsQueryStatsRes(BaseModel):
