@@ -2076,10 +2076,10 @@ def test_input_output_refs_filter():
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_4:String}
-            AND ((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
+            AND (((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
                 OR length(calls_merged.input_refs) = 0)
             AND (hasAny(calls_merged.output_refs, {pb_3:Array(String)})
-                OR length(calls_merged.output_refs) = 0))
+                OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
