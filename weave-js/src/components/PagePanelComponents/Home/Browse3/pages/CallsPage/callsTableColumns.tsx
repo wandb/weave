@@ -439,11 +439,8 @@ function buildCallsTableColumns(
             return <div>{parsed ? parsed.userDefinedType : c}</div>;
           },
           valueGetter: (unused: any, row: any) => {
-            // The feedback data is directly in the field, not in a nested structure
             const value = row[c];
             if (value == null) return '';
-
-            // The value is already the payload value for the current user
             return value;
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
