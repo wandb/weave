@@ -57,7 +57,8 @@ const sidebars: SidebarsConfig = {
               label: "Compare Traces",
               id: "guides/tools/comparison",
             },
-            "guides/tracking/trace-tree"
+            "guides/tracking/trace-tree",
+            "guides/tracking/otel",
           ]
         },
         {
@@ -150,7 +151,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tools/otel"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
