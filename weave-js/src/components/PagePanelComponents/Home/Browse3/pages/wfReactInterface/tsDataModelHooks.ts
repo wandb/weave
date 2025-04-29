@@ -192,7 +192,7 @@ const useCall = (
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
   const doFetch = useCallback(
-    (invalidateCache = false) => {
+    ({invalidateCache = false}: {invalidateCache?: boolean} = {}) => {
       if (deepKey) {
         if (invalidateCache) {
           callCache.del(deepKey);
@@ -218,14 +218,14 @@ const useCall = (
   );
 
   useEffect(() => {
-    doFetch(false);
+    doFetch({invalidateCache: false});
   }, [doFetch]);
 
   useEffect(() => {
     if (opts?.refetchOnRename) {
       const client = getTsClient();
       const unregisterRename = client.registerOnRenameListener(() =>
-        doFetch(true)
+        doFetch({invalidateCache: true})
       );
       return () => {
         unregisterRename();
