@@ -206,17 +206,18 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
                       variant="ghost"
                       active={!wrapLines}
                       icon="pan-tool-1"
-                      tooltip="Don't wrap long lines"
+                      tooltip="Don't wrap code"
                       onClick={() => {
                         setWrapLines(false);
                       }}
                     />
                     <Button
+                      className="mr-4"
                       size="small"
                       variant="ghost"
                       active={wrapLines}
                       icon="wrap"
-                      tooltip="Wrap long lines"
+                      tooltip="Wrap code"
                       onClick={() => {
                         setWrapLines(true);
                       }}
