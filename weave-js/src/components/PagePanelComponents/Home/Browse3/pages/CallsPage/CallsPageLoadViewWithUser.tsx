@@ -2,7 +2,7 @@ import React from 'react';
 
 import {ProjectInfo} from '../../../../../../common/hooks/useProjectInfo';
 import {UserInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {Loading} from '../../../../../Loading';
+import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {useSavedViewInstances} from '../SavedViews/savedViewUtil';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {CallsPageLoaded} from './CallsPageLoaded';
@@ -31,7 +31,22 @@ export const CallsPageLoadViewWithUser = ({
 
   const savedViewInstances = useSavedViewInstances(projectId, table);
   if (savedViewInstances.loading) {
-    return <Loading />;
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100%',
+        width: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        zIndex: 1,
+      }}>
+        <WaveLoader size="small" />
+      </div>
+    );
   }
   const {views, refetchViews: fetchViews} = savedViewInstances;
 

@@ -12,6 +12,7 @@ import {
   FormControl,
   ListItem,
   Tooltip,
+  Box,
 } from '@mui/material';
 import {
   GridColDef,
@@ -34,6 +35,7 @@ import {
   IconSortAscending,
   IconSortDescending,
 } from '@wandb/weave/components/Icon';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {
   FC,
   useCallback,
@@ -135,6 +137,25 @@ export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
 export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
+};
+
+const CustomLoadingOverlay: React.FC = () => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        display: 'flex',
+        justifyContent: 'center',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        zIndex: 1,
+      }}>
+        <WaveLoader size="small" />
+    </div>
+  );
 };
 
 export const CallsTable: FC<{
@@ -832,7 +853,6 @@ export const CallsTable: FC<{
     project,
   ]);
 
-  // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
       filterListSx={{
@@ -1114,6 +1134,7 @@ export const CallsTable: FC<{
             <IconPinToRight style={{transform: 'scaleX(-1)'}} />
           ),
           columnMenuPinRightIcon: IconPinToRight,
+          loadingOverlay: CustomLoadingOverlay,
         }}
         className="tw-style"
       />
