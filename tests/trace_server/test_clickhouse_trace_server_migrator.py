@@ -29,8 +29,12 @@ def migrator():
     # which results in calls to ch_client.command before our tests run
     migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
 
-    # Mock _initialize_migration_db to prevent it from being called again
+    # Mock methods that will be used in tests
     migrator._initialize_migration_db = MagicMock()
+    migrator._get_migration_status = MagicMock()
+    migrator._get_migrations = MagicMock()
+    migrator._determine_migrations_to_apply = MagicMock()
+    migrator._update_migration_status = MagicMock()
 
     # Reset the call count on ch_client.command to ignore initialization calls
     ch_client.command.reset_mock()
