@@ -16,14 +16,12 @@ def sample_mp4_path():
     """Create a sample MP4 file and return its path."""
     with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
         tmp_path = tmp.name
-
-    clip = ColorClip(size=(32, 32), color=(255, 0, 0), duration=0.5)
-    clip.fps = 24
-    clip.write_videofile(
-        tmp_path, codec="libx264", audio=False, verbose=False, logger=None
-    )
-
-    yield tmp_path
+        clip = ColorClip(size=(32, 32), color=(255, 0, 0), duration=0.5)
+        clip.fps = 24
+        clip.write_videofile(
+            tmp_path, codec="libx264", audio=False, verbose=False, logger=None
+        )
+        yield tmp_path
 
 
 @pytest.fixture
@@ -32,11 +30,11 @@ def sample_gif_path():
     with tempfile.NamedTemporaryFile(suffix=".gif") as tmp:
         tmp_path = tmp.name
 
-    clip = ColorClip(size=(32, 32), color=(0, 255, 0), duration=0.5)
-    clip.fps = 10
-    clip.write_gif(tmp_path)
+        clip = ColorClip(size=(32, 32), color=(0, 255, 0), duration=0.5)
+        clip.fps = 10
+        clip.write_gif(tmp_path)
 
-    yield tmp_path
+        yield tmp_path
 
 
 @pytest.fixture
@@ -45,19 +43,19 @@ def sample_webm_path():
     with tempfile.NamedTemporaryFile(suffix=".webm") as tmp:
         tmp_path = tmp.name
 
-    clip = ColorClip(size=(32, 32), color=(0, 0, 255), duration=0.5)
-    clip.fps = 24
-    clip.write_videofile(
-        tmp_path, codec="libvpx", audio=False, verbose=False, logger=None
-    )
+        clip = ColorClip(size=(32, 32), color=(0, 0, 255), duration=0.5)
+        clip.fps = 24
+        clip.write_videofile(
+            tmp_path, codec="libvpx", audio=False, verbose=False, logger=None
+        )
 
-    yield tmp_path
+        yield tmp_path
 
 
 def test_load_without_filename_extension(client, sample_mp4_path):
     """Test loading a video from a file without extension and ensure format is detected."""
     # Copy file to a path without extension
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+    with tempfile.NamedTemporaryFile() as tmp:
         tmp_path = tmp.name
 
     shutil.copyfile(sample_mp4_path, tmp_path)
