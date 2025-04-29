@@ -1,7 +1,8 @@
-import os
+import shutil
 import subprocess
 import tempfile
 
+import numpy as np
 import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
@@ -13,7 +14,7 @@ import weave
 @pytest.fixture
 def sample_mp4_path():
     """Create a sample MP4 file and return its path."""
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
         tmp_path = tmp.name
 
     clip = ColorClip(size=(32, 32), color=(255, 0, 0), duration=0.5)
@@ -22,26 +23,26 @@ def sample_mp4_path():
         tmp_path, codec="libx264", audio=False, verbose=False, logger=None
     )
 
-    return tmp_path
+    yield tmp_path
 
 
 @pytest.fixture
 def sample_gif_path():
     """Create a sample GIF file and return its path."""
-    with tempfile.NamedTemporaryFile(suffix=".gif", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".gif") as tmp:
         tmp_path = tmp.name
 
     clip = ColorClip(size=(32, 32), color=(0, 255, 0), duration=0.5)
     clip.fps = 10
     clip.write_gif(tmp_path)
 
-    return tmp_path
+    yield tmp_path
 
 
 @pytest.fixture
 def sample_webm_path():
     """Create a sample WEBM file and return its path."""
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".webm") as tmp:
         tmp_path = tmp.name
 
     clip = ColorClip(size=(32, 32), color=(0, 0, 255), duration=0.5)
@@ -50,7 +51,7 @@ def sample_webm_path():
         tmp_path, codec="libvpx", audio=False, verbose=False, logger=None
     )
 
-    return tmp_path
+    yield tmp_path
 
 
 def test_load_without_filename_extension(client, sample_mp4_path):
@@ -58,8 +59,6 @@ def test_load_without_filename_extension(client, sample_mp4_path):
     # Copy file to a path without extension
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp_path = tmp.name
-
-    import shutil
 
     shutil.copyfile(sample_mp4_path, tmp_path)
 
@@ -72,9 +71,6 @@ def test_load_without_filename_extension(client, sample_mp4_path):
     # Check that we can get it back
     recovered = weave.ref(ref.uri()).get()
     assert isinstance(recovered, VideoClip)
-
-    # Clean up
-    os.unlink(tmp_path)
 
 
 def test_videoclip_with_no_format_attribute(client):
@@ -89,7 +85,6 @@ def test_videoclip_with_no_format_attribute(client):
 
         def make_frame(self, t):
             # Return a blank frame (required for VideoClip)
-            import numpy as np
 
             return np.zeros((self.size[1], self.size[0], 3), dtype=np.uint8)
 
