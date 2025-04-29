@@ -271,18 +271,22 @@ export const ExampleCompareSection: React.FC<{
   const derivedScores = Object.values(
     getMetricIds(props.state.summary, 'score', 'derived')
   )
-    .filter(score => props.state.selectedMetrics?.[flattenedDimensionPath(score)])
-    .sort((dimensionA, dimensionB) => 
-      flattenedDimensionPath(dimensionA).localeCompare(flattenedDimensionPath(dimensionB))
+    .filter(
+      score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
+    )
+    .sort((dimensionA, dimensionB) =>
+      flattenedDimensionPath(dimensionA).localeCompare(
+        flattenedDimensionPath(dimensionB)
+      )
     );
 
   const numMetricScorers = metricGroupNames.length;
   const numDerivedScores = derivedScores.length;
   const numMetricsPerScorer = [
     ...metricGroupNames.map(groupName => {
-      return Object.keys(compositeScoreMetrics[groupName].metrics)
-        .sort((a, b) => a.localeCompare(b))
-        .length;
+      return Object.keys(compositeScoreMetrics[groupName].metrics).sort(
+        (a, b) => a.localeCompare(b)
+      ).length;
     }),
     numDerivedScores,
   ];

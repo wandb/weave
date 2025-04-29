@@ -346,173 +346,174 @@ export const ScorecardSection: React.FC<{
             return groupNameA.localeCompare(groupNameB);
           })
           .map(([groupName, group]) => {
-          const evalCallIdToScorerRef = evalCallIdToScorerRefs(group);
-          const uniqueScorerRefs = Array.from(
-            new Set(Object.values(evalCallIdToScorerRef))
-          );
-          const scorersAreComparable = uniqueScorerRefs.length === 1;
-          const scorerRefParsed = parseRefMaybe(
-            uniqueScorerRefs[0]
-          ) as WeaveObjectRef | null;
-          return (
-            <React.Fragment key={groupName}>
-              {groupName !== DERIVED_SCORER_REF_PLACEHOLDER && (
-                <>
-                  <GridCell
-                    style={{
-                      gridColumnEnd: 'span 2',
-                      borderTop: '1px solid #ccc',
-                      fontWeight: 'bold',
-                      textAlign: 'left',
-                    }}>
-                    {scorersAreComparable ? (
-                      scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
-                    ) : (
-                      <Alert
-                        severity="warning"
-                        style={{
-                          paddingTop: 0,
-                          paddingBottom: 0,
-                        }}>
-                        <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
-                          <div
-                            style={{
-                              whiteSpace: 'nowrap',
-                            }}>
-                            {SCORER_VARIATION_WARNING_TITLE}
-                          </div>
-                        </Tooltip>
-                      </Alert>
-                    )}
-                  </GridCell>
-                  {evalCallIds.map((evalCallId, mNdx) => {
-                    const innerScorerRefParsed = parseRefMaybe(
-                      evalCallIdToScorerRef[evalCallId]
-                    ) as WeaveObjectRef | null;
-                    return (
-                      <GridCell
-                        key={evalCallId}
-                        style={{
-                          borderTop: '1px solid #ccc',
-                          display: 'flex',
-                          alignItems: 'center',
-                        }}>
-                        {!scorersAreComparable &&
-                          (innerScorerRefParsed != null ? (
-                            <SmallRef objRef={innerScorerRefParsed} />
-                          ) : (
-                            <NotApplicable />
-                          ))}
-                      </GridCell>
-                    );
-                  })}
-                </>
-              )}
-              {Object.keys(group.metrics)
-                .sort((metricKeyA, metricKeyB) => metricKeyA.localeCompare(metricKeyB))
-                .map((metricKey, metricNdx, sortedKeys) => {
-                return (
-                  <React.Fragment key={metricKey}>
+            const evalCallIdToScorerRef = evalCallIdToScorerRefs(group);
+            const uniqueScorerRefs = Array.from(
+              new Set(Object.values(evalCallIdToScorerRef))
+            );
+            const scorersAreComparable = uniqueScorerRefs.length === 1;
+            const scorerRefParsed = parseRefMaybe(
+              uniqueScorerRefs[0]
+            ) as WeaveObjectRef | null;
+            return (
+              <React.Fragment key={groupName}>
+                {groupName !== DERIVED_SCORER_REF_PLACEHOLDER && (
+                  <>
                     <GridCell
                       style={{
                         gridColumnEnd: 'span 2',
-                        borderBottom:
-                          metricNdx === sortedKeys.length - 1
-                            ? '1px solid #ccc'
-                            : '',
+                        borderTop: '1px solid #ccc',
                         fontWeight: 'bold',
-                        textAlign: 'right',
-                        textOverflow: 'ellipsis',
+                        textAlign: 'left',
                       }}>
-                      {metricKey}
+                      {scorersAreComparable ? (
+                        scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
+                      ) : (
+                        <Alert
+                          severity="warning"
+                          style={{
+                            paddingTop: 0,
+                            paddingBottom: 0,
+                          }}>
+                          <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
+                            <div
+                              style={{
+                                whiteSpace: 'nowrap',
+                              }}>
+                              {SCORER_VARIATION_WARNING_TITLE}
+                            </div>
+                          </Tooltip>
+                        </Alert>
+                      )}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
-                      const baseline = resolveSummaryMetricResult(
-                        getBaselineCallId(props.state),
-                        groupName,
-                        metricKey,
-                        compositeSummaryMetrics,
-                        props.state
-                      )?.value;
-                      const metric = resolveSummaryMetricResult(
-                        evalCallId,
-                        groupName,
-                        metricKey,
-                        compositeSummaryMetrics,
-                        props.state
-                      );
-                      const value = metric?.value;
-                      const sourceCallId = metric?.sourceCallId;
-
-                      const valueIsNumber = typeof value === 'number';
-                      const dataIsNumber =
-                        valueIsNumber && typeof baseline === 'number';
-
-                      const onClick = sourceCallId
-                        ? () => onCallClick(sourceCallId)
-                        : undefined;
-
+                      const innerScorerRefParsed = parseRefMaybe(
+                        evalCallIdToScorerRef[evalCallId]
+                      ) as WeaveObjectRef | null;
                       return (
                         <GridCell
                           key={evalCallId}
                           style={{
-                            borderBottom:
-                              metricNdx ===
-                              sortedKeys.length - 1
-                                ? '1px solid #ccc'
-                                : '',
-                          }}
-                          onClick={onClick}
-                          button={!!onClick}>
-                          {value != null ? (
-                            <HorizontalBox
-                              style={{
-                                alignItems: 'center',
-                              }}>
-                              <HorizontalBox
-                                style={{
-                                  minWidth: '70px',
-                                  gap: '4px',
-                                }}>
-                                {valueIsNumber ? (
-                                  <ValueViewNumber
-                                    value={value}
-                                    fractionDigits={4}
-                                  />
-                                ) : (
-                                  <CellValueBoolean value={value} />
-                                )}
-                                {group.metrics[metricKey]
-                                  .scorerAgnosticMetricDef.unit ?? ''}
-                              </HorizontalBox>
-                              {dataIsNumber && (
-                                <ComparisonPill
-                                  value={value}
-                                  baseline={baseline}
-                                  metricUnit={
-                                    group.metrics[metricKey]
-                                      .scorerAgnosticMetricDef.unit ?? ''
-                                  }
-                                  metricLowerIsBetter={
-                                    group.metrics[metricKey]
-                                      .scorerAgnosticMetricDef.shouldMinimize ??
-                                    false
-                                  }
-                                />
-                              )}
-                            </HorizontalBox>
-                          ) : (
-                            <NotApplicable />
-                          )}
+                            borderTop: '1px solid #ccc',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}>
+                          {!scorersAreComparable &&
+                            (innerScorerRefParsed != null ? (
+                              <SmallRef objRef={innerScorerRefParsed} />
+                            ) : (
+                              <NotApplicable />
+                            ))}
                         </GridCell>
                       );
                     })}
-                  </React.Fragment>
-                );
-              })}
-            </React.Fragment>
-          );
-        })}
+                  </>
+                )}
+                {Object.keys(group.metrics)
+                  .sort((metricKeyA, metricKeyB) =>
+                    metricKeyA.localeCompare(metricKeyB)
+                  )
+                  .map((metricKey, metricNdx, sortedKeys) => {
+                    return (
+                      <React.Fragment key={metricKey}>
+                        <GridCell
+                          style={{
+                            gridColumnEnd: 'span 2',
+                            borderBottom:
+                              metricNdx === sortedKeys.length - 1
+                                ? '1px solid #ccc'
+                                : '',
+                            fontWeight: 'bold',
+                            textAlign: 'right',
+                            textOverflow: 'ellipsis',
+                          }}>
+                          {metricKey}
+                        </GridCell>
+                        {evalCallIds.map((evalCallId, mNdx) => {
+                          const baseline = resolveSummaryMetricResult(
+                            getBaselineCallId(props.state),
+                            groupName,
+                            metricKey,
+                            compositeSummaryMetrics,
+                            props.state
+                          )?.value;
+                          const metric = resolveSummaryMetricResult(
+                            evalCallId,
+                            groupName,
+                            metricKey,
+                            compositeSummaryMetrics,
+                            props.state
+                          );
+                          const value = metric?.value;
+                          const sourceCallId = metric?.sourceCallId;
+
+                          const valueIsNumber = typeof value === 'number';
+                          const dataIsNumber =
+                            valueIsNumber && typeof baseline === 'number';
+
+                          const onClick = sourceCallId
+                            ? () => onCallClick(sourceCallId)
+                            : undefined;
+
+                          return (
+                            <GridCell
+                              key={evalCallId}
+                              style={{
+                                borderBottom:
+                                  metricNdx === sortedKeys.length - 1
+                                    ? '1px solid #ccc'
+                                    : '',
+                              }}
+                              onClick={onClick}
+                              button={!!onClick}>
+                              {value != null ? (
+                                <HorizontalBox
+                                  style={{
+                                    alignItems: 'center',
+                                  }}>
+                                  <HorizontalBox
+                                    style={{
+                                      minWidth: '70px',
+                                      gap: '4px',
+                                    }}>
+                                    {valueIsNumber ? (
+                                      <ValueViewNumber
+                                        value={value}
+                                        fractionDigits={4}
+                                      />
+                                    ) : (
+                                      <CellValueBoolean value={value} />
+                                    )}
+                                    {group.metrics[metricKey]
+                                      .scorerAgnosticMetricDef.unit ?? ''}
+                                  </HorizontalBox>
+                                  {dataIsNumber && (
+                                    <ComparisonPill
+                                      value={value}
+                                      baseline={baseline}
+                                      metricUnit={
+                                        group.metrics[metricKey]
+                                          .scorerAgnosticMetricDef.unit ?? ''
+                                      }
+                                      metricLowerIsBetter={
+                                        group.metrics[metricKey]
+                                          .scorerAgnosticMetricDef
+                                          .shouldMinimize ?? false
+                                      }
+                                    />
+                                  )}
+                                </HorizontalBox>
+                              ) : (
+                                <NotApplicable />
+                              )}
+                            </GridCell>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+              </React.Fragment>
+            );
+          })}
       </div>
     </Box>
   );
