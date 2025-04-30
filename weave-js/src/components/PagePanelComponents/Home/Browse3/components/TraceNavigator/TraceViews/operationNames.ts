@@ -1,13 +1,11 @@
 export const AGENT_OP_NAMES = [
-  'agent.',
   'langchain.Chain.',
+  'openai_agent_agent',
   'openai_agent_trace',
-  'openai_agent_function',
   'openai_agent_handoff',
-  'openai_agent_guardrail',
-  'openai_agent_custom',
   'crewai.Crew.',
   'crewai.flow.',
+  'agent.'
 ];
 
 export const COMPLETION_OP_NAMES = [
@@ -25,10 +23,6 @@ export const COMPLETION_OP_NAMES = [
   'openai.responses.create',
   'langchain.Llm.',
   'langchain.Chat_model.',
-  'NotDiamond.model_select',
-  'NotDiamond.amodel_select',
-  'NotDiamond.LLMConfig.__init__',
-  'NotDiamond.LLMConfig.from_string',
   'Instructor.create',
   'Instructor.create_with_completion',
   'AsyncInstructor.create',
@@ -48,19 +42,6 @@ export const COMPLETION_OP_NAMES = [
   'vertexai.GenerativeModel.generate_content_async',
   'vertexai.ChatSession.send_message',
   'vertexai.ChatSession.send_message_async',
-  'dspy.LM',
-  'dspy.BootstrapFinetune.compile',
-  'dspy.MIPROv2.compile',
-  'dspy.LabeledFewShot.compile',
-  'dspy.KNNFewShot.compile',
-  'dspy.KNN',
-  'dspy.Ensemble.compile',
-  'dspy.COPRO.compile',
-  'dspy.BootstrapFewShotWithRandomSearch.compile',
-  'dspy.BootstrapFewShot.compile',
-  'dspy.BetterTogether.compile',
-  'dspy.ChatAdapter',
-  'dspy.JSONAdapter',
   'groq.chat.completions.create',
   'groq.async.chat.completions.create',
   'google.generativeai.GenerativeModel.generate_content',
@@ -106,6 +87,7 @@ export const COMPLETION_OP_NAMES = [
   'cohere.ClientV2.chat_stream',
   'cohere.AsyncClientV2.chat_stream',
   'weave.completions_create',
+  'completion.',
 ];
 
 export const EVAL_OP_NAMES = [
@@ -113,6 +95,7 @@ export const EVAL_OP_NAMES = [
   'dspy.Evaluate',
   'Evaluation.predict_and_score',
   'Evaluation.summarize',
+  'evaluation.',
 ];
 
 export const QUERY_OP_NAMES = [
@@ -125,6 +108,7 @@ export const QUERY_OP_NAMES = [
   'mcp.server.fastmcp.FastMCP.list_resources',
   'mcp.server.fastmcp.FastMCP.resource.',
   'llama_index.query',
+  'query.',
 ];
 
 export const IMAGE_OP_NAMES = [
@@ -137,21 +121,17 @@ export const IMAGE_OP_NAMES = [
   'huggingface_hub.AsyncInferenceClient.text_to_image',
   'huggingface_hub.InferenceClient.image_to_image',
   'huggingface_hub.AsyncInferenceClient.image_to_image',
+  'image.',
 ];
 
 export const TOOL_OP_NAMES = [
-  'google.genai.models.Models.count_tokens',
-  'google.genai.models.AsyncModels.count_tokens',
   'openai.embeddings.create',
+  'openai_agent_function',
+  'openai_agent_guardrail',
+  'openai_agent_custom',
+  'openai_agent_tool',
+  'openai_agent_Unknown',
   'langchain.Tool.',
-  'notdiamond.custom_router.train_router',
-  'notdiamond.custom_router.evaluate_router',
-  'notdiamond.toolkit.custom_router.fit',
-  'dspy.Embedder',
-  'dspy.ColBERTv2',
-  'dspy.retrievers.Embeddings',
-  'dspy.pythonInterpreter',
-  'dspy.PythonInterpreter.execute',
   'mcp.client.session.ClientSession.call_tool',
   'mcp.server.fastmcp.FastMCP.call_tool',
   'mcp.server.fastmcp.FastMCP.list_tools',
@@ -160,4 +140,5 @@ export const TOOL_OP_NAMES = [
   'crewai.Agent.execute_task',
   'crewai.Task.execute_sync',
   'crewai_tools.',
+  'tool.',
 ];
