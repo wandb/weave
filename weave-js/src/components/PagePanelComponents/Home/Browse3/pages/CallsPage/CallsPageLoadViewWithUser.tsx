@@ -45,7 +45,7 @@ export const CallsPageLoadViewWithUser = ({
           backgroundColor: 'rgba(255, 255, 255, 0.5)',
           zIndex: 1,
         }}>
-        <WaveLoader size="small" />
+        <WaveLoader size="huge" />
       </div>
     );
   }
