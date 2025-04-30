@@ -8,7 +8,7 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.type_handlers.Audio.audio_wrapper import AudioHandler, Audio
 
-def save(obj: Union[Audio, wave.Wave_read], artifact: MemTraceFilesArtifact, name: str) -> None:
+def save(obj: Union[Audio, wave.Wave_read, AudioHandler], artifact: MemTraceFilesArtifact, name: str) -> None:
     if isinstance(obj, wave.Wave_read):
         original_frame_position = obj.tell()
         obj.rewind()
@@ -29,8 +29,11 @@ def save(obj: Union[Audio, wave.Wave_read], artifact: MemTraceFilesArtifact, nam
     # Handle objects from audio backends
     else:
         try:
-            handler = AudioHandler(obj)
-                # Convert and save as wav to maintain compatibility
+            if not isinstance(obj, AudioHandler):
+                handler = AudioHandler(obj)
+            else:
+                handler = obj
+            # Convert and save as wav to maintain compatibility
             with artifact.writeable_file_path(f"audio.{handler.audio_format}") as fp:
                 handler.data.seek(0)
                 handler.export(fp)
@@ -58,7 +61,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> None:
     #         raise ValueError(f"Failed to load audio file: {str(e)}")
 
 def instance_check(obj: Any) -> bool:
-    return obj.__metadata__ == "weave.type_handlers.Audio.audio_wrapper.Audio" or isinstance(obj, AudioHandler) or isinstance(obj, wave.Wave_read)
+    return obj.__metadata__ == "weave.type_handlers.Audio.audio_wrapper.AudioHandler" or isinstance(obj, AudioHandler) or isinstance(obj, wave.Wave_read)
 
 def register() -> None:
     # Register the wave.Wave_read serializer for backward compatibility
