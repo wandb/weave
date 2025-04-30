@@ -182,7 +182,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     raise ValueError("No video or found for artifact")
 
 
-def is_instance(obj: Any) -> bool:
+def is_video_clip_instance(obj: Any) -> bool:
     """Check if the object is any subclass of VideoClip."""
     return isinstance(obj, VideoClip)
 
@@ -190,4 +190,4 @@ def is_instance(obj: Any) -> bool:
 def register() -> None:
     """Register the video type handler with the serializer."""
     if dependencies_met:
-        serializer.register_serializer(VideoClip, save, load, is_instance)
+        serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
