@@ -74,11 +74,10 @@ export const getFieldLabel = (field: string): string => {
   return FIELD_LABELS[field] ?? field;
 };
 
-const STRING_LIKE = 'string-like';
 export const FIELD_TYPE: Record<string, string> = {
-  id: STRING_LIKE,
+  id: 'id',
   'summary.weave.status': 'status',
-  'summary.weave.trace_name': STRING_LIKE,
+  'summary.weave.trace_name': 'string',
   wb_user_id: 'user',
   started_at: 'datetime',
 };
@@ -94,8 +93,7 @@ export type SelectOperatorOption = {
   group: OperatorGroup;
 };
 
-const allOperators: SelectOperatorOption[] = [
-  // String operators
+const stringOperators: SelectOperatorOption[] = [
   {
     value: '(string): contains',
     label: 'contains',
@@ -121,7 +119,9 @@ const allOperators: SelectOperatorOption[] = [
     label: 'does not contain',
     group: 'string',
   },
-  // Number operators
+];
+
+const numberOperators: SelectOperatorOption[] = [
   {
     value: '(number): =',
     label: '=',
@@ -152,13 +152,17 @@ const allOperators: SelectOperatorOption[] = [
     label: '≥',
     group: 'number',
   },
-  // Boolean operators
+];
+
+const booleanOperators: SelectOperatorOption[] = [
   {
     value: '(bool): is',
     label: 'is',
     group: 'boolean',
   },
-  // Date operators
+];
+
+const dateOperators: SelectOperatorOption[] = [
   {
     value: '(date): after',
     label: 'after',
@@ -169,7 +173,9 @@ const allOperators: SelectOperatorOption[] = [
     label: 'before',
     group: 'date',
   },
-  // Any operators
+];
+
+const anyOperators: SelectOperatorOption[] = [
   {
     value: '(any): isEmpty',
     label: 'is empty',
@@ -180,6 +186,14 @@ const allOperators: SelectOperatorOption[] = [
     label: 'is not empty',
     group: 'any',
   },
+];
+
+const allOperators: SelectOperatorOption[] = [
+  ...stringOperators,
+  ...numberOperators,
+  ...booleanOperators,
+  ...dateOperators,
+  ...anyOperators,
 ];
 
 // Display labels
@@ -249,7 +263,7 @@ export const getOperatorValueType = (operatorValue: string): string => {
 
 export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
   const fieldType = getFieldType(field);
-  if (STRING_LIKE === fieldType) {
+  if ('id' === fieldType) {
     return [
       {
         value: '(string): equals',
@@ -266,26 +280,13 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
         label: 'does not equal',
         group: 'string',
       },
-      {
-        value: '(string): notContains',
-        label: 'does not contain',
-        group: 'string',
-      },
     ];
   }
+  if ('string' === fieldType) {
+    return stringOperators;
+  }
   if ('datetime' === fieldType) {
-    return [
-      {
-        value: '(date): after',
-        label: 'after',
-        group: 'date',
-      },
-      {
-        value: '(date): before',
-        label: 'before',
-        group: 'date',
-      },
-    ];
+    return dateOperators;
   }
   if ('status' === fieldType) {
     return [
