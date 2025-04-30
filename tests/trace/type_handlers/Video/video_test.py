@@ -287,22 +287,15 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
 
     @weave.op()
     def return_video_mp4(path: str):
-        file_path = Path(path)
-        return VideoFileClip(file_path)
+        return VideoFileClip(path)
 
     @weave.op()
     def accept_video_mp4(val):
         width, height = val.size
         return f"Video size: {width}x{height}"
 
-    try:
-        res = accept_video_mp4(return_video_mp4(str(fp)))
-        assert res.startswith("Video size: ")
-    except Exception as e:
-        if fp.exists() and os.path.getsize(fp) > 0:
-            pytest.skip(f"Skipping due to file loading error: {e}")
-        else:
-            raise e
+    res = accept_video_mp4(return_video_mp4(str(fp)))
+    assert res.startswith("Video size: ")
 
 
 def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 1.0):
