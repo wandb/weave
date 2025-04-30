@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from enum import StrEnum
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from weave.trace.serialization import serializer
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-class VideoFormat(StrEnum):
+class VideoFormat(str, Enum):
     """
     These are NOT the list of formats we accept from the user
     Rather, these are the list of formats we can save to weave servers
