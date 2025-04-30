@@ -130,6 +130,7 @@ export type TraceCallsQueryStatsReq = {
 
 export type TraceCallsQueryStatsRes = {
   count: number;
+  total_storage_size_bytes?: number;
 };
 
 export type TraceCallsDeleteReq = {
