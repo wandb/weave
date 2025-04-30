@@ -17,6 +17,7 @@ export const TraceCountDisplay = ({
     project,
     {},
     undefined,
+    undefined,
     {skip: !hasWeaveData}
   );
 
