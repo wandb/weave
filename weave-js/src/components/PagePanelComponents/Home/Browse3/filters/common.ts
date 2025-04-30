@@ -318,7 +318,7 @@ export const getDefaultOperatorForValue = (value: any) => {
 
 export const FIELD_DESCRIPTIONS: Record<string, string> = {
   started_at: 'The time the op was invoked',
-  'summary.weave.trace_name': 'The name of the trace',
+  'summary.weave.trace_name': 'The name of the call',
   'attributes.weave.client_version': 'The version of the Weave library used',
   'attributes.weave.source': 'Which Weave client was used',
   'attributes.weave.os_name': 'Operating system name',
