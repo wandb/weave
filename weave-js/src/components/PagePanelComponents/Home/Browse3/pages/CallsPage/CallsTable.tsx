@@ -851,7 +851,7 @@ export const CallsTable: FC<{
     entity,
     project,
   ]);
-
+  // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
       filterListSx={{
