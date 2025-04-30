@@ -5,7 +5,7 @@ export const AGENT_OP_NAMES = [
   'openai_agent_handoff',
   'crewai.Crew.',
   'crewai.flow.',
-  'agent.'
+  'agent.',
 ];
 
 export const COMPLETION_OP_NAMES = [
