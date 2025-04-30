@@ -36,3 +36,9 @@ def leaderboard_path(entity_name: str, project_name: str, object_name: str) -> s
 
 def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
+
+
+def evaluation_compare_url(
+    entity_name: str, project_name: str, evaluation_call_id: str
+) -> str:
+    return f"{remote_project_root_url(entity_name, project_name)}/weave/compare-evaluations?evaluationcallids={quote(evaluation_call_id)}"

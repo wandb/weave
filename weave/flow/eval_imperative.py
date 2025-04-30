@@ -27,6 +27,7 @@ from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op
+from weave.trace.urls import evaluation_compare_url
 from weave.trace.weave_client import Call
 
 T = TypeVar("T")
@@ -340,6 +341,16 @@ class EvaluationLogger(BaseModel):
             return None
         return self._evaluate_call.ui_url
 
+    @property
+    def evaluation_compare_url(self) -> str | None:
+        if self._evaluate_call is None:
+            return None
+        return evaluation_compare_url(
+            self._evaluate_call.entity_name,
+            self._evaluate_call.project_name,
+            self._evaluate_call.id,
+        )
+
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
     _accumulated_predictions: list[ScoreLogger] = PrivateAttr(default_factory=list)
@@ -434,9 +445,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -511,9 +522,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
