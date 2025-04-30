@@ -333,20 +333,23 @@ export const convertLowLevelFilterToHighLevelFilter = (
   return highLevelFilter;
 };
 
-const getFeedbackMerged = (calls: CallSchema[], currentUserId?: string | null) => {
+const getFeedbackMerged = (
+  calls: CallSchema[],
+  currentUserId?: string | null
+) => {
   // for each call, reduce all feedback to the latest feedback of each type
   return calls.map(c => {
     if (!c.traceCall?.summary?.weave?.feedback) {
       return c;
     }
-    
+
     // Filter feedback by currentUserId if provided
     let feedbackToProcess = c.traceCall?.summary?.weave?.feedback;
     if (currentUserId) {
       feedbackToProcess = feedbackToProcess.filter(
         (feedback: Record<string, any>) => feedback.creator === currentUserId
       );
-      
+
       // If no feedback from current user, return call without feedback
       if (feedbackToProcess.length === 0) {
         const callWithoutFeedback = {...c};
@@ -359,7 +362,7 @@ const getFeedbackMerged = (calls: CallSchema[], currentUserId?: string | null) =
         return callWithoutFeedback;
       }
     }
-    
+
     const feedback = feedbackToProcess.reduce(
       (acc: Record<string, any>, curr: Record<string, any>) => {
         // keep most recent feedback of each type
@@ -371,7 +374,7 @@ const getFeedbackMerged = (calls: CallSchema[], currentUserId?: string | null) =
       },
       {}
     );
-    
+
     c.traceCall = {
       ...c.traceCall,
       summary: {
