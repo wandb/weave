@@ -28,6 +28,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
+from collections.abc import KeysView
 from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
@@ -1293,7 +1294,7 @@ def optimized_project_contains_call_query(
         WHEN EXISTS (
             SELECT 1
             FROM calls_merged
-            WHERE project_id = {param_slot(param_builder.add_param(project_id), 'String')}
+            WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
         )
         THEN 1
         ELSE 0
@@ -1301,3 +1302,33 @@ def optimized_project_contains_call_query(
     """,
         logger,
     )
+
+
+def build_calls_query_stats_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+) -> tuple[str, KeysView[str]]:
+    cq = CallsQuery(
+        project_id=req.project_id,
+        include_total_storage_size=req.include_total_storage_size,
+    )
+
+    cq.add_field("id")
+    if req.filter is not None:
+        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+    if req.query is not None:
+        cq.add_condition(req.query.expr_)
+    if req.limit is not None:
+        cq.set_limit(req.limit)
+
+    aggregated_columns = {"count": "count()"}
+    if req.include_total_storage_size:
+        aggregated_columns["total_storage_size_bytes"] = (
+            "sum(coalesce(total_storage_size_bytes, 0))"
+        )
+        cq.add_field("total_storage_size_bytes")
+
+    inner_query = cq.as_sql(param_builder)
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+
+    return (calls_query_sql, aggregated_columns.keys())
