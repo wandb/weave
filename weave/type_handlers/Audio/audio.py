@@ -67,19 +67,24 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
         with artifact.writeable_file_path(fname) as fp:
             obj.export(fp)
 
-    elif isinstance(obj, pydub.AudioSegment):
+    elif has_pydub and isinstance(obj, pydub.AudioSegment):
         obj.export(
             artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"),
             format=DEFAULT_VIDEO_FORMAT.value,
         )
-    else:
+    elif isinstance(obj, wave.Wave_read):
         # Object is a wave.Wave_read object
         save_wave(obj, artifact, name)
+    else:
+        # Should never occur, just to make type checker happy
+        raise ValueError(
+            "Recieved pydub.AudioSegment but failed to resolve pydub import"
+        )
 
 
 def load(
     artifact: MemTraceFilesArtifact, name: str
-) -> wave.Wave_read | pydub.AudioSegment:
+) -> "wave.Wave_read | pydub.AudioSegment":
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith("video."):
