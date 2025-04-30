@@ -74,9 +74,11 @@ export const getFieldLabel = (field: string): string => {
   return FIELD_LABELS[field] ?? field;
 };
 
+const STRING_LIKE = 'string-like';
 export const FIELD_TYPE: Record<string, string> = {
-  id: 'id',
+  id: STRING_LIKE,
   'summary.weave.status': 'status',
+  'summary.weave.trace_name': STRING_LIKE,
   wb_user_id: 'user',
   started_at: 'datetime',
 };
@@ -247,7 +249,7 @@ export const getOperatorValueType = (operatorValue: string): string => {
 
 export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
   const fieldType = getFieldType(field);
-  if ('id' === fieldType) {
+  if (STRING_LIKE === fieldType) {
     return [
       {
         value: '(string): equals',
