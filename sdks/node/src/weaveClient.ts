@@ -649,7 +649,6 @@ export class WeaveClient {
         response.data.digest
       );
 
-      // console.log('Saved op: ', ref.ui_url());
       return ref;
     })();
     return op.__savedRef;
