@@ -90,11 +90,11 @@ def require_current_call() -> Call:
 
     ```python
     @weave.op
-    def hello(name: str) -> None:
-        print(f"Hello {name}!")
+    def add(a: int, b: int) -> int:
+        return a + b
 
-    mycall = hello.call("world")
-    print(mycall.id)
+    result, call = add.call(1, 2)
+    print(call.id)
     ```
 
     Returns:
