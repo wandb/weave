@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import weave
 from weave.flow.util import transpose
@@ -79,7 +79,9 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
     # backwards compatibility.  In the future, this behavior may change to use the newer `output` key.
     # You can still pass a `column_map` to map to the new `output` key if preferred.
     @weave.op()
-    def score(self, target: dict, model_output: Optional[dict]) -> dict:
+    def score(
+        self, *, target: dict, model_output: Optional[dict], **kwargs: Any
+    ) -> dict:
         """
         Compare target labels with model outputs to determine correctness for each class.
 

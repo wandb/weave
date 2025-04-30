@@ -98,7 +98,7 @@ export const WeaveCHTable: FC<{
   const numRowsQuery = useTableQueryStats(
     lookupKey?.entity ?? '',
     lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
+    lookupKey?.digest ? [lookupKey?.digest] : [],
     {skip: lookupKey == null}
   );
 
@@ -168,7 +168,7 @@ export const WeaveCHTable: FC<{
   }, [loadedRows]);
 
   const totalRows = useMemo(() => {
-    return numRowsQuery.result?.count ?? pagedRows.length;
+    return numRowsQuery.result?.tables?.[0]?.count ?? pagedRows.length;
   }, [numRowsQuery.result, pagedRows]);
 
   // In this block, we setup a click handler. The underlying datatable is more general

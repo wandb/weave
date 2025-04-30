@@ -53,7 +53,12 @@ const NumberInput: React.FC<NumberInputProps> = ({
         // Do nothing on non arrow keys
         return;
       }
-      const v = parseFloat(stringValue);
+      // If the value is empty, try falling back to the placeholder in case it's a number
+      // since that's what the input will show. We will want to be able to shift the value
+      // from the empty state in this case.
+      const v = parseFloat(
+        stringValue === '' ? props?.placeholder?.toString() ?? '' : stringValue
+      );
       let newValue;
       if (ticks) {
         if (strideLength) {
@@ -82,7 +87,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
       setStringValue(newValue.toString());
       onChange(newValue);
     },
-    [onChange, ticks, stringValue, strideLength, min, max]
+    [onChange, ticks, stringValue, strideLength, min, max, props?.placeholder]
   );
 
   if (props.stepper && useStepperPlusMinus) {
@@ -104,7 +109,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
           className={`number-input-plus-minus__input ${props.className || ''}`}
           disabled={props.disabled}
           placeholder={props.placeholder}
-          style={{marginRight: 0, ...props.inputStyle}} // the default margin right is 4px but that misaligns the arrow buttons
+          style={props.inputStyle}
           type="number"
           value={stringValue}
           onFocus={() => {

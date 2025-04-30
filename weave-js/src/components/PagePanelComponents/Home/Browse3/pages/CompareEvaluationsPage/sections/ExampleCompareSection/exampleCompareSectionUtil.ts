@@ -1,24 +1,35 @@
-import _ from 'lodash';
-import {useMemo} from 'react';
+import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
+import _, {isEmpty} from 'lodash';
+import {
+  MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
+import {TraceServerClient} from '../../../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
 import {PredictAndScoreCall} from '../../ecpTypes';
-import {metricDefinitionId} from '../../ecpUtil';
-import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
+import {
+  metricDefinitionId,
+  resolveScoreMetricValueForPASCall,
+} from '../../ecpUtil';
 
 type RowBase = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
   inputRef: string;
-  input: {[inputKey: string]: any};
   path: string[];
   predictAndScore: PredictAndScoreCall;
 };
@@ -130,42 +141,34 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
           predictAndScoreRes => {
-            const datasetRow =
-              state.loadableComparisonResults.result?.inputs[
-                predictAndScoreRes.rowDigest
-              ];
-            if (datasetRow != null) {
-              const output = predictAndScoreRes._rawPredictTraceData?.output;
-              rows.push({
-                id: predictAndScoreRes.callId,
-                evaluationCallId: predictAndScoreRes.evaluationCallId,
-                inputDigest: datasetRow.digest,
-                inputRef: predictAndScoreRes.exampleRef,
-                input: flattenObjectPreservingWeaveTypes({
-                  input: datasetRow.val,
-                }),
-                output: flattenObjectPreservingWeaveTypes({output}),
-                scores: Object.fromEntries(
-                  [...Object.entries(state.summary.scoreMetrics)].map(
-                    ([scoreKey, scoreVal]) => {
-                      return [
-                        scoreKey,
-                        resolveScoreMetricValueForPASCall(
-                          scoreVal,
-                          predictAndScoreRes
-                        ),
-                      ];
-                    }
-                  )
-                ),
-                path: [
-                  rowDigest,
-                  predictAndScoreRes.evaluationCallId,
-                  predictAndScoreRes.callId,
-                ],
-                predictAndScore: predictAndScoreRes,
-              });
-            }
+            const output = predictAndScoreRes._rawPredictTraceData?.output;
+            rows.push({
+              id: predictAndScoreRes.callId,
+              evaluationCallId: predictAndScoreRes.evaluationCallId,
+              inputDigest: predictAndScoreRes.rowDigest,
+              inputRef: predictAndScoreRes.exampleRef,
+              // Note: this would be a possible location to record the raw predict_and_score inputs as the presumed data row.
+              output: flattenObjectPreservingWeaveTypes({output}),
+              scores: Object.fromEntries(
+                [...Object.entries(state.summary.scoreMetrics)].map(
+                  ([scoreKey, scoreVal]) => {
+                    return [
+                      scoreKey,
+                      resolveScoreMetricValueForPASCall(
+                        scoreVal,
+                        predictAndScoreRes
+                      ),
+                    ];
+                  }
+                )
+              ),
+              path: [
+                rowDigest,
+                predictAndScoreRes.evaluationCallId,
+                predictAndScoreRes.callId,
+              ],
+              predictAndScore: predictAndScoreRes,
+            });
           }
         );
       });
@@ -173,7 +176,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return rows;
   }, [
     state.loadableComparisonResults.result?.resultRows,
-    state.loadableComparisonResults.result?.inputs,
     state.summary.scoreMetrics,
   ]);
 
@@ -223,8 +225,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: rows[0].inputRef, // Should be the same for all,
-            input: rows[0].input, // Should be the same for all
+            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
             output: aggregateGroupedNestedRows(
               rows,
               'output',
@@ -292,20 +293,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return res;
   }, [aggregatedRows, compositeMetricsMap, state]);
 
-  const inputColumnKeys = useMemo(() => {
-    const keys = new Set<string>();
-    const keysList: string[] = [];
-    flattenedRows.forEach(row => {
-      Object.keys(row.input).forEach(key => {
-        if (!keys.has(key)) {
-          keys.add(key);
-          keysList.push(key);
-        }
-      });
-    });
-    return keysList;
-  }, [flattenedRows]);
-
   const outputColumnKeys = useMemo(() => {
     const keys = new Set<string>();
     const keysList: string[] = [];
@@ -323,9 +310,195 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   return useMemo(() => {
     return {
       filteredRows,
-      inputColumnKeys,
       outputColumnKeys,
       leafDims,
     };
-  }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys]);
+  }, [filteredRows, leafDims, outputColumnKeys]);
 };
+
+// Get the table digest used in the dataset of the first evaluation,
+// which prepares a request for actually fetching the table rows later
+async function makePartialTableReq(
+  evaluations: UseExampleCompareDataParams[0]['summary']['evaluations'],
+  filteredRows: UseExampleCompareDataParams[1],
+  targetIndex: UseExampleCompareDataParams[2],
+  getTraceServerClient: () => TraceServerClient
+) {
+  const targetRow = filteredRows[targetIndex];
+  if (targetRow == null) {
+    return null;
+  }
+  const datasetRef = Object.values(evaluations)[0].datasetRef as string;
+
+  const datasetObjRes = await getTraceServerClient().readBatch({
+    refs: [datasetRef],
+  });
+  if (!datasetObjRes.vals[0]) {
+    console.error('Dataset not found');
+    return null;
+  }
+
+  const rowsRef = datasetObjRes.vals[0].rows;
+  const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
+
+  return {
+    project_id: projectIdFromParts({
+      entity: parsedRowsRef.entityName,
+      project: parsedRowsRef.projectName,
+    }),
+    digest: parsedRowsRef.artifactVersion,
+  };
+}
+
+async function loadRowDataIntoCache(
+  rowDigests: string[],
+  cachedRowData: MutableRefObject<Record<string, any>>,
+  cachedPartialTableRequest: MutableRefObject<{
+    project_id: string;
+    digest: string;
+  } | null>,
+  getTraceServerClient: () => TraceServerClient
+) {
+  const rowsRes = await getTraceServerClient().tableQuery({
+    ...cachedPartialTableRequest.current!,
+    filter: {
+      row_digests: rowDigests,
+    },
+  });
+  for (const row of rowsRes.rows) {
+    cachedRowData.current[row.digest] = row.val;
+  }
+}
+
+type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
+
+export function useExampleCompareData(
+  state: EvaluationComparisonState,
+  filteredRows: Array<{
+    inputDigest: string;
+  }>,
+  targetIndex: number
+) {
+  const getTraceServerClient = useGetTraceServerClientContext();
+
+  // cache the row data for the current target row and adjacent rows,
+  // this is to allow for fast re-renders during pagination
+  const cachedRowData = useRef<Record<string, any>>({});
+  const cachedPartialTableRequest = useRef<{
+    project_id: string;
+    digest: string;
+  } | null>(null);
+
+  // This is to provide a way to manually control the re-render of the target row
+  const [cacheVersion, setCacheVersion] = useState<number>(0);
+  const increaseCacheVersion = useCallback(() => {
+    setCacheVersion(prev => prev + 1);
+  }, []);
+
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const targetRowValue = useMemo(() => {
+    if (isEmpty(filteredRows)) {
+      return undefined;
+    }
+    const digest = filteredRows[targetIndex].inputDigest;
+    return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
+    // Including `cacheVersion` in the dependency array ensures the memo recalculates
+    // when it changes, even though it's not directly used in the calculation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheVersion, filteredRows, targetIndex]);
+
+  useEffect(() => {
+    (async () => {
+      const targetRow = filteredRows[targetIndex];
+      if (targetRow == null) {
+        return;
+      }
+
+      const selectedRowDigest = targetRow.inputDigest;
+
+      // Check if we can get the data from the results directly.
+      // This is most commonly true for imperative evaluations
+      const rawDataRow =
+        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest]
+          ?.rawDataRow;
+      if (!(selectedRowDigest in cachedRowData.current) && rawDataRow) {
+        cachedRowData.current[selectedRowDigest] = rawDataRow;
+        increaseCacheVersion();
+        return;
+      }
+
+      if (!cachedPartialTableRequest.current) {
+        cachedPartialTableRequest.current = await makePartialTableReq(
+          state.summary.evaluations,
+          filteredRows,
+          targetIndex,
+          getTraceServerClient
+        );
+      }
+
+      if (cachedPartialTableRequest.current == null) {
+        // couldn't get the table digest, no way to proceed
+        return;
+      }
+
+      if (!(selectedRowDigest in cachedRowData.current)) {
+        // immediately fetch the current row
+        setLoading(true);
+
+        await loadRowDataIntoCache(
+          [selectedRowDigest],
+          cachedRowData,
+          cachedPartialTableRequest,
+          getTraceServerClient
+        );
+
+        // This trigger a re-calculation of the `target` and a re-render immediately
+        increaseCacheVersion();
+        setLoading(false);
+      }
+
+      // check if there is a need to fetch adjacent rows
+      const adjacentRows = [];
+      if (targetIndex > 0) {
+        adjacentRows.push(filteredRows[targetIndex - 1].inputDigest);
+      }
+      if (targetIndex < filteredRows.length - 1) {
+        adjacentRows.push(filteredRows[targetIndex + 1].inputDigest);
+      }
+
+      const adjacentRowsToFetch = adjacentRows.filter(
+        row => !(row in cachedRowData.current)
+      );
+
+      if (adjacentRowsToFetch.length > 0) {
+        // we load the data into the cache, but don't trigger a re-render
+        await loadRowDataIntoCache(
+          adjacentRowsToFetch,
+          cachedRowData,
+          cachedPartialTableRequest,
+          getTraceServerClient
+        );
+      }
+
+      // evict the obsolete cache
+      const newCache: Record<string, any> = {};
+      for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
+        newCache[rowDigest] = cachedRowData.current[rowDigest];
+      }
+      cachedRowData.current = newCache;
+    })();
+  }, [
+    state.summary.evaluations,
+    state.loadableComparisonResults.result,
+    filteredRows,
+    targetIndex,
+    increaseCacheVersion,
+    getTraceServerClient,
+  ]);
+
+  return {
+    targetRowValue,
+    loading,
+  };
+}

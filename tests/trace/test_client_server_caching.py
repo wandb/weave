@@ -47,6 +47,7 @@ def compare_datasets(ds1: weave.Dataset, ds2: weave.Dataset):
 
 
 def test_server_caching(client):
+    os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     dataset = weave.Dataset(rows=create_dataset_rows(5))
     ref = weave.publish(dataset)
 

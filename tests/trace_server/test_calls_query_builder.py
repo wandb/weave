@@ -373,9 +373,11 @@ def test_query_light_column_with_costs() -> None:
                     *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(
-                        if(usage_raw != '',
-                        JSONExtractKeysAndValuesRaw(usage_raw),
-                        [('weave_dummy_llm_id', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
+                        if(
+                            usage_raw != '' and usage_raw != '{}',
+                            JSONExtractKeysAndValuesRaw(usage_raw),
+                            [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')]
+                        )
                     ) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
@@ -494,7 +496,6 @@ def test_query_with_simple_feedback_sort() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_4:String}
-            AND calls_merged.project_id = {pb_4:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -567,7 +568,6 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_1:String}
-            AND calls_merged.project_id = {pb_1:String}
             AND (calls_merged.id IN filtered_calls)
         GROUP BY
             (calls_merged.project_id,
@@ -630,7 +630,6 @@ def test_query_with_simple_feedback_filter() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_3:String}
-            AND calls_merged.project_id = {pb_3:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -682,7 +681,6 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             calls_merged.id))
         WHERE
             calls_merged.project_id = {pb_6:String}
-            AND calls_merged.project_id = {pb_6:String}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -1956,7 +1954,6 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         FROM calls_merged
         LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
         WHERE calls_merged.project_id = {pb_2:String}
-            AND calls_merged.project_id = {pb_2:String}
             AND (calls_merged.id IN filtered_calls)
             AND ((calls_merged.inputs_dump LIKE {pb_8:String}
                 OR calls_merged.inputs_dump IS NULL))
@@ -2030,6 +2027,73 @@ def test_trace_id_filter_eq():
             "pb_1": "111111111111",
             "pb_0": ["weave-trace-internal:///%"],
             "pb_2": "project",
+        },
+    )
+
+
+def test_trace_roots_only_filter_with_condition():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "wb_user_id"},
+                    {"$literal": 1},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.parent_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.wb_user_id) = {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": 1, "pb_1": "project"},
+    )
+
+
+def test_input_output_refs_filter():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "input_refs": ["weave-trace-internal:///222222222222%"],
+            "output_refs": ["weave-trace-internal:///111111111111%"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (((hasAny(calls_merged.input_refs, {pb_2:Array(String)})
+                OR length(calls_merged.input_refs) = 0)
+            AND (hasAny(calls_merged.output_refs, {pb_3:Array(String)})
+                OR length(calls_merged.output_refs) = 0)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
+                AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)})))))
+        """,
+        {
+            "pb_4": "project",
+            "pb_0": ["weave-trace-internal:///222222222222%"],
+            "pb_1": ["weave-trace-internal:///111111111111%"],
+            "pb_2": ["weave-trace-internal:///222222222222%"],
+            "pb_3": ["weave-trace-internal:///111111111111%"],
         },
     )
 
