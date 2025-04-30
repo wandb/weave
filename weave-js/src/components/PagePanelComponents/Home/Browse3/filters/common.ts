@@ -34,7 +34,6 @@ export type FilterId = number | string | undefined;
 export const UNFILTERABLE_FIELDS = [
   'feedback',
   'summary.weave.latency_ms',
-  'summary.weave.trace_name',
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
@@ -50,6 +49,7 @@ export type ColumnInfo = {
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
   'summary.weave.status': 'Status',
+  'summary.weave.trace_name': 'Name',
   started_at: 'Called',
   wb_user_id: 'User',
 };
@@ -318,6 +318,7 @@ export const getDefaultOperatorForValue = (value: any) => {
 
 export const FIELD_DESCRIPTIONS: Record<string, string> = {
   started_at: 'The time the op was invoked',
+  'summary.weave.trace_name': 'The name of the call',
   'attributes.weave.client_version': 'The version of the Weave library used',
   'attributes.weave.source': 'Which Weave client was used',
   'attributes.weave.os_name': 'Operating system name',
