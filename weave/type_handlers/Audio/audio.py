@@ -87,7 +87,7 @@ def load(
 ) -> "wave.Wave_read | pydub.AudioSegment":
     for filename in artifact.path_contents:
         path = artifact.path(filename)
-        if filename.startswith("video."):
+        if filename.startswith("audio."):
             fmt = get_format_from_filename(filename)
             if fmt == AudioFormat.UNSUPPORTED:
                 raise ValueError(
