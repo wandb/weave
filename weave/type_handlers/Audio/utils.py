@@ -58,7 +58,7 @@ class AudioFile:
     path: str
     file_ext: AudioFormat
 
-    def __init__(self, path: str, file_ext: Optional[str]) -> None:
+    def __init__(self, path: str, file_ext: Optional[str] = None) -> None:
         file_ext = AudioFormat(file_ext.lower()) if file_ext else get_format_from_filename(path)
 
         if file_ext == AudioFormat.UNSUPPORTED:
@@ -66,7 +66,18 @@ class AudioFile:
         self.path = path
         self.file_ext = file_ext
 
+    @property
+    def format(self) -> str:
+        return self.file_ext.value
+
+    def __str__(self):
+        return str(self.path)
+
+    def __repr__(self):
+        return repr(self.path)
+
+    def __fspath__(self):
+        return str(self.path)
+
     def export(self, fp: str) -> None:
         shutil.copyfile(self.path, fp)
-
-file = AudioFile('test', 'mp3')
