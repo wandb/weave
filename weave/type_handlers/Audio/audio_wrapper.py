@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from pydub import AudioSegment
 
 class AudioFormat(str, Enum):
-    MP3 = "mp4"
+    MP3 = "mp3"
     M4A = "m4a"
     WAV = "wav"
     AAC = "aac"
@@ -120,7 +120,6 @@ class AudioHandler(Generic[AudioSource]):
             if isinstance(data_source, (str, Path)):
                 audio_format = audio_format or get_format_from_filename(str(data_source))
                 if not audio_format or audio_format not in SUPPORTED_FORMATS:
-                    formats = [fmt.value for fmt in AudioFormat]
                     raise ValueError(f"Unsupported audio_format: {audio_format}. Supported formats: {', '.join(SUPPORTED_FORMATS)}")
                 self.audio_format = audio_format
                 with open(data_source, 'rb') as f:
@@ -131,7 +130,7 @@ class AudioHandler(Generic[AudioSource]):
                 if not audio_format:
                     formats = [fmt.value for fmt in AudioFormat]
                     raise ValueError(f"audio_format must be specified when data is bytes or file-like object. Supported formats: {', '.join(formats)}")
-                elif audio_format not in AudioFormat:
+                elif audio_format not in SUPPORTED_FORMATS:
                     formats = [fmt.value for fmt in AudioFormat]
                     raise ValueError(f"Unsupported audio_format: {audio_format}. Supported formats: {', '.join(formats)}")
                 self.audio_format = audio_format
