@@ -64,7 +64,7 @@ export const useProjectHasTraceServerData = (
   return useMemo(
     () => ({
       loading,
-      result: (objs.result ?? []).length > 0 || calls.result,
+      result: (objs.result ?? []).length > 0 || (calls.result ?? false),
     }),
     [loading, objs.result, calls.result]
   );
