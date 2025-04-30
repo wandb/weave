@@ -5,7 +5,6 @@ from __future__ import annotations
 import shutil
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
-from pathlib import Path
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
@@ -34,6 +33,7 @@ class VideoFormat(StrEnum):
     If we detect that the file is in these formats, we copy it over directly
     Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default)
     """
+
     GIF = "gif"
     MP4 = "mp4"
     WEBM = "webm"
@@ -46,7 +46,9 @@ class VideoFormat(StrEnum):
     def _missing_(cls, value: Any) -> VideoFormat:
         return cls.UNSUPPORTED
 
+
 DEFAULT_VIDEO_FORMAT = VideoFormat.MP4
+
 
 def get_format_from_filename(filename: str) -> VideoFormat:
     """Get the file format from a filename.
@@ -109,7 +111,7 @@ def save_video_file_clip(
         obj: The VideoFileClip
         artifact: The artifact to save to
         name: Ignored, see comment below
-    """ 
+    """
     video_format = get_format_from_filename(obj.filename)
 
     # Check if the format is known/supported. If not, set to unsupported
@@ -127,6 +129,7 @@ def save_video_file_clip(
             # Copy the file directly if it's a supported format
             shutil.copy(obj.filename, fp)
 
+
 def save_non_file_clip(
     obj: VideoClip,
     artifact: MemTraceFilesArtifact,
@@ -136,6 +139,7 @@ def save_non_file_clip(
     with artifact.writeable_file_path(f"video.{ext}") as fp:
         # If the format is unsupported, we need to convert it
         write_video(fp, obj)
+
 
 def save(
     obj: VideoClip,
@@ -156,9 +160,7 @@ def save(
         else:
             save_non_file_clip(obj, artifact, name)
     except Exception as e:
-        raise ValueError(
-            f"Failed to write video file with error: {e}"
-        )
+        raise ValueError(f"Failed to write video file with error: {e}")
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:

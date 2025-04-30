@@ -1,11 +1,11 @@
 import os
+import shutil
 from pathlib import Path
 
 import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
 import weave
-import shutil
 from weave.trace.weave_client import WeaveClient
 from weave.type_handlers.Video.video import VideoFormat, write_video
 
@@ -26,6 +26,7 @@ def test_video() -> VideoClip:
     clip = ColorClip(size=(64, 64), color=(128, 0, 128), duration=1)
     clip.fps = 24
     return clip
+
 
 def test_save_mp4_clip(tmp_path: Path, test_video: VideoClip):
     fp = str(tmp_path / "test.mp4")
@@ -60,14 +61,17 @@ def test_save_no_ext_clip(tmp_path: Path, test_video: VideoClip):
     with pytest.raises(ValueError):
         write_video(fp, test_video)
 
+
 def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
     fp = str(tmp_path / "test.invalid")
     # Write video should throw exception if it recieves invalid format
     with pytest.raises(ValueError):
         write_video(fp, test_video)
 
-def test_video_with_no_ext_converted(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
 
+def test_video_with_no_ext_converted(
+    client: WeaveClient, tmp_path: Path, test_video: VideoClip
+):
     @weave.op
     def load_video_op(path: str):
         clip = VideoFileClip(path)
@@ -87,17 +91,20 @@ def test_video_with_no_ext_converted(client: WeaveClient, tmp_path: Path, test_v
 def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
     # Create a temporary file path
     fp = str(tmp_path / "test.mp4")
+
     # Use the temporary file path in the weave op
     @weave.op
     def save_video_op(clip: VideoClip, path: str):
         write_video(path, clip)
         return path
+
     # Call the weave op
     result = save_video_op(test_video, fp)
     # Check if the file was created
     assert os.path.exists(result)
     # Check if the video was written
     assert os.path.getsize(result) > 0
+
 
 def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
     ref = weave.publish(test_video)
@@ -119,6 +126,7 @@ def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
 
     # Since we can't easily compare video contents, we'll just check that it's a valid video
     assert gotten_video.duration == test_video.duration
+
 
 class VideoWrapper(weave.Object):
     video: VideoClip
@@ -226,6 +234,7 @@ def test_video_as_call_io(client: WeaveClient, test_video: VideoClip) -> None:
 
 def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_call_io_refs"
+
     # Helper function to compare sizes
     def compare_sizes(size1, size2, context=""):
         if isinstance(size1, list) and isinstance(size2, tuple):
@@ -369,6 +378,7 @@ def test_videos_in_load_of_dataset(client):
 
 def test_video_format_from_filename():
     from weave.type_handlers.Video.video import get_format_from_filename
+
     assert get_format_from_filename("test.mp4") == VideoFormat.MP4
     assert get_format_from_filename("test.webm") == VideoFormat.WEBM
     assert get_format_from_filename("test.gif") == VideoFormat.GIF
