@@ -7,6 +7,10 @@ import React from 'react';
 import {Loader, StrictLoaderProps} from 'semantic-ui-react';
 
 import {
+  WBLogoLoader,
+  WBLogoLoaderProps,
+} from '../../components/Loaders/WBLogoLoader';
+import {
   ProfileData,
   useLifecycleProfiling,
 } from './../hooks/useLifecycleProfiling';
@@ -150,4 +154,30 @@ export const TrackedWaveLoader = ({
   );
 
   return <WaveLoader size={size} delayBeforeShow={delayBeforeShow} />;
+};
+
+export const TrackedWBLogoLoader = ({
+  captureException,
+  name,
+  profilingCb,
+  samplingRate = 0.1,
+  track,
+  onComplete,
+  onStart,
+  ...props
+}: TrackedWandbLoaderProps & WBLogoLoaderProps) => {
+  useLifecycleProfiling(
+    name,
+    makeLoaderTracker({
+      name,
+      profilingCb,
+      onComplete,
+      track,
+      samplingRate,
+      captureException,
+    }),
+    onStart
+  );
+
+  return <WBLogoLoader {...props} />;
 };
