@@ -278,6 +278,7 @@ export const CallsTable: FC<{
     sortModelResolved,
     expandedRefCols,
     undefined,
+    userInfo && 'id' in userInfo ? userInfo.id : null,
     {
       // The total storage size only makes sense for traces,
       // and not for calls.
