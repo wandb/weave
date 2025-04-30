@@ -8,7 +8,6 @@
 
 import {
   Autocomplete,
-  Box,
   Chip,
   FormControl,
   ListItem,
@@ -153,7 +152,7 @@ const CustomLoadingOverlay: React.FC = () => {
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
         zIndex: 1,
       }}>
-        <WaveLoader size="small" />
+      <WaveLoader size="small" />
     </div>
   );
 };
