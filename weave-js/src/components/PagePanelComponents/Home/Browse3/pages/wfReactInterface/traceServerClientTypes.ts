@@ -124,6 +124,7 @@ export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   query?: Query;
+  limit?: number;
 };
 
 export type TraceCallsQueryStatsRes = {
