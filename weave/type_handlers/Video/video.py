@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import shutil
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
+from pathlib import Path
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
@@ -26,17 +27,28 @@ if TYPE_CHECKING:
     )
 
 
-class VideoFormat(str, Enum):
+class VideoFormat(StrEnum):
+    """
+    These are NOT the list of formats we accept from the user
+    Rather, these are the list of formats we can save to weave servers
+    If we detect that the file is in these formats, we copy it over directly
+    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default)
+    """
     GIF = "gif"
     MP4 = "mp4"
     WEBM = "webm"
+    UNSUPPORTED = "unsupported"
 
+    def __str__(self) -> str:
+        return self.value
 
-SUPPORTED_FORMATS = [format.value for format in VideoFormat]
-DEFAULT_VIDEO_FORMAT = VideoFormat.MP4.value
+    @classmethod
+    def _missing_(cls, value: Any) -> VideoFormat:
+        return cls.UNSUPPORTED
 
+DEFAULT_VIDEO_FORMAT = VideoFormat.MP4
 
-def get_format_from_filename(filename: str) -> str | None:
+def get_format_from_filename(filename: str) -> VideoFormat:
     """Get the file format from a filename.
 
     Args:
@@ -50,11 +62,80 @@ def get_format_from_filename(filename: str) -> str | None:
 
     # If there's no dot or it's the last character, return None
     if last_dot == -1 or last_dot == len(filename) - 1:
-        return None
+        return VideoFormat.UNSUPPORTED
 
     # Get the extension without the dot
-    return filename[last_dot + 1 :]
+    return VideoFormat(filename[last_dot + 1 :])
 
+
+def write_video(fp: str, clip: VideoClip) -> None:
+    """
+    Takes a filepath and a VideoClip and writes the video to the file.
+    errors if the file does not end in a supported video extension.
+    """
+    fps = clip.fps or None
+    audio = clip.audio
+    fmt_str = get_format_from_filename(fp)
+    fmt = VideoFormat(fmt_str)
+
+    if fmt == VideoFormat.UNSUPPORTED:
+        raise ValueError(f"Unsupported video format: {fmt_str}")
+
+    if fmt == VideoFormat.GIF:
+        clip.write_gif(fp, fps=fps)
+        return
+    if fmt == VideoFormat.WEBM:
+        codec = "libvpx"
+    else:
+        codec = "libx264"
+
+    clip.write_videofile(
+        fp,
+        fps=fps,
+        codec=codec,
+        audio=audio,
+        verbose=False,
+        logger=None,
+    )
+
+
+def save_video_file_clip(
+    obj: VideoFileClip,
+    artifact: MemTraceFilesArtifact,
+    _: str,
+) -> None:
+    """Save a VideoFileClip to the artifact.
+    Args:
+        obj: The VideoFileClip
+        artifact: The artifact to save to
+        name: Ignored, see comment below
+    """ 
+    video_format = get_format_from_filename(obj.filename)
+
+    # Check if the format is known/supported. If not, set to unsupported
+    fmt = VideoFormat(video_format)
+    ext = fmt.value
+
+    if fmt == VideoFormat.UNSUPPORTED:
+        ext = DEFAULT_VIDEO_FORMAT.value
+
+    with artifact.writeable_file_path(f"video.{ext}") as fp:
+        if fmt == VideoFormat.UNSUPPORTED:
+            # If the format is unsupported, we need to convert it
+            write_video(fp, obj)
+        else:
+            # Copy the file directly if it's a supported format
+            shutil.copy(obj.filename, fp)
+
+def save_non_file_clip(
+    obj: VideoClip,
+    artifact: MemTraceFilesArtifact,
+    _: str,
+) -> None:
+    ext = DEFAULT_VIDEO_FORMAT.value
+    with artifact.writeable_file_path(f"video.{ext}") as fp:
+        # If the format is unsupported, we need to convert it
+        write_video(fp, obj)
 
 def save(
     obj: VideoClip,
@@ -69,54 +150,15 @@ def save(
     """
     is_video_file = isinstance(obj, VideoFileClip)
 
-    if is_video_file:
-        video_format = get_format_from_filename(obj.filename) or DEFAULT_VIDEO_FORMAT
-    else:
-        video_format = getattr(obj, "format", DEFAULT_VIDEO_FORMAT)
-
-    video_format = video_format.lower()
-    if video_format not in SUPPORTED_FORMATS:
-        raise ValueError(
-            f"Unsupported video format: {video_format} - Only {', '.join(SUPPORTED_FORMATS)} are supported"
-        )
-
-    # Save the video file
-    with artifact.writeable_file_path(f"video.{video_format}") as fp:
+    try:
         if is_video_file:
-            # If it's already a VideoFileClip just copy it
-            shutil.copy(obj.filename, fp)
+            save_video_file_clip(obj, artifact, name)
         else:
-            # If it's not a VideoFileClip we need to encode and write the file
-            fps = obj.fps or None
-            try:
-                # Use appropriate writing method based on format
-                if (
-                    video_format == VideoFormat.WEBM.value
-                    or video_format == VideoFormat.MP4.value
-                ):
-                    # Add codec and verbose=False to ensure consistent behavior
-                    codec = (
-                        "libvpx"
-                        if video_format == VideoFormat.WEBM.value
-                        else "libx264"
-                    )
-                    obj.write_videofile(
-                        fp,
-                        fps=fps,
-                        codec=codec,
-                        audio=False,
-                        verbose=False,
-                        logger=None,
-                    )
-                else:
-                    # Gif is the default
-                    obj.write_gif(fp, fps=fps)
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to write video file with format {video_format} with error: {e}"
-                )
-
-    return
+            save_non_file_clip(obj, artifact, name)
+    except Exception as e:
+        raise ValueError(
+            f"Failed to write video file with error: {e}"
+        )
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
