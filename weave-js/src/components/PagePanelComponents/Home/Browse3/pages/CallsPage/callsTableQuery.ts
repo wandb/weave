@@ -345,6 +345,11 @@ const getFeedbackMerged = (
 
     // Filter feedback by currentUserId if provided
     let feedbackToProcess = c.traceCall?.summary?.weave?.feedback;
+    // Ensure feedbackToProcess is an array (for filterings)
+    if (!Array.isArray(feedbackToProcess)) {
+      feedbackToProcess = Object.values(feedbackToProcess);
+    }
+    
     if (currentUserId) {
       feedbackToProcess = feedbackToProcess.filter(
         (feedback: Record<string, any>) => feedback.creator === currentUserId
