@@ -173,12 +173,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           backgroundColor: 'transparent',
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
-        <SavedModelDropdown
-          value={playgroundStates[idx].savedModel.name}
-          onChange={(model, params) =>
-            handleSavedModelChange(idx, model, params)
-          }
-        />
         <LLMDropdown
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
@@ -264,11 +258,4 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
       />
     </Box>
   );
-};
-
-const SavedModelDropdown: React.FC<{
-  value: string | null;
-  onChange: (model: string, params: OptionalSavedPlaygroundModelParams) => void;
-}> = ({value, onChange}) => {
-  return <div>SavedModelDropdown</div>;
 };

@@ -145,7 +145,9 @@ export const PlaygroundChat = ({
     configuredProvidersLoading,
     customProvidersResult,
     customProviderModelsResult,
-    areCustomProvidersLoading
+    areCustomProvidersLoading,
+    savedModelsResult,
+    savedModelsLoading
   );
 
   // Check if any chat is loading

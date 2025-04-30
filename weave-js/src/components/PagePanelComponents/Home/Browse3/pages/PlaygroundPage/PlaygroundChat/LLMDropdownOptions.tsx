@@ -396,10 +396,13 @@ export const getLLMDropdownOptions = (
   configuredProvidersLoading: boolean,
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],
   customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[],
-  customLoading: boolean
+  customLoading: boolean,
+  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[],
+  savedModelsLoading: boolean
 ) => {
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
+  const savedModelsOptions: ProviderOption[] = [];
 
   if (configuredProvidersLoading) {
     options.push({
@@ -461,6 +464,17 @@ export const getLLMDropdownOptions = (
         });
       }
     });
+  }
+
+  if (!savedModelsLoading) {
+    console.log('savedModelsResult', savedModelsResult);
+    // savedModelsResult?.forEach(model => {
+    //   savedModelsOptions.push({
+    //     label: model.val.name,
+    //     value: model.val.name,
+    //     llms: [],
+    //   });
+    // });
   }
 
   // Combine enabled and disabled options

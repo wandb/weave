@@ -9,6 +9,7 @@ import React, {useState} from 'react';
 import {
   LlmStructuredCompletionModel,
   LlmStructuredCompletionModelDefaultParamsSchema,
+  Message,
   ResponseFormatSchema,
 } from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {useCreateBuiltinObjectInstance} from '../../wfReactInterface/objectClassQuery';
@@ -300,26 +301,38 @@ const useSaveModelConfiguration = ({
           ? ResponseFormatSchema.parse('json')
           : currentState.responseFormat === PlaygroundResponseFormats.Text
           ? ResponseFormatSchema.parse('text')
-          : currentState.responseFormat === PlaygroundResponseFormats.JsonSchema
-          ? ResponseFormatSchema.parse('jsonschema')
-          : undefined,
+          : // : currentState.responseFormat === PlaygroundResponseFormats.JsonSchema
+            // ? ResponseFormatSchema.parse('jsonschema')
+            undefined,
       functions: currentState.functions,
       n_times: currentState.nTimes,
+      messages_template: [],
     };
-    const messagesTemplate: Array<Record<string, string>> = [];
 
     if (currentState.traceCall?.inputs?.messages) {
-      messagesTemplate.push(...currentState.traceCall.inputs.messages);
+      defaultParams.messages_template.push(
+        ...currentState.traceCall.inputs.messages.map((message: Message) => ({
+          content: message.content,
+          function_call: message.function_call ?? null,
+          name: message.name ?? null,
+          role: message.role,
+          tool_call_id: message.tool_call_id ?? null,
+        }))
+      );
     }
     if (
       currentState.traceCall?.output &&
       (currentState.traceCall.output as TraceCallOutput)?.choices
     ) {
-      messagesTemplate.push(
-        (currentState.traceCall.output as TraceCallOutput)?.choices?.[
-          currentState.selectedChoiceIndex ?? 0
-        ]
-      );
+      const choice = (currentState.traceCall.output as TraceCallOutput)
+        ?.choices?.[currentState.selectedChoiceIndex ?? 0];
+      defaultParams.messages_template.push({
+        content: choice?.message.content,
+        function_call: choice?.message.function_call ?? null,
+        name: choice?.message.name ?? null,
+        role: choice?.message.role,
+        tool_call_id: choice?.message.tool_call_id ?? null,
+      });
     }
 
     const validatedParams =
@@ -337,8 +350,6 @@ const useSaveModelConfiguration = ({
     } = {
       name: finalModelName,
       llm_model_id: currentState.model,
-      messages_template: messagesTemplate,
-      response_format_schema: responseFormatSchema,
       default_params: validatedParams.data,
     };
 
