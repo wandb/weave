@@ -158,10 +158,10 @@ export const FilterBar = ({
         label: parsed ? parsed.displayName : col.field,
       });
     } else {
-      const name = FIELD_LABELS[col.field] ?? col.headerName ?? col.field;
+      const label = FIELD_LABELS[col.field] ?? col.headerName ?? col.field;
       (options[0] as GroupedOption).options.push({
         value: col.field,
-        label: name,
+        label,
         description: FIELD_DESCRIPTIONS[col.field],
       });
     }
