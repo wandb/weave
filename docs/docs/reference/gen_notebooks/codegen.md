@@ -47,6 +47,15 @@ First, let's set up our environment and import the necessary libraries:
 
 
 ```python
+%%capture
+# Temporary workaround to fix bug in openai:
+# TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+# See https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/15
+!pip install "httpx<0.28"
+```
+
+
+```python
 import ast
 import os
 import re
@@ -266,9 +275,9 @@ class CodeGenerationPipeline(weave.Model):
 This `CodeGenerationPipeline` class encapsulates our code generation logic as a Weave Model, providing several key benefits:
 
 1. Automatic experiment tracking: Weave captures inputs, outputs, and parameters for each run of the model.
-2. Versioning: Changes to the model's parameters or code are automatically versioned, creating a clear history of how your code generation pipeline evolves over time.
+2. Versioning: Changes to the model's attributes or code are automatically versioned, creating a clear history of how your code generation pipeline evolves over time.
 3. Reproducibility: The versioning and tracking make it easy to reproduce any previous result or configuration of your code generation pipeline.
-4. Hyperparameter management: Model parameters (like `model_name`) are clearly defined and tracked across different runs, facilitating experimentation.
+4. Hyperparameter management: Model attributes (like `model_name`) are clearly defined and tracked across different runs, facilitating experimentation.
 5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
 ## Implement evaluation metrics
@@ -290,8 +299,8 @@ if __name__ == "__main__":
 
 ```python
 @weave.op()
-async def score_humaneval_test(test: str, entry_point: str, model_output: str):
-    generated_code = model_output
+async def score_humaneval_test(test: str, entry_point: str, output: str):
+    generated_code = output
 
     # Extract test cases from the test string
     test_cases = re.findall(r"assert.*", test)

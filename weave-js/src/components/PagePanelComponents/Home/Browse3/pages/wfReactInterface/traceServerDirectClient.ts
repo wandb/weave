@@ -13,6 +13,7 @@
  */
 
 import {getCookie} from '@wandb/weave/common/util/cookie';
+import {HTTPError} from '@wandb/weave/errors';
 import fetch from 'isomorphic-unfetch';
 
 import {
@@ -404,7 +405,14 @@ export class DirectTraceServerClient {
       headers,
       body: reqBody,
     })
-      .then(response => {
+      .then(async response => {
+        if (!response.ok) {
+          throw new HTTPError(
+            response.statusText,
+            response.status,
+            await response.text()
+          );
+        }
         if (responseReturnType === 'text') {
           return response.text();
         } else if (responseReturnType === 'arrayBuffer') {
