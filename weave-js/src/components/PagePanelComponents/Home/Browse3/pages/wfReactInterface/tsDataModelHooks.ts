@@ -597,13 +597,14 @@ const useProjectHasCalls = (
   opts?: {skip?: boolean}
 ): Loadable<boolean> => {
   const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  const count = callsStats.result?.count ?? 0;
   return useMemo(() => {
     return {
       loading: callsStats.loading,
-      result: callsStats.result != null,
+      result: count > 0,
       error: callsStats.error,
     };
-  }, [callsStats]);
+  }, [callsStats, count]);
 };
 
 const useCallsDeleteFunc = () => {
