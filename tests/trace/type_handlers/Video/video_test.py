@@ -1,6 +1,7 @@
 import os
 import shutil
 from pathlib import Path
+import subprocess
 
 import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
@@ -72,10 +73,6 @@ def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
 def test_video_with_no_ext_converted(
     client: WeaveClient, tmp_path: Path, test_video: VideoClip
 ):
-    @weave.op
-    def load_video_op(path: str):
-        clip = VideoFileClip(path)
-        return clip
 
     video_path = str(tmp_path / "test.mp4")
     # Save an mp4 video
@@ -84,8 +81,15 @@ def test_video_with_no_ext_converted(
     test_path = str(tmp_path / "test")
     shutil.copyfile(video_path, test_path)
 
-    load_video_op(test_path)
-    assert len(client.calls()) == 1
+    # Load the video without extension
+    clip = VideoFileClip(test_path)
+
+    # Try to publish it - this should use DEFAULT_VIDEO_FORMAT (gif)
+    ref = weave.publish(clip)
+
+    # Check that we can get it back
+    recovered = weave.ref(ref.uri()).get()
+    assert isinstance(recovered, VideoClip)
 
 
 def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
@@ -268,18 +272,18 @@ def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> No
     )
 
 
-def test_video_as_file(client: WeaveClient) -> None:
+def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
     client.project = "test_video_as_file"
 
     # Use the existing test video file
-    file_path = Path(__file__).parent.resolve() / "test_video.mp4"
+    fp = tmp_path / "test_video.mp4"
 
-    if not file_path.exists():
+    if not fp.exists():
         # If no test video exists, create one
         clip = ColorClip(size=(64, 64), color=(128, 0, 128), duration=1)
         clip.fps = 24
         clip.write_videofile(
-            str(file_path), codec="libx264", audio=False, verbose=False, logger=None
+            str(fp), codec="libx264", audio=False, verbose=False, logger=None
         )
 
     @weave.op()
@@ -293,10 +297,10 @@ def test_video_as_file(client: WeaveClient) -> None:
         return f"Video size: {width}x{height}"
 
     try:
-        res = accept_video_mp4(return_video_mp4(str(file_path)))
+        res = accept_video_mp4(return_video_mp4(str(fp)))
         assert res.startswith("Video size: ")
     except Exception as e:
-        if file_path.exists() and os.path.getsize(file_path) > 0:
+        if fp.exists() and os.path.getsize(fp) > 0:
             pytest.skip(f"Skipping due to file loading error: {e}")
         else:
             raise e
@@ -387,3 +391,49 @@ def test_video_format_from_filename():
     assert get_format_from_filename(".mp4") == VideoFormat.MP4
     # Make sure it handles paths with multiple dots
     assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
+
+
+def test_multiple_video_formats(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
+    """Test that we can publish videos of different formats in the same session."""
+    sample_mp4_path = str(tmp_path / "test.mp4")
+    sample_gif_path = str(tmp_path / "test.gif")
+    sample_webm_path = str(tmp_path / "test.webm")
+
+    write_video(sample_mp4_path, test_video)
+    write_video(sample_gif_path, test_video)
+    write_video(sample_webm_path, test_video)
+
+    mp4_clip = VideoFileClip(sample_mp4_path)
+    gif_clip = VideoFileClip(sample_gif_path)
+    webm_clip = VideoFileClip(sample_webm_path)
+
+    # Publish all three
+    mp4_ref = weave.publish(mp4_clip)
+    gif_ref = weave.publish(gif_clip)
+    webm_ref = weave.publish(webm_clip)
+
+    # Retrieve them all
+    mp4_recovered = weave.ref(mp4_ref.uri()).get()
+    gif_recovered = weave.ref(gif_ref.uri()).get()
+    webm_recovered = weave.ref(webm_ref.uri()).get()
+
+    # Check they're all valid
+    assert isinstance(mp4_recovered, VideoClip)
+    assert isinstance(gif_recovered, VideoClip)
+    assert isinstance(webm_recovered, VideoClip)
+
+
+@pytest.mark.skip("Runs as a subprocess - skipped in regular test runs")
+def test_many_videos_will_consistently_log():
+    """Test that we can save many videos without issues."""
+    res = subprocess.run(
+        ["python", "tests/trace/type_handlers/Video/video_saving_script.py"],
+        capture_output=True,
+        text=True,
+    )
+
+    # This should always be True because the future executor won't raise an exception
+    assert res.returncode == 0
+
+    # But if there's an issue, the stderr will contain `Task failed:`
+    assert "Task failed" not in res.stderr
