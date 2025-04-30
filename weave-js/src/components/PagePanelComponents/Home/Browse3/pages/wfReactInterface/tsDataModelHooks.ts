@@ -166,7 +166,11 @@ const useMakeTraceServerEndpoint = <
 
 const useCall = (
   key: CallKey | null,
-  opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
+  opts?: {
+    includeCosts?: boolean;
+    includeTotalStorageSize?: boolean;
+    refetchOnRename?: boolean;
+  }
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -187,33 +191,48 @@ const useCall = (
 
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const doFetch = useCallback(() => {
-    if (deepKey) {
-      loadingRef.current = true;
-      setCallRes(null);
-      getTsClient()
-        .callRead({
-          project_id: projectIdFromParts(deepKey),
-          id: deepKey.callId,
-          include_costs: opts?.includeCosts,
-          ...(opts?.includeTotalStorageSize
-            ? {include_total_storage_size: true}
-            : null),
-        })
-        .then(res => {
-          loadingRef.current = false;
-          setCallRes(res);
-        });
-    }
-  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const doFetch = useCallback(
+    ({invalidateCache = false}: {invalidateCache?: boolean} = {}) => {
+      if (deepKey) {
+        if (invalidateCache) {
+          callCache.del(deepKey);
+        }
+        loadingRef.current = true;
+        setCallRes(null);
+        getTsClient()
+          .callRead({
+            project_id: projectIdFromParts(deepKey),
+            id: deepKey.callId,
+            include_costs: opts?.includeCosts,
+            ...(opts?.includeTotalStorageSize
+              ? {include_total_storage_size: true}
+              : null),
+          })
+          .then(res => {
+            loadingRef.current = false;
+            setCallRes(res);
+          });
+      }
+    },
+    [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]
+  );
 
   useEffect(() => {
-    doFetch();
+    doFetch({invalidateCache: false});
   }, [doFetch]);
 
   useEffect(() => {
-    return getTsClient().registerOnRenameListener(doFetch);
-  }, [getTsClient, doFetch]);
+    if (opts?.refetchOnRename) {
+      const client = getTsClient();
+      const unregisterRename = client.registerOnRenameListener(() =>
+        doFetch({invalidateCache: true})
+      );
+      return () => {
+        unregisterRename();
+      };
+    }
+    return undefined;
+  }, [getTsClient, doFetch, deepKey, opts?.refetchOnRename]);
 
   return useMemo(() => {
     if (deepKey == null) {
@@ -281,6 +300,7 @@ const useCallsNoExpansion = (
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const deepFilter = useDeepMemo(filter);
 
   const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
@@ -343,6 +363,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         console.error(e);
+        setError(e);
         setCallRes({calls: []});
       }
     };
@@ -413,9 +434,10 @@ const useCallsNoExpansion = (
         loading: false,
         result,
         refetch,
+        error,
       };
     }
-  }, [opts?.skip, callRes, columns, refetch, entity, project]);
+  }, [opts?.skip, callRes, columns, refetch, entity, project, error]);
 };
 
 const useCalls = (
@@ -462,8 +484,9 @@ const useCalls = (
       loading,
       result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
       refetch: calls.refetch,
+      error: calls.error,
     };
-  }, [calls.refetch, expandedCalls, loading]);
+  }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
 const useCallsStats = (
