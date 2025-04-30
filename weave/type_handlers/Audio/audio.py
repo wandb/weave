@@ -66,3 +66,4 @@ def instance_check(obj: Any) -> bool:
 def register() -> None:
     # Register the wave.Wave_read serializer for backward compatibility
     serializer.register_serializer(wave.Wave_read, save, load)
+    serializer.register_serializer(AudioHandler, save, load)
