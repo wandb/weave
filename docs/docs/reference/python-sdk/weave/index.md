@@ -174,11 +174,11 @@ Alternately, after defining your Op you can use its `call` method. For example:
 
 ```python
 @weave.op
-def hello(name: str) -> None:
-     print(f"Hello {name}!")
+def add(a: int, b: int) -> int:
+     return a + b
 
-mycall = hello.call("world")
-print(mycall.id)
+result, call = add.call(1, 2)
+print(call.id)
 ``` 
 
 
@@ -706,7 +706,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `dataset`: `<class 'flow.dataset.Dataset'>`
-- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x155d012d0>, json_schema_input_type=PydanticUndefined)]]]`
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x136c3cf70>, json_schema_input_type=PydanticUndefined)]]]`
 - `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
 - `trials`: `<class 'int'>`
 - `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`
