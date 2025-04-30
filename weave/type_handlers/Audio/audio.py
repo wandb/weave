@@ -1,26 +1,27 @@
-import wave
-
-from typing import TYPE_CHECKING, Any, Union, Protocol
-from enum import Enum
 import os
-import shutil
+import wave
+from typing import TYPE_CHECKING, Any, Union
+
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
-from .utils import DEFAULT_VIDEO_FORMAT, AudioFile, AudioFormat, SUPPORTED_FORMATS, get_format_from_filename
+
+from .utils import (
+    DEFAULT_VIDEO_FORMAT,
+    SUPPORTED_FORMATS,
+    AudioFile,
+    AudioFormat,
+    get_format_from_filename,
+)
 
 try:
     import pydub
+
     has_pydub = True
 except ImportError:
     has_pydub = False
 
 if TYPE_CHECKING:
     import pydub
-
-
-class SupportsAudioSegmentExport(Protocol):
-    def export(self, out_f=None, format='mp3', codec=None, bitrate=None, parameters=None, tags=None, id3v2_version='4', cover=None):
-        ...
 
 DEFAULT_AUDIO_FORMAT = AudioFormat.MP3
 
@@ -32,7 +33,7 @@ def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -
     obj.rewind()
     frames = obj.readframes(obj.getnframes())
     params = obj.getparams()
-    with artifact.writeable_file_path('audio.wav') as fp:
+    with artifact.writeable_file_path("audio.wav") as fp:
         with wave.open(fp, "w") as wav_file:
             # Exclude nframes param, it is often set as the maximum number of frames
             # which bumps into the 4GB max file size when creating the wave.Wave_write
@@ -45,6 +46,7 @@ def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -
     # Rewind to the original position
     obj.setpos(original_frame_position)
 
+
 def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
     # Represents a wrapped audio file path which should be copied directly
     if isinstance(obj, AudioFile):
@@ -56,30 +58,41 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
         ext = obj.file_ext
         # If it's not supported we can't copy it directly
         if ext not in SUPPORTED_FORMATS:
-            raise ValueError(f"Unsupported audio format: {ext} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}")
+            raise ValueError(
+                f"Unsupported audio format: {ext} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}"
+            )
 
         # Copy the file to the artifact
         fname = f"audio.{ext}"
         with artifact.writeable_file_path(fname) as fp:
             obj.export(fp)
 
-    elif isinstance(obj, "pydub.AudioSegment"):
-        obj.export(artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"), format=DEFAULT_VIDEO_FORMAT.value)
+    elif isinstance(obj, pydub.AudioSegment):
+        obj.export(
+            artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"),
+            format=DEFAULT_VIDEO_FORMAT.value,
+        )
     else:
         # Object is a wave.Wave_read object
         save_wave(obj, artifact, name)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | pydub.AudioSegment:
+def load(
+    artifact: MemTraceFilesArtifact, name: str
+) -> wave.Wave_read | pydub.AudioSegment:
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith("video."):
             fmt = get_format_from_filename(filename)
             if fmt == AudioFormat.UNSUPPORTED:
-                raise ValueError(f"Unsupported audio format: {filename} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}")
+                raise ValueError(
+                    f"Unsupported audio format: {filename} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}"
+                )
             elif fmt != AudioFormat.WAV:
                 if not has_pydub:
-                    raise ValueError(f"Pydub is required to retrieve {fmt.value} audio files")
+                    raise ValueError(
+                        f"Pydub is required to retrieve {fmt.value} audio files"
+                    )
                 # If the file is in a supported format, we can load it directly
                 return pydub.AudioSegment.from_file(path, format=fmt.value)
             else:
@@ -89,11 +102,13 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | pydub.A
 
     raise ValueError("No audio found for artifact")
 
+
 def is_audio_instance(obj: Any) -> bool:
     if has_pydub:
         return isinstance(obj, (AudioFile, pydub.AudioSegment, wave.Wave_read))
     else:
         return isinstance(obj, (AudioFile, wave.Wave_read))
+
 
 def register() -> None:
     # Register the serializers for the audio types
@@ -102,4 +117,3 @@ def register() -> None:
     serializer.register_serializer(wave.Wave_read, save, load)
     if has_pydub:
         serializer.register_serializer(pydub.AudioSegment, save, load)
-

@@ -1,19 +1,16 @@
-import wave
-
-from typing import Any, Optional, Protocol, TypeVar, Union
-from enum import Enum
 import shutil
-from weave.trace.serialization import serializer
-from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+from enum import Enum
+from typing import Any, Optional
 
 try:
     from pydub import AudioSegment
+
     has_pydub = True
 except ImportError:
     AudioSegment = None
     has_pydub = False
 
-from os import PathLike
+
 class AudioFormat(str, Enum):
     """
     These are NOT the list of formats we accept from the user
@@ -33,9 +30,11 @@ class AudioFormat(str, Enum):
     def _missing_(cls, value: Any) -> "AudioFormat":
         return cls.UNSUPPORTED
 
+
 SUPPORTED_FORMATS = [fmt.value for fmt in AudioFormat if fmt != AudioFormat.UNSUPPORTED]
 
 DEFAULT_VIDEO_FORMAT = AudioFormat.MP3
+
 
 def get_format_from_filename(filename: str) -> AudioFormat:
     """Get the file format from a filename.
@@ -54,15 +53,22 @@ def get_format_from_filename(filename: str) -> AudioFormat:
     # Get the extension without the dot
     return AudioFormat(filename[last_dot + 1 :])
 
+
 class AudioFile:
     path: str
     file_ext: AudioFormat
 
     def __init__(self, path: str, file_ext: Optional[str] = None) -> None:
-        file_ext = AudioFormat(file_ext.lower()) if file_ext else get_format_from_filename(path)
+        file_ext = (
+            AudioFormat(file_ext.lower())
+            if file_ext
+            else get_format_from_filename(path)
+        )
 
         if file_ext == AudioFormat.UNSUPPORTED:
-            raise ValueError(f"Unsupported or missing file format: {path} - Supported Extensions: {' '.join(SUPPORTED_FORMATS)}")
+            raise ValueError(
+                f"Unsupported or missing file format: {path} - Supported Extensions: {' '.join(SUPPORTED_FORMATS)}"
+            )
         self.path = path
         self.file_ext = file_ext
 
@@ -70,13 +76,13 @@ class AudioFile:
     def format(self) -> str:
         return self.file_ext.value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.path)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.path)
 
-    def __fspath__(self):
+    def __fspath__(self) -> str:
         return str(self.path)
 
     def export(self, fp: str) -> None:
