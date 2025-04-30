@@ -355,7 +355,7 @@ const getFeedbackMerged = (
         return c;
       }
     }
-    
+
     if (currentUserId) {
       feedbackToProcess = feedbackToProcess.filter(
         (feedback: Record<string, any>) => feedback.creator === currentUserId
