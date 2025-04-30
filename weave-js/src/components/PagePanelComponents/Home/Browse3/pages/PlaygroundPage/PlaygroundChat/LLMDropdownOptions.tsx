@@ -16,13 +16,14 @@ import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
 import {Link} from '../../common/Links';
-import {OptionalSavedPlaygroundModelParams} from '../types';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
   LLMMaxTokensKey,
 } from '../llmMaxTokens';
+import {OptionalSavedPlaygroundModelParams} from '../types';
+import {ProviderStatus} from '../useConfiguredProviders';
 
 export interface LLMOption {
   label: string;
@@ -31,8 +32,6 @@ export interface LLMOption {
   baseModelId?: LLMMaxTokensKey | null;
   defaultParams?: OptionalSavedPlaygroundModelParams;
 }
-
-import {ProviderStatus} from '../useConfiguredProviders';
 
 export interface ProviderOption {
   label: string | React.ReactNode;

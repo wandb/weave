@@ -4,10 +4,10 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {OptionalSavedPlaygroundModelParams} from '../types';
 import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
-import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 
 interface LLMDropdownProps {
