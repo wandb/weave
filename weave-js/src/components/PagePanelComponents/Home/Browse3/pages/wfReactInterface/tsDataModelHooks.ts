@@ -7,6 +7,7 @@
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import useAsync from 'react-use/lib/useAsync';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -2133,6 +2134,14 @@ export const useTableCreate = (): ((
     },
     [getTsClient]
   );
+};
+
+export const useFilesStats = (projectId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(async () => {
+    return getTsClient().filesStats({project_id: projectId});
+  }, [getTsClient, projectId]);
 };
 
 /// Utility Functions ///

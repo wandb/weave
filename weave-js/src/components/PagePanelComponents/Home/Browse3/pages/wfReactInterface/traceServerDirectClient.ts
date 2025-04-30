@@ -28,6 +28,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  FilesStatsReq,
+  FilesStatsRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -344,6 +346,13 @@ export class DirectTraceServerClient {
           reject(err);
         });
     });
+  }
+
+  public filesStats(req: FilesStatsReq): Promise<FilesStatsRes> {
+    return this.makeRequest<FilesStatsReq, FilesStatsRes>(
+      '/files/query_stats',
+      req
+    );
   }
 
   public completionsCreate(
