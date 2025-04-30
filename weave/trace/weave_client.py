@@ -807,7 +807,7 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
-MAX_TRACE_PAYLOAD_SIZE = 3.5 * 1024 * 1024  # 3.5 MB
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MB
 
 
 class WeaveClient:
@@ -1205,7 +1205,7 @@ class WeaveClient:
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
                     f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
-                    "Inputs will likely be dropped."
+                    "Inputs may be dropped."
                 )
 
             self.server.call_start(call_start_req)
@@ -1337,7 +1337,7 @@ class WeaveClient:
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
-                    "Output will likely be dropped."
+                    "Output may be dropped."
                 )
             self.server.call_end(call_end_req)
 
