@@ -64,7 +64,7 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
             obj.export(fp)
 
     elif isinstance(obj, "pydub.AudioSegment"):
-        obj.export(artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"), format=DEFAULT_VIDEO_FORMAT)
+        obj.export(artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"), format=DEFAULT_VIDEO_FORMAT.value)
     else:
         # Object is a wave.Wave_read object
         save_wave(obj, artifact, name)
@@ -96,4 +96,10 @@ def is_audio_instance(obj: Any) -> bool:
         return isinstance(obj, (AudioFile, wave.Wave_read))
 
 def register() -> None:
+    # Register the serializers for the audio types
+    # Target class is irrelevant, we just need to register the serializer with the instance check
+    serializer.register_serializer(AudioFile, save, load)
     serializer.register_serializer(wave.Wave_read, save, load)
+    if has_pydub:
+        serializer.register_serializer(pydub.AudioSegment, save, load)
+
