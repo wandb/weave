@@ -1467,8 +1467,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         n_chunks = query_result.result_rows[0][0]
         result_rows = list(query_result.result_rows)
 
-        if len(result_rows) != n_chunks:
+        if len(result_rows) < n_chunks:
             raise ValueError("Missing chunks")
+        elif len(result_rows) > n_chunks:
+            # The general case where this can occur is when there are multiple
+            # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
+            # of the most recent write is more than the effective `FILE_CHUNK_SIZE`
+            # of any previous write. In that case, you have something like tthe following:
+            # Consider a file of size 500 bytes.
+            # Insert Batch 1 (chunk_size=100): C0(0-99), C1(100-199), C2(200-299), C3(300-399), C4(400-499)
+            # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
+            # Insert Batch 3 (chunk_size=200): C0(0-199), C1(200-399), C2(400-499)
+            #
+            # When Clickhouse runs it's merge operation, it keeps the last inserted rows according to the index (project, digest, chunk_index).
+            # Similarly, the inner select statement in the query above (partitioned and keep row 1) does the same thing.
+            #
+            # As a result, the resulting query gives you all the chunks from batch 3, then any "extra" chunks from previous batches.
+            # |--------- Insert Batch 3 --------| |-------------------------- Extra Chunks from Batch 2 -----------------------------------|
+            # C0(0-199), C1(200-399), C2(400-499), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
+            #
+            #
+            # Those "extra" chunks are no long valid, but will be returned by the query. By design, we include the expected number of chunks in the response
+            # and since the last insert batch is the valid one, we can truncate the response to the expected number of chunks to isolate the valid chunks.
+            #
+            #
+            # Now, practically, we have never changed the `FILE_CHUNK_SIZE` - nor should we!
+            # However, with bucket storage, we don't chunk at all - storing the data effectively as a single chunk.
+            # This effectively means that `FILE_CHUNK_SIZE` for these cases is the size of the file!. Therefore,
+            # in such cases where a file was written before bucket storage (using chunking) and then after, we will
+            # reach a situation that matches the general case above.
+            #
+            # To solve this, we truncate the response to the expected number of chunks to isolate the valid chunks.
+            result_rows = result_rows[:n_chunks]
 
         # There are 2 cases:
         # 1: file_storage_uri_str is not none (storing in file store)
