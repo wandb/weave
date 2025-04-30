@@ -201,6 +201,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     query?: Query,
+    limit?: number,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (

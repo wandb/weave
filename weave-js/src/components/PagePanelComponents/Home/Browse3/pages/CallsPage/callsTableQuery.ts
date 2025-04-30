@@ -92,9 +92,16 @@ export const useCallsForQuery = (
     }
   );
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
-    refetchOnDelete: true,
-  });
+  const callsStats = useCallsStats(
+    entity,
+    project,
+    lowLevelFilter,
+    filterBy,
+    undefined,
+    {
+      refetchOnDelete: true,
+    }
+  );
 
   const callResults = useMemo(() => {
     return getFeedbackMerged(calls.result ?? []);
@@ -406,12 +413,26 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
-    skip: skip || cachedFilter != null,
-  });
-  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
-    skip: skip || cachedFilter != null,
-  });
+  const callStats7Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d7filter,
+    undefined,
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
+  const callStats30Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d30filter,
+    undefined,
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
 
   const defaultDatetimeFilter = useMemo(
     () => ({
