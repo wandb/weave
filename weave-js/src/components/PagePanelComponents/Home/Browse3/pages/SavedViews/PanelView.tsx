@@ -57,7 +57,11 @@ export const PanelView = ({
       <div className="flex-auto">
         <div className="flex items-center gap-8">
           {resolvedName}
-          {!creatorUserId && <Pill label="default" color="moon" />}
+          {!creatorUserId && (
+            <div className="night-aware">
+              <Pill label="default" color="moon" />
+            </div>
+          )}
         </div>
         <div className="text-sm text-moon-500">
           {saveTime && <>Saved on {saveTime} </>}
