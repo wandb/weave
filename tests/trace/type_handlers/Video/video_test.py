@@ -1,12 +1,13 @@
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
 import weave
+import shutil
 from weave.trace.weave_client import WeaveClient
+from weave.type_handlers.Video.video import VideoFormat, write_video
 
 """When testing types, it is important to test:
 Objects:
@@ -20,61 +21,85 @@ Calls:
 """
 
 
-@pytest.fixture(
-    params=[
-        {"format": "gif"},
-        {"format": "mp4"},
-        # Skip webm due to compatibility issues with FFMPEG
-        {"format": "webm"},
-        {"format": "unsupported", "should_fail": True},
-    ]
-)
-def test_video(request) -> VideoClip:
-    """Create test videos in different formats.
-    For testing unsupported formats, we'll just use a ColorClip with a fake format.
-    """
-    # Create a solid color clip (1 second duration)
+@pytest.fixture
+def test_video() -> VideoClip:
     clip = ColorClip(size=(64, 64), color=(128, 0, 128), duration=1)
-
-    # Set fps for the clip (needed for writing)
     clip.fps = 24
+    return clip
 
-    if request.param.get("should_fail", False):
-        # For unsupported format test, just set a format attribute
-        # This will be caught by the video type handler
-        clip.format = request.param["format"]
+def test_save_mp4_clip(tmp_path: Path, test_video: VideoClip):
+    fp = str(tmp_path / "test.mp4")
+    write_video(fp, test_video)
+    # Check if the file was created
+    assert os.path.exists(fp)
+    # Check if the video was written
+    assert os.path.getsize(fp) > 0
+
+
+def test_save_webm_clip(tmp_path: Path, test_video: VideoClip):
+    fp = str(tmp_path / "test.webm")
+    write_video(fp, test_video)
+    # Check if the file was created
+    assert os.path.exists(fp)
+    # Check if the video was written
+    assert os.path.getsize(fp) > 0
+
+
+def test_save_gif_clip(tmp_path: Path, test_video: VideoClip):
+    fp = str(tmp_path / "test.gif")
+    write_video(fp, test_video)
+    # Check if the file was created
+    assert os.path.exists(fp)
+    # Check if the video was written
+    assert os.path.getsize(fp) > 0
+
+
+def test_save_no_ext_clip(tmp_path: Path, test_video: VideoClip):
+    fp = str(tmp_path / "test")
+    # Write video should throw exception if it recieves no format
+    with pytest.raises(ValueError):
+        write_video(fp, test_video)
+
+def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
+    fp = str(tmp_path / "test.invalid")
+    # Write video should throw exception if it recieves invalid format
+    with pytest.raises(ValueError):
+        write_video(fp, test_video)
+
+def test_video_with_no_ext_converted(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
+
+    @weave.op
+    def load_video_op(path: str):
+        clip = VideoFileClip(path)
         return clip
 
-    # Create a temp file with the correct extension
-    with tempfile.NamedTemporaryFile(
-        suffix=f".{request.param['format']}", delete=False
-    ) as tmp:
-        tmp_path = tmp.name
+    video_path = str(tmp_path / "test.mp4")
+    # Save an mp4 video
+    write_video(video_path, test_video)
+    # Copy to a new file with no extension
+    test_path = str(tmp_path / "test")
+    shutil.copyfile(video_path, test_path)
 
-    # Write the clip to the temp file
-    if request.param["format"] == "gif":
-        clip.write_gif(tmp_path)
-    elif request.param["format"] == "webm":
-        clip.write_videofile(
-            tmp_path, codec="libvpx", audio=False, verbose=False, logger=None
-        )
-    else:
-        clip.write_videofile(
-            tmp_path, codec="libx264", audio=False, verbose=False, logger=None
-        )
-
-    # Return a VideoFileClip of the temp file
-    return VideoFileClip(tmp_path)
+    load_video_op(test_path)
+    assert len(client.calls()) == 1
 
 
-@pytest.mark.disable_logging_error_check  # Add marker to disable error log checking for this test
+def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
+    # Create a temporary file path
+    fp = str(tmp_path / "test.mp4")
+    # Use the temporary file path in the weave op
+    @weave.op
+    def save_video_op(clip: VideoClip, path: str):
+        write_video(path, clip)
+        return path
+    # Call the weave op
+    result = save_video_op(test_video, fp)
+    # Check if the file was created
+    assert os.path.exists(result)
+    # Check if the video was written
+    assert os.path.getsize(result) > 0
+
 def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
-    if hasattr(test_video, "format") and test_video.format == "unsupported":
-        # Test that unsupported formats raise an error
-        with pytest.raises(ValueError, match="Unsupported video format"):
-            weave.publish(test_video)
-        return
-
     ref = weave.publish(test_video)
     assert ref is not None
 
@@ -95,17 +120,12 @@ def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
     # Since we can't easily compare video contents, we'll just check that it's a valid video
     assert gotten_video.duration == test_video.duration
 
-
 class VideoWrapper(weave.Object):
     video: VideoClip
 
 
 def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_property"
-
-    if hasattr(test_video, "format") and test_video.format == "unsupported":
-        # Skip this test for unsupported formats
-        pytest.skip("Skipping unsupported format test for property publishing")
 
     video_wrapper = VideoWrapper(video=test_video)
     assert video_wrapper.video == test_video
@@ -133,11 +153,7 @@ def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
 def test_video_as_dataset_cell(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_dataset_cell"
 
-    if hasattr(test_video, "format") and test_video.format == "unsupported":
-        # Skip this test for unsupported formats
-        pytest.skip("Skipping unsupported format test for dataset cells")
-
-    dataset = weave.Dataset(rows=[{"video": test_video}])
+    dataset = weave.Dataset(rows=weave.Table([{"video": test_video}]))
     assert dataset.rows[0]["video"] == test_video
 
     ref = weave.publish(dataset)
@@ -173,12 +189,6 @@ def video_as_input_and_output_part(in_video: VideoClip) -> dict:
 
 
 def test_video_as_call_io(client: WeaveClient, test_video: VideoClip) -> None:
-    client.project = "test_video_as_call_io"
-
-    if hasattr(test_video, "format") and test_video.format == "unsupported":
-        # Skip this test for unsupported formats
-        pytest.skip("Skipping unsupported format test for call IO")
-
     non_published_video = video_as_solo_output(publish_first=False, video=test_video)
     video_dict = video_as_input_and_output_part(non_published_video)
 
@@ -216,11 +226,6 @@ def test_video_as_call_io(client: WeaveClient, test_video: VideoClip) -> None:
 
 def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_call_io_refs"
-
-    if hasattr(test_video, "format") and test_video.format == "unsupported":
-        # Skip this test for unsupported formats
-        pytest.skip("Skipping unsupported format test for call IO refs")
-
     # Helper function to compare sizes
     def compare_sizes(size1, size2, context=""):
         if isinstance(size1, list) and isinstance(size2, tuple):
@@ -292,11 +297,6 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
     # Create a solid color clip
     clip = ColorClip(size=video_size, color=(128, 0, 128), duration=duration)
     clip.fps = 24
-
-    # Set default format to gif for ColorClip to avoid issues
-    if not hasattr(clip, "format"):
-        clip.format = "gif"
-
     return clip
 
 
@@ -304,7 +304,7 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
 def dataset_ref(client):
     # This fixture represents a saved dataset containing videos
     N_ROWS = 3
-    rows = [{"video": make_random_video()} for _ in range(N_ROWS)]
+    rows = weave.Table([{"video": make_random_video()} for _ in range(N_ROWS)])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -333,7 +333,7 @@ def test_videos_in_load_of_dataset(client):
     N_ROWS = 3
     # Create smaller duration videos to avoid encoding issues
     videos = [make_random_video(duration=0.1) for _ in range(N_ROWS)]
-    rows = [{"video": video} for video in videos]
+    rows = weave.Table([{"video": video} for video in videos])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -369,12 +369,11 @@ def test_videos_in_load_of_dataset(client):
 
 def test_video_format_from_filename():
     from weave.type_handlers.Video.video import get_format_from_filename
-
-    assert get_format_from_filename("test.mp4") == "mp4"
-    assert get_format_from_filename("test.webm") == "webm"
-    assert get_format_from_filename("test.gif") == "gif"
-    assert get_format_from_filename("test") is None
+    assert get_format_from_filename("test.mp4") == VideoFormat.MP4
+    assert get_format_from_filename("test.webm") == VideoFormat.WEBM
+    assert get_format_from_filename("test.gif") == VideoFormat.GIF
+    assert get_format_from_filename("test") == VideoFormat.UNSUPPORTED
     # Make sure it handles paths with just extensions
-    assert get_format_from_filename(".mp4") == "mp4"
+    assert get_format_from_filename(".mp4") == VideoFormat.MP4
     # Make sure it handles paths with multiple dots
-    assert get_format_from_filename("test.something.mp4") == "mp4"
+    assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
