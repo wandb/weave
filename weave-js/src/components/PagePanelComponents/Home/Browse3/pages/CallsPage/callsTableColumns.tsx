@@ -8,7 +8,6 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
@@ -95,9 +94,6 @@ export const useCallsTableColumns = (
     Record<string, number>
   >({});
 
-  const {userInfo} = useViewerInfo();
-  const currentUserId = userInfo && 'id' in userInfo ? userInfo.id : null;
-
   // Determine which columns have refs to expand. Followup: this might want
   // to be an ever-growing list. Instead, this is recalculated on each page.
   // This is used to determine which columns should be expandable / collapsible.
@@ -177,8 +173,7 @@ export const useCallsTableColumns = (
               storageSizeLoading,
             }
           : null,
-        storageHasError,
-        currentUserId
+        storageHasError
       ),
     [
       entity,
@@ -201,7 +196,6 @@ export const useCallsTableColumns = (
       storageSizeLoading,
       storageHasError,
       costsHasError,
-      currentUserId,
     ]
   );
 
@@ -268,8 +262,7 @@ function buildCallsTableColumns(
     storageSizeResults: Map<string, number> | null;
     storageSizeLoading: boolean;
   } | null = null,
-  storageHasError: boolean = false,
-  currentUserId: string | null = null
+  storageHasError: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -439,21 +432,7 @@ function buildCallsTableColumns(
             return <div>{parsed ? parsed.userDefinedType : c}</div>;
           },
           valueGetter: (unused: any, row: any) => {
-            const value = row[c];
-            if (value == null) {
-              return '';
-            }
-            
-            // Filter feedback for current user
-            if (Array.isArray(value)) {
-              const userFeedback = value.find(f => f.creator === currentUserId);
-              return userFeedback?.payload?.value ?? null;
-            } else if (typeof value === 'object' && value.creator === currentUserId) {
-              return value.payload?.value ?? null;
-            }
-            
-            // If it's a direct value (not feedback object/array), return as is
-            return value;
+            return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
             return <CellValue value={params.value} />;
