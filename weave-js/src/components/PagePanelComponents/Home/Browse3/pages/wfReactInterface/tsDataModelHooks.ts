@@ -569,6 +569,26 @@ const useCallsStats = (
   }, [callStatsRes, opts?.skip, refetch]);
 };
 
+/*
+  Helper that calls the call stats hook with limit: 1, returning a boolean
+  if there are any calls in the project. This uses a highly optimized
+  query in the backend. 
+*/
+const useProjectHasCalls = (
+  entity: string,
+  project: string,
+  opts?: {skip?: boolean}
+): Loadable<boolean> => {
+  const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  return useMemo(() => {
+    return {
+      loading: callsStats.loading,
+      result: callsStats.result != null,
+      error: callsStats.error,
+    };
+  }, [callsStats]);
+};
+
 const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -2109,6 +2129,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useCallsStats,
+  useProjectHasCalls,
   useCallsDeleteFunc,
   useCallUpdateFunc,
   useCallsExport,
