@@ -1,7 +1,9 @@
 """Audio file handling adapter that selects available backends."""
 import importlib.util
-from typing import Any, Tuple
+from typing import Any, Tuple, Union
 import warnings
+import io
+from pathlib import Path
 
 
 class AudioBackendError(Exception):
@@ -49,12 +51,20 @@ class AudioBackendAdapter:
     def _init_soundfile(self) -> None:
         """Initialize soundfile backend."""
         import soundfile as sf
+        
+        def _sf_write(file_path, data, samplerate, **kwargs):
+            """Handle different file_path types for soundfile."""
+            if isinstance(file_path, (str, Path)):
+                return sf.write(file_path, data, samplerate, **kwargs)
+            elif isinstance(file_path, io.BytesIO):
+                return sf.write(file_path, data, samplerate, **kwargs)
+            else:
+                raise TypeError(f"Unsupported file_path type: {type(file_path)}")
+        
         self._backend = {
             "module": sf,
             "read": lambda file_path, **kwargs: sf.read(file_path),
-            "write": lambda file_path, data, samplerate, **kwargs: sf.write(
-                file_path, data, samplerate, **kwargs
-            ),
+            "write": _sf_write,
             "info": lambda file_path: sf.info(file_path)
         }
 
@@ -79,8 +89,17 @@ class AudioBackendAdapter:
 
         def _pydub_write(file_path, data, samplerate, **kwargs):
             import os
-            format = os.path.splitext(file_path)[1][1:]  # Get format from extension
-
+            
+            # Get format from kwargs or try to determine from file_path
+            format = kwargs.get('format')
+            
+            if format is None and isinstance(file_path, str):
+                format = os.path.splitext(file_path)[1][1:]  # Get format from extension
+            elif format is None and isinstance(file_path, Path):
+                format = file_path.suffix[1:]  # Get format from extension
+            elif format is None:
+                format = 'wav'  # Default format for BytesIO
+            
             # Convert float to int16
             if data.dtype == np.float32 or data.dtype == np.float64:
                 data = (data * (1 << 15)).astype(np.int16)
@@ -105,7 +124,13 @@ class AudioBackendAdapter:
                     channels=1
                 )
 
-            segment.export(file_path, format=format)
+            # Handle different file_path types
+            if isinstance(file_path, (str, Path)):
+                segment.export(file_path, format=format)
+            elif isinstance(file_path, io.BytesIO):
+                segment.export(file_path, format=format)
+            else:
+                raise TypeError(f"Unsupported file_path type: {type(file_path)}")
 
         def _pydub_info(file_path):
             audio = AudioSegment.from_file(file_path)
@@ -146,8 +171,16 @@ class AudioBackendAdapter:
             raise AudioBackendError("No audio backend available.")
         return self._backend["read"](file_path, **kwargs)
 
-    def write(self, file_path: str, data: Any, samplerate: int, **kwargs) -> None:
-        """Write audio data to a file."""
+    def write(self, file_path: Union[str, io.BytesIO, Path], data: Any, samplerate: int, **kwargs) -> None:
+        """
+        Write audio data to a file or buffer.
+        
+        Args:
+            file_path: Path to output file or BytesIO buffer
+            data: Audio data to write
+            samplerate: Sample rate of the audio data
+            **kwargs: Additional arguments to pass to the backend
+        """
         if self._backend is None:
             raise AudioBackendError("No audio backend available.")
         return self._backend["write"](file_path, data, samplerate, **kwargs)
