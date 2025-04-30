@@ -116,8 +116,7 @@ def is_audio_instance(obj: Any) -> bool:
 
 
 def register() -> None:
-    # Register the serializers for the audio types
-    # Target class is irrelevant, we just need to register the serializer with the instance check
+    # Register the serializers for the various audio types
     serializer.register_serializer(AudioFile, save, load)
     serializer.register_serializer(wave.Wave_read, save, load)
     if has_pydub:
