@@ -49,7 +49,7 @@ export type ColumnInfo = {
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
   'summary.weave.status': 'Status',
-  'summary.weave.trace_name': 'Trace name',
+  'summary.weave.trace_name': 'Name',
   started_at: 'Called',
   wb_user_id: 'User',
 };
