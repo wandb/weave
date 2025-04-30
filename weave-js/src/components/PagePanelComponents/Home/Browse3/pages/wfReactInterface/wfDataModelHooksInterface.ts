@@ -172,7 +172,11 @@ export type Refetchable = {
 export type WFDataModelHooksInterface = {
   useCall: (
     key: CallKey | null,
-    opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
+    opts?: {
+      includeCosts?: boolean;
+      refetchOnRename?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
