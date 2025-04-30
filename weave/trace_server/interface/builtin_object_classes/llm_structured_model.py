@@ -27,10 +27,10 @@ class Message(BaseModel):
     """
 
     role: str
-    content: str | list[dict] | None
-    name: str | None
-    function_call: dict | None
-    tool_call_id: str | None
+    content: Optional[Union[str, list[dict]]]
+    name: Optional[str]
+    function_call: Optional[dict]
+    tool_call_id: Optional[str]
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
