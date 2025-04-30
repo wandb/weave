@@ -4087,4 +4087,4 @@ def test_calls_query_stats_with_limit(client):
     assert calls_stats(filter={"trace_id": trace_id}).count == 2
 
     with pytest.raises(ValueError):
-        calls_stats(limit=-1)
+        calls_stats(limit=0)

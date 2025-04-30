@@ -459,7 +459,7 @@ class CallsQuery(BaseModel):
         return self
 
     def set_limit(self, limit: int) -> "CallsQuery":
-        if limit < 0:
+        if limit < 1:
             raise ValueError("Limit must be a positive integer")
         if self.limit is not None:
             raise ValueError("Limit can only be set once")
