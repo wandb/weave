@@ -347,7 +347,13 @@ const getFeedbackMerged = (
     let feedbackToProcess = c.traceCall?.summary?.weave?.feedback;
     // Ensure feedbackToProcess is an array (for filterings)
     if (!Array.isArray(feedbackToProcess)) {
-      feedbackToProcess = Object.values(feedbackToProcess);
+      // If feedback is an object, convert it to an array of values
+      if (typeof feedbackToProcess === 'object' && feedbackToProcess !== null) {
+        feedbackToProcess = Object.values(feedbackToProcess);
+      } else {
+        // If feedback is not an array or object, return the call as is
+        return c;
+      }
     }
     
     if (currentUserId) {
