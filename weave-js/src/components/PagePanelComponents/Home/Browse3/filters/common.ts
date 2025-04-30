@@ -120,7 +120,6 @@ const stringOperators: SelectOperatorOption[] = [
     group: 'string',
   },
 ];
-
 const numberOperators: SelectOperatorOption[] = [
   {
     value: '(number): =',
@@ -153,7 +152,6 @@ const numberOperators: SelectOperatorOption[] = [
     group: 'number',
   },
 ];
-
 const booleanOperators: SelectOperatorOption[] = [
   {
     value: '(bool): is',
@@ -161,7 +159,6 @@ const booleanOperators: SelectOperatorOption[] = [
     group: 'boolean',
   },
 ];
-
 const dateOperators: SelectOperatorOption[] = [
   {
     value: '(date): after',
@@ -174,7 +171,6 @@ const dateOperators: SelectOperatorOption[] = [
     group: 'date',
   },
 ];
-
 const anyOperators: SelectOperatorOption[] = [
   {
     value: '(any): isEmpty',
@@ -187,7 +183,6 @@ const anyOperators: SelectOperatorOption[] = [
     group: 'any',
   },
 ];
-
 const allOperators: SelectOperatorOption[] = [
   ...stringOperators,
   ...numberOperators,
