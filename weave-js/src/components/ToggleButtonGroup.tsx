@@ -22,6 +22,7 @@ export type ToggleButtonGroupProps = {
   isDisabled?: boolean;
   onValueChange: (value: string) => void;
   className?: string;
+  hideWhenDetached?: boolean; // whether to hide the tooltip when the button is detached from the DOM
 };
 
 /**
@@ -32,7 +33,15 @@ export const ToggleButtonGroup = React.forwardRef<
   ToggleButtonGroupProps
 >(
   (
-    {options, value, size, isDisabled = false, onValueChange, className},
+    {
+      options,
+      value,
+      size,
+      isDisabled = false,
+      onValueChange,
+      className,
+      hideWhenDetached = false,
+    },
     ref
   ) => {
     if (options.length < 2) {
@@ -105,7 +114,11 @@ export const ToggleButtonGroup = React.forwardRef<
                     disabled={isDisabled}
                     asChild>
                     {tooltip ? (
-                      <Tooltip content={tooltip} trigger={button} />
+                      <Tooltip
+                        content={tooltip}
+                        trigger={button}
+                        hideWhenDetached={hideWhenDetached}
+                      />
                     ) : (
                       button
                     )}

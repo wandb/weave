@@ -260,7 +260,7 @@ However, often LLM applications have additional logic (such as pre/post processi
         return f"Hello, {name}!"
     ```
 
-    4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
+    4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, fields, etc.
 
     1. One common use case is just appending a timestamp to the function's name.
 
@@ -272,7 +272,7 @@ However, often LLM applications have additional logic (such as pre/post processi
             return ...
         ```
 
-    2. You can also get creative with custom attributes
+    2. You can also log custom metadata using `.attributes`
 
         ```py
         def custom_attribute_name(call):
@@ -335,12 +335,12 @@ However, often LLM applications have additional logic (such as pre/post processi
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
-    When calling tracked functions, you can add additional metadata to the call by using the [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
+    When calling tracked functions, you can add additional metadata to the call by using [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
 
     ```python showLineNumbers
     # ... continued from above ...
 
-    # Add additional "attributes" to the call
+    # Add additional attributes to the call
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
     ```
@@ -424,7 +424,7 @@ You can also manually create Calls using the API directly.
     2. Find the call you want to view in the list
     3. Click on the call to open its details page
     
-    The details page will show the call's inputs, outputs, runtime, and any additional attributes or metadata.
+    The details page will show the call's inputs, outputs, runtime, and any additional metadata.
     
     ![View Call in Web App](../../../static/img/screenshots/basic_call.png)
     </TabItem>
@@ -760,6 +760,10 @@ Calculated Fields:
     * Cost
     * Duration
     * Status
+
+## Saved views 
+
+You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
 
 ## Configure autopatching
 

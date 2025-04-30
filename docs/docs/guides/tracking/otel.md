@@ -174,7 +174,7 @@ python openllmetry_example.py
 
 ### Without Instrumentation
 
-If you would prefer to use OTEL directly instead of an instrumentation package, you may do so. Attributes will be parsed according to the OpenTelemetry semantic conventions described at [https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
+If you would prefer to use OTEL directly instead of an instrumentation package, you may do so. Span attributes will be parsed according to the OpenTelemetry semantic conventions described at [https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
 
 First, install the required dependencies:
 
@@ -259,4 +259,4 @@ Finally, once you have set the fields specified above to their correct values, r
 python opentelemetry_example.py
 ```
 
-The attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all attributes are visible in the trace view. The full span is available in the side panel when you select a trace.
+The span attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all span attributes are visible in the trace view. The full span is available in the side panel when you select a trace.

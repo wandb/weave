@@ -26,6 +26,7 @@ import {
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
   Icon,
   IconNotVisible,
@@ -388,13 +389,23 @@ export const CallsTable: FC<{
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
 
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
+
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
           const existingFullMatchIndex = filterModel.items.findIndex(
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === JSON.stringify(value)
+              item.value === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
@@ -415,7 +426,7 @@ export const CallsTable: FC<{
             const newItems = [...filterModel.items];
             newItems[existingFieldOpMatchIndex] = {
               ...newItems[existingFieldOpMatchIndex],
-              value,
+              value: strVal,
             };
             setFilterModel({
               ...filterModel,
@@ -433,7 +444,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value,
+                value: strVal,
               },
             ],
           };
@@ -454,9 +465,11 @@ export const CallsTable: FC<{
     allowedColumnPatterns,
     onAddFilter,
     calls.costsLoading,
+    !!calls.costsError,
     shouldIncludeTotalStorageSize,
     shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
-    shouldIncludeTotalStorageSize && calls.storageSizeLoading
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading,
+    !!calls.storageSizeError
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -690,6 +703,19 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData]);
 
+  // MUI data grid is unhappy if you pass it a sort model
+  // that references columns that aren't in the grid - it triggers an
+  // infinite loop.
+  const sortModelFiltered = useMemo(() => {
+    // Get all valid column fields from muiColumns
+    const validColumnFields = new Set(muiColumns.map(col => col.field));
+
+    // Filter out any sort items that reference columns not in muiColumns
+    return sortModelResolved.filter(sortItem =>
+      validColumnFields.has(sortItem.field)
+    );
+  }, [muiColumns, sortModelResolved]);
+
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -770,6 +796,41 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const noRowsOverlay = useCallback(() => {
+    if (calls.primaryError) {
+      return (
+        <ErrorPanel
+          title="Oh no! Unable to load traces..."
+          error={calls.primaryError}
+        />
+      );
+    }
+    return (
+      <CallsTableNoRowsOverlay
+        entity={entity}
+        project={project}
+        callsLoading={callsLoading}
+        callsResult={callsResult}
+        isEvaluateTable={isEvaluateTable}
+        effectiveFilter={effectiveFilter}
+        filterModelResolved={filterModelResolved}
+        clearFilters={clearFilters}
+        setFilterModel={setFilterModel}
+      />
+    );
+  }, [
+    calls.primaryError,
+    callsLoading,
+    callsResult,
+    clearFilters,
+    effectiveFilter,
+    filterModelResolved,
+    isEvaluateTable,
+    setFilterModel,
+    entity,
+    project,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -867,13 +928,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCallIds={selectedCalls}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton
@@ -1002,12 +1065,12 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={sortModelFiltered}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
         pagination
-        rowCount={callsTotal}
+        rowCount={calls.primaryError ? 0 : callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
@@ -1041,19 +1104,7 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => (
-            <CallsTableNoRowsOverlay
-              entity={entity}
-              project={project}
-              callsLoading={callsLoading}
-              callsResult={callsResult}
-              isEvaluateTable={isEvaluateTable}
-              effectiveFilter={effectiveFilter}
-              filterModelResolved={filterModelResolved}
-              clearFilters={clearFilters}
-              setFilterModel={setFilterModel}
-            />
-          ),
+          noRowsOverlay,
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
@@ -1064,6 +1115,7 @@ export const CallsTable: FC<{
           ),
           columnMenuPinRightIcon: IconPinToRight,
         }}
+        className="tw-style"
       />
     </FilterLayoutTemplate>
   );
