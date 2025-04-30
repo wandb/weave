@@ -7,7 +7,7 @@ import {fuzzyMatchRegex} from '@wandb/weave/common/util/fuzzyMatch';
 import {CompareOp} from '@wandb/weave/common/util/ops';
 import classNames from 'classnames';
 import * as _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Button, ButtonGroup} from 'semantic-ui-react';
 
 import {ControlsBox} from './ControlBox';
@@ -23,10 +23,7 @@ import {
   LabelToggle,
   SearchInput,
 } from './ControlsUtil';
-import {
-  DEFAULT_ALL_MASK_CONTROL,
-  DEFAULT_TILE_LAYOUT,
-} from './ImageWithOverlays';
+import {DEFAULT_TILE_LAYOUT} from './ImageWithOverlays';
 
 type BoxSliderControlsProps = {
   boxes: {[boxGroup: string]: BoundingBox2D[]};
@@ -252,6 +249,26 @@ export const ControlsImageOverlays: React.FC<
     tileLayout = DEFAULT_TILE_LAYOUT,
   } = controls ?? {};
 
+  const [allClassToggleByControlID, setAllClassToggleByControlID] = useState<{
+    [controlID: string]: boolean;
+  }>({});
+
+  const haveAllClassTogglesBeenInitialized = React.useRef(false);
+  useEffect(() => {
+    if (!haveAllClassTogglesBeenInitialized.current && overlayControls) {
+      const initialState = Object.keys(overlayControls).reduce(
+        (acc, controlId) => {
+          acc[controlId] = false;
+          return acc;
+        },
+        {} as {[controlID: string]: boolean}
+      );
+
+      setAllClassToggleByControlID(initialState);
+      haveAllClassTogglesBeenInitialized.current = true;
+    }
+  }, [overlayControls]);
+
   const setControls = (controlId: string, newControl: Controls.OverlayState) =>
     updateControls({
       ...controls,
@@ -307,24 +324,9 @@ export const ControlsImageOverlays: React.FC<
           return null;
         }
 
-        const allClass =
-          control.classOverlayStates?.all ?? DEFAULT_ALL_MASK_CONTROL;
-
         const updateControl: Controls.UpdateControl = newControl => {
           const mergedControl = {...control, ...newControl};
           setControls(controlId, mergedControl);
-        };
-
-        const toggleControlVisibility = () => {
-          updateControl({
-            classOverlayStates: {
-              ...control.classOverlayStates,
-              all: {
-                ...allClass,
-                disabled: !allClass.disabled,
-              },
-            },
-          });
         };
 
         const setClassSearch = (newClassSearch: string) => {
@@ -357,8 +359,16 @@ export const ControlsImageOverlays: React.FC<
               <S.VisibilityToggleWrapper>
                 <ClassToggle
                   name="all"
-                  disabled={allClass.disabled}
-                  onClick={toggleControlVisibility}
+                  disabled={allClassToggleByControlID[controlId]}
+                  onClick={() => {
+                    const updatedAreAllClassesDisabled =
+                      !allClassToggleByControlID[controlId];
+                    setAllClasses(updatedAreAllClassesDisabled);
+                    setAllClassToggleByControlID(prev => ({
+                      ...prev,
+                      [controlId]: updatedAreAllClassesDisabled,
+                    }));
+                  }}
                 />
               </S.VisibilityToggleWrapper>
               <S.TitleWrapper>
