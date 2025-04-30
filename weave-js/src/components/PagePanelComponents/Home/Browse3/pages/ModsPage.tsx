@@ -150,6 +150,9 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
             // This is important to prevent a mod from redirecting the iframe
             // to a malicious site.
             const getBaseDomain = (domain?: string) => {
+              // oddly in Chrome we don't need this but in Safari the events
+              // origin is api.qa.wandb.ai... TODO: there must be a better way
+              domain = domain?.replace(/\.ai$/, '.tools')
               const parts = (domain || '').split('.');
               return parts.length > 2 ? parts.slice(1).join('.') : domain;
             };
@@ -161,7 +164,7 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
             if (modBaseDomain === originBaseDomain) {
               iframe.src = `https://${event.data.modDomain}`;
             } else {
-              console.error('invalid auth event');
+              console.error('invalid auth event', originBaseDomain, '!=', modBaseDomain);
             }
             break;
           case 'MOD_AUTH_ERROR':
