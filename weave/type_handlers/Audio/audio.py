@@ -46,18 +46,23 @@ def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -
     obj.setpos(original_frame_position)
 
 def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
+    # Represents a wrapped audio file path which should be copied directly
     if isinstance(obj, AudioFile):
+        # If file does not exist we can't copy it directly
         exists = os.path.exists(obj.path)
         if not exists:
             raise ValueError(f"Audio file does not exist: {obj.path}")
-        ext = obj.extension
+
+        ext = obj.file_ext
         # If it's not supported we can't copy it directly
         if ext not in SUPPORTED_FORMATS:
             raise ValueError(f"Unsupported audio format: {ext} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}")
+
+        # Copy the file to the artifact
         fname = f"audio.{ext}"
         with artifact.writeable_file_path(fname) as fp:
-            # Copy the file to the artifact
             obj.export(fp)
+
     elif isinstance(obj, "pydub.AudioSegment"):
         obj.export(artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"), format=DEFAULT_VIDEO_FORMAT)
     else:

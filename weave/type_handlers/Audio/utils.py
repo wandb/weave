@@ -1,6 +1,6 @@
 import wave
 
-from typing import Any, Protocol, TypeVar, Union
+from typing import Any, Optional, Protocol, TypeVar, Union
 from enum import Enum
 import shutil
 from weave.trace.serialization import serializer
@@ -54,16 +54,19 @@ def get_format_from_filename(filename: str) -> AudioFormat:
     # Get the extension without the dot
     return AudioFormat(filename[last_dot + 1 :])
 
-class AudioFile(PathLike):
+class AudioFile:
     path: str
-    extension: AudioFormat
+    file_ext: AudioFormat
 
-    def __init__(self, path: str):
-        self.extension = get_format_from_filename(path)
-        if self.extension == AudioFormat.UNSUPPORTED:
+    def __init__(self, path: str, file_ext: Optional[str]) -> None:
+        file_ext = AudioFormat(file_ext.lower()) if file_ext else get_format_from_filename(path)
+
+        if file_ext == AudioFormat.UNSUPPORTED:
             raise ValueError(f"Unsupported or missing file format: {path} - Supported Extensions: {' '.join(SUPPORTED_FORMATS)}")
         self.path = path
+        self.file_ext = file_ext
 
     def export(self, fp: str) -> None:
         shutil.copyfile(self.path, fp)
 
+file = AudioFile('test', 'mp3')
