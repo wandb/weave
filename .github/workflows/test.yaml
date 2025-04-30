@@ -195,7 +195,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox "uv<0.7.0"  # pin to unblock CI
       - name: Run nox
         run: nox -e lint
 
@@ -217,7 +217,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 18
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -233,6 +233,7 @@ jobs:
         nox-shard:
           [
             "trace",
+            "flow",
             "trace_server",
             "anthropic",
             "bedrock",
@@ -304,20 +305,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Run nox (Clickhouse Only)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client and not skip_clickhouse_client" \
-            --weave-server=clickhouse
-      - name: Run nox
+          pip install nox "uv<0.7.0"  # pin to unblock CI
+      - name: Run nox (Sqlite Only)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -333,6 +322,18 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+      - name: Run nox (Clickhouse Only)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "weave_client and not skip_clickhouse_client" \
+            --weave-server=clickhouse
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

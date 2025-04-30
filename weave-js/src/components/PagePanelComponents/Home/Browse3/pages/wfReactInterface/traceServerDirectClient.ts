@@ -13,6 +13,7 @@
  */
 
 import {getCookie} from '@wandb/weave/common/util/cookie';
+import {HTTPError} from '@wandb/weave/errors';
 import fetch from 'isomorphic-unfetch';
 
 import {
@@ -54,8 +55,8 @@ import {
   TraceRefsReadBatchRes,
   TraceTableQueryReq,
   TraceTableQueryRes,
-  TraceTableQueryStatsReq,
-  TraceTableQueryStatsRes,
+  TraceTableQueryStatsBatchReq,
+  TraceTableQueryStatsBatchRes,
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
@@ -287,13 +288,13 @@ export class DirectTraceServerClient {
     );
   }
 
-  public tableQueryStats(
-    req: TraceTableQueryStatsReq
-  ): Promise<TraceTableQueryStatsRes> {
-    return this.makeRequest<TraceTableQueryStatsReq, TraceTableQueryStatsRes>(
-      '/table/query_stats',
-      req
-    );
+  public tableQueryStatsBatch(
+    req: TraceTableQueryStatsBatchReq
+  ): Promise<TraceTableQueryStatsBatchRes> {
+    return this.makeRequest<
+      TraceTableQueryStatsBatchReq,
+      TraceTableQueryStatsBatchRes
+    >('/table/query_stats_batch', req);
   }
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
@@ -404,7 +405,14 @@ export class DirectTraceServerClient {
       headers,
       body: reqBody,
     })
-      .then(response => {
+      .then(async response => {
+        if (!response.ok) {
+          throw new HTTPError(
+            response.statusText,
+            response.status,
+            await response.text()
+          );
+        }
         if (responseReturnType === 'text') {
           return response.text();
         } else if (responseReturnType === 'arrayBuffer') {

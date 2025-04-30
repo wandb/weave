@@ -17,3 +17,11 @@ export const TabUseBanner = ({children}: TabUseBannerProps) => {
     </Alert>
   );
 };
+
+export const TabUseBannerError = ({children}: TabUseBannerProps) => {
+  return (
+    <Alert severity="error" style={STYLE_BANNER}>
+      {children}
+    </Alert>
+  );
+};

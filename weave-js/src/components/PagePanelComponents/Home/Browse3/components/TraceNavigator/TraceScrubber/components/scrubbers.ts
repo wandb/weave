@@ -75,7 +75,7 @@ export const SiblingScrubber = createScrubber({
         .map(node => node.id);
     }
 
-    return traceTreeFlat[parentId].childrenIds;
+    return traceTreeFlat[parentId]?.childrenIds ?? [];
   },
 });
 

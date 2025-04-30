@@ -204,6 +204,9 @@ defaultConfigurationOverrides: |
       <asynchronous_metrics>true</asynchronous_metrics>
     </prometheus>
     {{- end }}
+    <listen_host>0.0.0.0</listen_host>
+    <listen_host>::</listen_host>
+    <listen_try>1</listen_try>
     <storage_configuration>
       <disks>
         <s3_disk>

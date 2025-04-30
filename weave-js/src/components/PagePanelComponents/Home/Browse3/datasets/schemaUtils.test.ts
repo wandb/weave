@@ -176,6 +176,7 @@ describe('createSourceSchema', () => {
     ];
 
     expect(createSourceSchema(calls)).toEqual([
+      {name: 'trace', type: 'string'},
       {name: 'inputs.prompt', type: 'string'},
       {name: 'inputs.options', type: 'object'},
       {name: 'output', type: 'string'},
@@ -201,6 +202,7 @@ describe('createSourceSchema', () => {
     ];
 
     expect(createSourceSchema(calls)).toEqual([
+      {name: 'trace', type: 'string'},
       {name: 'inputs.prompt', type: 'string'},
       {name: 'output.text', type: 'string'},
       {name: 'output.metadata', type: 'object'},
@@ -233,6 +235,7 @@ describe('createSourceSchema', () => {
     ];
 
     expect(createSourceSchema(calls)).toEqual([
+      {name: 'trace', type: 'string'},
       {name: 'inputs.prompt', type: 'string'},
       {name: 'output', type: 'string'},
     ]);

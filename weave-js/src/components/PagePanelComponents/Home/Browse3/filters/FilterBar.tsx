@@ -322,7 +322,7 @@ export const FilterBar = ({
         ref={refBar}
         className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
           hasBorder
-            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:hover:border-2 dark:hover:border-teal-400'
+            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:outline dark:outline-[1.5px] dark:outline-transparent dark:hover:border-teal-400 dark:hover:outline-teal-400'
             : ''
         } ${
           !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
