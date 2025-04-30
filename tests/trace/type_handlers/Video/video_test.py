@@ -1,7 +1,7 @@
 import os
 import shutil
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
@@ -73,7 +73,6 @@ def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
 def test_video_with_no_ext_converted(
     client: WeaveClient, tmp_path: Path, test_video: VideoClip
 ):
-
     video_path = str(tmp_path / "test.mp4")
     # Save an mp4 video
     write_video(video_path, test_video)
@@ -393,7 +392,9 @@ def test_video_format_from_filename():
     assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
 
 
-def test_multiple_video_formats(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
+def test_multiple_video_formats(
+    client: WeaveClient, tmp_path: Path, test_video: VideoClip
+):
     """Test that we can publish videos of different formats in the same session."""
     sample_mp4_path = str(tmp_path / "test.mp4")
     sample_gif_path = str(tmp_path / "test.gif")
