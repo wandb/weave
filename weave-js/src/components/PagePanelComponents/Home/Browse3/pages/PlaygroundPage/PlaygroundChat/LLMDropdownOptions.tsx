@@ -23,7 +23,7 @@ import {ProviderStatus} from '../useConfiguredProviders';
 
 export interface LLMOption {
   label: string;
-  value: LLMMaxTokensKey | string;
+  value: LLMMaxTokensKey;
   max_tokens: number;
   provider?: string;
 }
@@ -82,7 +82,7 @@ const SubMenu = ({
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
-            onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
+            onChange(llm.value, llm.max_tokens);
             onSelect();
           }}
           sx={{
@@ -433,9 +433,8 @@ export const getLLMDropdownOptions = (
     });
   }
 
-  // Combine enabled and disabled options
+  // Combine options
   // Add a divider option before the add provider option
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
     dividerOption,
