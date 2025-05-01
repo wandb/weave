@@ -658,21 +658,33 @@ def test_trace_call_query_filter_trace_roots_only(client):
 
 
 def test_trace_call_query_filter_wb_run_ids(client):
-    run_name = "test-run-name"
-    full_wb_run_id = f"{client.entity}/{client.project}/{run_name}"
+    full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
+    full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
 
     with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id
+        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_1
     ):
         call_spec_1 = simple_line_call_bootstrap()
-    call_spec_2 = simple_line_call_bootstrap()
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_2
+    ):
+        call_spec_2 = simple_line_call_bootstrap()
+    call_spec_3 = simple_line_call_bootstrap()
+
+    total_calls = (
+        call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
+    )
 
     for wb_run_ids, exp_count in [
-        (None, call_spec_1.total_calls + call_spec_2.total_calls),
-        ([], call_spec_1.total_calls + call_spec_2.total_calls),
-        ([full_wb_run_id], call_spec_1.total_calls),
-        ([f"{client.entity}/{client.project}/NOT_A_CALL"], 0),
+        (None, total_calls),
+        ([], total_calls),
+        ([full_wb_run_id_1], call_spec_1.total_calls),
+        (
+            [full_wb_run_id_1, full_wb_run_id_2],
+            call_spec_1.total_calls + call_spec_2.total_calls,
+        ),
+        ([f"{client.entity}/{client.project}/NOT_A_RUN"], 0),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
@@ -689,13 +701,26 @@ def test_trace_call_query_filter_wb_user_ids(client):
 
     # OMG! How ugly is this?! The layers of testing servers is nasty
     client.server.server._next_trace_server._user_id = "second_user"
-
     call_spec_2 = simple_line_call_bootstrap()
 
+    # OMG! How ugly is this?! The layers of testing servers is nasty
+    client.server.server._next_trace_server._user_id = "third_user"
+    call_spec_3 = simple_line_call_bootstrap()
+
     for wb_user_ids, exp_count in [
-        (None, call_spec_1.total_calls + call_spec_2.total_calls),
-        ([], call_spec_1.total_calls + call_spec_2.total_calls),
+        (
+            None,
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (
+            [],
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
         (["second_user"], call_spec_2.total_calls),
+        (
+            ["second_user", "third_user"],
+            call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
         (["NOT_A_USER"], 0),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
