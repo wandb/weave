@@ -130,7 +130,7 @@ export const EditableCallName: React.FC<{
           placeholder={defaultDisplayName}
           autoGrow={true}
           rows={1}
-          className="w-full overflow-hidden text-ellipsis whitespace-nowrap px-[8px] py-[4px]"
+          className="w-full px-[8px] py-[4px]"
         />
       </div>
     </Tailwind>
