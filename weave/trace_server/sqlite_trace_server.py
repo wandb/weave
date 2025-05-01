@@ -516,7 +516,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
-                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
                                 ELSE 0
                             END
                         """
@@ -1581,6 +1581,16 @@ def _transform_external_calls_field_to_internal_calls_field(
         else:
             json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
+    elif field == "summary.weave.latency_ms":
+        # Special handling for latency to match sorting behavior
+        field = """
+            CASE
+                WHEN ended_at IS NOT NULL THEN
+                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
+                ELSE 0
+            END
+        """
+        json_path = None
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
