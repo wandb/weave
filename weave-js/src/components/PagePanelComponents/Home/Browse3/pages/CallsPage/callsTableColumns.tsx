@@ -316,7 +316,11 @@ function buildCallsTableColumns(
             field="summary.weave.trace_name"
             rowId={rowParams.id.toString()}
             operation={'(string): equals'}
-            value={name}>
+            value={name}
+            style={{
+              display: 'flex',
+              width: '100%',
+            }}>
             <CallLinkCell
               rowParams={rowParams}
               entity={entity}
