@@ -206,16 +206,18 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
               {node.opName}
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-moon-500">
-            <span>{stats.finishedCallCount} finished</span>
-            {stats.unfinishedCallCount > 0 && (
-              <span>• {stats.unfinishedCallCount} running</span>
-            )}
-            {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
-            {stats.finishedCallCount > 0 && (
-              <span>• {formatDuration(avgDuration)} avg</span>
-            )}
-            <div className="ml-auto whitespace-nowrap text-[11px] text-moon-500">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-moon-500">
+            <div className="flex min-w-[110px] flex-1 flex-wrap items-center gap-2">
+              <span>{stats.finishedCallCount} finished</span>
+              {stats.unfinishedCallCount > 0 && (
+                <span>• {stats.unfinishedCallCount} running</span>
+              )}
+              {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
+              {stats.finishedCallCount > 0 && (
+                <span>• {formatDuration(avgDuration)} avg</span>
+              )}
+            </div>
+            <div className="whitespace-nowrap">
               {stats.finishedCallCount > 0
                 ? stats.minDuration === stats.maxDuration
                   ? formatDuration(stats.minDuration)
