@@ -1,4 +1,4 @@
-import {Box, CircularProgress, Divider} from '@mui/material';
+import {Box, CircularProgress} from '@mui/material';
 import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
@@ -176,6 +176,11 @@ export const PlaygroundChat = ({
             maxHeight: 'calc(100% - 130px)',
             display: 'flex',
             position: 'relative',
+            maxWidth: '800px',
+            minWidth: '520px',
+            margin: '8px',
+            border: `1px solid ${MOON_200}`,
+            borderRadius: '4px',
           }}>
           <Box
             sx={{
@@ -188,14 +193,10 @@ export const PlaygroundChat = ({
             <Box
               sx={{
                 backgroundColor: 'white',
-                borderBottom: `1px solid ${MOON_200}`,
-                position: 'absolute',
-                top: '0',
                 width: '100%',
-                paddingTop: '8px',
-                paddingBottom: '8px',
-                paddingLeft: '16px',
-                paddingRight: '16px',
+                top: 0,
+                position: 'absolute',
+                padding: '8px 16px',
                 zIndex: 10,
               }}>
               <PlaygroundChatTopBar
@@ -262,153 +263,147 @@ export const PlaygroundChat = ({
       }}>
       <Box
         sx={{
-          width: '100%',
-          height: '100%',
-          maxHeight: 'calc(100% - 130px)',
           display: 'flex',
-          position: 'relative',
+          width: '100%',
+          marginX: 'auto',
+          overflowX: 'scroll',
+          overflowY: 'hidden',
+          height: '100%',
         }}>
-        {playgroundStates.map((state, idx) => (
-          <React.Fragment key={idx}>
-            {idx > 0 && (
-              <Divider
-                orientation="vertical"
-                flexItem
+        <Box sx={{display: 'flex', marginX: 'auto'}}>
+          {playgroundStates.map((state, idx) => (
+            <React.Fragment key={idx}>
+              <Box
                 sx={{
-                  height: '100%',
-                  borderRight: `1px solid ${MOON_200}`,
-                }}
-              />
-            )}
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-              }}>
-              {state.loading && (
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  maxWidth: '800px',
+                  minWidth: '520px',
+                  margin: '8px',
+                  border: `1px solid ${MOON_200}`,
+                  borderRadius: '4px',
+                }}>
+                {state.loading && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: hexToRGB(WHITE, 0.7),
+                      zIndex: 100,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <CircularProgress />
+                  </Box>
+                )}
                 <Box
                   sx={{
+                    backgroundColor: 'white',
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: hexToRGB(WHITE, 0.7),
-                    zIndex: 100,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    top: '0',
+                    width: '100%',
+                    padding: '8px 16px',
+                    zIndex: 10,
                   }}>
-                  <CircularProgress />
-                </Box>
-              )}
-              <Box
-                sx={{
-                  backgroundColor: 'white',
-                  borderBottom: `1px solid ${MOON_200}`,
-                  position: 'absolute',
-                  top: '0',
-                  width: '100%',
-                  paddingTop: '8px',
-                  paddingBottom: '8px',
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  zIndex: 10,
-                }}>
-                <PlaygroundChatTopBar
-                  idx={idx}
-                  settingsTab={settingsTab}
-                  setSettingsTab={setSettingsTab}
-                  setPlaygroundStateField={setPlaygroundStateField}
-                  setPlaygroundStates={setPlaygroundStates}
-                  playgroundStates={playgroundStates}
-                  entity={entity}
-                  project={project}
-                  isTeamAdmin={isTeamAdmin}
-                  refetchConfiguredProviders={refetchConfiguredProviders}
-                  refetchCustomLLMs={refetchCustomLLMs}
-                  llmDropdownOptions={llmDropdownOptions}
-                  areProvidersLoading={
-                    configuredProvidersLoading || areCustomProvidersLoading
-                  }
-                  customProvidersResult={customProvidersResult}
-                />
-              </Box>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  overflow: 'scroll',
-                  paddingTop: '48px', // Height of the top bar
-                  paddingX: '16px',
-                  flexGrow: 1,
-                }}>
-                <Tailwind>
-                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
-                    {state.traceCall && (
-                      <PlaygroundContext.Provider
-                        value={{
-                          isPlayground: true,
-                          deleteMessage: (messageIndex, responseIndexes) =>
-                            deleteMessage(idx, messageIndex, responseIndexes),
-                          editMessage: (messageIndex, newMessage) =>
-                            editMessage(idx, messageIndex, newMessage),
-                          deleteChoice: (messageIndex, choiceIndex) =>
-                            deleteChoice(idx, choiceIndex),
-                          addMessage: newMessage => addMessage(idx, newMessage),
-                          editChoice: (choiceIndex, newChoice) =>
-                            editChoice(idx, choiceIndex, newChoice),
-                          retry: (messageIndex: number, choiceIndex?: number) =>
-                            handleRetry(idx, messageIndex, choiceIndex),
-                          sendMessage: (
-                            role: PlaygroundMessageRole,
-                            content: string,
-                            toolCallId?: string
-                          ) => {
-                            handleSend(
-                              role,
-                              chatText,
-                              idx,
-                              content,
-                              toolCallId
-                            );
-                          },
-                          setSelectedChoiceIndex: (choiceIndex: number) =>
-                            setPlaygroundStateField(
-                              idx,
-                              'selectedChoiceIndex',
-                              choiceIndex
-                            ),
-                        }}>
-                        <CallChat call={state.traceCall as TraceCallSchema} />
-                      </PlaygroundContext.Provider>
-                    )}
-                  </div>
-                  {/* Spacer used for leaving room for the input */}
-                  <div className="h-[125px] w-full" />
-                </Tailwind>
-              </Box>
-              <Box
-                sx={{
-                  width: '100%',
-                  maxWidth: '800px',
-                  padding: '8px',
-                  paddingLeft: '12px',
-                  marginX: 'auto',
-                  marginBottom: '16px',
-                }}>
-                {state.traceCall.summary && (
-                  <PlaygroundCallStats
-                    call={state.traceCall as TraceCallSchema}
+                  <PlaygroundChatTopBar
+                    idx={idx}
+                    settingsTab={settingsTab}
+                    setSettingsTab={setSettingsTab}
+                    setPlaygroundStateField={setPlaygroundStateField}
+                    setPlaygroundStates={setPlaygroundStates}
+                    playgroundStates={playgroundStates}
+                    entity={entity}
+                    project={project}
+                    isTeamAdmin={isTeamAdmin}
+                    refetchConfiguredProviders={refetchConfiguredProviders}
+                    refetchCustomLLMs={refetchCustomLLMs}
+                    llmDropdownOptions={llmDropdownOptions}
+                    areProvidersLoading={
+                      configuredProvidersLoading || areCustomProvidersLoading
+                    }
+                    customProvidersResult={customProvidersResult}
                   />
-                )}
+                </Box>
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    overflow: 'scroll',
+                    paddingTop: '48px', // Height of the top bar
+                    paddingX: '16px',
+                    flexGrow: 1,
+                  }}>
+                  <Tailwind>
+                    <div className=" mx-auto mt-[32px] h-full pb-8">
+                      {state.traceCall && (
+                        <PlaygroundContext.Provider
+                          value={{
+                            isPlayground: true,
+                            deleteMessage: (messageIndex, responseIndexes) =>
+                              deleteMessage(idx, messageIndex, responseIndexes),
+                            editMessage: (messageIndex, newMessage) =>
+                              editMessage(idx, messageIndex, newMessage),
+                            deleteChoice: (messageIndex, choiceIndex) =>
+                              deleteChoice(idx, choiceIndex),
+                            addMessage: newMessage =>
+                              addMessage(idx, newMessage),
+                            editChoice: (choiceIndex, newChoice) =>
+                              editChoice(idx, choiceIndex, newChoice),
+                            retry: (
+                              messageIndex: number,
+                              choiceIndex?: number
+                            ) => handleRetry(idx, messageIndex, choiceIndex),
+                            sendMessage: (
+                              role: PlaygroundMessageRole,
+                              content: string,
+                              toolCallId?: string
+                            ) => {
+                              handleSend(
+                                role,
+                                chatText,
+                                idx,
+                                content,
+                                toolCallId
+                              );
+                            },
+                            setSelectedChoiceIndex: (choiceIndex: number) =>
+                              setPlaygroundStateField(
+                                idx,
+                                'selectedChoiceIndex',
+                                choiceIndex
+                              ),
+                          }}>
+                          <CallChat call={state.traceCall as TraceCallSchema} />
+                        </PlaygroundContext.Provider>
+                      )}
+                    </div>
+                  </Tailwind>
+                </Box>
+                <Box
+                  sx={{
+                    width: '100%',
+                    maxWidth: '800px',
+                    padding: '8px',
+                    paddingLeft: '12px',
+                    marginX: 'auto',
+                    marginBottom: '8px',
+                  }}>
+                  {state.traceCall.summary && (
+                    <PlaygroundCallStats
+                      call={state.traceCall as TraceCallSchema}
+                    />
+                  )}
+                </Box>
               </Box>
-            </Box>
-          </React.Fragment>
-        ))}
+            </React.Fragment>
+          ))}
+        </Box>
       </Box>
       <PlaygroundChatInput
         chatText={chatText}

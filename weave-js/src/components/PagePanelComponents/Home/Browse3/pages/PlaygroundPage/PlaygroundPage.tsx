@@ -1,12 +1,21 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
+import {OptionalTraceCallSchema, PlaygroundState} from './types';
 import {useConfiguredProviders} from './useConfiguredProviders';
 import {
   DEFAULT_SYSTEM_MESSAGE,
@@ -20,7 +29,29 @@ export type PlaygroundPageProps = {
   callId: string;
 };
 
+type PlaygroundPageInnerProps = PlaygroundPageProps & {
+  setPlaygroundStates: Dispatch<SetStateAction<PlaygroundState[]>>;
+  playgroundStates: PlaygroundState[];
+  setPlaygroundStateField: (
+    index: number,
+    field: keyof PlaygroundState,
+    value: any
+  ) => void;
+  setPlaygroundStateFromTraceCall: (traceCall: OptionalTraceCallSchema) => void;
+  settingsTab: number | null;
+  setSettingsTab: Dispatch<SetStateAction<number | null>>;
+};
+
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
+
+  const {
+    setPlaygroundStates,
+    playgroundStates,
+    setPlaygroundStateField,
+    setPlaygroundStateFromTraceCall,
+  } = usePlaygroundState();
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -33,32 +64,58 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
       tabs={[
         {
           label: 'main',
-          content: <PlaygroundPageInner {...props} />,
+          content: (
+            <PlaygroundPageInner
+              setPlaygroundStates={setPlaygroundStates}
+              playgroundStates={playgroundStates}
+              setPlaygroundStateField={setPlaygroundStateField}
+              setPlaygroundStateFromTraceCall={setPlaygroundStateFromTraceCall}
+              settingsTab={settingsTab}
+              setSettingsTab={setSettingsTab}
+              {...props}
+            />
+          ),
         },
       ]}
+      headerExtra={
+        <Button
+          variant="ghost"
+          size="medium"
+          icon="add-new"
+          onClick={() => {
+            setPlaygroundStates([
+              ...playgroundStates,
+              JSON.parse(JSON.stringify(playgroundStates[settingsTab ?? 0])),
+            ]);
+          }}>
+          Add chat
+        </Button>
+      }
     />
   );
 };
 
-export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
-  const {
-    setPlaygroundStates,
-    playgroundStates,
-    setPlaygroundStateField,
-    setPlaygroundStateFromTraceCall,
-  } = usePlaygroundState();
-
+export const PlaygroundPageInner = ({
+  playgroundStates,
+  setPlaygroundStateField,
+  setPlaygroundStateFromTraceCall,
+  settingsTab,
+  setSettingsTab,
+  setPlaygroundStates,
+  entity,
+  project,
+  callId,
+}: PlaygroundPageInnerProps) => {
   const {useCall, useCalls} = useWFHooks();
-  const [settingsTab, setSettingsTab] = useState<number | null>(0);
   const callKey = useMemo(() => {
-    return props.callId
+    return callId
       ? {
-          entity: props.entity,
-          project: props.project,
-          callId: props.callId,
+          entity: entity,
+          project: project,
+          callId: callId,
         }
       : null;
-  }, [props.entity, props.project, props.callId]);
+  }, [entity, project, callId]);
 
   const call = useCall(callKey);
   const callWithCosts = useCall(callKey, {
@@ -66,8 +123,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   });
 
   const {result: calls} = useCalls(
-    props.entity,
-    props.project,
+    entity,
+    project,
     {
       callIds: playgroundStates.map(state => state.traceCall.id || ''),
     },
@@ -86,14 +143,14 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     result: configuredProviders,
     loading: configuredProvidersLoading,
     refetch: refetchConfiguredProviders,
-  } = useConfiguredProviders(props.entity);
+  } = useConfiguredProviders(entity);
 
   const {
     result: customProvidersResult,
     loading: customProvidersLoading,
     refetch: refetchCustomProviders,
   } = useBaseObjectInstances('Provider', {
-    project_id: `${props.entity}/${props.project}`,
+    project_id: `${entity}/${project}`,
     filter: {
       latest_only: true,
     },
@@ -104,7 +161,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     loading: customProviderModelsLoading,
     refetch: refetchCustomProviderModels,
   } = useBaseObjectInstances('ProviderModel', {
-    project_id: `${props.entity}/${props.project}`,
+    project_id: `${entity}/${project}`,
     filter: {
       latest_only: true,
     },
@@ -131,7 +188,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         inputs: {
           messages: [DEFAULT_SYSTEM_MESSAGE],
         },
-        project_id: `${props.entity}/${props.project}`,
+        project_id: `${entity}/${project}`,
       });
     }
     // Only set the call the first time the page loads, and we get the call
@@ -187,8 +244,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           playgroundStates={playgroundStates}
           setPlaygroundStates={setPlaygroundStates}
           setPlaygroundStateField={setPlaygroundStateField}
-          entity={props.entity}
-          project={props.project}
+          entity={entity}
+          project={project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
           isOpenInPlayground={!!call.result}
