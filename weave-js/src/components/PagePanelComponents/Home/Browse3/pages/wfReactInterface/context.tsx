@@ -69,3 +69,28 @@ export const useProjectHasTraceServerData = (
     [loading, objs.result, calls.result]
   );
 };
+
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * objects or calls.
+ */
+export const useRunHasTraces = (
+  entity: string,
+  project: string,
+  runName: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const callStats = tsWFDataModelHooks.useCallsStats(
+    entity,
+    project,
+    {
+      runIds: [`${entity}/${project}/${runName}`],
+    },
+    undefined,
+    undefined,
+    {
+      skip: !hasTraceServer,
+    }
+  );
+  return callStats;
+};
