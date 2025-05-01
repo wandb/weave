@@ -23,7 +23,7 @@ export const SavedViewSuffix = ({
     <div className="flex items-center gap-8">
       {isModified ? (
         <Tooltip
-          content="Clears column actions, filters, and sorting"
+          content="Reset view to last saved state"
           trigger={
             <A $variant="primary" onClick={onResetView}>
               Reset view
