@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_calls_query_stats_query,
     combine_conditions,
     optimized_project_contains_call_query,
 )
@@ -347,29 +348,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        cq = CallsQuery(project_id=req.project_id)
-
-        cq.add_field("id")
-        if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
-        if req.query is not None:
-            cq.add_condition(req.query.expr_)
-        if req.limit is not None:
-            cq.set_limit(req.limit)
-
         pb = ParamBuilder()
+
         # Special case when limit=1 and there is no filter or query,
         # construct highly optimized query that returns early
-        if req.limit == 1 and req.filter is None and req.query is None:
+        if (
+            req.limit == 1
+            and req.filter is None
+            and req.query is None
+            and not req.include_total_storage_size
+        ):
             query = optimized_project_contains_call_query(req.project_id, pb)
-        else:
-            query = f"SELECT count() FROM ({cq.as_sql(pb)})"
-        raw_res = self._query(query, pb.get_params())
-        rows = raw_res.result_rows
-        count = 0
-        if rows and len(rows) == 1 and len(rows[0]) == 1:
+            raw_res = self._query(query, pb.get_params())
+            rows = raw_res.result_rows
             count = rows[0][0]
-        return tsi.CallsQueryStatsRes(count=count)
+            return tsi.CallsQueryStatsRes(
+                count=count,
+                total_storage_size_bytes=None,
+            )
+
+        query, columns = build_calls_query_stats_query(req, pb)
+
+        raw_res = self._query(query, pb.get_params())
+
+        res_dict = (
+            dict(zip(columns, raw_res.result_rows[0])) if raw_res.result_rows else {}
+        )
+
+        return tsi.CallsQueryStatsRes(
+            count=res_dict.get("count", 0),
+            total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+        )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
@@ -1579,6 +1588,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if client is None:
             raise FileStorageReadError("File storage client is not configured")
         return read_from_bucket(client, file_storage_uri)
+
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        pb = ParamBuilder()
+
+        project_id_param = pb.add_param(req.project_id)
+
+        query = f"""
+        SELECT sum(size_bytes) as total_size_bytes
+        FROM files_stats
+        WHERE project_id = {{{project_id_param}: String}}
+        """
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
+            raise RuntimeError("No results found")
+
+        return tsi.FilesStatsRes(total_size_bytes=result.result_rows[0][0])
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)

@@ -130,6 +130,7 @@ export type TraceCallsQueryStatsReq = {
 
 export type TraceCallsQueryStatsRes = {
   count: number;
+  total_storage_size_bytes?: number;
 };
 
 export type TraceCallsDeleteReq = {
@@ -319,6 +320,14 @@ export type TraceFileContentReadReq = {
 
 export type TraceFileContentReadRes = {
   content: ArrayBuffer;
+};
+
+export type FilesStatsReq = {
+  project_id: string;
+};
+
+export type FilesStatsRes = {
+  total_size_bytes: number;
 };
 
 export type CompletionsCreateInputs = {

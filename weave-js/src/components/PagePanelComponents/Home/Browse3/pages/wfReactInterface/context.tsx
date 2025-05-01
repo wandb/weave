@@ -49,29 +49,22 @@ export const useProjectHasTraceServerData = (
   const objs = tsWFDataModelHooks.useRootObjectVersions(
     entity,
     project,
-    {},
-    1,
+    {}, // filter
+    1, // limit
     true, // metadata only
     {
       skip: !hasTraceServer,
       noAutoRefresh: true,
     }
   );
-  const calls = tsWFDataModelHooks.useCallsStats(
-    entity,
-    project,
-    {},
-    undefined,
-    1, // limit
-    {
-      skip: !hasTraceServer,
-    }
-  );
+  const calls = tsWFDataModelHooks.useProjectHasCalls(entity, project, {
+    skip: !hasTraceServer,
+  });
   const loading = objs.loading || calls.loading;
   return useMemo(
     () => ({
       loading,
-      result: (objs.result ?? []).length > 0 || (calls.result?.count ?? 0) > 0,
+      result: (objs.result ?? []).length > 0 || (calls.result ?? false),
     }),
     [loading, objs.result, calls.result]
   );

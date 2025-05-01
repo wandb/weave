@@ -7,6 +7,7 @@
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import useAsync from 'react-use/lib/useAsync';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -495,7 +496,11 @@ const useCallsStats = (
   filter: CallFilter,
   query?: Query,
   limit?: number,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    includeTotalStorageSize?: boolean;
+  }
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -528,6 +533,9 @@ const useCallsStats = (
       },
       query,
       limit,
+      ...(!!opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
 
     getTsClient()
@@ -540,7 +548,16 @@ const useCallsStats = (
         loadingRef.current = false;
         setCallStatsRes({loading: false, result: null, error: err});
       });
-  }, [deepFilter, entity, project, query, limit, opts?.skip, getTsClient]);
+  }, [
+    opts?.skip,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter,
+    query,
+    limit,
+    getTsClient,
+  ]);
 
   useEffect(() => {
     doFetch();
@@ -567,6 +584,27 @@ const useCallsStats = (
       return {...callStatsRes, refetch};
     }
   }, [callStatsRes, opts?.skip, refetch]);
+};
+
+/*
+  Helper that calls the call stats hook with limit: 1, returning a boolean
+  if there are any calls in the project. This uses a highly optimized
+  query in the backend. 
+*/
+const useProjectHasCalls = (
+  entity: string,
+  project: string,
+  opts?: {skip?: boolean}
+): Loadable<boolean> => {
+  const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  const count = callsStats.result?.count ?? 0;
+  return useMemo(() => {
+    return {
+      loading: callsStats.loading,
+      result: count > 0,
+      error: callsStats.error,
+    };
+  }, [callsStats, count]);
 };
 
 const useCallsDeleteFunc = () => {
@@ -2099,6 +2137,14 @@ export const useTableCreate = (): ((
   );
 };
 
+export const useFilesStats = (projectId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(async () => {
+    return getTsClient().filesStats({project_id: projectId});
+  }, [getTsClient, projectId]);
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2109,6 +2155,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useCallsStats,
+  useProjectHasCalls,
   useCallsDeleteFunc,
   useCallUpdateFunc,
   useCallsExport,
