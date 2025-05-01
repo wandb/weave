@@ -68,10 +68,11 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
             obj.export(fp)
 
     elif has_pydub and isinstance(obj, pydub.AudioSegment):
-        obj.export(
-            artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}"),
-            format=DEFAULT_VIDEO_FORMAT.value,
-        )
+        with artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}") as fp:
+            obj.export(
+                fp,
+                format=DEFAULT_VIDEO_FORMAT.value,
+            )
     elif isinstance(obj, wave.Wave_read):
         # Object is a wave.Wave_read object
         save_wave(obj, artifact, name)
