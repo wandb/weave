@@ -1,4 +1,3 @@
-from unittest import mock
 import dataclasses
 import datetime
 import json
@@ -12,6 +11,7 @@ from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable
+from unittest import mock
 
 import pytest
 import wandb
@@ -661,8 +661,9 @@ def test_trace_call_query_filter_wb_run_ids(client):
     run_name = "test-run-name"
     full_wb_run_id = f"{client.entity}/{client.project}/{run_name}"
     from weave.trace import weave_client
-    with mock.patch.object(weave_client, "safe_current_wb_run_id", 
-                           lambda: full_wb_run_id
+
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id
     ):
         call_spec_1 = simple_line_call_bootstrap()
     call_spec_2 = simple_line_call_bootstrap()
@@ -681,6 +682,7 @@ def test_trace_call_query_filter_wb_run_ids(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
 
 def test_trace_call_query_filter_wb_user_ids(client):
     call_spec_1 = simple_line_call_bootstrap()
@@ -704,6 +706,7 @@ def test_trace_call_query_filter_wb_user_ids(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
 
 def test_trace_call_query_limit(client):
     call_spec = simple_line_call_bootstrap()
