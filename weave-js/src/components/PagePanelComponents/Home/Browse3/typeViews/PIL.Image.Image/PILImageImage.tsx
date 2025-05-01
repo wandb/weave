@@ -10,12 +10,12 @@ import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
-type PILImageImageTypePayload = CustomWeaveTypePayload<
+export type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
   {'image.jpg': string} | {'image.png': string} | {'image.webp': string}
 >;
 
-type PILImageImageProps = {
+export type PILImageImageProps = {
   entity: string;
   project: string;
   data: PILImageImageTypePayload;
@@ -43,6 +43,12 @@ type PILImageImageWithSizeProps = PILImageImageProps & {
   containerHeight: number;
 };
 
+export const imageTypes = {
+  'image.jpg': 'jpg',
+  'image.png': 'png',
+  'image.webp': 'webp',
+};
+
 const PILImageImageWithSize = ({
   entity,
   project,
@@ -51,12 +57,6 @@ const PILImageImageWithSize = ({
   containerHeight,
 }: PILImageImageWithSizeProps) => {
   const {useFileContent} = useWFHooks();
-  const imageTypes = {
-    'image.jpg': 'jpg',
-    'image.png': 'png',
-    'image.webp': 'webp',
-  } as const;
-
   const imageKey = Object.keys(data.files).find(key => key in imageTypes) as
     | keyof PILImageImageTypePayload['files']
     | undefined;
