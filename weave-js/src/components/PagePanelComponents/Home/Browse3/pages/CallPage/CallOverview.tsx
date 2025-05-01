@@ -20,13 +20,13 @@ export const Overview = styled.div`
 `;
 Overview.displayName = 'S.Overview';
 
-export const CallName = styled.div<{$isEditing?: boolean}>`
+export const CallName = styled.div`
   font-family: Source Sans Pro;
   font-size: 16px;
   font-weight: 600;
   text-align: left;
   word-break: break-all;
-  width: ${props => (props.$isEditing ? '100%' : 'max-content%')};
+  width: 100%;
 `;
 CallName.displayName = 'S.CallName';
 
@@ -46,7 +46,6 @@ export const CallOverview: React.FC<{
 }> = ({call}) => {
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
-  const [isEditing, setIsEditing] = React.useState(false);
 
   const status = call.traceCall
     ? traceCallStatusCode(call.traceCall)
@@ -56,8 +55,8 @@ export const CallOverview: React.FC<{
     <>
       <Overview>
         <StatusChip value={status} iconOnly />
-        <CallName $isEditing={isEditing}>
-          <EditableCallName call={call} onEditingChange={setIsEditing} />
+        <CallName>
+          <EditableCallName call={call} />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
