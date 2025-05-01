@@ -93,13 +93,18 @@ def load(
                 raise ValueError(
                     f"Unsupported audio format: {filename} - Supported formats are: {' '.join(SUPPORTED_FORMATS)}"
                 )
+
             elif fmt != AudioFormat.WAV:
-                if not has_pydub:
+                try:
+                    # We do this so that we can give the user a more descriptive error message.
+                    # The client running the load op might not be the same as the client that ran save
+                    # Since this fn is serialized for isolated execution, we need an env check
+                    from pydub import AudioSegment
+                    return AudioSegment.from_file(path, format=fmt.value)
+                except ImportError:
                     raise ValueError(
                         f"Pydub is required to retrieve {fmt.value} audio files"
                     )
-                # If the file is in a supported format, we can load it directly
-                return pydub.AudioSegment.from_file(path, format=fmt.value)
             else:
                 # File is in WAV format, return it as a wave.Wave_read object
                 wave_file = wave.open(path, "rb")
