@@ -71,9 +71,7 @@ def test_audio_segment_publish(client: WeaveClient) -> None:
     assert gotten_audio.duration_seconds == 1
 
 
-
 def test_weave_audio_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
-
     @weave.op
     def weave_audio_as_input_and_output_part(in_audio: weave.Audio) -> dict:
         return {"out_audio": in_audio}
@@ -101,7 +99,6 @@ def test_weave_audio_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None
 
 
 def test_audio_segment_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
-
     @weave.op
     def audio_segment_as_input_and_output_part(in_audio: AudioSegment) -> dict:
         return {"out_audio": in_audio}
