@@ -3,6 +3,8 @@ import _ from 'lodash';
 
 import {Query} from '../../wfReactInterface/traceServerClientInterface/query';
 
+const FIELDS_NO_FLOAT_CONVERT = ['summary.weave.latency_ms'];
+
 // Convert one Material GridFilterItem to our Mongo-like query format.
 export const operationConverter = (
   item: GridFilterItem
@@ -58,79 +60,115 @@ export const operationConverter = (
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $eq: [
-        {$convert: {input: {$getField: item.field}, to: 'double'}},
-        {$literal: val},
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $eq: [{$getField: item.field}, {$literal: val}],
+      };
+    } else {
+      return {
+        $eq: [
+          {$convert: {input: {$getField: item.field}, to: 'double'}},
+          {$literal: val},
+        ],
+      };
+    }
   } else if (item.operator === '(number): !=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [
-        {
-          $eq: [
-            {$convert: {input: {$getField: item.field}, to: 'double'}},
-            {$literal: val},
-          ],
-        },
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $not: [{$eq: [{$getField: item.field}, {$literal: val}]}],
+      };
+    } else {
+      return {
+        $not: [
+          {
+            $eq: [
+              {$convert: {input: {$getField: item.field}, to: 'double'}},
+              {$literal: val},
+            ],
+          },
+        ],
+      };
+    }
   } else if (item.operator === '(number): >') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $gt: [
-        {$convert: {input: {$getField: item.field}, to: 'double'}},
-        {$literal: val},
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $gt: [{$getField: item.field}, {$literal: val}],
+      };
+    } else {
+      return {
+        $gt: [
+          {$convert: {input: {$getField: item.field}, to: 'double'}},
+          {$literal: val},
+        ],
+      };
+    }
   } else if (item.operator === '(number): >=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $gte: [
-        {$convert: {input: {$getField: item.field}, to: 'double'}},
-        {$literal: val},
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $gte: [{$getField: item.field}, {$literal: val}],
+      };
+    } else {
+      return {
+        $gte: [
+          {$convert: {input: {$getField: item.field}, to: 'double'}},
+          {$literal: val},
+        ],
+      };
+    }
   } else if (item.operator === '(number): <') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [
-        {
-          $gte: [
-            {$convert: {input: {$getField: item.field}, to: 'double'}},
-            {$literal: val},
-          ],
-        },
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $not: [{$gte: [{$getField: item.field}, {$literal: val}]}],
+      };
+    } else {
+      return {
+        $not: [
+          {
+            $gte: [
+              {$convert: {input: {$getField: item.field}, to: 'double'}},
+              {$literal: val},
+            ],
+          },
+        ],
+      };
+    }
   } else if (item.operator === '(number): <=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [
-        {
-          $gt: [
-            {$convert: {input: {$getField: item.field}, to: 'double'}},
-            {$literal: val},
-          ],
-        },
-      ],
-    };
+    if (FIELDS_NO_FLOAT_CONVERT.includes(item.field)) {
+      return {
+        $not: [{$gt: [{$getField: item.field}, {$literal: val}]}],
+      };
+    } else {
+      return {
+        $not: [
+          {
+            $gt: [
+              {$convert: {input: {$getField: item.field}, to: 'double'}},
+              {$literal: val},
+            ],
+          },
+        ],
+      };
+    }
   } else if (item.operator === '(bool): is') {
     if (item.value === '') {
       return null;

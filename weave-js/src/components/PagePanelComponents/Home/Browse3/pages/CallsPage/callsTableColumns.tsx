@@ -718,7 +718,7 @@ function buildCallsTableColumns(
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      const timeMs = traceCallLatencyMs(cellParams.row) * 1.0001;
+      const timeMs = traceCallLatencyMs(cellParams.row);
       const timeString = monthRoundedTime(traceCallLatencyS(cellParams.row));
       return (
         <CellFilterWrapper

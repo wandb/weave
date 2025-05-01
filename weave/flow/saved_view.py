@@ -146,6 +146,9 @@ OPERATOR_MAP = {
 
 VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
 
+# We return a real float from the backend! do not convert to double!
+FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms"}
+
 
 def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
     """Convert Saved View Filter to API Filter"""
@@ -212,79 +215,99 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         return {"$or": clauses}
     elif item.operator == "(number): =":
         value = float(item.value)
-        return {
-            "$eq": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {"$eq": [{"$getField": item.field}, {"$literal": value}]}
+        else:
+            return {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
+                    {"$literal": value},
+                ],
+            }
     elif item.operator == "(number): !=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$eq": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                },
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {"$not": [{"$eq": [{"$getField": item.field}, {"$literal": value}]}]}
+        else:
+            return {
+                "$not": [
+                    {
+                        "$eq": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": item.field},
+                                    "to": "double",
+                                }
+                            },
+                            {"$literal": value},
+                        ],
+                    },
+                ],
+            }
     elif item.operator == "(number): >":
         value = float(item.value)
-        return {
-            "$gt": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {"$gt": [{"$getField": item.field}, {"$literal": value}]}
+        else:
+            return {
+                "$gt": [
+                    {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
+                    {"$literal": value},
+                ],
+            }
     elif item.operator == "(number): >=":
         value = float(item.value)
-        return {
-            "$gte": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {"$gte": [{"$getField": item.field}, {"$literal": value}]}
+        else:
+            return {
+                "$gte": [
+                    {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
+                    {"$literal": value},
+                ],
+            }
     elif item.operator == "(number): <":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gte": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {
+                "$not": [{"$gte": [{"$getField": item.field}, {"$literal": value}]}]
+            }
+        else:
+            return {
+                "$not": [
+                    {
+                        "$gte": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": item.field},
+                                    "to": "double",
+                                }
+                            },
+                            {"$literal": value},
+                        ],
+                    }
+                ],
+            }
     elif item.operator == "(number): <=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gt": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        if item.field in FIELDS_NO_FLOAT_CONVERT:
+            return {"$not": [{"$gt": [{"$getField": item.field}, {"$literal": value}]}]}
+        else:
+            return {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": item.field},
+                                    "to": "double",
+                                }
+                            },
+                            {"$literal": value},
+                        ],
+                    }
+                ],
+            }
     elif item.operator == "(bool): is":
         return {
             "$eq": [{"$getField": item.field}, {"$literal": str(item.value)}],
@@ -791,7 +814,8 @@ class SavedView:
     def ui_url(self) -> str | None:
         """URL to show this saved view in the UI.
 
-        Note this is the "result" page with traces etc, not the URL for the view object."""
+        Note this is the "result" page with traces etc, not the URL for the view object.
+        """
         if self.ref and self.entity and self.project:
             weave_root = urls.project_weave_root_url(self.entity, self.project)
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"
