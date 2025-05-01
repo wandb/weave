@@ -50,7 +50,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         }}>
         <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
           <Tag label={`${settingsTab + 1}`} />
-          <Tooltip title={playgroundStates[settingsTab].model}>
+          <Tooltip title={playgroundStates[settingsTab ?? 0]?.model ?? ''}>
             <Box
               sx={{
                 overflow: 'hidden',

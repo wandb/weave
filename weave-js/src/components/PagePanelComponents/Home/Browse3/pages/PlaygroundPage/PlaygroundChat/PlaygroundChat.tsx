@@ -1,10 +1,9 @@
-import {Box, CircularProgress} from '@mui/material';
-import {MOON_200, TEAL_400, WHITE} from '@wandb/weave/common/css/color.styles';
+import {CircularProgress} from '@mui/material';
+import {WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -43,13 +42,7 @@ const EmptyWithSettingsButton: React.FC<{
 
   return (
     <>
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px',
-        }}>
+      <div className="flex flex-col items-center gap-[16px]">
         <Empty {...emptyProps} />
         {isTeamAdmin && (
           <Button
@@ -60,7 +53,7 @@ const EmptyWithSettingsButton: React.FC<{
             Configure provider
           </Button>
         )}
-      </Box>
+      </div>
       <ProviderConfigDrawer
         isOpen={isDrawerOpen}
         onClose={() => {
@@ -160,45 +153,10 @@ export const PlaygroundChat = ({
 
   if (!hasConfiguredProviders && !isOpenInPlayground) {
     return (
-      <Box
-        sx={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          overflow: 'hidden',
-        }}>
-        <Box
-          sx={{
-            width: '100%',
-            height: '100%',
-            maxHeight: 'calc(100% - 130px)',
-            display: 'flex',
-            position: 'relative',
-            maxWidth: '800px',
-            minWidth: '520px',
-            margin: '8px',
-            border: `1px solid ${MOON_200}`,
-            borderRadius: '4px',
-          }}>
-          <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-            }}>
-            <Box
-              sx={{
-                backgroundColor: 'white',
-                width: '100%',
-                top: 0,
-                position: 'absolute',
-                padding: '8px 16px',
-                zIndex: 10,
-              }}>
+      <div className="flex h-full w-full flex-col items-center overflow-hidden">
+        <div className="relative m-[8px] flex h-full max-h-[calc(100%-130px)] w-full min-w-[520px] max-w-[800px] rounded-[4px] border border-[MOON_200]">
+          <div className="relative flex h-full w-full flex-col">
+            <div className="absolute top-0 z-[10] w-full bg-white px-[8px] py-[16px]">
               <PlaygroundChatTopBar
                 idx={0}
                 settingsTab={settingsTab}
@@ -217,16 +175,8 @@ export const PlaygroundChat = ({
                 }
                 customProvidersResult={customProvidersResult}
               />
-            </Box>
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingTop: '48px',
-              }}>
+            </div>
+            <div className="flex h-full w-full items-center justify-center pt-[48px]">
               <EmptyWithSettingsButton
                 entity={entity}
                 project={project}
@@ -235,9 +185,9 @@ export const PlaygroundChat = ({
                   refetchConfiguredProviders();
                 }}
               />
-            </Box>
-          </Box>
-        </Box>
+            </div>
+          </div>
+        </div>
         <PlaygroundChatInput
           chatText={chatText}
           setChatText={setChatText}
@@ -247,72 +197,30 @@ export const PlaygroundChat = ({
           settingsTab={settingsTab}
           hasConfiguredProviders={hasConfiguredProviders}
         />
-      </Box>
+      </div>
     );
   }
 
   return (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        overflow: 'hidden', // Rely on inner overflows, not outer page
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          width: '100%',
-          marginX: 'auto',
-          overflowX: 'scroll',
-          overflowY: 'hidden',
-          height: '100%',
-        }}>
-        <Box sx={{display: 'flex', marginX: 'auto'}}>
+    <div className="flex h-full w-full flex-col items-center overflow-hidden">
+      <div className="mx-auto flex h-full w-full overflow-y-hidden overflow-x-scroll">
+        <div className="mx-auto flex">
           {playgroundStates.map((state, idx) => (
             <React.Fragment key={idx}>
-              <Box
-                sx={{
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  maxWidth: '800px',
-                  minWidth: '520px',
-                  margin: '8px',
-                  border: `2px solid ${
-                    settingsTab === idx ? TEAL_400 : MOON_200
-                  }`,
-                  borderRadius: '4px',
-                }}>
+              <div
+                className={`relative m-[8px] flex w-full min-w-[520px] max-w-[800px] flex-col rounded-[4px] border-2 ${
+                  settingsTab === idx ? 'border-teal-400' : 'border-moon-200'
+                }`}>
                 {state.loading && (
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: hexToRGB(WHITE, 0.7),
-                      zIndex: 100,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
+                  <div
+                    className={`absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-[${hexToRGB(
+                      WHITE,
+                      0.7
+                    )}]`}>
                     <CircularProgress />
-                  </Box>
+                  </div>
                 )}
-                <Box
-                  sx={{
-                    backgroundColor: 'white',
-                    position: 'absolute',
-                    top: '0',
-                    width: '100%',
-                    padding: '8px 16px',
-                    zIndex: 10,
-                  }}>
+                <div className="absolute top-0 z-[10] w-full bg-white px-[16px] py-[8px]">
                   <PlaygroundChatTopBar
                     idx={idx}
                     settingsTab={settingsTab}
@@ -331,82 +239,61 @@ export const PlaygroundChat = ({
                     }
                     customProvidersResult={customProvidersResult}
                   />
-                </Box>
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    overflow: 'scroll',
-                    paddingTop: '48px', // Height of the top bar
-                    paddingX: '16px',
-                    flexGrow: 1,
-                  }}>
-                  <Tailwind>
-                    <div className=" mx-auto mt-[32px] h-full pb-8">
-                      {state.traceCall && (
-                        <PlaygroundContext.Provider
-                          value={{
-                            isPlayground: true,
-                            deleteMessage: (messageIndex, responseIndexes) =>
-                              deleteMessage(idx, messageIndex, responseIndexes),
-                            editMessage: (messageIndex, newMessage) =>
-                              editMessage(idx, messageIndex, newMessage),
-                            deleteChoice: (messageIndex, choiceIndex) =>
-                              deleteChoice(idx, choiceIndex),
-                            addMessage: newMessage =>
-                              addMessage(idx, newMessage),
-                            editChoice: (choiceIndex, newChoice) =>
-                              editChoice(idx, choiceIndex, newChoice),
-                            retry: (
-                              messageIndex: number,
-                              choiceIndex?: number
-                            ) => handleRetry(idx, messageIndex, choiceIndex),
-                            sendMessage: (
-                              role: PlaygroundMessageRole,
-                              content: string,
-                              toolCallId?: string
-                            ) => {
-                              handleSend(
-                                role,
-                                chatText,
-                                idx,
-                                content,
-                                toolCallId
-                              );
-                            },
-                            setSelectedChoiceIndex: (choiceIndex: number) =>
-                              setPlaygroundStateField(
-                                idx,
-                                'selectedChoiceIndex',
-                                choiceIndex
-                              ),
-                          }}>
-                          <CallChat call={state.traceCall as TraceCallSchema} />
-                        </PlaygroundContext.Provider>
-                      )}
-                    </div>
-                  </Tailwind>
-                </Box>
-                <Box
-                  sx={{
-                    width: '100%',
-                    maxWidth: '800px',
-                    padding: '8px',
-                    paddingLeft: '12px',
-                    marginX: 'auto',
-                    marginBottom: '8px',
-                  }}>
+                </div>
+                <div className="h-full w-full flex-grow overflow-scroll px-[16px] pt-[48px]">
+                  <div className=" mx-auto mt-[32px] h-full pb-8">
+                    {state.traceCall && (
+                      <PlaygroundContext.Provider
+                        value={{
+                          isPlayground: true,
+                          deleteMessage: (messageIndex, responseIndexes) =>
+                            deleteMessage(idx, messageIndex, responseIndexes),
+                          editMessage: (messageIndex, newMessage) =>
+                            editMessage(idx, messageIndex, newMessage),
+                          deleteChoice: (messageIndex, choiceIndex) =>
+                            deleteChoice(idx, choiceIndex),
+                          addMessage: newMessage => addMessage(idx, newMessage),
+                          editChoice: (choiceIndex, newChoice) =>
+                            editChoice(idx, choiceIndex, newChoice),
+                          retry: (messageIndex: number, choiceIndex?: number) =>
+                            handleRetry(idx, messageIndex, choiceIndex),
+                          sendMessage: (
+                            role: PlaygroundMessageRole,
+                            content: string,
+                            toolCallId?: string
+                          ) => {
+                            handleSend(
+                              role,
+                              chatText,
+                              idx,
+                              content,
+                              toolCallId
+                            );
+                          },
+                          setSelectedChoiceIndex: (choiceIndex: number) =>
+                            setPlaygroundStateField(
+                              idx,
+                              'selectedChoiceIndex',
+                              choiceIndex
+                            ),
+                        }}>
+                        <CallChat call={state.traceCall as TraceCallSchema} />
+                      </PlaygroundContext.Provider>
+                    )}
+                  </div>
+                </div>
+                <div className="mx-auto mb-[8px] w-full max-w-[800px] p-[8px] pl-[12px]">
                   {state.traceCall.summary && (
                     <PlaygroundCallStats
                       call={state.traceCall as TraceCallSchema}
                     />
                   )}
-                </Box>
-              </Box>
+                </div>
+              </div>
             </React.Fragment>
           ))}
-        </Box>
-      </Box>
+        </div>
+      </div>
       <PlaygroundChatInput
         chatText={chatText}
         setChatText={setChatText}
@@ -416,6 +303,6 @@ export const PlaygroundChat = ({
         settingsTab={settingsTab}
         hasConfiguredProviders={hasConfiguredProviders}
       />
-    </Box>
+    </div>
   );
 };

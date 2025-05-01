@@ -1,6 +1,7 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {
   Dispatch,
   SetStateAction,
@@ -13,9 +14,9 @@ import React, {
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {OptionalTraceCallSchema, PlaygroundState} from './types';
 import {useConfiguredProviders} from './useConfiguredProviders';
 import {
   DEFAULT_SYSTEM_MESSAGE,
@@ -29,18 +30,11 @@ export type PlaygroundPageProps = {
   callId: string;
 };
 
-type PlaygroundPageInnerProps = PlaygroundPageProps & {
-  setPlaygroundStates: Dispatch<SetStateAction<PlaygroundState[]>>;
-  playgroundStates: PlaygroundState[];
-  setPlaygroundStateField: (
-    index: number,
-    field: keyof PlaygroundState,
-    value: any
-  ) => void;
-  setPlaygroundStateFromTraceCall: (traceCall: OptionalTraceCallSchema) => void;
-  settingsTab: number | null;
-  setSettingsTab: Dispatch<SetStateAction<number | null>>;
-};
+type PlaygroundPageInnerProps = PlaygroundPageProps &
+  ReturnType<typeof usePlaygroundState> & {
+    settingsTab: number | null;
+    setSettingsTab: Dispatch<SetStateAction<number | null>>;
+  };
 
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
@@ -65,15 +59,19 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
         {
           label: 'main',
           content: (
-            <PlaygroundPageInner
-              setPlaygroundStates={setPlaygroundStates}
-              playgroundStates={playgroundStates}
-              setPlaygroundStateField={setPlaygroundStateField}
-              setPlaygroundStateFromTraceCall={setPlaygroundStateFromTraceCall}
-              settingsTab={settingsTab}
-              setSettingsTab={setSettingsTab}
-              {...props}
-            />
+            <Tailwind style={{width: '100%', height: '100%'}}>
+              <PlaygroundPageInner
+                setPlaygroundStates={setPlaygroundStates}
+                playgroundStates={playgroundStates}
+                setPlaygroundStateField={setPlaygroundStateField}
+                setPlaygroundStateFromTraceCall={
+                  setPlaygroundStateFromTraceCall
+                }
+                settingsTab={settingsTab}
+                setSettingsTab={setSettingsTab}
+                {...props}
+              />
+            </Tailwind>
           ),
         },
       ]}
@@ -107,12 +105,16 @@ export const PlaygroundPageInner = ({
   callId,
 }: PlaygroundPageInnerProps) => {
   const {useCall, useCalls} = useWFHooks();
+  const projectId = useMemo(
+    () => projectIdFromParts({entity, project}),
+    [entity, project]
+  );
   const callKey = useMemo(() => {
     return callId
       ? {
-          entity: entity,
-          project: project,
-          callId: callId,
+          entity,
+          project,
+          callId,
         }
       : null;
   }, [entity, project, callId]);
@@ -150,7 +152,7 @@ export const PlaygroundPageInner = ({
     loading: customProvidersLoading,
     refetch: refetchCustomProviders,
   } = useBaseObjectInstances('Provider', {
-    project_id: `${entity}/${project}`,
+    project_id: projectId,
     filter: {
       latest_only: true,
     },
@@ -161,7 +163,7 @@ export const PlaygroundPageInner = ({
     loading: customProviderModelsLoading,
     refetch: refetchCustomProviderModels,
   } = useBaseObjectInstances('ProviderModel', {
-    project_id: `${entity}/${project}`,
+    project_id: projectId,
     filter: {
       latest_only: true,
     },
@@ -188,7 +190,7 @@ export const PlaygroundPageInner = ({
         inputs: {
           messages: [DEFAULT_SYSTEM_MESSAGE],
         },
-        project_id: `${entity}/${project}`,
+        project_id: projectId,
       });
     }
     // Only set the call the first time the page loads, and we get the call
@@ -224,21 +226,11 @@ export const PlaygroundPageInner = ({
   }, [calls, setPlaygroundStates]);
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        height: '100%',
-        width: '100%',
-      }}>
+    <div className="flex h-full w-full">
       {call.loading ? (
-        <Box
-          sx={{
-            display: 'flex',
-            height: '100%',
-            width: '100%',
-          }}>
+        <div className="flex h-full w-full">
           <WeaveLoader />
-        </Box>
+        </div>
       ) : (
         <PlaygroundChat
           playgroundStates={playgroundStates}
@@ -266,6 +258,6 @@ export const PlaygroundPageInner = ({
           setSettingsTab={setSettingsTab}
         />
       )}
-    </Box>
+    </div>
   );
 };
