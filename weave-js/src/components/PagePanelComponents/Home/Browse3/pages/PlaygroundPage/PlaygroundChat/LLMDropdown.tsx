@@ -3,16 +3,21 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
-import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {OptionalSavedPlaygroundModelParams} from '../types';
 import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
-
+import {OptionalSavedPlaygroundModelParams} from '../types';
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
-  onChange: (value: LLMMaxTokensKey | string, maxTokens: number) => void;
+  onChange: (
+    value: LLMMaxTokensKey | string,
+    maxTokens: number,
+    savedModel?: {
+      name: string | null;
+      savedModelParams: OptionalSavedPlaygroundModelParams | null;
+    }
+  ) => void;
   entity: string;
   project: string;
   isTeamAdmin: boolean;

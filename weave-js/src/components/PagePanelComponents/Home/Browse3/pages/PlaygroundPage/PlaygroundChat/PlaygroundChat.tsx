@@ -5,7 +5,13 @@ import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {Empty} from '../../common/Empty';
@@ -221,8 +227,6 @@ export const PlaygroundChat = ({
                   configuredProvidersLoading || areCustomProvidersLoading
                 }
                 customProvidersResult={customProvidersResult}
-                savedModelsResult={savedModelsResult}
-                savedModelsLoading={savedModelsLoading}
               />
             </Box>
             <Box
@@ -340,11 +344,11 @@ export const PlaygroundChat = ({
                   refetchCustomLLMs={refetchCustomLLMs}
                   llmDropdownOptions={llmDropdownOptions}
                   areProvidersLoading={
-                    configuredProvidersLoading || areCustomProvidersLoading
+                    configuredProvidersLoading ||
+                    areCustomProvidersLoading ||
+                    savedModelsLoading
                   }
                   customProvidersResult={customProvidersResult}
-                  savedModelsResult={savedModelsResult}
-                  savedModelsLoading={savedModelsLoading}
                 />
               </Box>
               <Box

@@ -190,7 +190,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
-    model: state.model,
+    model: state.savedModel.name ? state.savedModel.name : state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
     stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,

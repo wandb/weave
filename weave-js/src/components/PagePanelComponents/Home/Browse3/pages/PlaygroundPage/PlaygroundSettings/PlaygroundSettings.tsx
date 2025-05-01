@@ -23,6 +23,7 @@ import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
 import {SaveModelModal} from './SaveModelModal';
 import {StopSequenceEditor} from './StopSequenceEditor';
+import {LLMMaxTokensKey} from '../llmMaxTokens';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -30,7 +31,7 @@ export type PlaygroundSettingsProps = {
   settingsTab: number;
   setSettingsTab: (tab: number) => void;
   projectId: string;
-  refetch: () => void;
+  refetchSavedModels: () => void;
 };
 
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
@@ -39,7 +40,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   settingsTab,
   setSettingsTab,
   projectId,
-  refetch,
+  refetchSavedModels,
 }) => {
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [initialSaveName, setInitialSaveName] = useState('');
@@ -59,11 +60,12 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   };
 
   const {saveModelConfiguration} = useSaveModelConfiguration({
+    setPlaygroundStateField,
     playgroundStates,
     settingsTab,
     projectId,
     closeDialog: handleSaveDialogClose,
-    refetch,
+    refetchSavedModels,
   });
 
   return (
@@ -252,19 +254,21 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
 };
 
 type UseSaveModelConfigurationArgs = {
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   playgroundStates: PlaygroundState[];
   settingsTab: number;
   projectId: string;
   closeDialog: () => void;
-  refetch: () => void;
+  refetchSavedModels: () => void;
 };
 
 const useSaveModelConfiguration = ({
+  setPlaygroundStateField,
   playgroundStates,
   settingsTab,
   projectId,
   closeDialog,
-  refetch,
+  refetchSavedModels,
 }: UseSaveModelConfigurationArgs) => {
   const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
     'LLMStructuredCompletionModel'
@@ -345,11 +349,15 @@ const useSaveModelConfiguration = ({
       return;
     }
 
+    const baseModelId = currentState.savedModel?.name
+      ? currentState.savedModel.name
+      : currentState.model;
+
     const modelToSave: Omit<LlmStructuredCompletionModel, 'ref'> & {
       name: string;
     } = {
       name: finalModelName,
-      llm_model_id: currentState.model,
+      llm_model_id: baseModelId,
       default_params: validatedParams.data,
     };
 
@@ -366,13 +374,25 @@ const useSaveModelConfiguration = ({
       toast(`Model "${finalModelName}" saved successfully!`, {
         type: 'success',
       });
+
+      refetchSavedModels();
+
+      setPlaygroundStateField(settingsTab, 'savedModel', {
+        name: baseModelId,
+        savedModelParams: validatedParams.data,
+      });
+
+      setPlaygroundStateField(
+        settingsTab,
+        'model',
+        finalModelName as LLMMaxTokensKey
+      );
     } catch (error) {
       console.error('Failed to save model:', error);
       toast(`Failed to save model: ${error}`, {
         type: 'error',
       });
     }
-    refetch();
   };
 
   return {saveModelConfiguration};

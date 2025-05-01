@@ -77,10 +77,11 @@ export function useLLMDropdownOptions({
   const overallLoading = configuredProvidersLoading || customLoading;
 
   // Process saved models into a provider-organized structure
-  const savedModelsByProvider = useMemo(() => {
-    const lookup: Record<string, LLMOption[]> = {};
+  const savedModels = useMemo(() => {
+    const lookup: LLMOption[] = [];
 
     if (savedModelsResult) {
+      console.log('savedModelsResult', savedModelsResult);
       savedModelsResult.forEach(savedModelObj => {
         const savedModelVal = savedModelObj.val as LlmStructuredCompletionModel;
         const baseModelId = savedModelVal.llm_model_id;
@@ -124,29 +125,23 @@ export function useLLMDropdownOptions({
           maxTokens = findMaxTokensByModelName(baseModelId);
         }
 
-        // Add model to the provider's list if we identified a provider
-        if (provider && maxTokens !== undefined) {
-          if (!lookup[provider]) {
-            lookup[provider] = [];
-          }
-          lookup[provider].push({
-            label: savedModelName,
-            value: savedModelName,
-            baseModelId: baseModelId as LLMMaxTokensKey,
-            max_tokens: maxTokens,
-            defaultParams: convertDefaultParamsToOptionalPlaygroundModelParams(
-              savedModelVal.default_params ?? {},
-              savedModelVal.messages_template ?? []
-            ),
-          });
-        }
+        lookup.push({
+          label: savedModelName,
+          value: savedModelName,
+          provider: provider,
+          baseModelId: baseModelId as LLMMaxTokensKey,
+          max_tokens: maxTokens,
+          defaultParams: convertDefaultParamsToOptionalPlaygroundModelParams(
+            savedModelVal.default_params ?? {messages_template: []}
+          ),
+        });
       });
     }
 
+    console.log('lookup', lookup);
+
     // Sort models alphabetically within each provider
-    Object.values(lookup).forEach(models =>
-      models.sort((a, b) => a.label.localeCompare(b.label))
-    );
+    lookup.sort((a, b) => a.label.localeCompare(b.label));
 
     return lookup;
   }, [savedModelsResult, customProviderModelsResult, customProvidersResult]);
@@ -155,12 +150,11 @@ export function useLLMDropdownOptions({
   const allOptions = useMemo(() => {
     const options: ProviderOption[] = [];
     const disabledOptions: ProviderOption[] = [];
+    const savedModelsOptions: ProviderOption[] = [];
 
     // Process built-in providers
     if (!configuredProvidersLoading) {
       Object.entries(configuredProviders).forEach(([provider, {status}]) => {
-        const savedProviderModels = savedModelsByProvider[provider] || [];
-
         const providerLLMs = Object.entries(LLM_MAX_TOKENS)
           .filter(([_, config]) => config.provider === provider)
           .map(
@@ -171,14 +165,11 @@ export function useLLMDropdownOptions({
             })
           );
 
-        // Combine saved models with built-in models for this provider
-        const allLLMsForProvider = [...savedProviderModels, ...providerLLMs];
-
         const option: ProviderOption = {
           label:
             LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
           value: provider,
-          llms: status ? allLLMsForProvider : [],
+          llms: providerLLMs,
           isDisabled: !status,
         };
 
@@ -197,9 +188,6 @@ export function useLLMDropdownOptions({
         const providerName = provider.val.name || '';
         const providerKey = providerName;
 
-        const savedCustomProviderModels =
-          savedModelsByProvider[providerKey] || [];
-
         const currentProviderModels =
           customProviderModelsResult?.filter(
             obj => obj.val.provider === provider.digest
@@ -216,30 +204,40 @@ export function useLLMDropdownOptions({
           max_tokens: model.val.max_tokens,
         }));
 
-        const allLLMsForCustomProvider = [
-          ...savedCustomProviderModels,
-          ...llmOptions,
-        ];
-
-        if (allLLMsForCustomProvider.length > 0) {
+        if (llmOptions.length > 0) {
           options.push({
             label: providerName,
             value: providerName,
-            llms: allLLMsForCustomProvider,
+            llms: llmOptions,
           });
         }
       });
     }
 
+    if (!savedModelsLoading && savedModels.length > 0) {
+      console.log('savedModels', savedModels);
+      savedModelsOptions.push({
+        label: 'Saved Models',
+        value: 'saved-models',
+        llms: savedModels,
+      });
+    }
+
     // Return all options with divider and add-provider button at the end
-    return [...options, ...disabledOptions, dividerOption, addProviderOption];
+    return [
+      ...options,
+      ...disabledOptions,
+      ...savedModelsOptions,
+      dividerOption,
+      addProviderOption,
+    ];
   }, [
     configuredProvidersLoading,
     configuredProviders,
     customLoading,
     customProvidersResult,
     customProviderModelsResult,
-    savedModelsByProvider,
+    savedModels,
   ]);
 
   // Combined refetch function
@@ -285,8 +283,7 @@ export function useLLMDropdownOptions({
 
 // Helper function to convert saved model parameters to playground format
 const convertDefaultParamsToOptionalPlaygroundModelParams = (
-  defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined,
-  messagesTemplate: Record<string, string>[] | null | undefined
+  defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined
 ): OptionalSavedPlaygroundModelParams => {
   if (!defaultParams) return {};
 
@@ -307,6 +304,6 @@ const convertDefaultParamsToOptionalPlaygroundModelParams = (
     ),
     functions: nullToUndefined(defaultParams.functions),
     stopSequences: nullToUndefined(defaultParams.stop),
-    messagesTemplate: nullToUndefined(messagesTemplate),
+    messagesTemplate: nullToUndefined(defaultParams.messages_template),
   };
 };

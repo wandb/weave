@@ -2,6 +2,7 @@ import {Box} from '@mui/material';
 import {
   MOON_100,
   MOON_200,
+  MOON_500,
   MOON_800,
   MOON_900,
   OBLIVION,
@@ -11,26 +12,36 @@ import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
 import {Link} from '../../common/Links';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
+  findMaxTokensByModelName,
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
   LLMMaxTokensKey,
 } from '../llmMaxTokens';
-import {OptionalSavedPlaygroundModelParams} from '../types';
+import {
+  OptionalSavedPlaygroundModelParams,
+  PlaygroundResponseFormats,
+} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
+import {
+  LlmStructuredCompletionModel,
+  LlmStructuredCompletionModelDefaultParams,
+} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 
 export interface LLMOption {
+  subLabel?: string | React.ReactNode;
   label: string;
   value: LLMMaxTokensKey | string;
   max_tokens: number;
   baseModelId?: LLMMaxTokensKey | null;
   defaultParams?: OptionalSavedPlaygroundModelParams;
+  provider?: string;
 }
 
 export interface ProviderOption {
@@ -41,7 +52,14 @@ export interface ProviderOption {
 }
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    savedModel?: {
+      name: string | null;
+      savedModelParams: OptionalSavedPlaygroundModelParams | null;
+    }
+  ) => void;
   entity: string;
   project: string;
   isAdmin?: boolean;
@@ -100,7 +118,14 @@ const SubMenu = ({
   onSelect,
 }: {
   llms: Array<LLMOption>;
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    savedModel?: {
+      name: string | null;
+      savedModelParams: OptionalSavedPlaygroundModelParams | null;
+    }
+  ) => void;
   position: {top: number; left: number};
   onSelect: () => void;
 }) => {
@@ -126,7 +151,16 @@ const SubMenu = ({
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
-            onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
+            onChange(
+              llm.value as LLMMaxTokensKey,
+              llm.max_tokens,
+              llm.defaultParams && llm.baseModelId
+                ? {
+                    name: llm.baseModelId,
+                    savedModelParams: llm.defaultParams,
+                  }
+                : undefined
+            );
             onSelect();
           }}
           sx={{
@@ -142,6 +176,9 @@ const SubMenu = ({
             },
           }}>
           {llm.label}
+          {llm.subLabel && (
+            <Box sx={{fontSize: '12px', color: MOON_500}}>{llm.subLabel}</Box>
+          )}
         </Box>
       ))}
     </Box>,
@@ -332,7 +369,16 @@ export const CustomOption = ({
             <Box
               key={llm.value}
               onClick={() => {
-                onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
+                onChange(
+                  llm.value as LLMMaxTokensKey,
+                  llm.max_tokens,
+                  llm.defaultParams && llm.baseModelId
+                    ? {
+                        name: llm.baseModelId,
+                        savedModelParams: llm.defaultParams,
+                      }
+                    : undefined
+                );
                 props.selectProps.onInputChange?.('', {
                   action: 'set-value',
                   prevInputValue: props.selectProps.inputValue,
@@ -465,15 +511,76 @@ export const getLLMDropdownOptions = (
     });
   }
 
-  if (!savedModelsLoading) {
-    console.log('savedModelsResult', savedModelsResult);
-    // savedModelsResult?.forEach(model => {
-    //   savedModelsOptions.push({
-    //     label: model.val.name,
-    //     value: model.val.name,
-    //     llms: [],
-    //   });
-    // });
+  const savedModels = useMemo(() => {
+    const savedModels: LLMOption[] = [];
+
+    if (savedModelsResult) {
+      savedModelsResult.forEach(savedModelObj => {
+        const savedModelVal = savedModelObj.val as LlmStructuredCompletionModel;
+        const baseModelId = savedModelVal.llm_model_id;
+        const savedModelName =
+          savedModelVal.name ?? savedModelObj.object_id ?? 'Unnamed Model';
+
+        let provider: string | undefined;
+        let maxTokens: number | undefined;
+
+        // Try to determine provider from built-in model list
+        if (baseModelId in LLM_MAX_TOKENS) {
+          const baseModelConfig =
+            LLM_MAX_TOKENS[baseModelId as LLMMaxTokensKey];
+          provider = baseModelConfig.provider;
+          maxTokens = baseModelConfig.max_tokens;
+        } else {
+          // Try to determine from custom provider models
+          const customModelMatch = customProviderModelsResult?.find(
+            customModel => {
+              const customProviderMatch = customProvidersResult?.find(
+                p => p.digest === customModel.val.provider
+              );
+              return (
+                `${customProviderMatch?.val.name}/${customModel.val.name}` ===
+                baseModelId
+              );
+            }
+          );
+
+          if (customModelMatch) {
+            const customProviderMatch = customProvidersResult?.find(
+              p => p.digest === customModelMatch.val.provider
+            );
+            provider = customProviderMatch?.val.name ?? undefined;
+            maxTokens = customModelMatch.val.max_tokens;
+          }
+        }
+
+        // Fallback max tokens determination
+        if (maxTokens === undefined) {
+          maxTokens = findMaxTokensByModelName(baseModelId);
+        }
+
+        savedModels.push({
+          label: savedModelName,
+          value: savedModelName,
+          provider: provider,
+          subLabel: baseModelId,
+          baseModelId: baseModelId as LLMMaxTokensKey,
+          max_tokens: maxTokens,
+          defaultParams: convertDefaultParamsToOptionalPlaygroundModelParams(
+            savedModelVal.default_params ?? {messages_template: []}
+          ),
+        });
+      });
+    }
+
+    return savedModels;
+  }, [savedModelsResult, customProviderModelsResult, customProvidersResult]);
+
+  if (!savedModelsLoading && savedModels.length > 0) {
+    savedModelsOptions.push({
+      label: 'Saved Models',
+      value: 'saved-models',
+      llms: savedModels,
+    });
   }
 
   // Combine enabled and disabled options
@@ -481,10 +588,38 @@ export const getLLMDropdownOptions = (
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
+    ...savedModelsOptions,
     ...disabledOptions,
     dividerOption,
     addProviderOption,
   ];
 
   return allOptions;
+};
+
+// Helper function to convert saved model parameters to playground format
+const convertDefaultParamsToOptionalPlaygroundModelParams = (
+  defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined
+): OptionalSavedPlaygroundModelParams => {
+  if (!defaultParams) return {};
+
+  // Helper function to convert null or undefined to undefined
+  const nullToUndefined = (value: any) => {
+    return value === null || value === undefined ? undefined : value;
+  };
+
+  return {
+    temperature: nullToUndefined(defaultParams.temperature),
+    topP: nullToUndefined(defaultParams.top_p),
+    maxTokens: nullToUndefined(defaultParams.max_tokens),
+    frequencyPenalty: nullToUndefined(defaultParams.frequency_penalty),
+    presencePenalty: nullToUndefined(defaultParams.presence_penalty),
+    nTimes: nullToUndefined(defaultParams.n_times) ?? 1,
+    responseFormat: nullToUndefined(
+      defaultParams.response_format as PlaygroundResponseFormats
+    ),
+    functions: nullToUndefined(defaultParams.functions),
+    stopSequences: nullToUndefined(defaultParams.stop),
+    messagesTemplate: nullToUndefined(defaultParams.messages_template),
+  };
 };

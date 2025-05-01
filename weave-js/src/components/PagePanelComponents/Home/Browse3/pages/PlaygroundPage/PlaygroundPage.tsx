@@ -6,7 +6,6 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
-import {useLLMDropdownOptions} from './PlaygroundChat/useLLMDropdownOptions';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
 import {
@@ -220,7 +219,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
           projectId={`${props.entity}/${props.project}`}
-          refetch={refetchSavedModels}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
     </Box>

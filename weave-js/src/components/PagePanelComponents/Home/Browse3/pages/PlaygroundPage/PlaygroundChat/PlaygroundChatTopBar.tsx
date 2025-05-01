@@ -7,12 +7,11 @@ import {
 import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
-import {Provider} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {
@@ -23,10 +22,7 @@ import {
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {ProviderOption} from './LLMDropdownOptions';
-import {
-  SetPlaygroundStateFieldFunctionType,
-  TraceCallOutput,
-} from './useChatFunctions';
+import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
 type PlaygroundChatTopBarProps = {
   idx: number;
@@ -43,8 +39,6 @@ type PlaygroundChatTopBarProps = {
   llmDropdownOptions: ProviderOption[];
   areProvidersLoading: boolean;
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
-  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[];
-  savedModelsLoading: boolean;
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -69,8 +63,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   llmDropdownOptions,
   areProvidersLoading,
   customProvidersResult,
-  savedModelsResult,
-  savedModelsLoading,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -90,6 +82,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
 
   const handleCompare = () => {
     if (onlyOneChat) {
+      console.log('handle compare');
       setPlaygroundStates([
         ...playgroundStates,
         JSON.parse(JSON.stringify(playgroundStates[0])),
@@ -100,7 +93,11 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   const handleModelChange = (
     index: number,
     model: LLMMaxTokensKey,
-    maxTokens: number
+    maxTokens: number,
+    savedModel?: {
+      name: string | null;
+      savedModelParams: OptionalSavedPlaygroundModelParams | null;
+    }
   ) => {
     setPlaygroundStates(
       playgroundStates.map((state, i) => {
@@ -110,24 +107,15 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             model,
             maxTokensLimit: maxTokens,
             maxTokens: Math.floor(maxTokens / 2),
-          };
-        }
-        return state;
-      })
-    );
-  };
-
-  const handleSavedModelChange = (
-    index: number,
-    model: string,
-    params: OptionalSavedPlaygroundModelParams
-  ) => {
-    setPlaygroundStates(
-      playgroundStates.map((state, i) => {
-        if (i === index) {
-          return {
-            ...state,
-            savedModel: {name: model, savedModelParams: params},
+            savedModel: savedModel
+              ? {
+                  name: savedModel.name,
+                  savedModelParams: savedModel.savedModelParams,
+                }
+              : {
+                  name: null,
+                  savedModelParams: null,
+                },
           };
         }
         return state;
@@ -175,8 +163,13 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
           value={playgroundStates[idx].model}
-          onChange={(model, maxTokens) =>
-            handleModelChange(idx, model as LLMMaxTokensKey, maxTokens)
+          onChange={(model, maxTokens, savedModel) =>
+            handleModelChange(
+              idx,
+              model as LLMMaxTokensKey,
+              maxTokens,
+              savedModel
+            )
           }
           entity={entity}
           project={project}
