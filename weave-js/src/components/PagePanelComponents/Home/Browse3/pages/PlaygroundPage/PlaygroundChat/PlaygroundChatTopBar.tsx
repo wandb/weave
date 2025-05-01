@@ -22,7 +22,10 @@ import {
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {ProviderOption} from './LLMDropdownOptions';
-import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
+import {
+  SetPlaygroundStateFieldFunctionType,
+  TraceCallOutput,
+} from './useChatFunctions';
 
 type PlaygroundChatTopBarProps = {
   idx: number;
@@ -123,6 +126,12 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
               inputs: {
                 ...state.traceCall?.inputs,
                 messages: messagesTemplate ?? state.traceCall?.inputs?.messages,
+              },
+              output: {
+                ...(state.traceCall?.output as TraceCallOutput),
+                choices: messagesTemplate
+                  ? undefined
+                  : (state.traceCall?.output as TraceCallOutput)?.choices,
               },
             },
             ...defaultParams,

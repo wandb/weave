@@ -239,7 +239,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           onClick={handleSaveClick}
           className="w-full"
           disabled={playgroundStates.length === 0}>
-          Save Model Configuration
+          Publish Model
         </Button>
       </Box>
 
