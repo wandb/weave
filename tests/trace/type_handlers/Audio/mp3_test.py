@@ -1,8 +1,8 @@
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
 from pydub import AudioSegment
-from typing import Optional
-from pathlib import Path
-import wave
 
 import weave
 from weave.trace.weave_client import WeaveClient, get_ref
@@ -17,6 +17,7 @@ Calls:
 5. Using as inputs, output, and output component (refs)
 """
 
+
 def make_audio(duration: Optional[int] = None) -> AudioSegment:
     sample_rate = 44100  # Standard audio sample rate
     duration = duration or 2  # seconds
@@ -24,14 +25,11 @@ def make_audio(duration: Optional[int] = None) -> AudioSegment:
 
     t = np.linspace(0, duration, int(sample_rate * duration), False)
     amplitude = np.iinfo(np.int16).max
-    tone = amplitude * np.sin(2*np.pi*frequency*t)
+    tone = amplitude * np.sin(2 * np.pi * frequency * t)
     audio_data = tone.astype(np.int16)
 
     return AudioSegment(
-        audio_data.tobytes(), 
-        frame_rate=sample_rate,
-        channels=1,
-        sample_width=2
+        audio_data.tobytes(), frame_rate=sample_rate, channels=1, sample_width=2
     )
 
 
@@ -39,6 +37,7 @@ def make_audio_file(filename: str, duration: Optional[int] = None) -> None:
     audio_segment = make_audio(duration)
     ext = filename.split(".")[-1]
     audio_segment.export(out_f=filename, format=ext)
+
 
 def test_weave_audio_publish(client: WeaveClient, tmp_path: Path) -> None:
     client.project = "test_audio_publish"

@@ -101,6 +101,7 @@ def load(
                     # The client running the load op might not be the same as the client that ran save
                     # Since this fn is serialized for isolated execution, we need an env check
                     from pydub import AudioSegment
+
                     return AudioSegment.from_file(path, format=fmt.value)
                 except ImportError:
                     raise ValueError(
