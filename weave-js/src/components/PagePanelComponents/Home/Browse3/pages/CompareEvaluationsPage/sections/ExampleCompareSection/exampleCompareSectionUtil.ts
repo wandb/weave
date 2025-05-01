@@ -1,5 +1,4 @@
-import {WeaveObjectRef} from '@wandb/weave/react';
-import {parseRef} from '@wandb/weave/react';
+import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
 import _, {isEmpty} from 'lodash';
 import {
   MutableRefObject,
@@ -225,7 +224,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: rows[0].inputRef, // Should be the same for all,
+            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
             output: aggregateGroupedNestedRows(
               rows,
               'output',
@@ -417,6 +416,17 @@ export function useExampleCompareData(
 
       const selectedRowDigest = targetRow.inputDigest;
 
+      // Check if we can get the data from the results directly.
+      // This is most commonly true for imperative evaluations
+      const rawDataRow =
+        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest]
+          ?.rawDataRow;
+      if (!(selectedRowDigest in cachedRowData.current) && rawDataRow) {
+        cachedRowData.current[selectedRowDigest] = rawDataRow;
+        increaseCacheVersion();
+        return;
+      }
+
       if (!cachedPartialTableRequest.current) {
         cachedPartialTableRequest.current = await makePartialTableReq(
           state.summary.evaluations,
@@ -479,6 +489,7 @@ export function useExampleCompareData(
     })();
   }, [
     state.summary.evaluations,
+    state.loadableComparisonResults.result,
     filteredRows,
     targetIndex,
     increaseCacheVersion,
