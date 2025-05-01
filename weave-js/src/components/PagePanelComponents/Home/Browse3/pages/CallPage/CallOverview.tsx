@@ -32,9 +32,17 @@ export const CallName = styled.div<{$isEditing?: boolean}>`
   font-weight: 600;
   text-align: left;
   min-width: 0;
-  width: 100%;
+  display: inline-block;
 `;
 CallName.displayName = 'S.CallName';
+
+export const NameIdContainer = styled.div`
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-right: 4px;
+`;
+NameIdContainer.displayName = 'S.NameIdContainer';
 
 export const Spacer = styled.div`
   flex: 1 1 auto;
@@ -58,10 +66,12 @@ export const CallOverview: React.FC<{
     <>
       <Overview>
         <StatusChip value={statusCode} iconOnly />
-        <CallName>
-          <EditableCallName call={call} onEditingChange={setIsEditing} />
-        </CallName>
-        <CopyableId id={call.callId} type="Call" />
+        <NameIdContainer>
+          <CallName>
+            <EditableCallName call={call} onEditingChange={setIsEditing} />
+          </CallName>
+          <CopyableId id={call.callId} type="Call" />
+        </NameIdContainer>
         <Spacer />
         <div>
           <Reactions weaveRef={refCall} forceVisible={true} />
