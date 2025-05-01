@@ -98,7 +98,7 @@ export const EditableCallName: React.FC<{
         <div
           className="group flex cursor-pointer items-center rounded px-[8px] py-[4px] hover:bg-moon-100 dark:hover:bg-moon-800"
           onClick={() => setIsEditing(true)}>
-          {currNameToDisplay}
+          <span className="truncate">{currNameToDisplay}</span>
           <Icon
             name="pencil-edit"
             width={16}
@@ -130,7 +130,7 @@ export const EditableCallName: React.FC<{
           placeholder={defaultDisplayName}
           autoGrow={true}
           rows={1}
-          className="w-full px-[8px] py-[4px]"
+          className="w-full overflow-hidden text-ellipsis whitespace-nowrap px-[8px] py-[4px]"
         />
       </div>
     </Tailwind>

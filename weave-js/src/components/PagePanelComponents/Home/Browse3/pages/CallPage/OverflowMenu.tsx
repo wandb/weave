@@ -86,7 +86,6 @@ export const OverflowMenu: FC<{
             icon="overflow-horizontal"
             size="medium"
             variant="ghost"
-            style={{marginLeft: '4px'}}
           />
         }
         offset="-178px, -16px"

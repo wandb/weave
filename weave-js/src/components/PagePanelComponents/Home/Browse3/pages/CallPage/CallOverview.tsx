@@ -14,7 +14,15 @@ import {OverflowMenu} from './OverflowMenu';
 export const Overview = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  & > * {
+    margin-right: 4px;
+  }
+  & > *:first-child {
+    margin-right: 4px;
+  }
+  & > *:last-child {
+    margin-right: 0px;
+  }
 `;
 Overview.displayName = 'S.Overview';
 
@@ -23,8 +31,8 @@ export const CallName = styled.div<{$isEditing?: boolean}>`
   font-size: 16px;
   font-weight: 600;
   text-align: left;
-  word-break: break-all;
-  width: ${props => (props.$isEditing ? '100%' : 'max-content%')};
+  min-width: 0;
+  width: 100%;
 `;
 CallName.displayName = 'S.CallName';
 
@@ -35,7 +43,6 @@ Spacer.displayName = 'S.Spacer';
 
 export const OverflowBin = styled.div`
   align-items: right;
-  margin-left: auto;
 `;
 OverflowBin.displayName = 'S.OverflowBin';
 
@@ -45,13 +52,13 @@ export const CallOverview: React.FC<{
   const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
-  const [isEditing, setIsEditing] = React.useState(false);
+  const [, setIsEditing] = React.useState(false);
 
   return (
     <>
       <Overview>
         <StatusChip value={statusCode} iconOnly />
-        <CallName $isEditing={isEditing}>
+        <CallName>
           <EditableCallName call={call} onEditingChange={setIsEditing} />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
