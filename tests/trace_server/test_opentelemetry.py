@@ -1,8 +1,9 @@
+import hashlib
 import json
 import uuid
 from binascii import hexlify
 from datetime import datetime
-from unittest.mock import patch
+from typing import Any
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -23,19 +24,25 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.attributes import (
-    Attributes,
-    AttributesFactory,
-    GenericAttributes,
-    OpenInferenceAttributes,
-    OpenTelemetryAttributes,
+    get_wandb_attributes,
+    get_weave_attributes,
+    get_weave_inputs,
+    get_weave_outputs,
+    get_weave_usage,
+)
+from weave.trace_server.opentelemetry.helpers import (
+    capture_parts,
     convert_numeric_keys_to_list,
     expand_attributes,
     flatten_attributes,
     get_attribute,
+    shorten_name,
     to_json_serializable,
     unflatten_key_values,
 )
-from weave.trace_server.opentelemetry.python_spans import Span as PySpan
+from weave.trace_server.opentelemetry.python_spans import (
+    Span as PySpan,
+)
 from weave.trace_server.opentelemetry.python_spans import (
     SpanKind,
     StatusCode,
@@ -156,22 +163,21 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert call.id == decoded_span
     assert call.trace_id == decoded_trace
 
-    call_attributes = Attributes(_attributes=call.attributes)
     for kv in export_span.attributes:
         key = kv.key
         value = kv.value
         if value.HasField("string_value"):
-            assert call_attributes.get_attribute_value(key) == value.string_value
+            assert get_attribute(call.attributes, key) == value.string_value
         elif value.HasField("int_value"):
-            assert call_attributes.get_attribute_value(key) == value.int_value
+            assert get_attribute(call.attributes, key) == value.int_value
         elif value.HasField("double_value"):
-            assert call_attributes.get_attribute_value(key) == value.double_value
+            assert get_attribute(call.attributes, key) == value.double_value
         elif value.HasField("bool_value"):
-            assert call_attributes.get_attribute_value(key) == value.bool_value
+            assert get_attribute(call.attributes, key) == value.bool_value
         elif value.HasField("array_value"):
             # Handle array values
             array_values = [v.string_value for v in value.array_value.values]
-            assert call_attributes.get_attribute_value(key) == array_values
+            assert get_attribute(call.attributes, key) == array_values
 
     # Verify call deletion using client provided ID works
     client.server.calls_delete(
@@ -206,13 +212,13 @@ class TestPythonSpans:
         assert py_span.status.message == pb_span.status.message
 
         # Verify attributes were correctly converted
-        assert py_span.attributes.get_attribute_value("test.attribute") == "test_value"
-        assert py_span.attributes.get_attribute_value("test.number") == 42
+        assert get_attribute(py_span.attributes, "test.attribute") == "test_value"
+        assert get_attribute(py_span.attributes, "test.number") == 42
         assert (
-            py_span.attributes.get_attribute_value("test.nested.value")
+            get_attribute(py_span.attributes, "test.nested.value")
             == "nested_test_value"
         )
-        array_value = py_span.attributes.get_attribute_value("test.array")
+        array_value = get_attribute(py_span.attributes, "test.array")
         assert isinstance(array_value, list)
         assert len(array_value) == 2
         assert array_value[0] == "value1"
@@ -223,15 +229,41 @@ class TestPythonSpans:
         pb_span = create_test_span()
         py_span = PySpan.from_proto(pb_span)
 
-        start_call, end_call = py_span.to_call("test_project")
+        start_call, _ = py_span.to_call("test_project")
 
         # Verify start call
         assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
         assert start_call.project_id == "test_project"
         assert start_call.id == py_span.span_id
-        assert start_call.op_name == py_span.name
+        assert (
+            start_call.op_name == py_span.name
+        )  # This should be using the shortened name if necessary
         assert start_call.trace_id == py_span.trace_id
         assert start_call.started_at == py_span.start_time
+
+    def test_span_to_call_long_name(self):
+        """Test that span names are properly shortened when too long."""
+        from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+        from weave.trace_server.opentelemetry.helpers import shorten_name
+
+        # Create a test span with a very long name
+        pb_span = create_test_span()
+        long_name = "a" * (MAX_OP_NAME_LENGTH + 10)
+        pb_span.name = long_name
+
+        py_span = PySpan.from_proto(pb_span)
+        start_call, end_call = py_span.to_call("test_project")
+
+        # Verify that the op_name was shortened
+        identifier = hashlib.sha256(long_name.encode("utf-8")).hexdigest()[:4]
+        shortened_name = shorten_name(
+            long_name,
+            MAX_OP_NAME_LENGTH,
+            abbrv=f":{identifier}",
+            use_delimiter_in_abbr=False,
+        )
+        assert start_call.op_name == shortened_name
+        assert len(start_call.op_name) <= MAX_OP_NAME_LENGTH
 
         # Verify attributes in start call
         assert "test" in start_call.attributes
@@ -242,6 +274,17 @@ class TestPythonSpans:
         assert start_call.attributes["test"]["nested"]["value"] == "nested_test_value"
         assert "array" in start_call.attributes["test"]
         assert start_call.attributes["test"]["array"] == ["value1", "value2"]
+
+        # Verify otel_span is included in attributes
+        assert "otel_span" in start_call.attributes
+        assert start_call.attributes["otel_span"]["name"] == py_span.name
+        assert (
+            start_call.attributes["otel_span"]["context"]["trace_id"]
+            == py_span.trace_id
+        )
+        assert (
+            start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
+        )
 
         # Verify end call
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
@@ -296,6 +339,133 @@ class TestAttributes:
         # Test enums
         assert to_json_serializable(SpanKind.INTERNAL) == 1
 
+    def test_to_json_serializable_special_floats(self):
+        """Test converting special float values (NaN, Infinity)."""
+        # Test NaN
+        assert to_json_serializable(float("nan")) == "nan"
+
+        # Test positive infinity
+        assert to_json_serializable(float("inf")) == "inf"
+
+        # Test negative infinity
+        assert to_json_serializable(float("-inf")) == "-inf"
+
+    def test_to_json_serializable_date_time(self):
+        """Test converting date and time objects."""
+        from datetime import date, time
+
+        # Test date
+        d = date(2023, 1, 1)
+        assert to_json_serializable(d) == "2023-01-01"
+
+        # Test time
+        t = time(12, 30, 45)
+        assert to_json_serializable(t) == "12:30:45"
+
+    def test_to_json_serializable_timedelta(self):
+        """Test converting timedelta objects."""
+        from datetime import timedelta
+
+        # Test one day
+        td = timedelta(days=1)
+        assert to_json_serializable(td) == 86400.0  # 24 * 60 * 60 seconds
+
+        # Test complex timedelta
+        td = timedelta(days=1, hours=2, minutes=30, seconds=15)
+        expected_seconds = (1 * 24 * 60 * 60) + (2 * 60 * 60) + (30 * 60) + 15
+        assert to_json_serializable(td) == expected_seconds
+
+    def test_to_json_serializable_uuid(self):
+        """Test converting UUID objects."""
+        import uuid
+
+        # Create a UUID with a known value
+        test_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        assert to_json_serializable(test_uuid) == "12345678-1234-5678-1234-567812345678"
+
+    def test_to_json_serializable_decimal(self):
+        """Test converting Decimal objects."""
+        from decimal import Decimal
+
+        # Test simple decimal
+        assert to_json_serializable(Decimal("10.5")) == 10.5
+
+        # Test high precision decimal
+        assert (
+            to_json_serializable(Decimal("3.14159265358979323846"))
+            == 3.14159265358979323846
+        )
+
+        # Test zero
+        assert to_json_serializable(Decimal("0")) == 0.0
+
+    def test_to_json_serializable_sets(self):
+        """Test converting set and frozenset objects."""
+        # Test set
+        s = {1, 2, 3, "test"}
+        result = to_json_serializable(s)
+        assert isinstance(result, list)
+        assert len(result) == 4
+        assert 1 in result
+        assert 2 in result
+        assert 3 in result
+        assert "test" in result
+
+        # Test frozenset
+        fs = frozenset([4, 5, 6, "frozen"])
+        result = to_json_serializable(fs)
+        assert isinstance(result, list)
+        assert len(result) == 4
+        assert 4 in result
+        assert 5 in result
+        assert 6 in result
+        assert "frozen" in result
+
+    def test_to_json_serializable_complex(self):
+        """Test converting complex numbers."""
+        c = complex(3, 4)
+        result = to_json_serializable(c)
+        assert isinstance(result, dict)
+        assert result == {"real": 3.0, "imag": 4.0}
+
+        # Test complex with negative imaginary part
+        c = complex(1, -2)
+        assert to_json_serializable(c) == {"real": 1.0, "imag": -2.0}
+
+    def test_to_json_serializable_bytes(self):
+        """Test converting bytes and bytearray objects."""
+        # Test bytes
+        b = b"hello world"
+        assert to_json_serializable(b) == "aGVsbG8gd29ybGQ="  # Base64 encoded
+
+        # Test bytearray
+        ba = bytearray(b"hello world")
+        assert to_json_serializable(ba) == "aGVsbG8gd29ybGQ="  # Base64 encoded
+
+    def test_to_json_serializable_dataclass(self):
+        """Test converting dataclass objects."""
+        from dataclasses import dataclass
+
+        @dataclass
+        class Person:
+            name: str
+            age: int
+
+        person = Person(name="John", age=30)
+        result = to_json_serializable(person)
+        assert isinstance(result, dict)
+        assert result == {"name": "John", "age": 30}
+
+        # Nested dataclass
+        @dataclass
+        class Department:
+            name: str
+            head: Person
+
+        dept = Department(name="Engineering", head=Person(name="Jane", age=35))
+        result = to_json_serializable(dept)
+        assert result == {"name": "Engineering", "head": {"name": "Jane", "age": 35}}
+
     def test_unflatten_key_values(self):
         """Test unflattening key-value pairs into nested structure."""
         # Create key-value pairs
@@ -322,13 +492,7 @@ class TestAttributes:
         assert get_attribute(nested, "a.b") == {"c": "value1"}
         assert get_attribute(nested, "d") == [1, 2, 3]
 
-        # Need to patch get_attribute function to correctly handle array indices
-        with patch(
-            "weave.trace_server.opentelemetry.attributes._get_value_from_nested_dict"
-        ) as mock_get:
-            mock_get.return_value = 1
-            assert get_attribute(nested, "d.0") == 1
-            mock_get.assert_called_once_with(nested, "d.0")
+        assert get_attribute(nested, "d.0") == 1
 
         assert get_attribute(nested, "nonexistent") is None
 
@@ -386,6 +550,10 @@ class TestAttributes:
         assert result == expected
 
 
+def create_attributes(d: dict[str, Any]):
+    return expand_attributes(d.items())
+
+
 class TestSemanticConventionParsing:
     """Test the semantic convention parsing functionality in attributes.py."""
 
@@ -394,89 +562,150 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference attributes
-        attributes = {
-            "openinference": True,
-            OISpanAttr.LLM_SYSTEM: "This is a system prompt",
-            OISpanAttr.LLM_PROVIDER: "test-provider",
-            OISpanAttr.LLM_MODEL_NAME: "test-model",
-            OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
-            OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
-                {"temperature": 0.7, "max_tokens": 100}
-            ),
-        }
-
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
+        attributes = create_attributes(
+            {
+                OISpanAttr.LLM_SYSTEM: "This is a system prompt",
+                OISpanAttr.LLM_PROVIDER: "test-provider",
+                OISpanAttr.LLM_MODEL_NAME: "test-model",
+                OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
+                OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
+                    {"temperature": 0.7, "max_tokens": 100}
+                ),
+            }
+        )
 
         # Test get_weave_attributes
-        extracted = oi_attrs.get_weave_attributes()
+        extracted = get_weave_attributes(attributes)
         assert extracted["system"] == "This is a system prompt"
         assert extracted["provider"] == "test-provider"
         assert extracted["model"] == "test-model"
         assert extracted["kind"] == "llm"
-        assert extracted["temperature"] == "0.7"
-        assert extracted["max_tokens"] == "100"
+        assert extracted["model_parameters"]["max_tokens"] == 100
+        assert extracted["model_parameters"]["temperature"] == 0.7
+
+    def test_wandb_attributes_extraction(self):
+        """Test extracting wandb-specific attributes."""
+        # Create attribute dictionary with W&B specific attributes
+        attributes = create_attributes(
+            {
+                "wandb.display_name": "My Custom Display Name",
+            }
+        )
+
+        # Test get_wandb_attributes
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["display_name"] == "My Custom Display Name"
+
+        # Test with missing attributes
+        empty_attributes = create_attributes({})
+        extracted = get_wandb_attributes(empty_attributes)
+        assert extracted == {}
+
+        # Test with partial attributes
+        partial_attributes = create_attributes(
+            {
+                "wandb.display_name": "Only Display Name",
+            }
+        )
+        extracted = get_wandb_attributes(partial_attributes)
+        assert extracted["display_name"] == "Only Display Name"
+        assert "project_id" not in extracted
+
+        # Test with nested attributes format
+        nested_attributes = create_attributes(
+            {
+                "wandb": {
+                    "display_name": "Nested Display Name",
+                }
+            }
+        )
+        extracted = get_wandb_attributes(nested_attributes)
+        assert extracted["display_name"] == "Nested Display Name"
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference input messages
-        input_messages = {"0": {"role": "user", "content": "What is machine learning?"}}
-        attributes = {
-            "openinference": True,
-            OISpanAttr.LLM_INPUT_MESSAGES: input_messages,
-        }
+        # Create attribute dictionary with OpenInference input value and mime type
+        attributes = create_attributes(
+            {
+                OISpanAttr.INPUT_VALUE: "What is machine learning?",
+                OISpanAttr.INPUT_MIME_TYPE: "text/plain",
+            }
+        )
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
-        # Test get_weave_inputs
-        inputs = oi_attrs.get_weave_inputs()
-        assert inputs == {"role_0": "user", "content_0": "What is machine learning?"}
-
-        # Test with multiple messages
-        input_messages_multiple = {
-            "0": {"role": "system", "content": "You are an assistant"},
-            "1": {"role": "user", "content": "What is machine learning?"},
-        }
-        attributes = {
-            "openinference": True,
-            OISpanAttr.LLM_INPUT_MESSAGES: input_messages_multiple,
-        }
-        oi_attrs = OpenInferenceAttributes(attributes)
-        inputs = oi_attrs.get_weave_inputs()
+        # Test get_weave_inputs with text input
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "role_0": "system",
-            "content_0": "You are an assistant",
-            "role_1": "user",
-            "content_1": "What is machine learning?",
+            "input.value": "What is machine learning?",
+        }
+
+        # Test with JSON input
+        json_input = json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "You are an assistant"},
+                    {"role": "user", "content": "What is machine learning?"},
+                ]
+            }
+        )
+        attributes = create_attributes(
+            {
+                OISpanAttr.INPUT_VALUE: json_input,
+                OISpanAttr.INPUT_MIME_TYPE: "application/json",
+            }
+        )
+        inputs = get_weave_inputs([], attributes)
+        assert inputs == {
+            "input.value": {
+                "messages": [
+                    {"role": "system", "content": "You are an assistant"},
+                    {"role": "user", "content": "What is machine learning?"},
+                ]
+            },
         }
 
     def test_openinference_outputs_extraction(self):
         """Test extracting outputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
-        # Create attribute dictionary with OpenInference output messages
-        output_messages = {
-            "0": {
-                "role": "assistant",
-                "content": "Machine learning is a field of AI...",
+        # Create attribute dictionary with OpenInference output value and mime type
+        attributes = create_attributes(
+            {
+                OISpanAttr.OUTPUT_VALUE: "Machine learning is a field of AI...",
+                OISpanAttr.OUTPUT_MIME_TYPE: "text/plain",
             }
-        }
-        attributes = {
-            "openinference": True,
-            OISpanAttr.LLM_OUTPUT_MESSAGES: output_messages,
-        }
+        )
 
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
-
-        # Test get_weave_outputs
-        outputs = oi_attrs.get_weave_outputs()
+        # Test get_weave_outputs with text output
+        outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "role_0": "assistant",
-            "content_0": "Machine learning is a field of AI...",
+            "output.value": "Machine learning is a field of AI...",
+        }
+
+        # Test with JSON output
+        json_output = json.dumps(
+            {
+                "response": {
+                    "role": "assistant",
+                    "content": "Machine learning is a field of AI...",
+                }
+            }
+        )
+        attributes = create_attributes(
+            {
+                OISpanAttr.OUTPUT_VALUE: json_output,
+                OISpanAttr.OUTPUT_MIME_TYPE: "application/json",
+            }
+        )
+        outputs = get_weave_outputs([], attributes)
+        assert outputs == {
+            "output.value": {
+                "response": {
+                    "role": "assistant",
+                    "content": "Machine learning is a field of AI...",
+                }
+            },
         }
 
     def test_openinference_usage_extraction(self):
@@ -484,18 +713,16 @@ class TestSemanticConventionParsing:
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
 
         # Create attribute dictionary with OpenInference token counts
-        attributes = {
-            "openinference": True,
-            OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
-            OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
-            OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
-        }
-
-        # Create OpenInference attributes object
-        oi_attrs = OpenInferenceAttributes(attributes)
+        attributes = create_attributes(
+            {
+                OISpanAttr.LLM_TOKEN_COUNT_PROMPT: 10,
+                OISpanAttr.LLM_TOKEN_COUNT_COMPLETION: 20,
+                OISpanAttr.LLM_TOKEN_COUNT_TOTAL: 30,
+            }
+        )
 
         # Test get_weave_usage
-        usage = oi_attrs.get_weave_usage()
+        usage = get_weave_usage(attributes)
         assert usage.get("prompt_tokens") == 10
         assert usage.get("completion_tokens") == 20
         assert usage.get("total_tokens") == 30
@@ -505,21 +732,19 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry attributes
-        attributes = {
-            "gen_ai": True,
-            OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
-            OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
-            OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
-            OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
-        }
-
-        # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_SYSTEM: "You are a helpful assistant",
+                OTSpanAttr.LLM_REQUEST_MAX_TOKENS: 150,
+                OTSpanAttr.TRACELOOP_SPAN_KIND: "llm",
+                OTSpanAttr.LLM_RESPONSE_MODEL: "gpt-4",
+            }
+        )
 
         # Test get_weave_attributes
-        extracted = ot_attrs.get_weave_attributes()
+        extracted = get_weave_attributes(attributes)
         assert extracted["system"] == "You are a helpful assistant"
-        assert extracted["max_tokens"] == 150
+        assert extracted["model_parameters"]["max_tokens"] == 150
         assert extracted["kind"] == "llm"
         assert extracted["model"] == "gpt-4"
 
@@ -529,18 +754,18 @@ class TestSemanticConventionParsing:
 
         # Create attribute dictionary with OpenTelemetry prompts
         prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
-        attributes = {
-            "gen_ai": True,
-            OTSpanAttr.LLM_PROMPTS: prompts,
-        }
-
-        # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_PROMPTS: prompts,
+            }
+        )
 
         # Test get_weave_inputs
-        inputs = ot_attrs.get_weave_inputs()
+        inputs = get_weave_inputs([], attributes)
         assert inputs == {
-            "0": {"role": "user", "content": "Tell me about quantum computing"}
+            "gen_ai.prompt": [
+                {"role": "user", "content": "Tell me about quantum computing"}
+            ]
         }
 
         # Test with multiple prompts
@@ -548,13 +773,18 @@ class TestSemanticConventionParsing:
             "0": {"role": "system", "content": "You are an expert in quantum physics"},
             "1": {"role": "user", "content": "Tell me about quantum computing"},
         }
-        attributes = {
-            "gen_ai": True,
-            OTSpanAttr.LLM_PROMPTS: prompts_multiple,
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_PROMPTS: prompts_multiple,
+            }
+        )
+        inputs = get_weave_inputs([], attributes)
+        assert inputs == {
+            "gen_ai.prompt": [
+                {"role": "system", "content": "You are an expert in quantum physics"},
+                {"role": "user", "content": "Tell me about quantum computing"},
+            ]
         }
-        ot_attrs = OpenTelemetryAttributes(attributes)
-        inputs = ot_attrs.get_weave_inputs()
-        assert inputs == prompts_multiple
 
     def test_opentelemetry_outputs_extraction(self):
         """Test extracting outputs from OpenTelemetry attributes."""
@@ -567,21 +797,23 @@ class TestSemanticConventionParsing:
                 "content": "Quantum computing uses quantum mechanics...",
             }
         }
-        attributes = {
-            "gen_ai": True,
-            OTSpanAttr.LLM_COMPLETIONS: completions,
-        }
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_COMPLETIONS: completions,
+            }
+        )
 
         # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
 
         # Test get_weave_outputs
-        outputs = ot_attrs.get_weave_outputs()
+        outputs = get_weave_outputs([], attributes)
         assert outputs == {
-            "0": {
-                "role": "assistant",
-                "content": "Quantum computing uses quantum mechanics...",
-            }
+            "gen_ai.completion": [
+                {
+                    "role": "assistant",
+                    "content": "Quantum computing uses quantum mechanics...",
+                }
+            ]
         }
 
     def test_opentelemetry_usage_extraction(self):
@@ -589,39 +821,110 @@ class TestSemanticConventionParsing:
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
         # Create attribute dictionary with OpenTelemetry token usage
-        attributes = {
-            "gen_ai": True,
-            OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
-            OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
-            OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
-        }
+        attributes = create_attributes(
+            {
+                OTSpanAttr.LLM_USAGE_PROMPT_TOKENS: 15,
+                OTSpanAttr.LLM_USAGE_COMPLETION_TOKENS: 25,
+                OTSpanAttr.LLM_USAGE_TOTAL_TOKENS: 40,
+            }
+        )
 
         # Create OpenTelemetry attributes object
-        ot_attrs = OpenTelemetryAttributes(attributes)
+        usage = get_weave_usage(attributes) or {}
 
-        # Test get_weave_usage
-        usage = ot_attrs.get_weave_usage()
         assert usage.get("prompt_tokens") == 15
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
 
-    def test_attributes_factory(self):
-        """Test the AttributesFactory for creating the correct attributes object."""
-        factory = AttributesFactory()
 
-        # Test OpenInference detection
-        oi_key_value = KeyValue(key="openinference", value=AnyValue(bool_value=True))
-        oi_attrs = factory.from_proto([oi_key_value])
-        assert isinstance(oi_attrs, OpenInferenceAttributes)
+class TestHelpers:
+    def test_capture_parts(self):
+        """Test capturing parts of a string split by delimiters."""
+        # Test with a single delimiter
+        assert capture_parts("part1.part2") == ["part1", ".", "part2"]
 
-        # Test OpenTelemetry detection
-        ot_key_value = KeyValue(key="gen_ai", value=AnyValue(bool_value=True))
-        ot_attrs = factory.from_proto([ot_key_value])
-        assert isinstance(ot_attrs, OpenTelemetryAttributes)
+        # Test with multiple delimiters
+        assert capture_parts("part1.part2,part3") == [
+            "part1",
+            ".",
+            "part2",
+            ",",
+            "part3",
+        ]
 
-        # Test generic attributes (no specific convention)
-        generic_key_value = KeyValue(
-            key="some_key", value=AnyValue(string_value="some_value")
+        # Test with delimiters that don't appear in the string
+        assert capture_parts("nodelimiters") == ["nodelimiters"]
+
+        # Test with an empty string
+        assert capture_parts("") == [""]
+
+        # Test with custom delimiters
+        assert capture_parts("a-b-c", delimiters=["-"]) == ["a", "-", "b", "-", "c"]
+
+        # Test with adjacent delimiters
+        assert capture_parts("part1..part2") == ["part1", ".", ".", "part2"]
+
+    def test_shorten_name_no_delimiters(self):
+        """Test shortening a name with no delimiters."""
+        # Test a string shorter than max_len - the function always adds ellipsis
+        assert shorten_name("short", 10) == "short"
+
+        # Test a string longer than max_len with no delimiters
+        long_name = "abcdefghijklmnopqrstuvwxyz"
+        assert shorten_name(long_name, 10) == "abcdefg..."
+
+    def test_shorten_name_with_delimiters(self):
+        """Test shortening a name with delimiters."""
+        # Test with a single delimiter
+        assert shorten_name("part1.part2", 10) == "part1..."
+
+        # Test with multiple delimiters where it fits within the max_len
+        assert shorten_name("a.b.c", 10) == "a.b.c"
+
+        # Test with multiple delimiters where it needs truncation
+        assert shorten_name("part1.part2.part3", 12) == "part1..."
+
+    def test_shorten_name_first_part_too_long(self):
+        """Test shortening a name where first part is already too long."""
+        # First part already exceeds max_len
+        assert shorten_name("verylongfirstpart.second", 10) == "verylon..."
+
+    def test_shorten_name_custom_abbreviation(self):
+        """Test shortening a name with custom abbreviation."""
+        assert shorten_name("part1.part2.part3", 10, "***") == "part1.***"
+
+        # Test with empty abbreviation
+        assert shorten_name("part1.part2.part3", 10, "") == "part1"
+
+    def test_shorten_name_different_delimiters(self):
+        """Test shortening a name with different types of delimiters."""
+        # Test with a space delimiter
+        assert shorten_name("word1 word2 word3", 12) == "word1 ..."
+
+        # Test with a slash delimiter
+        assert shorten_name("path/to/file", 8) == "path/..."
+
+        # Test with mixed delimiters
+        assert shorten_name("user.name@example.com", 12) == "user..."
+
+        # Test with a delimiter not in the default list
+        # Since '-' is not in the default delimiters list, it's treated as part of the string
+        result = shorten_name("part1-part2-part3", 10)
+        assert result.startswith("part1-")
+        assert result.endswith("...")
+        assert len(result) == 10
+
+        # Test with a question mark delimiter
+        assert shorten_name("api/endpoint?param=value", 15) == "api/..."
+
+    def test_long_url_regression(self):
+        # Test for a modified version of the URL which caused failed traces due to op_name length
+        actual = shorten_name(
+            "GET /api/trpc/lambda/organization.getActiveOrganization,account.getSubscription,checkout.getPrices,user.getUserToolGroupsConfig?batch=1&input=%8A%220%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%221%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%222%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%2P%223%22%3Z%8A%22json%22%3Znull%2P%22meta%22%3Z%8A%22values%22%3Z%5X%22undefined%22%5D%8D%8D%8D",
+            128,
         )
-        generic_attrs = factory.from_proto([generic_key_value])
-        assert isinstance(generic_attrs, GenericAttributes)
+        # The new implementation shortens the URL differently, so we check that it has the correct format
+        # and doesn't exceed the maximum length
+        assert actual.startswith("GET /")
+        assert actual.endswith("...")
+        assert len(actual) <= 128

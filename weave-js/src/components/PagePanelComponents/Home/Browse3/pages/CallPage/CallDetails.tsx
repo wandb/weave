@@ -95,6 +95,7 @@ export const CallDetails: FC<{
     call.entity,
     call.project,
     {
+      traceId: call.traceId,
       parentIds: [call.callId],
     },
     undefined,
@@ -111,6 +112,13 @@ export const CallDetails: FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();
+
+  const inputError = useMemo(() => {
+    return weaveErrorPayload(call.rawSpan.inputs);
+  }, [call.rawSpan.inputs]);
+  const outputError = useMemo(() => {
+    return weaveErrorPayload(call.rawSpan.output);
+  }, [call.rawSpan.output]);
 
   return (
     <Box
@@ -142,7 +150,11 @@ export const CallDetails: FC<{
               project: call.project,
               mode: 'object_viewer',
             }}>
-            <ObjectViewerSection title="Inputs" data={inputs} />
+            <ObjectViewerSection
+              title="Inputs"
+              data={inputs}
+              error={inputError}
+            />
           </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
@@ -168,7 +180,12 @@ export const CallDetails: FC<{
                 project: call.project,
                 mode: 'object_viewer',
               }}>
-              <ObjectViewerSection title="Output" data={output} isExpanded />
+              <ObjectViewerSection
+                title="Output"
+                data={output}
+                isExpanded
+                error={outputError}
+              />
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
@@ -222,6 +239,7 @@ export const CallDetails: FC<{
               project={call.project}
               allowedColumnPatterns={ALLOWED_COLUMN_PATTERNS}
               paginationModel={isPeeking ? {page: 0, pageSize: 10} : undefined}
+              columnVisibilityModel={{CustomCheckbox: false}}
             />
           );
           if (isPeeking) {
@@ -333,4 +351,17 @@ const callGrouping = (childCalls: CallSchema[]) => {
   );
 
   return {singularChildCalls, multipleChildCallOpRefs};
+};
+
+const weaveErrorPayload = (val: any): string | undefined => {
+  const isError =
+    val != null &&
+    typeof val === 'object' &&
+    '_weave' in val &&
+    val._weave.error;
+
+  if (isError) {
+    return val._weave.error;
+  }
+  return undefined;
 };

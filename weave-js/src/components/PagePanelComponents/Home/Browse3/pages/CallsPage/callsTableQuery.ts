@@ -63,6 +63,9 @@ export const useCallsForQuery = (
   refetch: () => void;
   storageSizeLoading: boolean;
   storageSizeResults: Map<string, number> | null;
+  primaryError?: Error | null;
+  costsError?: Error | null;
+  storageSizeError?: Error | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -89,9 +92,16 @@ export const useCallsForQuery = (
     }
   );
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
-    refetchOnDelete: true,
-  });
+  const callsStats = useCallsStats(
+    entity,
+    project,
+    lowLevelFilter,
+    filterBy,
+    undefined, // limit
+    {
+      refetchOnDelete: true,
+    }
+  );
 
   const callResults = useMemo(() => {
     return getFeedbackMerged(calls.result ?? []);
@@ -201,6 +211,9 @@ export const useCallsForQuery = (
         : callResults,
       total,
       refetch,
+      primaryError: calls.error,
+      costsError: costs.error,
+      storageSizeError: storageSize.error,
     };
   }, [
     callResults,
@@ -211,6 +224,9 @@ export const useCallsForQuery = (
     refetch,
     storageSize.loading,
     storageSizeResults,
+    calls.error,
+    costs.error,
+    storageSize.error,
   ]);
 };
 
@@ -282,7 +298,7 @@ const getFilterBy = (
   return {$expr: filterByRaw} as Query;
 };
 
-const convertHighLevelFilterToLowLevelFilter = (
+export const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   return {
@@ -294,6 +310,33 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+// Warning: This is a lossy conversion, there are things we
+// can represent in a low level filter that we cannot represent
+// in a high level filter.
+export const convertLowLevelFilterToHighLevelFilter = (
+  lowLevelFilter: CallFilter
+): WFHighLevelCallFilter => {
+  const highLevelFilter: WFHighLevelCallFilter = {};
+  if (lowLevelFilter.opVersionRefs) {
+    highLevelFilter.opVersionRefs = lowLevelFilter.opVersionRefs;
+  }
+  if (lowLevelFilter.inputObjectVersionRefs) {
+    highLevelFilter.inputObjectVersionRefs =
+      lowLevelFilter.inputObjectVersionRefs;
+  }
+  if (lowLevelFilter.outputObjectVersionRefs) {
+    highLevelFilter.outputObjectVersionRefs =
+      lowLevelFilter.outputObjectVersionRefs;
+  }
+  if (lowLevelFilter.parentIds) {
+    highLevelFilter.parentId = lowLevelFilter.parentIds[0];
+  }
+  if (lowLevelFilter.traceRootsOnly) {
+    highLevelFilter.traceRootsOnly = lowLevelFilter.traceRootsOnly;
+  }
+  return highLevelFilter;
 };
 
 const getFeedbackMerged = (calls: CallSchema[]) => {
@@ -370,12 +413,26 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
-    skip: skip || cachedFilter != null,
-  });
-  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
-    skip: skip || cachedFilter != null,
-  });
+  const callStats7Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d7filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
+  const callStats30Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d30filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
 
   const defaultDatetimeFilter = useMemo(
     () => ({

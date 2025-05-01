@@ -451,6 +451,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
         )
 
+    def table_query_stats_batch(
+        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
+    ) -> tsi.TableQueryStatsRes:
+        return self._generic_request(
+            "/table/query_stats_batch",
+            req,
+            tsi.TableQueryStatsBatchReq,
+            tsi.TableQueryStatsBatchRes,
+        )
+
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
@@ -484,6 +494,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
+
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._generic_request(
+            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
+        )
 
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
