@@ -40,6 +40,7 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
     props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE};
   transition: all 0.1s ease-in-out;
   width: 100%;
+  flex: 1 1 150px;
   min-width: 0;
 
   &:hover {
