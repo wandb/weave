@@ -2564,7 +2564,7 @@ def test_calls_filter_by_latency(client):
     assert sorted_calls[1].id == medium_call.id  # Medium call
     assert sorted_calls[2].id == fast_call.id  # Fast call
 
-    # Filter by latency
+    # Filter by latency, Float
     latency_calls = list(
         client.get_calls(
             query={
@@ -2578,6 +2578,21 @@ def test_calls_filter_by_latency(client):
         )
     )
     assert len(latency_calls) == 3
+
+    # Filter by latency, Int
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 10},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(latency_calls) == 0
 
 
 def test_calls_query_sort_by_trace_name(client):
