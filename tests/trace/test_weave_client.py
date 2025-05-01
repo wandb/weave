@@ -2517,6 +2517,7 @@ def test_calls_filter_by_latency(client):
     # Create calls with different latencies
     # Fast call - minimal latency
     fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
+    time.sleep(0.001)
     client.finish_call(fast_call, "fast result")  # Minimal latency
 
     # Medium latency

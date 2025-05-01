@@ -928,8 +928,9 @@ def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
     return f"""CASE
         WHEN {ended_at_sql} IS NULL THEN NULL
-        ELSE (
+        ELSE CAST(
             toUnixTimestamp64Milli({ended_at_sql}) - toUnixTimestamp64Milli({started_at_sql})
+            AS Float64
         )
     END"""
 
