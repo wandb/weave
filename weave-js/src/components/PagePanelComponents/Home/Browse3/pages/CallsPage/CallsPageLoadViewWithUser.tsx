@@ -12,7 +12,7 @@ type CallsPageLoadViewWithUserProps = {
   project: string;
   tab: string;
   view?: string;
-  userInfo: UserInfo;
+  userInfo: UserInfo | null;
   projectInfo: ProjectInfo;
 };
 

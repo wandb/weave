@@ -28,9 +28,6 @@ export const CallsPageLoadView = ({
   if (loadingUserInfo || loadingProjectInfo) {
     return <Loading />;
   }
-  if (!userInfo) {
-    return <Alert severity="error">User not found</Alert>;
-  }
   if (!projectInfo) {
     return <Alert severity="error">Invalid project: {project}</Alert>;
   }
