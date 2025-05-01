@@ -99,6 +99,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
       savedModelParams: OptionalSavedPlaygroundModelParams | null;
     }
   ) => {
+    const {messagesTemplate, ...defaultParams} =
+      savedModel?.savedModelParams ?? {};
     setPlaygroundStates(
       playgroundStates.map((state, i) => {
         if (i === index) {
@@ -116,6 +118,14 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
                   name: null,
                   savedModelParams: null,
                 },
+            traceCall: {
+              ...state.traceCall,
+              inputs: {
+                ...state.traceCall?.inputs,
+                messages: messagesTemplate ?? state.traceCall?.inputs?.messages,
+              },
+            },
+            ...defaultParams,
           };
         }
         return state;

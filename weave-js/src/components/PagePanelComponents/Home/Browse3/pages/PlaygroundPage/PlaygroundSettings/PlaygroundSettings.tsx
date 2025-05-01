@@ -330,13 +330,15 @@ const useSaveModelConfiguration = ({
     ) {
       const choice = (currentState.traceCall.output as TraceCallOutput)
         ?.choices?.[currentState.selectedChoiceIndex ?? 0];
-      defaultParams.messages_template.push({
-        content: choice?.message.content,
-        function_call: choice?.message.function_call ?? null,
-        name: choice?.message.name ?? null,
-        role: choice?.message.role,
-        tool_call_id: choice?.message.tool_call_id ?? null,
-      });
+      if (choice) {
+        defaultParams.messages_template.push({
+          content: choice?.message.content,
+          function_call: choice?.message.function_call ?? null,
+          name: choice?.message.name ?? null,
+          role: choice?.message.role,
+          tool_call_id: choice?.message.tool_call_id ?? null,
+        });
+      }
     }
 
     const validatedParams =
