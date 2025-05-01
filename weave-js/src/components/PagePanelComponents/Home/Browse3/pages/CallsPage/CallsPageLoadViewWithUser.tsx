@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {ProjectInfo} from '../../../../../../common/hooks/useProjectInfo';
-import {UserInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {MaybeUserInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {Loading} from '../../../../../Loading';
 import {useSavedViewInstances} from '../SavedViews/savedViewUtil';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
@@ -12,7 +12,7 @@ type CallsPageLoadViewWithUserProps = {
   project: string;
   tab: string;
   view?: string;
-  userInfo: UserInfo;
+  userInfo: MaybeUserInfo;
   projectInfo: ProjectInfo;
 };
 
