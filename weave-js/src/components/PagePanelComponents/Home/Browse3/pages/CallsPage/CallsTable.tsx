@@ -900,6 +900,7 @@ export const CallsTable: FC<{
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
+                  tooltipText="Compare metrics and examples for selected evaluations"
                   onClick={() => {
                     history.push(
                       router.compareEvaluationsUri(
