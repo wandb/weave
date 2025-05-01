@@ -104,7 +104,7 @@ class Dataset(Object):
             )
 
         # Convert HF Dataset to list of dicts
-        rows = list(target_hf_dataset)
+        rows = target_hf_dataset.to_list()
         return cls(rows=rows)
 
     def to_pandas(self) -> "pd.DataFrame":
