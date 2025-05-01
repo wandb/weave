@@ -45,9 +45,11 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
   const {useFeedback} = useWFHooks();
   const [foundFeedback, setFoundFeedback] = useState<HumanAnnotation[]>([]);
   const query = useFeedback({
-    entity: props.entity,
-    project: props.project,
-    weaveRef: props.callRef,
+    key: {
+      entity: props.entity,
+      project: props.project,
+      weaveRef: props.callRef,
+    },
   });
   const foundFeedbackCallRef = query?.result?.[0]?.weave_ref;
   const feedbackSpecRef = props.hfSpec.ref;

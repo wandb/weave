@@ -37,8 +37,12 @@ import {
   CallSchema,
   Loadable,
   LoadableWithError,
+  ObjectDeleteAllVersionsParams,
+  ObjectDeleteParams,
   ObjectVersionKey,
   ObjectVersionSchema,
+  OpVersionDeleteAllVersionsParams,
+  OpVersionDeleteParams,
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
@@ -55,7 +59,6 @@ import {
   UseFileContentParams,
   UseGetRefsTypeParams,
   UseObjCreateParams,
-  UseObjectDeleteParams,
   UseObjectVersionParams,
   UseOpVersionParams,
   UseOpVersionsParams,
@@ -494,15 +497,15 @@ const useCallsStats = (
         project: params.project,
       }),
       filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
+        op_names: deepFilter?.opVersionRefs,
+        input_refs: deepFilter?.inputObjectVersionRefs,
+        output_refs: deepFilter?.outputObjectVersionRefs,
+        parent_ids: deepFilter?.parentIds,
+        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter?.callIds,
+        trace_roots_only: deepFilter?.traceRootsOnly,
+        wb_run_ids: deepFilter?.runIds,
+        wb_user_ids: deepFilter?.userIds,
       },
       query: params.query,
       limit: params.limit,
@@ -1159,9 +1162,9 @@ const useRootObjectVersions = (
         project: params.project,
       }),
       filter: {
-        base_object_classes: deepFilter.baseObjectClasses,
-        object_ids: deepFilter.objectIds,
-        latest_only: deepFilter.latestOnly,
+        base_object_classes: deepFilter?.baseObjectClasses,
+        object_ids: deepFilter?.objectIds,
+        latest_only: deepFilter?.latestOnly,
         is_op: false,
       },
       limit: params.limit,
@@ -1258,8 +1261,8 @@ const useObjectDeleteFunc = () => {
   }, []);
 
   const objectVersionsDelete = useCallback(
-    (params: UseObjectDeleteParams) => {
-      params.digests.forEach(digest => {
+    (params: ObjectDeleteParams) => {
+      params.digests?.forEach(digest => {
         updateObjectCaches({
           scheme: 'weave',
           weaveKind: 'object',
@@ -1283,14 +1286,14 @@ const useObjectDeleteFunc = () => {
   );
 
   const objectDeleteAllVersions = useCallback(
-    (key: ObjectVersionKey) => {
-      updateObjectCaches(key);
+    (params: ObjectDeleteAllVersionsParams) => {
+      updateObjectCaches(params.key);
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
+          entity: params.key.entity,
+          project: params.key.project,
         }),
-        object_id: key.objectId,
+        object_id: params.key.objectId,
         digests: [],
       });
     },
@@ -1298,36 +1301,36 @@ const useObjectDeleteFunc = () => {
   );
 
   const opVersionsDelete = useCallback(
-    (entity: string, project: string, opId: string, digests: string[]) => {
-      digests.forEach(digest => {
+    (params: OpVersionDeleteParams) => {
+      params.digests?.forEach(digest => {
         updateOpCaches({
-          entity,
-          project,
-          opId,
+          entity: params.entity,
+          project: params.project,
+          opId: params.opId,
           versionHash: digest,
         });
       });
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity,
-          project,
+          entity: params.entity,
+          project: params.project,
         }),
-        object_id: opId,
-        digests,
+        object_id: params.opId,
+        digests: params.digests,
       });
     },
     [getTsClient, updateOpCaches]
   );
 
   const opDeleteAllVersions = useCallback(
-    (key: OpVersionKey) => {
-      updateOpCaches(key);
+    (params: OpVersionDeleteAllVersionsParams) => {
+      updateOpCaches(params.key);
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
+          entity: params.key.entity,
+          project: params.key.project,
         }),
-        object_id: key.opId,
+        object_id: params.key.opId,
         digests: [],
       });
     },

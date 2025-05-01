@@ -60,27 +60,17 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       : null;
   }, [props.entity, props.project, props.callId]);
 
-  const call = useCall(callKey);
-  const callWithCosts = useCall(callKey, {
-    includeCosts: true,
-  });
+  const call = useCall({key: callKey});
+  const callWithCosts = useCall({key: callKey, includeCosts: true});
 
-  const {result: calls} = useCalls(
-    props.entity,
-    props.project,
-    {
+  const {result: calls} = useCalls({
+    entity: props.entity,
+    project: props.project,
+    filter: {
       callIds: playgroundStates.map(state => state.traceCall.id || ''),
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      includeCosts: true,
-    }
-  );
+    includeCosts: true,
+  });
 
   const {
     result: configuredProviders,

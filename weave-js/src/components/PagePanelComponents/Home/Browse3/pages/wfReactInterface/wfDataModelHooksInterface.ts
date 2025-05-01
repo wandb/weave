@@ -103,7 +103,7 @@ type WandbArtifactObjectVersionKey = {
   scheme: 'wandb-artifact';
 } & CommonObjectVersionKey;
 
-type WeaveObjectVersionKey = {
+export type WeaveObjectVersionKey = {
   scheme: 'weave';
   weaveKind: WeaveKind;
 } & CommonObjectVersionKey;
@@ -196,7 +196,7 @@ export interface UseCallsParams {
 export interface UseCallsStatsParams {
   entity: string;
   project: string;
-  filter: CallFilter;
+  filter?: CallFilter;
   query?: Query;
   limit?: number;
   skip?: boolean;
@@ -287,7 +287,7 @@ export interface UseTableQueryStatsParams {
 export interface UseRootObjectVersionsParams {
   entity: string;
   project: string;
-  filter: ObjectVersionFilter;
+  filter?: ObjectVersionFilter;
   limit?: number;
   metadataOnly?: boolean;
   skip?: boolean;
@@ -295,11 +295,26 @@ export interface UseRootObjectVersionsParams {
   includeStorageSize?: boolean;
 }
 
-export interface UseObjectDeleteParams {
+export interface ObjectDeleteParams {
   entity: string;
   project: string;
   objectId: string;
-  digests: string[];
+  digests?: string[];
+}
+
+export interface ObjectDeleteAllVersionsParams {
+  key: ObjectVersionKey;
+}
+
+export interface OpVersionDeleteParams {
+  entity: string;
+  project: string;
+  opId: string;
+  digests?: string[];
+}
+
+export interface OpVersionDeleteAllVersionsParams {
+  key: OpVersionKey;
 }
 
 export interface UseRefsDataParams {
@@ -373,19 +388,16 @@ export type WFDataModelHooksInterface = {
   ) => LoadableWithError<ObjectVersionSchema[]>;
   useObjectDeleteFunc: () => {
     objectVersionsDelete: (
-      params: UseObjectDeleteParams
+      params: ObjectDeleteParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     objectDeleteAllVersions: (
-      key: ObjectVersionKey
+      params: ObjectDeleteAllVersionsParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     opVersionsDelete: (
-      entity: string,
-      project: string,
-      opId: string,
-      digests: string[]
+      params: OpVersionDeleteParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     opDeleteAllVersions: (
-      key: OpVersionKey
+      params: OpVersionDeleteAllVersionsParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
   };
   useRefsData: (params: UseRefsDataParams) => Loadable<any[]>;
@@ -401,7 +413,7 @@ export type WFDataModelHooksInterface = {
     params: UseTableUpdateParams
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
   useTableCreate: () => (
-    table: traceServerClientTypes.TableCreateReq
+    params: traceServerClientTypes.TableCreateReq
   ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
