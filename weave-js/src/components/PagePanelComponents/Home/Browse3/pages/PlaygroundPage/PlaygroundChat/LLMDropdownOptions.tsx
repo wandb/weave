@@ -8,6 +8,7 @@ import {
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
@@ -99,49 +100,62 @@ const SubMenu = ({
           {llm.label}
         </Box>
       ))}
-      {providers?.map(provider => (
-        <Box
-          key={provider.value}
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            p: '6px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            '&:hover': {
-              backgroundColor: hexToRGB(OBLIVION, 0.04),
-            },
-            width: '100%',
-          }}>
+      {providers?.map(provider => {
+        const tooltipContent =
+          provider.value !== 'custom-provider' && !isAdmin
+            ? 'You must be an admin to configure this provider'
+            : undefined;
+
+        const trigger = (
           <Box
+            key={provider.value}
             sx={{
-              wordBreak: 'break-all',
-              wordWrap: 'break-word',
-              whiteSpace: 'normal',
-            }}>
-            {provider.label}
-          </Box>
-          <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              p: '6px',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              '&:hover': {
+                backgroundColor: hexToRGB(OBLIVION, 0.04),
+              },
+              width: '100%',
+            }}
+            onClick={() => {
+              if (provider.value === 'custom-provider' || isAdmin) {
                 onConfigureProvider?.(provider.value);
-              }}
-              disabled={!isAdmin && provider.value !== 'custom-provider'}
-              tooltip={
-                !isAdmin && provider.value !== 'custom-provider'
-                  ? 'You must be an admin to configure this provider'
-                  : undefined
-              }>
-              Configure
-            </Button>
+              }
+            }}>
+            <Box
+              sx={{
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+              }}>
+              {provider.label}
+            </Box>
+            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onConfigureProvider?.(provider.value);
+                }}
+                disabled={!isAdmin && provider.value !== 'custom-provider'}>
+                Configure
+              </Button>
+            </Box>
           </Box>
-        </Box>
-      ))}
+        );
+
+        return tooltipContent ? (
+          <Tooltip content={tooltipContent} trigger={trigger} />
+        ) : (
+          trigger
+        );
+      })}
     </Box>,
     document.body
   );
