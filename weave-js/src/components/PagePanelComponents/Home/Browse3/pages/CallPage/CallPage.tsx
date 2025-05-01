@@ -72,6 +72,7 @@ export const CallPage: FC<CallPageProps> = props => {
       // CallSummary.tsx)
       // includeCosts: true,
       includeTotalStorageSize: true,
+      refetchOnRename: true,
     }
   );
 

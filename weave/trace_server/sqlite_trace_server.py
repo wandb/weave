@@ -325,6 +325,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
+            if filter.wb_user_ids:
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
+                conds += [f"wb_user_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -658,10 +661,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 filter=req.filter,
                 query=req.query,
                 limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
         return tsi.CallsQueryStatsRes(
             count=len(calls),
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1372,6 +1381,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if query_result is None:
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
+
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        print("files_stats is not implemented for SQLite trace server", req)
+        return tsi.FilesStatsRes(total_size_bytes=-1)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)

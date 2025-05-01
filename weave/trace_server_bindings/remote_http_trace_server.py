@@ -495,6 +495,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._generic_request(
+            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
+        )
+
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:

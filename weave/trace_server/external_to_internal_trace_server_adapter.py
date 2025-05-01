@@ -313,6 +313,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         # Special case where refs can never be part of the request
         return self._internal_trace_server.file_content_read(req)
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.files_stats, req)
+
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         original_user_id = req.wb_user_id

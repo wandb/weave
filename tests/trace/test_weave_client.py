@@ -47,6 +47,7 @@ from weave.trace_server.sqlite_trace_server import (
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
+    FilesStatsReq,
     RefsReadBatchReq,
     TableCreateReq,
     TableQueryReq,
@@ -3416,3 +3417,16 @@ def test_filter_calls_by_ref(client):
     # this as "no filter"
     calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
     assert len(calls) == 1
+
+
+def test_files_stats(client):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    f_bytes = b"0" * 10000005
+    client.server.file_create(
+        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
+    )
+    read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
+
+    assert read_res.total_size_bytes == 10000005
