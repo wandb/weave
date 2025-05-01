@@ -1,5 +1,5 @@
 import {Box, CircularProgress} from '@mui/material';
-import {MOON_200, WHITE} from '@wandb/weave/common/css/color.styles';
+import {MOON_200, TEAL_400, WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
@@ -282,7 +282,9 @@ export const PlaygroundChat = ({
                   maxWidth: '800px',
                   minWidth: '520px',
                   margin: '8px',
-                  border: `1px solid ${MOON_200}`,
+                  border: `2px solid ${
+                    settingsTab === idx ? TEAL_400 : MOON_200
+                  }`,
                   borderRadius: '4px',
                 }}>
                 {state.loading && (
