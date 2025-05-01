@@ -234,7 +234,8 @@ def test_add_rows_to_unsaved_dataset(client):
 
 def test_hf_conversion(client):
     try:
-        from datasets import Dataset as HFDataset, DatasetDict as HFDatasetDict
+        from datasets import Dataset as HFDataset
+        from datasets import DatasetDict as HFDatasetDict
         from datasets.features import Value  # Import Value for feature checking
     except ImportError:
         pytest.skip("requires huggingface datasets library")
@@ -274,7 +275,8 @@ def test_hf_conversion(client):
     )
 
     with pytest.warns(
-        UserWarning, match="Input dataset has multiple splits. Using 'train' split by default."
+        UserWarning,
+        match="Input dataset has multiple splits. Using 'train' split by default.",
     ):
         weave_dataset_from_dict = weave.Dataset.from_hf(hf_dataset_dict)
 
@@ -290,7 +292,7 @@ def test_hf_conversion(client):
     # Test converting an empty weave.Dataset to HFDataset
     # Create a valid dataset first, then manually empty its rows to test to_hf directly
     temp_weave_ds = weave.Dataset(rows=[{"temp": 1}])
-    temp_weave_ds.rows = [] # Manually set rows to empty, bypassing validator
+    temp_weave_ds.rows = []  # Manually set rows to empty, bypassing validator
     empty_hf_ds = temp_weave_ds.to_hf()
     assert isinstance(empty_hf_ds, HFDataset)
     assert len(empty_hf_ds) == 0
@@ -298,5 +300,7 @@ def test_hf_conversion(client):
 
     # Test from_hf with an empty HFDataset (should raise ValueError)
     empty_hf_dataset_input = HFDataset.from_list([])
-    with pytest.raises(ValueError, match="Attempted to construct a Dataset with an empty list"):
+    with pytest.raises(
+        ValueError, match="Attempted to construct a Dataset with an empty list"
+    ):
         weave.Dataset.from_hf(empty_hf_dataset_input)

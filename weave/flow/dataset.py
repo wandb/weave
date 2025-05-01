@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
@@ -16,12 +17,12 @@ from weave.trace.weave_client import (
     Call,
 )
 
-import warnings
-
 if TYPE_CHECKING:
     import pandas as pd
+
     # Import huggingface datasets for type checking
-    from datasets import Dataset as HFDataset, DatasetDict as HFDatasetDict
+    from datasets import Dataset as HFDataset
+    from datasets import DatasetDict as HFDatasetDict
 
 
 @register_object
@@ -74,7 +75,8 @@ class Dataset(Object):
     @classmethod
     def from_hf(cls, hf_dataset: Union["HFDataset", "HFDatasetDict"]) -> Self:
         try:
-            from datasets import Dataset as HFDataset, DatasetDict as HFDatasetDict
+            from datasets import Dataset as HFDataset
+            from datasets import DatasetDict as HFDatasetDict
         except ImportError:
             raise ImportError(
                 "huggingface datasets is required to use this method. "
