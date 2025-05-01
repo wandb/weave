@@ -195,7 +195,7 @@ def test_dataset_select(client):
     with pytest.raises(IndexError):
         ds.select([-1])
 
-        
+
 def test_add_rows(client):
     ds = weave.Dataset(name="test", rows=[{"a": i} for i in range(10)])
     ref = weave.publish(ds)
