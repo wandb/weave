@@ -71,27 +71,61 @@ def test_audio_segment_publish(client: WeaveClient) -> None:
     assert gotten_audio.duration_seconds == 1
 
 
-@weave.op
-def weave_audio_as_input_and_output_part(in_audio: weave.Audio) -> dict:
-    return {"out_audio": in_audio}
-
 
 def test_weave_audio_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
+
+    @weave.op
+    def weave_audio_as_input_and_output_part(in_audio: weave.Audio) -> dict:
+        return {"out_audio": in_audio}
+
+    client.project = "test_audio_as_call_io"
+    temp_file = str(tmp_path / "audio.mp3")
+    # Create a temporary audio file
+    make_audio_file(temp_file)
+
+    weave_audio = weave.Audio(temp_file)
+    # Load the file into audio segement
+    source_audio = AudioSegment.from_mp3(temp_file)
+
+    weave_audio_as_input_and_output_part(weave_audio)
+
+    # Load op returns an AudioSegment, so we don't need to .from_mp3 them
+    input_output_part_call = weave_audio_as_input_and_output_part.calls()[0]
+
+    # Load op returns a AudioSegment
+    in_audio = input_output_part_call.inputs["in_audio"]
+    assert in_audio[:5] == source_audio[:5]
+
+    output_audio = input_output_part_call.output["out_audio"]
+    assert output_audio[:5] == source_audio[:5]
+
+
+def test_audio_segment_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
+
+    @weave.op
+    def audio_segment_as_input_and_output_part(in_audio: AudioSegment) -> dict:
+        return {"out_audio": in_audio}
+
     client.project = "test_audio_as_call_io"
     temp_file = str(tmp_path / "audio.mp3")
     # Create a temporary audio file
     make_audio_file(temp_file)
 
     # Load the file into audio segement
-    audio = AudioSegment.from_mp3(temp_file)
-    source_test_frames = [audio.get_frame(i) for i in range(5)]
+    source_audio = AudioSegment.from_mp3(temp_file)
 
-    input_output_part_call = weave_audio_as_input_and_output_part.calls()[0]
+    audio_segment_as_input_and_output_part(source_audio)
+
+    calls = audio_segment_as_input_and_output_part.calls()
+    assert len(calls) == 1
+
+    input_output_part_call = calls[0]
 
     input_audio = input_output_part_call.inputs["in_audio"]
-    input_test_frames = [input_audio.get_frame(i) for i in range(5)]
-    assert input_test_frames == source_test_frames
-
     output_audio = input_output_part_call.output["out_audio"]
-    output_test_frames = [output_audio.get_frame(i) for i in range(5)]
-    assert output_test_frames == source_test_frames
+
+    source_frames = str([input_audio.get_frame(i) for i in range(5)])
+    in_frames = str([input_audio.get_frame(i) for i in range(5)])
+    out_frames = str([output_audio.get_frame(i) for i in range(5)])
+    assert source_frames == in_frames
+    assert source_frames == out_frames
