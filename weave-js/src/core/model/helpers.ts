@@ -147,6 +147,8 @@ export function toPythonTyping(type: Type): string {
     return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'joined-table') {
     return PYTHON_UNCONVERTED_TYPE;
+  } else if (type.type === 'incremental-table') {
+    return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'partitioned-table') {
     return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'file') {
@@ -194,6 +196,8 @@ const filePrefixToMediaType = (prefix: string): MediaType | null => {
     return {type: 'joined-table', columnTypes: {}};
   } else if (prefix === 'partitioned-table') {
     return {type: 'partitioned-table', columnTypes: {}};
+  } else if (prefix === 'incremental-table') {
+    return {type: 'incremental-table', columnTypes: {}};
   }
   return null;
 };

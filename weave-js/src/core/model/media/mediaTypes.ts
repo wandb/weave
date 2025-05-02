@@ -237,6 +237,16 @@ export const isPartitionedTableWBType = (
   return t.wb_type === 'partitioned-table';
 };
 
+export type IncrementalTableWBType = WBType & {
+  wb_type: 'incremental-table';
+};
+
+export const isIncrementalTableWBType = (
+  t: WBType
+): t is IncrementalTableWBType => {
+  return t.wb_type === 'incremental-table';
+};
+
 export type WBTraceTreeWBType = WBType & {
   wb_type: 'wb_trace_tree';
 };

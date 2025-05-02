@@ -178,12 +178,12 @@ export function isTableTypeLike(type: Type) {
   ) {
     return true;
   }
-  // joined-table
+  // incremental-table
   if (isIncrementalTable(type)) {
     return true;
   }
 
-  // wb joined-table file
+  // wb incremental-table file
   if (
     isFile(type) &&
     type.wbObjectType != null &&

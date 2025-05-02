@@ -1,29 +1,13 @@
-import * as _ from 'lodash';
-
-import type {Client} from '../../client';
-import {EngineClient} from '../../client';
-import * as HL from '../../hl';
 import {
   isIncrementalTable,
-  isTaggedValue,
   list,
   mappableNullableSkipTaggable,
-  mappableNullableTaggable,
-  mappableNullableTaggableVal,
-  maybe,
-  MediaIncrementalTable,
   nullableOneOrMany,
-  OpInputNodes,
-  OutputNode,
-  taggedValue,
-  TaggedValueType,
   typedDict,
-  withFileTag,
   withTableRowTag,
 } from '../../model';
 import {makeOp} from '../../opStore';
 import {docType} from '../../util/docs';
-import {makeTagGetterOp} from '../opKinds';
 import {makeResolveOutputTypeFromOp} from './refineOp';
 
 export const opIncrementalTableRowsType = makeOp({

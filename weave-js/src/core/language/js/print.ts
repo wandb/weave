@@ -247,6 +247,18 @@ export function typeToString(
           ),
           indent('>', level),
         ].join('\n');
+  } else if (type.type === 'incremental-table') {
+    return simple
+      ? '(incremental table)'
+      : _.isEmpty(type.columnTypes)
+      ? 'IncrementalTable'
+      : [
+          'IncrementalTable<',
+          ..._.map(type.columnTypes, (v, k) =>
+            indent(k + ':' + typeToString(v, simple, level + 1), level + 1)
+          ),
+          indent('>', level),
+        ].join('\n');
   } else if (type.type === 'dict') {
     return simple
       ? '(dictionary)'
