@@ -46,6 +46,8 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {RemovableTag} from '../../../../../Tag';
+import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -68,11 +70,7 @@ import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
-import {
-  truncateID,
-  useControllableState,
-  useURLSearchParamsDict,
-} from '../util';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
@@ -987,14 +985,22 @@ export const CallsTable: FC<{
               />
             )}
             {selectedParentId && (
-              <Chip
+              <RemovableTag
+                maxChars={48}
+                truncatedPart="middle"
+                color="moon"
                 label={`Parent: ${selectedParentId}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    parentId: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        parentId: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             <div className="flex items-center gap-6">
@@ -1247,10 +1253,11 @@ const useParentIdOptions = (
     if (parentCall.loading || parentCall.result == null) {
       return {};
     }
+    const call = parentCall.result;
+    const truncatedId = call.callId.slice(-4);
+    const label = `${call.displayName} (${truncatedId})`;
     return {
-      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
-        parentCall.result.callId
-      )})`,
+      [call.callId]: label,
     };
   }, [parentCall.loading, parentCall.result]);
 };
