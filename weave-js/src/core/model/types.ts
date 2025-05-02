@@ -309,7 +309,6 @@ export type MediaType =
   | PytorchSavedModelType
   | TableType
   | JoinedTableType
-  | IncrementalTableType
   | PartitionedTableType
   | WBTraceTreeType;
 
@@ -462,7 +461,6 @@ export type ComplexType =
   | Dict
   | TaggedValueType
   | TableType
-  | IncrementalTableType
   | JoinedTableType
   | PartitionedTableType
   | MediaType

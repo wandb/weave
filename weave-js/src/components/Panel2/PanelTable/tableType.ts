@@ -1,9 +1,7 @@
 import {
   applyOpToOneOrMany,
   constBoolean,
-  constFunction,
   isFile,
-  isIncrementalTable,
   isJoinedTable,
   isListLike,
   isPartitionedTable,
@@ -12,19 +10,14 @@ import {
   listObjectType,
   Node,
   nullableTaggableValue,
-  opConcat,
-  opFileIncrementalTable,
   opFileJoinedTable,
   opFilePartitionedTable,
   opFileTable,
   opJoinedTableRows,
-  opMap,
   opPartitionedTableRows,
   opTableRows,
   Type,
-  union,
 } from '@wandb/weave/core';
-import {opIncrementalTableRows} from '@wandb/weave/core/ops/domain/incrementalTable';
 
 export const GeneralTableType = {
   type: 'list' as const,
@@ -139,16 +132,6 @@ export function normalizeTableLike(node: Node) {
 
 export function isTableTypeLike(type: Type) {
   type = nullableTaggableValue(type);
-  // todo: might not be feasible
-  if (isUnion(type)) {
-    for (const member of type.members) {
-      if (!isTableTypeLike(member)) {
-        console.log('aint it');
-        return false;
-      }
-    }
-    return true;
-  }
 
   // wb table file
   if (isFile(type) && type.wbObjectType != null && isTable(type.wbObjectType)) {
@@ -178,6 +161,11 @@ export function isTableTypeLike(type: Type) {
     type.wbObjectType != null &&
     isJoinedTable(type.wbObjectType)
   ) {
+    return true;
+  }
+
+  // joined-table
+  if (isJoinedTable(type)) {
     return true;
   }
 

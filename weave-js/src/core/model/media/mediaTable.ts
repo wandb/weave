@@ -174,8 +174,7 @@ function wbTypeToMediaType(t: WBType.WBType): Types.Type {
     return {type: 'wb_trace_tree'};
   } else if (
     WBType.isPartitionedTableWBType(t) ||
-    WBType.isJoinedTableWBType(t) ||
-    WBType.isIncrementalTableWBType(t)
+    WBType.isJoinedTableWBType(t)
   ) {
     // This should never actually be the case
     return 'unknown';

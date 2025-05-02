@@ -100,7 +100,6 @@ export interface TableMetadata {
   columns: Array<string | number | boolean>; // the column headers for the table
   data?: Array<TableCellValue | TableCellValue[]>; // the text for the table
 }
-
 export function isTableMetadata(v: any): v is TableMetadata {
   return v?._type === 'table' && _.isArray(v.columns);
 }

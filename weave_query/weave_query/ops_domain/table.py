@@ -114,6 +114,8 @@ class JoinedTableType(types.ObjectType):
             "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
             "_file": artifact_fs.FilesystemArtifactFileType(),
         }
+
+
 @weave_class(weave_type=JoinedTableType)
 class JoinedTable:
     def __init__(self, _rows, _file):

@@ -261,10 +261,6 @@ export interface MediaPartitionedTable {
   parts_path: string;
 }
 
-export interface MediaIncrementalTable {
-  prev_increment_paths: string[];
-}
-
 // export type MediaType =
 //   | 'string'
 //   | 'number'
