@@ -578,7 +578,6 @@ def _call_sync_gen(
     client = weave_client_context.require_weave_client()
     has_finished = False
     accumulated_state = None
-    print(f"{op=}")
     acc = op._accumulator
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
