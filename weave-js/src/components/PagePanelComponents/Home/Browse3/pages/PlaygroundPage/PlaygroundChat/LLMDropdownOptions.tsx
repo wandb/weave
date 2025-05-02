@@ -217,7 +217,7 @@ const SubMenuOption = ({
       <Box
         sx={{
           borderBottom: `1px solid ${MOON_200}`,
-          mb: 1,
+          my: 1,
         }}
       />
     );
