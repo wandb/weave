@@ -749,10 +749,10 @@ async def _call_async_gen(
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
     func = op.resolve_fn
-    call = _placeholder_call()
+    call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if _should_skip_tracing(op):
+    if should_skip_tracing_for_op(op):
         gen = func(*args, **kwargs)
         call.output = gen
         return gen, call
