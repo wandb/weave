@@ -1,52 +1,108 @@
 # PydanticAI
 
-<!-- TODO: Add link to colab once the PR is merged. -->
+[PydanticAI](https://github.com/pydantic/pydantic-ai) is a Python agent framework built by the Pydantic team to make it easy and type-safe to build production-grade applications with Generative AI. It offers a model-agnostic, ergonomic design for composing generative agents.
 
-[PydanticAI](https://github.com/pydantic/pydantic-ai) is a library that lets you build agents with type-safe input validation and output parsing using Pydantic models.
+PydanticAI leverages [OpenTelemetry (OTEL)](https://opentelemetry.io/) for tracing all agent and tool calls. By configuring your OTEL tracer to point to Weave, you can visualize these traces in the Weave UI. For more details on OTEL tracing and advanced usage, see the [Weave OpenTelemetry Tracing Guide](../tracking/otel.md).
 
-## Tracing
+This guide will show you how to monitor and debug PydanticAI agents and tools with Weave's OpenTelemetry support.
 
-It's important to store traces of language model applications in a central location, both during development and in production. These traces can be useful for debugging and as a dataset that will help you improve your application.
+**Installation:**
 
-Weave will automatically capture traces for [PydanticAI](https://github.com/pydantic/pydantic-ai) agents. To start tracking, call `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
+Before you begin, make sure to install the required OpenTelemetry dependencies:
+
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+```
+
+## Setup: OpenTelemetry Tracing to Weave
+
+To send traces from PydanticAI to Weave, you need to configure OpenTelemetry with a `TracerProvider` and an `OTLPSpanExporter`. The exporter must be set up with the correct endpoint and HTTP headers for authentication and project identification.
+
+**Required configuration:**
+- **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
+- **Headers:**
+  - `Authorization`: Basic auth using your W&B API key
+  - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`)
+
+> **Note:** It's best practice to store sensitive values like your API key and project info in an environment file (e.g., `.env`) and load them using `os.environ`. This keeps your credentials secure and out of your codebase.
+
+**Example setup:**
+
+```python
+import base64
+import os
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+# Load sensitive values from environment variables
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = os.environ.get("WANDB_PROJECT_ID")  # e.g. "myteam/myproject"
+WANDB_API_KEY = os.environ.get("WANDB_API_KEY")
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+# Create the OTLP span exporter with endpoint and headers
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Create a tracer provider and add the exporter
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+```
+
+## Tracing PydanticAI Agents with OpenTelemetry
+
+To enable tracing of your PydanticAI agents and send those traces to Weave, you need to pass an `InstrumentationSettings` object (configured with your tracer provider from the previous step) to the `Agent` constructor. This ensures that all agent and tool calls are traced according to your OpenTelemetry setup.
+
+Below is an example of how to create a simple agent with tracing enabled. The key step is setting the `instrument` argument in the `Agent` initialization:
 
 ```python
 from pydantic_ai import Agent
-import weave
+from pydantic_ai.models.instrumented import InstrumentationSettings
 
-# Initialize Weave
-weave.init(project_name="pydantic-ai-test")
+# Create a PydanticAI agent with OTEL tracing
+agent = Agent(
+    "openai:gpt-4o",
+    instrument=InstrumentationSettings(tracer_provider=tracer_provider),
+)
 
-# Create a PydanticAI agent
-agent = Agent("openai:gpt-4o")
-
-# Run a simple query
 result = agent.run_sync("What is the capital of France?")
 print(result.output)
 ```
 
-| ![](./imgs/pydantic_ai/pydanticai_agent_trace.png)                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------------- |
-| Weave will now track and log all application and llm calls made using PydanticAI. You can view the traces in the Weave web interface. |
+All calls to the agent will be traced and sent to Weave.
 
-## Tool Calls
+|  ![](./imgs/pydantic_ai/pydanticai_agent_trace.png)  |
+| :--------------------------------------------------: |
+| *A trace visualization of a simple PydanticAI agent* |
 
-PydanticAI makes it easy to create and use tools with your agents. Weave automatically traces these tool calls, capturing both the inputs to the tools and their outputs.
+## Tracing PydanticAI Tools with OpenTelemetry
+
+Weave can trace any underlying `pydantic_ai` calls that are instrumented with OpenTelemetry, including both agent invocations and tool calls. This means that whenever your agent uses a tool (such as a function decorated with `@agent.tool_plain`), the entire flow—including the tool's input, output, and the LLM's reasoning—will be captured and visualized in Weave.
+
+Here's an example of how to create an agent with a system prompt and tracing enabled, and how tool calls are automatically traced:
 
 ```python
 from pydantic_ai import Agent
-import weave
+from pydantic_ai.models.instrumented import InstrumentationSettings
 
-# Initialize Weave
-weave.init(project_name="pydantic-ai-test")
-
-# Create a PydanticAI agent with a system prompt
+# Create a PydanticAI agent with a system prompt and OTEL tracing
 agent = Agent(
     "openai:gpt-4o",
     system_prompt=(
         "You are a helpful assistant that can multiply numbers. "
         "When asked to multiply numbers, use the multiply tool."
     ),
+    instrument=InstrumentationSettings(tracer_provider=tracer_provider),
 )
 
 # Define a tool
@@ -60,83 +116,12 @@ result = agent.run_sync("What is 7 multiplied by 8?")
 print(result.output)
 ```
 
-| ![](./imgs/pydantic_ai/pydanticai_tool_call.png)                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------- |
-| Weave traces both the agent calls and any tool calls the agent makes, allowing you to see the complete flow of your application. |
+| ![](./imgs/pydantic_ai/pydanticai_tool_call.png) |
+| :----------------------------------------------: |
+|      *A trace visualization of a tool call*      |
 
-| Decorating the `get_weather` function with `@weave.op` traces its inputs, outputs, and all internal LLM calls made inside the function. |
+Both the agent call and the tool call will be traced and visible in Weave, allowing you to inspect the full reasoning and execution path of your application.
 
-## Create a `Model` for easier experimentation
+---
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](../core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app.
-
-In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application's behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
-
-In the example below, you can experiment with `WeatherAssistant`. Every time you change one of these parameters, you'll get a new _version_ of `WeatherAssistant`.
-
-```python
-import asyncio
-from typing import Optional
-from pydantic import BaseModel
-
-import weave
-from pydantic_ai import Agent
-
-
-# Define output model
-class WeatherForecast(BaseModel):
-    temperature: float
-    conditions: str
-    location: str
-    forecast: str
-
-
-class WeatherAssistant(weave.Model):
-    openai_model: str
-    system_prompt: str
-    temperature: float = 0.7
-
-    @weave.op()
-    async def predict(self, location: str) -> WeatherForecast:
-        # Create a new agent with the model's parameters
-        agent = Agent(
-            self.openai_model,
-            system_prompt=self.system_prompt,
-            temperature=self.temperature,
-        )
-        
-        # Run the agent
-        result = await agent.run(
-            f"Generate a weather forecast for {location}. Be creative but realistic."
-        )
-        
-        # Parse the result
-        # In a real application, you'd call a real weather API
-        forecast = WeatherForecast.model_validate_json(result.output)
-        return forecast
-
-
-# Create the model
-model = WeatherAssistant(
-    openai_model="gpt-4o", 
-    system_prompt="You are a helpful weather forecasting assistant. Your responses should be formatted as valid JSON according to the WeatherForecast model."
-)
-
-# Make a prediction
-forecast = asyncio.run(model.predict("London"))
-print(f"Weather forecast for {forecast.location}: {forecast.temperature}°F, {forecast.conditions}")
-print(forecast.forecast)
-```
-
-## Serving a Weave Model
-
-Given a weave reference to a `weave.Model` object, you can spin up a FastAPI server and [`serve`](https://wandb.github.io/weave/guides/tools/serve) it.
-
-
-You can find the weave reference of any `weave.Model` by navigating to the model and copying it from the UI.
-
-You can serve your model by using the following command in the terminal:
-
-```shell
-weave serve weave:///your_entity/project-name/WeatherAssistant:<hash>
-``` 
+For more details on OTEL tracing and advanced usage, see the [OpenTelemetry guide](../tracking/otel.md). 
