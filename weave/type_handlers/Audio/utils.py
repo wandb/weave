@@ -2,15 +2,6 @@ import shutil
 from enum import Enum
 from typing import Any, Optional
 
-try:
-    from pydub import AudioSegment
-
-    has_pydub = True
-except ImportError:
-    AudioSegment = None
-    has_pydub = False
-
-
 class AudioFormat(str, Enum):
     """
     These are NOT the list of formats we accept from the user
@@ -33,7 +24,7 @@ class AudioFormat(str, Enum):
 
 SUPPORTED_FORMATS = [fmt.value for fmt in AudioFormat if fmt != AudioFormat.UNSUPPORTED]
 
-DEFAULT_VIDEO_FORMAT = AudioFormat.MP3
+DEFAULT_AUDIO_FORMAT = AudioFormat.MP3
 
 
 def get_format_from_filename(filename: str) -> AudioFormat:
@@ -54,7 +45,7 @@ def get_format_from_filename(filename: str) -> AudioFormat:
     return AudioFormat(filename[last_dot + 1 :])
 
 
-class AudioFile:
+class Audio:
     path: str
     file_ext: AudioFormat
 

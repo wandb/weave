@@ -6,9 +6,9 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 from .utils import (
-    DEFAULT_VIDEO_FORMAT,
+    DEFAULT_AUDIO_FORMAT,
     SUPPORTED_FORMATS,
-    AudioFile,
+    Audio,
     AudioFormat,
     get_format_from_filename,
 )
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 DEFAULT_AUDIO_FORMAT = AudioFormat.MP3
 
-AudioType = Union[wave.Wave_read, AudioFile, "pydub.AudioSegment"]
+AudioType = Union[wave.Wave_read, Audio, "pydub.AudioSegment"]
 
 
 def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -> None:
@@ -49,7 +49,7 @@ def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -
 
 def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
     # Represents a wrapped audio file path which should be copied directly
-    if isinstance(obj, AudioFile):
+    if isinstance(obj, Audio):
         # If file does not exist we can't copy it directly
         exists = os.path.exists(obj.path)
         if not exists:
@@ -68,10 +68,10 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
             obj.export(fp)
 
     elif has_pydub and isinstance(obj, pydub.AudioSegment):
-        with artifact.writeable_file_path(f"audio.{DEFAULT_VIDEO_FORMAT}") as fp:
+        with artifact.writeable_file_path(f"audio.{DEFAULT_AUDIO_FORMAT}") as fp:
             obj.export(
                 fp,
-                format=DEFAULT_VIDEO_FORMAT.value,
+                format=DEFAULT_AUDIO_FORMAT.value,
             )
     elif isinstance(obj, wave.Wave_read):
         # Object is a wave.Wave_read object
@@ -117,14 +117,14 @@ def load(
 
 def is_audio_instance(obj: Any) -> bool:
     if has_pydub:
-        return isinstance(obj, (AudioFile, pydub.AudioSegment, wave.Wave_read))
+        return isinstance(obj, (Audio, pydub.AudioSegment, wave.Wave_read))
     else:
-        return isinstance(obj, (AudioFile, wave.Wave_read))
+        return isinstance(obj, (Audio, wave.Wave_read))
 
 
 def register() -> None:
     # Register the serializers for the various audio types
-    serializer.register_serializer(AudioFile, save, load)
+    serializer.register_serializer(Audio, save, load)
     serializer.register_serializer(wave.Wave_read, save, load)
     if has_pydub:
         serializer.register_serializer(pydub.AudioSegment, save, load)
