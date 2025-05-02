@@ -725,7 +725,9 @@ def _get_incremental_table_awl_from_file(
     all_awls: list[ops_arrow.ArrowWeaveList] = []
     files = []
     if "prev_increment_paths" in data:
-        escaped_paths = [escape_artifact_path(path) for path in data["prev_increment_paths"]]
+        # only load the last 100 increments as a perf constraint
+        increment_paths = data["prev_increment_paths"][-100:] if len(data["prev_increment_paths"]) > 100 else data["prev_increment_paths"]
+        escaped_paths = [escape_artifact_path(path) for path in increment_paths]
         files = [_filesystem_artifact_file_from_artifact_path(path) for path in escaped_paths]
     files.append(file)
 
@@ -733,10 +735,27 @@ def _get_incremental_table_awl_from_file(
     rrows: list[list] = []
     object_types: list[types.Type] = []
     for incremental_file in files:
-        incremental_data = _get_table_data_from_file(incremental_file)
-        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
-        rrows.append(rows)
-        object_types.append(object_type)
+        # We catch this error because incremental tables are constructed from a list
+        # of hard-coded artifact URLs. This handles the possibility that the user has deleted an
+        # artifact version.
+        try:
+            incremental_data = _get_table_data_from_file(incremental_file)
+            rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+            rrows.append(rows)
+            object_types.append(object_type)
+        except FileNotFoundError as e:
+            return None
+        # Prevent a panel crash from stale file handle errors
+        # There are rare stale file handle errors that cause panel crashes as noted:
+        # https://wandb.atlassian.net/browse/WB-22355
+        except OSError as e:
+            import errno
+
+            if e.errno == errno.ESTALE:
+                return None
+            raise
+
+        
     object_type = types.union(*object_types)
 
     for rows, file in zip(rrows, files):
@@ -960,18 +979,14 @@ def joined_table(
 def incremental_table(
     file: artifact_fs.FilesystemArtifactFile,
 ) -> typing.Optional[IncrementalTable]:
-    # TODO(dom): Handle failure more granularly-- this code is really meant for one table file, not many.
     try:
         return IncrementalTable(_get_table_like_awl_from_file(file).awl)
+    # See above in file-table op on why we catch the FileNotFoundError
     except FileNotFoundError as e:
         return None
-    # Prevent a panel crash from stale file handle errors
-    # There are rare stale file handle errors that cause panel crashes as noted:
-    # https://wandb.atlassian.net/browse/WB-22355
     except OSError as e:
         import errno
 
         if e.errno == errno.ESTALE:
             return None
-        raise  
-
+        raise
