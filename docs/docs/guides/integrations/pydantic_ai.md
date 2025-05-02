@@ -122,6 +122,27 @@ print(result.output)
 
 Both the agent call and the tool call will be traced and visible in Weave, allowing you to inspect the full reasoning and execution path of your application.
 
+## Instrumenting All Agents by Default
+
+If you want to enable OpenTelemetry tracing for all PydanticAI agents in your application without having to set the `instrument` argument for each one, you can use the `Agent.instrument_all` method. This sets the default instrumentation for all agents where `instrument` is not explicitly set.
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.instrumented import InstrumentationSettings
+
+# Set up default instrumentation for all agents
+Agent.instrument_all(InstrumentationSettings(tracer_provider=tracer_provider))
+
+# Now, any new agent will use this instrumentation by default
+agent1 = Agent("openai:gpt-4o")
+agent2 = Agent("openai:gpt-4o", system_prompt="Be helpful.")
+
+result = agent1.run_sync("What is the capital of France?")
+print(result.output)
+```
+
+This is useful for larger applications where you want consistent tracing across all agents without repeating configuration. For more details, see the [PydanticAI Logfire/OTEL docs](https://ai.pydantic.dev/logfire/#using-logfire).
+
 ---
 
 For more details on OTEL tracing and advanced usage, see the [OpenTelemetry guide](../tracking/otel.md). 
