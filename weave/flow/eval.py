@@ -7,7 +7,6 @@ from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
 from rich import print
-from rich.console import Console
 from typing_extensions import Self
 
 import weave
@@ -34,13 +33,7 @@ from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
-console = Console()
 logger = logging.getLogger(__name__)
-
-INVALID_MODEL_ERROR = (
-    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
-    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
-)
 
 
 def default_evaluation_display_name(call: Call) -> str:
@@ -194,7 +187,10 @@ class Evaluation(Object):
 
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
-            raise ValueError(INVALID_MODEL_ERROR)
+            raise ValueError(
+                "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+                + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+            )
         eval_rows = []
 
         async def eval_example(example: dict) -> dict:
@@ -248,10 +244,12 @@ def evaluate(
     scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> dict:
-    eval = Evaluation(
-        dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=scorers,
+        preprocess_model_input=preprocess_model_input,
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(evaluation.evaluate(model))
 
 
 def is_valid_model(model: Any) -> bool:
