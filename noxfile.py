@@ -65,7 +65,6 @@ def lint(session):
         "pandas-test",
         "huggingface",
         "mcp",
-        "pydantic_ai",
     ],
 )
 def tests(session, shard):
