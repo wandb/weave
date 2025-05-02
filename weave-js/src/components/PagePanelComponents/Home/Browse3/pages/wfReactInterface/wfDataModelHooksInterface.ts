@@ -14,7 +14,6 @@ import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
-import {ContentType, TableUpdateSpec} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -226,7 +225,7 @@ export interface UseCallUpdateParams {
 export interface UseCallsExportParams {
   entity: string;
   project: string;
-  contentType: ContentType;
+  contentType: traceServerClientTypes.ContentType;
   filter: CallFilter;
   limit?: number;
   offset?: number;
