@@ -73,56 +73,49 @@ export const operationConverter = (
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $eq: [getFieldExpression(item.field), {$literal: val}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$eq: [field, {$literal: val}]};
   } else if (item.operator === '(number): !=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [{$eq: [getFieldExpression(item.field), {$literal: val}]}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$not: [{$eq: [field, {$literal: val}]}]};
   } else if (item.operator === '(number): >') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $gt: [getFieldExpression(item.field), {$literal: val}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$gt: [field, {$literal: val}]};
   } else if (item.operator === '(number): >=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $gte: [getFieldExpression(item.field), {$literal: val}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$gte: [field, {$literal: val}]};
   } else if (item.operator === '(number): <') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [{$gte: [getFieldExpression(item.field), {$literal: val}]}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$not: [{$gte: [field, {$literal: val}]}]};
   } else if (item.operator === '(number): <=') {
     if (item.value === '') {
       return null;
     }
     const val = parseFloat(item.value);
-    return {
-      $not: [{$gt: [getFieldExpression(item.field), {$literal: val}]}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$not: [{$gt: [field, {$literal: val}]}]};
   } else if (item.operator === '(bool): is') {
     if (item.value === '') {
       return null;
     }
-    return {
-      $eq: [{$getField: item.field}, {$literal: `${item.value}`}],
-    };
+    const field = getFieldExpression(item.field);
+    return {$eq: [field, {$literal: `${item.value}`}]};
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
       return null;
