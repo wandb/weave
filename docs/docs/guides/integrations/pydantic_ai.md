@@ -141,7 +141,7 @@ result = agent1.run_sync("What is the capital of France?")
 print(result.output)
 ```
 
-This is useful for larger applications where you want consistent tracing across all agents without repeating configuration. For more details, see the [PydanticAI Logfire/OTEL docs](https://ai.pydantic.dev/logfire/#using-logfire).
+This is useful for larger applications where you want consistent tracing across all agents without repeating configuration. For more details, see the [PydanticAI OTEL docs](https://ai.pydantic.dev/logfire/#using-logfire).
 
 ---
 
