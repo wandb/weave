@@ -152,12 +152,17 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     };
   }, [parsedRef]);
 
-  const numRowsQuery = useTableQueryStats({
-    entity: lookupKey?.entity ?? '',
-    project: lookupKey?.project ?? '',
-    digests: lookupKey?.digest ? [lookupKey?.digest] : [],
-    skip: lookupKey == null,
-  });
+  const tableQueryParams = useMemo(
+    () => ({
+      entity: lookupKey?.entity ?? '',
+      project: lookupKey?.project ?? '',
+      digests: lookupKey?.digest ? [lookupKey?.digest] : [],
+      skip: lookupKey == null,
+    }),
+    [lookupKey]
+  );
+
+  const numRowsQuery = useTableQueryStats(tableQueryParams);
 
   const totalRows = useMemo(() => {
     if (numRowsQuery.result == null) {

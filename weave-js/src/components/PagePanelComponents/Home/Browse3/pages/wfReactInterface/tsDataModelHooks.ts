@@ -64,7 +64,9 @@ import {
   UseOpVersionsParams,
   UseProjectHasCallsParams,
   UseRefsDataParams,
+  UseRefsReadBatchParams,
   UseRootObjectVersionsParams,
+  UseTableQueryParams,
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
@@ -92,24 +94,22 @@ type TraceServerClientPromiseKeys = {
 
 const makeTraceServerEndpointHook = <
   FN extends TraceServerClientPromiseKeys,
-  Input extends any[],
+  Params extends object,
   Output
 >(
   traceServerFnName: FN,
-  preprocessFn: (...input: Input) => {
+  preprocessFn: (params: Params) => {
     params: Parameters<traceServerClient.TraceServerClient[FN]>[0];
     skip?: boolean;
   },
   postprocessFn: (
     res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>,
-    ...input: Input
+    params: Params
   ) => Output
 ) => {
-  const useTraceServerRequest = (
-    ...input: Input
-  ): LoadableWithError<Output> => {
-    input = useDeepMemo(input);
-    const loadingInputRef = useRef<Input | null>(null);
+  const useTraceServerRequest = (params: Params): LoadableWithError<Output> => {
+    params = useDeepMemo(params);
+    const loadingInputRef = useRef<Params | null>(null);
     const getTsClient = useGetTraceServerClientContext();
     const [state, setState] = useState<LoadableWithError<Output>>({
       loading: true,
@@ -118,9 +118,9 @@ const makeTraceServerEndpointHook = <
     });
 
     useEffect(() => {
-      loadingInputRef.current = input;
+      loadingInputRef.current = params;
       setState({loading: true, result: null, error: null});
-      const req = preprocessFn(...input);
+      const req = preprocessFn(params);
       if (req.skip) {
         setState({loading: false, result: null, error: null});
         return;
@@ -128,25 +128,25 @@ const makeTraceServerEndpointHook = <
       const client = getTsClient();
       client[traceServerFnName](req.params as any)
         .then(res => {
-          if (input !== loadingInputRef.current) {
+          if (params !== loadingInputRef.current) {
             return;
           }
-          const output = postprocessFn(res as any, ...input);
+          const output = postprocessFn(res as any, params);
           setState({loading: false, result: output, error: null});
         })
         .catch(err => {
-          if (input !== loadingInputRef.current) {
+          if (params !== loadingInputRef.current) {
             return;
           }
           setState({loading: false, result: null, error: err});
         });
-    }, [getTsClient, input]);
+    }, [getTsClient, params]);
 
     const loadingReturn = useMemo(
       () => ({loading: true, result: null, error: null}),
       []
     );
-    if (loadingInputRef.current !== input) {
+    if (loadingInputRef.current !== params) {
       return loadingReturn;
     }
     return state;
@@ -1345,19 +1345,16 @@ const useObjectDeleteFunc = () => {
   };
 };
 
-const useRefsReadBatch = (
-  refUris: UseRefsDataParams['refUris'],
-  opts?: {skip?: boolean}
-) => {
+const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
   const getTsClient = useGetTraceServerClientContext();
   const [refsRes, setRefsRes] =
     useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
   const loadingRef = useRef(false);
 
-  const deepRefUris = useDeepMemo(refUris);
+  const deepRefUris = useDeepMemo(params.refUris);
 
   useEffect(() => {
-    if (opts?.skip || deepRefUris.length === 0) {
+    if (params.skip || deepRefUris.length === 0) {
       return;
     }
     setRefsRes(null);
@@ -1375,51 +1372,35 @@ const useRefsReadBatch = (
         console.error('Error fetching refs:', err);
         setRefsRes(null);
       });
-  }, [getTsClient, deepRefUris, opts?.skip]);
+  }, [getTsClient, deepRefUris, params.skip]);
 
   return useMemo(() => {
-    if (opts?.skip || refUris.length === 0) {
+    if (params.skip || params.refUris.length === 0) {
       return {loading: false, result: null};
     }
     if (refsRes == null || loadingRef.current) {
       return {loading: true, result: null};
     }
     return {loading: false, result: refsRes.vals};
-  }, [refsRes, refUris.length, opts?.skip]);
+  }, [refsRes, params.skip, params.refUris]);
 };
 
 const useTableQuery = makeTraceServerEndpointHook<
   'tableQuery',
-  [
-    string,
-    string,
-    traceServerTypes.TraceTableQueryReq['filter'],
-    traceServerTypes.TraceTableQueryReq['limit'],
-    traceServerTypes.TraceTableQueryReq['offset'],
-    traceServerTypes.TraceTableQueryReq['sort_by'],
-    {skip?: boolean}?
-  ],
-  any[]
+  UseTableQueryParams,
+  traceServerTypes.TraceTableQueryRes['rows']
 >(
   'tableQuery',
-  (
-    projectId: traceServerTypes.TraceTableQueryReq['project_id'],
-    digest: traceServerTypes.TraceTableQueryReq['digest'],
-    filter: traceServerTypes.TraceTableQueryReq['filter'],
-    limit: traceServerTypes.TraceTableQueryReq['limit'],
-    offset: traceServerTypes.TraceTableQueryReq['offset'],
-    sortBy: traceServerTypes.TraceTableQueryReq['sort_by'],
-    opts?: {skip?: boolean}
-  ) => ({
+  params => ({
     params: {
-      project_id: projectId,
-      digest,
-      filter,
-      limit,
-      offset,
-      sort_by: sortBy,
+      project_id: params.projectId,
+      digest: params.digest,
+      filter: params.filter,
+      limit: params.limit,
+      offset: params.offset,
+      sort_by: params.sortBy,
     },
-    skip: opts?.skip,
+    skip: params.skip,
   }),
   res => res.rows
 );
@@ -1522,7 +1503,8 @@ const useRefsData = (params: UseRefsDataParams): Loadable<any[]> => {
     return [needed, cached];
   }, [nonTableRefUris]);
 
-  const simpleValsResult = useRefsReadBatch(neededSimpleUris, {
+  const simpleValsResult = useRefsReadBatch({
+    refUris: neededSimpleUris,
     skip: neededSimpleUris.length === 0,
   });
   let tableUriProjectId = '';
@@ -1549,15 +1531,24 @@ const useRefsData = (params: UseRefsDataParams): Loadable<any[]> => {
 
   const cachedTableResult = refDataCache.get(tableRefKey);
 
-  const tableValsResult = useTableQuery(
-    tableUriProjectId,
-    tableUriDigest,
-    tableQueryFilter,
-    params.tableQuery?.limit,
-    undefined,
-    undefined,
-    {skip: tableRefUris.length === 0 || cachedTableResult != null}
+  const tableQueryParams = useMemo(
+    () => ({
+      projectId: tableUriProjectId,
+      digest: tableUriDigest,
+      filter: tableQueryFilter,
+      limit: params.tableQuery?.limit,
+      skip: tableRefUris.length === 0 || cachedTableResult != null,
+    }),
+    [
+      tableUriProjectId,
+      tableUriDigest,
+      tableQueryFilter,
+      params.tableQuery?.limit,
+      tableRefUris,
+      cachedTableResult,
+    ]
   );
+  const tableValsResult = useTableQuery(tableQueryParams);
 
   return useMemo(() => {
     if (params.refUris.length === 0) {

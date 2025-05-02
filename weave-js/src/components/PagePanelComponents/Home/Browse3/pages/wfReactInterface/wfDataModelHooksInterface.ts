@@ -264,6 +264,16 @@ export interface UseObjectVersionParams {
   metadataOnly?: boolean;
 }
 
+export interface UseTableQueryParams {
+  projectId: string;
+  digest: string;
+  filter: traceServerClientTypes.TraceTableQueryReq['filter'];
+  limit?: traceServerClientTypes.TraceTableQueryReq['limit'];
+  offset?: traceServerClientTypes.TraceTableQueryReq['offset'];
+  sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'];
+  skip?: boolean;
+}
+
 export interface UseTableRowsQueryParams {
   entity: string;
   project: string;
@@ -319,6 +329,11 @@ export interface OpVersionDeleteAllVersionsParams {
 export interface UseRefsDataParams {
   refUris: string[];
   tableQuery?: TableQuery;
+}
+
+export interface UseRefsReadBatchParams {
+  refUris: string[];
+  skip?: boolean;
 }
 
 export interface UseApplyMutationsToRefParams {
