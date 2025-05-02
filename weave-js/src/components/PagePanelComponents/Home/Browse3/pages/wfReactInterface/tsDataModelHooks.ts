@@ -7,6 +7,7 @@
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import useAsync from 'react-use/lib/useAsync';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -166,7 +167,11 @@ const useMakeTraceServerEndpoint = <
 
 const useCall = (
   key: CallKey | null,
-  opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
+  opts?: {
+    includeCosts?: boolean;
+    includeTotalStorageSize?: boolean;
+    refetchOnRename?: boolean;
+  }
 ): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -187,33 +192,48 @@ const useCall = (
 
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallReadRes | null>(null);
-  const doFetch = useCallback(() => {
-    if (deepKey) {
-      loadingRef.current = true;
-      setCallRes(null);
-      getTsClient()
-        .callRead({
-          project_id: projectIdFromParts(deepKey),
-          id: deepKey.callId,
-          include_costs: opts?.includeCosts,
-          ...(opts?.includeTotalStorageSize
-            ? {include_total_storage_size: true}
-            : null),
-        })
-        .then(res => {
-          loadingRef.current = false;
-          setCallRes(res);
-        });
-    }
-  }, [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  const doFetch = useCallback(
+    ({invalidateCache = false}: {invalidateCache?: boolean} = {}) => {
+      if (deepKey) {
+        if (invalidateCache) {
+          callCache.del(deepKey);
+        }
+        loadingRef.current = true;
+        setCallRes(null);
+        getTsClient()
+          .callRead({
+            project_id: projectIdFromParts(deepKey),
+            id: deepKey.callId,
+            include_costs: opts?.includeCosts,
+            ...(opts?.includeTotalStorageSize
+              ? {include_total_storage_size: true}
+              : null),
+          })
+          .then(res => {
+            loadingRef.current = false;
+            setCallRes(res);
+          });
+      }
+    },
+    [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]
+  );
 
   useEffect(() => {
-    doFetch();
+    doFetch({invalidateCache: false});
   }, [doFetch]);
 
   useEffect(() => {
-    return getTsClient().registerOnRenameListener(doFetch);
-  }, [getTsClient, doFetch]);
+    if (opts?.refetchOnRename) {
+      const client = getTsClient();
+      const unregisterRename = client.registerOnRenameListener(() =>
+        doFetch({invalidateCache: true})
+      );
+      return () => {
+        unregisterRename();
+      };
+    }
+    return undefined;
+  }, [getTsClient, doFetch, deepKey, opts?.refetchOnRename]);
 
   return useMemo(() => {
     if (deepKey == null) {
@@ -281,6 +301,7 @@ const useCallsNoExpansion = (
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const deepFilter = useDeepMemo(filter);
 
   const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
@@ -343,6 +364,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         console.error(e);
+        setError(e);
         setCallRes({calls: []});
       }
     };
@@ -413,9 +435,10 @@ const useCallsNoExpansion = (
         loading: false,
         result,
         refetch,
+        error,
       };
     }
-  }, [opts?.skip, callRes, columns, refetch, entity, project]);
+  }, [opts?.skip, callRes, columns, refetch, entity, project, error]);
 };
 
 const useCalls = (
@@ -462,8 +485,9 @@ const useCalls = (
       loading,
       result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
       refetch: calls.refetch,
+      error: calls.error,
     };
-  }, [calls.refetch, expandedCalls, loading]);
+  }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
 const useCallsStats = (
@@ -471,7 +495,12 @@ const useCallsStats = (
   project: string,
   filter: CallFilter,
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  limit?: number,
+  opts?: {
+    skip?: boolean;
+    refetchOnDelete?: boolean;
+    includeTotalStorageSize?: boolean;
+  }
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -503,6 +532,10 @@ const useCallsStats = (
         wb_user_ids: deepFilter.userIds,
       },
       query,
+      limit,
+      ...(!!opts?.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
     };
 
     getTsClient()
@@ -515,7 +548,16 @@ const useCallsStats = (
         loadingRef.current = false;
         setCallStatsRes({loading: false, result: null, error: err});
       });
-  }, [deepFilter, entity, project, query, opts?.skip, getTsClient]);
+  }, [
+    opts?.skip,
+    opts?.includeTotalStorageSize,
+    entity,
+    project,
+    deepFilter,
+    query,
+    limit,
+    getTsClient,
+  ]);
 
   useEffect(() => {
     doFetch();
@@ -542,6 +584,27 @@ const useCallsStats = (
       return {...callStatsRes, refetch};
     }
   }, [callStatsRes, opts?.skip, refetch]);
+};
+
+/*
+  Helper that calls the call stats hook with limit: 1, returning a boolean
+  if there are any calls in the project. This uses a highly optimized
+  query in the backend. 
+*/
+const useProjectHasCalls = (
+  entity: string,
+  project: string,
+  opts?: {skip?: boolean}
+): Loadable<boolean> => {
+  const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  const count = callsStats.result?.count ?? 0;
+  return useMemo(() => {
+    return {
+      loading: callsStats.loading,
+      result: count > 0,
+      error: callsStats.error,
+    };
+  }, [callsStats, count]);
 };
 
 const useCallsDeleteFunc = () => {
@@ -1077,6 +1140,7 @@ export const convertTraceServerObjectVersionToSchema = <
     versionIndex: obj.version_index,
     val: obj.val,
     userId: obj.wb_user_id,
+    sizeBytes: obj.size_bytes,
   };
 };
 
@@ -1086,7 +1150,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean; noAutoRefresh?: boolean}
+  opts?: {skip?: boolean; noAutoRefresh?: boolean; includeStorageSize?: boolean}
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1116,6 +1180,7 @@ const useRootObjectVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -1139,6 +1204,7 @@ const useRootObjectVersions = (
     project,
     limit,
     metadataOnly,
+    opts?.includeStorageSize,
   ]);
 
   useEffect(() => {
@@ -1622,15 +1688,17 @@ const useTableRowsQuery = (
 const useTableQueryStats = (
   entity: string,
   project: string,
-  digest: string,
-  opts?: {skip?: boolean}
-): Loadable<traceServerTypes.TraceTableQueryStatsRes> => {
+  digests: string[],
+  opts?: {skip?: boolean; includeStorageSize?: boolean}
+): Loadable<traceServerTypes.TraceTableQueryStatsBatchRes> => {
   const getTsClient = useGetTraceServerClientContext();
   const [statsRes, setStatsRes] =
-    useState<traceServerTypes.TraceTableQueryStatsRes | null>(null);
+    useState<traceServerTypes.TraceTableQueryStatsBatchRes | null>(null);
   const loadingRef = useRef(false);
 
   const projectId = projectIdFromParts({entity, project});
+
+  const digestsDeep = useDeepMemo(digests);
 
   const doFetch = useCallback(() => {
     if (opts?.skip) {
@@ -1639,13 +1707,14 @@ const useTableQueryStats = (
     setStatsRes(null);
     loadingRef.current = true;
 
-    const req: traceServerTypes.TraceTableQueryStatsReq = {
+    const req: traceServerTypes.TraceTableQueryStatsBatchReq = {
       project_id: projectId,
-      digest,
+      digests: digestsDeep,
+      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : {}),
     };
 
     getTsClient()
-      .tableQueryStats(req)
+      .tableQueryStatsBatch(req)
       .then(res => {
         loadingRef.current = false;
         setStatsRes(res);
@@ -1655,7 +1724,13 @@ const useTableQueryStats = (
         console.error('Error fetching table query stats:', err);
         setStatsRes(null);
       });
-  }, [getTsClient, projectId, digest, opts?.skip]);
+  }, [
+    getTsClient,
+    projectId,
+    digestsDeep,
+    opts?.skip,
+    opts?.includeStorageSize,
+  ]);
 
   useEffect(() => {
     doFetch();
@@ -2062,6 +2137,14 @@ export const useTableCreate = (): ((
   );
 };
 
+export const useFilesStats = (projectId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(async () => {
+    return getTsClient().filesStats({project_id: projectId});
+  }, [getTsClient, projectId]);
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2072,6 +2155,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useCallsStats,
+  useProjectHasCalls,
   useCallsDeleteFunc,
   useCallUpdateFunc,
   useCallsExport,

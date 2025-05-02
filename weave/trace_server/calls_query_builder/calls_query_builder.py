@@ -28,6 +28,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
+from collections.abc import KeysView
 from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
@@ -711,17 +712,29 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id conditions REQUIRE conditioning on the started_at
-        # field after grouping in the HAVING clause. These filters can remove
+        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
+        # started_at field after grouping in the HAVING clause. These filters remove
         # call starts before grouping, creating orphan call ends. By conditioning
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
-        op_name_sql = process_op_name_filter_to_conditions(
+        op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
         )
-        trace_id_sql = process_trace_id_filter_to_conditions(
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        # ref filters also have group by filters, because output_refs exist on the
+        # call end parts.
+        ref_filter_opt_sql = process_ref_filters_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -810,9 +823,11 @@ class CallsQuery(BaseModel):
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {trace_roots_only_sql}
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
+        {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1072,7 +1087,7 @@ def process_query_to_conditions(
     )
 
 
-def process_op_name_filter_to_conditions(
+def process_op_name_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1123,7 +1138,7 @@ def process_op_name_filter_to_conditions(
     return " AND " + combine_conditions(or_conditions, "OR")
 
 
-def process_trace_id_filter_to_conditions(
+def process_trace_id_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1154,6 +1169,69 @@ def process_trace_id_filter_to_conditions(
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
+def process_trace_roots_only_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_ref_filters_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Adds a ref filter optimization to the query.
+
+    To be used before group by. This filter is NOT guaranteed to return
+    the correct results, as it can operate on call ends (output_refs) so it
+    should be used in addition to the existing ref filters after group by
+    generated in process_calls_filter_to_conditions."""
+    if hardcoded_filter is None or (
+        not hardcoded_filter.filter.output_refs
+        and not hardcoded_filter.filter.input_refs
+    ):
+        return ""
+
+    def process_ref_filter(field_name: str, refs: list[str]) -> str:
+        field = get_field_by_name(field_name)
+        if not isinstance(field, CallsMergedAggField):
+            raise TypeError(f"{field_name} is not an aggregate field")
+
+        field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
+        param = param_builder.add_param(refs)
+        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        return f"{ref_filter_sql} OR length({field_sql}) = 0"
+
+    ref_filters = []
+    if hardcoded_filter.filter.input_refs:
+        ref_filters.append(
+            process_ref_filter("input_refs", hardcoded_filter.filter.input_refs)
+        )
+    if hardcoded_filter.filter.output_refs:
+        ref_filters.append(
+            process_ref_filter("output_refs", hardcoded_filter.filter.output_refs)
+        )
+
+    if not ref_filters:
+        return ""
+
+    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
@@ -1165,6 +1243,9 @@ def process_calls_filter_to_conditions(
     """
     conditions: list[str] = []
 
+    # technically not required, as we are now doing a pre-groupby optimization
+    # that should filter out 100% of non-matching rows. However, we can't remove
+    # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
@@ -1189,19 +1270,65 @@ def process_calls_filter_to_conditions(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
-    if filter.trace_roots_only:
-        conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IS NULL"
-        )
-
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
+
+
+def optimized_project_contains_call_query(
+    project_id: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Returns a query that checks if the project contains any calls."""
+    return safely_format_sql(
+        f"""SELECT
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        )
+        THEN 1
+        ELSE 0
+        END as has_any
+    """,
+        logger,
+    )
+
+
+def build_calls_query_stats_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+) -> tuple[str, KeysView[str]]:
+    cq = CallsQuery(
+        project_id=req.project_id,
+        include_total_storage_size=req.include_total_storage_size,
+    )
+
+    cq.add_field("id")
+    if req.filter is not None:
+        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+    if req.query is not None:
+        cq.add_condition(req.query.expr_)
+    if req.limit is not None:
+        cq.set_limit(req.limit)
+
+    aggregated_columns = {"count": "count()"}
+    if req.include_total_storage_size:
+        aggregated_columns["total_storage_size_bytes"] = (
+            "sum(coalesce(total_storage_size_bytes, 0))"
+        )
+        cq.add_field("total_storage_size_bytes")
+
+    inner_query = cq.as_sql(param_builder)
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+
+    return (calls_query_sql, aggregated_columns.keys())

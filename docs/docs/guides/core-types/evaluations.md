@@ -38,6 +38,11 @@ weave.init('intro-example')
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
+:::info Looking for a less opinionated approach?
+
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
+:::
+
 ## Create an Evaluation
 
 To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
@@ -192,6 +197,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 ### Using `preprocess_model_input` to format dataset rows before evaluating
 
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
+
 - Rename fields to match your model's expected input
 - Transform data into the correct format
 - Add or remove fields
@@ -241,6 +247,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 In this example, our dataset contains examples with an `input_text` field, but our evaluation function expects a `question` parameter. The `preprocess_example` function transforms each example by renaming the field, allowing the evaluation to work correctly.
 
 The preprocessing function:
+
 1. Receives the raw example from your dataset
 2. Returns a dictionary with the fields your model expects
 3. Is applied to each example before it's passed to your evaluation function
@@ -249,8 +256,12 @@ This is particularly useful when working with external datasets that may have di
 
 ### Using HuggingFace Datasets with evaluations
 
-We are continuously improving our integrations with third-party services and libraries. 
+We are continuously improving our integrations with third-party services and libraries.
 
-While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).

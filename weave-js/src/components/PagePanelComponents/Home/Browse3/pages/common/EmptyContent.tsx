@@ -23,7 +23,8 @@ const NewDatasetButton: React.FC = () => {
       <Button
         variant="primary"
         icon="add-new"
-        onClick={() => setIsDrawerOpen(true)}>
+        onClick={() => setIsDrawerOpen(true)}
+        data-testid="create-dataset-button">
         New dataset
       </Button>
       <CreateDatasetDrawer
@@ -31,6 +32,7 @@ const NewDatasetButton: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSaveDataset={handleSaveDataset}
         isCreating={isCreatingDataset}
+        data-testid="create-dataset-drawer"
       />
     </>
   );
@@ -219,6 +221,21 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_OBJECT_VERSIONS: EmptyProps = {
+  icon: 'cube-container' as const,
+  heading: 'No object versions',
+  description:
+    'The requested object does not exist or all versions of it have been deleted.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_objects">
+        object basics
+      </TargetBlank>
+      .
+    </>
+  ),
+};
 export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
   icon: 'weave' as const,
   heading: 'Weave coming soon!',

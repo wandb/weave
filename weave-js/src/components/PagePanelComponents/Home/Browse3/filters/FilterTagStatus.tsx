@@ -2,18 +2,19 @@
  * This component is used to display the status values in the filter bar.
  */
 
+import _ from 'lodash';
 import React from 'react';
 
 import {FILTER_TO_STATUS, StatusChip} from '../pages/common/StatusChip';
 
 type FilterTagStatusProps = {
-  value: string;
+  value: string | string[];
 };
 
 export const FilterTagStatus = ({value}: FilterTagStatusProps) => {
-  const enabled = value.split(',');
+  const enabled = _.isArray(value) ? value : value.split(',');
   return (
-    <div className="flex gap-2">
+    <div className="night-aware flex gap-2">
       {Object.keys(FILTER_TO_STATUS).map(status => {
         const isEnabled = enabled.includes(status);
         if (isEnabled) {

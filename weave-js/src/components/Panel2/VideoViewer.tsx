@@ -16,6 +16,7 @@ interface VideoViewerProps {
   videoFilename?: string;
   headerElement?: ReactNode;
   footerElement?: ReactNode;
+  loadingElement?: ReactNode;
   failedLoadElement?: ReactNode;
   refreshTimestamp?: number;
   mediaFailedToLoad?: boolean;
@@ -33,6 +34,7 @@ const VideoViewer = (props: VideoViewerProps) => {
     refreshTimestamp,
     headerElement,
     footerElement,
+    loadingElement,
     failedLoadElement,
     mediaFailedToLoad,
     setDomLoadFailed,
@@ -141,13 +143,17 @@ const VideoViewer = (props: VideoViewerProps) => {
     height: '100%',
   };
 
+  const loader = loadingElement ? (
+    loadingElement
+  ) : (
+    <Placeholder style={{width, height}}>
+      <Placeholder.Image />
+    </Placeholder>
+  );
+
   const content = (
     <>
-      {!videoLoaded && (
-        <Placeholder style={{width, height}}>
-          <Placeholder.Image />
-        </Placeholder>
-      )}
+      {!videoLoaded && loader}
 
       {!mediaFailedToLoad ? (
         <>

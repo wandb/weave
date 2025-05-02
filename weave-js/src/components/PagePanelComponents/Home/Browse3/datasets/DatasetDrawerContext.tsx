@@ -312,7 +312,6 @@ function datasetDrawerReducer(
       }
 
       const {selectedCalls} = action.payload;
-      const isNewDataset = state.selectedDataset === null;
 
       try {
         // Map calls to dataset rows
@@ -320,23 +319,6 @@ function datasetDrawerReducer(
           selectedCalls,
           state.fieldMappings
         );
-
-        // Apply filtering for new datasets
-        if (isNewDataset) {
-          const targetFields = new Set(
-            state.fieldMappings.map(m => m.targetField)
-          );
-          mappedRows = mappedRows.map(row => {
-            const {___weave, ...rest} = row;
-            const filteredData = Object.fromEntries(
-              Object.entries(rest).filter(([key]) => targetFields.has(key))
-            );
-            return {
-              ___weave,
-              ...filteredData,
-            };
-          });
-        }
 
         // Process rows with schema-based filtering
         const processedRowsMap = createProcessedRowsMap(

@@ -1,6 +1,7 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
 from textwrap import dedent
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -72,7 +73,7 @@ class ContextEntityRecallScorer(LLMScorer):
         return entities
 
     @weave.op
-    async def score(self, output: str, context: str) -> dict:
+    async def score(self, *, output: str, context: str, **kwargs: Any) -> dict:
         expected_entities = await self._extract_entities(output)
         context_entities = await self._extract_entities(context)
         # Calculate recall
@@ -134,7 +135,7 @@ class ContextRelevancyScorer(LLMScorer):
     )
 
     @weave.op
-    async def score(self, output: str, context: str) -> dict:
+    async def score(self, *, output: str, context: str, **kwargs: Any) -> dict:
         prompt = self.relevancy_prompt.format(question=output, context=context)
         response = await self._acompletion(
             messages=[{"role": "user", "content": prompt}],
