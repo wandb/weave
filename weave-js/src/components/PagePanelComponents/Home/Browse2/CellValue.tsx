@@ -64,7 +64,7 @@ export const CellValue = ({value, noLink}: CellValueProps) => {
     );
   }
   if (isCustomWeaveTypePayload(value)) {
-    return <CustomWeaveTypeDispatcher data={value} />;
+    return <CustomWeaveTypeDispatcher data={value}/>;
   }
   return <CellValueString value={JSON.stringify(value)} />;
 };

@@ -184,6 +184,13 @@ const VideoTitle = styled.div`
   color: #333;
 `;
 
+const VideoLinkText = styled.div`
+  font-size: 18px;
+  font-weight: 500;
+  padding: 16px;
+  text-align: center;
+  color: #333;
+`;
 const VideoWrapper = styled.div`
   position: relative;
   flex: 1;
@@ -323,11 +330,11 @@ const PlaybackSpeedButton = styled.button`
   padding: 4px 8px;
   margin-left: 12px;
   border-radius: 4px;
-  
+
   &:hover {
     background-color: #f5f5f5;
   }
-  
+
   &:focus {
     outline: none;
   }
@@ -343,6 +350,7 @@ const formatTime = (seconds: number): string => {
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+import VideoViewer from '../../../../../../components/Panel2/VideoViewer'
 const VideoPlayerLoaded = ({
   url,
   fileExt,
@@ -351,217 +359,9 @@ const VideoPlayerLoaded = ({
   containerHeight,
   title,
 }: VideoPlayerLoadedProps) => {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [showPreview, setShowPreview] = useState(!!previewImageUrl);
-
-  const isGif = fileExt === 'gif';
-  
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement || isGif) return;
-
-    const updateTime = () => {
-      setCurrentTime(videoElement.currentTime);
-      setDuration(videoElement.duration);
-    };
-
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
-
-    videoElement.addEventListener('timeupdate', updateTime);
-    videoElement.addEventListener('durationchange', updateTime);
-    videoElement.addEventListener('play', handlePlay);
-    videoElement.addEventListener('pause', handlePause);
-    videoElement.addEventListener('ended', handleEnded);
-
-    return () => {
-      videoElement.removeEventListener('timeupdate', updateTime);
-      videoElement.removeEventListener('durationchange', updateTime);
-      videoElement.removeEventListener('play', handlePlay);
-      videoElement.removeEventListener('pause', handlePause);
-      videoElement.removeEventListener('ended', handleEnded);
-    };
-  }, [isGif]);
-
-  const togglePlay = () => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    if (isPlaying) {
-      videoElement.pause();
-    } else {
-      setShowPreview(false);
-      videoElement.play();
-    }
-  };
-
-  const handleRewind = () => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    videoElement.currentTime = Math.max(0, videoElement.currentTime - 10);
-  };
-
-  const handleReset = () => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-    
-    videoElement.currentTime = 0;
-  };
-
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const progressElement = progressRef.current;
-    const videoElement = videoRef.current;
-    if (!progressElement || !videoElement) return;
-
-    const rect = progressElement.getBoundingClientRect();
-    const clickPosition = (e.clientX - rect.left) / rect.width;
-    videoElement.currentTime = clickPosition * videoElement.duration;
-  };
-
-  const toggleFullscreen = () => {
-    setLightboxOpen(true);
-  };
-
-  const togglePlaybackRate = () => {
-    const rates = [0.5, 1, 1.5, 2];
-    const currentIndex = rates.indexOf(playbackRate);
-    const nextIndex = (currentIndex + 1) % rates.length;
-    
-    const videoElement = videoRef.current;
-    if (videoElement) {
-      const newRate = rates[nextIndex];
-      videoElement.playbackRate = newRate;
-      setPlaybackRate(newRate);
-    }
-  };
-
-  // For GIFs, we use an img element
-  if (isGif) {
+  if (containerHeight >= 1) {
     return (
-      <VideoContainer>
-        <VideoWrapper>
-          <img
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-            }}
-            src={url}
-            alt="Video clip (GIF)"
-            onClick={() => setLightboxOpen(true)}
-          />
-        </VideoWrapper>
-        <Lightbox
-          plugins={[Fullscreen]}
-          open={lightboxOpen}
-          close={() => setLightboxOpen(false)}
-          controller={{
-            closeOnBackdropClick: true,
-          }}
-          slides={[{src: url}]}
-          render={{
-            buttonPrev: () => null,
-            buttonNext: () => null,
-          }}
-          carousel={{finite: true}}
-        />
-      </VideoContainer>
-    );
-  }
-
-  const progress = duration > 0 ? currentTime / duration : 0;
-
-  return (
-    <>
-      <VideoContainer>
-        <VideoWrapper onClick={togglePlay}>
-          {showPreview && previewImageUrl && (
-            <PreviewImageContainer onClick={togglePlay}>
-              <PreviewImage src={previewImageUrl} alt={`${title} preview`} />
-            </PreviewImageContainer>
-          )}
-          {!isPlaying && (
-            <PlayButtonOverlay>
-              <svg viewBox="0 0 24 24" fill="white">
-                <path d="M8 5.14v14l11-7-11-7z" />
-              </svg>
-            </PlayButtonOverlay>
-          )}
-          <VideoElement
-            ref={videoRef}
-            src={url}
-            onClick={togglePlay}
-            playsInline
-            autoPlay={false}
-          />
-        </VideoWrapper>
-        <CustomControls>
-          <PlayButton onClick={togglePlay}>
-            {isPlaying ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5.14v14l11-7-11-7z" />
-              </svg>
-            )}
-          </PlayButton>
-          <ResetButton onClick={handleReset}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
-            </svg>
-          </ResetButton>
-          <RewindButton onClick={handleRewind}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 6c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1s-1-.45-1-1V7c0-.55.45-1 1-1zm3.66 6.82l5.77 4.07c.66.47 1.58-.01 1.58-.82V7.93c0-.81-.91-1.28-1.58-.82l-5.77 4.07c-.57.4-.57 1.24 0 1.64z" />
-            </svg>
-          </RewindButton>
-          <TimeDisplay>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </TimeDisplay>
-          <ProgressContainer ref={progressRef} onClick={handleProgressClick}>
-            <ProgressBar progress={progress} />
-            <ProgressHandle progress={progress} />
-          </ProgressContainer>
-          <PlaybackSpeedButton onClick={togglePlaybackRate}>
-            {playbackRate}x
-          </PlaybackSpeedButton>
-          <FullscreenButton onClick={toggleFullscreen}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-            </svg>
-          </FullscreenButton>
-        </CustomControls>
-      </VideoContainer>
-      <Lightbox
-        plugins={[Fullscreen, Video]}
-        open={lightboxOpen}
-        close={() => setLightboxOpen(false)}
-        controller={{
-          closeOnBackdropClick: true,
-        }}
-        slides={[
-          {
-            type: 'video',
-            sources: [{src: url, type: fileExt === 'webm' ? 'video/webm' : 'video/mp4'}],
-          },
-        ]}
-        render={{
-          buttonPrev: () => null,
-          buttonNext: () => null,
-        }}
-        carousel={{finite: true}}
-      />
-    </>
-  );
+      <VideoViewer videoSrc={url} width={containerWidth} height={containerHeight}/>
+    )
+  } else return null
 };
