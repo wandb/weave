@@ -1,9 +1,9 @@
-import {CircularProgress} from '@mui/material';
 import {WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -208,8 +208,12 @@ export const PlaygroundChat = ({
           {playgroundStates.map((state, idx) => (
             <React.Fragment key={idx}>
               <div
-                className={`relative m-[8px] flex w-full min-w-[520px] max-w-[800px] flex-col rounded-[4px] border-2 ${
-                  settingsTab === idx ? 'border-teal-400' : 'border-moon-200'
+                className={`relative m-[8px] flex w-full min-w-[520px] ${
+                  playgroundStates.length === 1 ? 'lg:min-w-[800px]' : ''
+                } max-w-[800px] flex-col rounded-[4px] border ${
+                  settingsTab === idx
+                    ? 'border-teal-400 outline outline-[1.5px] outline-teal-400'
+                    : 'border-moon-200'
                 }`}>
                 {state.loading && (
                   <div
@@ -217,10 +221,10 @@ export const PlaygroundChat = ({
                       WHITE,
                       0.7
                     )}]`}>
-                    <CircularProgress />
+                    <WaveLoader size="small" />
                   </div>
                 )}
-                <div className="absolute top-0 z-[10] w-full bg-white px-[16px] py-[8px]">
+                <div className="absolute top-0 z-[10] w-full rounded-t-[4px] bg-white px-[16px] py-[8px]">
                   <PlaygroundChatTopBar
                     idx={idx}
                     settingsTab={settingsTab}
