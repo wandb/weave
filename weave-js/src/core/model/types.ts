@@ -129,7 +129,6 @@ export const WANDB_DOMAIN_TYPES = [
   'table',
   'joined-table',
   'partitioned-table',
-  'incremental-table',
   'file',
   'dir',
   'runQueue',
@@ -149,7 +148,6 @@ export const BASIC_MEDIA_TYPES: MediaType[] = [
   {type: 'table', columnTypes: {}},
   {type: 'joined-table', columnTypes: {}},
   {type: 'partitioned-table', columnTypes: {}},
-  {type: 'incremental-table', columnTypes: {}},
   {type: 'wb_trace_tree'},
 ];
 // TODO: make this systematic -- we should use some kind of registry
@@ -283,11 +281,6 @@ export interface PytorchSavedModelType {
 
 export interface TableType {
   type: 'table';
-  columnTypes: {[key: string]: Type};
-}
-
-export interface IncrementalTableType {
-  type: 'incremental-table';
   columnTypes: {[key: string]: Type};
 }
 

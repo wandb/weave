@@ -152,7 +152,6 @@ export const mediaStrings = [
   'table-file',
   'partitioned-table',
   'joined-table',
-  'incremental-table',
   'images',
   'images/separated',
   'image-file',

@@ -114,44 +114,6 @@ class JoinedTableType(types.ObjectType):
             "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
             "_file": artifact_fs.FilesystemArtifactFileType(),
         }
-    
-@dataclasses.dataclass(frozen=True)
-class IncrementalTableType(types.ObjectType):
-    name = "incremental-table"
-
-    def property_types(self):
-        return {
-            "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
-        }
-    
-@weave_class(weave_type=IncrementalTableType)
-class IncrementalTable:
-    def __init__(self, _rows):
-        self._rows = _rows
-
-    @op(
-        name="incrementaltable-rowsType",
-        input_type={"incrementaltable": types.optional(IncrementalTableType())},
-        output_type=types.TypeType(),
-        hidden=True,
-    )
-    def incremental_rows_type(incrementaltable):
-        if incrementaltable == None:
-            return types.NoneType()
-        ttype = types.TypeRegistry.type_of(incrementaltable._rows)
-        return ttype
-
-    @op(
-        name="incrementaltable-rows",
-        input_type={"incrementaltable": IncrementalTableType()},
-        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
-        refine_output_type=incremental_rows_type,
-    )
-    def rows(incrementaltable):
-        return incrementaltable._rows
-
-
-
 @weave_class(weave_type=JoinedTableType)
 class JoinedTable:
     def __init__(self, _rows, _file):
@@ -974,19 +936,3 @@ def joined_table(
         return JoinedTable(_get_table_like_awl_from_file(file).awl, file)
     except FileNotFoundError as e:
         return None
-
-@op(name="file-incrementalTable")
-def incremental_table(
-    file: artifact_fs.FilesystemArtifactFile,
-) -> typing.Optional[IncrementalTable]:
-    try:
-        return IncrementalTable(_get_table_like_awl_from_file(file).awl)
-    # See above in file-table op on why we catch the FileNotFoundError
-    except FileNotFoundError as e:
-        return None
-    except OSError as e:
-        import errno
-
-        if e.errno == errno.ESTALE:
-            return None
-        raise

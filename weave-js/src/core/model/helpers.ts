@@ -147,8 +147,6 @@ export function toPythonTyping(type: Type): string {
     return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'joined-table') {
     return PYTHON_UNCONVERTED_TYPE;
-  } else if (type.type === 'incremental-table') {
-    return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'partitioned-table') {
     return PYTHON_UNCONVERTED_TYPE;
   } else if (type.type === 'file') {
@@ -196,8 +194,6 @@ const filePrefixToMediaType = (prefix: string): MediaType | null => {
     return {type: 'joined-table', columnTypes: {}};
   } else if (prefix === 'partitioned-table') {
     return {type: 'partitioned-table', columnTypes: {}};
-  } else if (prefix === 'incremental-table') {
-    return {type: 'incremental-table', columnTypes: {}};
   }
   return null;
 };
@@ -374,12 +370,6 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
     } else if (
       type.type === 'partitioned-table' &&
       toType.type === 'partitioned-table'
-    ) {
-      // TODO: not true! Check column types!
-      return true;
-    } else if (
-      type.type === 'incremental-table' &&
-      toType.type === 'incremental-table'
     ) {
       // TODO: not true! Check column types!
       return true;
@@ -1037,10 +1027,6 @@ export function isFunction(t: Type): t is FunctionType {
 
 export function isTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'table';
-}
-
-export function isIncrementalTable(t: Type): t is TableType {
-  return !isSimpleTypeShape(t) && t?.type === 'incremental-table';
 }
 
 export function isPartitionedTable(t: Type): t is TableType {

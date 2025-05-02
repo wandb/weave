@@ -80,7 +80,7 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
     elif tc_type == "incremental-table-file":
         extension = types.Const(types.String(), "json")
-        return artifact_fs.FilesystemArtifactFileType(extension, table.IncrementalTableType())
+        return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
     elif tc_type == "joined-table":
         extension = types.Const(types.String(), "json")
         return artifact_fs.FilesystemArtifactFileType(

@@ -48,10 +48,6 @@ export const ConvertibleToDataTableType = {
       type: 'file' as const,
       wbObjectType: {type: 'table' as const, columnTypes: {}},
     },
-    {
-      type: 'file' as const,
-      wbObjectType: {type: 'incremental-table' as const, columnTypes: {}},
-    },
     // {type: 'partitioned-table' as const, columnTypes: {}},
     {
       type: 'file' as const,
@@ -79,20 +75,6 @@ export function normalizeTableLike(node: Node) {
   let type = nullableTaggableValue(node.type);
   if (isListLike(type)) {
     type = nullableTaggableValue(listObjectType(type));
-  }
-
-  if (isUnion(type)) {
-    return opConcat({
-      arr: opMap({
-        arr: node,
-        mapFn: constFunction(
-          {row: union('incremental-table-file', 'table-file')},
-          ({row}) => {
-            return normalizeTableLike(row);
-          }
-        ),
-      }),
-    });
   }
 
   // wb table file
@@ -152,21 +134,6 @@ export function normalizeTableLike(node: Node) {
     });
   }
 
-  // incremental-table file
-  if (
-    isFile(type) &&
-    type.wbObjectType != null &&
-    isIncrementalTable(type.wbObjectType)
-  ) {
-    return opIncrementalTableRows({
-      incrementalTable: opFileIncrementalTable({file: node}),
-    });
-  }
-
-  if (isIncrementalTable(type)) {
-    return opIncrementalTableRows({incrementalTable: node});
-  }
-
   return node;
 }
 
@@ -210,19 +177,6 @@ export function isTableTypeLike(type: Type) {
     isFile(type) &&
     type.wbObjectType != null &&
     isJoinedTable(type.wbObjectType)
-  ) {
-    return true;
-  }
-  // incremental-table
-  if (isIncrementalTable(type)) {
-    return true;
-  }
-
-  // wb incremental-table file
-  if (
-    isFile(type) &&
-    type.wbObjectType != null &&
-    isIncrementalTable(type.wbObjectType)
   ) {
     return true;
   }
