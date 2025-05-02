@@ -1959,11 +1959,10 @@ export const traceCallLatencyMs = (
   const endDate = traceCall.ended_at
     ? convertISOToDate(traceCall.ended_at)
     : null;
-  let latencyMs = 0;
-  if (startDate && endDate) {
-    latencyMs = endDate.getTime() - startDate.getTime();
+  if (startDate == null || endDate == null) {
+    return 0;
   }
-  return latencyMs;
+  return endDate.getTime() - startDate.getTime();
 };
 
 const traceCallToLegacySpan = (
