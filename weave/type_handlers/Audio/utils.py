@@ -2,6 +2,7 @@ import shutil
 from enum import Enum
 from typing import Any, Optional
 
+
 class AudioFormat(str, Enum):
     """
     These are NOT the list of formats we accept from the user
