@@ -156,7 +156,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     entity: lookupKey?.entity ?? '',
     project: lookupKey?.project ?? '',
     digests: lookupKey?.digest ? [lookupKey?.digest] : [],
-    skip: lookupKey == null
+    skip: lookupKey == null,
   });
 
   const totalRows = useMemo(() => {
@@ -194,8 +194,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     limit: numRowsToFetch,
     offset,
     sortBy,
-    skip: lookupKey == null
-});
+    skip: lookupKey == null,
+  });
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
   const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
