@@ -1095,7 +1095,7 @@ def op(
             elif is_generator:
 
                 @wraps(func)
-                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = _call_sync_gen(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1103,7 +1103,7 @@ def op(
             elif is_async_generator:
 
                 @wraps(func)
-                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_gen(
                         cast(Op, wrapper), *args, __should_raise=True, **kwargs
                     )
