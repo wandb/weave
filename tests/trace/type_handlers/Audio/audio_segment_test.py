@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import pytest
 from pydub import AudioSegment
 
 import weave
@@ -18,9 +19,10 @@ Calls:
 """
 
 
-def make_audio(duration: Optional[int] = None) -> AudioSegment:
+@pytest.fixture
+def make_audio_segment(duration: Optional[int] = None) -> AudioSegment:
     sample_rate = 44100  # Standard audio sample rate
-    duration = duration or 2  # seconds
+    duration = 1
     frequency = 440  # Hz (A4 note)
 
     t = np.linspace(0, duration, int(sample_rate * duration), False)
@@ -33,60 +35,53 @@ def make_audio(duration: Optional[int] = None) -> AudioSegment:
     )
 
 
-def make_audio_file(filename: str, duration: Optional[int] = None) -> None:
-    audio_segment = make_audio(duration)
+@pytest.fixture
+def make_mp3_file(tmp_path: Path) -> str:
+    filename = str(tmp_path / "audio.mp3")
+    audio_segment = make_audio_segment()
     ext = filename.split(".")[-1]
     audio_segment.export(out_f=filename, format=ext)
+    return filename
 
 
-def test_weave_audio_publish(client: WeaveClient, tmp_path: Path) -> None:
+def test_weave_audio_publish(client: WeaveClient, make_mp3_file: str) -> None:
     client.project = "test_audio_publish"
-    filename = str(tmp_path / "audio.mp3")
-    duration = 1
-    make_audio_file(filename, duration)
 
     # Goes in as wrapper around path
-    audio = weave.Audio(filename)
+    audio = weave.Audio(make_mp3_file)
     weave.publish(audio)
     ref = get_ref(audio)
     assert ref is not None
-    weave.ref(ref.uri()).get()
     # Comes out as an AudioSegment object
-    gotten_audio: AudioSegment = weave.ref(ref.uri()).get()
+    gotten_audio: AudioSegment = ref.get()
     assert gotten_audio.duration_seconds == 1
 
 
-def test_audio_segment_publish(client: WeaveClient) -> None:
+def test_audio_segment_publish(client: WeaveClient, make_audio: AudioSegment) -> None:
     client.project = "test_audio_publish"
-    duration = 1
-    audio = make_audio(duration)
-
     # Goes in as AudioSegement object
-    weave.publish(audio)
-    ref = get_ref(audio)
+    weave.publish(make_audio)
+    ref = get_ref(make_audio)
     assert ref is not None
-
     # Comes out as an AudioSegment object
-    gotten_audio = weave.ref(ref.uri()).get()
-    assert gotten_audio.duration_seconds == 1
+    gotten_audio = ref.get()
+    assert isinstance(gotten_audio, AudioSegment)
 
 
-def test_weave_audio_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
+def test_weave_audio_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
+    client.project = "test_weave_audio_mp3_as_call_io"
+
     @weave.op
     def weave_audio_as_input_and_output_part(in_audio: weave.Audio) -> dict:
         return {"out_audio": in_audio}
 
-    client.project = "test_audio_as_call_io"
-    temp_file = str(tmp_path / "audio.mp3")
     # Create a temporary audio file
-    make_audio_file(temp_file)
+    weave_audio = weave.Audio(make_mp3_file)
 
-    weave_audio = weave.Audio(temp_file)
     # Load the file into audio segement
-    source_audio = AudioSegment.from_mp3(temp_file)
+    source_audio = AudioSegment.from_mp3(make_mp3_file)
 
     weave_audio_as_input_and_output_part(weave_audio)
-
     # Load op returns an AudioSegment, so we don't need to .from_mp3 them
     input_output_part_call = weave_audio_as_input_and_output_part.calls()[0]
 
@@ -98,18 +93,14 @@ def test_weave_audio_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None
     assert output_audio[:5] == source_audio[:5]
 
 
-def test_audio_segment_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> None:
+def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
     @weave.op
     def audio_segment_as_input_and_output_part(in_audio: AudioSegment) -> dict:
         return {"out_audio": in_audio}
 
     client.project = "test_audio_as_call_io"
-    temp_file = str(tmp_path / "audio.mp3")
-    # Create a temporary audio file
-    make_audio_file(temp_file)
-
     # Load the file into audio segement
-    source_audio = AudioSegment.from_mp3(temp_file)
+    source_audio = AudioSegment.from_mp3(make_mp3_file)
 
     audio_segment_as_input_and_output_part(source_audio)
 
@@ -121,8 +112,8 @@ def test_audio_segment_mp3_as_call_io(client: WeaveClient, tmp_path: Path) -> No
     input_audio = input_output_part_call.inputs["in_audio"]
     output_audio = input_output_part_call.output["out_audio"]
 
-    source_frames = str([input_audio.get_frame(i) for i in range(5)])
-    in_frames = str([input_audio.get_frame(i) for i in range(5)])
-    out_frames = str([output_audio.get_frame(i) for i in range(5)])
-    assert source_frames == in_frames
-    assert source_frames == out_frames
+    input_audio = input_output_part_call.inputs["in_audio"]
+    assert input_audio[:5] == source_audio[:5]
+
+    output_audio = input_output_part_call.output["out_audio"]
+    assert output_audio[:5] == source_audio[:5]
