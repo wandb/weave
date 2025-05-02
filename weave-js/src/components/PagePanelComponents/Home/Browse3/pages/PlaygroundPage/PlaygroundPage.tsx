@@ -86,7 +86,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
               JSON.parse(JSON.stringify(playgroundStates[settingsTab ?? 0])),
             ]);
           }}>
-          Add chat
+          Add model
         </Button>
       }
     />
