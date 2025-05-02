@@ -1,23 +1,28 @@
 import {
   applyOpToOneOrMany,
   constBoolean,
+  constFunction,
   isFile,
   isIncrementalTable,
   isJoinedTable,
   isListLike,
   isPartitionedTable,
   isTable,
+  isUnion,
   listObjectType,
   Node,
   nullableTaggableValue,
+  opConcat,
   opFileIncrementalTable,
   opFileJoinedTable,
   opFilePartitionedTable,
   opFileTable,
   opJoinedTableRows,
+  opMap,
   opPartitionedTableRows,
   opTableRows,
   Type,
+  union,
 } from '@wandb/weave/core';
 import {opIncrementalTableRows} from '@wandb/weave/core/ops/domain/incrementalTable';
 
@@ -76,6 +81,20 @@ export function normalizeTableLike(node: Node) {
     type = nullableTaggableValue(listObjectType(type));
   }
 
+  if (isUnion(type)) {
+    return opConcat({
+      arr: opMap({
+        arr: node,
+        mapFn: constFunction(
+          {row: union('incremental-table-file', 'table-file')},
+          ({row}) => {
+            return normalizeTableLike(row);
+          }
+        ),
+      }),
+    });
+  }
+
   // wb table file
   if (isFile(type) && type.wbObjectType != null && isTable(type.wbObjectType)) {
     return opTableRows({table: opFileTable({file: node})});
@@ -98,16 +117,7 @@ export function normalizeTableLike(node: Node) {
       {}
     );
   }
-  // incremental-table
-  if (
-    isFile(type) &&
-    type.wbObjectType != null &&
-    isIncrementalTable(type.wbObjectType)
-  ) {
-    return opIncrementalTableRows({
-      incrementalTable: opFileIncrementalTable({file: node}),
-    });
-  }
+
   // partitioned-table
   if (isPartitionedTable(type)) {
     return applyOpToOneOrMany(
@@ -142,11 +152,36 @@ export function normalizeTableLike(node: Node) {
     });
   }
 
+  // incremental-table file
+  if (
+    isFile(type) &&
+    type.wbObjectType != null &&
+    isIncrementalTable(type.wbObjectType)
+  ) {
+    return opIncrementalTableRows({
+      incrementalTable: opFileIncrementalTable({file: node}),
+    });
+  }
+
+  if (isIncrementalTable(type)) {
+    return opIncrementalTableRows({incrementalTable: node});
+  }
+
   return node;
 }
 
 export function isTableTypeLike(type: Type) {
   type = nullableTaggableValue(type);
+  // todo: might not be feasible
+  if (isUnion(type)) {
+    for (const member of type.members) {
+      if (!isTableTypeLike(member)) {
+        console.log('aint it');
+        return false;
+      }
+    }
+    return true;
+  }
 
   // wb table file
   if (isFile(type) && type.wbObjectType != null && isTable(type.wbObjectType)) {
