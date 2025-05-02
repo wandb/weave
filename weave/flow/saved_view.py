@@ -162,10 +162,6 @@ def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
     )
 
 
-def make_convert_getfield_query(field: str, value: Any, to: str) -> dict[str, Any]:
-    return {"$convert": {"input": {"$getField": field}, "to": to}}
-
-
 # See operationConverter in weave-js
 def get_field_expression(field: str) -> dict[str, Any]:
     """Helper function to get field expression based on whether it needs float conversion."""
