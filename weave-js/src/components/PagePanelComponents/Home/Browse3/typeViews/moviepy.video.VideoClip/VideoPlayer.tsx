@@ -34,6 +34,7 @@ export const VideoPlayer = (props: VideoPlayerProps) => (
       return (
         <VideoPlayerWithSize
           {...props}
+          mode={props.mode}
           containerWidth={width}
           containerHeight={height}
         />
@@ -53,7 +54,9 @@ const VideoPlayerWithSize = ({
   data,
   containerWidth,
   containerHeight,
+  ...props
 }: VideoPlayerWithSizeProps) => {
+  const [showPopup, setShowPopup] = useState(false);
   const {useFileContent} = useWFHooks();
   const videoTypes = {
     'video.gif': 'gif',
@@ -70,15 +73,33 @@ const VideoPlayerWithSize = ({
     videoKey ? data.files[videoKey] : '',
     {skip: !videoKey}
   );
+
+  const context = useContext(CustomWeaveTypeProjectContext);
+  const mode = props.mode ?? context?.mode;
+
   if (!videoKey) {
     return <NotApplicable />;
-  } else if (videoBinary.loading) {
+  }
+
+  const fileExt = videoTypes[videoKey as keyof typeof videoTypes];
+  if (!mode || mode != 'object_viewer') {
+    const videoText = `${fileExt.toUpperCase()} Video`
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', margin: 'auto' }}>
+        <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
+      </div>
+      // <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', padding: '8px' }}>
+      //   <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
+      // </div>
+    )
+  }
+
+  if (videoBinary.loading) {
     return <LoadingDots />;
   } else if (videoBinary.result == null) {
     return <span></span>;
   }
 
-  const fileExt = videoTypes[videoKey as keyof typeof videoTypes];
   return (
     <VideoPlayerWithData
       fileExt={fileExt}
@@ -351,6 +372,8 @@ const formatTime = (seconds: number): string => {
 };
 
 import VideoViewer from '../../../../../../components/Panel2/VideoViewer'
+import { CustomWeaveTypeProjectContext } from '../CustomWeaveTypeDispatcher';
+import { CustomLink } from '../../pages/common/Links';
 const VideoPlayerLoaded = ({
   url,
   fileExt,
