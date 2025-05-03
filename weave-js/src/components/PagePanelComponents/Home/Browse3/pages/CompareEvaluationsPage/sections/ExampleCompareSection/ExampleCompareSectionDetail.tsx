@@ -49,7 +49,7 @@ import {
   PivotedRow,
   useExampleCompareData,
   useFilteredAggregateRows,
-} from './exampleCompareSectionUtil';
+} from './ExampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
 const MIN_EVAL_WIDTH_PX = 350;
@@ -197,7 +197,7 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
 
-export const ExampleCompareSection: React.FC<{
+export const ExampleCompareSectionDetail: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {
@@ -1096,3 +1096,5 @@ const adjustValueForDisplay = (
     return value;
   }
 };
+
+

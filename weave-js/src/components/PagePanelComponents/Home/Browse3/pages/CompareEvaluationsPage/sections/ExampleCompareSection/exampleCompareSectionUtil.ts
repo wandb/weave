@@ -372,6 +372,13 @@ async function loadRowDataIntoCache(
 
 type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
 
+function useExampleCompareDataLow(
+  state: EvaluationComparisonState,
+  inputDigest: string | null
+) {
+  const getTraceServerClient = useGetTraceServerClientContext();
+}
+
 export function useExampleCompareData(
   state: EvaluationComparisonState,
   filteredRows: Array<{

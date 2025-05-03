@@ -7,7 +7,7 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import React, {FC, useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -29,7 +29,8 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
+import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
@@ -250,6 +251,11 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const [viewMode, setViewMode] = useState<'detail' | 'table'>('table');
+  const toggleViewMode = useCallback(() => {
+    setViewMode(viewMode === 'detail' ? 'table' : 'detail');
+  }, [viewMode]);
+
   return (
     <VerticalBox
       sx={{
@@ -272,14 +278,21 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
+        <button onClick={toggleViewMode}>
+          Toggle that sick view!
+        </button>
       </HorizontalBox>
       <Box
         sx={{
           height,
           overflow: 'auto',
         }}>
-        <ExampleCompareSection state={state} />
-      </Box>
+          {viewMode === 'detail' ? (
+            <ExampleCompareSectionDetail state={state} />
+          ) : (
+            <ExampleCompareSectionTable state={state} />
+          )}
+        </Box>
     </VerticalBox>
   );
 };
