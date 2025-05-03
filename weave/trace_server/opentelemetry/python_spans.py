@@ -34,6 +34,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.attributes import (
     SpanEvent,
+    get_span_overrides,
     get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
@@ -290,6 +291,10 @@ class Span:
         outputs = get_weave_outputs(events, self.attributes) or {}
         attributes = get_weave_attributes(self.attributes) or {}
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
+        overrides = get_span_overrides(self.attributes) or {}
+
+        start_time = overrides.get("start_time") or self.start_time
+        end_time = overrides.get("end_time") or self.end_time
 
         llm_usage = tsi.LLMUsageSchema(
             input_tokens=usage.get("input_tokens"),
@@ -343,7 +348,7 @@ class Span:
             op_name=op_name,
             trace_id=self.trace_id,
             parent_id=self.parent_id,
-            started_at=self.start_time,
+            started_at=start_time,
             attributes=attributes,
             inputs=inputs,
             display_name=display_name,
@@ -357,7 +362,7 @@ class Span:
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            ended_at=self.end_time,
+            ended_at=end_time,
             exception=exception_msg,
             output=outputs,
             summary=summary_insert_map,
