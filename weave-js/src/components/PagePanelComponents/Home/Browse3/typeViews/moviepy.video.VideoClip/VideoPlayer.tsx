@@ -12,6 +12,7 @@ import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import { PILImageImageTypePayload, imageTypes } from '../PIL.Image.Image/PILImageImage';
+import * as Dialog from '../../../../../../components/Dialog/Dialog';
 
 type VideoClipTypePayload = CustomWeaveTypePayload<
   'moviepy.video.VideoClip.VideoClip',
@@ -85,12 +86,28 @@ const VideoPlayerWithSize = ({
   if (!mode || mode != 'object_viewer') {
     const videoText = `${fileExt.toUpperCase()} Video`
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', margin: 'auto' }}>
-        <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
-      </div>
-      // <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', padding: '8px' }}>
-      //   <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
-      // </div>
+      <>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', margin: 'auto', padding: '6px' }}>
+          <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
+        </div>
+
+        {showPopup && videoBinary.result && (
+          <Dialog.Root open={showPopup} onOpenChange={setShowPopup}>
+            <Dialog.Portal>
+              <Dialog.Overlay />
+              <Dialog.Content className="w-[60vw] h-[60vh] p-0"> 
+                <VideoPlayerWithData
+                  fileExt={fileExt}
+                  buffer={videoBinary.result}
+                  containerWidth={containerWidth}
+                  containerHeight={containerHeight}
+                  title={data.custom_name || entity.split('-')[0]}
+                />
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+        )}
+      </>
     )
   }
 
