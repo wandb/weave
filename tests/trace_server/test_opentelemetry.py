@@ -23,7 +23,9 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.attributes import (
+    get_span_overrides,
     get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
@@ -38,6 +40,7 @@ from weave.trace_server.opentelemetry.helpers import (
     get_attribute,
     shorten_name,
     to_json_serializable,
+    try_parse_timestamp,
     unflatten_key_values,
 )
 from weave.trace_server.opentelemetry.python_spans import (
@@ -243,9 +246,6 @@ class TestPythonSpans:
 
     def test_span_to_call_long_name(self):
         """Test that span names are properly shortened when too long."""
-        from weave.trace_server.constants import MAX_OP_NAME_LENGTH
-        from weave.trace_server.opentelemetry.helpers import shorten_name
-
         # Create a test span with a very long name
         pb_span = create_test_span()
         long_name = "a" * (MAX_OP_NAME_LENGTH + 10)
@@ -933,8 +933,6 @@ class TestHelpers:
         """Test parsing timestamps from various formats."""
         from datetime import datetime
 
-        from weave.trace_server.opentelemetry.helpers import try_parse_timestamp
-
         # Test parsing ISO 8601 format string
         iso_timestamp = "2023-01-01T12:00:00"
         result = try_parse_timestamp(iso_timestamp)
@@ -981,9 +979,6 @@ class TestSpanOverrides:
         """Test extracting span overrides from attributes."""
         from datetime import datetime
 
-        from weave.trace_server.opentelemetry.attributes import get_span_overrides
-        from weave.trace_server.opentelemetry.helpers import expand_attributes
-
         # Create attribute dictionary with timestamp overrides in ISO format
         iso_start = "2023-01-01T10:00:00"
         iso_end = "2023-01-01T10:01:30"
@@ -1006,9 +1001,6 @@ class TestSpanOverrides:
     def test_get_span_overrides_with_timestamps(self):
         """Test extracting span overrides with different timestamp formats."""
         from datetime import datetime
-
-        from weave.trace_server.opentelemetry.attributes import get_span_overrides
-        from weave.trace_server.opentelemetry.helpers import expand_attributes
 
         # Create attribute dictionary with epoch timestamps
         start_ns = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
@@ -1045,9 +1037,6 @@ class TestSpanOverrides:
 
     def test_get_span_overrides_with_missing_attributes(self):
         """Test get_span_overrides when no override attributes are present."""
-        from weave.trace_server.opentelemetry.attributes import get_span_overrides
-        from weave.trace_server.opentelemetry.helpers import expand_attributes
-
         # Create attribute dictionary without overrides
         attributes = expand_attributes(
             [
