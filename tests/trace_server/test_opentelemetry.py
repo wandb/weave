@@ -928,3 +928,134 @@ class TestHelpers:
         assert actual.startswith("GET /")
         assert actual.endswith("...")
         assert len(actual) <= 128
+
+    def test_try_parse_timestamp(self):
+        """Test parsing timestamps from various formats."""
+        from datetime import datetime
+
+        from weave.trace_server.opentelemetry.helpers import try_parse_timestamp
+
+        # Test parsing ISO 8601 format string
+        iso_timestamp = "2023-01-01T12:00:00"
+        result = try_parse_timestamp(iso_timestamp)
+        assert isinstance(result, datetime)
+        assert result.year == 2023
+        assert result.month == 1
+        assert result.day == 1
+        assert result.hour == 12
+        assert result.minute == 0
+        assert result.second == 0
+
+        # Test parsing nanoseconds since epoch (int)
+        ns_timestamp = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
+        result = try_parse_timestamp(ns_timestamp)
+        assert isinstance(result, datetime)
+        assert result.year == 2023
+        assert result.month == 1
+        assert result.day == 1
+        # Hour may vary based on timezone, so we don't check it
+
+        # Test parsing seconds since epoch (float)
+        seconds_timestamp = 1672574400.0  # 2023-01-01T12:00:00 in seconds
+        result = try_parse_timestamp(seconds_timestamp)
+        assert isinstance(result, datetime)
+        assert result.year == 2023
+        assert result.month == 1
+        assert result.day == 1
+        # Hour may vary based on timezone, so we don't check it
+
+        # Test with invalid string format
+        invalid_string = "not-a-timestamp"
+        assert try_parse_timestamp(invalid_string) is None
+
+        # Test with other types
+        assert try_parse_timestamp(None) is None
+        assert try_parse_timestamp({}) is None
+        assert try_parse_timestamp([]) is None
+
+
+class TestSpanOverrides:
+    """Test the functionality for span overrides in opentelemetry attributes."""
+
+    def test_get_span_overrides(self):
+        """Test extracting span overrides from attributes."""
+        from datetime import datetime
+
+        from weave.trace_server.opentelemetry.attributes import get_span_overrides
+        from weave.trace_server.opentelemetry.helpers import expand_attributes
+
+        # Create attribute dictionary with timestamp overrides in ISO format
+        iso_start = "2023-01-01T10:00:00"
+        iso_end = "2023-01-01T10:01:30"
+        attributes = expand_attributes(
+            [
+                ("langfuse.startTime", iso_start),
+                ("langfuse.endTime", iso_end),
+                ("other.attribute", "value"),
+            ]
+        )
+
+        # Test extracting the overrides
+        overrides = get_span_overrides(attributes)
+        assert len(overrides) == 2
+        assert isinstance(overrides["start_time"], datetime)
+        assert isinstance(overrides["end_time"], datetime)
+        assert overrides["start_time"].isoformat() == iso_start
+        assert overrides["end_time"].isoformat() == iso_end
+
+    def test_get_span_overrides_with_timestamps(self):
+        """Test extracting span overrides with different timestamp formats."""
+        from datetime import datetime
+
+        from weave.trace_server.opentelemetry.attributes import get_span_overrides
+        from weave.trace_server.opentelemetry.helpers import expand_attributes
+
+        # Create attribute dictionary with epoch timestamps
+        start_ns = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
+        end_seconds = 1672574460.0  # 2023-01-01T12:01:00 in seconds
+
+        attributes = expand_attributes(
+            [
+                ("langfuse.startTime", start_ns),
+                ("langfuse.endTime", end_seconds),
+            ]
+        )
+
+        # Test extracting the overrides
+        overrides = get_span_overrides(attributes)
+        assert len(overrides) == 2
+        assert isinstance(overrides["start_time"], datetime)
+        assert isinstance(overrides["end_time"], datetime)
+
+        # Check the year/month/day to ensure timestamps were parsed correctly
+        # (not checking hour due to timezone differences)
+        assert overrides["start_time"].year == 2023
+        assert overrides["start_time"].month == 1
+        assert overrides["start_time"].day == 1
+
+        assert overrides["end_time"].year == 2023
+        assert overrides["end_time"].month == 1
+        assert overrides["end_time"].day == 1
+
+        # End time should be 60 seconds after start time
+        delta = overrides["end_time"] - overrides["start_time"]
+        assert (
+            abs(delta.total_seconds() - 60) < 1
+        )  # Allow small difference due to float precision
+
+    def test_get_span_overrides_with_missing_attributes(self):
+        """Test get_span_overrides when no override attributes are present."""
+        from weave.trace_server.opentelemetry.attributes import get_span_overrides
+        from weave.trace_server.opentelemetry.helpers import expand_attributes
+
+        # Create attribute dictionary without overrides
+        attributes = expand_attributes(
+            [
+                ("some.attribute", "value"),
+                ("other.attribute", 123),
+            ]
+        )
+
+        # Test extracting the overrides
+        overrides = get_span_overrides(attributes)
+        assert overrides == {}

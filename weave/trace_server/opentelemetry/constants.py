@@ -135,6 +135,6 @@ WB_KEYS = {
 # These represent fields that are set by a provider which override top level span information
 # Langfuse relies on these attributes to give the real start and end time for spans
 SPAN_OVERRIDES = {
-    "start_time": ['langfuse.startTime', try_parse_timestamp],
-    "end_time": ['langfuse.endTime', try_parse_timestamp],
+    "start_time": [("langfuse.startTime", try_parse_timestamp)],
+    "end_time": [("langfuse.endTime", try_parse_timestamp)],
 }

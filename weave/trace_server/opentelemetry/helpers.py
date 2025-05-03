@@ -453,6 +453,7 @@ def shorten_name(
         i += 1
     return shortened_name
 
+
 def try_parse_timestamp(x: Any) -> Any:
     """
     Try to parse a timestamp from various formats.
