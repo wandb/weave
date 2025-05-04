@@ -687,18 +687,18 @@ def _get_incremental_table_awl_from_file(
 ) -> ops_arrow.ArrowWeaveList:
     from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
     all_awls: list[ops_arrow.ArrowWeaveList] = []
-    files = []
-    if "prev_increment_paths" in data:
-        # only load the last 100 increments as a perf constraint
-        increment_paths = data["prev_increment_paths"][-100:] if len(data["prev_increment_paths"]) > 100 else data["prev_increment_paths"]
-        escaped_paths = [escape_artifact_path(path) for path in increment_paths]
-        files = [_filesystem_artifact_file_from_artifact_path(path) for path in escaped_paths]
-    files.append(file)
-
+    increment_dir = file.artifact.path_info("")
+    if isinstance(increment_dir, artifact_fs.FilesystemArtifactDir):
+        files = {}
+        current_incr_num_str, incremental_table_root_filename = file.path.split('.', 1)
+        current_incr_num = int(current_incr_num_str)
+        for i in range(current_incr_num, max(current_incr_num - 99, -1), -1):
+            files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
+        
     asyncio.run(ensure_files(files))
     rrows: list[list] = []
     object_types: list[types.Type] = []
-    for incremental_file in files:
+    for incremental_file in files.values():
         # We catch this error because incremental tables are constructed from a list
         # of hard-coded artifact URLs. This handles the possibility that the user has deleted an
         # artifact version.
@@ -722,7 +722,7 @@ def _get_incremental_table_awl_from_file(
         
     object_type = types.union(*object_types)
 
-    for rows, file in zip(rrows, files):
+    for rows, file in zip(rrows, files.values()):
         all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_awls)
     return arrow_weave_list
