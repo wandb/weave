@@ -281,7 +281,10 @@ export const PlaygroundChat = ({
                               choiceIndex
                             ),
                         }}>
-                        <CallChat call={state.traceCall as TraceCallSchema} />
+                        <CallChat
+                          call={state.traceCall as TraceCallSchema}
+                          useDrawerAnimationBuffer={false}
+                        />
                       </PlaygroundContext.Provider>
                     )}
                   </div>
