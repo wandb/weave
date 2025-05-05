@@ -55,7 +55,7 @@ const PILImageImageWithSize = ({
     'image.jpg': 'jpg',
     'image.png': 'png',
     'image.webp': 'webp',
-  };
+  } as const;
 
   const imageKey = Object.keys(data.files).find(key => key in imageTypes) as
     | keyof PILImageImageTypePayload['files']
