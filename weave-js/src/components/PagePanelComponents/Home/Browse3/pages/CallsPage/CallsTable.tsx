@@ -406,6 +406,7 @@ export const CallsTable: FC<{
             return;
           }
 
+          console.log('TEST');
           // Check if there is a match for field and operator in filterModel.items
           // If a match exists, update the value instead of adding a new filter
           const existingFieldOpMatchIndex = filterModel.items.findIndex(
