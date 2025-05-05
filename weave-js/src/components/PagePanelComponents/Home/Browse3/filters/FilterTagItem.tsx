@@ -12,7 +12,6 @@ import {
   Timestamp,
   TimestampRange,
   TimestampRelative,
-  TimestampSmall,
 } from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';

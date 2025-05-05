@@ -3,7 +3,7 @@ import {
   GridSortItem,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {isRelativeDate, parseDate} from '@wandb/weave/util/date';
+import {isRelativeDate} from '@wandb/weave/util/date';
 import _ from 'lodash';
 import {useMemo} from 'react';
 import {useParams} from 'react-router-dom';
