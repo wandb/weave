@@ -1,6 +1,7 @@
 import asyncio
 import inspect  # Added for function signature inspection
 import traceback
+import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, Union
@@ -225,6 +226,11 @@ class Dataset(Object):
             Processing happens in parallel across multiple processors, controlled by `num_procs`.
             A rich progress bar is displayed during processing.
 
+        Traceability:
+            For best traceability in Weave's UI and lineage tracking, use named functions 
+            instead of lambda functions. Named functions provide clear operation names in the
+            Weave UI, while lambda functions appear as generic "<lambda>" operations.
+
         Immutability:
             The original dataset remains unchanged. A new Dataset instance is returned with
             the transformed rows.
@@ -291,6 +297,16 @@ class Dataset(Object):
         # Inspect the function signature
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
+        
+        # Check if a lambda function is being used and warn about traceability
+        if func.__name__ == "<lambda>":
+            warnings.warn(
+                "Lambda functions in Dataset.map reduce traceability in Weave. "
+                "For better tracking and visualization in the UI, use named functions instead. "
+                "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
+                UserWarning,
+                stacklevel=2
+            )
 
         async def process_row(row: dict) -> dict:
             try:
