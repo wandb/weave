@@ -101,15 +101,10 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             model,
             maxTokensLimit: maxTokens,
             maxTokens: Math.floor(maxTokens / 2),
-            savedModel: savedModel
-              ? {
-                  name: savedModel.name,
-                  savedModelParams: savedModel.savedModelParams,
-                }
-              : {
-                  name: null,
-                  savedModelParams: null,
-                },
+            savedModel: {
+              name: savedModel?.name ?? null,
+              savedModelParams: savedModel?.savedModelParams ?? null,
+            },
             traceCall: {
               ...state.traceCall,
               inputs: {

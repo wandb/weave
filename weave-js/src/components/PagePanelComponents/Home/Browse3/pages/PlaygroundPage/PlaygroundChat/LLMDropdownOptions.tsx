@@ -146,49 +146,6 @@ const SubMenu = ({
           )}
         </Box>
       ))}
-      {providers?.map(provider => (
-        <Box
-          key={provider.value}
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            p: '6px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            '&:hover': {
-              backgroundColor: hexToRGB(OBLIVION, 0.04),
-            },
-            width: '100%',
-          }}>
-          <Box
-            sx={{
-              wordBreak: 'break-all',
-              wordWrap: 'break-word',
-              whiteSpace: 'normal',
-            }}>
-            {provider.label}
-          </Box>
-          <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onConfigureProvider?.(provider.value);
-              }}
-              disabled={!isAdmin && provider.value !== 'custom-provider'}
-              tooltip={
-                !isAdmin && provider.value !== 'custom-provider'
-                  ? 'You must be an admin to configure this provider'
-                  : undefined
-              }>
-              Configure
-            </Button>
-          </Box>
-        </Box>
-      ))}
       {providers?.map(provider => {
         const tooltipContent =
           provider.value !== 'custom-provider' && !isAdmin
@@ -616,7 +573,7 @@ export const useLLMDropdownOptions = (
     });
   }
 
-  // Combine enabled and disabled options
+  // Combine options
   // Add a divider option before the add provider option
   const allOptions = [
     ...options,

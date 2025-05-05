@@ -1,30 +1,18 @@
 import {Box, Tooltip} from '@mui/material';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Button, Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
 import React, {useState} from 'react';
 
-import {
-  LlmStructuredCompletionModel,
-  LlmStructuredCompletionModelDefaultParamsSchema,
-  Message,
-  ResponseFormatSchema,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
-import {useCreateBuiltinObjectInstance} from '../../wfReactInterface/objectClassQuery';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {
-  SetPlaygroundStateFieldFunctionType,
-  TraceCallOutput,
-} from '../PlaygroundChat/useChatFunctions';
-import {PlaygroundResponseFormats, PlaygroundState} from '../types';
+import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
+import {PlaygroundState} from '../types';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
 import {SaveModelModal} from './SaveModelModal';
 import {StopSequenceEditor} from './StopSequenceEditor';
-
+import {useSaveModelConfiguration} from './useSaveModelConfiguration';
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
@@ -101,7 +89,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 fontSize: '16px',
                 fontWeight: '600',
               }}>
-              {playgroundStates[settingsTab].model}
+              {playgroundStates[settingsTab ?? 0]?.model ?? ''}
             </Box>
           </Tooltip>
         </Box>
@@ -143,6 +131,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     )
                   }
                 />
+
                 <StopSequenceEditor
                   stopSequences={playgroundState.stopSequences}
                   setStopSequences={value =>
@@ -162,6 +151,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Number of trials"
                   value={playgroundState.nTimes}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={playgroundState.maxTokensLimit || 100}
@@ -172,6 +162,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Maximum tokens"
                   value={playgroundState.maxTokens}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={2}
@@ -182,6 +173,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Temperature"
                   value={playgroundState.temperature}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -192,6 +184,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Top P"
                   value={playgroundState.topP}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -202,6 +195,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Frequency penalty"
                   value={playgroundState.frequencyPenalty}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -212,6 +206,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Presence penalty"
                   value={playgroundState.presencePenalty}
                 />
+
                 <Box
                   sx={{
                     width: '100%',
@@ -274,146 +269,4 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
       />
     </Box>
   );
-};
-
-type UseSaveModelConfigurationArgs = {
-  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
-  playgroundStates: PlaygroundState[];
-  settingsTab: number;
-  projectId: string;
-  closeDialog: () => void;
-  refetchSavedModels: () => void;
-};
-
-const useSaveModelConfiguration = ({
-  setPlaygroundStateField,
-  playgroundStates,
-  settingsTab,
-  projectId,
-  closeDialog,
-  refetchSavedModels,
-}: UseSaveModelConfigurationArgs) => {
-  const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
-    'LLMStructuredCompletionModel'
-  );
-
-  const saveModelConfiguration = async (modelName: string) => {
-    const finalModelName = modelName.trim();
-    if (!finalModelName) {
-      toast('Model name cannot be empty.', {type: 'error'});
-      return;
-    }
-
-    const currentState = playgroundStates[settingsTab];
-    if (!currentState) {
-      toast('Cannot find current playground state.', {type: 'error'});
-      closeDialog();
-      return;
-    }
-
-    const defaultParams: LlmStructuredCompletionModel['default_params'] = {
-      temperature: currentState.temperature,
-      top_p: currentState.topP,
-      max_tokens: currentState.maxTokens,
-      presence_penalty: currentState.presencePenalty,
-      frequency_penalty: currentState.frequencyPenalty,
-      stop: currentState.stopSequences ?? [],
-      response_format:
-        currentState.responseFormat === PlaygroundResponseFormats.JsonObject
-          ? ResponseFormatSchema.parse('json')
-          : currentState.responseFormat === PlaygroundResponseFormats.Text
-          ? ResponseFormatSchema.parse('text')
-          : // : currentState.responseFormat === PlaygroundResponseFormats.JsonSchema
-            // ? ResponseFormatSchema.parse('jsonschema')
-            undefined,
-      functions: currentState.functions,
-      n_times: currentState.nTimes,
-      messages_template: [],
-    };
-
-    if (currentState.traceCall?.inputs?.messages) {
-      defaultParams.messages_template.push(
-        ...currentState.traceCall.inputs.messages.map((message: Message) => ({
-          content: message.content,
-          function_call: message.function_call ?? null,
-          name: message.name ?? null,
-          role: message.role,
-          tool_call_id: message.tool_call_id ?? null,
-        }))
-      );
-    }
-    if (
-      currentState.traceCall?.output &&
-      (currentState.traceCall.output as TraceCallOutput)?.choices
-    ) {
-      const choice = (currentState.traceCall.output as TraceCallOutput)
-        ?.choices?.[currentState.selectedChoiceIndex ?? 0];
-      if (choice) {
-        defaultParams.messages_template.push({
-          content: choice?.message.content,
-          function_call: choice?.message.function_call ?? null,
-          name: choice?.message.name ?? null,
-          role: choice?.message.role,
-          tool_call_id: choice?.message.tool_call_id ?? null,
-        });
-      }
-    }
-
-    const validatedParams =
-      LlmStructuredCompletionModelDefaultParamsSchema.safeParse(defaultParams);
-    if (!validatedParams.success) {
-      console.error('Parameter validation failed:', validatedParams.error);
-      toast(`Invalid parameters: ${validatedParams.error.message}`, {
-        type: 'error',
-      });
-      return;
-    }
-
-    const baseModelId = currentState.savedModel?.name
-      ? currentState.savedModel.name
-      : currentState.model;
-
-    const modelToSave: Omit<LlmStructuredCompletionModel, 'ref'> & {
-      name: string;
-    } = {
-      name: finalModelName,
-      llm_model_id: baseModelId,
-      default_params: validatedParams.data,
-    };
-
-    closeDialog();
-
-    try {
-      await createLLMStructuredCompletionModel({
-        obj: {
-          project_id: projectId,
-          object_id: finalModelName,
-          val: modelToSave,
-        },
-      });
-      toast(`Model "${finalModelName}" saved successfully!`, {
-        type: 'success',
-      });
-
-      refetchSavedModels();
-
-      setPlaygroundStateField(settingsTab, 'savedModel', {
-        name: baseModelId,
-        savedModelParams: validatedParams.data,
-      });
-
-      setPlaygroundStateField(
-        settingsTab,
-        'model',
-        finalModelName as LLMMaxTokensKey
-      );
-    } catch (error) {
-      console.error('Failed to save model:', error);
-      toast(`Failed to save model: ${error}`, {
-        type: 'error',
-      });
-    }
-  };
-
-  return {saveModelConfiguration};
 };

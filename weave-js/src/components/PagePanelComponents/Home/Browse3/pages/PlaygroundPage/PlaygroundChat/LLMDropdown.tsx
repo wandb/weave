@@ -46,7 +46,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
-    refetchCustomLLMs();
+    refetchConfiguredProviders();
   };
 
   const handleConfigureProvider = (provider: string) => {
