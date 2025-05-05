@@ -484,6 +484,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -952,6 +955,175 @@
       "title": "InOperation",
       "type": "object"
     },
+    "LLMStructuredCompletionModel": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "llm_model_id": {
+          "title": "Llm Model Id",
+          "type": "string"
+        },
+        "default_params": {
+          "$ref": "#/$defs/LLMStructuredCompletionModelDefaultParams"
+        }
+      },
+      "required": [
+        "llm_model_id"
+      ],
+      "title": "LLMStructuredCompletionModel",
+      "type": "object"
+    },
+    "LLMStructuredCompletionModelDefaultParams": {
+      "properties": {
+        "messages_template": {
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "title": "Messages Template",
+          "type": "array"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top P"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "presence_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Presence Penalty"
+        },
+        "frequency_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency Penalty"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop"
+        },
+        "n_times": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Times"
+        },
+        "functions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Functions"
+        },
+        "response_format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResponseFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "messages_template"
+      ],
+      "title": "LLMStructuredCompletionModelDefaultParams",
+      "type": "object"
+    },
     "Leaderboard": {
       "properties": {
         "name": {
@@ -1073,6 +1245,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1099,6 +1274,74 @@
         "response_schema"
       ],
       "title": "LlmJudgeActionConfig",
+      "type": "object"
+    },
+    "Message": {
+      "description": "A message in a conversation with an LLM.\n\nAttributes:\n    role: The role of the message's author. Can be: system, user, assistant, function or tool.\n    content: The contents of the message. Required for all messages, but may be null for assistant messages with function calls.\n    name: The name of the author of the message. Required if role is \"function\". Must match the name of the function represented in content.\n          Can contain characters (a-z, A-Z, 0-9), and underscores, with a maximum length of 64 characters.\n    function_call: The name and arguments of a function that should be called, as generated by the model.\n    tool_call_id: Tool call that this message is responding to.",
+      "properties": {
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Content"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "function_call": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Function Call"
+        },
+        "tool_call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tool Call Id"
+        }
+      },
+      "required": [
+        "role",
+        "content",
+        "name",
+        "function_call",
+        "tool_call_id"
+      ],
+      "title": "Message",
       "type": "object"
     },
     "NotOperation": {
@@ -1271,7 +1514,11 @@
           "type": "object"
         },
         "return_type": {
-          "$ref": "#/$defs/ProviderReturnType",
+          "allOf": [
+            {
+              "$ref": "#/$defs/ProviderReturnType"
+            }
+          ],
           "default": "openai"
         }
       },
@@ -1325,6 +1572,7 @@
       "type": "object"
     },
     "ProviderReturnType": {
+      "const": "openai",
       "enum": [
         "openai"
       ],
@@ -1368,6 +1616,14 @@
       ],
       "title": "Query",
       "type": "object"
+    },
+    "ResponseFormat": {
+      "enum": [
+        "json",
+        "text"
+      ],
+      "title": "ResponseFormat",
+      "type": "string"
     },
     "SavedView": {
       "properties": {
@@ -1659,6 +1915,9 @@
     },
     "SavedView": {
       "$ref": "#/$defs/SavedView"
+    },
+    "LLMStructuredCompletionModel": {
+      "$ref": "#/$defs/LLMStructuredCompletionModel"
     }
   },
   "required": [
@@ -1669,7 +1928,8 @@
     "AnnotationSpec",
     "Provider",
     "ProviderModel",
-    "SavedView"
+    "SavedView",
+    "LLMStructuredCompletionModel"
   ],
   "title": "CompositeBaseObject",
   "type": "object"

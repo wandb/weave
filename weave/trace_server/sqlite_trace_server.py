@@ -325,6 +325,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
+            if filter.wb_user_ids:
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
+                conds += [f"wb_user_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -513,7 +516,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
-                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
                                 ELSE 0
                             END
                         """
@@ -1379,6 +1382,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        print("files_stats is not implemented for SQLite trace server", req)
+        return tsi.FilesStatsRes(total_size_bytes=-1)
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
         return tsi.CostCreateRes()
@@ -1574,6 +1581,16 @@ def _transform_external_calls_field_to_internal_calls_field(
         else:
             json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
+    elif field == "summary.weave.latency_ms":
+        # Special handling for latency to match sorting behavior
+        field = """
+            CASE
+                WHEN ended_at IS NOT NULL THEN
+                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
+                ELSE 0
+            END
+        """
+        json_path = None
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"

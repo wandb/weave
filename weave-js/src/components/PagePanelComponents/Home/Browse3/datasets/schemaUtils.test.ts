@@ -3,7 +3,6 @@ import {
   createProcessedRowsMap,
   createSourceSchema,
   createTargetSchema,
-  extractTopLevelFields,
   inferType,
   mapCallsToDatasetRows,
   unwrapRefValue,
@@ -33,38 +32,6 @@ describe('inferType', () => {
     expect(inferType(42)).toBe('number');
     expect(inferType(true)).toBe('boolean');
     expect(inferType(undefined)).toBe('undefined');
-  });
-});
-
-describe('extractTopLevelFields', () => {
-  test('extracts only top-level fields', () => {
-    const obj = {
-      user: {
-        name: 'Alice',
-        address: {
-          city: 'Paris',
-        },
-      },
-      age: 30,
-    };
-
-    expect(extractTopLevelFields(obj)).toEqual([
-      {name: 'user', type: 'object'},
-      {name: 'age', type: 'number'},
-    ]);
-  });
-
-  test('handles arrays as single fields', () => {
-    const obj = {tags: ['a', 'b', 'c']};
-    expect(extractTopLevelFields(obj)).toEqual([{name: 'tags', type: 'array'}]);
-  });
-
-  test('handles prefix correctly', () => {
-    const obj = {name: 'Alice', age: 30};
-    expect(extractTopLevelFields(obj, 'user')).toEqual([
-      {name: 'user.name', type: 'string'},
-      {name: 'user.age', type: 'number'},
-    ]);
   });
 });
 

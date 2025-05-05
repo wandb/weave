@@ -7,6 +7,7 @@
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import useAsync from 'react-use/lib/useAsync';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -596,13 +597,14 @@ const useProjectHasCalls = (
   opts?: {skip?: boolean}
 ): Loadable<boolean> => {
   const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  const count = callsStats.result?.count ?? 0;
   return useMemo(() => {
     return {
       loading: callsStats.loading,
-      result: callsStats.result != null,
+      result: count > 0,
       error: callsStats.error,
     };
-  }, [callsStats]);
+  }, [callsStats, count]);
 };
 
 const useCallsDeleteFunc = () => {
@@ -1947,15 +1949,20 @@ export const traceCallStatusCode = (
 export const traceCallLatencyS = (
   traceCall: traceServerTypes.TraceCallSchema
 ) => {
+  return traceCallLatencyMs(traceCall) / 1000;
+};
+
+export const traceCallLatencyMs = (
+  traceCall: traceServerTypes.TraceCallSchema
+) => {
   const startDate = convertISOToDate(traceCall.started_at);
   const endDate = traceCall.ended_at
     ? convertISOToDate(traceCall.ended_at)
     : null;
-  let latencyS = 0;
-  if (startDate && endDate) {
-    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
+  if (startDate == null || endDate == null) {
+    return 0;
   }
-  return latencyS;
+  return endDate.getTime() - startDate.getTime();
 };
 
 const traceCallToLegacySpan = (
@@ -2133,6 +2140,14 @@ export const useTableCreate = (): ((
     },
     [getTsClient]
   );
+};
+
+export const useFilesStats = (projectId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(async () => {
+    return getTsClient().filesStats({project_id: projectId});
+  }, [getTsClient, projectId]);
 };
 
 /// Utility Functions ///

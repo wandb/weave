@@ -322,6 +322,14 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type FilesStatsReq = {
+  project_id: string;
+};
+
+export type FilesStatsRes = {
+  total_size_bytes: number;
+};
+
 export type CompletionsCreateInputs = {
   model: string;
   messages: any[];

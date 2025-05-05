@@ -79,7 +79,7 @@ add_cost(
     llm_id: 'str',
     prompt_token_cost: 'float',
     completion_token_cost: 'float',
-    effective_date: 'datetime | None' = datetime.datetime(2025, 4, 28, 21, 2, 47, 965547, tzinfo=datetime.timezone.utc),
+    effective_date: 'datetime | None' = datetime.datetime(2025, 4, 30, 23, 50, 40, 886784, tzinfo=datetime.timezone.utc),
     prompt_token_cost_unit: 'str | None' = 'USD',
     completion_token_cost_unit: 'str | None' = 'USD',
     provider_id: 'str | None' = 'default'

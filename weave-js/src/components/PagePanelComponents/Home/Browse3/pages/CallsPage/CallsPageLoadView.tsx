@@ -3,7 +3,7 @@ import React from 'react';
 import {useProjectInfo} from '../../../../../../common/hooks/useProjectInfo';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {Alert} from '../../../../../Alert';
-import {Loading} from '../../../../../Loading';
+import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {CallsPageLoadViewWithUser} from './CallsPageLoadViewWithUser';
 
 type CallsPageLoadViewProps = {
@@ -26,10 +26,23 @@ export const CallsPageLoadView = ({
   );
 
   if (loadingUserInfo || loadingProjectInfo) {
-    return <Loading />;
-  }
-  if (!userInfo) {
-    return <Alert severity="error">User not found</Alert>;
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          width: '100%',
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          zIndex: 1,
+        }}>
+        <WaveLoader size="huge" />
+      </div>
+    );
   }
   if (!projectInfo) {
     return <Alert severity="error">Invalid project: {project}</Alert>;
