@@ -1,36 +1,35 @@
+import asyncio
+import inspect  # Added for function signature inspection
+import traceback
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union, Callable
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 from pydantic import field_validator
+from rich.console import Console  # Added Console import
+
+# from weave.flow.eval import console # REMOVED due to circular import
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.flow.util import short_str
+from weave.flow.util import IterationSpeedColumn, async_foreach, short_str
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.env import get_weave_parallelism
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import (
     Call,
 )
-from weave.flow.util import async_foreach, IterationSpeedColumn
-from weave.trace.env import get_weave_parallelism
-import asyncio
-import traceback
-import inspect # Added for function signature inspection
-# from weave.flow.eval import console # REMOVED due to circular import
-
-from rich.progress import (
-    Progress,
-    TextColumn,
-    MofNCompleteColumn,
-    TaskProgressColumn,
-    BarColumn,
-    TimeElapsedColumn,
-)
-from rich.console import Console # Added Console import
 
 console = Console()
 
@@ -206,7 +205,7 @@ class Dataset(Object):
 
         This method processes each row of the dataset by applying the provided function `func`
         to specific columns. The function can:
-        
+
         1. Accept specific parameters matching column names in the dataset (`func(id, val)`)
         2. Return a dictionary of new/updated values
         3. Return a single value (which will be stored using the function name as key)
@@ -266,7 +265,7 @@ class Dataset(Object):
         # Inspect the function signature
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
-        
+
         async def process_row(row: dict) -> dict:
             try:
                 # Extract and pass specific parameters
@@ -283,13 +282,13 @@ class Dataset(Object):
                                 f"Function expects parameter '{name}' but this column "
                                 f"is not in the dataset row: {short_str(row)}"
                             )
-                
+
                 result = func(**kwargs)
-                
+
                 # If the user function is async, await it
                 if asyncio.iscoroutine(result):
                     result = await result
-                
+
                 # Handle the result based on its type
                 if not isinstance(result, dict):
                     # For non-dictionary returns, use the function name as the key
@@ -298,18 +297,18 @@ class Dataset(Object):
                     if fn_name == "<lambda>":
                         fn_name = "<lambda>"
                     result = {fn_name: result}
-                
-                # Update the original row with the results
-                row_copy = row.copy()
-                row_copy.update(result)
-                return row_copy
             except Exception as e:
                 # Log the error and propagate it to stop the map operation
                 print(f"Error processing row with map function: {short_str(row)}")
                 traceback.print_exc()
                 raise e
+            else:
+                # Update the original row with the results
+                row_copy = row.copy()
+                row_copy.update(result)
+                return row_copy
 
-        async def main(progress: Progress):
+        async def main(progress: Progress) -> Self:
             async for _, processed_row in async_foreach(
                 self.rows,
                 process_row,
@@ -329,7 +328,7 @@ class Dataset(Object):
             BarColumn(),
             IterationSpeedColumn(),
             TimeElapsedColumn(),
-            console=console, # Use the instantiated console
-            transient=True, # Remove progress bar when done
+            console=console,  # Use the instantiated console
+            transient=True,  # Remove progress bar when done
         ) as progress:
             return asyncio.run(main(progress))

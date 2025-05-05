@@ -1,5 +1,6 @@
-import pytest
 import asyncio
+
+import pytest
 
 import weave
 from tests.trace.test_evaluate import Dataset
@@ -227,6 +228,7 @@ def test_add_rows_to_unsaved_dataset(client):
 
 # Dataset.map tests
 
+
 def test_dataset_map_basic(client):
     original_rows = [{"id": i, "val": i * 2} for i in range(5)]
     ds = weave.Dataset(rows=original_rows)
@@ -299,10 +301,10 @@ def test_dataset_map_uneven_dicts(client):
 
     assert len(mapped_ds) == 4
     expected_rows = [
-        {"id": 0, "is_even": True, "even_val": 0}, # missing is_odd
-        {"id": 1, "is_odd": True},               # missing is_even, even_val
-        {"id": 2, "is_even": True, "even_val": 20},# missing is_odd
-        {"id": 3, "is_odd": True},               # missing is_even, even_val
+        {"id": 0, "is_even": True, "even_val": 0},  # missing is_odd
+        {"id": 1, "is_odd": True},  # missing is_even, even_val
+        {"id": 2, "is_even": True, "even_val": 20},  # missing is_odd
+        {"id": 3, "is_odd": True},  # missing is_even, even_val
     ]
     assert list(mapped_ds) == expected_rows
     # The columns_names property gets the keys from the *first* row.
@@ -311,12 +313,12 @@ def test_dataset_map_uneven_dicts(client):
 
 def test_dataset_map_immutability(client):
     original_rows = [{"id": i, "val": i} for i in range(3)]
-    original_rows_copy = [r.copy() for r in original_rows] # Deep copy for comparison
+    original_rows_copy = [r.copy() for r in original_rows]  # Deep copy for comparison
     ds = weave.Dataset(rows=original_rows)
 
     # Use named parameters instead of row dictionary
     def add_square(val):
-        return {"val_squared": val ** 2}
+        return {"val_squared": val**2}
 
     mapped_ds = ds.map(add_square)
 
@@ -328,7 +330,9 @@ def test_dataset_map_immutability(client):
     assert len(ds) == 3
     assert list(ds) == original_rows_copy
     # Ensure the dictionaries within the original dataset were not mutated
-    assert ds.rows[0] is original_rows[0] # Check object identity if rows were passed directly
+    assert (
+        ds.rows[0] is original_rows[0]
+    )  # Check object identity if rows were passed directly
     assert ds.rows[0] == original_rows_copy[0]
 
 
@@ -416,13 +420,13 @@ def test_dataset_map_missing_param(client):
 def test_dataset_map_with_lambda(client):
     """Test mapping with lambda functions."""
     ds = weave.Dataset(rows=[{"a": i, "b": i * 2} for i in range(5)])
-    
+
     # Lambda that takes specific params
     mapped_ds = ds.map(lambda a, b: {"sum": a + b})
     assert len(mapped_ds) == 5
     assert mapped_ds[0] == {"a": 0, "b": 0, "sum": 0}
     assert mapped_ds[2] == {"a": 2, "b": 4, "sum": 6}
-    
+
     # Lambda with a scalar return value (should get a generic key)
     mapped_ds = ds.map(lambda a, b: a * b)
     assert len(mapped_ds) == 5
@@ -433,7 +437,7 @@ def test_dataset_map_with_lambda(client):
 def test_dataset_map_parameter_reuse(client):
     """Test mapping when a function uses the same parameter in multiple ways."""
     ds = weave.Dataset(rows=[{"id": i, "val": i * 2} for i in range(3)])
-    
+
     # Function that uses a parameter in multiple ways
     def reuse_param(id, val):
         return {
@@ -441,14 +445,14 @@ def test_dataset_map_parameter_reuse(client):
             "id_plus_val": id + val,
             "id_times_val": id * val,
         }
-    
+
     mapped_ds = ds.map(reuse_param)
-    
+
     assert len(mapped_ds) == 3
     assert mapped_ds[2] == {
-        "id": 2, 
-        "val": 4, 
-        "identity": 2, 
+        "id": 2,
+        "val": 4,
+        "identity": 2,
         "id_plus_val": 6,  # 2 + 4
         "id_times_val": 8,  # 2 * 4
     }
@@ -457,7 +461,7 @@ def test_dataset_map_parameter_reuse(client):
 def test_dataset_map_error_handling(client):
     """Test error handling in more complex scenarios."""
     ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
-    
+
     # Function that raises different errors based on input
     def problematic_func(id, val):
         if id == 0:
@@ -474,12 +478,12 @@ def test_dataset_map_error_handling(client):
         else:
             # Should not get here in this test
             return {"ok": False}
-    
+
     # Test None return value is handled
     mapped_ds = ds.map(lambda id, val: None if id == 3 else {"ok": id})
     assert "problematic_func" not in mapped_ds[1]
     assert mapped_ds[3]["<lambda>"] is None
-    
+
     # Test list return is wrapped
     list_ds = ds.map(lambda id, val: [id, val] if id == 2 else {"ok": id})
     assert isinstance(list_ds[2]["<lambda>"], list)
@@ -498,7 +502,7 @@ def test_dataset_map_empty_dataset(client):
 def test_dataset_map_return_types(client):
     """Test mapping with different return types."""
     ds = weave.Dataset(rows=[{"id": i} for i in range(3)])
-    
+
     # Test returning various data types
     def return_types(id):
         return {
@@ -509,9 +513,9 @@ def test_dataset_map_return_types(client):
             "none_val": None,
             "float_val": float(id),
         }
-    
+
     types_ds = ds.map(return_types)
-    
+
     # Check all types are preserved
     assert types_ds[1]["str_val"] == "1"
     assert types_ds[1]["bool_val"] is True
@@ -519,30 +523,32 @@ def test_dataset_map_return_types(client):
     assert types_ds[1]["dict_val"] == {"x": 1}
     assert types_ds[1]["none_val"] is None
     assert types_ds[1]["float_val"] == 1.0
-    
+
     # Test returning a complex object directly
     class CustomClass:
         def __init__(self, value):
             self.value = value
-    
+
     custom_ds = ds.map(lambda id: CustomClass(id + 100))
-    
+
     # The CustomClass object should be stored under the function name
     assert custom_ds[1]["<lambda>"].value == 101
 
 
 def test_dataset_map_typed_params(client):
     """Test mapping with type hints in function parameters."""
-    ds = weave.Dataset(rows=[{"id": i, "num": str(i), "flag": i % 2 == 0} for i in range(5)])
-    
+    ds = weave.Dataset(
+        rows=[{"id": i, "num": str(i), "flag": i % 2 == 0} for i in range(5)]
+    )
+
     # Function with type annotations
     def typed_func(id: int, num: str, flag: bool) -> dict:
         # Convert num to int and add to id if flag is True
         result = int(num) + id if flag else id
         return {"result": result}
-    
+
     mapped_ds = ds.map(typed_func)
-    
+
     assert len(mapped_ds) == 5
     assert mapped_ds[0]["result"] == 0  # 0 + 0, flag=True
     assert mapped_ds[1]["result"] == 1  # Just id, flag=False
@@ -554,13 +560,13 @@ def test_dataset_map_typed_params(client):
 def test_dataset_map_empty_function(client):
     """Test mapping with an empty function (no parameters)."""
     ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
-    
+
     # Function with no parameters
     def constant_func():
         return {"constant": 42}
-    
+
     mapped_ds = ds.map(constant_func)
-    
+
     # Should add the constant to every row
     assert len(mapped_ds) == 5
     for i in range(5):
@@ -570,7 +576,7 @@ def test_dataset_map_empty_function(client):
 def test_dataset_map_error_handling(client):
     """Test error handling in more complex scenarios."""
     ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
-    
+
     # Function that raises different errors based on input
     def problematic_func(id, val):
         if id == 0:
@@ -587,12 +593,12 @@ def test_dataset_map_error_handling(client):
         else:
             # Should not get here in this test
             return {"ok": False}
-    
+
     # Test None return value is handled
     mapped_ds = ds.map(lambda id, val: None if id == 3 else {"ok": id})
     assert "problematic_func" not in mapped_ds[1]
     assert mapped_ds[3]["<lambda>"] is None
-    
+
     # Test list return is wrapped
     list_ds = ds.map(lambda id, val: [id, val] if id == 2 else {"ok": id})
     assert isinstance(list_ds[2]["<lambda>"], list)
