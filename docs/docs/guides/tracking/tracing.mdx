@@ -765,6 +765,85 @@ Calculated Fields:
 
 You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
 
+## View a W&B run in the Traces table
+
+With Weave, you can trace function calls in your code and link them directly to the [W&B runs](https://docs.wandb.ai/guides/runs/) in which they were executed. 
+When you trace a function with @weave.op() and call it inside a wandb.init() context, Weave automatically associates the trace with the W&B run. 
+Links to any associated runs are shown in the Traces table.
+
+### Python example
+
+The following Python code shows how traced operations are linked to W&B
+runs when executed inside a `wandb.init()` context. These traces appear in the
+Weave UI and are associated with the corresponding run.
+
+```python 
+import wandb
+import weave
+
+def example_wandb(projname):
+    # Split projname into entity and project
+    entity, project = projname.split("/", 1)
+
+    # Initialize Weave context for tracing
+    weave.init(projname)
+
+    # Define a traceable operation
+    @weave.op()
+    def say(message: str) -> str:
+        return f"I said: {message}"
+
+    # First W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 1",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+    # Second W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 2",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world from experiment 2!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+
+if __name__ == "__main__":
+    # Replace this with your actual W&B username/project
+    example_wandb("your-username/your-project")
+```
+
+To use the code sample:
+
+1. In the terminal, install dependencies:
+
+   ```bash
+   pip install wandb weave
+   ```
+
+2. Log in to W&B:
+
+   ```bash
+   wandb login
+   ```
+
+3. In the script, replace `your-username/your-project` with your actual W&B entity/project.
+4. Run the script:
+
+   ```bash
+   python weave_trace_with_wandb.py
+   ```
+5. Visit [https://weave.wandb.ai](https://weave.wandb.ai) and select your project.
+6. In the **Traces** tab, view the trace output. Links to any associated runs are shown in the Traces table.
+
 ## Configure autopatching
 
 By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
