@@ -21,8 +21,8 @@ import React, {
 
 import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {isWeaveRef} from '../../filters/common';
+import {OpDefCode} from '../../OpDefCode';
 import {objectRefDisplayName} from '../../smallRef/SmallWeaveRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
@@ -351,7 +351,7 @@ export const ObjectViewer = ({
                   width: '100%',
                   height: '100%',
                 }}>
-                <Browse2OpDefCode uri={row.value} maxRowsInView={20} />
+                <OpDefCode uri={row.value} maxRowsInView={20} />
               </Box>
             );
           }
