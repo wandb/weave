@@ -4,7 +4,10 @@ import multiprocessing
 import random
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, Optional
+
+from rich.progress import Progress, TaskID, ProgressColumn, Text
+from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,8 @@ async def async_foreach(
     sequence: Iterable[T],
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
+    progress: Optional[Progress] = None,
+    progress_desc: str = "Processing items",
 ) -> AsyncIterator[tuple[T, U]]:
     """Process items from a sequence concurrently with a maximum number of parallel tasks.
 
@@ -36,6 +41,8 @@ async def async_foreach(
         sequence: An iterable of items to process. Items are loaded lazily.
         func: An async function that processes each item from the sequence.
         max_concurrent_tasks: Maximum number of items to process concurrently.
+        progress: Optional rich Progress object to display progress.
+        progress_desc: Description to show in the progress bar.
 
     Yields:
         Tuples of (original_item, processed_result) in the same order as the input sequence.
@@ -58,6 +65,17 @@ async def async_foreach(
     """
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
     active_tasks: list[asyncio.Task] = []
+    task_id: Optional[TaskID] = None
+    total: Optional[int] = None
+    processed_count = 0
+
+    if progress:
+        try:
+            total = len(sequence) # type: ignore
+        except TypeError:
+            # Sequence doesn't have a defined length (e.g., generator)
+            total = None
+        task_id = progress.add_task(progress_desc, total=total)
 
     async def process_item(item: T) -> tuple[T, U]:
         """Process a single item using the provided function with semaphore control."""
@@ -87,6 +105,9 @@ async def async_foreach(
             task = active_tasks.pop(0)  # Remove completed task from front of list
             try:
                 item, result = await task
+                processed_count += 1
+                if progress and task_id is not None:
+                    progress.update(task_id, advance=1, refresh=True)
                 yield item, result
 
                 # Add a new task if there are more items
@@ -104,6 +125,15 @@ async def async_foreach(
             task.cancel()
         await asyncio.gather(*active_tasks, return_exceptions=True)
         raise
+    finally:
+        if progress and task_id is not None:
+            # Ensure progress bar stops cleanly, even if total wasn't known
+            final_description = f"{progress_desc} (Completed)"
+            if progress.tasks[task_id].total is None:
+                progress.update(task_id, total=processed_count, completed=processed_count, description=final_description)
+            else:
+                 progress.update(task_id, description=final_description)
+            progress.stop_task(task_id)
 
 
 def _subproc(
@@ -251,3 +281,14 @@ def short_str(obj: Any, limit: int = 25) -> str:
     if len(str_val) > limit:
         return str_val[:limit] + "..."
     return str_val
+
+class IterationSpeedColumn(ProgressColumn):
+    """Renders human readable iteration speed."""
+
+    def render(self, task: "Task") -> Text:
+        """Show iteration speed."""
+        speed = task.finished_speed or task.speed
+        if speed is None:
+            return Text("?", style="progress.data.speed")
+        it_speed = int(speed)
+        return Text(f"{it_speed}/s", style="progress.data.speed")
