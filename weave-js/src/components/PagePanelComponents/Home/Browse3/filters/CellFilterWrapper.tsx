@@ -34,6 +34,7 @@ export const CellFilterWrapper = ({
     ? (e: React.MouseEvent) => {
         // event.altKey - pressed Option key on Macs
         if (e.altKey) {
+          console.log('altKey', field, operation, value, rowId);
           e.stopPropagation();
           e.preventDefault();
           onUpdateFilter(field, operation, value, rowId);

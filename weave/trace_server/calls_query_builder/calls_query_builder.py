@@ -352,12 +352,22 @@ class OrderField(BaseModel):
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
+    _owner: Optional["CallsQuery"] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        object_mapping: Optional[dict[str, str]] = None,
+    ) -> str:
+        mappings = object_mapping or (
+            self._owner.get_object_mapping() if self._owner else None
+        )
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            object_mapping=mappings,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -376,6 +386,8 @@ class Condition(BaseModel):
         for field in self._get_consumed_fields():
             if field.is_heavy():
                 return True
+        if self._owner:
+            return True
         return False
 
     def is_feedback(self) -> bool:
@@ -441,7 +453,9 @@ class CallsQuery(BaseModel):
             for op in operand.and_:
                 self.add_condition(op)
         else:
-            self.query_conditions.append(Condition(operand=operand))
+            condition = Condition(operand=operand)
+            condition._owner = self
+            self.query_conditions.append(condition)
         return self
 
     def set_hardcoded_filter(self, filter: HardCodedFilter) -> "CallsQuery":
@@ -695,11 +709,28 @@ class CallsQuery(BaseModel):
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
 
+        # Process object joins
+        ref_patterns = self._extract_reference_conditions()
+        object_mapping = {}
+        object_joins = ""
+
+        # Build object joins if we have any reference conditions
+        if ref_patterns:
+            # Create a mapping from field paths to object aliases
+            for i, (field_path, digest, _) in enumerate(ref_patterns):
+                object_mapping[field_path] = f"obj_{i}"
+
+            # Generate the SQL for object joins
+            object_joins = self._get_object_joins(pb, ref_patterns)
+
         having_filter_sql = ""
         having_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
+            # The object mapping will ensure that any field references to objects
+            # will be properly translated to the joined object's fields
+            mappings = object_mapping if object_mapping else None
             having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
+                c.as_sql(pb, table_alias, mappings) for c in self.query_conditions
             )
             for query_condition in self.query_conditions:
                 if query_condition.is_feedback():
@@ -708,9 +739,12 @@ class CallsQuery(BaseModel):
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
         if len(having_conditions_sql) > 0:
+            print("\n\n>>>>>> having_conditions_sql", having_conditions_sql)
             having_filter_sql = "HAVING " + combine_conditions(
                 having_conditions_sql, "AND"
             )
+            if having_filter_sql == "HAVING ":
+                having_filter_sql = ""
 
         # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
         # started_at field after grouping in the HAVING clause. These filters remove
@@ -819,6 +853,7 @@ class CallsQuery(BaseModel):
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
+        {object_joins}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
@@ -836,6 +871,112 @@ class CallsQuery(BaseModel):
         """
 
         return safely_format_sql(raw_sql, logger)
+
+    def _get_object_joins(
+        self,
+        pb: ParamBuilder,
+        ref_patterns: Optional[list[tuple[str, str, str]]] = None,
+    ) -> str:
+        """
+        Generates SQL joins for object references found in query conditions.
+        This allows filtering by object values.
+        """
+        object_joins = []
+        if ref_patterns is None:
+            ref_patterns = self._extract_reference_conditions()
+
+        for i, (field_path, digest, ref_str) in enumerate(ref_patterns):
+            # Create a unique alias for each joined object
+            obj_alias = f"obj_{i}"
+
+            # Extract the base path (e.g., "inputs" from "inputs.model")
+            parts = field_path.split(".")
+            base_field = parts[0]
+            if base_field == "inputs":
+                base_field = "input_refs"
+            elif base_field == "outputs":
+                base_field = "output_refs"
+            else:
+                raise ValueError(f"Invalid base field: {base_field}")
+
+            # Determine the field we need to access
+            json_path = parts[1:] if len(parts) > 1 else []
+
+            # Add join for this object
+            digest_param = pb.add_param(digest)
+            project_param = pb.add_param(self.project_id)
+
+            join_sql = f"""
+            ARRAY JOIN calls_merged.{base_field} as {base_field}_item
+            LEFT JOIN (
+                SELECT 
+                    object_id, 
+                    digest,
+                    'weave-trace-internal:///' || {param_slot(project_param, 'String')} || '/object/' || digest AS full_ref,
+                    any(val_dump) as val_dump
+                FROM object_versions
+                WHERE project_id = {param_slot(project_param, "String")} 
+                    AND digest = {param_slot(digest_param, "String")}
+                GROUP BY object_id, digest
+            ) AS {obj_alias} ON {obj_alias}.full_ref = {base_field}_item
+            """
+
+            object_joins.append(join_sql)
+
+        return "\n".join(object_joins) if object_joins else ""
+
+    def _extract_reference_conditions(self) -> list[tuple[str, str, str]]:
+        """
+        Extracts field paths and object digests from query conditions that reference objects.
+        Returns a list of (field_path, digest, literal_value) tuples.
+        """
+        ref_patterns = []
+
+        for condition in self.query_conditions:
+            # Check if this is a reference equality condition
+            if isinstance(condition.operand, tsi_query.EqOperation):
+                left, right = condition.operand.eq_
+
+                # Check if we're comparing a field with a literal
+                if (
+                    isinstance(left, tsi_query.GetFieldOperator)
+                    and isinstance(right, tsi_query.LiteralOperation)
+                    and isinstance(right.literal_, str)
+                ):
+
+                    field_path = left.get_field_
+                    literal_value = right.literal_
+
+                    # Check if the literal is a Weave object reference
+                    if (
+                        literal_value
+                        and isinstance(literal_value, str)
+                        and "weave-trace-internal:///" in literal_value
+                    ):
+                        # Extract the digest from the weave reference
+                        parts = literal_value.split(":")
+                        if len(parts) > 1:
+                            digest = parts[-1]
+                            ref_patterns.append((field_path, digest, literal_value))
+
+        return ref_patterns
+
+    def get_object_mapping(self) -> dict[str, str]:
+        """
+        Returns a mapping from field paths to object table aliases for all conditions.
+        Used to properly reference object fields in query conditions.
+        """
+        mapping = {}
+        ref_patterns = self._extract_reference_conditions()
+
+        for i, (field_path, _, _) in enumerate(ref_patterns):
+            # Create a unique alias for each joined object
+            obj_alias = f"obj_{i}"
+
+            # Map the base field path to its object alias
+            mapping[field_path] = obj_alias
+
+        return mapping
 
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
@@ -978,10 +1119,12 @@ def process_query_to_conditions(
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
+    object_mapping: Optional[dict[str, str]] = None,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
+    object_mapping = object_mapping or {}
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -1048,6 +1191,17 @@ def process_query_to_conditions(
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
                 raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
 
+            # Check if we're accessing a nested field in a referenced object
+            for field_prefix, obj_alias in object_mapping.items():
+                if operand.get_field_.startswith(field_prefix + "."):
+                    # This is a nested object field access
+                    nested_path = operand.get_field_[len(field_prefix) + 1 :]
+                    json_path_param = param_builder.add_param(f"$.{nested_path}")
+
+                    # Return JSON_VALUE extraction from the object's val_dump
+                    return f"JSON_VALUE(any({obj_alias}.val_dump), {param_slot(json_path_param, 'String')})"
+
+            # Regular field access
             structured_field = get_field_by_name(operand.get_field_)
 
             if isinstance(structured_field, CallsMergedDynamicField):
