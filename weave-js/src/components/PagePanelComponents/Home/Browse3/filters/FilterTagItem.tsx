@@ -4,10 +4,16 @@
 
 import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {RemoveAction} from '@wandb/weave/components/Tag';
+import {isRelativeDate} from '@wandb/weave/util/date';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Timestamp, TimestampRange, TimestampSmall} from '../../../../Timestamp';
+import {
+  Timestamp,
+  TimestampRange,
+  TimestampRelative,
+  TimestampSmall,
+} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -70,7 +76,11 @@ export const FilterTagItem = ({
   } else if (isDateOperator(item.operator)) {
     // Special case for the Called after field, show the micro label
     if (item.operator === '(date): after' && field === 'Called') {
-      label = <TimestampSmall value={item.value} label="Past" />;
+      if (isRelativeDate(item.value)) {
+        label = <TimestampRelative value={item.value} />;
+      } else {
+        label = <Timestamp value={item.value} dropTimeWhenDefault />;
+      }
       disableRemove = true;
     } // Special case for when we have both before/after, show a range
     else if (item.operator === '(date): range') {

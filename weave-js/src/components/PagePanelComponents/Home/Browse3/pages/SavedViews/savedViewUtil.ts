@@ -3,6 +3,7 @@ import {
   GridSortItem,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
+import {isRelativeDate, parseDate} from '@wandb/weave/util/date';
 import _ from 'lodash';
 import {useMemo} from 'react';
 import {useParams} from 'react-router-dom';
@@ -330,14 +331,26 @@ const filterToClause = (item: Filter): Record<string, any> => {
       $eq: [{$getField: item.field}, {$literal: value}],
     };
   } else if (item.operator === '(date): after') {
+    if (isRelativeDate(item.value)) {
+      return {
+        $gt: [{$getField: item.field}, {$literal: item.value}],
+      };
+    }
+    // Handle absolute time values
     const seconds = toSeconds(item.value);
-    if (seconds === null) {
+    if (seconds == null) {
       throw new Error(`Invalid date value: ${item.value}`);
     }
     return {
       $gt: [{$getField: item.field}, {$literal: seconds}],
     };
   } else if (item.operator === '(date): before') {
+    if (isRelativeDate(item.value)) {
+      return {
+        $lt: [{$getField: item.field}, {$literal: item.value}],
+      };
+    }
+    // Handle absolute time values
     const seconds = toSeconds(item.value);
     if (seconds === null) {
       throw new Error(`Invalid date value: ${item.value}`);
@@ -428,16 +441,20 @@ const operandToFilterGt = (operand: any): Filter => {
   if (left.$convert && ['double', 'int'].includes(left.$convert.to)) {
     left = left.$convert.input;
   }
-  if (left.$getField && right.$literal) {
+  const field = left.$getField;
+  if (field && right.$literal) {
     let operator = '(number): >';
     let value = right.$literal;
-    if (typeof value !== 'number') {
-      throw new Error(`Could not parse gt operand: ${JSON.stringify(operand)}`);
-    }
-    const field = left.$getField;
-    if (field === 'started_at') {
+    if (typeof value === 'string' && isRelativeDate(value)) {
+      // Keep the value as a relative string like "1w"
       operator = '(date): after';
-      value = new Date(value * 1000).toISOString();
+    } else if (typeof value !== 'number') {
+      throw new Error(`Could not parse gt operand: ${JSON.stringify(operand)}`);
+    } else {
+      if (field === 'started_at') {
+        operator = '(date): after';
+        value = new Date(value * 1000).toISOString();
+      }
     }
     return {
       field,
@@ -454,15 +471,23 @@ const operandToFilterGte = (operand: any): Filter => {
   if (left.$convert && ['double', 'int'].includes(left.$convert.to)) {
     left = left.$convert.input;
   }
-  if (left.$getField && right.$literal) {
-    const operator = '(number): >=';
-    const value = right.$literal;
-    if (typeof value !== 'number') {
+  const field = left.$getField;
+  if (field && right.$literal) {
+    let operator = '(number): >=';
+    let value = right.$literal;
+    if (typeof value === 'string' && isRelativeDate(value)) {
+      // Keep the value as a relative string like "1w"
+      operator = '(date): after';
+    } else if (typeof value !== 'number') {
       throw new Error(
         `Could not parse gte operand: ${JSON.stringify(operand)}`
       );
+    } else {
+      if (field === 'started_at') {
+        operator = '(date): after';
+        value = new Date(value * 1000).toISOString();
+      }
     }
-    const field = left.$getField;
     return {
       field,
       operator,

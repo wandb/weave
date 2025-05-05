@@ -266,8 +266,8 @@ export const isRelativeDate = (value: string): boolean => {
 
   const trimmedValue = value.trim().toLowerCase();
 
-  // Check for shorthand patterns (e.g., "1d", "2w", "3mo", "5h", "10m")
-  if (/^\d+([dwymoh]|mo)$/i.test(trimmedValue)) {
+  // Check for shorthand patterns (e.g., "0s", "1d", "2w", "3mo", "5h", "10m")
+  if (/^\d+([smdwymoh]|mo)$/i.test(trimmedValue)) {
     return true;
   }
 
