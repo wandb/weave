@@ -284,7 +284,7 @@ In some applications we want to create custom `Scorer` classes - where for examp
         {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
     ]
     # If you have already published the Dataset, you can run:
-    # dataset = weave.ref('example_labels').get()
+    # dataset = weave.get('example_labels')
 
     # We define a scoring function to compare our model predictions with a ground truth label.
     @weave.op()

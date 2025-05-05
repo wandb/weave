@@ -44,7 +44,7 @@ Select a tab to see Python and TypeScript-specific code.
     weave.publish(dataset)
 
     # Retrieve the dataset
-    dataset_ref = weave.ref('grammar').get()
+    dataset_ref = weave.get('grammar')
 
     # Access a specific example
     example_label = dataset_ref.rows[2]['sentence']

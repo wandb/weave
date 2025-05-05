@@ -47,7 +47,7 @@ Saving an object with a name will create the first version of that object if it 
 
     ```python
     weave.init('intro-example')
-    cat_names = weave.ref('cat-names').get()
+    cat_names = weave.get('cat-names')
     ```
 
   </TabItem>

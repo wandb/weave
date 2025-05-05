@@ -209,9 +209,9 @@ Next, we can simply define the evaluation and run it.
 
 
 ```python
-validation_dataset = weave.ref(
+validation_dataset = weave.get(
     f"bigbenchhard_{metadata.big_bench_hard_task}_val:v0"
-).get()
+)
 
 evaluation = weave.Evaluation(
     name="baseline_causal_reasoning_module",
