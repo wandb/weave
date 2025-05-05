@@ -95,10 +95,13 @@ export const WeaveCHTable: FC<{
     };
   }, [parsedRef]);
 
+  const digests = useMemo(() => {
+    return lookupKey?.digest ? [lookupKey?.digest] : [];
+  }, [lookupKey]);
   const numRowsQuery = useTableQueryStats({
     entity: lookupKey?.entity ?? '',
     project: lookupKey?.project ?? '',
-    digests: lookupKey?.digest ? [lookupKey?.digest] : [],
+    digests,
     skip: lookupKey == null,
   });
 

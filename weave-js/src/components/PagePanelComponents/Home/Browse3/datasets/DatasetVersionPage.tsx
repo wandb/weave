@@ -136,11 +136,14 @@ export const DatasetVersionPage: React.FC<{
     ).filter(Boolean) as string[];
   }, [objectVersions]);
 
+  const digests = useMemo(() => {
+    return tableDigests ?? [];
+  }, [tableDigests]);
   const tableStats = useTableQueryStats({
     entity: entityName,
     project: projectName,
-    digests: tableDigests ?? [],
-    skip: tableDigests == null,
+    digests,
+    skip: digests == null,
     includeStorageSize: true,
   });
 
