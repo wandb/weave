@@ -76,6 +76,7 @@ import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
+  PREDICT_AND_SCORE_OP_NAME_JS,
   PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
   PREDICT_OP_NAME,
 } from '../common/heuristics';
@@ -440,8 +441,10 @@ const fetchEvaluationComparisonResults = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call =>
-        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(
+        call =>
+          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
+          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_JS)
       )
       .map(call => [call.id, call])
   );

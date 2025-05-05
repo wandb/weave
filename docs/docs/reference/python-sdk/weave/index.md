@@ -163,7 +163,7 @@ def hello(name: str) -> None:
 
 It is also possible to access a Call after the Op has returned. 
 
-If you have the Call's id, perhaps from the UI, you can use the `call` method on the `WeaveClient` returned from `weave.init` to retrieve the Call object. 
+If you have the Call's id, perhaps from the UI, you can use the `get_call` method on the `WeaveClient` returned from `weave.init` to retrieve the Call object. 
 
 ```python
 client = weave.init("<project>")
@@ -174,11 +174,11 @@ Alternately, after defining your Op you can use its `call` method. For example:
 
 ```python
 @weave.op
-def hello(name: str) -> None:
-     print(f"Hello {name}!")
+def add(a: int, b: int) -> int:
+     return a + b
 
-mycall = hello.call("world")
-print(mycall.id)
+result, call = add.call(1, 2)
+print(call.id)
 ``` 
 
 
@@ -706,7 +706,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `dataset`: `<class 'flow.dataset.Dataset'>`
-- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x155d012d0>, json_schema_input_type=PydanticUndefined)]]]`
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x146df4f70>, json_schema_input_type=PydanticUndefined)]]]`
 - `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
 - `trials`: `<class 'int'>`
 - `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`

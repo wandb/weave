@@ -58,7 +58,7 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
-import {OnAddFilter} from '../../filters/CellFilterWrapper';
+import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -392,9 +392,7 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
-  // TODO: Despite the name, this has changed to be slightly more sophisticated,
-  //       where it may replace or toggle a filter off. We should consider renaming.
-  const onAddFilter: OnAddFilter | undefined =
+  const onUpdateFilter: OnUpdateFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
           // This condition is used to filter by the parent ref itself, not the child cell.
@@ -483,7 +481,7 @@ export const CallsTable: FC<{
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter,
+    onUpdateFilter,
     calls.costsLoading,
     !!calls.costsError,
     shouldIncludeTotalStorageSize,
@@ -920,6 +918,7 @@ export const CallsTable: FC<{
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
+                  tooltipText="Compare metrics and examples for selected evaluations"
                   onClick={() => {
                     history.push(
                       router.compareEvaluationsUri(
