@@ -5,18 +5,20 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
+import {SavedPlaygroundModelState} from '../types';
+import {
+  CustomOption,
+  LLMOption,
+  LLMOptionToSavedPlaygroundModelState,
+  ProviderOption,
+} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
-import {OptionalSavedPlaygroundModelParams} from '../types';
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
   onChange: (
     value: LLMMaxTokensKey | string,
     maxTokens: number,
-    savedModel?: {
-      name: string | null;
-      savedModelParams: OptionalSavedPlaygroundModelParams | null;
-    }
+    savedModel?: SavedPlaygroundModelState
   ) => void;
   entity: string;
   project: string;
@@ -46,7 +48,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
-    refetchCustomLLMs();
+    refetchConfiguredProviders();
   };
 
   const handleConfigureProvider = (provider: string) => {
@@ -74,14 +76,37 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   useEffect(() => {
     if (!isValueAvailable && !areProvidersLoading) {
       let firstAvailableLlm: LLMOption | null = null;
-      for (const option of llmDropdownOptions) {
-        if ('llms' in option && !option.isDisabled && option.llms.length > 0) {
-          firstAvailableLlm = option.llms[0];
-          break;
+
+      // Check if the value is a saved model
+      const savedModelOption = llmDropdownOptions.find(
+        option => option.value === 'saved-models'
+      );
+      if (savedModelOption) {
+        firstAvailableLlm =
+          savedModelOption.llms.find(
+            llm => llm.objectId === value && llm.isLatest
+          ) ?? null;
+      }
+
+      // If the value is not a saved model, check if theres any available LLM
+      if (!firstAvailableLlm) {
+        for (const option of llmDropdownOptions) {
+          if (
+            'llms' in option &&
+            !option.isDisabled &&
+            option.llms.length > 0
+          ) {
+            firstAvailableLlm = option.llms[0];
+            break;
+          }
         }
       }
       if (firstAvailableLlm) {
-        onChange(firstAvailableLlm.value, firstAvailableLlm.max_tokens);
+        onChange(
+          firstAvailableLlm.value,
+          firstAvailableLlm.max_tokens,
+          LLMOptionToSavedPlaygroundModelState(firstAvailableLlm)
+        );
       }
     }
   }, [
@@ -123,9 +148,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
             if (selectedOption.llms.length > 0) {
               const llm = selectedOption.llms[0];
-              if (llm) {
-                onChange(llm.value, llm.max_tokens);
-              }
+              onChange(llm.value, llm.max_tokens);
             }
           }
         }}

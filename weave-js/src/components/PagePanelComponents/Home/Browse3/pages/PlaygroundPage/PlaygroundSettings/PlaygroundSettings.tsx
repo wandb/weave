@@ -1,29 +1,21 @@
-import {Box, Tooltip} from '@mui/material';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Box, TextField, Tooltip} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Button, Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
+import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
 import {
-  LlmStructuredCompletionModel,
-  LlmStructuredCompletionModelDefaultParamsSchema,
-  Message,
-  ResponseFormatSchema,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
-import {useCreateBuiltinObjectInstance} from '../../wfReactInterface/objectClassQuery';
-import {
-  SetPlaygroundStateFieldFunctionType,
-  TraceCallOutput,
-} from '../PlaygroundChat/useChatFunctions';
-import {PlaygroundResponseFormats, PlaygroundState} from '../types';
+  JSON_PLAYGROUND_MODEL_PARAMS_KEYS,
+  PLAYGROUND_MODEL_PARAMS_KEYS,
+  PlaygroundState,
+} from '../types';
+import {useSaveModelConfiguration} from '../useSaveModelConfiguration';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
-import {SaveModelModal} from './SaveModelModal';
 import {StopSequenceEditor} from './StopSequenceEditor';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -42,31 +34,30 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   projectId,
   refetchSavedModels,
 }) => {
-  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [initialSaveName, setInitialSaveName] = useState('');
+  const [currentModelName, setCurrentModelName] = useState('');
 
-  const handleSaveClick = () => {
-    const currentModelName = playgroundStates[settingsTab]?.model;
-    setInitialSaveName(
-      currentModelName
-        ? `${currentModelName.replace('/', '-')}-saved`
-        : 'saved-model'
-    );
-    setIsSaveDialogOpen(true);
-  };
-
-  const handleSaveDialogClose = () => {
-    setIsSaveDialogOpen(false);
-  };
+  useEffect(() => {
+    const objectId = playgroundStates[settingsTab]?.savedModel?.objectId;
+    if (objectId != null) {
+      setCurrentModelName(objectId);
+    }
+  }, [playgroundStates, settingsTab]);
 
   const {saveModelConfiguration} = useSaveModelConfiguration({
     setPlaygroundStateField,
     playgroundStates,
     settingsTab,
     projectId,
-    closeDialog: handleSaveDialogClose,
     refetchSavedModels,
   });
+
+  const isUpdatingPublishedModel =
+    playgroundStates[settingsTab]?.savedModel?.llmModelId;
+
+  const areSettingsEqual = arePlaygroundSettingsEqual(
+    currentModelName,
+    playgroundStates[settingsTab]
+  );
 
   return (
     <Box
@@ -77,7 +68,6 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         display: 'flex',
         flexDirection: 'column',
         width: '320px',
-        overflowY: 'scroll',
         flexShrink: 0,
         position: 'relative',
       }}>
@@ -90,9 +80,10 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           borderBottom: `1px solid ${MOON_250}`,
           padding: '8px 16px',
         }}>
+        {/* Header */}
         <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
           <Tag label={`${settingsTab + 1}`} />
-          <Tooltip title={playgroundStates[settingsTab ?? 0]?.model ?? ''}>
+          <Tooltip title={playgroundStates[settingsTab].model}>
             <Box
               sx={{
                 overflow: 'hidden',
@@ -115,7 +106,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           }}
         />
       </Box>
-      <Box sx={{padding: '0 16px'}}>
+      <Box sx={{padding: '0 16px', overflowY: 'scroll', height: '100%'}}>
         <Tabs.Root value={settingsTab.toString()}>
           {playgroundStates.map((playgroundState, idx) => (
             <Tabs.Content key={idx} value={idx.toString()}>
@@ -124,8 +115,59 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '16px',
-                  mt: 2,
+                  my: 2,
                 }}>
+                {/* Model Name Input */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    width: '100%',
+                  }}>
+                  <span style={{fontSize: '14px'}}>Model Name</span>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: `1px solid ${MOON_250}`,
+                      borderRadius: '4px',
+                      width: '100%',
+                    }}>
+                    <TextField
+                      value={currentModelName}
+                      onChange={e => setCurrentModelName(e.target.value)}
+                      placeholder="Enter model name..."
+                      fullWidth
+                      variant="standard"
+                      sx={{
+                        fontFamily: 'Source Sans Pro',
+                        '& .MuiInputBase-root': {
+                          border: 'none',
+                          '&:before, &:after': {
+                            borderBottom: 'none',
+                          },
+                          '&:hover:not(.Mui-disabled):before': {
+                            borderBottom: 'none',
+                          },
+                        },
+                        '& .MuiInputBase-input': {
+                          padding: '8px',
+                          fontFamily: 'Source Sans Pro',
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Parameters */}
+                <Box sx={{display: 'flex', flexDirection: 'column'}}>
+                  <div className="font-[Source Sans Pro] mb-[-16px] text-sm font-semibold text-moon-500">
+                    PARAMETERS
+                  </div>
+                </Box>
+
+                {/* Response Format Editor */}
                 <ResponseFormatEditor
                   responseFormat={playgroundState.responseFormat}
                   setResponseFormat={value =>
@@ -143,6 +185,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     )
                   }
                 />
+
                 <StopSequenceEditor
                   stopSequences={playgroundState.stopSequences}
                   setStopSequences={value =>
@@ -162,6 +205,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Number of trials"
                   value={playgroundState.nTimes}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={playgroundState.maxTokensLimit || 100}
@@ -172,6 +216,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Maximum tokens"
                   value={playgroundState.maxTokens}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={2}
@@ -182,6 +227,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Temperature"
                   value={playgroundState.temperature}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -192,6 +238,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Top P"
                   value={playgroundState.topP}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -202,6 +249,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Frequency penalty"
                   value={playgroundState.frequencyPenalty}
                 />
+
                 <PlaygroundSlider
                   min={0}
                   max={1}
@@ -212,6 +260,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   label="Presence penalty"
                   value={playgroundState.presencePenalty}
                 />
+
                 <Box
                   sx={{
                     width: '100%',
@@ -248,177 +297,73 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
 
       <Box
         sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
           p: 2,
           borderTop: `1px solid ${MOON_250}`,
           backgroundColor: 'white',
-          zIndex: 1,
         }}>
         <Button
           variant="primary"
-          onClick={handleSaveClick}
+          onClick={() => saveModelConfiguration(currentModelName)}
           className="w-full"
-          disabled={playgroundStates.length === 0}>
-          Publish Model
+          disabled={
+            playgroundStates.length === 0 ||
+            !currentModelName.trim() ||
+            areSettingsEqual
+          }>
+          {isUpdatingPublishedModel ? 'Update model' : 'Publish model'}
         </Button>
       </Box>
-
-      <SaveModelModal
-        isOpen={isSaveDialogOpen}
-        onClose={handleSaveDialogClose}
-        onSave={saveModelConfiguration}
-        initialModelName={initialSaveName}
-      />
     </Box>
   );
 };
 
-type UseSaveModelConfigurationArgs = {
-  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
-  playgroundStates: PlaygroundState[];
-  settingsTab: number;
-  projectId: string;
-  closeDialog: () => void;
-  refetchSavedModels: () => void;
-};
+// Compares saved model default params with current params
+const arePlaygroundSettingsEqual = (
+  currentModelName: string,
+  currentPlaygroundState: PlaygroundState | undefined
+): boolean => {
+  const savedParams = currentPlaygroundState?.savedModel?.savedModelParams;
+  if (
+    !currentPlaygroundState ||
+    !savedParams ||
+    !currentPlaygroundState.savedModel?.llmModelId
+  ) {
+    return false; // Not equal if essential parts are missing
+  }
 
-const useSaveModelConfiguration = ({
-  setPlaygroundStateField,
-  playgroundStates,
-  settingsTab,
-  projectId,
-  closeDialog,
-  refetchSavedModels,
-}: UseSaveModelConfigurationArgs) => {
-  const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
-    'LLMStructuredCompletionModel'
-  );
+  // First, check if the user is updating the objectId
+  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
+    return false;
+  }
 
-  const saveModelConfiguration = async (modelName: string) => {
-    const finalModelName = modelName.trim();
-    if (!finalModelName) {
-      toast('Model name cannot be empty.', {type: 'error'});
-      return;
+  for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    if (key === 'messagesTemplate') {
+      const messagesTemplate = savedParams.messagesTemplate;
+      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
+      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
+        return false;
+      }
+      continue;
     }
 
-    const currentState = playgroundStates[settingsTab];
-    if (!currentState) {
-      toast('Cannot find current playground state.', {type: 'error'});
-      closeDialog();
-      return;
-    }
+    const currentValue = currentPlaygroundState[key];
+    const savedValue = savedParams[key];
 
-    let responseFormatSchema: Record<string, any> = {};
-    if (currentState.responseFormat === PlaygroundResponseFormats.JsonObject) {
-      responseFormatSchema = {type: 'object'};
-    }
-
-    const defaultParams: LlmStructuredCompletionModel['default_params'] = {
-      temperature: currentState.temperature,
-      top_p: currentState.topP,
-      max_tokens: currentState.maxTokens,
-      presence_penalty: currentState.presencePenalty,
-      frequency_penalty: currentState.frequencyPenalty,
-      stop: currentState.stopSequences ?? [],
-      response_format:
-        currentState.responseFormat === PlaygroundResponseFormats.JsonObject
-          ? ResponseFormatSchema.parse('json')
-          : currentState.responseFormat === PlaygroundResponseFormats.Text
-          ? ResponseFormatSchema.parse('text')
-          : // : currentState.responseFormat === PlaygroundResponseFormats.JsonSchema
-            // ? ResponseFormatSchema.parse('jsonschema')
-            undefined,
-      functions: currentState.functions,
-      n_times: currentState.nTimes,
-      messages_template: [],
-    };
-
-    if (currentState.traceCall?.inputs?.messages) {
-      defaultParams.messages_template.push(
-        ...currentState.traceCall.inputs.messages.map((message: Message) => ({
-          content: message.content,
-          function_call: message.function_call ?? null,
-          name: message.name ?? null,
-          role: message.role,
-          tool_call_id: message.tool_call_id ?? null,
-        }))
-      );
-    }
-    if (
-      currentState.traceCall?.output &&
-      (currentState.traceCall.output as TraceCallOutput)?.choices
-    ) {
-      const choice = (currentState.traceCall.output as TraceCallOutput)
-        ?.choices?.[currentState.selectedChoiceIndex ?? 0];
-      if (choice) {
-        defaultParams.messages_template.push({
-          content: choice?.message.content,
-          function_call: choice?.message.function_call ?? null,
-          name: choice?.message.name ?? null,
-          role: choice?.message.role,
-          tool_call_id: choice?.message.tool_call_id ?? null,
-        });
+    if (JSON_PLAYGROUND_MODEL_PARAMS_KEYS.includes(key)) {
+      const currentValueObject = currentValue ?? {};
+      const savedValueObject = savedValue ?? {};
+      if (
+        JSON.stringify(currentValueObject) !== JSON.stringify(savedValueObject)
+      ) {
+        return false;
+      }
+    } else {
+      // For other primitive types, direct comparison
+      if (currentValue !== savedValue) {
+        return false;
       }
     }
+  }
 
-    const validatedParams =
-      LlmStructuredCompletionModelDefaultParamsSchema.safeParse(defaultParams);
-    if (!validatedParams.success) {
-      console.error('Parameter validation failed:', validatedParams.error);
-      toast(`Invalid parameters: ${validatedParams.error.message}`, {
-        type: 'error',
-      });
-      return;
-    }
-
-    const baseModelId = currentState.savedModel?.name
-      ? currentState.savedModel.name
-      : currentState.model;
-
-    const modelToSave: Omit<LlmStructuredCompletionModel, 'ref'> & {
-      name: string;
-    } = {
-      name: finalModelName,
-      llm_model_id: baseModelId,
-      default_params: validatedParams.data,
-    };
-
-    closeDialog();
-
-    try {
-      await createLLMStructuredCompletionModel({
-        obj: {
-          project_id: projectId,
-          object_id: finalModelName,
-          val: modelToSave,
-        },
-      });
-      toast(`Model "${finalModelName}" saved successfully!`, {
-        type: 'success',
-      });
-
-      refetchSavedModels();
-
-      setPlaygroundStateField(settingsTab, 'savedModel', {
-        name: baseModelId,
-        savedModelParams: validatedParams.data,
-      });
-
-      setPlaygroundStateField(
-        settingsTab,
-        'model',
-        finalModelName as LLMMaxTokensKey
-      );
-    } catch (error) {
-      console.error('Failed to save model:', error);
-      toast(`Failed to save model: ${error}`, {
-        type: 'error',
-      });
-    }
-  };
-
-  return {saveModelConfiguration};
+  return true; // All compared keys are equal
 };

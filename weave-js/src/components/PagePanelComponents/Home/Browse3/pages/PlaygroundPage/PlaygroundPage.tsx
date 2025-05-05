@@ -174,8 +174,7 @@ export const PlaygroundPageInner = ({
     loading: savedModelsLoading,
     refetch: refetchSavedModels,
   } = useBaseObjectInstances('LLMStructuredCompletionModel', {
-    project_id: `${props.entity}/${props.project}`,
-    filter: {latest_only: true},
+    project_id: projectId,
   });
 
   const refetchCustomLLMs = useCallback(() => {
@@ -267,7 +266,7 @@ export const PlaygroundPageInner = ({
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
-          projectId={`${props.entity}/${props.project}`}
+          projectId={projectId}
           refetchSavedModels={refetchSavedModels}
         />
       )}

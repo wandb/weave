@@ -8,6 +8,14 @@ export enum PlaygroundResponseFormats {
   // JsonSchema = 'json_schema',
 }
 
+export type SavedPlaygroundModelState = {
+  llmModelId: string | null;
+  versionIndex: number | null;
+  isLatest: boolean;
+  savedModelParams: OptionalSavedPlaygroundModelParams | null;
+  objectId: string | null;
+};
+
 export type PlaygroundState = {
   traceCall: OptionalTraceCallSchema;
   trackLLMCall: boolean;
@@ -15,10 +23,7 @@ export type PlaygroundState = {
   model: LLMMaxTokensKey;
   selectedChoiceIndex: number;
   maxTokensLimit: number;
-  savedModel: {
-    name: string | null;
-    savedModelParams: OptionalSavedPlaygroundModelParams | null;
-  };
+  savedModel: SavedPlaygroundModelState;
 } & PlaygroundModelParams;
 
 export type PlaygroundModelParams = {
@@ -29,10 +34,30 @@ export type PlaygroundModelParams = {
   presencePenalty: number;
   nTimes: number;
   responseFormat: PlaygroundResponseFormats;
-  functions: Array<Record<string, any>>;
+  functions: Array<{
+    name: string;
+    [key: string]: any;
+  }>;
   stopSequences: string[];
   responseFormatSchema?: Record<string, any>;
 };
+
+export const JSON_PLAYGROUND_MODEL_PARAMS_KEYS: Array<
+  keyof PlaygroundModelParams | 'messagesTemplate'
+> = ['functions', 'stopSequences', 'responseFormatSchema', 'messagesTemplate'];
+
+// Define the keys from PlaygroundModelParams to iterate and compare
+export const PLAYGROUND_MODEL_PARAMS_KEYS: Array<
+  keyof PlaygroundModelParams | 'messagesTemplate'
+> = [
+  'maxTokens',
+  'temperature',
+  'topP',
+  'frequencyPenalty',
+  'presencePenalty',
+  'nTimes',
+  ...JSON_PLAYGROUND_MODEL_PARAMS_KEYS,
+];
 
 export type SavedPlaygroundModelParams = PlaygroundModelParams & {
   messagesTemplate: Array<Record<string, any>>;
