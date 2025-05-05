@@ -146,6 +146,12 @@ OPERATOR_MAP = {
 
 VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
 
+# We return a real float from the backend! do not convert to double!
+# When option clicking latency, because we are generating this field
+# manually on the backend, it is actually a float, not a string stored
+# in json, so we need to omit the conversion params from the filter
+FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms"}
+
 
 def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
     """Convert Saved View Filter to API Filter"""
@@ -157,6 +163,13 @@ def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
 
 
 # See operationConverter in weave-js
+def get_field_expression(field: str) -> dict[str, Any]:
+    """Helper function to get field expression based on whether it needs float conversion."""
+    if field in FIELDS_NO_FLOAT_CONVERT:
+        return {"$getField": field}
+    return {"$convert": {"input": {"$getField": field}, "to": "double"}}
+
+
 def filter_to_clause(item: Filter) -> dict[str, Any]:
     if item.operator == "(any): isEmpty":
         return {
@@ -212,79 +225,28 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         return {"$or": clauses}
     elif item.operator == "(number): =":
         value = float(item.value)
-        return {
-            "$eq": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$eq": [field, {"$literal": value}]}
     elif item.operator == "(number): !=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$eq": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                },
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$eq": [field, {"$literal": value}]}]}
     elif item.operator == "(number): >":
         value = float(item.value)
-        return {
-            "$gt": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$gt": [field, {"$literal": value}]}
     elif item.operator == "(number): >=":
         value = float(item.value)
-        return {
-            "$gte": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$gte": [field, {"$literal": value}]}
     elif item.operator == "(number): <":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gte": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$gte": [field, {"$literal": value}]}]}
     elif item.operator == "(number): <=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gt": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$gt": [field, {"$literal": value}]}]}
     elif item.operator == "(bool): is":
         return {
             "$eq": [{"$getField": item.field}, {"$literal": str(item.value)}],
