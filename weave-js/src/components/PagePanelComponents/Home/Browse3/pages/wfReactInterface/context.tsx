@@ -49,7 +49,7 @@ export const useProjectHasTraceServerData = (
   const objs = tsWFDataModelHooks.useRootObjectVersions({
     entity,
     project,
-    limit: 1, // limit
+    limit: 1,
     metadataOnly: true,
     skip: !hasTraceServer,
     noAutoRefresh: true,

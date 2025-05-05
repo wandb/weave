@@ -80,7 +80,6 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     entity: entity || '',
     project: project || '',
     digest: tableDigest || '',
-    skip: tableDigest == null,
     limit: 10, // This is an arbitrary limit to prevent loading too much data.
   });
 

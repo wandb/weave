@@ -91,6 +91,7 @@ export const useObjectVersions = (
     entity,
     project,
     filter: {objectIds},
+    // TODO: This is super wasteful - getting all the data for all versions of every object mentioned
     metadataOnly: false,
   });
   if (rootObjectVersions.loading) {

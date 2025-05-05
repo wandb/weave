@@ -66,8 +66,7 @@ const DatasetOption: React.FC<DatasetOptionProps> = ({
     entity: entity || '',
     project: project || '',
     digest: tableDigest || '',
-    skip: tableDigest == null,
-    limit: 5, // Limit to 5 rows for preview
+    limit: 5,
   });
 
   const previewRows = tableRowsQuery?.result?.rows.map(row => row.val) || [];
