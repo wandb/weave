@@ -693,7 +693,7 @@ def _get_incremental_table_awl_from_file(
         current_incr_num_str, incremental_table_root_filename = file.path.split('.', 1)
         current_incr_num = int(current_incr_num_str)
         # Only load the latest 100 increments
-        for i in range(current_incr_num, max(current_incr_num - 99, -1), -1):
+        for i in range(max(0, current_incr_num - 99), current_incr_num + 1):
             try:
                 files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
             except KeyError:
