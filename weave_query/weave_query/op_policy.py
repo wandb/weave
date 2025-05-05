@@ -38,6 +38,7 @@ CACHE_OP_NAMES = (
         # is fixed.
         "file-partitionedTable",
         "file-table",
+        "file-joinedTable",
         "op-umap_project",
         "op-openai_embed",
         "op-hdbscan_cluster",

@@ -692,32 +692,22 @@ def _get_incremental_table_awl_from_file(
         files = {}
         current_incr_num_str, incremental_table_root_filename = file.path.split('.', 1)
         current_incr_num = int(current_incr_num_str)
+        # Only load the latest 100 increments
         for i in range(current_incr_num, max(current_incr_num - 99, -1), -1):
-            files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
-        
+            try:
+                files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
+            except KeyError:
+                # Skip if the file doesn't exist in the increment directory
+                continue
+
     asyncio.run(ensure_files(files))
     rrows: list[list] = []
     object_types: list[types.Type] = []
     for incremental_file in files.values():
-        # We catch this error because incremental tables are constructed from a list
-        # of hard-coded artifact URLs. This handles the possibility that the user has deleted an
-        # artifact version.
-        try:
-            incremental_data = _get_table_data_from_file(incremental_file)
-            rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
-            rrows.append(rows)
-            object_types.append(object_type)
-        except FileNotFoundError as e:
-            return None
-        # Prevent a panel crash from stale file handle errors
-        # There are rare stale file handle errors that cause panel crashes as noted:
-        # https://wandb.atlassian.net/browse/WB-22355
-        except OSError as e:
-            import errno
-
-            if e.errno == errno.ESTALE:
-                return None
-            raise
+        incremental_data = _get_table_data_from_file(incremental_file)
+        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+        rrows.append(rows)
+        object_types.append(object_type)
 
         
     object_type = types.union(*object_types)
@@ -739,7 +729,7 @@ def _get_table_like_awl_from_file(
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
-    if "prev_increment_paths" in data:
+    if "log_mode" in data and data["log_mode"] == "INCREMENTAL":
         awl = _get_incremental_table_awl_from_file(data, file)
     elif file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
@@ -844,7 +834,7 @@ def _get_partitioned_table_awl_from_file(
 
 # Download files in a `FilesystemArtifactDir` in parallel.
 # This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
-async def ensure_files(files: typing.Union[typing.Dict[str, artifact_fs.FilesystemArtifactFile], typing.List[artifact_fs.FilesystemArtifactFile]]):
+async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     client = io_service.get_async_client()
     loop = asyncio.get_running_loop()
     tasks = set()

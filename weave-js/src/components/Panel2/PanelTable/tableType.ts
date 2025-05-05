@@ -6,7 +6,6 @@ import {
   isListLike,
   isPartitionedTable,
   isTable,
-  isUnion,
   listObjectType,
   Node,
   nullableTaggableValue,
@@ -92,7 +91,6 @@ export function normalizeTableLike(node: Node) {
       {}
     );
   }
-
   // partitioned-table
   if (isPartitionedTable(type)) {
     return applyOpToOneOrMany(
@@ -163,7 +161,6 @@ export function isTableTypeLike(type: Type) {
   ) {
     return true;
   }
-
   // joined-table
   if (isJoinedTable(type)) {
     return true;
