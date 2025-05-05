@@ -452,3 +452,24 @@ def shorten_name(
             shortened_name += next_part
         i += 1
     return shortened_name
+
+
+def try_parse_timestamp(x: Any) -> Any:
+    """
+    Try to parse a timestamp from various formats.
+    Args:
+        x: The input value to parse as a timestamp.
+    Returns:
+        A datetime object if parsing is successful, otherwise returns None.
+    """
+    try:
+        if isinstance(x, str):
+            # Try to parse as ISO 8601 format
+            return datetime.fromisoformat(x)
+        elif isinstance(x, int):
+            # Try to parse from unix_ns
+            return datetime.fromtimestamp(x / 1_000_000_000)
+        elif isinstance(x, float):
+            return datetime.fromtimestamp(x)
+    except (ValueError, TypeError):
+        return None

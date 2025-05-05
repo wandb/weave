@@ -6,7 +6,6 @@ import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
-import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
 import {WeaveflowPeekContext} from '../../context';
@@ -15,6 +14,7 @@ import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
 import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {OpDefCode} from '../../OpDefCode';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -189,7 +189,7 @@ const useCallTabs = (call: CallSchema) => {
       ? [
           {
             label: 'Code',
-            content: <Browse2OpDefCode uri={codeURI} />,
+            content: <OpDefCode uri={codeURI} />,
           },
         ]
       : []),

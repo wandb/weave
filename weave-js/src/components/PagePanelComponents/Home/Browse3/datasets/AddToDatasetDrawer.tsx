@@ -9,6 +9,7 @@ import {useWeaveflowRouteContext} from '../context';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useClientSideCallRefExpansion} from '../pages/wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {
   ACTION_TYPES,
   DatasetDrawerProvider,
@@ -39,7 +40,13 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = props => {
       onClose={props.onClose}
       entity={props.entity}
       project={props.project}>
-      <AddToDatasetDrawerInner {...props} />
+      <CustomWeaveTypeProjectContext.Provider
+        value={{
+          entity: props.entity,
+          project: props.project,
+        }}>
+        <AddToDatasetDrawerInner {...props} />
+      </CustomWeaveTypeProjectContext.Provider>
     </DatasetDrawerProvider>
   );
 };
