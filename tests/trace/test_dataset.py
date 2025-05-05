@@ -329,10 +329,10 @@ def test_dataset_map_immutability(client):
     # Assert original dataset (ds) and its rows are unchanged
     assert len(ds) == 3
     assert list(ds) == original_rows_copy
-    # Ensure the dictionaries within the original dataset were not mutated
-    assert (
-        ds.rows[0] is original_rows[0]
-    )  # Check object identity if rows were passed directly
+
+    # Check value equality rather than object identity
+    # WeaveDict objects won't be the same objects as the original dicts,
+    # but they should contain the same data
     assert ds.rows[0] == original_rows_copy[0]
 
 
@@ -359,7 +359,7 @@ def test_dataset_map_with_specific_params(client):
 
 
 def test_dataset_map_with_scalar_return(client):
-    """Test mapping a function that returns a scalar value instead of a dictionary."""
+    """Test that mapping with a scalar return value raises a TypeError."""
     original_rows = [{"id": i, "val": i * 2} for i in range(5)]
     ds = weave.Dataset(rows=original_rows)
 
@@ -367,18 +367,17 @@ def test_dataset_map_with_scalar_return(client):
     def sum_values(id, val):
         return id + val
 
-    # The function's name "sum_values" should be used as the key
-    mapped_ds = ds.map(sum_values)
+    # Should raise TypeError because function returns a scalar, not a dict
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(sum_values)
 
-    assert len(mapped_ds) == 5
-    expected_rows = [
-        {"id": 0, "val": 0, "sum_values": 0},
-        {"id": 1, "val": 2, "sum_values": 3},
-        {"id": 2, "val": 4, "sum_values": 6},
-        {"id": 3, "val": 6, "sum_values": 9},
-        {"id": 4, "val": 8, "sum_values": 12},
-    ]
-    assert list(mapped_ds) == expected_rows
+    # Correct version that returns a dictionary
+    def sum_values_dict(id, val):
+        return {"sum": id + val}
+
+    # This should work
+    mapped_ds = ds.map(sum_values_dict)
+    assert mapped_ds[2]["sum"] == 6  # 2 + 4
 
 
 def test_dataset_map_with_default_param(client):
@@ -421,17 +420,21 @@ def test_dataset_map_with_lambda(client):
     """Test mapping with lambda functions."""
     ds = weave.Dataset(rows=[{"a": i, "b": i * 2} for i in range(5)])
 
-    # Lambda that takes specific params
+    # Lambda that takes specific params and returns a dictionary
     mapped_ds = ds.map(lambda a, b: {"sum": a + b})
     assert len(mapped_ds) == 5
     assert mapped_ds[0] == {"a": 0, "b": 0, "sum": 0}
     assert mapped_ds[2] == {"a": 2, "b": 4, "sum": 6}
 
-    # Lambda with a scalar return value (should get a generic key)
-    mapped_ds = ds.map(lambda a, b: a * b)
+    # Lambda with a scalar return value should raise TypeError
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(lambda a, b: a * b)
+
+    # Correct version that returns a dictionary
+    mapped_ds = ds.map(lambda a, b: {"product": a * b})
     assert len(mapped_ds) == 5
-    assert "<lambda>" in mapped_ds[0]  # Should use "<lambda>" as key
-    assert mapped_ds[2]["<lambda>"] == 8  # 2 * 4
+    assert mapped_ds[0] == {"a": 0, "b": 0, "product": 0}
+    assert mapped_ds[2] == {"a": 2, "b": 4, "product": 8}
 
 
 def test_dataset_map_parameter_reuse(client):
@@ -462,32 +465,77 @@ def test_dataset_map_error_handling(client):
     """Test error handling in more complex scenarios."""
     ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
 
-    # Function that raises different errors based on input
+    # Test None return value
+    def return_none(id):
+        return None
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(return_none)
+
+    # Test list return
+    def return_list(id):
+        return [id, id * 2]
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(return_list)
+
+    # Test proper dictionary return with error inside
     def problematic_func(id, val):
         if id == 0:
             return {"ok": True}
-        elif id == 1:
-            return None  # Should be wrapped in a dict
-        elif id == 2:
-            # Type error when converting val to a list
-            return {"error": list(val)}
         elif id == 3:
             # KeyError
             d = {}
             return {"error": d["nonexistent"]}
         else:
-            # Should not get here in this test
             return {"ok": False}
 
-    # Test None return value is handled
-    mapped_ds = ds.map(lambda id, val: None if id == 3 else {"ok": id})
-    assert "problematic_func" not in mapped_ds[1]
-    assert mapped_ds[3]["<lambda>"] is None
+    # Should propagate the KeyError from the problematic_func
+    with pytest.raises(KeyError):
+        ds.map(problematic_func)
 
-    # Test list return is wrapped
-    list_ds = ds.map(lambda id, val: [id, val] if id == 2 else {"ok": id})
-    assert isinstance(list_ds[2]["<lambda>"], list)
-    assert list_ds[2]["<lambda>"] == [2, 2]
+
+def test_dataset_map_key_collision(client):
+    """Test that mapping can update/override existing keys in the dataset."""
+    ds = weave.Dataset(
+        rows=[{"id": i, "val": i * 2, "data": f"Original {i}"} for i in range(3)]
+    )
+
+    # Function that returns a dict with keys that already exist
+    def update_existing_keys(id, val):
+        # Override existing 'val' and 'data' keys
+        return {
+            "val": val * 10,  # Replace original val
+            "data": f"New {id}",  # Replace original data
+        }
+
+    mapped_ds = ds.map(update_existing_keys)
+
+    assert len(mapped_ds) == 3
+    # Check that original keys were overridden
+    assert mapped_ds[1]["val"] == 20  # Original was 2, now 2*10
+    assert mapped_ds[1]["data"] == "New 1"  # Original was "Original 1"
+    # Check that untouched keys remain
+    assert mapped_ds[1]["id"] == 1  # Not modified
+
+
+def test_dataset_map_non_dict_return_error(client):
+    """Test that non-dictionary returns raise TypeError."""
+    ds = weave.Dataset(rows=[{"id": i} for i in range(3)])
+
+    # Test various non-dictionary returns
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(lambda id: (id, id * 10))  # Tuple
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(lambda id: [id, id * 10])  # List
+
+    class CustomClass:
+        def __init__(self, value):
+            self.value = value
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        ds.map(lambda id: CustomClass(id))  # Custom object
 
 
 def test_dataset_map_empty_dataset(client):
@@ -496,14 +544,14 @@ def test_dataset_map_empty_dataset(client):
     with pytest.raises(ValueError, match="empty list"):
         # This should fail during dataset creation, not during map
         ds = weave.Dataset(rows=[])
-        ds.map(lambda x: x + 1)
+        ds.map(lambda x: {"result": x + 1})
 
 
 def test_dataset_map_return_types(client):
-    """Test mapping with different return types."""
+    """Test mapping with different return types in a dictionary."""
     ds = weave.Dataset(rows=[{"id": i} for i in range(3)])
 
-    # Test returning various data types
+    # Test returning various data types in a dictionary
     def return_types(id):
         return {
             "str_val": str(id),
@@ -523,16 +571,6 @@ def test_dataset_map_return_types(client):
     assert types_ds[1]["dict_val"] == {"x": 1}
     assert types_ds[1]["none_val"] is None
     assert types_ds[1]["float_val"] == 1.0
-
-    # Test returning a complex object directly
-    class CustomClass:
-        def __init__(self, value):
-            self.value = value
-
-    custom_ds = ds.map(lambda id: CustomClass(id + 100))
-
-    # The CustomClass object should be stored under the function name
-    assert custom_ds[1]["<lambda>"].value == 101
 
 
 def test_dataset_map_typed_params(client):
@@ -571,35 +609,3 @@ def test_dataset_map_empty_function(client):
     assert len(mapped_ds) == 5
     for i in range(5):
         assert mapped_ds[i] == {"id": i, "val": i, "constant": 42}
-
-
-def test_dataset_map_error_handling(client):
-    """Test error handling in more complex scenarios."""
-    ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
-
-    # Function that raises different errors based on input
-    def problematic_func(id, val):
-        if id == 0:
-            return {"ok": True}
-        elif id == 1:
-            return None  # Should be wrapped in a dict
-        elif id == 2:
-            # Type error when converting val to a list
-            return {"error": list(val)}
-        elif id == 3:
-            # KeyError
-            d = {}
-            return {"error": d["nonexistent"]}
-        else:
-            # Should not get here in this test
-            return {"ok": False}
-
-    # Test None return value is handled
-    mapped_ds = ds.map(lambda id, val: None if id == 3 else {"ok": id})
-    assert "problematic_func" not in mapped_ds[1]
-    assert mapped_ds[3]["<lambda>"] is None
-
-    # Test list return is wrapped
-    list_ds = ds.map(lambda id, val: [id, val] if id == 2 else {"ok": id})
-    assert isinstance(list_ds[2]["<lambda>"], list)
-    assert list_ds[2]["<lambda>"] == [2, 2]

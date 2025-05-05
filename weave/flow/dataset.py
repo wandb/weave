@@ -199,65 +199,91 @@ class Dataset(Object):
         selected_rows = [self[i] for i in indices_list]
         return self.__class__(rows=selected_rows)
 
-    def map(self, func: Callable, num_procs: int = get_weave_parallelism()) -> Self:
+    @weave.op
+    def map(
+        self, func: Callable, num_procs: int = get_weave_parallelism()
+    ) -> "Dataset":
         """
         Apply a function to each row of the dataset in parallel and return a new dataset.
 
-        This method processes each row of the dataset by applying the provided function `func`
-        to specific columns. The function can:
+        The `map` method transforms each row in the dataset by applying `func` to it, adding or
+        updating columns based on the dictionary returned by the function. This is the primary
+        way to transform or enrich datasets.
 
-        1. Accept specific parameters matching column names in the dataset (`func(id, val)`)
-        2. Return a dictionary of new/updated values
-        3. Return a single value (which will be stored using the function name as key)
+        Parameter Mapping:
+            The function parameters are automatically matched with dataset columns by name.
+            For example, if `func` has parameters `(id, text)` and the dataset has columns
+            `id`, `text`, and `timestamp`, the function will be called with only the `id` and
+            `text` values for each row.
 
-        The returned values will be used to update the original row's dictionary,
-        effectively adding new columns or modifying existing ones.
+        Dictionary Return Requirement:
+            Functions MUST return a dictionary mapping column names to values. Each key-value
+            pair in the returned dictionary will be added to or update the corresponding row.
+            Returning non-dictionary types (such as integers, strings, lists) will raise a TypeError.
 
-        The processing happens in parallel using `asyncio` and `util.async_foreach`,
-        controlled by the `num_procs` parameter. A progress bar will be displayed
-        during processing.
+        Parallelism:
+            Processing happens in parallel across multiple processors, controlled by `num_procs`.
+            A rich progress bar is displayed during processing.
 
-        The original dataset remains unchanged (immutability).
+        Immutability:
+            The original dataset remains unchanged. A new Dataset instance is returned with
+            the transformed rows.
 
         Args:
-            func: A function (synchronous or asynchronous) that takes specific columns
-                  as parameters, and returns updates for that row.
-            num_procs: The number of parallel processes to use. Defaults to the value
-                     set by the `WEAVE_PARALLELISM` environment variable or a sensible default.
+            func: A function that takes specific columns as parameters and returns a dictionary
+                 mapping new or updated column names to values. The function can be synchronous
+                 or asynchronous and can include type annotations.
+
+            num_procs: The number of parallel processes to use. Defaults to the value set by
+                     the `WEAVE_PARALLELISM` environment variable.
 
         Returns:
-            A new `Dataset` object containing the processed rows with the updates applied.
+            A new `Dataset` object containing the processed rows with updates applied.
 
         Raises:
-            TypeError: If the function `func` does not return a dictionary or a value.
+            TypeError: If the function does not return a dictionary.
             ValueError: If the function requires parameters not present in the dataset.
-            Exception: Propagates any exception raised by `func` during processing of a row.
+            Exception: Any exception raised by the function during processing is propagated.
 
-        Example:
+        Examples:
             ```python
             import weave
 
-            # Create a sample dataset
+            # Create a dataset
             ds = weave.Dataset(rows=[
-                {"id": 1, "value": 10},
-                {"id": 2, "value": 20}
+                {"id": 1, "text": "Hello world", "lang": "en"},
+                {"id": 2, "text": "Bonjour monde", "lang": "fr"},
+                {"id": 3, "text": "Hola mundo", "lang": "es"}
             ])
 
-            # Function with specific parameters
-            def double_value(value):
-                return {"value_doubled": value * 2}
+            # Example 1: Simple transformation with a single parameter
+            def add_text_length(text):
+                return {"length": len(text)}
 
-            # Function returning a scalar value
-            def sum_fields(id, value):
-                return id + value  # Will be stored under key "sum_fields"
+            # Example 2: Multi-parameter function with type hints
+            def combine_fields(id: int, text: str, lang: str) -> dict:
+                return {
+                    "display": f"[{id}] {text} ({lang})",
+                    "uppercase": text.upper()
+                }
 
-            # Apply the functions using map
-            new_ds1 = ds.map(double_value)
-            new_ds2 = ds.map(sum_fields)
+            # Example 3: Function with default parameters
+            def classify_language(lang, default_category="other"):
+                categories = {"en": "english", "es": "spanish", "fr": "french"}
+                return {"category": categories.get(lang, default_category)}
 
-            # Print the results
-            print(new_ds1[0])  # {'id': 1, 'value': 10, 'value_doubled': 20}
-            print(new_ds2[0])  # {'id': 1, 'value': 10, 'sum_fields': 11}
+            # Apply the transformations
+            ds_with_length = ds.map(add_text_length)
+            ds_combined = ds.map(combine_fields)
+            ds_categorized = ds.map(classify_language)
+
+            # Example output for ds_with_length[0]:
+            # {
+            #     "id": 1,
+            #     "text": "Hello world",
+            #     "lang": "en",
+            #     "length": 11
+            # }
             ```
         """
         processed_rows = []
@@ -291,12 +317,12 @@ class Dataset(Object):
 
                 # Handle the result based on its type
                 if not isinstance(result, dict):
-                    # For non-dictionary returns, use the function name as the key
-                    # If it's a lambda function, use "<lambda>" as key
-                    fn_name = func.__name__
-                    if fn_name == "<lambda>":
-                        fn_name = "<lambda>"
-                    result = {fn_name: result}
+                    # Raise error for non-dictionary returns
+                    raise TypeError(
+                        f"Function must return a dictionary, but got {type(result).__name__} "
+                        f"from function '{func.__name__}'. Use a dictionary to specify "
+                        f"which columns to add or update."
+                    )
             except Exception as e:
                 # Log the error and propagate it to stop the map operation
                 print(f"Error processing row with map function: {short_str(row)}")
@@ -308,7 +334,7 @@ class Dataset(Object):
                 row_copy.update(result)
                 return row_copy
 
-        async def main(progress: Progress) -> Self:
+        async def main(progress: Progress) -> "Dataset":
             async for _, processed_row in async_foreach(
                 self.rows,
                 process_row,
