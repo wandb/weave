@@ -13,6 +13,7 @@ import {
   ResponseFormatSchema,
 } from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {useCreateBuiltinObjectInstance} from '../../wfReactInterface/objectClassQuery';
+import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {
   SetPlaygroundStateFieldFunctionType,
   TraceCallOutput,
@@ -23,7 +24,6 @@ import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
 import {SaveModelModal} from './SaveModelModal';
 import {StopSequenceEditor} from './StopSequenceEditor';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
 
 export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
@@ -309,11 +309,6 @@ const useSaveModelConfiguration = ({
       toast('Cannot find current playground state.', {type: 'error'});
       closeDialog();
       return;
-    }
-
-    let responseFormatSchema: Record<string, any> = {};
-    if (currentState.responseFormat === PlaygroundResponseFormats.JsonObject) {
-      responseFormatSchema = {type: 'object'};
     }
 
     const defaultParams: LlmStructuredCompletionModel['default_params'] = {

@@ -3,15 +3,8 @@ import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {
-  Dispatch,
-  SetStateAction,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {Empty} from '../../common/Empty';
@@ -24,7 +17,7 @@ import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
-import {getLLMDropdownOptions} from './LLMDropdownOptions';
+import {useLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -140,7 +133,7 @@ export const PlaygroundChat = ({
   );
   const isTeamAdmin = maybeTeamAdmin ?? false;
 
-  const llmDropdownOptions = getLLMDropdownOptions(
+  const llmDropdownOptions = useLLMDropdownOptions(
     configuredProviders,
     configuredProvidersLoading,
     customProvidersResult,

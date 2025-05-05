@@ -7,7 +7,7 @@ import {
 import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
-import React, {useCallback, useState} from 'react';
+import React, {useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 

@@ -9,10 +9,15 @@ import {
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
+import {
+  LlmStructuredCompletionModel,
+  LlmStructuredCompletionModelDefaultParams,
+} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
   findMaxTokensByModelName,
@@ -25,11 +30,7 @@ import {
   PlaygroundResponseFormats,
 } from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
-import {
-  LlmStructuredCompletionModel,
-  LlmStructuredCompletionModelDefaultParams,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+
 export interface LLMOption {
   subLabel?: string | React.ReactNode;
   label: string;
@@ -468,7 +469,7 @@ export const addProviderOption = (
   ],
 });
 
-export const getLLMDropdownOptions = (
+export const useLLMDropdownOptions = (
   configuredProviders: Record<string, ProviderStatus>,
   configuredProvidersLoading: boolean,
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],

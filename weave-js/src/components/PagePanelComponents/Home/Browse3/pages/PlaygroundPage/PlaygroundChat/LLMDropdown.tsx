@@ -5,9 +5,9 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
+import {OptionalSavedPlaygroundModelParams} from '../types';
 import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
-import {OptionalSavedPlaygroundModelParams} from '../types';
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
   onChange: (
