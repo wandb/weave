@@ -31,7 +31,7 @@ const isTableTypeHistoryKeyType = (id: string) => {
     'table-file',
     'partitioned-table',
     'joined-table',
-    'incr-table-file',
+    'incremental-table-file',
   ].includes(id);
 };
 

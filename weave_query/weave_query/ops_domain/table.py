@@ -700,20 +700,21 @@ def _get_incremental_table_awl_from_file(
                 # Skip if the file doesn't exist in the increment directory
                 continue
 
-    asyncio.run(ensure_files(files))
-    rrows: list[list] = []
-    object_types: list[types.Type] = []
-    for incremental_file in files.values():
-        incremental_data = _get_table_data_from_file(incremental_file)
-        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
-        rrows.append(rows)
-        object_types.append(object_type)
+        asyncio.run(ensure_files(files))
+        rrows: list[list] = []
+        object_types: list[types.Type] = []
+        for incremental_file in files.values():
+            incremental_data = _get_table_data_from_file(incremental_file)
+            rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+            rrows.append(rows)
+            object_types.append(object_type)
 
-        
-    object_type = types.union(*object_types)
+            
+        object_type = types.union(*object_types)
 
-    for rows, file in zip(rrows, files.values()):
-        all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
+        for rows, file in zip(rrows, files.values()):
+            all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
+
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_awls)
     return arrow_weave_list
 
@@ -840,8 +841,7 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     tasks = set()
     
     async with client.connect() as conn:
-        file_list = files.values() if isinstance(files, dict) else files
-        for file in file_list:
+        for file in files.values():
             if (
                 isinstance(file.artifact, artifact_wandb.WandbArtifact)
                 and file.artifact._read_artifact_uri
