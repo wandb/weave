@@ -912,7 +912,7 @@ class CallsQuery(BaseModel):
                 SELECT 
                     object_id, 
                     digest,
-                    'weave-trace-internal:///' || {param_slot(project_param, 'String')} || '/object/' || digest AS full_ref,
+                    'weave-trace-internal:///' || {param_slot(project_param, 'String')} || '/object/' || object_id || ':' || digest AS full_ref,
                     any(val_dump) as val_dump
                 FROM object_versions
                 WHERE project_id = {param_slot(project_param, "String")} 
