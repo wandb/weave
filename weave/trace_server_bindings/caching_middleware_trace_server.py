@@ -356,6 +356,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda content: tsi.FileContentReadRes(content=content),
         )
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._with_cache_pydantic(
+            self._next_trace_server.files_stats,
+            req,
+            tsi.FilesStatsRes,
+        )
+
     # Remaining Un-cacheable Methods:
 
     # Call API

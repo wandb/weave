@@ -18,6 +18,7 @@ import {
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
+  FIELD_LABELS,
   FilterId,
   getOperatorOptions,
   isValuelessOperator,
@@ -157,9 +158,10 @@ export const FilterBar = ({
         label: parsed ? parsed.displayName : col.field,
       });
     } else {
+      const label = FIELD_LABELS[col.field] ?? col.headerName ?? col.field;
       (options[0] as GroupedOption).options.push({
         value: col.field,
-        label: col.headerName ?? col.field,
+        label,
         description: FIELD_DESCRIPTIONS[col.field],
       });
     }

@@ -1,7 +1,18 @@
 import Markdown from '@wandb/weave/common/components/Markdown';
 import * as globalStyles from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
-import {constString, maybe, Node, NodeOrVoidNode} from '@wandb/weave/core';
+import {
+  constString,
+  maybe,
+  Node,
+  NodeOrVoidNode,
+  opGetRunTag,
+  opIsNone,
+  opPick,
+  opRunId,
+  varNode,
+  weaveIf,
+} from '@wandb/weave/core';
 import * as Diff from 'diff';
 import React, {useContext} from 'react';
 
@@ -10,6 +21,7 @@ import * as CGReact from '../../react';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
+import {usePanelContext} from './PanelContext';
 import * as S from './PanelString.styles';
 import {TooltipTrigger} from './Tooltip';
 import {WeaveFormatContext} from './WeaveFormatContext';
@@ -164,7 +176,27 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
 
 export const PanelString: React.FC<PanelStringProps> = props => {
   const config = props.config ?? defaultConfig();
-  const inputValue = CGReact.useNodeValue(props.input as Node<'string'>);
+  const {frame} = usePanelContext();
+  let inputNode = props.input as Node<'string'>;
+  if (
+    props.input.nodeType === 'output' &&
+    props.input.fromOp.name === 'run-name' &&
+    frame.customRunNames != null
+  ) {
+    const customRunNameNode = opPick({
+      obj: varNode(frame.customRunNames.type, 'customRunNames'),
+      key: opRunId({run: opGetRunTag({obj: props.input})}),
+    }) as Node<'string'>;
+
+    inputNode = weaveIf(
+      opIsNone({
+        val: customRunNameNode,
+      }),
+      props.input,
+      customRunNameNode
+    ) as Node<'string'>;
+  }
+  const inputValue = CGReact.useNodeValue(inputNode);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
   const {stringFormat} = useContext(WeaveFormatContext);

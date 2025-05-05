@@ -127,9 +127,19 @@ class HttpAsync:
                         async with self.fs.open_write(path, mode="wb") as f:
                             with tracer.trace("async_download_file_task.iter_chunked"):
                                 chunk_size = 8 * 1024 * 1024
+                                buffer = bytearray()
                                 async for data in r.content.iter_chunked(chunk_size):
+                                    buffer.extend(data)
+                                    if len(buffer) >= chunk_size:
+                                        with tracer.trace(
+                                            "async_download_file_task.write"
+                                        ):
+                                            await f.write(buffer)
+                                        buffer = bytearray()
+
+                                if buffer:
                                     with tracer.trace("async_download_file_task.write"):
-                                        await f.write(data)
+                                        await f.write(buffer)
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status, "Download failed"
