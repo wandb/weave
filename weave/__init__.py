@@ -33,6 +33,7 @@ __docspec__ = [
     init,
     publish,
     ref,
+    get,
     require_current_call,
     get_current_call,
     finish,

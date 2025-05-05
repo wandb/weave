@@ -1949,15 +1949,20 @@ export const traceCallStatusCode = (
 export const traceCallLatencyS = (
   traceCall: traceServerTypes.TraceCallSchema
 ) => {
+  return traceCallLatencyMs(traceCall) / 1000;
+};
+
+export const traceCallLatencyMs = (
+  traceCall: traceServerTypes.TraceCallSchema
+) => {
   const startDate = convertISOToDate(traceCall.started_at);
   const endDate = traceCall.ended_at
     ? convertISOToDate(traceCall.ended_at)
     : null;
-  let latencyS = 0;
-  if (startDate && endDate) {
-    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
+  if (startDate == null || endDate == null) {
+    return 0;
   }
-  return latencyS;
+  return endDate.getTime() - startDate.getTime();
 };
 
 const traceCallToLegacySpan = (

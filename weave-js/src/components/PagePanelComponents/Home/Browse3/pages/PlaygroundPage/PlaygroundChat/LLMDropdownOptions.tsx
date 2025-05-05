@@ -29,7 +29,7 @@ import {
   LlmStructuredCompletionModel,
   LlmStructuredCompletionModelDefaultParams,
 } from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
-
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 export interface LLMOption {
   subLabel?: string | React.ReactNode;
   label: string;
@@ -40,6 +40,12 @@ export interface LLMOption {
   provider?: string;
 }
 
+export interface LLMOption {
+  label: string;
+  value: LLMMaxTokensKey | string;
+  max_tokens: number;
+  provider?: string;
+}
 export interface ProviderOption {
   label: string | React.ReactNode;
   value: string;
@@ -182,6 +188,62 @@ const SubMenu = ({
           </Box>
         </Box>
       ))}
+      {providers?.map(provider => {
+        const tooltipContent =
+          provider.value !== 'custom-provider' && !isAdmin
+            ? 'You must be an admin to configure this provider'
+            : undefined;
+
+        const trigger = (
+          <Box
+            key={provider.value}
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              p: '6px',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              '&:hover': {
+                backgroundColor: hexToRGB(OBLIVION, 0.04),
+              },
+              width: '100%',
+            }}
+            onClick={() => {
+              if (provider.value === 'custom-provider' || isAdmin) {
+                onConfigureProvider?.(provider.value);
+              }
+            }}>
+            <Box
+              sx={{
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+              }}>
+              {provider.label}
+            </Box>
+            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onConfigureProvider?.(provider.value);
+                }}
+                disabled={!isAdmin && provider.value !== 'custom-provider'}>
+                Configure
+              </Button>
+            </Box>
+          </Box>
+        );
+
+        return tooltipContent ? (
+          <Tooltip content={tooltipContent} trigger={trigger} />
+        ) : (
+          trigger
+        );
+      })}
     </Box>,
     document.body
   );
@@ -555,7 +617,6 @@ export const getLLMDropdownOptions = (
 
   // Combine enabled and disabled options
   // Add a divider option before the add provider option
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
     ...savedModelsOptions,

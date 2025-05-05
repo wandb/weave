@@ -29,7 +29,7 @@ export type PlaygroundSettingsProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
-  setSettingsTab: (tab: number) => void;
+  setSettingsTab: (tab: number | null) => void;
   projectId: string;
   refetchSavedModels: () => void;
 };
@@ -71,7 +71,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   return (
     <Box
       sx={{
-        padding: '0px 16px 8px 16px',
+        padding: '0 0 8px',
         height: '100%',
         borderLeft: `1px solid ${MOON_250}`,
         display: 'flex',
@@ -81,22 +81,42 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         flexShrink: 0,
         position: 'relative',
       }}>
-      <Box sx={{flexGrow: 1, overflowY: 'auto', paddingBottom: '60px'}}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          justifyContent: 'space-between',
+          borderBottom: `1px solid ${MOON_250}`,
+          padding: '8px 16px',
+        }}>
+        <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <Tag label={`${settingsTab + 1}`} />
+          <Tooltip title={playgroundStates[settingsTab ?? 0]?.model ?? ''}>
+            <Box
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: '16px',
+                fontWeight: '600',
+              }}>
+              {playgroundStates[settingsTab].model}
+            </Box>
+          </Tooltip>
+        </Box>
+        <Button
+          tooltip={'Close settings drawer'}
+          variant="ghost"
+          size="medium"
+          icon="close"
+          onClick={() => {
+            setSettingsTab(null);
+          }}
+        />
+      </Box>
+      <Box sx={{padding: '0 16px'}}>
         <Tabs.Root value={settingsTab.toString()}>
-          <Tabs.List>
-            {playgroundStates.map((state, idx) => (
-              <Tabs.Trigger
-                key={idx}
-                value={idx.toString()}
-                onClick={() => setSettingsTab(idx)}
-                className="max-w-[120px]">
-                {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
-                <Tooltip title={state.model}>
-                  <span className="truncate">{state.model}</span>
-                </Tooltip>
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
           {playgroundStates.map((playgroundState, idx) => (
             <Tabs.Content key={idx} value={idx.toString()}>
               <Box
@@ -129,6 +149,9 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     setPlaygroundStateField(idx, 'stopSequences', value)
                   }
                 />
+
+                {/* TODO: N times to run is not supported for all models */}
+                {/* TODO: rerun in backend if this is not supported */}
                 <PlaygroundSlider
                   min={1}
                   max={100}

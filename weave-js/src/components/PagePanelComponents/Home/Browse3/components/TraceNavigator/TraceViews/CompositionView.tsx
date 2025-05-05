@@ -39,7 +39,9 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   background: ${props =>
     props.$isSelected ? `${Colors.TEAL_300}52` : Colors.WHITE};
   transition: all 0.1s ease-in-out;
-  flex: 1 1 100px;
+  width: 100%;
+  flex: 1 1 150px;
+  min-width: 0;
 
   &:hover {
     ${props =>
@@ -65,6 +67,7 @@ const NodeHeader = styled.button`
   cursor: pointer;
   min-height: 32px;
   user-select: none;
+  min-width: 0;
 `;
 NodeHeader.displayName = 'NodeHeader';
 
@@ -72,6 +75,8 @@ const NodeContent = styled.div<{$isExpanded: boolean}>`
   display: ${props => (props.$isExpanded ? 'flex' : 'none')};
   flex-wrap: wrap;
   gap: 4px;
+  width: 100%;
+  min-width: 0;
 `;
 NodeContent.displayName = 'NodeContent';
 
@@ -197,19 +202,23 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
     <NodeContainer $level={level} $isSelected={isSelected}>
       <NodeHeader onClick={handleClick}>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex w-full items-center ">
-            <div className="truncate text-sm font-medium">{node.opName}</div>
+          <div className="flex w-full items-center">
+            <div className="truncate text-sm font-medium" title={node.opName}>
+              {node.opName}
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-moon-500">
-            <span>{stats.finishedCallCount} finished</span>
-            {stats.unfinishedCallCount > 0 && (
-              <span>• {stats.unfinishedCallCount} running</span>
-            )}
-            {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
-            {stats.finishedCallCount > 0 && (
-              <span>• {formatDuration(avgDuration)} avg</span>
-            )}
-            <div className="ml-auto whitespace-nowrap text-[11px] text-moon-500">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-moon-500">
+            <div className="flex min-w-[110px] flex-1 flex-wrap items-center gap-2">
+              <span>{stats.finishedCallCount} finished</span>
+              {stats.unfinishedCallCount > 0 && (
+                <span>• {stats.unfinishedCallCount} running</span>
+              )}
+              {stats.errorCount > 0 && <span>• {stats.errorCount} errors</span>}
+              {stats.finishedCallCount > 0 && (
+                <span>• {formatDuration(avgDuration)} avg</span>
+              )}
+            </div>
+            <div className="whitespace-nowrap">
               {stats.finishedCallCount > 0
                 ? stats.minDuration === stats.maxDuration
                   ? formatDuration(stats.minDuration)
