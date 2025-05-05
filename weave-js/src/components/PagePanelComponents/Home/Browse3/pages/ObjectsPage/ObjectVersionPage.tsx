@@ -75,6 +75,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Provider: 'model',
   ProviderModel: 'model',
   Monitor: 'job-automation',
+  LLMStructuredCompletionModel: 'model',
 };
 export const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {

@@ -17,6 +17,7 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Provider: 'gold',
   ProviderModel: 'blue',
   Monitor: 'gold',
+  LLMStructuredCompletionModel: 'blue',
 };
 
 export const TypeVersionCategoryChip: React.FC<{
