@@ -4,8 +4,8 @@ import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {MarkdownView} from './Markdown/MarkdownView';
-import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
+import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;

@@ -1,18 +1,21 @@
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
+
+import * as Dialog from '../../../../../../components/Dialog/Dialog';
+import VideoViewer from '../../../../../../components/Panel2/VideoViewer';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {useContext} from 'react';
 import {NotApplicable} from '../../NotApplicable';
+import {CustomLink} from '../../pages/common/Links';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../CustomWeaveTypeDispatcher';
-import {CustomLink} from '../../pages/common/Links';
-import VideoViewer from '../../../../../../components/Panel2/VideoViewer'
-import * as Dialog from '../../../../../../components/Dialog/Dialog';
+
+type VideoFormat = 'gif' | 'mp4' | 'webm';
+type VideoFileKeys = `video.${VideoFormat}`;
 
 type VideoClipTypePayload = CustomWeaveTypePayload<
   'moviepy.video.VideoClip.VideoClip',
-  {'video.gif': string} | {'video.mp4': string} | {'video.webm': string}
+  {[K in VideoFileKeys]: string}
 >;
 
 type VideoPlayerProps = {
@@ -22,21 +25,29 @@ type VideoPlayerProps = {
   data: VideoClipTypePayload;
 };
 
-export const VideoPlayer = (props: VideoPlayerProps) => (
+const VIDEO_TYPES: Record<VideoFileKeys, VideoFormat> = {
+  'video.gif': 'gif',
+  'video.mp4': 'mp4',
+  'video.webm': 'webm',
+};
+
+const MIME_TYPES: Record<VideoFormat, string> = {
+  gif: 'image/gif',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+};
+
+export const VideoPlayer: React.FC<VideoPlayerProps> = props => (
   <AutoSizer style={{height: '100%', width: '100%'}}>
-    {({width, height}) => {
-      if (width === 0 || height === 0) {
-        return null;
-      }
-      return (
+    {({width, height}) =>
+      width === 0 || height === 0 ? null : (
         <VideoPlayerWithSize
           {...props}
-          mode={props.mode}
           containerWidth={width}
           containerHeight={height}
         />
-      );
-    }}
+      )
+    }
   </AutoSizer>
 );
 
@@ -45,25 +56,25 @@ type VideoPlayerWithSizeProps = VideoPlayerProps & {
   containerHeight: number;
 };
 
-const VideoPlayerWithSize = ({
+const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
   entity,
   project,
   data,
   containerWidth,
   containerHeight,
-  ...props
-}: VideoPlayerWithSizeProps) => {
+  mode: propMode,
+}) => {
   const [showPopup, setShowPopup] = useState(false);
   const {useFileContent} = useWFHooks();
-  const videoTypes = {
-    'video.gif': 'gif',
-    'video.mp4': 'mp4',
-    'video.webm': 'webm',
-  } as const;
+  const context = useContext(CustomWeaveTypeProjectContext);
+  const mode = propMode ?? context?.mode;
 
-  const videoKey = Object.keys(data.files).find(key => key in videoTypes) as
-    | keyof VideoClipTypePayload['files']
+  // Find the first available video format
+  const videoKey = Object.keys(data.files).find(key => key in VIDEO_TYPES) as
+    | VideoFileKeys
     | undefined;
+
+  // Always call the hook with consistent arguments
   const videoBinary = useFileContent(
     entity,
     project,
@@ -71,114 +82,63 @@ const VideoPlayerWithSize = ({
     {skip: !videoKey}
   );
 
-  const context = useContext(CustomWeaveTypeProjectContext);
-  const mode = props.mode ?? context?.mode;
-
   if (!videoKey) {
     return <NotApplicable />;
   }
 
-  const fileExt = videoTypes[videoKey as keyof typeof videoTypes];
-  if (!mode || mode != 'object_viewer') {
-    const videoText = `${fileExt.toUpperCase()} Video`
+  const fileExt = VIDEO_TYPES[videoKey];
+  const title = data.custom_name || entity.split('-')[0];
+
+  // Link mode (default view)
+  if (!mode || mode !== 'object_viewer') {
+    const videoText = `${fileExt.toUpperCase()} Video`;
+
     return (
       <>
-        <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', margin: 'auto', padding: '6px' }}>
-          <CustomLink text={videoText} onClick={() => setShowPopup(true)}/>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-start',
+            width: '100%',
+            margin: 'auto',
+            padding: '6px',
+          }}>
+          <CustomLink text={videoText} onClick={() => setShowPopup(true)} />
         </div>
 
         {showPopup && videoBinary.result && (
           <Dialog.Root open={showPopup} onOpenChange={setShowPopup}>
             <Dialog.Portal>
               <Dialog.Overlay />
-              <Dialog.Content className="w-[60vw] h-[60vh] p-0"> 
-                <VideoPlayerWithData
+              <Dialog.Content className="h-[60vh] w-[60vw] p-0">
+                <VideoContent
                   fileExt={fileExt}
                   buffer={videoBinary.result}
                   containerWidth={containerWidth}
                   containerHeight={containerHeight}
-                  title={data.custom_name || entity.split('-')[0]}
+                  title={title}
                 />
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>
         )}
       </>
-    )
+    );
   }
 
+  // Full viewer mode
   if (videoBinary.loading) {
     return <LoadingDots />;
-  } else if (videoBinary.result == null) {
-    return <span></span>;
+  }
+
+  if (videoBinary.result == null) {
+    return <span />;
   }
 
   return (
-    <VideoPlayerWithData
+    <VideoContent
       fileExt={fileExt}
       buffer={videoBinary.result}
-      containerWidth={containerWidth}
-      containerHeight={containerHeight}
-      title={data.custom_name || entity.split('-')[0]} // Using first part of entity as title if no custom name
-    />
-  );
-};
-
-type VideoPlayerWithDataProps = {
-  fileExt: 'gif' | 'mp4' | 'webm';
-  buffer: ArrayBuffer;
-  previewImageUrl?: string;
-  containerWidth: number;
-  containerHeight: number;
-  title: string;
-};
-
-const VideoPlayerWithData = ({
-  fileExt,
-  buffer,
-  previewImageUrl,
-  containerWidth,
-  containerHeight,
-  title,
-}: VideoPlayerWithDataProps) => {
-  const [url, setUrl] = useState<string>('');
-
-  useEffect(() => {
-    let mimeType: string;
-    switch (fileExt) {
-      case 'gif':
-        mimeType = 'image/gif';
-        break;
-      case 'mp4':
-        mimeType = 'video/mp4';
-        break;
-      case 'webm':
-        mimeType = 'video/webm';
-        break;
-      default:
-        mimeType = 'video/mp4';
-    }
-
-    const blob = new Blob([buffer], {
-      type: mimeType,
-    });
-    const objectUrl = URL.createObjectURL(blob);
-    setUrl(objectUrl);
-
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [buffer, fileExt]);
-
-  if (!url) {
-    return <LoadingDots />;
-  }
-
-  return (
-    <VideoPlayerLoaded
-      url={url}
-      fileExt={fileExt}
-      previewImageUrl={previewImageUrl}
       containerWidth={containerWidth}
       containerHeight={containerHeight}
       title={title}
@@ -186,19 +146,43 @@ const VideoPlayerWithData = ({
   );
 };
 
-type VideoPlayerLoadedProps = {
-  url: string;
-  fileExt: 'gif' | 'mp4' | 'webm';
-  previewImageUrl?: string;
+type VideoContentProps = {
+  fileExt: VideoFormat;
+  buffer: ArrayBuffer;
   containerWidth: number;
   containerHeight: number;
   title: string;
+  previewImageUrl?: string;
 };
 
-const VideoPlayerLoaded = (props: VideoPlayerLoadedProps) => {
-  if (props.containerHeight >= 1) {
-    return (
-      <VideoViewer videoSrc={props.url} width={props.containerWidth} height={props.containerHeight}/>
-    )
-  } else return null
+const VideoContent: React.FC<VideoContentProps> = ({
+  fileExt,
+  buffer,
+  containerWidth,
+  containerHeight,
+  title,
+  previewImageUrl,
+}) => {
+  const [url, setUrl] = useState<string>('');
+
+  useEffect(() => {
+    const mimeType = MIME_TYPES[fileExt];
+    const blob = new Blob([buffer], {type: mimeType});
+    const objectUrl = URL.createObjectURL(blob);
+    setUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [buffer, fileExt]);
+
+  if (!url) {
+    return <LoadingDots />;
+  }
+
+  return containerHeight >= 1 ? (
+    <VideoViewer
+      videoSrc={url}
+      width={containerWidth}
+      height={containerHeight}
+    />
+  ) : null;
 };
