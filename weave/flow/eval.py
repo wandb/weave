@@ -271,7 +271,7 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model, verbose=verbose)
         summary = await self.summarize(eval_results)
 
-        console.print(Panel(Pretty(summary), title="Evaluation Summary", expand=False))
+        console.print(summary)
 
         return summary
 
