@@ -4,9 +4,9 @@ import multiprocessing
 import random
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
-from typing import Any, Callable, TypeVar, Optional
+from typing import Any, Callable, Optional, TypeVar
 
-from rich.progress import Progress, TaskID, ProgressColumn, Text
+from rich.progress import Progress, ProgressColumn, Task, TaskID, Text
 from rich.text import Text
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ async def async_foreach(
 
     if progress:
         try:
-            total = len(sequence) # type: ignore
+            total = len(sequence)  # type: ignore
         except TypeError:
             # Sequence doesn't have a defined length (e.g., generator)
             total = None
@@ -130,9 +130,14 @@ async def async_foreach(
             # Ensure progress bar stops cleanly, even if total wasn't known
             final_description = f"{progress_desc} (Completed)"
             if progress.tasks[task_id].total is None:
-                progress.update(task_id, total=processed_count, completed=processed_count, description=final_description)
+                progress.update(
+                    task_id,
+                    total=processed_count,
+                    completed=processed_count,
+                    description=final_description,
+                )
             else:
-                 progress.update(task_id, description=final_description)
+                progress.update(task_id, description=final_description)
             progress.stop_task(task_id)
 
 
@@ -282,13 +287,12 @@ def short_str(obj: Any, limit: int = 25) -> str:
         return str_val[:limit] + "..."
     return str_val
 
-class IterationSpeedColumn(ProgressColumn):
-    """Renders human readable iteration speed."""
 
-    def render(self, task: "Task") -> Text:
+class IterationSpeedColumn(ProgressColumn):
+    """Renders the iteration speed (iterations per second)."""
+
+    def render(self, task: Task) -> Text:
         """Show iteration speed."""
-        speed = task.finished_speed or task.speed
-        if speed is None:
-            return Text("?", style="progress.data.speed")
-        it_speed = int(speed)
-        return Text(f"{it_speed}/s", style="progress.data.speed")
+        if task.speed is None:
+            return Text("? iter/s", style="progress.data.speed")
+        return Text(f"{task.speed:.2f} iter/s", style="progress.data.speed")

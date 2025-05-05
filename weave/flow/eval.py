@@ -11,11 +11,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.progress import (
-    Progress,
-    TextColumn,
-    MofNCompleteColumn,
-    TaskProgressColumn,
     BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
     TimeElapsedColumn,
 )
 from typing_extensions import Self
