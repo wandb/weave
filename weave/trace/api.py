@@ -192,7 +192,7 @@ def ref(location: str) -> weave_client.ObjectRef:
     return uri
 
 
-def get(uri: str) -> Any:
+def get(uri: str | weave_client.ObjectRef) -> Any:
     """A convenience function for getting an object from a URI.
 
     Many objects logged by Weave are automatically registered with the Weave
@@ -214,6 +214,8 @@ def get(uri: str) -> Any:
     dataset2 = weave.get(ref.uri())  # same as dataset!
     ```
     """
+    if isinstance(uri, weave_client.ObjectRef):
+        return uri.get()
     return ref(uri).get()
 
 
