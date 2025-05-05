@@ -227,7 +227,7 @@ class Dataset(Object):
             A rich progress bar is displayed during processing.
 
         Traceability:
-            For best traceability in Weave's UI and lineage tracking, use named functions 
+            For best traceability in Weave's UI and lineage tracking, use named functions
             instead of lambda functions. Named functions provide clear operation names in the
             Weave UI, while lambda functions appear as generic "<lambda>" operations.
 
@@ -297,7 +297,7 @@ class Dataset(Object):
         # Inspect the function signature
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
-        
+
         # Check if a lambda function is being used and warn about traceability
         if func.__name__ == "<lambda>":
             warnings.warn(
@@ -305,7 +305,7 @@ class Dataset(Object):
                 "For better tracking and visualization in the UI, use named functions instead. "
                 "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
                 UserWarning,
-                stacklevel=2
+                stacklevel=2,
             )
 
         async def process_row(row: dict) -> dict:
