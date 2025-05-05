@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, Callable
 
 from pydantic import field_validator
 from typing_extensions import Self
@@ -15,6 +15,24 @@ from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import (
     Call,
 )
+from weave.flow.util import async_foreach, IterationSpeedColumn
+from weave.trace.env import get_weave_parallelism
+import asyncio
+import traceback
+import inspect # Added for function signature inspection
+# from weave.flow.eval import console # REMOVED due to circular import
+
+from rich.progress import (
+    Progress,
+    TextColumn,
+    MofNCompleteColumn,
+    TaskProgressColumn,
+    BarColumn,
+    TimeElapsedColumn,
+)
+from rich.console import Console # Added Console import
+
+console = Console()
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -181,3 +199,137 @@ class Dataset(Object):
 
         selected_rows = [self[i] for i in indices_list]
         return self.__class__(rows=selected_rows)
+
+    def map(self, func: Callable, num_procs: int = get_weave_parallelism()) -> Self:
+        """
+        Apply a function to each row of the dataset in parallel and return a new dataset.
+
+        This method processes each row of the dataset by applying the provided function `func`
+        to specific columns. The function can:
+        
+        1. Accept specific parameters matching column names in the dataset (`func(id, val)`)
+        2. Return a dictionary of new/updated values
+        3. Return a single value (which will be stored using the function name as key)
+
+        The returned values will be used to update the original row's dictionary,
+        effectively adding new columns or modifying existing ones.
+
+        The processing happens in parallel using `asyncio` and `util.async_foreach`,
+        controlled by the `num_procs` parameter. A progress bar will be displayed
+        during processing.
+
+        The original dataset remains unchanged (immutability).
+
+        Args:
+            func: A function (synchronous or asynchronous) that takes specific columns
+                  as parameters, and returns updates for that row.
+            num_procs: The number of parallel processes to use. Defaults to the value
+                     set by the `WEAVE_PARALLELISM` environment variable or a sensible default.
+
+        Returns:
+            A new `Dataset` object containing the processed rows with the updates applied.
+
+        Raises:
+            TypeError: If the function `func` does not return a dictionary or a value.
+            ValueError: If the function requires parameters not present in the dataset.
+            Exception: Propagates any exception raised by `func` during processing of a row.
+
+        Example:
+            ```python
+            import weave
+
+            # Create a sample dataset
+            ds = weave.Dataset(rows=[
+                {"id": 1, "value": 10},
+                {"id": 2, "value": 20}
+            ])
+
+            # Function with specific parameters
+            def double_value(value):
+                return {"value_doubled": value * 2}
+
+            # Function returning a scalar value
+            def sum_fields(id, value):
+                return id + value  # Will be stored under key "sum_fields"
+
+            # Apply the functions using map
+            new_ds1 = ds.map(double_value)
+            new_ds2 = ds.map(sum_fields)
+
+            # Print the results
+            print(new_ds1[0])  # {'id': 1, 'value': 10, 'value_doubled': 20}
+            print(new_ds2[0])  # {'id': 1, 'value': 10, 'sum_fields': 11}
+            ```
+        """
+        processed_rows = []
+
+        # Inspect the function signature
+        sig = inspect.signature(func)
+        param_names = list(sig.parameters.keys())
+        
+        async def process_row(row: dict) -> dict:
+            try:
+                # Extract and pass specific parameters
+                kwargs = {}
+                for name in param_names:
+                    if name in row:
+                        kwargs[name] = row[name]
+                    else:
+                        # Skip this parameter or use a default if available
+                        if sig.parameters[name].default is not inspect.Parameter.empty:
+                            kwargs[name] = sig.parameters[name].default
+                        else:
+                            raise ValueError(
+                                f"Function expects parameter '{name}' but this column "
+                                f"is not in the dataset row: {short_str(row)}"
+                            )
+                
+                result = func(**kwargs)
+                
+                # If the user function is async, await it
+                if asyncio.iscoroutine(result):
+                    result = await result
+                
+                # Handle the result based on its type
+                if not isinstance(result, dict):
+                    # For non-dictionary returns, use the function name as the key
+                    # If it's a lambda function, use "<lambda>" as key
+                    fn_name = func.__name__
+                    if fn_name == "<lambda>":
+                        fn_name = "<lambda>"
+                    result = {fn_name: result}
+                
+                # Update the original row with the results
+                row_copy = row.copy()
+                row_copy.update(result)
+                return row_copy
+            except Exception as e:
+                # Log the error and propagate it to stop the map operation
+                print(f"Error processing row with map function: {short_str(row)}")
+                traceback.print_exc()
+                raise e
+
+        async def main(progress: Progress):
+            async for _, processed_row in async_foreach(
+                self.rows,
+                process_row,
+                num_procs,
+                progress=progress,
+                progress_desc="Mapping dataset",
+            ):
+                processed_rows.append(processed_row)
+
+            return self.__class__(rows=processed_rows)
+
+        # Setup and run the progress bar and async processing
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            BarColumn(),
+            IterationSpeedColumn(),
+            TimeElapsedColumn(),
+            console=console, # Use the instantiated console
+            transient=True, # Remove progress bar when done
+        ) as progress:
+            return asyncio.run(main(progress))
