@@ -413,11 +413,59 @@ export const EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN: EmptyProps = {
   icon: 'forum-chat-bubble' as const,
   heading: 'Get started with the LLM playground',
   description: 'Configure an LLM provider to start using the playground',
-  moreInformation: <></>,
+  moreInformation: () => {
+    const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+    const userInfoLoaded = !viewerLoading ? userInfo : null;
+    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {orgName} = useOrgName({
+      entityName,
+      skip: viewerLoading || !entityName,
+    });
+
+    // Log empty state view event for analytics
+    useEffect(() => {
+      if (!userInfoLoaded || !entityName || !projectName) {
+        return;
+      }
+      viewEvents.emptyStateViewed({
+        userId: userInfoLoaded.id,
+        organizationName: orgName,
+        entityName,
+        projectName,
+        emptyStateType: 'llm_playground_admin',
+      });
+    }, [userInfoLoaded, orgName, entityName, projectName]);
+
+    return <></>;
+  },
 };
 
 export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
   ...EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
-  description:
-    'Contact a team admin to configure an LLM provider to start using the playground',
+  description: 'Contact a team admin to configure an LLM provider to start using the playground',
+  moreInformation: () => {
+    const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+    const userInfoLoaded = !viewerLoading ? userInfo : null;
+    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {orgName} = useOrgName({
+      entityName,
+      skip: viewerLoading || !entityName,
+    });
+
+    // Log empty state view event for analytics
+    useEffect(() => {
+      if (!userInfoLoaded || !entityName || !projectName) {
+        return;
+      }
+      viewEvents.emptyStateViewed({
+        userId: userInfoLoaded.id,
+        organizationName: orgName,
+        entityName,
+        projectName,
+        emptyStateType: 'llm_playground_non_admin',
+      });
+    }, [userInfoLoaded, orgName, entityName, projectName]);
+
+    return <></>;
+  },
 };
