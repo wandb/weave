@@ -66,7 +66,7 @@ const TracesMoreInformation: React.FC = () => {
       projectName,
       emptyStateType: 'traces',
     });
-  }, [userInfoLoaded, orgName, entityName, projectName] as const);
+  }, [userInfoLoaded, orgName, entityName, projectName]);
 
   const fireAnalyticsForEmpty =
     (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
@@ -158,7 +158,7 @@ const EvaluationsMoreInformation: React.FC = () => {
       projectName,
       emptyStateType: 'evaluations',
     });
-  }, [userInfoLoaded, orgName, entityName, projectName] as const);
+  }, [userInfoLoaded, orgName, entityName, projectName]);
 
   const fireAnalyticsForEmpty =
     (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
