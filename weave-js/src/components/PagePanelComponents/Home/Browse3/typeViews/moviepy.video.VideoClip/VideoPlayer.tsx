@@ -1,16 +1,15 @@
-import React, {useContext, useEffect, useState} from 'react';
-import {AutoSizer} from 'react-virtualized';
-
 import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
-import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
+import {Icon} from '@wandb/weave/components/Icon';
+import {IconNames} from '@wandb/weave/components/Icon/types';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
-import {Icon} from '@wandb/weave/components/Icon';
-import {IconNames} from '@wandb/weave/components/Icon/types';
+import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
+import React, {useContext, useEffect, useState} from 'react';
+import {AutoSizer} from 'react-virtualized';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
 type VideoFileKeys = `video.${VideoFormat}`;
