@@ -14,6 +14,7 @@ export enum ChatFormat {
   None = 'None',
   OpenAI = 'OpenAI',
   Gemini = 'Gemini',
+  Mistral = 'Mistral',
 }
 
 export const hasStringProp = (obj: any, prop: string): boolean => {
@@ -321,6 +322,12 @@ export const isTraceCallChatFormatOpenAI = (call: TraceCallSchema): boolean => {
   if (!_.isArray(messages)) {
     return false;
   }
+  if (
+    hasStringProp(call.inputs, 'model') &&
+    call.inputs.model.toLowerCase().includes('mistral')
+  ) {
+    return false;
+  }
   return messages.every(isMessage);
 };
 
@@ -332,6 +339,9 @@ export const isCallChat = (call: CallSchema): boolean => {
 export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (!('traceCall' in call) || !call.traceCall) {
     return ChatFormat.None;
+  }
+  if (isTraceCallChatFormatMistral(call.traceCall)) {
+    return ChatFormat.Mistral;
   }
   if (isTraceCallChatFormatOpenAI(call.traceCall)) {
     return ChatFormat.OpenAI;
@@ -447,15 +457,26 @@ export const normalizeChatCompletion = (
         completion.content,
         completion.stop_reason
       ),
-      created: 0,
+      created: 0, // Anthropic doesn't provide `created`
       model: completion.model,
-      system_fingerprint: '',
+      system_fingerprint: '', // Anthropic doesn't provide `system_fingerprint`
       usage: {
         prompt_tokens: completion.usage.input_tokens,
         completion_tokens: completion.usage.output_tokens,
         total_tokens:
           completion.usage.input_tokens + completion.usage.output_tokens,
       },
+    };
+  }
+  if (isMistralCompletionFormat(completion)) {
+    // Ensure all fields of ChatCompletion are present, especially system_fingerprint.
+    return {
+      id: completion.id,
+      choices: completion.choices, // isMistralChatCompletionChoice ensures these are compatible
+      created: completion.created,
+      model: completion.model,
+      system_fingerprint: completion.system_fingerprint ?? '', // Provide a default if not present
+      usage: completion.usage, // isMistralUsage ensures this is compatible
     };
   }
   return completion as ChatCompletion;
@@ -491,4 +512,94 @@ export const useCallAsChat = (
     request,
     result,
   };
+};
+
+export const isMistralChatCompletionChoice = (choice: any): boolean => {
+  if (!_.isPlainObject(choice)) {
+    return false;
+  }
+  if (!hasNumberProp(choice, 'index')) {
+    return false;
+  }
+  if (!isMessage(choice.message)) {
+    return false;
+  }
+  if (!hasStringProp(choice, 'finish_reason')) {
+    return false;
+  }
+  return true;
+};
+
+export const isMistralUsage = (usage: any): boolean => {
+  if (!_.isPlainObject(usage)) {
+    return false;
+  }
+  return (
+    hasNumberProp(usage, 'prompt_tokens') &&
+    hasNumberProp(usage, 'completion_tokens') &&
+    hasNumberProp(usage, 'total_tokens')
+  );
+};
+
+export const isMistralRequestFormat = (inputs: KeyedDictType): boolean => {
+  if (!('messages' in inputs)) {
+    return false;
+  }
+  const {messages} = inputs;
+  if (!_.isArray(messages) || !messages.every(isMessage)) {
+    return false;
+  }
+  if (
+    !hasStringProp(inputs, 'model') ||
+    !inputs.model.toLowerCase().includes('mistral')
+  ) {
+    return false;
+  }
+  return true;
+};
+
+export const isMistralCompletionFormat = (output: any): boolean => {
+  if (output === null) {
+    return true;
+  }
+  if (!_.isPlainObject(output)) {
+    return false;
+  }
+  if (!hasStringProp(output, 'id')) {
+    return false;
+  }
+  if (
+    !hasStringProp(output, 'object') ||
+    !output.object.startsWith('chat.completion')
+  ) {
+    return false;
+  }
+  if (!hasNumberProp(output, 'created')) {
+    return false;
+  }
+  if (
+    !hasStringProp(output, 'model') ||
+    !output.model.toLowerCase().includes('mistral')
+  ) {
+    return false;
+  }
+  if (!_.isArray(output.choices)) {
+    return false;
+  }
+  if (!output.choices.every((c: any) => isMistralChatCompletionChoice(c))) {
+    return false;
+  }
+  if (!isMistralUsage(output.usage)) {
+    return false;
+  }
+  return true;
+};
+
+export const isTraceCallChatFormatMistral = (
+  call: TraceCallSchema
+): boolean => {
+  return (
+    isMistralRequestFormat(call.inputs) &&
+    isMistralCompletionFormat(call.output)
+  );
 };
