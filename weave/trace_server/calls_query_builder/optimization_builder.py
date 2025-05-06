@@ -577,7 +577,15 @@ class ObjectReferenceProcessor(ABC):
 
     @abstractmethod
     def process_condition(
-        self, field_path: str, operation: tsi_query.Operation, pb: "ParamBuilder"
+        self,
+        field_path: str,
+        operation: Union[
+            tsi_query.EqOperation,
+            tsi_query.ContainsOperation,
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+        ],
+        pb: "ParamBuilder",
     ) -> tuple[str, str, Any]:
         """Process condition and return operator, field, and value."""
         pass
@@ -657,11 +665,46 @@ OBJECT_REFERENCE_PROCESSORS = {
 }
 
 
+def _field_is_expanded_column(field: Any, expand_columns: list[str]) -> bool:
+    """
+    Check if a field is part of the expanded columns or is a child of an expanded path.
+    """
+    field_path = ".".join([field.field.field.split("_")[0]] + field.field.extra_path)
+    return _is_expanded_column(field_path, expand_columns)
+
+
+def _is_expanded_column(field_path: str, expand_columns: list[str]) -> bool:
+    """
+    Check if a field path is part of the expanded columns or is a child of an expanded path.
+
+    Args:
+        field_path: The field path to check, e.g. "inputs.model.name"
+        expand_columns: List of expanded column paths, e.g. ["inputs.model", "output.values"]
+
+    Returns:
+        True if the field path is covered by an expanded column, False otherwise
+    """
+    if not expand_columns:
+        return True  # If no explicit columns to expand, treat all as expandable
+
+    parts = field_path.split(".")
+    if len(parts) < 2:
+        return False
+
+    field_prefix = ".".join(parts[:2])  # e.g., "inputs.model"
+
+    for expand_path in expand_columns:
+        if expand_path == field_prefix or field_path.startswith(expand_path + "."):
+            return True
+    return False
+
+
 def build_object_ref_conditions(
     pb: "ParamBuilder",
     project_id: str,
     table_alias: str,
     object_mapping: dict[str, "Condition"],
+    expand_columns: list[str] = [],
 ) -> dict[str, Any]:
     """
     Builds SQL components for filtering based on object references.
@@ -675,20 +718,44 @@ def build_object_ref_conditions(
         table_alias: The alias of the table being queried
         object_mapping: A mapping from field path to condition objects
                         e.g. {"inputs.model.name.str": Condition}
+        expand_columns: List of column paths that should be treated as references
+                        to the objects table, e.g. ["inputs.model", "output.values"]
 
     Returns:
         Dictionary with cte_parts and filter_sql
     """
+    project_param = pb.add_param(project_id)
     if not object_mapping:
-        return {"cte_parts": [], "filter_sql": ""}
+        if not expand_columns:
+            return {"cte_parts": [], "filter_sql": ""}
+
+        # must be an order by
+        cte_sql_str = f"""obj_order_by AS (
+            SELECT val_dump,
+                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+            FROM object_versions
+            WHERE project_id = {param_slot(project_param, "String")}
+            GROUP BY project_id, object_id, digest
+        )"""
+        root_field = expand_columns[0].split(".")[0] + "_dump"
+        field_access = f"JSON_VALUE({table_alias}.{root_field}, '$.{expand_columns[0].split('.')[1]}')"
+        filter_sql_str = f"""
+        {field_access} IN (
+            SELECT full_ref 
+            FROM obj_order_by
+        )"""
+        return {"cte_parts": [cte_sql_str], "filter_sql": filter_sql_str}
 
     # Start building the CTEs from the deepest leaf values
     cte_parts = []
     filter_conditions = []
 
-    project_param = pb.add_param(project_id)
-
+    # Process object mapping conditions
     for i, (path_str, filter_condition) in enumerate(object_mapping.items()):
+        # Only proceed if this path is in expand_columns (when provided)
+        if not _is_expanded_column(path_str, expand_columns):
+            continue
+
         path_parts = path_str.split(".")
         root_field = path_parts[0] + "_dump"
         # The property within the root field (model, name, etc.)
@@ -704,7 +771,19 @@ def build_object_ref_conditions(
             continue
 
         try:
-            op_str, _, val = processor.process_condition(path_str, operation, pb)
+            # Cast operation to the specific type that the processor expects
+            if isinstance(
+                operation,
+                (
+                    tsi_query.EqOperation,
+                    tsi_query.ContainsOperation,
+                    tsi_query.GtOperation,
+                    tsi_query.GteOperation,
+                ),
+            ):
+                op_str, _, val = processor.process_condition(path_str, operation, pb)
+            else:
+                continue
         except ValueError:
             # Skip if we can't process the condition
             continue
@@ -784,7 +863,9 @@ def build_object_ref_conditions(
         return {"cte_parts": [], "filter_sql": ""}
 
     # Add the object_conditions CTE to gather all conditions
-    conditions_sql = " AND (" + " AND ".join(filter_conditions) + ")"
+    conditions_sql = ""
+    if filter_conditions:
+        conditions_sql = " AND (" + " AND ".join(filter_conditions) + ")"
 
     # Return components separately
     return {

@@ -419,6 +419,13 @@ export const CallsTable: FC<{
             //   operator: op,
             //   value: expandedRef.value,
             // });
+            console.log('setting expanded ref cols', expandedRef.field);
+            setExpandedRefCols(prevState => {
+              const newSet = new Set(prevState);
+              newSet.delete('inputs.example');
+              newSet.add(expandedRef.field);
+              return newSet;
+            });
           }
 
           // All values added to the filter model should be strings, we

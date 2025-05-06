@@ -38,6 +38,8 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     OptimizationConditions,
     process_query_to_optimization_sql,
     build_object_ref_conditions,
+    _is_expanded_column,
+    _field_is_expanded_column,
 )
 from weave.trace_server.calls_query_builder.utils import (
     param_slot,
@@ -432,6 +434,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    expand_columns: list[str] = Field(default_factory=list)
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
@@ -481,6 +484,16 @@ class CallsQuery(BaseModel):
         self.offset = offset
         return self
 
+    def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
+        """Set columns that should be expanded as object references.
+
+        Args:
+            expand_columns: List of nested column paths, e.g. ["inputs.model", "output.values"]
+                that should be treated as refs to the objects table.
+        """
+        self.expand_columns = expand_columns
+        return self
+
     def clone(self) -> "CallsQuery":
         return CallsQuery(
             project_id=self.project_id,
@@ -490,18 +503,14 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            expand_columns=self.expand_columns.copy(),
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
         return self
 
-    def as_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str = "calls_merged",
-        in_nested_with: bool = False,
-    ) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -575,7 +584,6 @@ class CallsQuery(BaseModel):
         Args:
             pb: Parameter builder for the query
             table_alias: The alias to use for the table
-            in_nested_with: Whether this query is already inside a WITH clause
 
         Returns:
             SQL query string
@@ -640,7 +648,7 @@ class CallsQuery(BaseModel):
 
         # Extract object reference conditions
         object_ref_join_conditions = filter_object_ref_join_conditions(
-            self.query_conditions
+            self.query_conditions, self.expand_columns
         )
 
         # If we should not optimize, then just build the base query
@@ -658,6 +666,7 @@ class CallsQuery(BaseModel):
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
+            expand_columns=self.expand_columns,
         )
 
         # Select Fields:
@@ -711,7 +720,11 @@ class CallsQuery(BaseModel):
         else:
             # Now we add the object join cte
             object_refs_sql = build_object_ref_conditions(
-                pb, self.project_id, table_alias, object_ref_join_conditions
+                pb,
+                self.project_id,
+                table_alias,
+                object_ref_join_conditions,
+                self.expand_columns,
             )
             if object_refs_sql.get("cte_parts"):
                 raw_sql += f""",
@@ -794,16 +807,27 @@ class CallsQuery(BaseModel):
         str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
 
         order_by_sql = ""
+        print(f"{self.expand_columns=} {self.order_fields=}")
         if len(self.order_fields) > 0:
-            order_by_sql = "ORDER BY " + ", ".join(
-                [
-                    order_field.as_sql(pb, table_alias)
-                    for order_field in self.order_fields
-                ]
-            )
-            for order_field in self.order_fields:
-                if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
-                    needs_feedback = True
+            if self.expand_columns and len(self.expand_columns) > 0:
+                for order_field in self.order_fields:
+                    if not isinstance(order_field.field, CallsMergedDynamicField):
+                        print(f"{order_field.field=} NOT DYNAMIC")
+                        continue
+                    if _field_is_expanded_column(order_field, self.expand_columns):
+                        print(f"{order_field.field=} IS EXPANDED")
+                        extra_path = order_field.field.extra_path
+                        order_by_sql = f"ORDER BY JSON_VALUE(obj_order_by.val_dump, '$.{extra_path[-1]}') {order_field.direction.lower()}"
+
+            # order_by_sql = "ORDER BY " + ", ".join(
+            #     [
+            #         order_field.as_sql(pb, table_alias)
+            #         for order_field in self.order_fields
+            #     ]
+            # )
+            # for order_field in self.order_fields:
+            #     if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+            #         needs_feedback = True
 
         limit_sql = ""
         if self.limit is not None:
@@ -892,6 +916,7 @@ class CallsQuery(BaseModel):
 
 def filter_object_ref_join_conditions(
     query_conditions: list[Condition],
+    expand_columns: list[str] = [],
 ) -> dict[str, Condition]:
     """
     Filter the query conditions to identify conditions involving object references.
@@ -909,11 +934,14 @@ def filter_object_ref_join_conditions(
         filter_object_ref_join_conditions(query_conditions)
         # returns {"inputs.model.name.str": "claude"}
 
-    This functino also modifies the query_conditions to remove the conditions that
+    This function also modifies the query_conditions to remove the conditions that
     are used to build the object reference conditions.
 
     Args:
         query_conditions: List of query conditions to filter
+        expand_columns: List of column paths that should be treated as references
+                        to the objects table, e.g. ["inputs.model", "output.values"]
+                        Only paths in these columns will be extracted for object reference.
 
     Returns:
         Dictionary mapping paths to filter values for object references
@@ -1013,13 +1041,29 @@ def filter_object_ref_join_conditions(
 
         # We need to ensure:
         # 1. The field path starts with a root field that can contain references
-        # 2. The path has at least 3 segments for nested object references (root.object_prop.leaf)
+        # 2. The path has at least 2 segments for nested object references (root.object_prop)
         # 3. The filter value is a string, number, or boolean (not complex objects)
+        # 4. If expand_columns is provided, the field or its parent path must be in expand_columns
         if (
             len(parts) >= 2
             and parts[0] in root_fields
             and isinstance(filter_value, (str, int, float, bool))
         ):
+            # Check if this field or its parent path is in expand_columns
+            if expand_columns:
+                should_expand = False
+                field_prefix = ".".join(parts[:2])  # e.g., "inputs.model"
+
+                for expanded_path in expand_columns:
+                    if expanded_path == field_prefix or field_path.startswith(
+                        expanded_path + "."
+                    ):
+                        should_expand = True
+                        break
+
+                if not should_expand:
+                    continue
+
             result[field_path] = condition
             to_remove.append(i)
 
@@ -1511,6 +1555,8 @@ def build_calls_query_stats_query(
         cq.add_condition(req.query.expr_)
     if req.limit is not None:
         cq.set_limit(req.limit)
+    if hasattr(req, "expand_columns") and req.expand_columns:
+        cq.set_expand_columns(req.expand_columns)
 
     aggregated_columns = {"count": "count()"}
     if req.include_total_storage_size:

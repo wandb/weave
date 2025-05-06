@@ -289,6 +289,7 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
+  expandedColumns?: Set<string>,
   opts?: {
     skip?: boolean;
     refetchOnDelete?: boolean;
@@ -323,6 +324,7 @@ const useCallsNoExpansion = (
       sort_by: sortBy,
       query,
       columns,
+      expand_columns: expandedColumns ? Array.from(expandedColumns) : undefined,
       include_costs: opts?.includeCosts,
       include_feedback: opts?.includeFeedback,
       ...(opts?.includeTotalStorageSize
@@ -338,6 +340,7 @@ const useCallsNoExpansion = (
     sortBy,
     query,
     columns,
+    expandedColumns,
     opts?.includeCosts,
     opts?.includeFeedback,
     opts?.includeTotalStorageSize,
@@ -468,6 +471,7 @@ const useCalls = (
     sortBy,
     query,
     columns,
+    expandedRefColumns,
     opts
   );
 
