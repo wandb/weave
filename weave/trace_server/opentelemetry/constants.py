@@ -52,9 +52,10 @@ INPUT_KEYS = [
     "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
     "traceloop.entity.input"  # From Traceloop's conventions
+    "gcp.vertex.agent.tool_call_args", # From Google's Vertex AI
+    "gcp.vertex.agent.llm_request", # From Google's Vertex AI
     "input",  # Generic fallback for Pydantic models - lowest priority
-    "gcp.vertex.agent.llm_request",
-    "gcp.vertex.agent.tool_call_args",
+
 ]
 
 # OUTPUT_KEYS: Maps attribute keys that represent model completions or outputs
@@ -67,9 +68,10 @@ OUTPUT_KEYS = [
     "mlflow.spanOutputs",  # From MLFlow's tracking format
     "gen_ai.content.completion",  # From OpenLit project's format
     "traceloop.entity.output",  # From Traceloop's conventions
+    "gcp.vertex.agent.tool_response", # From Google's Vertex AI
+    "gcp.vertex.agent.llm_response", # From Google's Vertex AI
     "output",  # Generic fallback for Pydantic models - lowest priority
-    "gcp.vertex.agent.llm_response",
-    "gcp.vertex.agent.tool_response",
+
 ]
 
 # USAGE_KEYS: Maps internal Weave usage metric names to their equivalent keys in
