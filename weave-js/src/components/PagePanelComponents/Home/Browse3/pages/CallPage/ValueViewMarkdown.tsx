@@ -83,7 +83,11 @@ export const ValueViewMarkdown = ({value}: ValueViewMarkdownProps) => {
 
   let content: ReactNode = trimmed;
   if (format === 'Markdown') {
-    content = <Markdown content={trimmed} />;
+    content = (
+      <PreserveWrapping>
+        <Markdown content={trimmed} />
+      </PreserveWrapping>
+    );
   } else if (format === 'Code') {
     content = <CodeEditor value={trimmed} language="markdown" readOnly />;
   } else {
