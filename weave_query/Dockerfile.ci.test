@@ -2,7 +2,7 @@
 FROM python:3.9.11 as builder
 
 RUN apt update
-RUN apt -y install python3-venv python3-dev gcc g++ xz-utils ffmpeg
+RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY weave_query/requirements.* /root/
 WORKDIR /root

@@ -19,7 +19,7 @@ ENV CONDA_VERSION=4.9.2 \
 # - Cleanup conda files
 # - Uninstall miniconda install dependencies
 RUN mkdir /weave && \
-    apk add --no-cache wget bzip2 ffmpeg && \
+    apk add --no-cache wget bzip2 && \
     wget --quiet https://repo.continuum.io/miniconda/Miniconda3-py${PYTHON_VERSION}_$CONDA_VERSION-Linux-x86_64.sh && \
     echo "${CONDA_MD5}  Miniconda3-py${PYTHON_VERSION}_$CONDA_VERSION-Linux-x86_64.sh" >miniconda.md5 && \
     if [ $(md5sum -c miniconda.md5 | awk '{print $2}') != "OK" ]; then exit 1; fi && \
