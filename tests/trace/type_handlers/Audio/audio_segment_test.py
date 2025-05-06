@@ -56,7 +56,9 @@ def test_weave_audio_publish(client: WeaveClient, make_mp3_file: str) -> None:
     assert gotten_audio.duration_seconds == 1
 
 
-def test_audio_segment_publish(client: WeaveClient, make_audio_segment: AudioSegment) -> None:
+def test_audio_segment_publish(
+    client: WeaveClient, make_audio_segment: AudioSegment
+) -> None:
     client.project = "test_audio_publish"
     # Goes in as AudioSegement object
     weave.publish(make_audio_segment)
@@ -97,8 +99,8 @@ def test_weave_audio_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
         assert in_frames[i] == source_frames[i]
         assert out_frames[i] == source_frames[i]
 
-def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
 
+def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
     @weave.op
     def audio_segment_as_input_and_output_part(in_audio: AudioSegment) -> dict:
         return {"out_audio": in_audio}
@@ -124,4 +126,3 @@ def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> Non
     # However, the input and output should match
     for i in range(5):
         assert in_frames[i] == out_frames[i]
-
