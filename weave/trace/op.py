@@ -1122,9 +1122,9 @@ def op(
             elif is_async_generator:
 
                 @wraps(func)
-                async def wrapper(
+                async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
-                ) -> AsyncGenerator[R, None]:  # pyright: ignore[reportRedeclaration]
+                ) -> AsyncGenerator[R, None]:
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
