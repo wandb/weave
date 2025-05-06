@@ -236,7 +236,9 @@ export const colabButtonClicked = makeTrackEvent<
     };
     url: {
       description: 'URL of the Colab notebook being accessed';
-      exampleValues: ['https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb'];
+      exampleValues: [
+        'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb'
+      ];
     };
   }
 >('Weave colab link clicked');
@@ -277,11 +279,18 @@ export const docsLinkClicked = makeTrackEvent<
     };
     docType: {
       description: 'Type of documentation being accessed';
-      exampleValues: ['tracing_basics', 'quickstart_guide', 'evaluation_basics'];
+      exampleValues: [
+        'tracing_basics',
+        'quickstart_guide',
+        'evaluation_basics'
+      ];
     };
     url: {
       description: 'URL of the documentation being accessed';
-      exampleValues: ['http://wandb.me/weave_traces', 'http://wandb.me/weave_quickstart'];
+      exampleValues: [
+        'http://wandb.me/weave_traces',
+        'http://wandb.me/weave_quickstart'
+      ];
     };
   }
 >('Weave docs link clicked');

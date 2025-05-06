@@ -1,10 +1,10 @@
 import {Box} from '@mui/material';
-import React, {useState, useEffect} from 'react';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import React, {useEffect,useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
-import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
-import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import * as viewEvents from '../../../../../../integrations/analytics/viewEvents';
 import {Button} from '../../../../../Button';
