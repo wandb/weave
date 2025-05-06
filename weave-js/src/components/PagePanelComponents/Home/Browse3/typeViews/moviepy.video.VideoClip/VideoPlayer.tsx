@@ -1,6 +1,4 @@
 import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
-import {Icon} from '@wandb/weave/components/Icon';
-import {IconNames} from '@wandb/weave/components/Icon/types';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
@@ -101,7 +99,6 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
             text={videoText}
             fontWeight={400}
             onClick={() => setShowPopup(true)}
-            icon={<Icon name={IconNames.Play} />}
           />
         </div>
 
