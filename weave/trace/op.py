@@ -279,7 +279,11 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
 
 def _create_call(
-    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
+    func: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    extra_attributes: dict[str, Any] | None = None,
+    **kwargs: Any,
 ) -> Call:
     client = weave_client_context.require_weave_client()
 
@@ -299,10 +303,13 @@ def _create_call(
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
-    attributes = call_attributes.get()
+
     from weave.trace.serialization.serialize import dictify
 
-    attributes = dictify(attributes)
+    attributes = dictify(call_attributes.get())
+
+    if extra_attributes is not None:
+        attributes = {**attributes, **extra_attributes}
 
     return client.create_call(
         func,
@@ -561,7 +568,13 @@ def _call_sync_gen(
 
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        call = _create_call(
+            op,
+            *args,
+            __weave=__weave,
+            extra_attributes={"is_generator": True},
+            **kwargs,
+        )
     except OpCallError:
         raise
     except Exception:
@@ -1088,7 +1101,7 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
             elif is_generator:
@@ -1096,7 +1109,7 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = _call_sync_gen(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
             elif is_async_generator:
@@ -1104,7 +1117,7 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_gen(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
             else:
@@ -1112,7 +1125,7 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
 
