@@ -16,7 +16,7 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, OpRef, parse_uri
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -135,7 +135,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, ObjectRef):
-        if isinstance(ref, weave_client.OpRef):
+        if isinstance(ref, OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
@@ -219,20 +219,6 @@ def get(uri: str | ObjectRef) -> Any:
     return ref(uri).get()
 
 
-def obj_ref(obj: Any) -> ObjectRef | None:
-    return weave_client.get_ref(obj)
-
-
-def output_of(obj: Any) -> weave_client.Call | None:
-    client = weave_client_context.require_weave_client()
-
-    ref = obj_ref(obj)
-    if ref is None:
-        return ref
-
-    return client._ref_output_of(ref)
-
-
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
     """
@@ -277,8 +263,6 @@ __all__ = [
     "as_op",
     "publish",
     "ref",
-    "obj_ref",
-    "output_of",
     "attributes",
     "finish",
     "op",
