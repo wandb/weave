@@ -13,6 +13,7 @@ import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
 import {EvaluationComparisonState} from '../../ecpState';
+import {flattenedDimensionPath} from '../../ecpUtil';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   PivotedRow,
@@ -20,10 +21,26 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
-import { flattenedDimensionPath } from '../../ecpUtil';
 
 type RowData = PivotedRow & {
   // simpleOutput: PivotedRow['output'][string]
+  // dataRow: {[key: string]: any}
+};
+
+const DatasetRowItemRenderer: React.FC<{
+  state: EvaluationComparisonState;
+  digest: string;
+  inputKey: string;
+}> = props => {
+  const row = useExampleCompareData(
+    props.state,
+    [{
+      inputDigest: props.digest,
+    }],
+    0
+  );
+  console.log(row, props)
+  return <CellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
 export const ExampleCompareSectionTable: React.FC<{
@@ -50,6 +67,8 @@ export const ExampleCompareSectionTable: React.FC<{
         //     return Object.entries(evaluationRow.predictAndScores).flatMap(([predictAndScoreCallId, predictAndScoreRow]) => {
         return {
           ...originalRow,
+          // TODO: this has to be more sophisticated.
+          // dataRow: props.state.loadableComparisonResults.result?.resultRows?.[originalRow.inputDigest]?.rawDataRow ?? {},
           // simpleOutput: Object.fromEntries(Object.entries(originalRow.output).map(([k, v]) => {
           //     return [k, v[originalRow.evaluationCallId]]
           // }))
@@ -78,6 +97,7 @@ export const ExampleCompareSectionTable: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
+  console.log(inputSubFields)
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -144,30 +164,32 @@ export const ExampleCompareSectionTable: React.FC<{
           );
         },
       },
-      // ...inputSubFields.map(key => ({
-      //     field: `inputs.${key}`,
-      //     headerName: key,
-      //     // width: 100,
-      //     flex: 1,
-      //     valueGetter: (value: any, row: RowData) => {
-      //         if (key === '') {
-      //             if (_.isObject(row.inputs)) {
-      //                 return ''
-      //             } else {
-      //                 return row.inputs
-      //             }
-      //         }
-      //         return row.inputs[key]
-      //     },
-      //     valueFormatter: (value: any, row: RowData) => {
-      //         return <DatasetRowItemRenderer
-      //             state={props.state}
-      //             digest={row.datasetRowDigest}
-      //             key={key}
-      //         />
-      //         // return JSON.stringify(value)
-      //     }
-      // })),
+      ...inputSubFields.map(key => ({
+          field: `inputs.${key}`,
+          headerName: key,
+          // width: 100,
+          flex: 1,
+          valueGetter: (value: any, row: RowData) => {
+            return row.inputDigest
+              // if (key === '') {
+              //     if (_.isObject(row.dataRow)) {
+              //         return ''
+              //     } else {
+              //         return row.dataRow
+              //     }
+              // }
+              // return row.dataRow[key]
+          },
+          renderCell: (params: GridRenderCellParams<RowData>) => {
+            console.log(key)
+              return <DatasetRowItemRenderer
+                  state={props.state}
+                  digest={params.row.inputDigest}
+                  inputKey={key}
+              />
+
+          }
+      })),
       {
         field: 'evaluationCallId',
         headerName: 'Model',
@@ -305,7 +327,9 @@ export const ExampleCompareSectionTable: React.FC<{
       })),
       ...scoreSubFields.map(key => ({
         field: `scores.${key}`,
-        headerName: flattenedDimensionPath(props.state.summary.scoreMetrics[key]),
+        headerName: flattenedDimensionPath(
+          props.state.summary.scoreMetrics[key]
+        ),
         // width: 100,
         flex: 1,
         valueGetter: (value: any, row: RowData) => {
@@ -334,7 +358,7 @@ export const ExampleCompareSectionTable: React.FC<{
       })),
     ];
     return res;
-  }, [outputSubFields, scoreSubFields, props.state]);
+  }, [inputSubFields, outputSubFields, scoreSubFields, props.state]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
@@ -362,7 +386,7 @@ export const ExampleCompareSectionTable: React.FC<{
     ];
   }, [inputSubFields, scoreSubFields, outputSubFields]);
 
-  console.log(props.state.summary.scoreMetrics)
+  console.log(props.state.summary.scoreMetrics);
 
   return (
     <StyledDataGrid
