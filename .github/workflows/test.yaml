@@ -165,7 +165,7 @@ jobs:
       - uses: actions/setup-node@v1
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         with:
-          node-version: "18.x"
+          node-version: "20.x"
       - name: Configure npm for GitHub Packages
         run: |
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
