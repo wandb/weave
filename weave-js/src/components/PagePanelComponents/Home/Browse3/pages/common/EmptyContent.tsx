@@ -289,14 +289,14 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
   heading: 'Create your first trace',
   description:
     'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
-  moreInformation: TracesMoreInformation,
+  moreInformation: <TracesMoreInformation />,
 };
 
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
   heading: 'Create your first evaluation',
   description: 'Use evaluations to track the performance of your application.',
-  moreInformation: EvaluationsMoreInformation,
+  moreInformation: <EvaluationsMoreInformation />,
 };
 
 export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
