@@ -4,6 +4,7 @@ import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {MarkdownView} from './Markdown/MarkdownView';
+import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
@@ -51,6 +52,9 @@ const customWeaveTypeRegistry: {
   'rich.markdown.Markdown': {
     component: MarkdownView,
     preferredRowHeight: 350,
+  },
+  'moviepy.video.VideoClip.VideoClip': {
+    component: VideoPlayer,
   },
 };
 
