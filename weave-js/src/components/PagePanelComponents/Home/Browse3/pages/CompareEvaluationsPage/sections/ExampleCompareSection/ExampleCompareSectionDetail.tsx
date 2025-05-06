@@ -47,6 +47,7 @@ import {
 } from '../ScorecardSection/ScorecardSection';
 import {
   PivotedRow,
+  removePrefix,
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
@@ -980,13 +981,6 @@ export const ExampleCompareSectionDetail: React.FC<{
   );
 };
 
-const removePrefix = (key: string, prefix: string) => {
-  if (key.startsWith(prefix)) {
-    return key.slice(prefix.length);
-  }
-  return key;
-};
-
 const ICValueView: React.FC<{value: any}> = ({value}) => {
   // We should merge this with ValueView.tsx. Unfortunately,
   // the styling preferences and sizing differ enough to make
@@ -1096,5 +1090,3 @@ const adjustValueForDisplay = (
     return value;
   }
 };
-
-

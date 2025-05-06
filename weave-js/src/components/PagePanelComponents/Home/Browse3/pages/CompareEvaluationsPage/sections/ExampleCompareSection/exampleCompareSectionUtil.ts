@@ -37,6 +37,7 @@ type RowBase = {
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
+  trialNdx: number;
 };
 
 export type PivotedRow = RowBase & {
@@ -140,7 +141,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     ).forEach(([rowDigest, rowCollection]) => {
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
-          predictAndScoreRes => {
+          (predictAndScoreRes, trialNdx) => {
             const output = predictAndScoreRes._rawPredictTraceData?.output;
             rows.push({
               id: predictAndScoreRes.callId,
@@ -168,6 +169,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                 predictAndScoreRes.callId,
               ],
               predictAndScore: predictAndScoreRes,
+              trialNdx,
             });
           }
         );
@@ -372,13 +374,6 @@ async function loadRowDataIntoCache(
 
 type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
 
-function useExampleCompareDataLow(
-  state: EvaluationComparisonState,
-  inputDigest: string | null
-) {
-  const getTraceServerClient = useGetTraceServerClientContext();
-}
-
 export function useExampleCompareData(
   state: EvaluationComparisonState,
   filteredRows: Array<{
@@ -509,3 +504,10 @@ export function useExampleCompareData(
     loading,
   };
 }
+
+export const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
+};

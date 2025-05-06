@@ -7,7 +7,7 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useRef, useState} from 'react';
+import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -278,21 +278,19 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={toggleViewMode}>
-          Toggle that sick view!
-        </button>
+        <button onClick={toggleViewMode}>Toggle that sick view!</button>
       </HorizontalBox>
       <Box
         sx={{
           height,
           overflow: 'auto',
         }}>
-          {viewMode === 'detail' ? (
-            <ExampleCompareSectionDetail state={state} />
-          ) : (
-            <ExampleCompareSectionTable state={state} />
-          )}
-        </Box>
+        {viewMode === 'detail' ? (
+          <ExampleCompareSectionDetail state={state} />
+        ) : (
+          <ExampleCompareSectionTable state={state} />
+        )}
+      </Box>
     </VerticalBox>
   );
 };
