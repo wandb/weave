@@ -501,12 +501,12 @@ export const EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN: EmptyProps = {
   icon: 'forum-chat-bubble' as const,
   heading: 'Get started with the LLM playground',
   description: 'Configure an LLM provider to start using the playground',
-  moreInformation: LLMProvidersAdminMoreInformation,
+  moreInformation: <LLMProvidersAdminMoreInformation />,
 };
 
 export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
   ...EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
   description:
     'Contact a team admin to configure an LLM provider to start using the playground',
-  moreInformation: LLMProvidersNonAdminMoreInformation,
+  moreInformation: <LLMProvidersNonAdminMoreInformation />,
 };
