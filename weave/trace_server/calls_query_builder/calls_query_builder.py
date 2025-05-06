@@ -775,7 +775,8 @@ class CallsQuery(BaseModel):
         )
 
         optimization_conditions = process_query_to_optimization_sql(
-            self.query_conditions,
+            # self.query_conditions,
+            [],
             pb,
             table_alias,
         )
@@ -1199,7 +1200,7 @@ def process_query_to_conditions(
                     json_path_param = param_builder.add_param(f"$.{nested_path}")
 
                     # Return JSON_VALUE extraction from the object's val_dump
-                    return f"JSON_VALUE(any({obj_alias}.val_dump), {param_slot(json_path_param, 'String')})"
+                    return f"JSON_VALUE(argMax({obj_alias}.val_dump, length({obj_alias}.val_dump) > 0), {param_slot(json_path_param, 'String')})"
 
             # Regular field access
             structured_field = get_field_by_name(operand.get_field_)
