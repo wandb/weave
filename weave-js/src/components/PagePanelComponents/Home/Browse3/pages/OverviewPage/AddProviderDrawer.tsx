@@ -9,6 +9,7 @@ import {useHandleScroll} from '@wandb/weave/common/hooks/useHandleScroll';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
+import * as userEvents from '@wandb/weave/integrations/analytics/userEvents';
 import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
@@ -23,7 +24,6 @@ import {
   ProviderDrawerHeader,
   ProviderNameInput,
 } from './AddProviderDrawerFormComponents';
-import * as userEvents from '@wandb/weave/integrations/analytics/userEvents';
 
 interface AddProviderDrawerProps {
   entityName: string;

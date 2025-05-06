@@ -1,7 +1,7 @@
 import {Box} from '@mui/material';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
-import React, {useEffect,useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
@@ -50,7 +50,10 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
   moreInformation: () => {
     const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
     const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {entity: entityName, project: projectName} = useParams<{
+      entity: string;
+      project: string;
+    }>();
     const {orgName} = useOrgName({
       entityName,
       skip: viewerLoading || !entityName,
@@ -70,51 +73,61 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
       });
     }, [userInfoLoaded, orgName, entityName, projectName]);
 
-    const fireAnalyticsForEmpty = (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
-      if (!userInfoLoaded || !url || !projectName || !entityName) {
-        return;
-      }
-      const baseEventData = {
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        source: 'traces_empty_state',
+    const fireAnalyticsForEmpty =
+      (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
+        if (!userInfoLoaded || !url || !projectName || !entityName) {
+          return;
+        }
+        const baseEventData = {
+          userId: userInfoLoaded.id,
+          organizationName: orgName,
+          entityName,
+          projectName,
+          source: 'traces_empty_state',
+        };
+
+        if (type === 'doc' && docType) {
+          userEvents.docsLinkClicked({
+            ...baseEventData,
+            docType,
+            url,
+          });
+        } else if (type === 'colab') {
+          userEvents.colabButtonClicked({
+            ...baseEventData,
+            url,
+          });
+        }
       };
 
-      if (type === 'doc' && docType) {
-        userEvents.docsLinkClicked({
-          ...baseEventData,
-          docType,
-          url,
-        });
-      } else if (type === 'colab') {
-        userEvents.colabButtonClicked({
-          ...baseEventData,
-          url,
-        });
-      }
-    };
-
-    const COLAB_URL = 'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
+    const COLAB_URL =
+      'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
 
     return (
       <>
         Learn{' '}
-        <TargetBlank 
+        <TargetBlank
           href="http://wandb.me/weave_traces"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_tracing_basics', 'http://wandb.me/weave_traces')}>
+          onClick={fireAnalyticsForEmpty(
+            'doc',
+            'empty_state_tracing_basics',
+            'http://wandb.me/weave_traces'
+          )}>
           tracing basics
         </TargetBlank>{' '}
         or see traces in action by{' '}
-        <TargetBlank 
+        <TargetBlank
           href="http://wandb.me/weave_quickstart"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_quickstart_guide', 'http://wandb.me/weave_quickstart')}>
+          onClick={fireAnalyticsForEmpty(
+            'doc',
+            'empty_state_quickstart_guide',
+            'http://wandb.me/weave_quickstart'
+          )}>
           following our quickstart guide
         </TargetBlank>
         .
         <Box sx={{mt: 2}}>
-          <TargetBlank 
+          <TargetBlank
             href={COLAB_URL}
             onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
             <Button variant="secondary" icon="logo-colab">
@@ -134,7 +147,10 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   moreInformation: () => {
     const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
     const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {entity: entityName, project: projectName} = useParams<{
+      entity: string;
+      project: string;
+    }>();
     const {orgName} = useOrgName({
       entityName,
       skip: viewerLoading || !entityName,
@@ -154,51 +170,61 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
       });
     }, [userInfoLoaded, orgName, entityName, projectName]);
 
-    const fireAnalyticsForEmpty = (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
-      if (!userInfoLoaded || !url || !projectName || !entityName) {
-        return;
-      }
-      const baseEventData = {
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        source: 'evaluations_empty_state',
+    const fireAnalyticsForEmpty =
+      (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
+        if (!userInfoLoaded || !url || !projectName || !entityName) {
+          return;
+        }
+        const baseEventData = {
+          userId: userInfoLoaded.id,
+          organizationName: orgName,
+          entityName,
+          projectName,
+          source: 'evaluations_empty_state',
+        };
+
+        if (type === 'doc' && docType) {
+          userEvents.docsLinkClicked({
+            ...baseEventData,
+            docType,
+            url,
+          });
+        } else if (type === 'colab') {
+          userEvents.colabButtonClicked({
+            ...baseEventData,
+            url,
+          });
+        }
       };
 
-      if (type === 'doc' && docType) {
-        userEvents.docsLinkClicked({
-          ...baseEventData,
-          docType,
-          url,
-        });
-      } else if (type === 'colab') {
-        userEvents.colabButtonClicked({
-          ...baseEventData,
-          url,
-        });
-      }
-    };
-
-    const COLAB_URL = 'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
+    const COLAB_URL =
+      'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
 
     return (
       <>
         Learn{' '}
-        <TargetBlank 
+        <TargetBlank
           href="https://wandb.me/weave_evals"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_evaluation_basics', 'https://wandb.me/weave_evals')}>
+          onClick={fireAnalyticsForEmpty(
+            'doc',
+            'empty_state_evaluation_basics',
+            'https://wandb.me/weave_evals'
+          )}>
           evaluation basics
         </TargetBlank>{' '}
         or follow our tutorial to{' '}
-        <TargetBlank 
+        <TargetBlank
           href="http://wandb.me/weave_eval_tut"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_evaluation_tutorial', 'http://wandb.me/weave_eval_tut')}>
+          onClick={fireAnalyticsForEmpty(
+            'doc',
+            'empty_state_evaluation_tutorial',
+            'http://wandb.me/weave_eval_tut'
+          )}>
           set up an evaluation pipeline
         </TargetBlank>
         .
         <Box sx={{mt: 2}}>
-          <TargetBlank 
+          <TargetBlank
             href={COLAB_URL}
             onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
             <Button variant="secondary" icon="logo-colab">
@@ -416,7 +442,10 @@ export const EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN: EmptyProps = {
   moreInformation: () => {
     const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
     const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {entity: entityName, project: projectName} = useParams<{
+      entity: string;
+      project: string;
+    }>();
     const {orgName} = useOrgName({
       entityName,
       skip: viewerLoading || !entityName,
@@ -442,11 +471,15 @@ export const EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN: EmptyProps = {
 
 export const EMPTY_PROPS_NO_LLM_PROVIDERS: EmptyProps = {
   ...EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN,
-  description: 'Contact a team admin to configure an LLM provider to start using the playground',
+  description:
+    'Contact a team admin to configure an LLM provider to start using the playground',
   moreInformation: () => {
     const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
     const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
+    const {entity: entityName, project: projectName} = useParams<{
+      entity: string;
+      project: string;
+    }>();
     const {orgName} = useOrgName({
       entityName,
       skip: viewerLoading || !entityName,

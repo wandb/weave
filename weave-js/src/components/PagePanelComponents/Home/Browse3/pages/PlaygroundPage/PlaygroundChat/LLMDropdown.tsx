@@ -70,7 +70,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
       source: 'llm_dropdown',
       provider,
     });
-    
+
     setSelectedProvider(provider);
     setConfigDrawerOpen(true);
   };
