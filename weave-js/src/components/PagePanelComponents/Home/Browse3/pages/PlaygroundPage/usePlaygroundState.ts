@@ -26,6 +26,14 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
 
+export const DEFAULT_SAVED_MODEL = {
+  name: null,
+  versionIndex: null,
+  isLatest: false,
+  objectId: null,
+  savedModelParams: null,
+};
+
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
     inputs: {
@@ -46,10 +54,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   maxTokensLimit: 16384,
   model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
-  savedModel: {
-    name: null,
-    savedModelParams: null,
-  },
+  savedModel: DEFAULT_SAVED_MODEL,
 };
 
 type NumericPlaygroundStateKey =

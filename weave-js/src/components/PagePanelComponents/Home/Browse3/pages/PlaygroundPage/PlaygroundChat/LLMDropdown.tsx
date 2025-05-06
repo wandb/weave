@@ -5,7 +5,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {OptionalSavedPlaygroundModelParams} from '../types';
+import {SavedPlaygroundModelState} from '../types';
 import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 interface LLMDropdownProps {
@@ -13,10 +13,7 @@ interface LLMDropdownProps {
   onChange: (
     value: LLMMaxTokensKey | string,
     maxTokens: number,
-    savedModel?: {
-      name: string | null;
-      savedModelParams: OptionalSavedPlaygroundModelParams | null;
-    }
+    savedModel?: SavedPlaygroundModelState
   ) => void;
   entity: string;
   project: string;

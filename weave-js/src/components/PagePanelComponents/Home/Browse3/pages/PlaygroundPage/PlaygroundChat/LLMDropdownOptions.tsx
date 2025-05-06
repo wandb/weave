@@ -9,15 +9,13 @@ import {
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Pill} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
-import {
-  LlmStructuredCompletionModel,
-  LlmStructuredCompletionModelDefaultParams,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {LlmStructuredCompletionModel} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
   findMaxTokensByModelName,
@@ -27,26 +25,25 @@ import {
 } from '../llmMaxTokens';
 import {
   OptionalSavedPlaygroundModelParams,
-  PlaygroundResponseFormats,
+  SavedPlaygroundModelState,
 } from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
+import {convertDefaultParamsToOptionalPlaygroundModelParams} from '../useSaveModelConfiguration';
 
 export interface LLMOption {
-  subLabel?: string | React.ReactNode;
   label: string;
+  subLabel?: string | React.ReactNode;
   value: LLMMaxTokensKey | string;
   max_tokens: number;
+
+  // Saved LLM options
   baseModelId?: LLMMaxTokensKey | null;
   defaultParams?: OptionalSavedPlaygroundModelParams;
-  provider?: string;
+  versionIndex?: number | null;
+  isLatest?: boolean;
+  objectId?: string;
 }
 
-export interface LLMOption {
-  label: string;
-  value: LLMMaxTokensKey | string;
-  max_tokens: number;
-  provider?: string;
-}
 export interface ProviderOption {
   label: string | React.ReactNode;
   value: string;
@@ -59,10 +56,7 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onChange: (
     value: LLMMaxTokensKey,
     maxTokens: number,
-    savedModel?: {
-      name: string | null;
-      savedModelParams: OptionalSavedPlaygroundModelParams | null;
-    }
+    savedModel?: SavedPlaygroundModelState
   ) => void;
   entity: string;
   project: string;
@@ -83,10 +77,7 @@ const SubMenu = ({
   onChange: (
     value: LLMMaxTokensKey,
     maxTokens: number,
-    savedModel?: {
-      name: string | null;
-      savedModelParams: OptionalSavedPlaygroundModelParams | null;
-    }
+    savedModel?: SavedPlaygroundModelState
   ) => void;
   position: {top: number; left: number};
   onSelect: () => void;
@@ -112,7 +103,7 @@ const SubMenu = ({
       }}>
       {llms.map(llm => (
         <Box
-          key={llm.value}
+          key={llm.value + llm.versionIndex}
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
@@ -123,6 +114,9 @@ const SubMenu = ({
                 ? {
                     name: llm.baseModelId,
                     savedModelParams: llm.defaultParams,
+                    versionIndex: llm.versionIndex ?? null,
+                    isLatest: llm.isLatest ?? false,
+                    objectId: llm.objectId ?? null,
                   }
                 : undefined
             );
@@ -304,26 +298,31 @@ export const CustomOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  data,
   ...props
 }: CustomOptionProps) => {
   const {inputValue} = props.selectProps;
   // If searching, show nested structure
   if (inputValue) {
-    const {llms, isDisabled} = props.data;
+    const isDisabled = data.isDisabled;
     if (isDisabled) {
       return null;
     }
 
-    const filteredLLMs = llms.filter(
-      llm =>
-        llm.value.toLowerCase().includes(inputValue.toLowerCase()) ||
-        llm.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-        (llm.subLabel &&
-          llm.subLabel
-            .toString()
-            .toLowerCase()
-            .includes(inputValue.toLowerCase()))
-    );
+    const filteredLLMs = data.llms
+      .filter(
+        llm =>
+          llm.value.toLowerCase().includes(inputValue.toLowerCase()) ||
+          llm.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+          (llm.subLabel &&
+            llm.subLabel
+              .toString()
+              .toLowerCase()
+              .includes(inputValue.toLowerCase()))
+      )
+      .sort((a, b) => {
+        return a.label.localeCompare(b.label);
+      });
 
     return (
       <Box>
@@ -341,7 +340,7 @@ export const CustomOption = ({
             wordWrap: 'break-word',
             whiteSpace: 'normal',
           }}>
-          <span>{props.data.label}</span>
+          <span>{data.label}</span>
         </Box>
         <Box
           sx={{
@@ -352,7 +351,7 @@ export const CustomOption = ({
           }}>
           {filteredLLMs.map(llm => (
             <Box
-              key={llm.value}
+              key={llm.value + llm.versionIndex}
               onClick={() => {
                 onChange(
                   llm.value as LLMMaxTokensKey,
@@ -361,6 +360,9 @@ export const CustomOption = ({
                     ? {
                         name: llm.baseModelId,
                         savedModelParams: llm.defaultParams,
+                        versionIndex: llm.versionIndex ?? null,
+                        isLatest: llm.isLatest ?? false,
+                        objectId: llm.objectId ?? null,
                       }
                     : undefined
                 );
@@ -377,23 +379,35 @@ export const CustomOption = ({
                 '&:hover': {
                   backgroundColor: MOON_100,
                 },
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}>
-              {llm.label}
-              {llm.subLabel && (
-                <Box sx={{fontSize: '12px', color: MOON_500}}>
-                  {llm.subLabel}
-                </Box>
-              )}
+              <Box>
+                {llm.label}
+                {llm.subLabel && (
+                  <Box sx={{fontSize: '12px', color: MOON_500}}>
+                    {llm.subLabel}
+                  </Box>
+                )}
+              </Box>
+              {llm.isLatest && <Pill label="Latest" color="moon" />}
             </Box>
           ))}
         </Box>
       </Box>
     );
   }
+
+  const filteredData = {
+    ...data,
+    llms: data.llms.filter(llm => !!llm.isLatest),
+  };
   // If not searching, use the hover submenu
   return (
     <SubMenuOption
       {...props}
+      data={data.value === 'saved-models' ? filteredData : data}
       onChange={onChange}
       entity={entity}
       project={project}
@@ -511,14 +525,12 @@ export const useLLMDropdownOptions = (
         const savedModelName =
           savedModelVal.name ?? savedModelObj.object_id ?? 'Unnamed Model';
 
-        let provider: string | undefined;
         let maxTokens: number | undefined;
 
         // Try to determine provider from built-in model list
         if (baseModelId in LLM_MAX_TOKENS) {
           const baseModelConfig =
             LLM_MAX_TOKENS[baseModelId as LLMMaxTokensKey];
-          provider = baseModelConfig.provider;
           maxTokens = baseModelConfig.max_tokens;
         } else {
           // Try to determine from custom provider models
@@ -535,10 +547,6 @@ export const useLLMDropdownOptions = (
           );
 
           if (customModelMatch) {
-            const customProviderMatch = customProvidersResult?.find(
-              p => p.digest === customModelMatch.val.provider
-            );
-            provider = customProviderMatch?.val.name ?? undefined;
             maxTokens = customModelMatch.val.max_tokens;
           }
         }
@@ -547,17 +555,18 @@ export const useLLMDropdownOptions = (
         if (maxTokens === undefined) {
           maxTokens = findMaxTokensByModelName(baseModelId);
         }
-
         savedModels.push({
-          label: savedModelName,
-          value: savedModelName,
-          provider: provider,
+          label: savedModelName + `:v${savedModelObj.version_index}`,
+          value: savedModelName + `:v${savedModelObj.version_index}`,
           subLabel: baseModelId,
           baseModelId: baseModelId as LLMMaxTokensKey,
           max_tokens: maxTokens,
           defaultParams: convertDefaultParamsToOptionalPlaygroundModelParams(
             savedModelVal.default_params ?? {messages_template: []}
           ),
+          objectId: savedModelName,
+          versionIndex: savedModelObj.version_index ?? null,
+          isLatest: !!savedModelObj.is_latest,
         });
       });
     }
@@ -583,31 +592,4 @@ export const useLLMDropdownOptions = (
   ];
 
   return allOptions;
-};
-
-// Helper function to convert saved model parameters to playground format
-const convertDefaultParamsToOptionalPlaygroundModelParams = (
-  defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined
-): OptionalSavedPlaygroundModelParams => {
-  if (!defaultParams) return {};
-
-  // Helper function to convert null or undefined to undefined
-  const nullToUndefined = (value: any) => {
-    return value === null || value === undefined ? undefined : value;
-  };
-
-  return {
-    temperature: nullToUndefined(defaultParams.temperature),
-    topP: nullToUndefined(defaultParams.top_p),
-    maxTokens: nullToUndefined(defaultParams.max_tokens),
-    frequencyPenalty: nullToUndefined(defaultParams.frequency_penalty),
-    presencePenalty: nullToUndefined(defaultParams.presence_penalty),
-    nTimes: nullToUndefined(defaultParams.n_times) ?? 1,
-    responseFormat: nullToUndefined(
-      defaultParams.response_format as PlaygroundResponseFormats
-    ),
-    functions: nullToUndefined(defaultParams.functions),
-    stopSequences: nullToUndefined(defaultParams.stop),
-    messagesTemplate: nullToUndefined(defaultParams.messages_template),
-  };
 };

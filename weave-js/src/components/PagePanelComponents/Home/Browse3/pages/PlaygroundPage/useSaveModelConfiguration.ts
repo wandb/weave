@@ -2,24 +2,28 @@ import {toast} from '@wandb/weave/common/components/elements/Toast';
 
 import {
   LlmStructuredCompletionModel,
+  LlmStructuredCompletionModelDefaultParams,
   LlmStructuredCompletionModelDefaultParamsSchema,
   Message,
   ResponseFormatSchema,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
-import {useCreateBuiltinObjectInstance} from '../../wfReactInterface/objectClassQuery';
-import {LLMMaxTokensKey} from '../llmMaxTokens';
+} from '../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
+import {LLMMaxTokensKey} from './llmMaxTokens';
 import {
   SetPlaygroundStateFieldFunctionType,
   TraceCallOutput,
-} from '../PlaygroundChat/useChatFunctions';
-import {PlaygroundResponseFormats, PlaygroundState} from '../types';
+} from './PlaygroundChat/useChatFunctions';
+import {
+  OptionalSavedPlaygroundModelParams,
+  PlaygroundResponseFormats,
+  PlaygroundState,
+} from './types';
 
 type UseSaveModelConfigurationArgs = {
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   playgroundStates: PlaygroundState[];
   settingsTab: number;
   projectId: string;
-  closeDialog: () => void;
   refetchSavedModels: () => void;
 };
 
@@ -28,7 +32,6 @@ export const useSaveModelConfiguration = ({
   playgroundStates,
   settingsTab,
   projectId,
-  closeDialog,
   refetchSavedModels,
 }: UseSaveModelConfigurationArgs) => {
   const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
@@ -45,7 +48,6 @@ export const useSaveModelConfiguration = ({
     const currentState = playgroundStates[settingsTab];
     if (!currentState) {
       toast('Cannot find current playground state.', {type: 'error'});
-      closeDialog();
       return;
     }
 
@@ -119,8 +121,6 @@ export const useSaveModelConfiguration = ({
       default_params: validatedParams.data,
     };
 
-    closeDialog();
-
     try {
       await createLLMStructuredCompletionModel({
         obj: {
@@ -137,7 +137,9 @@ export const useSaveModelConfiguration = ({
 
       setPlaygroundStateField(settingsTab, 'savedModel', {
         name: baseModelId,
-        savedModelParams: validatedParams.data,
+        savedModelParams: convertDefaultParamsToOptionalPlaygroundModelParams(
+          validatedParams.data
+        ),
       });
 
       setPlaygroundStateField(
@@ -154,4 +156,31 @@ export const useSaveModelConfiguration = ({
   };
 
   return {saveModelConfiguration};
+};
+
+// Helper function to convert saved model parameters to playground format
+export const convertDefaultParamsToOptionalPlaygroundModelParams = (
+  defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined
+): OptionalSavedPlaygroundModelParams => {
+  if (!defaultParams) return {};
+
+  // Helper function to convert null or undefined to undefined
+  const nullToUndefined = (value: any) => {
+    return value === null || value === undefined ? undefined : value;
+  };
+
+  return {
+    temperature: nullToUndefined(defaultParams.temperature),
+    topP: nullToUndefined(defaultParams.top_p),
+    maxTokens: nullToUndefined(defaultParams.max_tokens),
+    frequencyPenalty: nullToUndefined(defaultParams.frequency_penalty),
+    presencePenalty: nullToUndefined(defaultParams.presence_penalty),
+    nTimes: nullToUndefined(defaultParams.n_times) ?? 1,
+    responseFormat: nullToUndefined(
+      defaultParams.response_format as PlaygroundResponseFormats
+    ),
+    functions: nullToUndefined(defaultParams.functions),
+    stopSequences: nullToUndefined(defaultParams.stop),
+    messagesTemplate: nullToUndefined(defaultParams.messages_template),
+  };
 };

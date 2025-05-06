@@ -15,11 +15,14 @@ import {CopyableId} from '../../common/Id';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {
-  OptionalSavedPlaygroundModelParams,
   OptionalTraceCallSchema,
   PlaygroundState,
+  SavedPlaygroundModelState,
 } from '../types';
-import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
+import {
+  DEFAULT_SAVED_MODEL,
+  DEFAULT_SYSTEM_MESSAGE,
+} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {ProviderOption} from './LLMDropdownOptions';
 import {
@@ -86,10 +89,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     index: number,
     model: LLMMaxTokensKey,
     maxTokens: number,
-    savedModel?: {
-      name: string | null;
-      savedModelParams: OptionalSavedPlaygroundModelParams | null;
-    }
+    savedModel?: SavedPlaygroundModelState
   ) => {
     const {messagesTemplate, ...defaultParams} =
       savedModel?.savedModelParams ?? {};
@@ -101,10 +101,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             model,
             maxTokensLimit: maxTokens,
             maxTokens: Math.floor(maxTokens / 2),
-            savedModel: {
-              name: savedModel?.name ?? null,
-              savedModelParams: savedModel?.savedModelParams ?? null,
-            },
+            savedModel: savedModel ?? DEFAULT_SAVED_MODEL,
             traceCall: {
               ...state.traceCall,
               inputs: {
@@ -223,8 +220,10 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           disabled={onlyOneChat}
           tooltip={onlyOneChat ? 'Cannot remove last chat' : 'Remove chat'}
           onClick={() => {
-            if (settingsTab === idx) {
-              setSettingsTab(0);
+            // If the settings tab is set to length that is going to be removed,
+            // we need to set the settings tab to the previous chat.
+            if (settingsTab && settingsTab < playgroundStates.length + 1) {
+              setSettingsTab(settingsTab - 1);
             }
             setPlaygroundStates(
               playgroundStates.filter((_, index) => index !== idx)
