@@ -1,8 +1,8 @@
 import {Box} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_200, MOON_500} from '@wandb/weave/common/css/color.styles';
-import {useInsertSecret} from '@wandb/weave/common/hooks/useSecrets';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useInsertSecret} from '@wandb/weave/common/hooks/useSecrets';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
