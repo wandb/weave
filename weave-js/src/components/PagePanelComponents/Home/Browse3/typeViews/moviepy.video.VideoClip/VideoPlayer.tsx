@@ -1,14 +1,14 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 
-import * as Dialog from '../../../../../../components/Dialog/Dialog';
-import VideoViewer from '../../../../../../components/Panel2/VideoViewer';
-import {LoadingDots} from '../../../../../LoadingDots';
-import {NotApplicable} from '../../NotApplicable';
-import {CustomLink} from '../../pages/common/Links';
-import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '../customWeaveType.types';
-import {CustomWeaveTypeProjectContext} from '../CustomWeaveTypeDispatcher';
+import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
+import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
+import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
+import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
 type VideoFileKeys = `video.${VideoFormat}`;
@@ -96,7 +96,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
     return (
       <>
         <div className="flex items-center justify-start w-full h-full">
-          <CustomLink text={videoText} onClick={() => setShowPopup(true)} />
+          <CustomLink text={videoText} fontWeight={400} onClick={() => setShowPopup(true)} />
         </div>
 
         {showPopup && videoBinary.result && (
