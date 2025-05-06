@@ -383,4 +383,4 @@ export const providerUpdated = makeTrackEvent<
       exampleValues: [1, 2, 3];
     };
   }
->('Weave playground provider added / updated');
+>('Weave playground provider added or updated');
