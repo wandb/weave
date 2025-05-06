@@ -3,9 +3,7 @@ import {
   MOON_100,
   MOON_200,
   MOON_800,
-  MOON_900,
   OBLIVION,
-  TEAL_500,
 } from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
@@ -15,7 +13,6 @@ import React, {useEffect, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
-import {Link} from '../../common/Links';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
   LLM_MAX_TOKENS,
@@ -24,15 +21,18 @@ import {
 } from '../llmMaxTokens';
 import {ProviderStatus} from '../useConfiguredProviders';
 
+export interface LLMOption {
+  label: string;
+  value: LLMMaxTokensKey;
+  max_tokens: number;
+  provider?: string;
+}
 export interface ProviderOption {
   label: string | React.ReactNode;
   value: string;
-  llms: Array<{
-    label: string;
-    value: LLMMaxTokensKey;
-    max_tokens: number;
-  }>;
+  llms: Array<LLMOption>;
   isDisabled?: boolean;
+  providers?: ProviderOption[];
 }
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
@@ -43,61 +43,22 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onConfigureProvider?: (provider: string) => void;
 }
 
-export const DisabledProviderTooltip: React.FC<{
-  children: React.ReactNode;
-  entity: string;
-  isAdmin?: boolean;
-}> = ({children, entity, isAdmin = false}) => {
-  return (
-    <Tooltip
-      trigger={children}
-      aria-label="Provider configuration status"
-      content={
-        <Box
-          sx={{
-            backgroundColor: MOON_900,
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: 400,
-            borderRadius: '4px',
-          }}>
-          <div>This provider is not configured.</div>
-          <div>
-            Check{' '}
-            {isAdmin ? (
-              <Link
-                to={`/${entity}/settings`}
-                target="_blank"
-                aria-label="Go to team settings to configure missing secrets"
-                rel="noopener noreferrer"
-                style={{
-                  color: TEAL_500,
-                  textDecoration: 'none',
-                }}
-                className="hover:opacity-80">
-                missing secrets
-              </Link>
-            ) : (
-              'missing secrets'
-            )}{' '}
-            to enable it.
-          </div>
-        </Box>
-      }
-    />
-  );
-};
-
 const SubMenu = ({
   llms,
   onChange,
   position,
   onSelect,
+  isAdmin,
+  onConfigureProvider,
+  providers,
 }: {
-  llms: Array<{label: string; value: LLMMaxTokensKey; max_tokens: number}>;
+  llms: Array<LLMOption>;
   onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
   position: {top: number; left: number};
   onSelect: () => void;
+  isAdmin?: boolean;
+  onConfigureProvider?: (provider: string) => void;
+  providers?: ProviderOption[];
 }) => {
   return ReactDOM.createPortal(
     <Box
@@ -115,7 +76,7 @@ const SubMenu = ({
         p: '6px',
         zIndex: 1,
       }}>
-      {llms.map((llm, index) => (
+      {llms.map(llm => (
         <Box
           key={llm.value}
           onClick={e => {
@@ -139,6 +100,62 @@ const SubMenu = ({
           {llm.label}
         </Box>
       ))}
+      {providers?.map(provider => {
+        const tooltipContent =
+          provider.value !== 'custom-provider' && !isAdmin
+            ? 'You must be an admin to configure this provider'
+            : undefined;
+
+        const trigger = (
+          <Box
+            key={provider.value}
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              p: '6px',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              '&:hover': {
+                backgroundColor: hexToRGB(OBLIVION, 0.04),
+              },
+              width: '100%',
+            }}
+            onClick={() => {
+              if (provider.value === 'custom-provider' || isAdmin) {
+                onConfigureProvider?.(provider.value);
+              }
+            }}>
+            <Box
+              sx={{
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+              }}>
+              {provider.label}
+            </Box>
+            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onConfigureProvider?.(provider.value);
+                }}
+                disabled={!isAdmin && provider.value !== 'custom-provider'}>
+                Configure
+              </Button>
+            </Box>
+          </Box>
+        );
+
+        return tooltipContent ? (
+          <Tooltip content={tooltipContent} trigger={trigger} />
+        ) : (
+          trigger
+        );
+      })}
     </Box>,
     document.body
   );
@@ -157,6 +174,7 @@ const SubMenuOption = ({
   const [position, setPosition] = useState({top: 0, left: 0});
   const optionRef = useRef<HTMLDivElement>(null);
   const {llms, isDisabled} = props.data;
+  const hasOptions = llms.length > 0 || (props.data.providers?.length ?? 0) > 0;
 
   useEffect(() => {
     if (isHovered && optionRef.current) {
@@ -168,100 +186,68 @@ const SubMenuOption = ({
     }
   }, [isHovered]);
 
-  const optionContent = React.useMemo(
-    () => (
-      <Box
-        ref={optionRef}
-        onMouseEnter={() => !isDisabled && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        sx={{
-          position: 'relative',
-          width: '100%',
-          opacity: isDisabled ? 0.5 : 1,
-        }}>
-        <Box sx={{position: 'relative', zIndex: 1}}>
-          <components.Option {...props}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-              <Box
-                sx={{
-                  wordBreak: 'break-all',
-                  wordWrap: 'break-word',
-                  whiteSpace: 'normal',
-                  width: '90%',
-                }}>
-                {children}
-              </Box>
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-                {isAdmin && isDisabled && (
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onConfigureProvider?.(props.data.value);
-                    }}>
-                    Configure
-                  </Button>
-                )}
-                {llms.length > 0 && (
-                  <Icon name="chevron-next" color="moon_500" />
-                )}
-              </Box>
-            </Box>
-          </components.Option>
-        </Box>
-        {isHovered && llms.length > 0 && (
-          <SubMenu
-            llms={llms}
-            onChange={onChange}
-            position={position}
-            onSelect={() => {
-              props.selectProps.onInputChange?.('', {
-                action: 'set-value',
-                prevInputValue: props.selectProps.inputValue,
-              });
-              props.selectProps.onMenuClose?.();
-            }}
-          />
-        )}
-      </Box>
-    ),
-    [
-      isAdmin,
-      children,
-      isDisabled,
-      isHovered,
-      llms,
-      onChange,
-      position,
-      props,
-      onConfigureProvider,
-    ]
-  );
-
   if (props.data.value === 'divider') {
     return (
       <Box
         sx={{
           borderBottom: `1px solid ${MOON_200}`,
-          mb: 1,
+          my: 1,
         }}
       />
     );
   }
 
-  return isDisabled && !isAdmin ? (
-    <DisabledProviderTooltip entity={entity} isAdmin={isAdmin}>
-      {optionContent}
-    </DisabledProviderTooltip>
-  ) : (
-    optionContent
+  return (
+    <Box
+      ref={optionRef}
+      onMouseEnter={() => !isDisabled && setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      sx={{
+        position: 'relative',
+        width: '100%',
+        opacity: isDisabled ? 0.5 : 1,
+      }}>
+      <Box sx={{position: 'relative', zIndex: 1}}>
+        <components.Option {...props}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+            <Box
+              sx={{
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+                width: '90%',
+              }}>
+              {children}
+            </Box>
+            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              {hasOptions && <Icon name="chevron-next" color="moon_500" />}
+            </Box>
+          </Box>
+        </components.Option>
+      </Box>
+      {isHovered && hasOptions && (
+        <SubMenu
+          providers={props.data.providers}
+          llms={llms}
+          onChange={onChange}
+          position={position}
+          onSelect={() => {
+            props.selectProps.onInputChange?.('', {
+              action: 'set-value',
+              prevInputValue: props.selectProps.inputValue,
+            });
+            props.selectProps.onMenuClose?.();
+          }}
+          isAdmin={isAdmin}
+          onConfigureProvider={onConfigureProvider}
+        />
+      )}
+    </Box>
   );
 };
 
@@ -282,8 +268,10 @@ export const CustomOption = ({
       return null;
     }
 
-    const filteredLLMs = llms.filter(llm =>
-      llm.value.toLowerCase().includes(inputValue.toLowerCase())
+    const filteredLLMs = llms.filter(
+      llm =>
+        llm.value.toLowerCase().includes(inputValue.toLowerCase()) ||
+        llm.label.toLowerCase().includes(inputValue.toLowerCase())
     );
 
     return (
@@ -303,18 +291,6 @@ export const CustomOption = ({
             whiteSpace: 'normal',
           }}>
           <span>{props.data.label}</span>
-          {isAdmin && isDisabled && (
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onConfigureProvider?.(props.data.value);
-              }}>
-              Configure
-            </Button>
-          )}
         </Box>
         <Box
           sx={{
@@ -369,21 +345,21 @@ export const dividerOption: ProviderOption = {
   llms: [],
 };
 
-export const addProviderOption: ProviderOption = {
-  label: (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-      }}>
-      <Icon name="add-new" />
-      Add AI provider
-    </Box>
-  ),
-  value: 'add-provider',
+export const addProviderOption = (
+  disabledOptions: ProviderOption[]
+): ProviderOption => ({
+  label: 'Add AI provider',
+  value: 'configure-provider',
   llms: [],
-};
+  providers: [
+    ...disabledOptions,
+    {
+      label: 'Custom provider',
+      value: 'custom-provider',
+      llms: [],
+    },
+  ],
+});
 
 export const getLLMDropdownOptions = (
   configuredProviders: Record<string, ProviderStatus>,
@@ -457,14 +433,12 @@ export const getLLMDropdownOptions = (
     });
   }
 
-  // Combine enabled and disabled options
+  // Combine options
   // Add a divider option before the add provider option
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
-    ...disabledOptions,
     dividerOption,
-    addProviderOption,
+    addProviderOption(disabledOptions),
   ];
 
   return allOptions;

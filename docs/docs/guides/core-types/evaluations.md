@@ -196,6 +196,11 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ### Using `preprocess_model_input` to format dataset rows before evaluating
 
+:::important
+The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
+Scorer functions always receive the original dataset example, without any preprocessing applied.
+:::
+
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
 
 - Rename fields to match your model's expected input

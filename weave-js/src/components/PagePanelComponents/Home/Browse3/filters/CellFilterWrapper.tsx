@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-export type OnAddFilter = (
+export type OnUpdateFilter = (
   field: string,
   operator: string | null,
   value: any,
@@ -13,7 +13,7 @@ export type OnAddFilter = (
 ) => void;
 type CellFilterWrapperProps = {
   children: React.ReactNode;
-  onAddFilter?: OnAddFilter;
+  onUpdateFilter?: OnUpdateFilter;
   field: string;
   operation: string | null;
   value: any;
@@ -23,20 +23,20 @@ type CellFilterWrapperProps = {
 
 export const CellFilterWrapper = ({
   children,
-  onAddFilter,
+  onUpdateFilter,
   field,
   operation,
   value,
   rowId,
   style,
 }: CellFilterWrapperProps) => {
-  const onClickCapture = onAddFilter
+  const onClickCapture = onUpdateFilter
     ? (e: React.MouseEvent) => {
         // event.altKey - pressed Option key on Macs
         if (e.altKey) {
           e.stopPropagation();
           e.preventDefault();
-          onAddFilter(field, operation, value, rowId);
+          onUpdateFilter(field, operation, value, rowId);
         }
       }
     : undefined;
