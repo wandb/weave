@@ -133,7 +133,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           organizationName: orgName,
           entityName,
           projectName,
-          source: 'playground_drawer',
+          source: 'playground_custom_provider_drawer',
           providerName: name,
           isNewProvider: !editingProvider,
           numModels: modelName.filter(model => model !== '').length,

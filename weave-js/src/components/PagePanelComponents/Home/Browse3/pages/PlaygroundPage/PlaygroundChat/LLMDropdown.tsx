@@ -184,6 +184,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           isOpen={configDrawerOpen}
           onClose={handleCloseConfigDrawer}
           entity={entity}
+          project={project}
           defaultProvider={selectedProvider}
         />
       )}

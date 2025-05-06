@@ -344,7 +344,7 @@ export const providerUpdated = makeTrackEvent<
     source: string;
     providerName: string;
     isNewProvider: boolean;
-    numModels: number;
+    numModels?: number;
   },
   {
     _description: `User added or updated an AI provider`;
@@ -379,7 +379,7 @@ export const providerUpdated = makeTrackEvent<
       exampleValues: [true, false];
     };
     numModels: {
-      description: 'Number of models configured for this provider';
+      description: 'Optional: Number of models configured for this provider';
       exampleValues: [1, 2, 3];
     };
   }

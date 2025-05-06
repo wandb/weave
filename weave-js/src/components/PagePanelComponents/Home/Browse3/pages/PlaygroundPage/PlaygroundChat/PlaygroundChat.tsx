@@ -85,6 +85,7 @@ const EmptyWithSettingsButton: React.FC<{
           setIsDrawerOpen(false);
         }}
         entity={entity}
+        project={project}
       />
     </>
   );
