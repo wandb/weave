@@ -15,7 +15,7 @@ improving performance for complex conditions.
 
 import datetime
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, Any
 
 from pydantic import BaseModel
 
@@ -570,3 +570,224 @@ def _create_datetime_optimization_sql(
     return (
         f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
     )
+
+
+class ObjectReferenceProcessor(ABC):
+    """Base processor for handling object reference operations."""
+
+    @abstractmethod
+    def process_condition(
+        self, field_path: str, operation: tsi_query.Operation, pb: "ParamBuilder"
+    ) -> tuple[str, str, Any]:
+        """Process condition and return operator, field, and value."""
+        pass
+
+
+class EqObjectReferenceProcessor(ObjectReferenceProcessor):
+    """Process equality operations for object references."""
+
+    def process_condition(
+        self, field_path: str, operation: tsi_query.EqOperation, pb: "ParamBuilder"
+    ) -> tuple[str, str, Any]:
+        """Convert equality operation to SQL operator, field, and value."""
+        field_operand, literal_operand = _extract_field_and_literal(operation)
+        if field_operand is None or literal_operand is None:
+            raise ValueError(f"Invalid field or literal operand for {field_path}")
+
+        return "=", field_operand.get_field_, literal_operand.literal_
+
+
+class ContainsObjectReferenceProcessor(ObjectReferenceProcessor):
+    """Process contains operations for object references."""
+
+    def process_condition(
+        self,
+        field_path: str,
+        operation: tsi_query.ContainsOperation,
+        pb: "ParamBuilder",
+    ) -> tuple[str, str, Any]:
+        """Convert contains operation to SQL operator, field, and value."""
+        if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
+            raise ValueError(f"Contains input must be a field for {field_path}")
+
+        if not isinstance(operation.contains_.substr, tsi_query.LiteralOperation):
+            raise ValueError(f"Contains substr must be a literal for {field_path}")
+
+        get_field = operation.contains_.input.get_field_
+        val = operation.contains_.substr.literal_
+        val = f"%{val}%"
+
+        return "LIKE", get_field, val
+
+
+class GtObjectReferenceProcessor(ObjectReferenceProcessor):
+    """Process greater than operations for object references."""
+
+    def process_condition(
+        self, field_path: str, operation: tsi_query.GtOperation, pb: "ParamBuilder"
+    ) -> tuple[str, str, Any]:
+        """Convert greater than operation to SQL operator, field, and value."""
+        field_operand, literal_operand = _extract_field_and_literal(operation)
+        if field_operand is None or literal_operand is None:
+            raise ValueError(f"Invalid field or literal operand for {field_path}")
+
+        return ">", field_operand.get_field_, literal_operand.literal_
+
+
+class GteObjectReferenceProcessor(ObjectReferenceProcessor):
+    """Process greater than or equal operations for object references."""
+
+    def process_condition(
+        self, field_path: str, operation: tsi_query.GteOperation, pb: "ParamBuilder"
+    ) -> tuple[str, str, Any]:
+        """Convert greater than or equal operation to SQL operator, field, and value."""
+        field_operand, literal_operand = _extract_field_and_literal(operation)
+        if field_operand is None or literal_operand is None:
+            raise ValueError(f"Invalid field or literal operand for {field_path}")
+
+        return ">=", field_operand.get_field_, literal_operand.literal_
+
+
+# Mapping of operation types to their processors
+OBJECT_REFERENCE_PROCESSORS = {
+    tsi_query.EqOperation: EqObjectReferenceProcessor(),
+    tsi_query.ContainsOperation: ContainsObjectReferenceProcessor(),
+    tsi_query.GtOperation: GtObjectReferenceProcessor(),
+    tsi_query.GteOperation: GteObjectReferenceProcessor(),
+}
+
+
+def build_object_ref_conditions(
+    pb: "ParamBuilder",
+    project_id: str,
+    table_alias: str,
+    object_mapping: dict[str, "Condition"],
+) -> dict[str, Any]:
+    """
+    Builds SQL components for filtering based on object references.
+
+    This function processes various condition types (eq, contains, gt, gte)
+    and creates the appropriate SQL for filtering object references.
+
+    Args:
+        pb: ParamBuilder for parameter management
+        project_id: Project ID for the query
+        table_alias: The alias of the table being queried
+        object_mapping: A mapping from field path to condition objects
+                        e.g. {"inputs.model.name.str": Condition}
+
+    Returns:
+        Dictionary with cte_parts and filter_sql
+    """
+    if not object_mapping:
+        return {"cte_parts": [], "filter_sql": ""}
+
+    # Start building the CTEs from the deepest leaf values
+    cte_parts = []
+    filter_conditions = []
+
+    project_param = pb.add_param(project_id)
+
+    for i, (path_str, filter_condition) in enumerate(object_mapping.items()):
+        path_parts = path_str.split(".")
+        root_field = path_parts[0] + "_dump"
+        # The property within the root field (model, name, etc.)
+        property_path = path_parts[1:]
+
+        # Process the operation based on its type
+        operation = filter_condition.operand
+        operation_type = type(operation)
+        processor = OBJECT_REFERENCE_PROCESSORS.get(operation_type)
+
+        if processor is None:
+            # Skip if we don't have a processor for this operation type
+            continue
+
+        try:
+            op_str, _, val = processor.process_condition(path_str, operation, pb)
+        except ValueError:
+            # Skip if we can't process the condition
+            continue
+
+        # Convert filter value to appropriate parameter
+        from weave.trace_server.orm import python_value_to_ch_type
+
+        filter_param = pb.add_param(val)
+        filter_type = python_value_to_ch_type(val)
+
+        # Simple case: direct field in the table (inputs.model = value)
+        if len(property_path) == 1:
+            field_access = (
+                f"JSON_VALUE({table_alias}.{root_field}, '$.{property_path[0]}')"
+            )
+            condition = (
+                f"{field_access} {op_str} {param_slot(filter_param, filter_type)}"
+            )
+            filter_conditions.append(condition)
+            continue
+
+        # Complex case: requires object table joins
+        cte_name = f"obj_filter_{i}"
+
+        # The leaf level query directly checks the property value
+        leaf_property = property_path[-1]
+
+        leaf_cte = f"""
+        {cte_name} AS (
+            SELECT
+                object_id,
+                digest,
+                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+            FROM object_versions
+            WHERE project_id = {param_slot(project_param, "String")}
+                AND JSON_VALUE(val_dump, '$.{leaf_property}') {op_str} {param_slot(filter_param, filter_type)}
+            GROUP BY project_id, object_id, digest
+        )"""
+        cte_parts.append(leaf_cte)
+
+        # If we have more than two levels of nesting, we need intermediate CTEs
+        current_cte_name = cte_name
+        if len(property_path) > 2:
+            # ['model', 'config', 'sensitivity'] -> ['sensitivity', 'config]
+            properties = reversed(property_path[1:-1])
+            for j, prop in enumerate(properties):
+                intermediate_cte_name = f"{cte_name}_level_{j}"
+
+                intermediate_cte = f"""
+                {intermediate_cte_name} AS (
+                    SELECT 
+                        ov.object_id, 
+                        ov.digest,
+                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS full_ref
+                    FROM object_versions ov
+                    WHERE ov.project_id = {param_slot(project_param, "String")}
+                    AND JSON_VALUE(ov.val_dump, '$.{prop}') IN (
+                        SELECT full_ref 
+                        FROM {current_cte_name}
+                    )
+                    GROUP BY ov.project_id, ov.object_id, ov.digest
+                )"""
+                cte_parts.append(intermediate_cte)
+                current_cte_name = intermediate_cte_name
+
+        # Connect to the main query - if we have only inputs.x.y, then we join directly to inputs.x
+        field_access = f"JSON_VALUE({table_alias}.{root_field}, '$.{property_path[0]}')"
+        condition = f"""
+        {field_access} IN (
+            SELECT full_ref 
+            FROM {current_cte_name}
+        )"""
+        filter_conditions.append(condition)
+
+    # Return the CTEs and filter condition
+    if not cte_parts and not filter_conditions:
+        return {"cte_parts": [], "filter_sql": ""}
+
+    # Add the object_conditions CTE to gather all conditions
+    conditions_sql = " AND (" + " AND ".join(filter_conditions) + ")"
+
+    # Return components separately
+    return {
+        "cte_parts": cte_parts,
+        "filter_sql": conditions_sql,
+    }

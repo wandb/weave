@@ -29,13 +29,15 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import KeysView
-from typing import Callable, Literal, Optional, cast
+from typing import Callable, Literal, Optional, cast, Any
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.optimization_builder import (
+    OptimizationConditions,
     process_query_to_optimization_sql,
+    build_object_ref_conditions,
 )
 from weave.trace_server.calls_query_builder.utils import (
     param_slot,
@@ -72,6 +74,10 @@ class QueryBuilderField(BaseModel):
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+
+    def is_heavy(self) -> bool:
+        """Default implementation assumes fields are not heavy."""
+        return False
 
 
 class CallsMergedField(QueryBuilderField):
@@ -490,7 +496,12 @@ class CallsQuery(BaseModel):
         self.include_costs = include_costs
         return self
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str = "calls_merged",
+        in_nested_with: bool = False,
+    ) -> str:
         """
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -561,6 +572,13 @@ class CallsQuery(BaseModel):
         OFFSET {OFFSET}                         -- optional
         ```
 
+        Args:
+            pb: Parameter builder for the query
+            table_alias: The alias to use for the table
+            in_nested_with: Whether this query is already inside a WITH clause
+
+        Returns:
+            SQL query string
         """
         if not self.select_fields:
             raise ValueError("Missing select columns")
@@ -620,9 +638,19 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Extract object reference conditions
+        object_ref_join_conditions = filter_object_ref_join_conditions(
+            self.query_conditions
+        )
+
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
-            return self._as_sql_base_format(pb, table_alias)
+            return self._as_sql_base_format(
+                pb,
+                table_alias,
+                object_ref_join_conditions,
+                id_subquery_name=None,
+            )
 
         # If so, build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
@@ -663,6 +691,7 @@ class CallsQuery(BaseModel):
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         """
 
+        # TODO: support filter by ref in the cost query
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
@@ -673,13 +702,26 @@ class CallsQuery(BaseModel):
                 for sort_by in self.order_fields
             ]
             raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            all_calls AS ({outer_query._as_sql_base_format(
+                pb, table_alias, object_ref_join_conditions, 
+                id_subquery_name="filtered_calls"
+            )}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
-
         else:
+            # Now we add the object join cte
+            object_refs_sql = build_object_ref_conditions(
+                pb, self.project_id, table_alias, object_ref_join_conditions
+            )
+            if object_refs_sql.get("cte_parts"):
+                raw_sql += f""",
+                {', '.join(object_refs_sql["cte_parts"])}
+                """
             raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            {outer_query._as_sql_base_format(
+                pb, table_alias, object_ref_join_conditions, 
+                id_subquery_name="filtered_calls"
+            )}
             """
 
         return safely_format_sql(raw_sql, logger)
@@ -688,6 +730,7 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
+        object_ref_join_conditions: Optional[dict[str, Condition]] = None,
         id_subquery_name: Optional[str] = None,
     ) -> str:
         needs_feedback = False
@@ -813,6 +856,14 @@ class CallsQuery(BaseModel):
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
+        # Process object reference conditions if any exist
+        object_filter_sql = ""
+        if object_ref_join_conditions:
+            object_refs_sql = build_object_ref_conditions(
+                pb, self.project_id, table_alias, object_ref_join_conditions
+            )
+            object_filter_sql = object_refs_sql.get("filter_sql", "")
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
@@ -822,6 +873,7 @@ class CallsQuery(BaseModel):
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
+        {object_filter_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
         {op_name_sql}
@@ -836,6 +888,145 @@ class CallsQuery(BaseModel):
         """
 
         return safely_format_sql(raw_sql, logger)
+
+
+def filter_object_ref_join_conditions(
+    query_conditions: list[Condition],
+) -> dict[str, Condition]:
+    """
+    Filter the query conditions to identify conditions involving object references.
+
+    This function extracts conditions that operate on object references and
+    prepares them for use with the object table join CTE.
+
+    Example:
+        query_conditions = [
+            Condition(operand=EqOperation(eq_=[
+                GetFieldOperator(get_field_="inputs.model.name.str"),
+                LiteralOperation(literal_="claude")])),
+        ]
+
+        filter_object_ref_join_conditions(query_conditions)
+        # returns {"inputs.model.name.str": "claude"}
+
+    This functino also modifies the query_conditions to remove the conditions that
+    are used to build the object reference conditions.
+
+    Args:
+        query_conditions: List of query conditions to filter
+
+    Returns:
+        Dictionary mapping paths to filter values for object references
+    """
+    result: dict[str, Any] = {}
+
+    # Root fields that may contain object references
+    root_fields = ["inputs", "output", "attributes", "summary"]
+
+    to_remove = []
+
+    for i, condition in enumerate(query_conditions):
+        # Check for object reference paths
+        operation = condition.operand
+        if not isinstance(
+            operation,
+            (
+                tsi_query.EqOperation,
+                tsi_query.ContainsOperation,
+                tsi_query.GtOperation,
+                tsi_query.GteOperation,
+            ),
+        ):
+            continue
+
+        # For EqOperation/GtOperation/GteOperation
+        if isinstance(
+            operation,
+            (tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation),
+        ):
+            if not (
+                len(getattr(operation, operation.__class__.__name__[:-9].lower() + "_"))
+                == 2
+            ):
+                continue
+
+            # Extract the field path
+            field_operand = None
+            literal_operand = None
+
+            if isinstance(
+                (
+                    operation.eq_[0]
+                    if hasattr(operation, "eq_")
+                    else (
+                        operation.gt_[0]
+                        if hasattr(operation, "gt_")
+                        else operation.gte_[0]
+                    )
+                ),
+                tsi_query.GetFieldOperator,
+            ):
+                field_operand = (
+                    operation.eq_[0]
+                    if hasattr(operation, "eq_")
+                    else (
+                        operation.gt_[0]
+                        if hasattr(operation, "gt_")
+                        else operation.gte_[0]
+                    )
+                )
+                literal_operand = (
+                    operation.eq_[1]
+                    if hasattr(operation, "eq_")
+                    else (
+                        operation.gt_[1]
+                        if hasattr(operation, "gt_")
+                        else operation.gte_[1]
+                    )
+                )
+            else:
+                continue
+
+            if not isinstance(
+                field_operand, tsi_query.GetFieldOperator
+            ) or not isinstance(literal_operand, tsi_query.LiteralOperation):
+                continue
+
+            field_path = field_operand.get_field_
+            filter_value = literal_operand.literal_
+
+        # For ContainsOperation
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
+                continue
+
+            if not isinstance(operation.contains_.substr, tsi_query.LiteralOperation):
+                continue
+
+            field_path = operation.contains_.input.get_field_
+            filter_value = operation.contains_.substr.literal_
+        else:
+            continue
+
+        # Check if this is potentially a reference path (contains at least 2 dots)
+        parts = field_path.split(".")
+
+        # We need to ensure:
+        # 1. The field path starts with a root field that can contain references
+        # 2. The path has at least 3 segments for nested object references (root.object_prop.leaf)
+        # 3. The filter value is a string, number, or boolean (not complex objects)
+        if (
+            len(parts) >= 2
+            and parts[0] in root_fields
+            and isinstance(filter_value, (str, int, float, bool))
+        ):
+            result[field_path] = condition
+            to_remove.append(i)
+
+    for i in sorted(to_remove, reverse=True):
+        query_conditions.pop(i)
+
+    return result
 
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
@@ -1310,7 +1501,7 @@ def build_calls_query_stats_query(
 ) -> tuple[str, KeysView[str]]:
     cq = CallsQuery(
         project_id=req.project_id,
-        include_total_storage_size=req.include_total_storage_size,
+        include_total_storage_size=bool(req.include_total_storage_size),
     )
 
     cq.add_field("id")

@@ -395,17 +395,31 @@ export const CallsTable: FC<{
   const onUpdateFilter: OnUpdateFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
+          const op = operator ? operator : getDefaultOperatorForValue(value);
           // This condition is used to filter by the parent ref itself, not the child cell.
           // Should be removed once we can filter by reffed values on the backend.
           const expandedRef = getFieldAndValueForRefExpandedFilter(
             field,
             rowId
           );
+          console.log(
+            'expandedRef',
+            expandedRef?.value,
+            expandedRef?.field,
+            field
+          );
           if (expandedRef != null) {
-            value = expandedRef.value;
-            field = expandedRef.field;
+            // special case, we need to add TWO values to the filter
+            // 1. the ref
+            // 2. the value of the ref
+            // This is because the ref is not a real column, and we need to filter by the
+            // value of the ref.
+            // filterModel.items.push({
+            //   field: expandedRef.field,
+            //   operator: op,
+            //   value: expandedRef.value,
+            // });
           }
-          const op = operator ? operator : getDefaultOperatorForValue(value);
 
           // All values added to the filter model should be strings, we
           // only allow text-field input in the filter bar (even for numeric)
