@@ -431,6 +431,36 @@ def _call_sync_func(
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
+
+        if (
+            op._accumulator
+            and isinstance(output, (Iterator, Generator))
+            and not isinstance(output, (str, bytes))
+        ):
+            # If an accumulator is set on the op directly (e.g., via @weave.op(accumulator=...))
+            # and the function returns a standard iterator/generator, apply the accumulator.
+
+            # Create an _Accumulator helper instance
+            # op._accumulator is Callable[[State | None, Value], State]
+            acc_logic: _Accumulator = _Accumulator(op._accumulator)
+
+            # Define callbacks for the _IteratorWrapper
+            def acc_on_yield(value: Any) -> None:
+                acc_logic.next(value)
+
+            def acc_on_error(e: Exception) -> None:
+                # Call the original finish function with accumulated state and exception
+                finish(acc_logic.get_state(), e)
+
+            def acc_on_close() -> None:
+                # Call the original finish function with accumulated state
+                finish(acc_logic.get_state(), None)
+
+            # Wrap the output iterator with the accumulation logic
+            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+
+        # Original behavior: if no handler and no accumulator for an iterator,
+        # or if output is not an iterator type we should accumulate.
         finish(output)
         return output
 
