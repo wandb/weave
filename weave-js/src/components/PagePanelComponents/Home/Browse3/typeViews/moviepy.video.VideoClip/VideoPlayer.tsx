@@ -9,6 +9,8 @@ import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
+import {Icon} from '@wandb/weave/components/Icon';
+import {IconNames} from '@wandb/weave/components/Icon/types';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
 type VideoFileKeys = `video.${VideoFormat}`;
@@ -96,7 +98,12 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
     return (
       <>
         <div className="flex items-center justify-start w-full h-full">
-          <CustomLink text={videoText} fontWeight={400} onClick={() => setShowPopup(true)} />
+          <CustomLink 
+            text={videoText}
+            fontWeight={400}
+            onClick={() => setShowPopup(true)}
+            icon={<Icon name={IconNames.Play} />} 
+          />
         </div>
 
         {showPopup && videoBinary.result && (
