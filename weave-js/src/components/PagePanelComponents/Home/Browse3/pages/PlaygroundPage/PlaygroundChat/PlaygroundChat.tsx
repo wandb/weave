@@ -9,11 +9,9 @@ import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {
   Dispatch,
   SetStateAction,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
-import {useParams} from 'react-router-dom';
 
 import * as userEvents from '../../../../../../../integrations/analytics/userEvents';
 import {CallChat} from '../../CallPage/CallChat';
