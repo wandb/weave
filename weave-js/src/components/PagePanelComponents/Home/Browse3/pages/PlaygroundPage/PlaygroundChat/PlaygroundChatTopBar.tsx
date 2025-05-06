@@ -91,8 +91,26 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     maxTokens: number,
     savedModel?: SavedPlaygroundModelState
   ) => {
+    if (!savedModel) {
+      setPlaygroundStates(
+        playgroundStates.map((state, i) => {
+          if (i === index) {
+            return {
+              ...state,
+              model,
+              maxTokensLimit: maxTokens,
+              maxTokens: Math.floor(maxTokens / 2),
+            };
+          }
+          return state;
+        })
+      );
+      return;
+    }
+
     const {messagesTemplate, ...defaultParams} =
       savedModel?.savedModelParams ?? {};
+
     setPlaygroundStates(
       playgroundStates.map((state, i) => {
         if (i === index) {
@@ -101,20 +119,25 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             model,
             maxTokensLimit: maxTokens,
             maxTokens: Math.floor(maxTokens / 2),
+
+            // Update the state to show we are using a saved model
             savedModel: savedModel ?? DEFAULT_SAVED_MODEL,
             traceCall: {
               ...state.traceCall,
               inputs: {
                 ...state.traceCall?.inputs,
+                // If the saved model has messages, use them, otherwise use the current messages
                 messages: messagesTemplate ?? state.traceCall?.inputs?.messages,
               },
               output: {
                 ...(state.traceCall?.output as TraceCallOutput),
+                // If the saved model has messages, clear the choices, otherwise use the current choices
                 choices: messagesTemplate
                   ? undefined
                   : (state.traceCall?.output as TraceCallOutput)?.choices,
               },
             },
+            // Update the other params
             ...defaultParams,
           };
         }

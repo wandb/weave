@@ -26,56 +26,6 @@ export type PlaygroundSettingsProps = {
   refetchSavedModels: () => void;
 };
 
-const arePlaygroundSettingsEqual = (
-  currentModelName: string,
-  currentPlaygroundState: PlaygroundState | undefined
-): boolean => {
-  const savedParams = currentPlaygroundState?.savedModel?.savedModelParams;
-  if (
-    !currentPlaygroundState ||
-    !savedParams ||
-    !currentPlaygroundState.savedModel?.llmModelId
-  ) {
-    return false; // Not equal if essential parts are missing
-  }
-
-  // First, check if the model name (which is part of PlaygroundState but not directly in PlaygroundModelParams structure) is the same
-  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
-    return false;
-  }
-
-  for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
-    if (key === 'messagesTemplate') {
-      const messagesTemplate = savedParams.messagesTemplate;
-      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
-      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
-        return false;
-      }
-      continue;
-    }
-
-    const currentValue = currentPlaygroundState[key];
-    const savedValue = savedParams[key];
-
-    if (JSON_PLAYGROUND_MODEL_PARAMS_KEYS.includes(key)) {
-      const currentValueObject = currentValue ?? {};
-      const savedValueObject = savedValue ?? {};
-      if (
-        JSON.stringify(currentValueObject) !== JSON.stringify(savedValueObject)
-      ) {
-        return false;
-      }
-    } else {
-      // For other primitive types, direct comparison
-      if (currentValue !== savedValue) {
-        return false;
-      }
-    }
-  }
-
-  return true; // All compared keys are equal
-};
-
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   playgroundStates,
   setPlaygroundStateField,
@@ -365,4 +315,55 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
       </Box>
     </Box>
   );
+};
+
+// Compares saved model default params with current params
+const arePlaygroundSettingsEqual = (
+  currentModelName: string,
+  currentPlaygroundState: PlaygroundState | undefined
+): boolean => {
+  const savedParams = currentPlaygroundState?.savedModel?.savedModelParams;
+  if (
+    !currentPlaygroundState ||
+    !savedParams ||
+    !currentPlaygroundState.savedModel?.llmModelId
+  ) {
+    return false; // Not equal if essential parts are missing
+  }
+
+  // First, check if the user is updating the objectId
+  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
+    return false;
+  }
+
+  for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    if (key === 'messagesTemplate') {
+      const messagesTemplate = savedParams.messagesTemplate;
+      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
+      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
+        return false;
+      }
+      continue;
+    }
+
+    const currentValue = currentPlaygroundState[key];
+    const savedValue = savedParams[key];
+
+    if (JSON_PLAYGROUND_MODEL_PARAMS_KEYS.includes(key)) {
+      const currentValueObject = currentValue ?? {};
+      const savedValueObject = savedValue ?? {};
+      if (
+        JSON.stringify(currentValueObject) !== JSON.stringify(savedValueObject)
+      ) {
+        return false;
+      }
+    } else {
+      // For other primitive types, direct comparison
+      if (currentValue !== savedValue) {
+        return false;
+      }
+    }
+  }
+
+  return true; // All compared keys are equal
 };

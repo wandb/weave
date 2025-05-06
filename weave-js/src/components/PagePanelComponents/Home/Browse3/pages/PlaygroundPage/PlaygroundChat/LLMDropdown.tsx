@@ -148,9 +148,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
             if (selectedOption.llms.length > 0) {
               const llm = selectedOption.llms[0];
-              if (llm) {
-                onChange(llm.value, llm.max_tokens);
-              }
+              onChange(llm.value, llm.max_tokens);
             }
           }
         }}

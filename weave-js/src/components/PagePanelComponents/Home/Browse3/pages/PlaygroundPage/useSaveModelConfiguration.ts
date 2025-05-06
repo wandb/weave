@@ -40,65 +40,58 @@ export const useSaveModelConfiguration = ({
 
   const saveModelConfiguration = async (modelName: string) => {
     const finalModelName = modelName.trim();
+    // This should never happen(button is disabled), but just in case
     if (!finalModelName) {
       toast('Model name cannot be empty.', {type: 'error'});
       return;
     }
 
-    const currentState = playgroundStates[settingsTab];
-    if (!currentState) {
+    const state = playgroundStates[settingsTab];
+    if (!state) {
       toast('Cannot find current playground state.', {type: 'error'});
       return;
     }
 
     const defaultParams: LlmStructuredCompletionModel['default_params'] = {
-      temperature: currentState.temperature,
-      top_p: currentState.topP,
-      max_tokens: currentState.maxTokens,
-      presence_penalty: currentState.presencePenalty,
-      frequency_penalty: currentState.frequencyPenalty,
-      stop: currentState.stopSequences ?? [],
+      temperature: state.temperature,
+      top_p: state.topP,
+      max_tokens: state.maxTokens,
+      presence_penalty: state.presencePenalty,
+      frequency_penalty: state.frequencyPenalty,
+      stop: state.stopSequences ?? [],
       response_format:
-        currentState.responseFormat === PlaygroundResponseFormats.JsonObject
+        state.responseFormat === PlaygroundResponseFormats.JsonObject
           ? ResponseFormatSchema.parse('json')
-          : currentState.responseFormat === PlaygroundResponseFormats.Text
+          : state.responseFormat === PlaygroundResponseFormats.Text
           ? ResponseFormatSchema.parse('text')
-          : // : currentState.responseFormat === PlaygroundResponseFormats.JsonSchema
-            // ? ResponseFormatSchema.parse('jsonschema')
-            undefined,
-      functions: currentState.functions,
-      n_times: currentState.nTimes,
+          : undefined,
+      functions: state.functions,
+      n_times: state.nTimes,
       messages_template: [],
     };
 
-    if (currentState.traceCall?.inputs?.messages) {
-      defaultParams.messages_template.push(
-        ...currentState.traceCall.inputs.messages.map((message: Message) => ({
-          content: message.content,
-          function_call: message.function_call ?? null,
-          name: message.name ?? null,
-          role: message.role,
-          tool_call_id: message.tool_call_id ?? null,
-        }))
-      );
-    }
-    if (
-      currentState.traceCall?.output &&
-      (currentState.traceCall.output as TraceCallOutput)?.choices
-    ) {
-      const choice = (currentState.traceCall.output as TraceCallOutput)
-        ?.choices?.[currentState.selectedChoiceIndex ?? 0];
-      if (choice) {
-        defaultParams.messages_template.push({
-          content: choice?.message.content,
-          function_call: choice?.message.function_call ?? null,
-          name: choice?.message.name ?? null,
-          role: choice?.message.role,
-          tool_call_id: choice?.message.tool_call_id ?? null,
-        });
-      }
+    const addMessageToTemplate = (message: Message) => {
+      defaultParams.messages_template.push({
+        content: message.content,
+        function_call: message.function_call ?? null,
+        name: message.name ?? null,
+        role: message.role,
+        tool_call_id: message.tool_call_id ?? null,
+      });
+    };
+
+    if (state.traceCall?.inputs?.messages) {
+      state.traceCall.inputs.messages.forEach(addMessageToTemplate);
     }
 
+    const choice = (state.traceCall?.output as TraceCallOutput)?.choices?.[
+      state.selectedChoiceIndex ?? 0
+    ];
+    if (choice) {
+      addMessageToTemplate(choice.message);
+    }
+
+    // Validate the default parameters
     const validatedParams =
       LlmStructuredCompletionModelDefaultParamsSchema.safeParse(defaultParams);
     if (!validatedParams.success) {
@@ -109,10 +102,12 @@ export const useSaveModelConfiguration = ({
       return;
     }
 
-    const baseModelId = currentState.savedModel?.llmModelId
-      ? currentState.savedModel.llmModelId
-      : currentState.model;
+    // Get the base model id (if resaving llmModelId, otherwise use the current model)
+    const baseModelId = state.savedModel?.llmModelId
+      ? state.savedModel.llmModelId
+      : state.model;
 
+    // Create payload for the new model
     const modelToSave: Omit<LlmStructuredCompletionModel, 'ref'> & {
       name: string;
     } = {
@@ -121,6 +116,7 @@ export const useSaveModelConfiguration = ({
       default_params: validatedParams.data,
     };
 
+    // Save the new model
     try {
       await createLLMStructuredCompletionModel({
         obj: {
@@ -135,13 +131,13 @@ export const useSaveModelConfiguration = ({
 
       refetchSavedModels();
 
+      // Update state so LLM dropdown shows the new model
       setPlaygroundStateField(settingsTab, 'savedModel', {
         name: baseModelId,
         savedModelParams: convertDefaultParamsToOptionalPlaygroundModelParams(
           validatedParams.data
         ),
       });
-
       setPlaygroundStateField(
         settingsTab,
         'model',
@@ -158,7 +154,7 @@ export const useSaveModelConfiguration = ({
   return {saveModelConfiguration};
 };
 
-// Helper function to convert saved model parameters to playground format
+// Helper function to convert backend saved model parameters to playground state format
 export const convertDefaultParamsToOptionalPlaygroundModelParams = (
   defaultParams: LlmStructuredCompletionModelDefaultParams | null | undefined
 ): OptionalSavedPlaygroundModelParams => {
@@ -169,6 +165,7 @@ export const convertDefaultParamsToOptionalPlaygroundModelParams = (
     return value === null || value === undefined ? undefined : value;
   };
 
+  // We want undefined instead of null for the default params
   return {
     temperature: nullToUndefined(defaultParams.temperature),
     topP: nullToUndefined(defaultParams.top_p),

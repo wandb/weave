@@ -515,7 +515,7 @@ export const useLLMDropdownOptions = (
 
         let maxTokens: number | undefined;
 
-        // Try to determine provider from built-in model list
+        // Try to determine max tokens from built-in model list
         if (baseModelId in LLM_MAX_TOKENS) {
           const baseModelConfig =
             LLM_MAX_TOKENS[baseModelId as LLMMaxTokensKey];
@@ -533,16 +533,16 @@ export const useLLMDropdownOptions = (
               );
             }
           );
-
           if (customModelMatch) {
             maxTokens = customModelMatch.val.max_tokens;
           }
         }
-
         // Fallback max tokens determination
         if (maxTokens === undefined) {
           maxTokens = findMaxTokensByModelName(baseModelId);
         }
+
+        // Add the saved model to the list
         savedModels.push({
           label: savedModelName + `:v${savedModelObj.version_index}`,
           value: savedModelName + `:v${savedModelObj.version_index}`,
