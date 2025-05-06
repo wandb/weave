@@ -36,11 +36,10 @@ def make_audio_segment(duration: Optional[int] = None) -> AudioSegment:
 
 
 @pytest.fixture
-def make_mp3_file(tmp_path: Path) -> str:
+def make_mp3_file(tmp_path: Path, make_audio_segment: AudioSegment) -> str:
     filename = str(tmp_path / "audio.mp3")
-    audio_segment = make_audio_segment()
     ext = filename.split(".")[-1]
-    audio_segment.export(out_f=filename, format=ext)
+    make_audio_segment.export(out_f=filename, format=ext)
     return filename
 
 
