@@ -94,7 +94,7 @@ export const Empty = ({
   size = 'medium',
 }: EmptyProps) => {
   return (
-    <Container>
+    <Container data-testid={`empty-${icon}`}>
       <Content>
         <Circle size={size}>
           <CircleIcon size={size} name={icon} />

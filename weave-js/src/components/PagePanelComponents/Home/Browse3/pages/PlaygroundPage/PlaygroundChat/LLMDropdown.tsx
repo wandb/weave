@@ -43,6 +43,10 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   };
 
   const handleConfigureProvider = (provider: string) => {
+    if (provider === 'custom-provider') {
+      setIsAddProviderDrawerOpen(true);
+      return;
+    }
     setSelectedProvider(provider);
     setConfigDrawerOpen(true);
   };
@@ -101,7 +105,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             const selectedOption = option as ProviderOption;
 
             // Check if the "Add AI provider" option was selected
-            if (selectedOption.value === 'add-provider') {
+            if (selectedOption.value === 'configure-provider') {
               setIsAddProviderDrawerOpen(true);
               return;
             }

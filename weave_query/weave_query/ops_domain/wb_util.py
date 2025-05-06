@@ -96,6 +96,11 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             elif "path" in val and run_path is not None:
                 return _filesystem_runfiles_from_run_path(run_path, val["path"])
 
+        if val["_type"] == "incremental-table-file":
+            if "artifact_path" in val:
+                artifact_path = escape_artifact_path(val["artifact_path"])
+                return _filesystem_artifact_file_from_artifact_path(artifact_path)
+
         if val["_type"] in ["joined-table", "partitioned-table"]:
             return _filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 

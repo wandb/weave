@@ -37,7 +37,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
 
   return (
     <Tailwind>
-      <div className="flex w-full items-center justify-center gap-8 py-8">
+      <div className="flex w-full items-center justify-center gap-8">
         <TraceCostStats
           usageData={usageData}
           costData={costData}

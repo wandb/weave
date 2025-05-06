@@ -258,9 +258,9 @@ class ArxivChainOfDensityPipeline(weave.Model):
 This `ArxivChainOfDensityPipeline` class encapsulates our summarization logic as a Weave Model, providing several key benefits:
 
 1. Automatic experiment tracking: Weave captures inputs, outputs, and parameters for each run of the model.
-2. Versioning: Changes to the model's parameters or code are automatically versioned, creating a clear history of how your summarization pipeline evolves over time.
+2. Versioning: Changes to the model's attributes or code are automatically versioned, creating a clear history of how your summarization pipeline evolves over time.
 3. Reproducibility: The versioning and tracking make it easy to reproduce any previous result or configuration of your summarization pipeline.
-4. Hyperparameter management: Model parameters (like `model` and `density_iterations`) are clearly defined and tracked across different runs, facilitating experimentation.
+4. Hyperparameter management: Model attributes (like `model` and `density_iterations`) are clearly defined and tracked across different runs, facilitating experimentation.
 5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
 ## Implement evaluation metrics
@@ -353,8 +353,8 @@ For our evaluation, we'll use an LLM-as-a-judge approach. This technique involve
 ```python
 # Define the scorer function
 @weave.op()
-def quality_scorer(instruction: str, model_output: dict) -> dict:
-    result = evaluate_summary(model_output["final_summary"], instruction)
+def quality_scorer(instruction: str, output: dict) -> dict:
+    result = evaluate_summary(output["final_summary"], instruction)
     return result
 ```
 

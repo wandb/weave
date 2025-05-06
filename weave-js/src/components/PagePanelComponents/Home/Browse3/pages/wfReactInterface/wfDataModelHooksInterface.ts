@@ -23,6 +23,7 @@ export type KnownBaseObjectClassType =
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
+  error?: Error | null;
 };
 
 export type LoadableWithError<T> = {
@@ -171,7 +172,11 @@ export type Refetchable = {
 export type WFDataModelHooksInterface = {
   useCall: (
     key: CallKey | null,
-    opts?: {includeCosts?: boolean; includeTotalStorageSize?: boolean}
+    opts?: {
+      includeCosts?: boolean;
+      refetchOnRename?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
@@ -196,8 +201,18 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     query?: Query,
-    opts?: {skip?: boolean; refetchOnDelete?: boolean}
+    limit?: number,
+    opts?: {
+      skip?: boolean;
+      refetchOnDelete?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
+  useProjectHasCalls: (
+    entity: string,
+    project: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<boolean>;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,

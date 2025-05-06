@@ -13,6 +13,7 @@
  */
 
 import {getCookie} from '@wandb/weave/common/util/cookie';
+import {HTTPError} from '@wandb/weave/errors';
 import fetch from 'isomorphic-unfetch';
 
 import {
@@ -27,6 +28,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  FilesStatsReq,
+  FilesStatsRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -345,6 +348,13 @@ export class DirectTraceServerClient {
     });
   }
 
+  public filesStats(req: FilesStatsReq): Promise<FilesStatsRes> {
+    return this.makeRequest<FilesStatsReq, FilesStatsRes>(
+      '/files/query_stats',
+      req
+    );
+  }
+
   public completionsCreate(
     req: CompletionsCreateReq
   ): Promise<CompletionsCreateRes> {
@@ -404,7 +414,14 @@ export class DirectTraceServerClient {
       headers,
       body: reqBody,
     })
-      .then(response => {
+      .then(async response => {
+        if (!response.ok) {
+          throw new HTTPError(
+            response.statusText,
+            response.status,
+            await response.text()
+          );
+        }
         if (responseReturnType === 'text') {
           return response.text();
         } else if (responseReturnType === 'arrayBuffer') {

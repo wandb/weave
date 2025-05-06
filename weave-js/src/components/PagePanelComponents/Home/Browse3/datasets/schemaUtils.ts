@@ -44,6 +44,7 @@ export const FIELD_NAMES = {
   IS_NEW: 'isNew',
   SERVER_VALUE: 'serverValue',
   SELF: 'self',
+  MODEL: 'model',
 };
 
 // Weave metadata namespace
@@ -98,57 +99,6 @@ export const denestData = (
   });
 
   return nestedObject;
-};
-
-/**
- * Extracts only the top-level fields from an object without deep flattening.
- * Used primarily for source/call schema where we only want the top-level structure.
- */
-export const extractTopLevelFields = (obj: any, prefix = ''): SchemaField[] => {
-  const fields: SchemaField[] = [];
-
-  // Return empty array for null or undefined inputs
-  if (obj == null) {
-    return fields;
-  }
-
-  if (Array.isArray(obj)) {
-    fields.push({
-      name: prefix,
-      type: 'array',
-    });
-    return fields;
-  }
-
-  // Special handling for __ref__ and __val__ pattern
-  if (
-    typeof obj === 'object' &&
-    WEAVE_EXPANDED_REF_PROPS.REF in obj &&
-    WEAVE_EXPANDED_REF_PROPS.VAL in obj
-  ) {
-    if (
-      typeof obj[WEAVE_EXPANDED_REF_PROPS.VAL] === 'object' &&
-      !Array.isArray(obj[WEAVE_EXPANDED_REF_PROPS.VAL])
-    ) {
-      // For object values, extract its top-level fields
-      return extractTopLevelFields(obj[WEAVE_EXPANDED_REF_PROPS.VAL], prefix);
-    } else {
-      // For primitive or array values, return as is
-      return [
-        {name: prefix, type: inferType(obj[WEAVE_EXPANDED_REF_PROPS.VAL])},
-      ];
-    }
-  }
-
-  for (const [key, value] of Object.entries(obj)) {
-    const newKey = prefix ? `${prefix}.${key}` : key;
-    fields.push({
-      name: newKey,
-      type: inferType(value),
-    });
-  }
-
-  return fields;
 };
 
 /**
@@ -320,7 +270,8 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
       if (
         output !== null &&
         typeof output === 'object' &&
-        !Array.isArray(output)
+        !Array.isArray(output) &&
+        output._type === undefined
       ) {
         Object.entries(output).forEach(([key, value]) => {
           allFields.push({
@@ -387,7 +338,8 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
   return allFields
     .filter(
       field =>
-        !field.name.startsWith(`${FIELD_PREFIX.INPUTS}${FIELD_NAMES.SELF}`)
+        !field.name.startsWith(`${FIELD_PREFIX.INPUTS}${FIELD_NAMES.SELF}`) &&
+        !field.name.startsWith(`${FIELD_PREFIX.INPUTS}${FIELD_NAMES.MODEL}`)
     )
     .reduce((acc, field) => {
       if (!acc.some(f => f.name === field.name)) {
@@ -547,11 +499,12 @@ export const mapCallsToDatasetRows = (
       const value = obj[key];
       const newPrefix = prefix ? `${prefix}.${key}` : key;
 
-      // If it's an object and not an array, recurse and merge results
+      // If it's an object and not an array or weave object, recurse and merge results
       if (
         typeof value === 'object' &&
         value !== null &&
-        !Array.isArray(value)
+        !Array.isArray(value) &&
+        value?._type === undefined
       ) {
         Object.assign(result, flattenObject(value, newPrefix));
       } else {
@@ -572,11 +525,9 @@ export const mapCallsToDatasetRows = (
       const summary = call.val.summary || {};
 
       let sourceValue: any;
-      if (
-        mapping.sourceField === FIELD_NAMES.OUTPUT &&
-        typeof output === 'string'
-      ) {
-        sourceValue = output;
+      if (mapping.sourceField === FIELD_NAMES.OUTPUT) {
+        // Case where output is a primitive value or array
+        sourceValue = unwrapRefValue(output);
       } else {
         sourceValue = resolveValue(
           {
@@ -589,21 +540,17 @@ export const mapCallsToDatasetRows = (
           mapping.sourceField
         );
       }
-
       if (sourceValue !== undefined) {
         if (
           typeof sourceValue === 'object' &&
           sourceValue !== null &&
-          !Array.isArray(sourceValue)
+          !Array.isArray(sourceValue) &&
+          sourceValue._type === undefined
         ) {
-          // Flatten nested objects into path-based keys
-          const flattenedValues = flattenObject(sourceValue);
-          Object.keys(flattenedValues).forEach(key => {
-            const fullKey = `${mapping.targetField}.${key}`;
-            rowData[fullKey] = flattenedValues[key];
+          Object.entries(flattenObject(sourceValue)).forEach(([key, value]) => {
+            rowData[`${mapping.targetField}.${key}`] = value;
           });
         } else {
-          // For primitive values and arrays, add directly
           rowData[mapping.targetField] = sourceValue;
         }
       }
@@ -618,40 +565,6 @@ export const mapCallsToDatasetRows = (
     } as WeaveRow;
   });
 };
-
-/**
- * Filters row data for new datasets based on target fields.
- *
- * @param mappedRows - The rows mapped from calls
- * @param targetFields - Set of target field names to include
- * @returns Filtered rows containing only the specified target fields
- */
-export function filterRowsForNewDataset(
-  mappedRows: WeaveRow[],
-  targetFields: Set<string>
-): WeaveRow[] {
-  return mappedRows
-    .map(row => {
-      try {
-        if (!row || typeof row !== 'object' || !row[WEAVE_NAMESPACE]) {
-          return undefined;
-        }
-
-        const {[WEAVE_NAMESPACE]: weaveData, ...rest} = row;
-        const filteredData = Object.fromEntries(
-          Object.entries(rest).filter(([key]) => targetFields.has(key))
-        );
-        return {
-          [WEAVE_NAMESPACE]: weaveData,
-          ...filteredData,
-        } as WeaveRow;
-      } catch (rowError) {
-        console.error('Error processing row:', rowError);
-        return undefined;
-      }
-    })
-    .filter((row): row is WeaveRow => row !== undefined);
-}
 
 /**
  * Creates a map of processed rows with schema-based filtering.
@@ -671,13 +584,28 @@ export function createProcessedRowsMap(
         // If datasetObject has a schema, filter row properties to match schema fields
         if (datasetObject?.schema && Array.isArray(datasetObject.schema)) {
           const schemaFields = new Set(
-            datasetObject.schema.map((f: {name: string}) => f.name)
+            datasetObject.schema.map((f: {name: string}) => {
+              // Remove inputs. or output. prefix if present
+              const name = f.name;
+              if (name.startsWith(FIELD_PREFIX.INPUTS)) {
+                return name.slice(FIELD_PREFIX.INPUTS.length);
+              }
+              if (name.startsWith(FIELD_PREFIX.OUTPUT)) {
+                return name.slice(FIELD_PREFIX.OUTPUT.length);
+              }
+              return name;
+            })
           );
-          const {[WEAVE_NAMESPACE]: weaveData, ...rest} = row;
 
+          const {[WEAVE_NAMESPACE]: weaveData, ...rest} = row;
           // Only include fields that are in the schema
           const filteredData = Object.fromEntries(
-            Object.entries(rest).filter(([key]) => schemaFields.has(key))
+            Object.entries(rest).filter(([key]) =>
+              Array.from(schemaFields).some(
+                schemaField =>
+                  key === schemaField || key.startsWith(`${schemaField}.`)
+              )
+            )
           );
 
           return [

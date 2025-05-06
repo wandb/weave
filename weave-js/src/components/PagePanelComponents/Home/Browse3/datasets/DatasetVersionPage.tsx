@@ -225,7 +225,9 @@ export const DatasetVersionPage: React.FC<{
             <div className="flex h-22 w-22 items-center justify-center rounded-full bg-moon-300/[0.48] text-moon-600">
               <Icon width={14} height={14} name="table" />
             </div>
-            {objectVersionText(objectName, objectVersionIndex)}
+            <span data-testid="dataset-version-page-name">
+              {objectVersionText(objectName, objectVersionIndex)}
+            </span>
           </div>
         </Tailwind>
       }
