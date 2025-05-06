@@ -681,6 +681,45 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
             data = json.load(f)
     return data
 
+def _get_incremental_table_awl_from_file(
+    data: dict,
+    file: artifact_fs.FilesystemArtifactFile
+) -> ops_arrow.ArrowWeaveList:
+    from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
+    all_awls: list[ops_arrow.ArrowWeaveList] = []
+    increment_dir = file.artifact.path_info("")
+    if isinstance(increment_dir, artifact_fs.FilesystemArtifactDir):
+        files = {}
+        current_incr_num_str, incremental_table_root_filename = file.path.split('.', 1)
+        current_incr_num = int(current_incr_num_str)
+        # Only load the latest 100 increments
+        for i in range(max(0, current_incr_num - 99), current_incr_num + 1):
+            try:
+                files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
+            except KeyError:
+                # Skip if the file doesn't exist in the increment directory
+                continue
+
+        asyncio.run(ensure_files(files))
+        rrows: list[list] = []
+        object_types: list[types.Type] = []
+        for incremental_file in files.values():
+            incremental_data = _get_table_data_from_file(incremental_file)
+            rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+            rrows.append(rows)
+            object_types.append(object_type)
+
+            
+        object_type = types.union(*object_types)
+
+        for rows, file in zip(rrows, files.values()):
+            all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
+
+    arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_awls)
+    return arrow_weave_list
+
+
+
 
 def _get_table_like_awl_from_file(
     file: typing.Union[
@@ -691,7 +730,9 @@ def _get_table_like_awl_from_file(
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
-    if file.path.endswith(".joined-table.json"):
+    if "log_mode" in data and data["log_mode"] == "INCREMENTAL":
+        awl = _get_incremental_table_awl_from_file(data, file)
+    elif file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
     elif file.path.endswith(".partitioned-table.json"):
         awl = _get_partitioned_table_awl_from_file(data, file)
@@ -796,10 +837,9 @@ def _get_partitioned_table_awl_from_file(
 # This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
 async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     client = io_service.get_async_client()
-
     loop = asyncio.get_running_loop()
-
     tasks = set()
+    
     async with client.connect() as conn:
         for file in files.values():
             if (
