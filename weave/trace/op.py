@@ -9,7 +9,14 @@ import random
 import sys
 import traceback
 import weakref
-from collections.abc import AsyncIterator, Coroutine, Generator, Iterator, Mapping
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Coroutine,
+    Generator,
+    Iterator,
+    Mapping,
+)
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -1115,11 +1122,14 @@ def op(
             elif is_async_generator:
 
                 @wraps(func)
-                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                async def wrapper(
+                    *args: P.args, **kwargs: P.kwargs
+                ) -> AsyncGenerator[R, None]:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
-                    return cast(R, res)
+                    async for item in res:
+                        yield item
             else:
 
                 @wraps(func)

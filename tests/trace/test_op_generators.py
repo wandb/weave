@@ -96,7 +96,7 @@ def test_deeply_nested_generator(client):
 @pytest.mark.asyncio
 async def test_basic_async_gen(client):
     lst = []
-    res = await basic_async_gen(3)
+    res = basic_async_gen(3)
     async for i in res:
         lst.append(i)
 
@@ -109,7 +109,7 @@ async def test_basic_async_gen(client):
 @pytest.mark.asyncio
 async def test_nested_async_generator(client):
     lst = []
-    res = await nested_async_generator(3)
+    res = nested_async_generator(3)
     async for i in res:
         lst.append(i)
 
@@ -128,7 +128,7 @@ async def test_nested_async_generator(client):
 @pytest.mark.asyncio
 async def test_deeply_nested_async_generator(client):
     lst = []
-    res = await deeply_nested_async_generator(4)
+    res = deeply_nested_async_generator(4)
     async for i in res:
         lst.append(i)
 
@@ -191,7 +191,7 @@ async def basic_async_gen_with_accumulator(x: int) -> AsyncGenerator[int, None]:
 @pytest.mark.asyncio
 async def test_async_generator_with_custom_accumulator(client):
     # Call the generator with the accumulator from the decorator
-    res = await basic_async_gen_with_accumulator(3)
+    res = basic_async_gen_with_accumulator(3)
 
     # The generator still works as expected
     assert [item async for item in res] == [0, 1, 2]
@@ -229,7 +229,7 @@ async def async_gen_with_decorator_accumulator(x: int) -> AsyncGenerator[int, No
 @pytest.mark.asyncio
 async def test_async_generator_with_decorator_accumulator(client):
     # Call the generator with the accumulator from the decorator
-    res = await async_gen_with_decorator_accumulator(3)
+    res = async_gen_with_decorator_accumulator(3)
 
     # The generator still works as expected
     assert [item async for item in res] == [0, 1, 2]
