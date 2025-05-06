@@ -14,15 +14,8 @@ Simply create a function decorated with `@weave.op()` that invokes each completi
 ## Pre-requisites: 
 1. Create a [SambaNova Cloud](https://cloud.sambanova.ai/) account and get an API key.
 
-2. Install the packages recommended in the `requirements.txt` file.
-```bash
-cd integrations/weave
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+2. Install the required packages.
 
-or install them separately:
 ```bash
 pip install dotenv
 pip install langchain-sambanova  # If you want to use our SambaNova LangChain Chat object
