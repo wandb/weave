@@ -200,3 +200,88 @@ export const dateFilterDropdownUsed = makeTrackEvent<
     };
   }
 >('Weave date filter dropdown used');
+
+export const colabButtonClicked = makeTrackEvent<
+  {
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    source: string;
+    url: string;
+  },
+  {
+    _description: `User clicked the 'Get started with Colab' button`;
+    _location: '';
+    _motivation: 'Used for tracking Colab tutorial engagement';
+    userId: {
+      description: 'ID of user clicking the button';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project where the button was clicked';
+      exampleValues: ['my-project'];
+    };
+    source: {
+      description: 'Location where the Colab button was clicked';
+      exampleValues: ['traces_empty_state', 'evaluations_empty_state'];
+    };
+    url: {
+      description: 'URL of the Colab notebook being accessed';
+      exampleValues: ['https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb'];
+    };
+  }
+>('Weave colab link clicked');
+
+export const docsLinkClicked = makeTrackEvent<
+  {
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    source: string;
+    docType: string;
+    url: string;
+  },
+  {
+    _description: `User clicked a documentation link during onboarding`;
+    _location: '';
+    _motivation: 'Used for tracking documentation engagement during onboarding';
+    userId: {
+      description: 'ID of user clicking the link';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project where the link was clicked';
+      exampleValues: ['my-project'];
+    };
+    source: {
+      description: 'Location where the docs link was clicked';
+      exampleValues: ['traces_empty_state', 'evaluations_empty_state'];
+    };
+    docType: {
+      description: 'Type of documentation being accessed';
+      exampleValues: ['tracing_basics', 'quickstart_guide', 'evaluation_basics'];
+    };
+    url: {
+      description: 'URL of the documentation being accessed';
+      exampleValues: ['http://wandb.me/weave_traces', 'http://wandb.me/weave_quickstart'];
+    };
+  }
+>('Weave docs link clicked');

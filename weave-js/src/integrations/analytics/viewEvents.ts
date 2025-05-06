@@ -167,6 +167,10 @@ export const emptyStateViewed = makeTrackEvent<
       description: 'Name of organization';
       exampleValues: ['my-org'];
     };
+    projectName: {
+      description: 'Name of project';
+      exampleValues: ['my-project'];
+    };
     entityName: {
       description: 'Name of entity';
       exampleValues: ['my-entity'];
@@ -174,10 +178,6 @@ export const emptyStateViewed = makeTrackEvent<
     emptyStateType: {
       description: 'Type of empty state viewed';
       exampleValues: ['traces', 'evaluations', 'datasets'];
-    };
-    projectName: {
-      description: 'Name of project';
-      exampleValues: ['my-project'];
     };
   }
 >('Weave empty state viewed');
