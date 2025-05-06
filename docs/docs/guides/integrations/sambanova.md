@@ -24,12 +24,6 @@ pip install openai  # If you want to use the OpenAI SDK
 pip install weave
 ```
 
-## Notebooks
-The `Weave@SambaNova.ipynb` notebook shows how to use `Weave` with `Sambanova` using the three connectors:
-- SambaNova LangChain chat object.
-- LiteLLM.
-- OpenAI SDK.
-
 ## Setup
 ```python
 import os
