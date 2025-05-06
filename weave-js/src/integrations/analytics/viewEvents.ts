@@ -152,8 +152,8 @@ export const emptyStateViewed = makeTrackEvent<
     userId: string;
     organizationName: string;
     entityName: string;
-    emptyStateType: string;
     projectName: string;
+    emptyStateType: string;
   },
   {
     _description: `User viewed an empty state`;
@@ -167,13 +167,13 @@ export const emptyStateViewed = makeTrackEvent<
       description: 'Name of organization';
       exampleValues: ['my-org'];
     };
-    projectName: {
-      description: 'Name of project';
-      exampleValues: ['my-project'];
-    };
     entityName: {
       description: 'Name of entity';
       exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project';
+      exampleValues: ['my-project'];
     };
     emptyStateType: {
       description: 'Type of empty state viewed';

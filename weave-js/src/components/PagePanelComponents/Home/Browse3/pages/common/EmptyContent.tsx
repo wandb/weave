@@ -65,8 +65,8 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         userId: userInfoLoaded.id,
         organizationName: orgName,
         entityName,
-        emptyStateType: 'traces',
         projectName,
+        emptyStateType: 'traces',
       });
     }, [userInfoLoaded, orgName, entityName, projectName]);
 
@@ -149,8 +149,8 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
         userId: userInfoLoaded.id,
         organizationName: orgName,
         entityName,
-        emptyStateType: 'evaluations',
         projectName,
+        emptyStateType: 'evaluations',
       });
     }, [userInfoLoaded, orgName, entityName, projectName]);
 
