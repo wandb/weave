@@ -300,7 +300,6 @@ jobs:
         run: sudo apt update && sudo apt install -y libsqlite3-dev
       - name: Install audio dependencies
         run: sudo apt update && sudo apt install -y ffmpeg
-      - name: Install audio dependencies
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
