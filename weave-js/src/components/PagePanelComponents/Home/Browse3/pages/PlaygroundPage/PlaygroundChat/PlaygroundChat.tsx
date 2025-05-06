@@ -6,12 +6,7 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import React, {
-  Dispatch,
-  SetStateAction,
-  useMemo,
-  useState,
-} from 'react';
+import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import * as userEvents from '../../../../../../../integrations/analytics/userEvents';
 import {CallChat} from '../../CallPage/CallChat';
