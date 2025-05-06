@@ -27,7 +27,7 @@ export const DEFAULT_SYSTEM_MESSAGE = {
 };
 
 export const DEFAULT_SAVED_MODEL = {
-  name: null,
+  llmModelId: null,
   versionIndex: null,
   isLatest: false,
   objectId: null,
@@ -195,7 +195,9 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
-    model: state.savedModel.name ? state.savedModel.name : state.model,
+    model: state.savedModel.llmModelId
+      ? state.savedModel.llmModelId
+      : state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
     stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,

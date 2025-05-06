@@ -111,13 +111,7 @@ const SubMenu = ({
               llm.value as LLMMaxTokensKey,
               llm.max_tokens,
               llm.defaultParams && llm.baseModelId
-                ? {
-                    name: llm.baseModelId,
-                    savedModelParams: llm.defaultParams,
-                    versionIndex: llm.versionIndex ?? null,
-                    isLatest: llm.isLatest ?? false,
-                    objectId: llm.objectId ?? null,
-                  }
+                ? LLMOptionToSavedPlaygroundModelState(llm)
                 : undefined
             );
             onSelect();
@@ -357,13 +351,7 @@ export const CustomOption = ({
                   llm.value as LLMMaxTokensKey,
                   llm.max_tokens,
                   llm.defaultParams && llm.baseModelId
-                    ? {
-                        name: llm.baseModelId,
-                        savedModelParams: llm.defaultParams,
-                        versionIndex: llm.versionIndex ?? null,
-                        isLatest: llm.isLatest ?? false,
-                        objectId: llm.objectId ?? null,
-                      }
+                    ? LLMOptionToSavedPlaygroundModelState(llm)
                     : undefined
                 );
                 props.selectProps.onInputChange?.('', {
@@ -592,4 +580,16 @@ export const useLLMDropdownOptions = (
   ];
 
   return allOptions;
+};
+
+export const LLMOptionToSavedPlaygroundModelState = (
+  llmOption: LLMOption
+): SavedPlaygroundModelState => {
+  return {
+    llmModelId: llmOption.baseModelId ?? null,
+    objectId: llmOption.objectId ?? null,
+    savedModelParams: llmOption.defaultParams ?? null,
+    isLatest: llmOption.isLatest ?? false,
+    versionIndex: llmOption.versionIndex ?? null,
+  };
 };

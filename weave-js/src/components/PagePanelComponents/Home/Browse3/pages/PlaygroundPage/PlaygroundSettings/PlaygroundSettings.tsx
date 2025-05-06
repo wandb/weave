@@ -34,17 +34,26 @@ const arePlaygroundSettingsEqual = (
   if (
     !currentPlaygroundState ||
     !savedParams ||
-    !currentPlaygroundState.savedModel?.name
+    !currentPlaygroundState.savedModel?.llmModelId
   ) {
     return false; // Not equal if essential parts are missing
   }
 
   // First, check if the model name (which is part of PlaygroundState but not directly in PlaygroundModelParams structure) is the same
-  if (currentModelName !== currentPlaygroundState.model) {
+  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
     return false;
   }
 
   for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    if (key === 'messagesTemplate') {
+      const messagesTemplate = savedParams.messagesTemplate;
+      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
+      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
+        return false;
+      }
+      continue;
+    }
+
     const currentValue = currentPlaygroundState[key];
     const savedValue = savedParams[key];
 
@@ -93,7 +102,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   });
 
   const isUpdatingPublishedModel =
-    playgroundStates[settingsTab]?.savedModel?.name;
+    playgroundStates[settingsTab]?.savedModel?.llmModelId;
 
   const areSettingsEqual = arePlaygroundSettingsEqual(
     currentModelName,

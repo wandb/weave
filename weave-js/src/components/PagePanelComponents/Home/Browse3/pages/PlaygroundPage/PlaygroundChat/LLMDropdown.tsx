@@ -6,7 +6,12 @@ import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {SavedPlaygroundModelState} from '../types';
-import {CustomOption, LLMOption, ProviderOption} from './LLMDropdownOptions';
+import {
+  CustomOption,
+  LLMOption,
+  LLMOptionToSavedPlaygroundModelState,
+  ProviderOption,
+} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
@@ -71,14 +76,37 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   useEffect(() => {
     if (!isValueAvailable && !areProvidersLoading) {
       let firstAvailableLlm: LLMOption | null = null;
-      for (const option of llmDropdownOptions) {
-        if ('llms' in option && !option.isDisabled && option.llms.length > 0) {
-          firstAvailableLlm = option.llms[0];
-          break;
+
+      // Check if the value is a saved model
+      const savedModelOption = llmDropdownOptions.find(
+        option => option.value === 'saved-models'
+      );
+      if (savedModelOption) {
+        firstAvailableLlm =
+          savedModelOption.llms.find(
+            llm => llm.objectId === value && llm.isLatest
+          ) ?? null;
+      }
+
+      // If the value is not a saved model, check if theres any available LLM
+      if (!firstAvailableLlm) {
+        for (const option of llmDropdownOptions) {
+          if (
+            'llms' in option &&
+            !option.isDisabled &&
+            option.llms.length > 0
+          ) {
+            firstAvailableLlm = option.llms[0];
+            break;
+          }
         }
       }
       if (firstAvailableLlm) {
-        onChange(firstAvailableLlm.value, firstAvailableLlm.max_tokens);
+        onChange(
+          firstAvailableLlm.value,
+          firstAvailableLlm.max_tokens,
+          LLMOptionToSavedPlaygroundModelState(firstAvailableLlm)
+        );
       }
     }
   }, [

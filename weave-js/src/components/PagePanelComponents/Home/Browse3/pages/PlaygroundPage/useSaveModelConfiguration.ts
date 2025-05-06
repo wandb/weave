@@ -109,8 +109,8 @@ export const useSaveModelConfiguration = ({
       return;
     }
 
-    const baseModelId = currentState.savedModel?.name
-      ? currentState.savedModel.name
+    const baseModelId = currentState.savedModel?.llmModelId
+      ? currentState.savedModel.llmModelId
       : currentState.model;
 
     const modelToSave: Omit<LlmStructuredCompletionModel, 'ref'> & {
