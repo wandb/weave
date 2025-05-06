@@ -1,7 +1,10 @@
 import {Box} from '@mui/material';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useEffect, useState} from 'react';
 
+import * as userEvents from '../../../../../../../integrations/analytics/userEvents';
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
@@ -37,16 +40,37 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {orgName} = useOrgName({
+    entityName: entity,
+    skip: viewerLoading || !entity,
+  });
+
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
     refetchConfiguredProviders();
   };
 
   const handleConfigureProvider = (provider: string) => {
+    if (!userInfoLoaded || !entity || !project) {
+      return;
+    }
+
     if (provider === 'custom-provider') {
       setIsAddProviderDrawerOpen(true);
       return;
     }
+
+    userEvents.openConfigureProviderDrawer({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
+      entityName: entity,
+      projectName: project,
+      source: 'llm_dropdown',
+      provider,
+    });
+    
     setSelectedProvider(provider);
     setConfigDrawerOpen(true);
   };
