@@ -1933,13 +1933,17 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET' | DESCENDANT_ERROR;
 export const traceCallStatusCode = (
   traceCall: traceServerTypes.TraceCallSchema
 ): StatusCodeType => {
   if (traceCall.exception) {
     return 'ERROR';
   } else if (traceCall.ended_at) {
+    console.log(traceCall)
+    if ((traceCall['summary.status_counts.error'] ?? 0) > 0) {
+      return 'DESCENDANT_ERROR';
+    }
     return 'SUCCESS';
   } else {
     return 'UNSET';

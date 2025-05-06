@@ -74,9 +74,9 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     costs: Optional[dict[str, LLMCostSchema]]
     feedback: Optional[list[FeedbackDict]]
 
-
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: dict[str, LLMUsageSchema]
+    status_counts: dict[TraceStatus, int]
 
 
 class SummaryMap(SummaryInsertMap, total=False):

@@ -73,6 +73,7 @@ import {OpVersionIndexText} from './OpVersionIndexText';
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
   'summary.weave',
+  'summary.status_counts',
   'feedback',
 ];
 

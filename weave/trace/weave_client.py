@@ -132,6 +132,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
+    TraceStatus,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
@@ -1277,18 +1278,13 @@ class WeaveClient:
                 summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
 
-        # JR Oct 24 - This descendants stats code has been commented out since
-        # it entered the code base. A screenshot of the non-ideal UI that the
-        # comment refers to is available in the description of that PR:
-        # https://github.com/wandb/weave/pull/1414
-        # These should probably be added under the "weave" key in the summary.
-        # ---
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
+        # Create client-side rollup of status_counts_by_op
+        status_counts_dict = summary.setdefault("status_counts", {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0})
+        if exception:
+            status_counts_dict[TraceStatus.ERROR] += 1
+        else:
+            status_counts_dict[TraceStatus.SUCCESS] += 1
+
         call.summary = summary
 
         # Exception Handling
