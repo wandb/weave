@@ -1,7 +1,7 @@
 import {Box} from '@mui/material';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
-import React, {useEffect,useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
@@ -42,35 +42,34 @@ const NewDatasetButton: React.FC = () => {
   );
 };
 
-export const EMPTY_PROPS_TRACES: EmptyProps = {
-  icon: 'layout-tabs' as const,
-  heading: 'Create your first trace',
-  description:
-    'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
-  moreInformation: () => {
-    const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
-    const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
-    const {orgName} = useOrgName({
+const TracesMoreInformation: React.FC = () => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {entity: entityName, project: projectName} = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const {orgName} = useOrgName({
+    entityName,
+    skip: viewerLoading || !entityName,
+  });
+
+  // Log empty state view event for analytics
+  useEffect(() => {
+    if (!userInfoLoaded || !entityName || !projectName) {
+      return;
+    }
+    viewEvents.emptyStateViewed({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
       entityName,
-      skip: viewerLoading || !entityName,
+      projectName,
+      emptyStateType: 'traces',
     });
+  }, [userInfoLoaded, orgName, entityName, projectName] as const);
 
-    // Log empty state view event for analytics
-    useEffect(() => {
-      if (!userInfoLoaded || !entityName || !projectName) {
-        return;
-      }
-      viewEvents.emptyStateViewed({
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        emptyStateType: 'traces',
-      });
-    }, [userInfoLoaded, orgName, entityName, projectName]);
-
-    const fireAnalyticsForEmpty = (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
+  const fireAnalyticsForEmpty =
+    (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
       if (!userInfoLoaded || !url || !projectName || !entityName) {
         return;
       }
@@ -96,65 +95,73 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
       }
     };
 
-    const COLAB_URL = 'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
+  const COLAB_URL =
+    'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
 
-    return (
-      <>
-        Learn{' '}
-        <TargetBlank 
-          href="http://wandb.me/weave_traces"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_tracing_basics', 'http://wandb.me/weave_traces')}>
-          tracing basics
-        </TargetBlank>{' '}
-        or see traces in action by{' '}
-        <TargetBlank 
-          href="http://wandb.me/weave_quickstart"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_quickstart_guide', 'http://wandb.me/weave_quickstart')}>
-          following our quickstart guide
+  return (
+    <>
+      Learn{' '}
+      <TargetBlank
+        href="http://wandb.me/weave_traces"
+        onClick={fireAnalyticsForEmpty(
+          'doc',
+          'empty_state_tracing_basics',
+          'http://wandb.me/weave_traces'
+        )}>
+        tracing basics
+      </TargetBlank>{' '}
+      or see traces in action by{' '}
+      <TargetBlank
+        href="http://wandb.me/weave_quickstart"
+        onClick={fireAnalyticsForEmpty(
+          'doc',
+          'empty_state_quickstart_guide',
+          'http://wandb.me/weave_quickstart'
+        )}>
+        following our quickstart guide
+      </TargetBlank>
+      .
+      <Box sx={{mt: 2}}>
+        <TargetBlank
+          href={COLAB_URL}
+          onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
         </TargetBlank>
-        .
-        <Box sx={{mt: 2}}>
-          <TargetBlank 
-            href={COLAB_URL}
-            onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
-            <Button variant="secondary" icon="logo-colab">
-              Get started with Colab
-            </Button>
-          </TargetBlank>
-        </Box>
-      </>
-    );
-  },
+      </Box>
+    </>
+  );
 };
 
-export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
-  icon: 'type-boolean' as const,
-  heading: 'Create your first evaluation',
-  description: 'Use evaluations to track the performance of your application.',
-  moreInformation: () => {
-    const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
-    const userInfoLoaded = !viewerLoading ? userInfo : null;
-    const {entity: entityName, project: projectName} = useParams<{entity: string; project: string}>();
-    const {orgName} = useOrgName({
+const EvaluationsMoreInformation: React.FC = () => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {entity: entityName, project: projectName} = useParams<{
+    entity: string;
+    project: string;
+  }>();
+  const {orgName} = useOrgName({
+    entityName,
+    skip: viewerLoading || !entityName,
+  });
+
+  // Log empty state view event for analytics
+  useEffect(() => {
+    if (!userInfoLoaded || !entityName || !projectName) {
+      return;
+    }
+    viewEvents.emptyStateViewed({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
       entityName,
-      skip: viewerLoading || !entityName,
+      projectName,
+      emptyStateType: 'evaluations',
     });
+  }, [userInfoLoaded, orgName, entityName, projectName] as const);
 
-    // Log empty state view event for analytics
-    useEffect(() => {
-      if (!userInfoLoaded || !entityName || !projectName) {
-        return;
-      }
-      viewEvents.emptyStateViewed({
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        emptyStateType: 'evaluations',
-      });
-    }, [userInfoLoaded, orgName, entityName, projectName]);
-
-    const fireAnalyticsForEmpty = (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
+  const fireAnalyticsForEmpty =
+    (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
       if (!userInfoLoaded || !url || !projectName || !entityName) {
         return;
       }
@@ -180,35 +187,58 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
       }
     };
 
-    const COLAB_URL = 'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
+  const COLAB_URL =
+    'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
 
-    return (
-      <>
-        Learn{' '}
-        <TargetBlank 
-          href="https://wandb.me/weave_evals"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_evaluation_basics', 'https://wandb.me/weave_evals')}>
-          evaluation basics
-        </TargetBlank>{' '}
-        or follow our tutorial to{' '}
-        <TargetBlank 
-          href="http://wandb.me/weave_eval_tut"
-          onClick={fireAnalyticsForEmpty('doc', 'empty_state_evaluation_tutorial', 'http://wandb.me/weave_eval_tut')}>
-          set up an evaluation pipeline
+  return (
+    <>
+      Learn{' '}
+      <TargetBlank
+        href="https://wandb.me/weave_evals"
+        onClick={fireAnalyticsForEmpty(
+          'doc',
+          'empty_state_evaluation_basics',
+          'https://wandb.me/weave_evals'
+        )}>
+        evaluation basics
+      </TargetBlank>{' '}
+      or follow our tutorial to{' '}
+      <TargetBlank
+        href="http://wandb.me/weave_eval_tut"
+        onClick={fireAnalyticsForEmpty(
+          'doc',
+          'empty_state_evaluation_tutorial',
+          'http://wandb.me/weave_eval_tut'
+        )}>
+        set up an evaluation pipeline
+      </TargetBlank>
+      .
+      <Box sx={{mt: 2}}>
+        <TargetBlank
+          href={COLAB_URL}
+          onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
         </TargetBlank>
-        .
-        <Box sx={{mt: 2}}>
-          <TargetBlank 
-            href={COLAB_URL}
-            onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
-            <Button variant="secondary" icon="logo-colab">
-              Get started with Colab
-            </Button>
-          </TargetBlank>
-        </Box>
-      </>
-    );
-  },
+      </Box>
+    </>
+  );
+};
+
+export const EMPTY_PROPS_TRACES: EmptyProps = {
+  icon: 'layout-tabs' as const,
+  heading: 'Create your first trace',
+  description:
+    'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
+  moreInformation: TracesMoreInformation,
+};
+
+export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
+  icon: 'type-boolean' as const,
+  heading: 'Create your first evaluation',
+  description: 'Use evaluations to track the performance of your application.',
+  moreInformation: EvaluationsMoreInformation,
 };
 
 export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
