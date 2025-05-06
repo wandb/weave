@@ -294,3 +294,93 @@ export const docsLinkClicked = makeTrackEvent<
     };
   }
 >('Weave docs link clicked');
+
+export const openConfigureProviderDrawer = makeTrackEvent<
+  {
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    source: string;
+    provider: string;
+  },
+  {
+    _description: `User opened the LLM provider configuration drawer`;
+    _location: '';
+    _motivation: 'Used for tracking LLM provider configuration engagement';
+    userId: {
+      description: 'ID of user clicking the button';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project where the button was clicked';
+      exampleValues: ['my-project'];
+    };
+    source: {
+      description: 'Location where the configure button was clicked';
+      exampleValues: ['llm_playground_empty_state', 'llm_dropdown'];
+    };
+    provider: {
+      description: 'The provider being configured';
+      exampleValues: ['openai', 'anthropic', 'custom-provider'];
+    };
+  }
+>('Weave playground provider config drawer clicked');
+
+export const providerUpdated = makeTrackEvent<
+  {
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    source: string;
+    providerName: string;
+    isNewProvider: boolean;
+    numModels: number;
+  },
+  {
+    _description: `User added or updated an AI provider`;
+    _location: '';
+    _motivation: 'Used for tracking provider configuration changes';
+    userId: {
+      description: 'ID of user configuring the provider';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project';
+      exampleValues: ['my-project'];
+    };
+    source: {
+      description: 'Location where the provider was configured';
+      exampleValues: ['playground_drawer', 'settings_page'];
+    };
+    providerName: {
+      description: 'Name of the provider being configured';
+      exampleValues: ['openai', 'anthropic', 'custom-provider'];
+    };
+    isNewProvider: {
+      description: 'Whether this is a new provider being added (true) or an update to an existing one (false)';
+      exampleValues: [true, false];
+    };
+    numModels: {
+      description: 'Number of models configured for this provider';
+      exampleValues: [1, 2, 3];
+    };
+  }
+>('Weave playground provider added / updated');
