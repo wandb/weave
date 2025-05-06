@@ -34,12 +34,13 @@ const DatasetRowItemRenderer: React.FC<{
 }> = props => {
   const row = useExampleCompareData(
     props.state,
-    [{
-      inputDigest: props.digest,
-    }],
+    [
+      {
+        inputDigest: props.digest,
+      },
+    ],
     0
   );
-  console.log(row, props)
   return <CellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
@@ -97,7 +98,7 @@ export const ExampleCompareSectionTable: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
-  console.log(inputSubFields)
+  console.log(inputSubFields);
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -165,30 +166,31 @@ export const ExampleCompareSectionTable: React.FC<{
         },
       },
       ...inputSubFields.map(key => ({
-          field: `inputs.${key}`,
-          headerName: key,
-          // width: 100,
-          flex: 1,
-          valueGetter: (value: any, row: RowData) => {
-            return row.inputDigest
-              // if (key === '') {
-              //     if (_.isObject(row.dataRow)) {
-              //         return ''
-              //     } else {
-              //         return row.dataRow
-              //     }
-              // }
-              // return row.dataRow[key]
-          },
-          renderCell: (params: GridRenderCellParams<RowData>) => {
-            console.log(key)
-              return <DatasetRowItemRenderer
-                  state={props.state}
-                  digest={params.row.inputDigest}
-                  inputKey={key}
-              />
-
-          }
+        field: `inputs.${key}`,
+        headerName: key,
+        // width: 100,
+        flex: 1,
+        valueGetter: (value: any, row: RowData) => {
+          return row.inputDigest;
+          // if (key === '') {
+          //     if (_.isObject(row.dataRow)) {
+          //         return ''
+          //     } else {
+          //         return row.dataRow
+          //     }
+          // }
+          // return row.dataRow[key]
+        },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          console.log(key);
+          return (
+            <DatasetRowItemRenderer
+              state={props.state}
+              digest={params.row.inputDigest}
+              inputKey={key}
+            />
+          );
+        },
       })),
       {
         field: 'evaluationCallId',

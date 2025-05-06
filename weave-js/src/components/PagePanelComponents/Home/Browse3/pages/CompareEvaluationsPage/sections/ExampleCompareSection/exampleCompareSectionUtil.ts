@@ -376,16 +376,22 @@ async function loadRowDataIntoCache(
 type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
 
 const getCachedRowData = (state: EvaluationComparisonState, digest: string) => {
-  return state.loadableComparisonResults.result?.resultRows?.[digest]?.rawDataRow
-}
+  return state.loadableComparisonResults.result?.resultRows?.[digest]
+    ?.rawDataRow;
+};
 
-const setCachedRowData = (state: EvaluationComparisonState, digest: string, data: any) => {
-  const currentRow = state.loadableComparisonResults.result?.resultRows?.[digest];
+const setCachedRowData = (
+  state: EvaluationComparisonState,
+  digest: string,
+  data: any
+) => {
+  const currentRow =
+    state.loadableComparisonResults.result?.resultRows?.[digest];
   if (currentRow == null) {
     return;
   }
   currentRow.rawDataRow = data;
-}
+};
 
 export function useExampleCompareData(
   state: EvaluationComparisonState,
@@ -455,19 +461,19 @@ export function useExampleCompareData(
       }
 
       // if (rawDataRow == null) {
-        // immediately fetch the current row
-        setLoading(true);
+      // immediately fetch the current row
+      setLoading(true);
 
-        await loadRowDataIntoCache(
-          [selectedRowDigest],
-          (digest, data) => setCachedRowData(state, digest, data),
-          cachedPartialTableRequest,
-          getTraceServerClient
-        );
+      await loadRowDataIntoCache(
+        [selectedRowDigest],
+        (digest, data) => setCachedRowData(state, digest, data),
+        cachedPartialTableRequest,
+        getTraceServerClient
+      );
 
-        // This trigger a re-calculation of the `target` and a re-render immediately
-        increaseCacheVersion();
-        setLoading(false);
+      // This trigger a re-calculation of the `target` and a re-render immediately
+      increaseCacheVersion();
+      setLoading(false);
       // }
 
       // check if there is a need to fetch adjacent rows
@@ -493,7 +499,15 @@ export function useExampleCompareData(
         );
       }
     })();
-  }, [state.summary.evaluations, state.loadableComparisonResults.result, filteredRows, targetIndex, increaseCacheVersion, getTraceServerClient, state]);
+  }, [
+    state.summary.evaluations,
+    state.loadableComparisonResults.result,
+    filteredRows,
+    targetIndex,
+    increaseCacheVersion,
+    getTraceServerClient,
+    state,
+  ]);
 
   return {
     targetRowValue,
