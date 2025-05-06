@@ -96,12 +96,12 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 
     return (
       <>
-        <div className="flex items-center justify-start w-full h-full">
-          <CustomLink 
+        <div className="flex h-full w-full items-center justify-start">
+          <CustomLink
             text={videoText}
             fontWeight={400}
             onClick={() => setShowPopup(true)}
-            icon={<Icon name={IconNames.Play} />} 
+            icon={<Icon name={IconNames.Play} />}
           />
         </div>
 
