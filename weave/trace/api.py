@@ -211,7 +211,7 @@ def get(uri: str | ObjectRef) -> Any:
     dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
     ref = weave.publish(dataset)
 
-    dataset2 = weave.get(ref.uri())  # same as dataset!
+    dataset2 = weave.get(ref)  # same as dataset!
     ```
     """
     if isinstance(uri, ObjectRef):
