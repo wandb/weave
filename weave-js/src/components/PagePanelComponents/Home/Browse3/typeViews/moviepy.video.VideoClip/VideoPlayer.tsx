@@ -38,7 +38,7 @@ const MIME_TYPES: Record<VideoFormat, string> = {
 };
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = props => (
-  <AutoSizer style={{height: '100%', width: '100%'}}>
+  <AutoSizer className="h-full w-full">
     {({width, height}) =>
       width === 0 || height === 0 ? null : (
         <VideoPlayerWithSize
@@ -95,14 +95,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 
     return (
       <>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-start',
-            width: '100%',
-            margin: 'auto',
-            padding: '6px',
-          }}>
+        <div className="flex items-center justify-start w-full h-full">
           <CustomLink text={videoText} onClick={() => setShowPopup(true)} />
         </div>
 
