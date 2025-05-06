@@ -56,11 +56,11 @@ def test_weave_audio_publish(client: WeaveClient, make_mp3_file: str) -> None:
     assert gotten_audio.duration_seconds == 1
 
 
-def test_audio_segment_publish(client: WeaveClient, make_audio: AudioSegment) -> None:
+def test_audio_segment_publish(client: WeaveClient, make_audio_segment: AudioSegment) -> None:
     client.project = "test_audio_publish"
     # Goes in as AudioSegement object
-    weave.publish(make_audio)
-    ref = get_ref(make_audio)
+    weave.publish(make_audio_segment)
+    ref = get_ref(make_audio_segment)
     assert ref is not None
     # Comes out as an AudioSegment object
     gotten_audio = ref.get()
@@ -84,15 +84,21 @@ def test_weave_audio_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
     # Load op returns an AudioSegment, so we don't need to .from_mp3 them
     input_output_part_call = weave_audio_as_input_and_output_part.calls()[0]
 
-    # Load op returns a AudioSegment
-    in_audio = input_output_part_call.inputs["in_audio"]
-    assert in_audio[:5] == source_audio[:5]
-
+    input_audio = input_output_part_call.inputs["in_audio"]
     output_audio = input_output_part_call.output["out_audio"]
-    assert output_audio[:5] == source_audio[:5]
 
+    source_frames = source_audio[:5]
+    in_frames = input_audio[:5]
+    out_frames = output_audio[:5]
+
+    # Here the file should be copied directly so it is never re-encoded
+    # Thus, source audio should match input and output
+    for i in range(5):
+        assert in_frames[i] == source_frames[i]
+        assert out_frames[i] == source_frames[i]
 
 def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> None:
+
     @weave.op
     def audio_segment_as_input_and_output_part(in_audio: AudioSegment) -> dict:
         return {"out_audio": in_audio}
@@ -100,10 +106,9 @@ def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> Non
     client.project = "test_audio_as_call_io"
     # Load the file into audio segement
     source_audio = AudioSegment.from_mp3(make_mp3_file)
-
     audio_segment_as_input_and_output_part(source_audio)
-
     calls = audio_segment_as_input_and_output_part.calls()
+
     assert len(calls) == 1
 
     input_output_part_call = calls[0]
@@ -111,8 +116,12 @@ def test_audio_segment_mp3_as_call_io(client: WeaveClient, make_mp3_file) -> Non
     input_audio = input_output_part_call.inputs["in_audio"]
     output_audio = input_output_part_call.output["out_audio"]
 
-    input_audio = input_output_part_call.inputs["in_audio"]
-    assert input_audio[:5] == source_audio[:5]
+    in_frames = input_audio.get_array_of_samples()[:5]
+    out_frames = output_audio.get_array_of_samples()[:5]
 
-    output_audio = input_output_part_call.output["out_audio"]
-    assert output_audio[:5] == source_audio[:5]
+    # Here we pass an audio secgment object, so it is re-encoded
+    # Thus, source audio WILL NOT match input and output
+    # However, the input and output should match
+    for i in range(5):
+        assert in_frames[i] == out_frames[i]
+
