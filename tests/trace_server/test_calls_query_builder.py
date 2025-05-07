@@ -2062,6 +2062,34 @@ def test_trace_roots_only_filter_with_condition():
     )
 
 
+def test_parent_id_filter():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"parent_ids": ["111111111111", "222222222222"]}
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.parent_id IN {pb_1:Array(String)}
+                OR calls_merged.parent_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.parent_id) IN {pb_0:Array(String)}))
+        """,
+        {
+            "pb_0": ["111111111111", "222222222222"],
+            "pb_1": ["111111111111", "222222222222"],
+            "pb_2": "project",
+        },
+    )
+
+
 def test_input_output_refs_filter():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
