@@ -34,7 +34,7 @@ def test_audio_publish(client: WeaveClient, tmp_path: Path) -> None:
 
     ref = get_ref(audio)
     assert ref is not None
-    gotten_audio = ref.get()
+    gotten_audio = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_audio.readframes(10)
 
 
@@ -49,7 +49,7 @@ def test_audio_as_dataset_cell(client: WeaveClient, tmp_path) -> None:
     ref = get_ref(dataset)
     assert ref is not None
 
-    gotten_dataset = ref.get()
+    gotten_dataset = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
 
 
@@ -89,7 +89,7 @@ def test_audio_with_max_nframes(client: WeaveClient, tmp_path: Path) -> None:
 
     ref = get_ref(audio)
     assert ref is not None
-    gotten_audio = ref.get()
+    gotten_audio = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_audio.readframes(10)
 
     # now with 0 nframes
@@ -99,5 +99,5 @@ def test_audio_with_max_nframes(client: WeaveClient, tmp_path: Path) -> None:
 
     ref = get_ref(audio)
     assert ref is not None
-    gotten_audio = ref.get()
+    gotten_audio = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_audio.readframes(10)
