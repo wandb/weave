@@ -562,47 +562,20 @@ export const ExampleCompareSectionDetail: React.FC<{
     metricIndex: number
   ) => {
     const dimension = lookupDimension(scorerIndex, metricIndex);
-    const unit = dimensionUnit(dimension, true);
-    const isBinary = dimension.scoreType === 'binary';
-    const summaryMetric = adjustValueForDisplay(
-      lookupAggScorerMetricValue(evalIndex, scorerIndex, metricIndex),
-      isBinary
+    const summaryValue = lookupAggScorerMetricValue(
+      evalIndex,
+      scorerIndex,
+      metricIndex
     );
-    const baseline = adjustValueForDisplay(
-      lookupAggScorerMetricValue(BASELINE_EVAL_INDEX, scorerIndex, metricIndex),
-      isBinary
+    const baselineValue = lookupAggScorerMetricValue(
+      BASELINE_EVAL_INDEX,
+      scorerIndex,
+      metricIndex
     );
-
-    const lowerIsBetter = dimension.shouldMinimize ?? false;
-
-    if (summaryMetric == null) {
-      return <NotApplicable />;
-    }
-
-    return (
-      <HorizontalBox
-        style={{
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <HorizontalBox
-          style={{
-            alignItems: 'center',
-            gap: '1px',
-          }}>
-          <ValueViewNumber
-            fractionDigits={SIGNIFICANT_DIGITS}
-            value={summaryMetric}
-          />
-          {unit}
-        </HorizontalBox>
-        <ComparisonPill
-          value={summaryMetric}
-          baseline={baseline}
-          metricUnit={unit}
-          metricLowerIsBetter={lowerIsBetter}
-        />
-      </HorizontalBox>
+    return evalAggScorerMetricCompGeneric(
+      dimension,
+      summaryValue,
+      baselineValue
     );
   };
 
@@ -1089,4 +1062,49 @@ const adjustValueForDisplay = (
   } else {
     return value;
   }
+};
+
+export const evalAggScorerMetricCompGeneric = (
+  dimension: MetricDefinition,
+  summaryValue: MetricValueType | undefined,
+  baselineValue: MetricValueType | undefined
+) => {
+  const unit = dimensionUnit(dimension, true);
+  const isBinary = dimension.scoreType === 'binary';
+
+  const summaryMetric = adjustValueForDisplay(summaryValue, isBinary);
+
+  const baseline = adjustValueForDisplay(baselineValue, isBinary);
+
+  const lowerIsBetter = dimension.shouldMinimize ?? false;
+
+  if (summaryMetric == null) {
+    return <NotApplicable />;
+  }
+
+  return (
+    <HorizontalBox
+      style={{
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+      <HorizontalBox
+        style={{
+          alignItems: 'center',
+          gap: '1px',
+        }}>
+        <ValueViewNumber
+          fractionDigits={SIGNIFICANT_DIGITS}
+          value={summaryMetric}
+        />
+        {unit}
+      </HorizontalBox>
+      <ComparisonPill
+        value={summaryMetric}
+        baseline={baseline}
+        metricUnit={unit}
+        metricLowerIsBetter={lowerIsBetter}
+      />
+    </HorizontalBox>
+  );
 };

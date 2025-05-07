@@ -255,6 +255,10 @@ const ResultExplorer: React.FC<{
   const toggleViewMode = useCallback(() => {
     setViewMode(viewMode === 'detail' ? 'table' : 'detail');
   }, [viewMode]);
+  const [modelsAsRows, setModelsAsRows] = useState(false);
+  const toggleModelsAsRows = useCallback(() => {
+    setModelsAsRows(!modelsAsRows);
+  }, [modelsAsRows]);
 
   return (
     <VerticalBox
@@ -278,8 +282,8 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={toggleViewMode}>Toggle Table</button>
-        <button onClick={toggleViewMode}>Toggle Detail</button>
+        <button onClick={toggleViewMode}>Toggle Display</button>
+        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
       </HorizontalBox>
 
       <Box
@@ -291,9 +295,12 @@ const ResultExplorer: React.FC<{
           // width: '50%',
         }}>
         {viewMode === 'detail' ? (
-          <ExampleCompareSectionTable state={state} />
-        ) : (
           <ExampleCompareSectionDetail state={state} />
+        ) : (
+          <ExampleCompareSectionTable
+            state={state}
+            modelsAsRows={modelsAsRows}
+          />
         )}
       </Box>
     </VerticalBox>
