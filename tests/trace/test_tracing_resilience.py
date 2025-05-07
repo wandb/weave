@@ -151,7 +151,8 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            do_test()
+            # Consume the generator to trigger the make_accumulator call
+            list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -186,7 +187,9 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            await do_test()
+            # Consume the generator to trigger the make_accumulator call
+            res = await do_test()
+            l = [item async for item in res]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -347,7 +350,9 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            await do_test()
+            # Consume the generator
+            gen = await do_test()
+            _ = [i async for i in gen]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -394,6 +399,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
+            # Consume the generator to trigger the make_accumulator call
             list(do_test())
 
     # We should gracefully handle the error and return a value
@@ -440,6 +446,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
+            # Consume the generator to trigger the make_accumulator call
             res = await do_test()
             l = [item async for item in res]
 
@@ -505,12 +512,16 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+            # Consume the generator
+            gen = await do_test()
+            _ = [i async for i in gen]
 
-    # User errors should still be raised
-    with pytest.raises(DummyTestException):
-        res = await do_test()
-        l = [item async for item in res]
+    # We should gracefully handle the error and return a value
+    res = await do_test()
+    assert [item async for item in res] == [1]
 
     assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) == 1
+    assert logs[0].msg.startswith("Error capturing call output")

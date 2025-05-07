@@ -414,19 +414,35 @@ def _call_sync_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
         nonlocal has_finished
         if has_finished:
-            raise ValueError("Should not call finish more than once")
+            return  # Return early instead of raising an error
+        has_finished = True
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if (
+                    hasattr(op, "_on_finish_post_processor")
+                    and op._on_finish_post_processor
+                ):
+                    output = op._on_finish_post_processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
@@ -535,19 +551,35 @@ async def _call_async_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        if __require_explicit_finish:
-            return
-
         nonlocal has_finished
         if has_finished:
-            raise ValueError("Should not call finish more than once")
+            return  # Return early instead of raising an error
+        has_finished = True
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if (
+                    hasattr(op, "_on_finish_post_processor")
+                    and op._on_finish_post_processor
+                ):
+                    output = op._on_finish_post_processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
@@ -656,28 +688,30 @@ def _call_sync_gen(
             return  # Return early instead of raising an error
         has_finished = True
 
-        # Apply any post-processing to the accumulated state if needed
         try:
-            if (
-                hasattr(op, "_on_finish_post_processor")
-                and op._on_finish_post_processor
-            ):
-                output = op._on_finish_post_processor(output)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if (
+                    hasattr(op, "_on_finish_post_processor")
+                    and op._on_finish_post_processor
+                ):
+                    output = op._on_finish_post_processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
-        # Only pop the call context if we're the current call
-        current_call = call_context.get_current_call()
-        if current_call and current_call.id == call.id:
-            call_context.pop_call(call.id)
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     # Create the generator wrapper
     try:
@@ -859,28 +893,30 @@ async def _call_async_gen(
             return  # Return early instead of raising an error
         has_finished = True
 
-        # Apply any post-processing to the accumulated state if needed
         try:
-            if (
-                hasattr(op, "_on_finish_post_processor")
-                and op._on_finish_post_processor
-            ):
-                output = op._on_finish_post_processor(output)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if (
+                    hasattr(op, "_on_finish_post_processor")
+                    and op._on_finish_post_processor
+                ):
+                    output = op._on_finish_post_processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
-        # Only pop the call context if we're the current call
-        current_call = call_context.get_current_call()
-        if current_call and current_call.id == call.id:
-            call_context.pop_call(call.id)
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     # Create the generator wrapper
     try:
