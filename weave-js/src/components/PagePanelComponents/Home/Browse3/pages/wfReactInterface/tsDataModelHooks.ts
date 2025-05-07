@@ -1933,20 +1933,19 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET' | DESCENDANT_ERROR;
 export const traceCallStatusCode = (
   traceCall: traceServerTypes.TraceCallSchema
-): StatusCodeType => {
+): traceServerTypes.ComputedCallStatusType => {
   if (traceCall.exception) {
-    return 'ERROR';
+    return traceServerTypes.ComputedCallStatuses.error;
   } else if (traceCall.ended_at) {
-    console.log(traceCall)
+    // THIS IS NOT CORRECTLY TYPED BECAUSE IT IS FLATTENED!
     if ((traceCall['summary.status_counts.error'] ?? 0) > 0) {
-      return 'DESCENDANT_ERROR';
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
     }
-    return 'SUCCESS';
+    return traceServerTypes.ComputedCallStatuses.success;
   } else {
-    return 'UNSET';
+    return traceServerTypes.ComputedCallStatuses.running;
   }
 };
 

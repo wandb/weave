@@ -64,6 +64,7 @@ class TraceStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     RUNNING = "running"
+    DESCENDANT_ERROR = "descendant_error"
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
@@ -73,6 +74,7 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     latency_ms: Optional[int]
     costs: Optional[dict[str, LLMCostSchema]]
     feedback: Optional[list[FeedbackDict]]
+
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: dict[str, LLMUsageSchema]

@@ -1279,7 +1279,9 @@ class WeaveClient:
                 summary["usage"][model] = {"requests": 1, **usage}
 
         # Create client-side rollup of status_counts_by_op
-        status_counts_dict = summary.setdefault("status_counts", {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0})
+        status_counts_dict = summary.setdefault(
+            "status_counts", {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0}
+        )
         if exception:
             status_counts_dict[TraceStatus.ERROR] += 1
         else:
