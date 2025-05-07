@@ -416,7 +416,7 @@ def _call_sync_func(
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         nonlocal has_finished
         if has_finished:
-            return  # Return early instead of raising an error
+            raise ValueError("Should not call finish more than once")
         has_finished = True
 
         try:
@@ -553,7 +553,7 @@ async def _call_async_func(
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         nonlocal has_finished
         if has_finished:
-            return  # Return early instead of raising an error
+            raise ValueError("Should not call finish more than once")
         has_finished = True
 
         try:
@@ -685,7 +685,7 @@ def _call_sync_gen(
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         nonlocal has_finished
         if has_finished:
-            return  # Return early instead of raising an error
+            raise ValueError("Should not call finish more than once")
         has_finished = True
 
         try:
@@ -890,7 +890,7 @@ async def _call_async_gen(
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         nonlocal has_finished
         if has_finished:
-            return  # Return early instead of raising an error
+            raise ValueError("Should not call finish more than once")
         has_finished = True
 
         try:
