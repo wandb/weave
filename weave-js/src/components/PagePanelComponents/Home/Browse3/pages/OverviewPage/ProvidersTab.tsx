@@ -6,7 +6,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {createContext, useContext, useState} from 'react';
+import React, {createContext, useContext, useMemo, useState} from 'react';
 
 import {DeleteModal} from '../common/DeleteModal';
 import {ProviderConfigDrawer} from '../PlaygroundPage/PlaygroundChat/ProviderConfigDrawer';
@@ -164,10 +164,13 @@ export const ProvidersTabInner: React.FC<{
     }
   );
 
-  const configureProvider = (provider: string) => {
-    setIsConfiguringProviderDrawerOpen(true);
-    setConfiguringProvider(provider);
-  };
+  const configureProviderContextValue = useMemo(() => {
+    const configureProvider = (provider: string) => {
+      setIsConfiguringProviderDrawerOpen(true);
+      setConfiguringProvider(provider);
+    };
+    return {configureProvider};
+  }, []);
 
   return (
     <Tailwind>
@@ -186,7 +189,7 @@ export const ProvidersTabInner: React.FC<{
 
             <div className="flex h-full min-h-[200px] items-center justify-center">
               <ConfigureProviderContext.Provider
-                value={{configureProvider: configureProvider}}>
+                value={configureProviderContextValue}>
                 <ProviderTable
                   columns={columns}
                   providers={providers}
