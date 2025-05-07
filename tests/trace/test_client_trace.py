@@ -2335,6 +2335,26 @@ def test_call_query_stream_columns_with_costs(client):
     calls = list(calls)
     assert len(calls) == 2
     assert calls[0].summary is not None
+    # Costs should be None because we don't have a cost entry for test_model
+    assert calls[0].summary.get("weave").get("costs") is None
+
+    client.add_cost(
+        "test_model",
+        Decimal("0.00001"),
+        Decimal("0.00003"),
+        datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
 
     # also assert that derived summary fields are included when getting costs
@@ -2461,6 +2481,59 @@ def test_read_call_start_with_cost(client):
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
     )
     client.purge_costs(price_id)
+
+
+def test_call_read_with_unkown_llm(client):
+    """Tests that if an op reports usage for an LLM ID that has no cost entry
+    in the database, the cost calculation handles it gracefully (by not adding cost info).
+    """
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    # Generate a unique LLM ID unlikely to exist
+    llm_id_no_cost = f"non_existent_llm_{generate_id()}"
+
+    @weave.op()
+    def op_with_usage_no_cost(input_val: int) -> dict[str, Any]:
+        usage_details = {
+            "requests": 1,
+            "prompt_tokens": 15,
+            "completion_tokens": 25,
+            "total_tokens": 40,
+        }
+        # WeaveClient should automatically extract 'usage' from the return dict
+        # and place it into the call's summary.
+        return {
+            "output_val": input_val * 3,
+            "usage": usage_details,
+            "model": llm_id_no_cost,
+        }
+
+    op_with_usage_no_cost(10)
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary", "output_dump"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 1
+    assert calls[0].output["output_val"] == 30
+    assert calls[0].summary is not None
+
+    summary = calls[0].summary
+    # Basic checks on the summary
+    assert summary is not None
+    assert "usage" in summary
+    assert llm_id_no_cost in summary["usage"]
+    assert summary["usage"][llm_id_no_cost]["prompt_tokens"] == 15
+
+    # Check the cost calculation part
+    assert "weave" in summary
+    assert "costs" not in summary["weave"]
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
