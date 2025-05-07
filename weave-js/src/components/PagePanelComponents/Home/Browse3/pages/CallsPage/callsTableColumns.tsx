@@ -51,9 +51,12 @@ import {
 } from '../CallPage/cost';
 import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
-import {STATUS_TO_FILTER, StatusChip} from '../common/StatusChip';
+import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {
+  ComputedCallStatuses,
+  TraceCallSchema,
+} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyMs,
@@ -73,6 +76,7 @@ import {OpVersionIndexText} from './OpVersionIndexText';
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
   'summary.weave',
+  'summary.status_counts',
   'feedback',
 ];
 
@@ -386,7 +390,7 @@ function buildCallsTableColumns(
       },
       renderCell: cellParams => {
         const valueStatus = traceCallStatusCode(cellParams.row);
-        const valueFilter = STATUS_TO_FILTER[valueStatus];
+        const valueFilter = ComputedCallStatuses[valueStatus];
         return (
           <CellFilterWrapper
             onUpdateFilter={onUpdateFilter}
@@ -686,7 +690,7 @@ function buildCallsTableColumns(
         return (
           <div className="flex h-full w-full items-center justify-center">
             <StatusChip
-              value="ERROR"
+              value={ComputedCallStatuses.error}
               tooltipOverride="There was an error fetching the cost for this call."
             />
           </div>
@@ -709,7 +713,7 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: true,
     valueGetter: (unused: any, row: any) => {
-      if (traceCallStatusCode(row) === 'UNSET') {
+      if (traceCallStatusCode(row) === ComputedCallStatuses.running) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
@@ -717,7 +721,9 @@ function buildCallsTableColumns(
       return traceCallLatencyS(row);
     },
     renderCell: cellParams => {
-      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+      if (
+        traceCallStatusCode(cellParams.row) === ComputedCallStatuses.running
+      ) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
@@ -757,7 +763,7 @@ function buildCallsTableColumns(
           return (
             <div className="flex h-full w-full items-center justify-center">
               <StatusChip
-                value="ERROR"
+                value={ComputedCallStatuses.error}
                 tooltipOverride="There was an error fetching the storage size for this call."
               />
             </div>

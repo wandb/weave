@@ -3,9 +3,18 @@ type ExtraKeysAllowed = {
   [key: string]: any;
 };
 
+export const ComputedCallStatuses = {
+  success: 'success' as const,
+  error: 'error' as const,
+  running: 'running' as const,
+  descendant_error: 'descendant_error' as const,
+} as const;
+export type ComputedCallStatusType = keyof typeof ComputedCallStatuses;
+
 type WeaveSummarySchema = {
   costs?: {[key: string]: LLMCostSchema};
   latency_ms?: number; // latency in milliseconds
+  status?: ComputedCallStatusType;
 } & ExtraKeysAllowed;
 
 export type LLMUsageSchema = {
