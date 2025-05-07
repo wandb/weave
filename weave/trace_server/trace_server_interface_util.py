@@ -1,7 +1,8 @@
 import base64
 import hashlib
-from typing import Any
+from typing import Any, Union
 
+from weave.trace.refs import AnyRef, parse_uri
 from weave.trace_server import refs_internal
 
 TRACE_REF_SCHEME = "weave"
@@ -28,8 +29,7 @@ def _order_dict(dictionary: dict) -> dict:
     }
 
 
-valid_schemes = [
-    TRACE_REF_SCHEME,
+valid_internal_schemes = [
     ARTIFACT_REF_SCHEME,
     refs_internal.WEAVE_INTERNAL_SCHEME,
 ]
@@ -41,16 +41,30 @@ def extract_refs_from_values(
     refs = []
 
     def _visit(val: Any) -> Any:
+        parsed: Union[AnyRef, refs_internal.InternalRef, None] = None
         if isinstance(val, dict):
             for v in val.values():
                 _visit(v)
         elif isinstance(val, list):
             for v in val:
                 _visit(v)
-        elif isinstance(val, str) and any(
-            val.startswith(scheme + "://") for scheme in valid_schemes
-        ):
-            refs.append(val)
+        elif isinstance(val, str):
+            if val.startswith(f"{TRACE_REF_SCHEME}:///"):
+                try:
+                    parsed = parse_uri(val)
+                    if parsed.uri() == val:
+                        refs.append(val)
+                except Exception:
+                    pass
+            elif any(
+                val.startswith(scheme + ":///") for scheme in valid_internal_schemes
+            ):
+                try:
+                    parsed = refs_internal.parse_internal_uri(val)
+                    if parsed.uri() == val:
+                        refs.append(val)
+                except Exception:
+                    pass
 
     _visit(vals)
     return refs
