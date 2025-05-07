@@ -53,13 +53,13 @@ type CallPageInnerProps = CallPageProps & {
 };
 
 export const CallPage: FC<CallPageProps> = props => {
-  const {useCall} = useWFHooks();
+  const {useCall2} = useWFHooks();
 
   const descendentCallId = props.focusedCallId ?? props.rootCallId;
 
   // Note to future devs: We could delay the cost (and i/o) fetching. This is
   // just needed to validate that the call truly exists.
-  const call = useCall({
+  const call = useCall2({
     key: {
       entity: props.entity,
       project: props.project,

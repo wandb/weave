@@ -48,7 +48,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
-  const {useCall, useCalls} = useWFHooks();
+  const {useCall2, useCalls} = useWFHooks();
   const [settingsTab, setSettingsTab] = useState<number | null>(0);
   const callKey = useMemo(() => {
     return props.callId
@@ -60,8 +60,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       : null;
   }, [props.entity, props.project, props.callId]);
 
-  const call = useCall({key: callKey});
-  const callWithCosts = useCall({key: callKey, includeCosts: true});
+  const call = useCall2({key: callKey});
+  const callWithCosts = useCall2({key: callKey, includeCosts: true});
 
   const {result: calls} = useCalls({
     entity: props.entity,

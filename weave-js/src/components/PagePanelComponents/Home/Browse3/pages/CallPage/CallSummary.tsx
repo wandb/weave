@@ -37,7 +37,7 @@ const StorageSizeDisplay: React.FC<{
 export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const {useCall} = useWFHooks();
+  const {useCall2} = useWFHooks();
   const span = call.rawSpan;
   // Process attributes, only filtering out null values and keys starting with '_'
   const attributes = _.fromPairs(
@@ -58,7 +58,7 @@ export const CallSummary: React.FC<{
   // TODO: Once the server responds with costs even for unfinished calls,
   // we can remove this second call. See the comment in CallPage.tsx.
   // with `(This results in a second query in CallSummary.tsx)`
-  const callWithCosts = useCall({
+  const callWithCosts = useCall2({
     key: {
       entity: call.entity,
       project: call.project,

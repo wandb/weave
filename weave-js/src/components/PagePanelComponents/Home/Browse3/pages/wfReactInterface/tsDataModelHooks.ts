@@ -34,6 +34,7 @@ import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
+  CallKey,
   CallSchema,
   Loadable,
   LoadableWithError,
@@ -182,7 +183,23 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+const useCall = (
+  key: CallKey | null,
+  opts?: {
+    includeCosts?: boolean;
+    refetchOnRename?: boolean;
+    includeTotalStorageSize?: boolean;
+  }
+): Loadable<CallSchema | null> => {
+  return useCall2({
+    key,
+    includeCosts: opts?.includeCosts,
+    refetchOnRename: opts?.refetchOnRename,
+    includeTotalStorageSize: opts?.includeTotalStorageSize,
+  });
+};
+
+const useCall2 = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -2121,6 +2138,7 @@ export const convertISOToDate = (iso: string): Date => {
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
+  useCall2,
   useCalls,
   useCallsStats,
   useProjectHasCalls,
