@@ -8,7 +8,14 @@ import {
   TraceCallSchema,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {Chat, ChatCompletion, ChatRequest, Choice, Message, ToolCall} from './types';
+import {
+  Chat,
+  ChatCompletion,
+  ChatRequest,
+  Choice,
+  Message,
+  ToolCall,
+} from './types';
 
 export enum ChatFormat {
   None = 'None',
@@ -607,7 +614,10 @@ export const isMistralChatCompletionChoice = (choice: any): boolean => {
   if (!('finish_reason' in choice)) {
     return false;
   }
-  if (choice.finish_reason !== null && !hasStringProp(choice, 'finish_reason')) {
+  if (
+    choice.finish_reason !== null &&
+    !hasStringProp(choice, 'finish_reason')
+  ) {
     return false;
   }
   return true;
