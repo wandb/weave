@@ -1,10 +1,13 @@
 import {Box} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {MOON_200, MOON_500} from '@wandb/weave/common/css/color.styles';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useInsertSecret} from '@wandb/weave/common/hooks/useSecrets';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
+import * as userEvents from '@wandb/weave/integrations/analytics/userEvents';
 import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../../common/ResizableDrawer';
@@ -25,6 +28,7 @@ interface ProviderConfigDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   entity: string;
+  project: string;
   defaultProvider?: Provider;
 }
 
@@ -32,6 +36,7 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
   isOpen,
   onClose,
   entity,
+  project,
   defaultProvider = 'openai',
 }) => {
   const [selectedProvider, setSelectedProvider] =
@@ -40,6 +45,10 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
     LLM_PROVIDER_SECRETS[defaultProvider]?.map(secret => '') || ['']
   );
   const insertSecret = useInsertSecret();
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: entity,
+  });
 
   const providerOptions = LLM_PROVIDERS.map(provider => ({
     label: LLM_PROVIDER_LABELS[provider],
@@ -61,6 +70,20 @@ export const ProviderConfigDrawer: React.FC<ProviderConfigDrawerProps> = ({
             secretValue: apiKeys[index],
           },
         });
+
+        // Track the provider update event
+        if (!viewerLoading && !orgNameLoading && userInfo) {
+          userEvents.providerUpdated({
+            userId: userInfo.id,
+            organizationName: orgName,
+            entityName: entity,
+            projectName: project,
+            source: 'playground_config_drawer',
+            providerName: selectedProvider,
+            isNewProvider: true, // Currently, we only support adding a new provider
+          });
+        }
+
         toast('Provider secret saved successfully');
         onClose();
         setApiKeys([]);

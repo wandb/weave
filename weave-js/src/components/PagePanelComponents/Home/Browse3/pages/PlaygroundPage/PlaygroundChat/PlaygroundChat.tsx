@@ -1,11 +1,14 @@
 import {WHITE} from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
+import * as userEvents from '../../../../../../../integrations/analytics/userEvents';
 import {CallChat} from '../../CallPage/CallChat';
 import {Empty} from '../../common/Empty';
 import {
@@ -35,6 +38,27 @@ const EmptyWithSettingsButton: React.FC<{
   onConfigureProvider: () => void;
 }> = ({entity, project, isTeamAdmin, onConfigureProvider}) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {orgName} = useOrgName({
+    entityName: entity,
+    skip: viewerLoading || !entity,
+  });
+
+  const handleConfigureClick = () => {
+    if (!userInfoLoaded || !entity || !project) {
+      return;
+    }
+    userEvents.openConfigureProviderDrawer({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
+      entityName: entity,
+      projectName: project,
+      source: 'llm_playground_empty_state',
+      provider: 'openai',
+    });
+    setIsDrawerOpen(true);
+  };
 
   const emptyProps = isTeamAdmin
     ? EMPTY_PROPS_NO_LLM_PROVIDERS_ADMIN
@@ -47,7 +71,7 @@ const EmptyWithSettingsButton: React.FC<{
         {isTeamAdmin && (
           <Button
             variant="primary"
-            onClick={() => setIsDrawerOpen(true)}
+            onClick={handleConfigureClick}
             icon="key-admin"
             size="medium">
             Configure provider
@@ -61,6 +85,7 @@ const EmptyWithSettingsButton: React.FC<{
           setIsDrawerOpen(false);
         }}
         entity={entity}
+        project={project}
       />
     </>
   );

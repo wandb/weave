@@ -6,7 +6,10 @@ import {
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
 import {useHandleScroll} from '@wandb/weave/common/hooks/useHandleScroll';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
+import * as userEvents from '@wandb/weave/integrations/analytics/userEvents';
 import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
@@ -55,6 +58,10 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
   const createProviderModel = useCreateBuiltinObjectInstance('ProviderModel');
   const {useObjectDeleteFunc} = useWFHooks();
   const {objectDeleteAllVersions} = useObjectDeleteFunc();
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName,
+  });
 
   const [drawerWidth, setDrawerWidth] = useState(480);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -118,6 +125,20 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
           },
         },
       });
+
+      // Track the provider update event
+      if (!viewerLoading && !orgNameLoading && userInfo) {
+        userEvents.providerUpdated({
+          userId: userInfo.id,
+          organizationName: orgName,
+          entityName,
+          projectName,
+          source: 'playground_custom_provider_drawer',
+          providerName: name,
+          isNewProvider: !editingProvider,
+          numModels: modelName.filter(model => model !== '').length,
+        });
+      }
 
       toast(`Provider ${name} ${editingProvider ? 'updated' : 'created'}`, {
         type: 'success',
