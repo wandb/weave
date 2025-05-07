@@ -158,7 +158,7 @@ __init__(ref: 'str') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L204"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L216"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add`
 
@@ -167,6 +167,7 @@ add(
     feedback_type: 'str',
     payload: 'dict[str, Any] | None' = None,
     creator: 'str | None' = None,
+    annotation_ref: 'str | None' = None,
     **kwargs: 'dict[str, Any]'
 ) → str
 ```
@@ -177,7 +178,7 @@ feedback_type: A string identifying the type of feedback. The "wandb." prefix is
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L232"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L244"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_note`
 
@@ -191,7 +192,7 @@ add_note(note: 'str', creator: 'str | None' = None) → str
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L223"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L235"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_reaction`
 
@@ -219,7 +220,7 @@ execute() → Feedbacks
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L241"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L253"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `purge`
 

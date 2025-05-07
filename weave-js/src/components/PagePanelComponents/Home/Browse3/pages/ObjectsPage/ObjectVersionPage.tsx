@@ -3,6 +3,7 @@ import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
+import {useObjectStorageSizeCalculation} from '../../../../../../common/hooks/useStorageSizeCalculation';
 import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -34,6 +35,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
+import {StorageSizeSection} from '../common/StorageSizeSection';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
@@ -71,6 +73,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   SavedView: 'view-glasses',
   Provider: 'model',
   ProviderModel: 'model',
+  LLMStructuredCompletionModel: 'model',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -140,7 +143,10 @@ const ObjectVersionPageInner: React.FC<{
       objectIds: [objectName],
     },
     undefined,
-    true
+    true,
+    {
+      includeStorageSize: true,
+    }
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
@@ -215,6 +221,13 @@ const ObjectVersionPageInner: React.FC<{
   const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
+
+  const {
+    currentVersionSizeBytes,
+    allVersionsSizeBytes,
+    shouldShowAllVersions,
+    isLoading,
+  } = useObjectStorageSizeCalculation(objectVersions, objectVersionIndex);
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
@@ -292,6 +305,12 @@ const ObjectVersionPageInner: React.FC<{
                 <UserLink userId={objectVersion.userId} includeName />
               </div>
             )}
+            <StorageSizeSection
+              isLoading={isLoading}
+              shouldShowAllVersions={shouldShowAllVersions}
+              currentVersionBytes={currentVersionSizeBytes}
+              allVersionsSizeBytes={allVersionsSizeBytes}
+            />
             {isScorer && (
               <div className="block">
                 <p className="text-moon-500">Scores</p>

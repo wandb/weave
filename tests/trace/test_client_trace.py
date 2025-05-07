@@ -11,6 +11,7 @@ from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable
+from unittest import mock
 
 import pytest
 import wandb
@@ -650,6 +651,82 @@ def test_trace_call_query_filter_trace_roots_only(client):
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi.CallsFilter(trace_roots_only=trace_roots_only),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_filter_wb_run_ids(client):
+    full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
+    full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
+    from weave.trace import weave_client
+
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_1
+    ):
+        call_spec_1 = simple_line_call_bootstrap()
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_2
+    ):
+        call_spec_2 = simple_line_call_bootstrap()
+    call_spec_3 = simple_line_call_bootstrap()
+
+    total_calls = (
+        call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
+    )
+
+    for wb_run_ids, exp_count in [
+        (None, total_calls),
+        ([], total_calls),
+        ([full_wb_run_id_1], call_spec_1.total_calls),
+        (
+            [full_wb_run_id_1, full_wb_run_id_2],
+            call_spec_1.total_calls + call_spec_2.total_calls,
+        ),
+        ([f"{client.entity}/{client.project}/NOT_A_RUN"], 0),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_filter_wb_user_ids(client):
+    call_spec_1 = simple_line_call_bootstrap()
+
+    # OMG! How ugly is this?! The layers of testing servers is nasty
+    client.server.server._next_trace_server._user_id = "second_user"
+    call_spec_2 = simple_line_call_bootstrap()
+
+    # OMG! How ugly is this?! The layers of testing servers is nasty
+    client.server.server._next_trace_server._user_id = "third_user"
+    call_spec_3 = simple_line_call_bootstrap()
+
+    for wb_user_ids, exp_count in [
+        (
+            None,
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (
+            [],
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (["second_user"], call_spec_2.total_calls),
+        (
+            ["second_user", "third_user"],
+            call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (["NOT_A_USER"], 0),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_user_ids=wb_user_ids),
             )
         )
 
@@ -4045,3 +4122,165 @@ def test_get_object_from_uri_non_registered_object(client):
     assert res._class_name == "MyModel"
     assert res._bases == ["Model", "Object", "BaseModel"]
     assert res.predict(5) == 6
+
+
+def test_dedupe_ref_in_calls_stream(client):
+    nested_obj = {"nested": 123}
+    nested_ref = weave.publish(nested_obj)
+
+    obj = {
+        "my_dataset1": nested_ref,
+        "my_dataset2": nested_ref,
+        "my_dataset3": nested_ref,
+        "my_dataset4": nested_ref,
+        "my_dataset5": nested_ref,
+        "ref_list": {
+            "1": nested_ref,
+            "2": nested_ref,
+            "3": nested_ref,
+        },
+    }
+    obj_ref = weave.publish(obj)
+
+    @weave.op
+    def log():
+        return obj_ref
+
+    log()
+
+    def call_stream(columns, expand_columns):
+        return list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=client._project_id(),
+                    columns=columns,
+                    expand_columns=expand_columns,
+                )
+            )
+        )
+
+    calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
+    assert len(calls_hydrated) == 1
+    assert calls_hydrated[0].output == {
+        "_ref": obj_ref.uri(),
+        "my_dataset1": nested_ref.uri(),
+        "my_dataset2": nested_ref.uri(),
+        "my_dataset3": nested_ref.uri(),
+        "my_dataset4": nested_ref.uri(),
+        "my_dataset5": nested_ref.uri(),
+        "ref_list": {
+            "1": nested_ref.uri(),
+            "2": nested_ref.uri(),
+            "3": nested_ref.uri(),
+        },
+    }
+
+    cols = [
+        "output",
+        "output.my_dataset1",
+        "output.my_dataset2",
+        "output.my_dataset3",
+        "output.my_dataset4",
+        "output.my_dataset5",
+        "output.ref_list",
+        "output.ref_list.1",
+        "output.ref_list.2",
+        "output.ref_list.3",
+    ]
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    calls_all_columns = call_stream(columns=cols, expand_columns=cols)
+    assert len(calls_all_columns) == 1
+    assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset2"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset3"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset4"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset5"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["ref_list"] == {
+        "1": nested_obj_with_ref,
+        "2": nested_obj_with_ref,
+        "3": nested_obj_with_ref,
+    }
+
+
+def test_calls_query_stats_with_limit(client):
+    def calls_stats(limit=None, filter=None, include_total_storage_size=False):
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                limit=limit,
+                filter=filter,
+                include_total_storage_size=include_total_storage_size,
+            )
+        )
+
+    @weave.op
+    def child_op():
+        return 1
+
+    @weave.op
+    def parent_op():
+        return child_op()
+
+    assert calls_stats().count == 0
+
+    parent_op()
+    assert calls_stats().count == 2
+
+    trace_id = client.get_calls()[0].trace_id
+
+    # test limit, uses special optimization
+    assert calls_stats(limit=1).count == 1
+    # test limit, does not use special optimization
+    assert calls_stats(limit=2).count == 2
+    # test limit and filter, should use limit but not special optimization
+    assert calls_stats(limit=1, filter={"trace_roots_only": True}).count == 1
+    # test filter, should not use special optimization
+    assert calls_stats(filter={"trace_id": trace_id}).count == 2
+
+    with pytest.raises(ValueError):
+        calls_stats(limit=-1)
+
+    # Test that the query works with include_total_storage_size
+    result = calls_stats(limit=1, include_total_storage_size=True)
+    assert result.count == 1
+    assert result.total_storage_size_bytes is not None
+
+
+def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    result = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            include_total_storage_size=True,
+        )
+    )
+
+    print(result)
+    assert result is not None
+    assert result.count == 2
+    # Unfortunate that we can't assert the exact value here, because of the
+    # uncertainty of the clickhouse materialized view merging moment.
+    assert result.total_storage_size_bytes is not None

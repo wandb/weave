@@ -40,8 +40,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 :::info Looking for a less opinionated approach?
 
-If you prefer a more flexible evaluation framework, check out Weave's [Imperative Evaluations](../evaluation/imperative_evaluations.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
-
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
 :::
 
 ## Create an Evaluation
@@ -197,6 +196,11 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ### Using `preprocess_model_input` to format dataset rows before evaluating
 
+:::important
+The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
+Scorer functions always receive the original dataset example, without any preprocessing applied.
+:::
+
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
 
 - Rename fields to match your model's expected input
@@ -262,3 +266,7 @@ We are continuously improving our integrations with third-party services and lib
 While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).

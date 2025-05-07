@@ -7,6 +7,10 @@ import React from 'react';
 import {Loader, StrictLoaderProps} from 'semantic-ui-react';
 
 import {
+  WBLogoLoader,
+  WBLogoLoaderProps,
+} from '../../components/Loaders/WBLogoLoader';
+import {
   ProfileData,
   useLifecycleProfiling,
 } from './../hooks/useLifecycleProfiling';
@@ -66,6 +70,36 @@ export const fireOnRandom = (
   }
 };
 
+const makeLoaderTracker =
+  ({
+    name,
+    profilingCb,
+    onComplete,
+    track,
+    samplingRate,
+    captureException,
+  }: TrackedWandbLoaderProps & {samplingRate: number}) =>
+  (data: ProfileData) => {
+    try {
+      // log the lifecycle for each loader to segment
+      const additionalData = profilingCb ? profilingCb() : {};
+      const trackedData = {
+        componentId: data.id,
+        duration: data.duration,
+        ...additionalData,
+      };
+      if (onComplete) {
+        onComplete(name, trackedData);
+      }
+      fireOnRandom(() => {
+        track('wandb-loader-onscreen', trackedData);
+      }, samplingRate);
+    } catch (e) {
+      // Tracking should be able to fail gracefully without breaking the app
+      captureException?.(e);
+    }
+  };
+
 export const TrackedWandbLoader = ({
   captureException,
   name,
@@ -78,26 +112,14 @@ export const TrackedWandbLoader = ({
 }: TrackedWandbLoaderProps & WandbLoaderProps) => {
   useLifecycleProfiling(
     name,
-    (data: ProfileData) => {
-      try {
-        // log the lifecycle for each loader to segment
-        const additionalData = profilingCb ? profilingCb() : {};
-        const trackedData = {
-          componentId: data.id,
-          duration: data.duration,
-          ...additionalData,
-        };
-        if (onComplete) {
-          onComplete(name, trackedData);
-        }
-        fireOnRandom(() => {
-          track('wandb-loader-onscreen', trackedData);
-        }, samplingRate);
-      } catch (e) {
-        // Tracking should be able to fail gracefully without breaking the app
-        captureException?.(e);
-      }
-    },
+    makeLoaderTracker({
+      name,
+      profilingCb,
+      onComplete,
+      track,
+      samplingRate,
+      captureException,
+    }),
     onStart
   );
 
@@ -120,28 +142,42 @@ export const TrackedWaveLoader = ({
 }) => {
   useLifecycleProfiling(
     name,
-    (data: ProfileData) => {
-      try {
-        // log the lifecycle for each loader to segment
-        const additionalData = profilingCb ? profilingCb() : {};
-        const trackedData = {
-          componentId: data.id,
-          duration: data.duration,
-          ...additionalData,
-        };
-        if (onComplete) {
-          onComplete(name, trackedData);
-        }
-        fireOnRandom(() => {
-          track('wandb-loader-onscreen', trackedData);
-        }, samplingRate);
-      } catch (e) {
-        // Tracking should be able to fail gracefully without breaking the app
-        captureException?.(e);
-      }
-    },
+    makeLoaderTracker({
+      name,
+      profilingCb,
+      onComplete,
+      track,
+      samplingRate,
+      captureException,
+    }),
     onStart
   );
 
   return <WaveLoader size={size} delayBeforeShow={delayBeforeShow} />;
+};
+
+export const TrackedWBLogoLoader = ({
+  captureException,
+  name,
+  profilingCb,
+  samplingRate = 0.1,
+  track,
+  onComplete,
+  onStart,
+  ...props
+}: TrackedWandbLoaderProps & WBLogoLoaderProps) => {
+  useLifecycleProfiling(
+    name,
+    makeLoaderTracker({
+      name,
+      profilingCb,
+      onComplete,
+      track,
+      samplingRate,
+      captureException,
+    }),
+    onStart
+  );
+
+  return <WBLogoLoader {...props} />;
 };

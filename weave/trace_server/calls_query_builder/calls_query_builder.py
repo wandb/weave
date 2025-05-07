@@ -28,6 +28,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
+from collections.abc import KeysView
 from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
@@ -1228,7 +1229,7 @@ def process_ref_filters_to_sql(
     if not ref_filters:
         return ""
 
-    return " AND " + combine_conditions(ref_filters, "AND")
+    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
 
 
 def process_calls_filter_to_conditions(
@@ -1271,12 +1272,63 @@ def process_calls_filter_to_conditions(
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
+
+
+def optimized_project_contains_call_query(
+    project_id: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Returns a query that checks if the project contains any calls."""
+    return safely_format_sql(
+        f"""SELECT
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM calls_merged
+            WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        )
+        THEN 1
+        ELSE 0
+        END as has_any
+    """,
+        logger,
+    )
+
+
+def build_calls_query_stats_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+) -> tuple[str, KeysView[str]]:
+    cq = CallsQuery(
+        project_id=req.project_id,
+        include_total_storage_size=req.include_total_storage_size,
+    )
+
+    cq.add_field("id")
+    if req.filter is not None:
+        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+    if req.query is not None:
+        cq.add_condition(req.query.expr_)
+    if req.limit is not None:
+        cq.set_limit(req.limit)
+
+    aggregated_columns = {"count": "count()"}
+    if req.include_total_storage_size:
+        aggregated_columns["total_storage_size_bytes"] = (
+            "sum(coalesce(total_storage_size_bytes, 0))"
+        )
+        cq.add_field("total_storage_size_bytes")
+
+    inner_query = cq.as_sql(param_builder)
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+
+    return (calls_query_sql, aggregated_columns.keys())

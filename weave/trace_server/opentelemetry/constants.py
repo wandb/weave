@@ -1,4 +1,4 @@
-from weave.trace_server.opentelemetry.helpers import try_parse_int
+from weave.trace_server.opentelemetry.helpers import try_parse_int, try_parse_timestamp
 
 """
 The constants defined in this file map attribute keys from various telemetry standards
@@ -47,8 +47,9 @@ This would be the resulting dict dumped to clickhouse:
 from weave.trace_server.opentelemetry.helpers import try_parse_int
 
 INPUT_KEYS = [
+    "ai.prompt",  # Vercel
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
-    "input.value",  # From OpenInference standard - highest priority
+    "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
     "traceloop.entity.input"  # From Traceloop's conventions
     "input",  # Generic fallback for Pydantic models - lowest priority
@@ -58,6 +59,7 @@ INPUT_KEYS = [
 # Priority is given to standards in this order:
 # This is used to populate the `output_dump` column in clickhouse
 OUTPUT_KEYS = [
+    "ai.response",  # Vercel
     "gen_ai.completion",  # From OpenTelemetry AI semantic conventions
     "output.value",  # From OpenInference standard - highest priority
     "mlflow.spanOutputs",  # From MLFlow's tracking format
@@ -73,14 +75,23 @@ OUTPUT_KEYS = [
 # Never assume that the value is of a certain type or error, conventions provide no guarantees
 USAGE_KEYS = {
     # Maps Weave's "prompt_tokens" to keys from different standards
+    "input_tokens": [
+        ("gen_ai.usage.input_tokens", try_parse_int),
+    ],
+    # Maps Weave's "completion_tokens" to keys from different standards
+    "completion_tokens": [
+        ("gen_ai.usage.output_tokens", try_parse_int),
+    ],
     "prompt_tokens": [
         ("gen_ai.usage.prompt_tokens", try_parse_int),
         ("llm.token_count.prompt", try_parse_int),
+        ("ai.usage.promptTokens", try_parse_int),  # Vercel
     ],
     # Maps Weave's "completion_tokens" to keys from different standards
     "completion_tokens": [
         ("gen_ai.usage.completion_tokens", try_parse_int),
         ("llm.token_count.completion", try_parse_int),
+        ("ai.usage.completionTokens", try_parse_int),  # Vercel
     ],
     # Maps Weave's "total_tokens" to keys from different standards
     "total_tokens": [
@@ -105,10 +116,11 @@ ATTRIBUTE_KEYS = {
         "openinference.span.kind",  # OpenInference
     ],
     # Model name/identifier
-    "model": ["gen_ai.response.model", "llm.model_name"],
+    "model": ["gen_ai.response.model", "llm.model_name", "ai.model.id"],
     # Provider/vendor of the model
     "provider": [
         "llm.provider",  # Common across standards
+        "ai.model.provider",  # Vercel
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
@@ -118,4 +130,11 @@ ATTRIBUTE_KEYS = {
 WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
+}
+
+# These represent fields that are set by a provider which override top level span information
+# Langfuse relies on these attributes to give the real start and end time for spans
+SPAN_OVERRIDES = {
+    "start_time": [("langfuse.startTime", try_parse_timestamp)],
+    "end_time": [("langfuse.endTime", try_parse_timestamp)],
 }

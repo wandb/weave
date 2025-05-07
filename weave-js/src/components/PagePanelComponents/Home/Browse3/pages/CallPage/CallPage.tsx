@@ -6,7 +6,6 @@ import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
-import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
 import {WeaveflowPeekContext} from '../../context';
@@ -15,6 +14,7 @@ import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
 import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {OpDefCode} from '../../OpDefCode';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -65,7 +65,15 @@ export const CallPage: FC<CallPageProps> = props => {
       project: props.project,
       callId: descendentCallId,
     },
-    {includeCosts: true, includeTotalStorageSize: true}
+    {
+      // Sadly we cannot include costs as unfinished calls will result
+      // in null response (bug on server side). As a result, the summary
+      // will not show costs. FIXME (This results in a second query in
+      // CallSummary.tsx)
+      // includeCosts: true,
+      includeTotalStorageSize: true,
+      refetchOnRename: true,
+    }
   );
 
   // This is a little hack, but acceptable for now.
@@ -183,7 +191,7 @@ const useCallTabs = (call: CallSchema) => {
       ? [
           {
             label: 'Code',
-            content: <Browse2OpDefCode uri={codeURI} />,
+            content: <OpDefCode uri={codeURI} />,
           },
         ]
       : []),

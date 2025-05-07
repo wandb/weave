@@ -63,6 +63,9 @@ export const useCallsForQuery = (
   refetch: () => void;
   storageSizeLoading: boolean;
   storageSizeResults: Map<string, number> | null;
+  primaryError?: Error | null;
+  costsError?: Error | null;
+  storageSizeError?: Error | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -89,9 +92,16 @@ export const useCallsForQuery = (
     }
   );
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
-    refetchOnDelete: true,
-  });
+  const callsStats = useCallsStats(
+    entity,
+    project,
+    lowLevelFilter,
+    filterBy,
+    undefined, // limit
+    {
+      refetchOnDelete: true,
+    }
+  );
 
   const callResults = useMemo(() => {
     return getFeedbackMerged(calls.result ?? []);
@@ -201,6 +211,9 @@ export const useCallsForQuery = (
         : callResults,
       total,
       refetch,
+      primaryError: calls.error,
+      costsError: costs.error,
+      storageSizeError: storageSize.error,
     };
   }, [
     callResults,
@@ -211,6 +224,9 @@ export const useCallsForQuery = (
     refetch,
     storageSize.loading,
     storageSizeResults,
+    calls.error,
+    costs.error,
+    storageSize.error,
   ]);
 };
 
@@ -397,12 +413,26 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
-    skip: skip || cachedFilter != null,
-  });
-  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
-    skip: skip || cachedFilter != null,
-  });
+  const callStats7Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d7filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
+  const callStats30Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d30filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
 
   const defaultDatetimeFilter = useMemo(
     () => ({

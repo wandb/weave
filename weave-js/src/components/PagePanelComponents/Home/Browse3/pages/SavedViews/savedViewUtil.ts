@@ -228,6 +228,7 @@ const filterToClause = (item: Filter): Record<string, any> => {
       $contains: {
         input: {$getField: item.field},
         substr: {$literal: item.value},
+        case_insensitive: false,
       },
     };
   } else if (item.operator === '(string): notContains') {
@@ -237,6 +238,7 @@ const filterToClause = (item: Filter): Record<string, any> => {
           $contains: {
             input: {$getField: item.field},
             substr: {$literal: item.value},
+            case_insensitive: false,
           },
         },
       ],
@@ -508,7 +510,6 @@ const operandToFilter = (operand: any): Filter => {
     } else if (filter.operator === '(any): isNotEmpty') {
       filter.operator = '(any): isEmpty';
     } else {
-      debugger;
       throw new Error(
         `Could not parse "not" operand: ${JSON.stringify(
           operand

@@ -325,6 +325,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
+            if filter.wb_user_ids:
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
+                conds += [f"wb_user_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -513,7 +516,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
-                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
                                 ELSE 0
                             END
                         """
@@ -641,6 +644,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
@@ -648,15 +653,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        if req.limit is not None and req.limit < 1:
+            raise ValueError("Limit must be a positive integer")
         calls = self.calls_query(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=req.filter,
                 query=req.query,
+                limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
         return tsi.CallsQueryStatsRes(
             count=len(calls),
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1368,6 +1382,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        print("files_stats is not implemented for SQLite trace server", req)
+        return tsi.FilesStatsRes(total_size_bytes=-1)
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
         return tsi.CostCreateRes()
@@ -1563,6 +1581,16 @@ def _transform_external_calls_field_to_internal_calls_field(
         else:
             json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
+    elif field == "summary.weave.latency_ms":
+        # Special handling for latency to match sorting behavior
+        field = """
+            CASE
+                WHEN ended_at IS NOT NULL THEN
+                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
+                ELSE 0
+            END
+        """
+        json_path = None
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
