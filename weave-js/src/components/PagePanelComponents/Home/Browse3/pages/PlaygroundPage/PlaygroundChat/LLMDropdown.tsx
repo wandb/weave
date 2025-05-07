@@ -11,6 +11,7 @@ import {
   LLMOption,
   LLMOptionToSavedPlaygroundModelState,
   ProviderOption,
+  SAVED_MODEL_OPTION_VALUE,
 } from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
 interface LLMDropdownProps {
@@ -66,12 +67,15 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     refetchConfiguredProviders();
   }, [refetchConfiguredProviders]);
 
-  const isValueAvailable = useMemo(() => {
-    return llmDropdownOptions.some(
-      (option: ProviderOption) =>
-        'llms' in option && option.llms?.some(llm => llm && llm.value === value)
-    );
-  }, [llmDropdownOptions, value]);
+  const isValueAvailable = useMemo(
+    () =>
+      llmDropdownOptions.some(
+        (option: ProviderOption) =>
+          'llms' in option &&
+          option.llms?.some(llm => llm && llm.value === value)
+      ),
+    [llmDropdownOptions, value]
+  );
 
   useEffect(() => {
     if (!isValueAvailable && !areProvidersLoading) {
@@ -79,7 +83,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
       // Check if the value is a saved model
       const savedModelOption = llmDropdownOptions.find(
-        option => option.value === 'saved-models'
+        option => option.value === SAVED_MODEL_OPTION_VALUE
       );
       if (savedModelOption) {
         firstAvailableLlm =

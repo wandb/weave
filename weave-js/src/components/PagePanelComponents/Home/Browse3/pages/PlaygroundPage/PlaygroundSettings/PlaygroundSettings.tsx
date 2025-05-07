@@ -6,11 +6,7 @@ import {Tag} from '@wandb/weave/components/Tag';
 import React, {useEffect, useState} from 'react';
 
 import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
-import {
-  JSON_PLAYGROUND_MODEL_PARAMS_KEYS,
-  PLAYGROUND_MODEL_PARAMS_KEYS,
-  PlaygroundState,
-} from '../types';
+import {PLAYGROUND_MODEL_PARAMS_KEYS, PlaygroundState} from '../types';
 import {useSaveModelConfiguration} from '../useSaveModelConfiguration';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
@@ -118,22 +114,9 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   my: 2,
                 }}>
                 {/* Model Name Input */}
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    width: '100%',
-                  }}>
+                <div className="flex w-full flex-col gap-2">
                   <span style={{fontSize: '14px'}}>Model Name</span>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      border: `1px solid ${MOON_250}`,
-                      borderRadius: '4px',
-                      width: '100%',
-                    }}>
+                  <div className="flex w-full flex-col rounded-md border border-moon-250">
                     <TextField
                       value={currentModelName}
                       onChange={e => setCurrentModelName(e.target.value)}
@@ -157,15 +140,13 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                         },
                       }}
                     />
-                  </Box>
-                </Box>
+                  </div>
+                </div>
 
                 {/* Parameters */}
-                <Box sx={{display: 'flex', flexDirection: 'column'}}>
-                  <div className="font-[Source Sans Pro] mb-[-16px] text-sm font-semibold text-moon-500">
-                    PARAMETERS
-                  </div>
-                </Box>
+                <div className="font-[Source Sans Pro] mb-[-16px] text-sm font-semibold text-moon-500">
+                  PARAMETERS
+                </div>
 
                 {/* Response Format Editor */}
                 <ResponseFormatEditor
@@ -336,7 +317,9 @@ const arePlaygroundSettingsEqual = (
     return false;
   }
 
+  // Check each key in the saved params for equality
   for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    // messagesTemplate is a special case, because its stored in the trace call state
     if (key === 'messagesTemplate') {
       const messagesTemplate = savedParams.messagesTemplate;
       const messages = currentPlaygroundState.traceCall?.inputs?.messages;
@@ -349,21 +332,12 @@ const arePlaygroundSettingsEqual = (
     const currentValue = currentPlaygroundState[key];
     const savedValue = savedParams[key];
 
-    if (JSON_PLAYGROUND_MODEL_PARAMS_KEYS.includes(key)) {
-      const currentValueObject = currentValue ?? {};
-      const savedValueObject = savedValue ?? {};
-      if (
-        JSON.stringify(currentValueObject) !== JSON.stringify(savedValueObject)
-      ) {
-        return false;
-      }
-    } else {
-      // For other primitive types, direct comparison
-      if (currentValue !== savedValue) {
-        return false;
-      }
+    // We compare the JSON strings of the current and saved values, since some values are not primitive types
+    if (JSON.stringify(currentValue) !== JSON.stringify(savedValue)) {
+      return false;
     }
   }
 
-  return true; // All compared keys are equal
+  // All compared keys are equal
+  return true;
 };

@@ -30,6 +30,8 @@ import {
 import {ProviderStatus} from '../useConfiguredProviders';
 import {convertDefaultParamsToOptionalPlaygroundModelParams} from '../useSaveModelConfiguration';
 
+export const SAVED_MODEL_OPTION_VALUE = 'saved-models';
+
 export interface LLMOption {
   label: string;
   subLabel?: string | React.ReactNode;
@@ -345,7 +347,7 @@ export const CustomOption = ({
           }}>
           {filteredLLMs.map(llm => (
             <Box
-              key={llm.value + llm.versionIndex}
+              key={`${llm.value}${llm.versionIndex}`}
               onClick={() => {
                 onChange(
                   llm.value as LLMMaxTokensKey,
@@ -395,7 +397,7 @@ export const CustomOption = ({
   return (
     <SubMenuOption
       {...props}
-      data={data.value === 'saved-models' ? filteredData : data}
+      data={data.value === SAVED_MODEL_OPTION_VALUE ? filteredData : data}
       onChange={onChange}
       entity={entity}
       project={project}
@@ -503,11 +505,11 @@ export const useLLMDropdownOptions = (
     });
   }
 
-  const savedModels = useMemo(() => {
-    const savedModels: LLMOption[] = [];
-
-    if (savedModelsResult) {
-      savedModelsResult.forEach(savedModelObj => {
+  const savedModels = useMemo(
+    () =>
+      // If savedModelsResult is undefined, return an empty array
+      // Else convert the saved models to LLMOption(s)
+      (savedModelsResult || []).map(savedModelObj => {
         const savedModelVal = savedModelObj.val as LlmStructuredCompletionModel;
         const baseModelId = savedModelVal.llm_model_id;
         const savedModelName =
@@ -542,10 +544,10 @@ export const useLLMDropdownOptions = (
           maxTokens = findMaxTokensByModelName(baseModelId);
         }
 
-        // Add the saved model to the list
-        savedModels.push({
-          label: savedModelName + `:v${savedModelObj.version_index}`,
-          value: savedModelName + `:v${savedModelObj.version_index}`,
+        const savedModelLabel = `${savedModelName}:v${savedModelObj.version_index}`;
+        return {
+          label: savedModelLabel,
+          value: savedModelLabel,
           subLabel: baseModelId,
           baseModelId: baseModelId as LLMMaxTokensKey,
           max_tokens: maxTokens,
@@ -555,17 +557,15 @@ export const useLLMDropdownOptions = (
           objectId: savedModelName,
           versionIndex: savedModelObj.version_index ?? null,
           isLatest: !!savedModelObj.is_latest,
-        });
-      });
-    }
-
-    return savedModels;
-  }, [savedModelsResult, customProviderModelsResult, customProvidersResult]);
+        };
+      }),
+    [savedModelsResult, customProviderModelsResult, customProvidersResult]
+  );
 
   if (!savedModelsLoading && savedModels.length > 0) {
     savedModelsOptions.push({
       label: 'Saved Models',
-      value: 'saved-models',
+      value: SAVED_MODEL_OPTION_VALUE,
       llms: savedModels,
     });
   }

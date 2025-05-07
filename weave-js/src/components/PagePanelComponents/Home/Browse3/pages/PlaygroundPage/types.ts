@@ -42,10 +42,6 @@ export type PlaygroundModelParams = {
   responseFormatSchema?: Record<string, any>;
 };
 
-export const JSON_PLAYGROUND_MODEL_PARAMS_KEYS: Array<
-  keyof PlaygroundModelParams | 'messagesTemplate'
-> = ['functions', 'stopSequences', 'responseFormatSchema', 'messagesTemplate'];
-
 // Define the keys from PlaygroundModelParams to iterate and compare
 export const PLAYGROUND_MODEL_PARAMS_KEYS: Array<
   keyof PlaygroundModelParams | 'messagesTemplate'
@@ -56,7 +52,10 @@ export const PLAYGROUND_MODEL_PARAMS_KEYS: Array<
   'frequencyPenalty',
   'presencePenalty',
   'nTimes',
-  ...JSON_PLAYGROUND_MODEL_PARAMS_KEYS,
+  'functions',
+  'stopSequences',
+  'responseFormat',
+  'messagesTemplate',
 ];
 
 export type SavedPlaygroundModelParams = PlaygroundModelParams & {
