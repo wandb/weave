@@ -64,7 +64,7 @@ def get_video(clip: VideoFileClip) -> VideoClip:
     This ensures that the VideoFileClip is created and managed within the
     Weave op's thread context, avoiding thread-safety issues.
     """
-    new_clip = clip.subclipped(0, 1)
+    new_clip = clip.subclip(0, 1)
     return new_clip
 
 if __name__ == "__main__":
