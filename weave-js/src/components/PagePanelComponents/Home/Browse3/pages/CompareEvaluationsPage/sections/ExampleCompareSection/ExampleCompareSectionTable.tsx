@@ -4,6 +4,8 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {Icon} from '@wandb/weave/components/Icon';
+import {IconButton} from '@wandb/weave/components/IconButton';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
@@ -21,14 +23,12 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
-import { IconButton } from '@wandb/weave/components/IconButton';
-import { Icon } from '@wandb/weave/components/Icon';
 
 type RowData = PivotedRow & {
   // simpleOutput: PivotedRow['output'][string]
   // dataRow: {[key: string]: any}
   _type: 'trial' | 'summary';
-  _numTrials?: number;
+  _numTrials: number;
 };
 
 const DatasetRowItemRenderer: React.FC<{
@@ -64,25 +64,34 @@ export const ExampleCompareSectionTable: React.FC<{
     })),
     0
   );
-  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>([]);
+  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
+    []
+  );
 
-  const rows: RowData[] = useMemo(() => {
-    return filteredRows.flatMap(filteredRow => {
+  const {rows, hasTrials} = useMemo(() => {
+    let hasTrials = false;
+    const returnRows = filteredRows.flatMap(filteredRow => {
       const evaluationCallIds = props.state.evaluationCallIdsOrdered;
       const finalRows: RowData[] = [];
       for (const evaluationCallId of evaluationCallIds) {
-        const originalRows = filteredRow.originalRows.filter(row => row.evaluationCallId === evaluationCallId).map(row => {
+        const matchingRows = filteredRow.originalRows.filter(
+          row => row.evaluationCallId === evaluationCallId
+        );
+        const numTrials = matchingRows.length;
+        const originalRows = matchingRows.map(row => {
           return {
             _type: 'trial' as const,
+            _numTrials: numTrials,
             ...row,
           };
         });
-        const digestEvalId = filteredRow.inputDigest + ":" + evaluationCallId;
-        if (originalRows.length > 0 && !expandedDigestEvalIds.includes(digestEvalId)) {
+        const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
+        hasTrials = hasTrials || numTrials > 1;
+        if (numTrials > 1 && !expandedDigestEvalIds.includes(digestEvalId)) {
           const summaryRow: RowData = {
             ...originalRows[0],
             _type: 'summary' as const,
-            _numTrials: originalRows.length,
+            _numTrials: numTrials,
             id: digestEvalId,
             output: filteredRow.output,
             scores: filteredRow.scores,
@@ -99,9 +108,13 @@ export const ExampleCompareSectionTable: React.FC<{
         }
       }
       return finalRows;
-    }); 
-  }, [expandedDigestEvalIds, filteredRows, props.state.evaluationCallIdsOrdered]);
-  
+    });
+    return {rows: returnRows, hasTrials};
+  }, [
+    expandedDigestEvalIds,
+    filteredRows,
+    props.state.evaluationCallIdsOrdered,
+  ]);
 
   // console.log(filteredRows);
 
@@ -244,41 +257,52 @@ export const ExampleCompareSectionTable: React.FC<{
           );
         },
       },
-      {
-        field: 'expandTrials',
-        headerName: '',
-        width: 50,
-        resizable: false,
-        valueGetter: (value: any, row: RowData) => {
-          return row.evaluationCallId;
-        },
-        renderCell: params => {
-          return (
-            <Box
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                width: '100%',
-              }}>
-              <IconButton
-                onClick={() => {
-                  const digestEvalId = params.row.inputDigest + ":" + params.row.evaluationCallId;
-                  setExpandedDigestEvalIds(prev => {
-                    if (prev.includes(digestEvalId)) {
-                      return prev.filter(id => id !== digestEvalId);
-                    } else {
-                      return [...prev, digestEvalId];
-                    }
-                  });
-                }}>
-                <Icon name="expand-uncollapse" />
-              </IconButton>
-            </Box>
-          );
-        },
-      },
+      ...(hasTrials
+        ? [
+            {
+              field: 'expandTrials',
+              headerName: '',
+              width: 50,
+              resizable: false,
+              valueGetter: (value: any, row: RowData) => {
+                return row.evaluationCallId;
+              },
+              renderCell: (params: GridRenderCellParams<RowData>) => {
+                if (params.row._numTrials < 2) {
+                  return null;
+                }
+                const digestEvalId =
+                  params.row.inputDigest + ':' + params.row.evaluationCallId;
+                const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
+                return (
+                  <Box
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      width: '100%',
+                    }}>
+                    <IconButton
+                      onClick={() => {
+                        setExpandedDigestEvalIds(prev => {
+                          if (prev.includes(digestEvalId)) {
+                            return prev.filter(id => id !== digestEvalId);
+                          } else {
+                            return [...prev, digestEvalId];
+                          }
+                        });
+                      }}>
+                      <Icon
+                        name={isExpanded ? 'collapse' : 'expand-uncollapse'}
+                      />
+                    </IconButton>
+                  </Box>
+                );
+              },
+            },
+          ]
+        : []),
       {
         field: 'trialNdx',
         headerName: 'Trial',
@@ -299,7 +323,17 @@ export const ExampleCompareSectionTable: React.FC<{
           //   return null;
           // }
           if (params.row._type === 'summary') {
-            return <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',}}>{params.row._numTrials}</div>;
+            return (
+              <div
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                {params.row._numTrials}
+              </div>
+            );
           }
           const trialPredict = params.row.predictAndScore._rawPredictTraceData;
           const [trialEntity, trialProject] =
@@ -434,7 +468,7 @@ export const ExampleCompareSectionTable: React.FC<{
       })),
     ];
     return res;
-  }, [inputSubFields, outputSubFields, scoreSubFields, props.state]);
+  }, [inputSubFields, hasTrials, outputSubFields, scoreSubFields, props.state, expandedDigestEvalIds]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
@@ -483,6 +517,7 @@ export const ExampleCompareSectionTable: React.FC<{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
         },
+        width: '100%',
       }}
     />
   );

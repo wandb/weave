@@ -278,17 +278,22 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={toggleViewMode}>Toggle that sick view!</button>
+        <button onClick={toggleViewMode}>Toggle Table</button>
+        <button onClick={toggleViewMode}>Toggle Detail</button>
       </HorizontalBox>
+
       <Box
         sx={{
           height,
-          overflow: 'auto',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'row',
+          // width: '50%',
         }}>
         {viewMode === 'detail' ? (
-          <ExampleCompareSectionDetail state={state} />
-        ) : (
           <ExampleCompareSectionTable state={state} />
+        ) : (
+          <ExampleCompareSectionDetail state={state} />
         )}
       </Box>
     </VerticalBox>
