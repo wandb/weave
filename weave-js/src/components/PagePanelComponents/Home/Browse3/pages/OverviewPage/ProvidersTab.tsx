@@ -6,7 +6,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {useState} from 'react';
+import React, {createContext, useContext, useState} from 'react';
 
 import {DeleteModal} from '../common/DeleteModal';
 import {ProviderConfigDrawer} from '../PlaygroundPage/PlaygroundChat/ProviderConfigDrawer';
@@ -24,6 +24,30 @@ const ProviderStatus = ({isActive}: {isActive: boolean}) => {
         label={isActive ? 'Configured' : 'Not configured'}
         icon={isActive ? 'checkmark-circle' : 'failed'}
       />
+    </div>
+  );
+};
+
+const ConfigureProviderContext = createContext<{
+  configureProvider: (provider: string) => void;
+}>({
+  configureProvider: () => {},
+});
+
+const ConfigureProviderCell = (params: GridRenderCellParams) => {
+  const {configureProvider} = useContext(ConfigureProviderContext);
+  return (
+    <div className="flex h-full items-center justify-between">
+      {!params.row.status && params.row.isAdmin && (
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => {
+            configureProvider(params.row.name);
+          }}>
+          Configure
+        </Button>
+      )}
     </div>
   );
 };
@@ -51,20 +75,7 @@ const columns: GridColDef[] = [
     headerName: '',
     flex: 0.4,
     minWidth: 200,
-    renderCell: (params: GridRenderCellParams) => (
-      <div className="flex h-full items-center justify-between">
-        {!params.row.status && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              params.row.configure();
-            }}>
-            Configure
-          </Button>
-        )}
-      </div>
-    ),
+    renderCell: ConfigureProviderCell,
   },
 ];
 
@@ -157,6 +168,11 @@ export const ProvidersTabInner: React.FC<{
     }
   );
 
+  const configureProvider = (provider: string) => {
+    setIsConfiguringProviderDrawerOpen(true);
+    setConfiguringProvider(provider);
+  };
+
   return (
     <Tailwind>
       <div className="mx-32 my-16 min-h-screen">
@@ -173,11 +189,14 @@ export const ProvidersTabInner: React.FC<{
             </div>
 
             <div className="flex h-full min-h-[200px] items-center justify-center">
-              <ProviderTable
-                columns={columns}
-                providers={providers}
-                loading={configuredProvidersLoading}
-              />
+              <ConfigureProviderContext.Provider
+                value={{configureProvider: configureProvider}}>
+                <ProviderTable
+                  columns={columns}
+                  providers={providers}
+                  loading={configuredProvidersLoading}
+                />
+              </ConfigureProviderContext.Provider>
             </div>
           </div>
 
