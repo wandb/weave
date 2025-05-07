@@ -43,7 +43,7 @@ The following code sample demonstrates how to trace a video processing function 
 Before you can use the code sample, complete the prerequisites:
 
 1. Install `weave` and `moviepy==1.0.3`.
-2. Create a W&B account 
+2. Create a W&B account.
 
 :::important
 To avoid thread-safety issues, always pass the path to `VideoFileClip` objects instead of creating them outside the Weave `op`.
