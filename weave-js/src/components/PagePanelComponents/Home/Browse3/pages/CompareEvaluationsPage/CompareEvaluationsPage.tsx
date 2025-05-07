@@ -251,13 +251,16 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
-  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>('table');
+  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
+    'table'
+  );
   const [modelsAsRows, setModelsAsRows] = useState(false);
   const toggleModelsAsRows = useCallback(() => {
     setModelsAsRows(!modelsAsRows);
   }, [modelsAsRows]);
 
-  const nextViewMode = viewMode === 'split' ? 'table' : viewMode === 'table' ? 'detail' : 'split'
+  const nextViewMode =
+    viewMode === 'split' ? 'table' : viewMode === 'table' ? 'detail' : 'split';
 
   return (
     <VerticalBox
@@ -281,7 +284,9 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={() => setViewMode(nextViewMode)}>Toggle Display ({nextViewMode})</button>
+        <button onClick={() => setViewMode(nextViewMode)}>
+          Toggle Display ({nextViewMode})
+        </button>
         <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
       </HorizontalBox>
 
@@ -294,25 +299,23 @@ const ResultExplorer: React.FC<{
           // width: '50%',
           borderTop: '1px solid #e0e0e0',
         }}>
-
-        <Box style={{flex: 1, display: viewMode !== 'detail' ? 'block' : 'none'}}>
-        <ExampleCompareSectionTable
+        <Box
+          style={{flex: 1, display: viewMode !== 'detail' ? 'block' : 'none'}}>
+          <ExampleCompareSectionTable
             state={state}
             modelsAsRows={modelsAsRows}
           />
         </Box>
 
-        <Box style={{flex: 1, borderLeft: '1px solid #e0e0e0',
-          borderTop: '1px solid #e0e0e0',
-          display: viewMode !== 'table' ? 'block' : 'none',
-        }}>
+        <Box
+          style={{
+            flex: 1,
+            borderLeft: '1px solid #e0e0e0',
+            borderTop: '1px solid #e0e0e0',
+            display: viewMode !== 'table' ? 'block' : 'none',
+          }}>
           <ExampleCompareSectionDetail state={state} />
-
         </Box>
-
-
-
-
       </Box>
     </VerticalBox>
   );

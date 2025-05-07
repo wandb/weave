@@ -6,10 +6,9 @@ import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
 
 import {
-  MOON_100,
+  MOON_50,
   MOON_200,
   MOON_300,
-  MOON_50,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRef, parseRefMaybe} from '../../../../../../../../react';
