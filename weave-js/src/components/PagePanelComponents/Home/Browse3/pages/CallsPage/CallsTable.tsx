@@ -1252,7 +1252,7 @@ const useParentIdOptions = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
-  const {useCall2} = useWFHooks();
+  const {useCall} = useWFHooks();
   const callKey = effectiveFilter.parentId
     ? {
         entity,
@@ -1260,7 +1260,7 @@ const useParentIdOptions = (
         callId: effectiveFilter.parentId,
       }
     : null;
-  const parentCall = useCall2({key: callKey});
+  const parentCall = useCall({key: callKey});
   return useMemo(() => {
     if (parentCall.loading || parentCall.result == null) {
       return {};

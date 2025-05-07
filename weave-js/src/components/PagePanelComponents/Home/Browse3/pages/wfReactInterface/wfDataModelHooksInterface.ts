@@ -372,7 +372,8 @@ export interface UseGetRefsTypeParams {
 }
 
 export type WFDataModelHooksInterface = {
-  useCall: (
+  useCall: (params: UseCallParams) => Loadable<CallSchema | null>;
+  useCall2: (
     key: CallKey | null,
     opts?: {
       includeCosts?: boolean;
@@ -380,7 +381,6 @@ export type WFDataModelHooksInterface = {
       includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema | null>;
-  useCall2: (params: UseCallParams) => Loadable<CallSchema | null>;
   useCalls: (params: UseCallsParams) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     params: UseCallsStatsParams

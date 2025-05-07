@@ -179,7 +179,7 @@ export const SmallWeaveCallRef = ({
   noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useCall2} = useWFHooks();
+  const {useCall} = useWFHooks();
 
   const callKey = {
     entity: objRef.entityName,
@@ -187,7 +187,7 @@ export const SmallWeaveCallRef = ({
     callId: objRef.artifactName,
   };
 
-  const callResult = useCall2({key: callKey});
+  const callResult = useCall({key: callKey});
 
   const error = callResult.loading
     ? null

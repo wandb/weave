@@ -536,8 +536,8 @@ const useCallPeekRedirect = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
-  const {useCall2} = useWFHooks();
-  const {result: call} = useCall2({
+  const {useCall} = useWFHooks();
+  const {result: call} = useCall({
     key: {
       entity: params.entity,
       project: params.project,
