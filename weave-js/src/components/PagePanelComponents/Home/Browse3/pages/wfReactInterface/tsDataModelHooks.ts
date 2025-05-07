@@ -291,23 +291,6 @@ const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   }, [cachedCall, callRes, deepKey]);
 };
 
-// Legacy function to handle the core useCall call site
-const useCall2 = (
-  key: CallKey | null,
-  opts?: {
-    includeCosts?: boolean;
-    refetchOnRename?: boolean;
-    includeTotalStorageSize?: boolean;
-  }
-): Loadable<CallSchema | null> => {
-  return useCall({
-    key,
-    includeCosts: opts?.includeCosts,
-    refetchOnRename: opts?.refetchOnRename,
-    includeTotalStorageSize: opts?.includeTotalStorageSize,
-  });
-};
-
 const useCallsNoExpansion = (
   params: UseCallsParams
 ): Loadable<CallSchema[]> & Refetchable => {
@@ -2139,7 +2122,6 @@ export const convertISOToDate = (iso: string): Date => {
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
-  useCall2,
   useCalls,
   useCallsStats,
   useProjectHasCalls,
