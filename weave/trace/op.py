@@ -434,11 +434,11 @@ def _call_sync_func(
 
         if (
             op._accumulator
-            and isinstance(output, (Iterator, Generator))
+            and isinstance(output, (Iterator, Generator, AsyncIterator))
             and not isinstance(output, (str, bytes))
         ):
             # If an accumulator is set on the op directly (e.g., via @weave.op(accumulator=...))
-            # and the function returns a standard iterator/generator, apply the accumulator.
+            # and the function returns a standard iterator/generator, or an async iterator, apply the accumulator.
 
             # Create an _Accumulator helper instance
             # op._accumulator is Callable[[State | None, Value], State]
@@ -457,6 +457,7 @@ def _call_sync_func(
                 finish(acc_logic.get_state(), None)
 
             # Wrap the output iterator with the accumulation logic
+            # _IteratorWrapper can handle sync and async iterators through its __next__ and __anext__.
             return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
 
         # Original behavior: if no handler and no accumulator for an iterator,
@@ -551,8 +552,27 @@ async def _call_async_func(
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
-        finish(output)
-        return output
+
+        if (
+            op._accumulator
+            and isinstance(output, AsyncIterator)
+            and not isinstance(output, (str, bytes))
+        ):
+            acc_logic: _Accumulator = _Accumulator(op._accumulator)
+
+            def acc_on_yield(value: Any) -> None:
+                acc_logic.next(value)
+
+            def acc_on_error(e: Exception) -> None:
+                finish(acc_logic.get_state(), e)
+
+            def acc_on_close() -> None:
+                finish(acc_logic.get_state(), None)
+
+            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+        else:
+            finish(output)
+            return output
 
     try:
         res = await func(*args, **kwargs)
