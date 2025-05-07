@@ -6,10 +6,8 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 from .utils import (
-    DEFAULT_AUDIO_FORMAT,
     SUPPORTED_FORMATS,
     Audio,
-    AudioFormat,
     get_format_from_filename,
 )
 
@@ -23,9 +21,7 @@ except ImportError:
 if TYPE_CHECKING:
     import pydub
 
-DEFAULT_AUDIO_FORMAT = AudioFormat.MP3
-
-AudioType = Union[wave.Wave_read, Audio, "pydub.AudioSegment"]
+AudioType = Union[wave.Wave_read, Audio]
 
 
 def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -> None:
@@ -48,13 +44,13 @@ def save_wave(obj: wave.Wave_read, artifact: MemTraceFilesArtifact, name: str) -
 
 
 def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
+    if isinstance(obj, wave.Wave_read):
+        original_frame_position = obj.tell()
+        obj.rewind()
+        frame_bytes = obj.readframes(obj.getnframes())
+        audio = Audio(data=frame_bytes, fmt="wav")
     # Represents a wrapped audio file path which should be copied directly
-    if isinstance(obj, Audio):
-        # If file does not exist we can't copy it directly
-        exists = os.path.exists(obj.path)
-        if not exists:
-            raise ValueError(f"Audio file does not exist: {obj.path}")
-
+    else:
         ext = obj.file_ext
         # If it's not supported we can't copy it directly
         if ext not in SUPPORTED_FORMATS:
@@ -85,10 +81,11 @@ def save(obj: AudioType, artifact: MemTraceFilesArtifact, name: str) -> None:
 
 def load(
     artifact: MemTraceFilesArtifact, name: str
-) -> "wave.Wave_read | pydub.AudioSegment":
+) -> "Audio":
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith("audio."):
+
             fmt = get_format_from_filename(filename)
             if fmt == AudioFormat.UNSUPPORTED:
                 raise ValueError(
