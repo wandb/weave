@@ -23,6 +23,7 @@ export type KnownBaseObjectClassType =
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
+  error?: Error | null;
 };
 
 export type LoadableWithError<T> = {
@@ -36,6 +37,9 @@ export type CallKey = {
   project: string;
   callId: string;
 };
+
+export type CacheableCallKey = CallKey & Record<string, unknown>;
+
 export type CallSchema = CallKey & {
   spanName: string;
   displayName: string | null;
@@ -49,6 +53,7 @@ export type CallSchema = CallKey & {
   userId: string | null;
   runId: string | null;
   traceCall?: traceServerClientTypes.TraceCallSchema; // this will eventually be the entire call schema
+  totalStorageSizeBytes?: number | null;
 };
 
 export type CallFilter = {
@@ -114,6 +119,7 @@ export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   createdAtMs: number;
   val: T;
   userId?: string;
+  sizeBytes?: number;
 };
 
 export type ObjectVersionFilter = {
@@ -166,7 +172,11 @@ export type Refetchable = {
 export type WFDataModelHooksInterface = {
   useCall: (
     key: CallKey | null,
-    opts?: {includeCosts?: boolean}
+    opts?: {
+      includeCosts?: boolean;
+      refetchOnRename?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
@@ -183,6 +193,7 @@ export type WFDataModelHooksInterface = {
       refetchOnDelete?: boolean;
       includeCosts?: boolean;
       includeFeedback?: boolean;
+      includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
@@ -190,8 +201,18 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     query?: Query,
-    opts?: {skip?: boolean; refetchOnDelete?: boolean}
+    limit?: number,
+    opts?: {
+      skip?: boolean;
+      refetchOnDelete?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
+  useProjectHasCalls: (
+    entity: string,
+    project: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<boolean>;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,
@@ -253,16 +274,20 @@ export type WFDataModelHooksInterface = {
   useTableQueryStats: (
     entity: string,
     project: string,
-    digest: string,
-    opts?: {skip?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
+    digests: string[],
+    opts?: {skip?: boolean; includeStorageSize?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsBatchRes>;
   useRootObjectVersions: (
     entity: string,
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
-    opts?: {skip?: boolean; noAutoRefresh?: boolean}
+    opts?: {
+      skip?: boolean;
+      noAutoRefresh?: boolean;
+      includeStorageSize?: boolean;
+    }
   ) => LoadableWithError<ObjectVersionSchema[]>;
   useObjectDeleteFunc: () => {
     objectVersionsDelete: (

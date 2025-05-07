@@ -110,7 +110,7 @@ const CreateDatasetContext = createContext<
 // Provider component
 export const CreateDatasetProvider: React.FC<{
   children: React.ReactNode;
-  onPublishDataset: (dataset: any) => void;
+  onPublishDataset: (name: string, rows: any[]) => void;
 }> = ({children, onPublishDataset}) => {
   return (
     <DatasetEditProvider>
@@ -124,10 +124,15 @@ export const CreateDatasetProvider: React.FC<{
 // Inner provider that has access to the editor context
 const CreateDatasetProviderInner: React.FC<{
   children: React.ReactNode;
-  onPublishDataset: (dataset: any) => void;
+  onPublishDataset: (name: string, rows: any[]) => void;
 }> = ({children, onPublishDataset}) => {
   const [state, dispatch] = useReducer(createDatasetReducer, initialState);
   const editorContext = useDatasetEditContext();
+
+  interface ParseError {
+    message: string;
+    row?: number;
+  }
 
   const parseFile = useCallback(
     async (file: File) => {
@@ -145,21 +150,45 @@ const CreateDatasetProviderInner: React.FC<{
           });
         }
 
-        let result;
+        let transformedRows: Record<string, any>[];
         const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
         switch (fileExtension) {
           case 'csv':
-            result = await parseCSV(file);
+            const csvResult = await parseCSV(file);
+            if (csvResult.errors.length > 0) {
+              const errorMessage = csvResult.errors
+                .map((err: ParseError) => `Row ${err.row}: ${err.message}`)
+                .join('\n');
+              dispatch({
+                type: CREATE_DATASET_ACTIONS.SET_ERROR,
+                payload: `File parsing errors:\n${errorMessage}`,
+              });
+              return;
+            }
+            transformedRows = csvResult.data;
             break;
           case 'tsv':
-            result = await parseCSV(file, '\t');
+            const tsvResult = await parseCSV(file, '\t');
+            if (tsvResult.errors.length > 0) {
+              const errorMessage = tsvResult.errors
+                .map((err: ParseError) => `Row ${err.row}: ${err.message}`)
+                .join('\n');
+              dispatch({
+                type: CREATE_DATASET_ACTIONS.SET_ERROR,
+                payload: `File parsing errors:\n${errorMessage}`,
+              });
+              return;
+            }
+            transformedRows = tsvResult.data;
             break;
           case 'json':
-            result = await parseJSON(file);
+            const jsonResult = await parseJSON(file);
+            transformedRows = jsonResult.data;
             break;
           case 'jsonl':
-            result = await parseJSONL(file);
+            const jsonlResult = await parseJSONL(file);
+            transformedRows = jsonlResult.data;
             break;
           default:
             throw new Error(
@@ -167,30 +196,24 @@ const CreateDatasetProviderInner: React.FC<{
             );
         }
 
-        if (result.errors.length > 0) {
-          const errorMessage = result.errors
-            .map(err => `Row ${err.row}: ${err.message}`)
-            .join('\n');
-          dispatch({
-            type: CREATE_DATASET_ACTIONS.SET_ERROR,
-            payload: `File parsing errors:\n${errorMessage}`,
-          });
-          return;
-        }
-
-        // Transform the data into the format expected by EditableDatasetView
-        const transformedRows = result.data.map((row, index) => ({
-          ...row,
-          ___weave: {
-            id: `row-${index}`,
-            index,
-            isNew: true,
-          },
-        }));
+        // Add weave metadata to each row
+        transformedRows = transformedRows.map(
+          (row: Record<string, any>, index: number) => ({
+            ...row,
+            ___weave: {
+              id: `row-${index}`,
+              index,
+              isNew: true,
+            },
+          })
+        );
 
         // Create a Map of the transformed rows for the editor context
         const rowsMap = new Map<string, any>(
-          transformedRows.map(row => [row.___weave.id, row])
+          transformedRows.map((row: Record<string, any>) => [
+            row.___weave.id,
+            row,
+          ])
         );
 
         const transformedData: DatasetObjectVal = {
@@ -237,16 +260,8 @@ const CreateDatasetProviderInner: React.FC<{
       // Get the updated rows from the editor context
       const rows = editorContext.getRowsNoMeta();
 
-      // Update the dataset with the edited rows and mark it for publication
-      const updatedDataset = {
-        ...state.parsedData,
-        name: state.datasetName,
-        rows: JSON.stringify(rows),
-        publishNow: true,
-      };
-
-      // Call the onSaveDataset callback with the publish flag
-      onPublishDataset(updatedDataset);
+      // Call the onPublishDataset callback with just the name and rows
+      onPublishDataset(state.datasetName, rows);
 
       // Reset the state
       dispatch({type: CREATE_DATASET_ACTIONS.RESET});

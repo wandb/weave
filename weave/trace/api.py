@@ -107,7 +107,7 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -134,7 +134,7 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
 
     ref = client._save_object(obj, save_name, "latest")
 
-    if isinstance(ref, weave_client.ObjectRef):
+    if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
@@ -161,7 +161,7 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     return ref
 
 
-def ref(location: str) -> weave_client.ObjectRef:
+def ref(location: str) -> ObjectRef:
     """Construct a Ref to a Weave object.
 
     TODO: what happens if obj does not exist
@@ -187,12 +187,39 @@ def ref(location: str) -> weave_client.ObjectRef:
         location = str(client._ref_uri(name, version, "obj"))
 
     uri = parse_uri(location)
-    if not isinstance(uri, weave_client.ObjectRef):
+    if not isinstance(uri, ObjectRef):
         raise TypeError("Expected an object ref")
     return uri
 
 
-def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
+def get(uri: str | ObjectRef) -> Any:
+    """A convenience function for getting an object from a URI.
+
+    Many objects logged by Weave are automatically registered with the Weave
+    server. This function allows you to retrieve those objects by their URI.
+
+    Args:
+        uri: A fully-qualified weave ref URI.
+
+    Returns:
+        The object.
+
+    Example:
+
+    ```python
+    weave.init("weave_get_example")
+    dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
+    ref = weave.publish(dataset)
+
+    dataset2 = weave.get(ref)  # same as dataset!
+    ```
+    """
+    if isinstance(uri, ObjectRef):
+        return uri.get()
+    return ref(uri).get()
+
+
+def obj_ref(obj: Any) -> ObjectRef | None:
     return weave_client.get_ref(obj)
 
 
@@ -261,4 +288,5 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "get",
 ]

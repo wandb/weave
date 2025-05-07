@@ -22,6 +22,7 @@ import {
   isWeaveRef,
 } from './common';
 import {FilterTag} from './FilterTag';
+import {FilterTagStatus} from './FilterTagStatus';
 import {IdList} from './IdList';
 
 type FilterTagItemProps = {
@@ -53,7 +54,15 @@ export const FilterTagItem = ({
   if (fieldType === 'id') {
     value = <IdList ids={getStringList(item.value)} type="Call" />;
   } else if (fieldType === 'user') {
-    value = <UserLink userId={item.value} hasPopover={false} />;
+    // This additional night-aware is unfortunate, necessary to counteract
+    // the night-aware in FilterTag's useTagClasses call.
+    value = (
+      <div className="night-aware">
+        <UserLink userId={item.value} hasPopover={false} />
+      </div>
+    );
+  } else if (fieldType === 'status') {
+    value = <FilterTagStatus value={item.value} />;
   } else if (isWeaveRef(item.value)) {
     value = <SmallRef objRef={parseRef(item.value)} />;
   } else if (isValuelessOperator(item.operator)) {

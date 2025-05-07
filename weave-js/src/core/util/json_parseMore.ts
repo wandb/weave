@@ -1,6 +1,4 @@
 // @ts-nocheck
-/* tslint:disable */
-
 // Adapted from Crockford's JSON.parse (see https://github.com/douglascrockford/JSON-js)
 // This version adds support for NaN, -Infinity and Infinity.
 

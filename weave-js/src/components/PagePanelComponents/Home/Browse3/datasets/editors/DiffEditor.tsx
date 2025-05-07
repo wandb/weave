@@ -1,13 +1,14 @@
 import {DiffEditor as MonacoDiffEditor} from '@monaco-editor/react';
 import {Box} from '@mui/material';
-import type {editor as monacoEditor} from 'monaco-editor';
-import React from 'react';
+import React, {useRef} from 'react';
 
 interface DiffEditorProps {
   value: string;
   originalValue: string;
   onChange: (value: string) => void;
-  onClose: () => void;
+  onClose: (value?: any) => void;
+  language?: string;
+  disableClosing?: boolean;
 }
 
 export const DiffEditor: React.FC<DiffEditorProps> = ({
@@ -15,7 +16,61 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
   originalValue,
   onChange,
   onClose,
+  language,
+  disableClosing = false,
 }) => {
+  const editorRef = useRef<any>(null);
+  const currentValueRef = useRef(value);
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Get the modified editor (right side of diff)
+    const modifiedEditor = editor.getModifiedEditor();
+
+    // Ensure value is in sync
+    if (modifiedEditor && modifiedEditor.getValue() !== value) {
+      modifiedEditor.setValue(value);
+    }
+
+    // Track content changes
+    modifiedEditor.onDidChangeModelContent(() => {
+      const newValue = modifiedEditor.getValue();
+      currentValueRef.current = newValue;
+      onChange(newValue);
+    });
+
+    // Override the default Enter key behavior to prevent newlines on Cmd+Enter
+    modifiedEditor.onKeyDown((e: any) => {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
+        // Get the latest value before closing
+        onClose(modifiedEditor.getValue());
+      } else if (e.code === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Don't close if closing is disabled
+        if (disableClosing) {
+          return;
+        }
+
+        // Escape cancels the edit
+        onClose();
+      }
+    });
+  };
+
+  // Update ref when value changes
+  currentValueRef.current = value;
+
   return (
     <Box
       sx={
@@ -40,39 +95,8 @@ export const DiffEditor: React.FC<DiffEditorProps> = ({
         height="100%"
         original={originalValue}
         modified={value}
-        onMount={(editor: monacoEditor.IStandaloneDiffEditor, monaco) => {
-          const modifiedEditor = editor.getModifiedEditor();
-          modifiedEditor.addAction({
-            id: 'closeEditor',
-            label: 'Close Editor',
-            keybindings: [monaco.KeyMod.CtrlCmd + monaco.KeyCode.Enter],
-            run: () => {
-              onClose();
-            },
-          });
-
-          const keyDisposable = modifiedEditor.onKeyDown(e => {
-            if (e.browserEvent.key === 'Enter' && !e.browserEvent.metaKey) {
-              e.browserEvent.preventDefault();
-              e.browserEvent.stopPropagation();
-              modifiedEditor.trigger('keyboard', 'type', {text: '\n'});
-            }
-          });
-
-          const changeDisposable = modifiedEditor.onDidChangeModelContent(
-            () => {
-              const model = modifiedEditor.getModel();
-              if (model) {
-                onChange(model.getValue());
-              }
-            }
-          );
-
-          modifiedEditor.onDidDispose(() => {
-            keyDisposable.dispose();
-            changeDisposable.dispose();
-          });
-        }}
+        language={language}
+        onMount={handleEditorDidMount}
         options={{
           minimap: {enabled: false},
           scrollBeyondLastLine: true,

@@ -139,14 +139,7 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             isShown: isShowAll,
             key: 'moreModels',
-            menu: [
-              'jobs',
-              'automations',
-              'sweeps',
-              'reportlist',
-              'artifacts',
-              'overview',
-            ],
+            menu: ['jobs', 'automations', 'sweeps', 'reportlist', 'artifacts'],
           },
           {
             type: 'divider' as const,

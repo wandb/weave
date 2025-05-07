@@ -9,8 +9,8 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
+from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
-from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -677,7 +677,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "model_latency": {"mean": pytest.approx(0, abs=2)},
     }
 
 

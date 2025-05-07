@@ -9,6 +9,7 @@ import {useWeaveflowRouteContext} from '../context';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useClientSideCallRefExpansion} from '../pages/wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {
   ACTION_TYPES,
   DatasetDrawerProvider,
@@ -39,7 +40,13 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = props => {
       onClose={props.onClose}
       entity={props.entity}
       project={props.project}>
-      <AddToDatasetDrawerInner {...props} />
+      <CustomWeaveTypeProjectContext.Provider
+        value={{
+          entity: props.entity,
+          project: props.project,
+        }}>
+        <AddToDatasetDrawerInner {...props} />
+      </CustomWeaveTypeProjectContext.Provider>
     </DatasetDrawerProvider>
   );
 };
@@ -97,11 +104,20 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     entity,
     project,
     {callIds: selectedCallIds},
-    selectedCallIds.length // limit to fetch all selected calls
+    selectedCallIds.length, // limit to fetch all selected calls
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {includeFeedback: true}
   );
 
-  // Recursively expand all refs in inputs and output
-  const expandRefColumns = useMemo(() => new Set(['inputs', 'output']), []);
+  // Recursively expand all refs in inputs, output, and summary
+  const expandRefColumns = useMemo(
+    () => new Set(['inputs', 'output', 'summary']),
+    []
+  );
 
   // Use the enhanced useClientSideCallRefExpansion hook with recursiveUnwrap option,
   // but only for inputs.* fields

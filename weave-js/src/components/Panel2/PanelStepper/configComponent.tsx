@@ -19,15 +19,6 @@ export const PanelStepperConfig: React.FC<
     childPanelHandler,
   } = props;
 
-  // TODO (nicholaspun-wandb): Used for the "Slider Key" config option below
-  // const sliderKeys = useMemo(
-  //   () =>
-  //     Object.keys(keysAndTypes).filter(key =>
-  //       isAssignableTo(keysAndTypes[key], 'number')
-  //     ),
-  //   [keysAndTypes]
-  // );
-
   const handlerHasConfigComponent =
     childPanelHandler != null &&
     (childPanelHandler.ConfigComponent != null ||
@@ -36,11 +27,7 @@ export const PanelStepperConfig: React.FC<
 
   return (
     <>
-      {/*
-      TODO (nicholaspun-wandb): This technically works, but slider keys that aren't integral
-      numbers don't work well.
-
-      <ConfigOption label="Slider Key">
+      <ConfigPanel.ConfigOption label="Slider Key">
         <ModifiedDropdownConfigField
           selection
           search
@@ -48,19 +35,17 @@ export const PanelStepperConfig: React.FC<
           scrolling
           item
           direction="left"
-          options={sliderKeys.map(key => ({
+          options={(config?.validSliderKeys ?? []).map(key => ({
             key,
             value: key,
             text: key,
           }))}
-          value={config?.workingSliderKey ?? '_step'}
+          value={config?.workingSliderKey ?? config?.validSliderKeys?.[0]}
           onChange={(e, {value}) =>
             safeUpdateConfig({workingSliderKey: value as string})
           }
         />
-      </ConfigOption> 
-      
-      */}
+      </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label="Property Key">
         <ModifiedDropdownConfigField
           selection

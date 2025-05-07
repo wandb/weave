@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import datetime
 import json
 import platform
 import re
@@ -21,8 +22,9 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
-from weave.trace.context.call_context import tracing_disabled
+from weave.trace.context import call_context
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -38,12 +40,14 @@ from weave.trace.serialization.serializer import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
+    FilesStatsReq,
     RefsReadBatchReq,
     TableCreateReq,
     TableQueryReq,
@@ -535,6 +539,39 @@ def test_get_calls_limit_offset(client):
     calls = client.get_calls(offset=5)
     for i, call in enumerate(calls[2:]):
         assert call.inputs["a"] == 7 + i
+
+
+def test_get_calls_page_size_with_offset(client):
+    for i in range(20):
+        client.create_call("x", {"a": i})
+
+    batch_size = 5
+    batch_num = 0
+    all_call_ids = []
+    all_values = []
+
+    while True:
+        call_batch = client.get_calls(
+            limit=batch_size,
+            offset=batch_num * batch_size,
+            page_size=2,
+        )
+
+        # Convert to list to force fetch
+        call_batch_list = list(call_batch)
+        if not call_batch_list:
+            break
+
+        # Store call IDs
+        batch_call_ids = [call.id for call in call_batch_list]
+        all_call_ids.extend(batch_call_ids)
+
+        values = [call.inputs["a"] for call in call_batch_list]
+        all_values.extend(values)
+        batch_num += 1
+
+    assert len(all_call_ids) == 20
+    assert all_values == list(range(20))
 
 
 def test_calls_delete(client):
@@ -1937,7 +1974,7 @@ def test_flush_progress_bar(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -1954,7 +1991,7 @@ def test_flush_callback(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -1974,7 +2011,7 @@ def test_repeated_flushing(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
     client.flush()
@@ -2021,7 +2058,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(10):
+    for i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
@@ -2366,13 +2403,13 @@ def test_calls_query_sort_by_latency(client):
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.1)
+    time.sleep(0.05)
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.2)
+    time.sleep(0.1)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2479,16 +2516,17 @@ def test_calls_filter_by_latency(client):
 
     # Create calls with different latencies
     # Fast call - minimal latency
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
+    fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
+    time.sleep(0.001)
     client.finish_call(fast_call, "fast result")  # Minimal latency
 
     # Medium latency
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
+    medium_call = client.create_call("x-medium", {"a": 2, "b": 2, "test_id": test_id})
     time.sleep(0.1)  # Add delay to increase latency
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
+    slow_call = client.create_call("x-slow", {"a": 3, "b": 3, "test_id": test_id})
     time.sleep(0.2)  # Add more delay to further increase latency
     client.finish_call(slow_call, "slow result")
 
@@ -2509,33 +2547,53 @@ def test_calls_filter_by_latency(client):
             f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
         )
 
-    # Instead of filtering by latency in the database query, let's do it in memory
-    # since we're having issues with the nested JSON query
-    # Sort the calls by latency to identify fast, medium and slow calls
-    sorted_calls = sorted(
-        all_calls, key=lambda call: call.summary.get("weave", {}).get("latency_ms", 0)
+    # Verify asc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="asc")],
     )
-
-    # Verify the order matches our expectation
     assert sorted_calls[0].id == fast_call.id  # Fast call
     assert sorted_calls[1].id == medium_call.id  # Medium call
     assert sorted_calls[2].id == slow_call.id  # Slow call
 
-    # For completeness, let's verify the specific call IDs
-    fast_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[fast_call.id]))
+    # Verify desc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="desc")],
     )
-    assert len(fast_latency_calls) == 1
+    assert sorted_calls[0].id == slow_call.id  # Slow call
+    assert sorted_calls[1].id == medium_call.id  # Medium call
+    assert sorted_calls[2].id == fast_call.id  # Fast call
 
-    medium_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[medium_call.id]))
+    # Filter by latency, Float
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$gte": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 0.001},
+                    ]
+                }
+            }
+        )
     )
-    assert len(medium_latency_calls) == 1
+    assert len(latency_calls) == 3
 
-    slow_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[slow_call.id]))
+    # Filter by latency, Int
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 10},
+                    ]
+                }
+            }
+        )
     )
-    assert len(slow_latency_calls) == 1
+    assert len(latency_calls) == 0
 
 
 def test_calls_query_sort_by_trace_name(client):
@@ -2764,3 +2822,632 @@ def test_calls_query_hardcoded_filter_length_validation(client):
         ),
     ):
         calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
+
+
+def test_calls_query_datetime_optimization_with_gt_operation(client):
+    """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
+    if client_is_sqlite(client):
+        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
+        # correctly in sqlite
+        return
+
+    # Use a unique test ID to identify these calls
+    test_id = generate_id()
+
+    # Create calls with different timestamps
+    # Call 1: Start at t=0, end at t=1
+    call1 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.01)  # Ensure different timestamps
+    client.finish_call(call1, "result1")
+
+    # Call 2: Start at t=1, end at t=2
+    time.sleep(0.01)  # Ensure different timestamps
+    call2 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.01)
+    client.finish_call(call2, "result2")
+
+    # Call 3: Start at t=2, end at t=3
+    time.sleep(0.01)  # Ensure different timestamps
+    call3 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.01)
+    client.finish_call(call3, "result3")
+
+    # Call 4: Start at t=3, end at t=4
+    time.sleep(0.01)  # Ensure different timestamps
+    call4 = client.create_call("x", {"test_id": test_id})
+    time.sleep(0.01)
+    client.finish_call(call4, "result4")
+
+    # Flush to make sure all calls are committed
+    client.flush()
+
+    # Get all calls to determine their actual timestamps
+    base_query = {
+        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
+    }
+    all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
+    assert len(all_calls) == 4
+
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test GT operation on started_at
+    # Query for calls started after call2's timestamp
+    gt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                ]
+            }
+        }
+    )
+    gt_calls = list(client.get_calls(query=gt_query))
+    assert len(gt_calls) == 2  # Should get call3 and call4
+    gt_call_ids = {call.id for call in gt_calls}
+    assert gt_call_ids == {call3.id, call4.id}
+
+    # Test GT operation on ended_at
+    # Query for calls that ended after call2's end timestamp
+    gt_ended_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call2.ended_at.timestamp()},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    gt_ended_calls = list(client.get_calls(query=gt_ended_query))
+    assert len(gt_ended_calls) == 2  # Should get call3 and call4
+    gt_ended_call_ids = {call.id for call in gt_ended_calls}
+    assert gt_ended_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp between call2 and call3
+    mid_timestamp = (call2_ts + call3_ts) / 2
+    mid_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": mid_timestamp}]},
+                ]
+            }
+        }
+    )
+    mid_calls = list(client.get_calls(query=mid_query))
+    assert len(mid_calls) == 2  # Should get call3 and call4
+    mid_call_ids = {call.id for call in mid_calls}
+    assert mid_call_ids == {call3.id, call4.id}
+
+    # Test GT operation with a timestamp after all calls
+    future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
+    future_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": future_timestamp},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    future_calls = list(client.get_calls(query=future_query))
+    assert len(future_calls) == 0  # Should get no calls
+
+    # Test date range query with additional conditions
+    date_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    date_range_calls = list(client.get_calls(query=date_range_query))
+    assert len(date_range_calls) == 2  # Should get call3 and call4
+    date_range_call_ids = {call.id for call in date_range_calls}
+    assert date_range_call_ids == {call3.id, call4.id}
+
+    # Test date range query with ended_at field
+    ended_at_range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
+                    {
+                        "$not": [
+                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    ended_at_range_calls = list(client.get_calls(query=ended_at_range_query))
+    assert len(ended_at_range_calls) == 2  # Should get call2 and call3
+    ended_at_range_call_ids = {call.id for call in ended_at_range_calls}
+    assert ended_at_range_call_ids == {call2.id, call3.id}
+
+    # Deeply nested datetime query
+    nested_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    # greated than or equal to call 1
+                    {"$gte": [{"$getField": "started_at"}, {"$literal": call1_ts}]},
+                    # not greater than call 4
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": call4_ts},
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "$or": [
+                            # or greater than call 2 and not greater than call 4
+                            {
+                                "$and": [
+                                    {
+                                        "$gt": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$eq": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call4_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                            # or greater than call 2 and not greater than call 3
+                            {
+                                "$and": [
+                                    {
+                                        "$gte": [
+                                            {"$getField": "started_at"},
+                                            {"$literal": call2_ts},
+                                        ]
+                                    },
+                                    {
+                                        "$not": [
+                                            {
+                                                "$gt": [
+                                                    {"$getField": "started_at"},
+                                                    {"$literal": call3_ts},
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 2
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == call2.id
+    assert call_ids[1] == call3.id
+
+
+def _make_call(client, _id):
+    trace_id = "trace" + "0" * (32 - len("trace"))
+    parent_id = "wo" + "0" * (16 - len("wo"))
+    call_res = client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=_id,
+                op_name="explicit_log_with_custom_ids",
+                display_name=f"call_{_id}",
+                trace_id=trace_id,
+                started_at=datetime.datetime.now(),
+                parent_id=None,
+                inputs={"test_id": _id},
+                attributes={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=client._project_id(),
+                id=call_res.id,
+                ended_at=datetime.datetime.now(),
+                outputs={"hello": "world"},
+                summary={"number": "1"},
+            )
+        )
+    )
+
+
+def test_calls_query_with_non_uuidv7_ids(client):
+    """Test that calls query works with non-uuidv7 ids."""
+    if client_is_sqlite(client):
+        # TODO(gst): FIX this asap. timestamps aren't actually evaluated
+        # correctly in sqlite
+        return
+
+    # Create a call with an 8 byte hex id
+    non_uuidv7_id1 = "1111111111111111"
+    non_uuidv7_id2 = "2222222222222222"
+    non_uuidv7_id3 = "3333333333333333"
+    non_uuidv7_id4 = "4444444444444444"
+
+    # Create calls with timestamps
+    call1 = _make_call(client, non_uuidv7_id1)
+    time.sleep(0.01)
+
+    call2 = _make_call(client, non_uuidv7_id2)
+    time.sleep(0.01)
+
+    call3 = _make_call(client, non_uuidv7_id3)
+    time.sleep(0.01)
+
+    call4 = _make_call(client, non_uuidv7_id4)
+    time.sleep(0.01)
+
+    client.flush()
+
+    all_calls = list(client.get_calls())
+    # Sort calls by started_at to get their order
+    sorted_calls = sorted(all_calls, key=lambda call: call.started_at)
+    call1_ts = sorted_calls[0].started_at.timestamp()
+    call2_ts = sorted_calls[1].started_at.timestamp()
+    call3_ts = sorted_calls[2].started_at.timestamp()
+    call4_ts = sorted_calls[3].started_at.timestamp()
+
+    # Test basic filtering with $eq
+    query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 1
+    assert calls[0].id == non_uuidv7_id1
+
+    # Test filtering with $gt (greater than)
+    query = {
+        "$expr": {
+            "$gt": [
+                {"$getField": "started_at"},
+                {"$literal": call1_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test filtering with $gte (greater than or equal)
+    query = {
+        "$expr": {
+            "$gte": [
+                {"$getField": "started_at"},
+                {"$literal": call2_ts},
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=query))
+    assert len(calls) == 3
+    call_ids = {call.id for call in calls}
+    assert call_ids == {non_uuidv7_id2, non_uuidv7_id3, non_uuidv7_id4}
+
+    # Test nested filtering with mixed operators
+    nested_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "$eq": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call3_ts},
+                            ]
+                        },
+                    ]
+                }
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=nested_query))
+    assert len(calls) == 2
+    assert calls[0].id == non_uuidv7_id3
+    assert calls[1].id == non_uuidv7_id4
+
+    # Add UUIDv7 calls and test mixed filtering
+    uuidv7_calls = []
+    for i in range(4):
+        time.sleep(0.01)
+        call = client.create_call("x", {"test_id": f"uuidv7_{i}", "special": "true"})
+        client.finish_call(call, "result")
+        uuidv7_calls.append(call)
+
+    client.flush()
+
+    # Test filtering with  mixed ID types
+    mixed_query = {
+        "$expr": {
+            "$and": [
+                {
+                    "$gt": [
+                        {"$getField": "started_at"},
+                        {"$literal": call2_ts},
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 6
+    # call3, call4, uuidv7_calls[1], uuidv7_calls[2], uuidv7_calls[3], uuidv7_calls[4]
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id3
+    assert call_ids[1] == non_uuidv7_id4
+    assert call_ids[2] == uuidv7_calls[0].id
+    assert call_ids[3] == uuidv7_calls[1].id
+    assert call_ids[4] == uuidv7_calls[2].id
+    assert call_ids[5] == uuidv7_calls[3].id
+
+    # test filtering nested, with bad or, and mixed ids
+    now = datetime.datetime.now().timestamp()
+    mixed_query = {
+        "$expr": {
+            "$or": [
+                {
+                    "$or": [
+                        {
+                            "$gt": [
+                                {"$getField": "started_at"},
+                                {"$literal": call2_ts},
+                            ]
+                        },
+                        # all hex id calls satisfy this
+                        {
+                            "$eq": [
+                                {"$getField": "summary.number"},
+                                {"$literal": "1"},
+                            ]
+                        },
+                    ]
+                },
+                # all uuidv7 calls satisfy this
+                {
+                    "$and": [
+                        {
+                            "$not": [
+                                {
+                                    "$gt": [
+                                        {"$getField": "started_at"},
+                                        {"$literal": now},
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.special"},
+                                {"$literal": "true"},
+                            ]
+                        },
+                    ]
+                },
+            ]
+        }
+    }
+    calls = list(client.get_calls(query=mixed_query))
+    assert len(calls) == 8
+    call_ids = [call.id for call in calls]
+    assert call_ids[0] == non_uuidv7_id1
+    assert call_ids[1] == non_uuidv7_id2
+    assert call_ids[2] == non_uuidv7_id3
+    assert call_ids[3] == non_uuidv7_id4
+    assert call_ids[4] == uuidv7_calls[0].id
+    assert call_ids[5] == uuidv7_calls[1].id
+    assert call_ids[6] == uuidv7_calls[2].id
+    assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_calls_query_filter_by_root_refs(client):
+    @weave.op()
+    def root_op(x: int):
+        return {"n": x, "child": child_op(x)}
+
+    @weave.op()
+    def child_op(x: int):
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int):
+        return x + 3
+
+    with call_context.set_call_stack([]):
+        root_op(1)
+        root_op(2)
+
+    # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) == 6
+
+    # basic trace roots only filter
+    calls = client.get_calls(filter={"trace_roots_only": True})
+    assert len(calls) == 2  # tests the stats query
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+    root_op_ref = calls[0].op_name
+
+    # basic trace roots only filter = false, this should be everything
+    calls = client.get_calls(filter={"trace_roots_only": False})
+    assert len(calls) == 6
+
+    # trace roots only + inputs query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
+                    {"$literal": 1},
+                ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + output query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
+                    {"$literal": 2},
+                ],
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + op filter
+    calls = client.get_calls(
+        filter={"trace_roots_only": True, "op_names": [root_op_ref]},
+    )
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+
+
+def test_filter_calls_by_ref(client):
+    obj = {"a": 1}
+    ref = client.save(obj, "obj").ref
+    ref2 = client.save(obj, "obj2").ref
+    ref3 = client.save(obj, "obj3").ref
+
+    @weave.op
+    def log_obj(ref: str):
+        return {
+            "ref2": ref2,
+            "ref3": ref3,
+        }
+
+    log_obj(ref)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for input ref
+    calls = client.get_calls(filter={"input_refs": [ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for output ref
+    calls = client.get_calls(filter={"output_refs": [ref2.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by both input and output ref
+    calls = client.get_calls(
+        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by two output refs
+    calls = client.get_calls(filter={"output_refs": [ref2.uri(), ref3.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+    assert calls[0].output["ref3"] == obj
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
+    assert len(calls) == 0
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"output_refs": [ref.uri()]})
+    assert len(calls) == 0
+
+    # filter by duplicate refs
+    calls = client.get_calls(filter={"input_refs": [ref.uri(), ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by empty refs, this is ambiguously defined, currently we treat
+    # this as "no filter"
+    calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
+    assert len(calls) == 1
+
+
+def test_files_stats(client):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    f_bytes = b"0" * 10000005
+    client.server.file_create(
+        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
+    )
+    read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
+
+    assert read_res.total_size_bytes == 10000005

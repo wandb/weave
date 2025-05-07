@@ -10,6 +10,7 @@ export type PanelStepperConfigType = {
   workingPanelId: string | undefined;
   workingKeyAndType: {key: string; type: Type};
   workingSliderKey: string | null;
+  validSliderKeys: string[];
 };
 
 export const LIST_ANY_TYPE: Type = {

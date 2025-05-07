@@ -260,7 +260,7 @@ However, often LLM applications have additional logic (such as pre/post processi
         return f"Hello, {name}!"
     ```
 
-    4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
+    4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, fields, etc.
 
     1. One common use case is just appending a timestamp to the function's name.
 
@@ -272,7 +272,7 @@ However, often LLM applications have additional logic (such as pre/post processi
             return ...
         ```
 
-    2. You can also get creative with custom attributes
+    2. You can also log custom metadata using `.attributes`
 
         ```py
         def custom_attribute_name(call):
@@ -335,12 +335,12 @@ However, often LLM applications have additional logic (such as pre/post processi
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
-    When calling tracked functions, you can add additional metadata to the call by using the [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
+    When calling tracked functions, you can add additional metadata to the call by using [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
 
     ```python showLineNumbers
     # ... continued from above ...
 
-    # Add additional "attributes" to the call
+    # Add additional attributes to the call
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
     ```
@@ -424,7 +424,7 @@ You can also manually create Calls using the API directly.
     2. Find the call you want to view in the list
     3. Click on the call to open its details page
     
-    The details page will show the call's inputs, outputs, runtime, and any additional attributes or metadata.
+    The details page will show the call's inputs, outputs, runtime, and any additional metadata.
     
     ![View Call in Web App](../../../static/img/screenshots/basic_call.png)
     </TabItem>
@@ -760,6 +760,89 @@ Calculated Fields:
     * Cost
     * Duration
     * Status
+
+## Saved views 
+
+You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
+
+## View a W&B run in the Traces table
+
+With Weave, you can trace function calls in your code and link them directly to the [W&B runs](https://docs.wandb.ai/guides/runs/) in which they were executed. 
+When you trace a function with @weave.op() and call it inside a wandb.init() context, Weave automatically associates the trace with the W&B run. 
+Links to any associated runs are shown in the Traces table.
+
+### Python example
+
+The following Python code shows how traced operations are linked to W&B
+runs when executed inside a `wandb.init()` context. These traces appear in the
+Weave UI and are associated with the corresponding run.
+
+```python 
+import wandb
+import weave
+
+def example_wandb(projname):
+    # Split projname into entity and project
+    entity, project = projname.split("/", 1)
+
+    # Initialize Weave context for tracing
+    weave.init(projname)
+
+    # Define a traceable operation
+    @weave.op()
+    def say(message: str) -> str:
+        return f"I said: {message}"
+
+    # First W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 1",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+    # Second W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 2",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world from experiment 2!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+
+if __name__ == "__main__":
+    # Replace this with your actual W&B username/project
+    example_wandb("your-username/your-project")
+```
+
+To use the code sample:
+
+1. In the terminal, install dependencies:
+
+   ```bash
+   pip install wandb weave
+   ```
+
+2. Log in to W&B:
+
+   ```bash
+   wandb login
+   ```
+
+3. In the script, replace `your-username/your-project` with your actual W&B entity/project.
+4. Run the script:
+
+   ```bash
+   python weave_trace_with_wandb.py
+   ```
+5. Visit [https://weave.wandb.ai](https://weave.wandb.ai) and select your project.
+6. In the **Traces** tab, view the trace output. Links to any associated runs are shown in the Traces table.
 
 ## Configure autopatching
 

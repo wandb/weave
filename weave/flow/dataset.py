@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Iterator
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import field_validator
@@ -7,10 +8,13 @@ from typing_extensions import Self
 import weave
 from weave.flow.obj import Object
 from weave.flow.util import short_str
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
-from weave.trace.weave_client import Call
+from weave.trace.weave_client import (
+    Call,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -71,6 +75,48 @@ class Dataset(Object):
 
         return pd.DataFrame(self.rows)
 
+    def add_rows(self, rows: Iterable[dict]) -> "Dataset":
+        """Create a new dataset version by appending rows to the existing dataset.
+
+        This is useful for adding examples to large datasets without having to
+        load the entire dataset into memory.
+
+        Args:
+            rows: The rows to add to the dataset.
+
+        Returns:
+            The updated dataset.
+        """
+        client = require_weave_client()
+        if not isinstance(self.rows, WeaveTable) or not self.rows.table_ref:
+            raise TypeError(
+                "This dataset is not saved to weave. Call weave.publish(dataset) "
+                "to save the dataset before adding rows."
+            )
+        if self.rows.table_ref.project != client.project:
+            raise ValueError(
+                "This dataset is not saved to the same project as the current weave client. "
+                "Client is in project:  "
+                + client.project
+                + " but dataset is in project: "
+                + self.rows.table_ref.project
+            )
+        if self.rows.table_ref.entity != client.entity:
+            raise ValueError(
+                "This dataset is not saved to the same entity as the current weave client. "
+                "Client is in entity: "
+                + client.entity
+                + " but dataset is in entity: "
+                + self.rows.table_ref.entity
+            )
+
+        new_table = client._append_to_table(self.rows.table_ref.digest, list(rows))
+        new_dataset = Dataset(
+            name=self.name, description=self.description, rows=new_table
+        )
+        weave.publish(new_dataset, name=self.name)
+        return new_dataset
+
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:
         if weave_isinstance(rows, WeaveTable):
@@ -106,3 +152,32 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
+
+    def __str__(self) -> str:
+        return f"Dataset({{\n    features: {list(self.columns_names)},\n    num_rows: {self.num_rows}\n}})"
+
+    @cached_property
+    def columns_names(self) -> list[str]:
+        return list(self.rows[0].keys())
+
+    @cached_property
+    def num_rows(self) -> int:
+        return len(self.rows)
+
+    def select(self, indices: Iterable[int]) -> Self:
+        """
+        Select rows from the dataset based on the provided indices.
+
+        Args:
+            indices: An iterable of integer indices specifying which rows to select.
+
+        Returns:
+            A new Dataset object containing only the selected rows.
+        """
+        # Ensure indices is not empty before proceeding
+        indices_list = list(indices)
+        if not indices_list:
+            raise ValueError("Cannot select rows with an empty set of indices.")
+
+        selected_rows = [self[i] for i in indices_list]
+        return self.__class__(rows=selected_rows)

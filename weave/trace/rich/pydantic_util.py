@@ -9,12 +9,14 @@ from rich.table import Table
 from weave.trace import util
 
 
-def dict_to_table(d: dict[str, Any]) -> Table:
+def dict_to_table(d: dict[str, Any], *, filter_none_values: bool = False) -> Table:
     """Create a two-column table from a dictionary."""
     table = Table(show_header=False)
     table.add_column("Key", justify="right", style="bold cyan")
     table.add_column("Value")
     for k, v in d.items():
+        if filter_none_values and v is None:
+            continue
         table.add_row(k, str(v))
     return table
 
@@ -28,9 +30,9 @@ def table_to_str(table: Table) -> str:
     return capture.get().strip()
 
 
-def model_to_table(model: BaseModel) -> Table:
+def model_to_table(model: BaseModel, *, filter_none_values: bool = False) -> Table:
     """Create a two-column table from a Pydantic model."""
-    return dict_to_table(model.model_dump())
+    return dict_to_table(model.model_dump(), filter_none_values=filter_none_values)
 
 
 def model_to_str(model: BaseModel) -> Table:

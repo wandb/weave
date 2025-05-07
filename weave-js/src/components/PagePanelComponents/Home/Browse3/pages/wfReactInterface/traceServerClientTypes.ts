@@ -73,11 +73,13 @@ export type TraceCallSchema = {
   summary?: SummaryMap;
   wb_run_id?: string;
   wb_user_id?: string;
+  total_storage_size_bytes?: number;
 };
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
   include_costs?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -112,6 +114,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_total_storage_size?: boolean;
 };
 
 export type TraceCallsQueryRes = {
@@ -122,10 +125,12 @@ export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   query?: Query;
+  limit?: number;
 };
 
 export type TraceCallsQueryStatsRes = {
   count: number;
+  total_storage_size_bytes?: number;
 };
 
 export type TraceCallsDeleteReq = {
@@ -208,6 +213,7 @@ export type TraceObjQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   metadata_only?: boolean;
+  include_storage_size?: boolean;
 };
 
 export interface TraceObjSchema<
@@ -225,6 +231,7 @@ export interface TraceObjSchema<
   base_object_class?: OBC;
   val: T;
   wb_user_id?: string;
+  size_bytes?: number;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {
@@ -284,13 +291,18 @@ export type TraceTableQueryReq = {
   sort_by?: SortBy[];
 };
 
-export type TraceTableQueryStatsReq = {
+export type TraceTableQueryStatsBatchReq = {
   project_id: string;
-  digest: string;
+  digests: string[];
+  include_storage_size?: boolean;
 };
 
-export type TraceTableQueryStatsRes = {
-  count: number;
+export type TraceTableQueryStatsBatchRes = {
+  tables: Array<{
+    digest: string;
+    count: number;
+    storage_size_bytes: number;
+  }>;
 };
 
 export type TraceTableQueryRes = {
@@ -308,6 +320,14 @@ export type TraceFileContentReadReq = {
 
 export type TraceFileContentReadRes = {
   content: ArrayBuffer;
+};
+
+export type FilesStatsReq = {
+  project_id: string;
+};
+
+export type FilesStatsRes = {
+  total_size_bytes: number;
 };
 
 export type CompletionsCreateInputs = {

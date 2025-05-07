@@ -20,7 +20,7 @@ export const PanelStepper: React.FC<
 
   const stepsNode = opPick({
     obj: filteredNode,
-    key: constString(config?.workingSliderKey ?? '_step'),
+    key: constString(config?.workingSliderKey!),
   });
   const {result: stepsNodeResult, loading: stepsNodeLoading} =
     useNodeValue(stepsNode);
@@ -30,9 +30,9 @@ export const PanelStepper: React.FC<
       return;
     }
 
-    const newSteps: number[] = [...new Set<number>(stepsNodeResult)].sort(
-      (a, b) => a - b
-    );
+    const newSteps: number[] = [...new Set<number>(stepsNodeResult)]
+      .filter(n => n != null)
+      .sort((a, b) => a - b);
 
     const currentConfigSteps = config?.steps;
 
@@ -45,11 +45,10 @@ export const PanelStepper: React.FC<
       safeUpdateConfig({steps: newSteps});
     }
 
-    const configCurrentStep = config?.currentStep ?? -1;
+    const configCurrentStep = config?.currentStep;
     const shouldUpdateCurrentStep =
       hasStepsChanged ||
       configCurrentStep === undefined ||
-      configCurrentStep < 0 ||
       !newSteps.includes(configCurrentStep);
 
     if (shouldUpdateCurrentStep) {
@@ -58,58 +57,72 @@ export const PanelStepper: React.FC<
   }, [stepsNodeResult, stepsNodeLoading, config, safeUpdateConfig]);
 
   return (
-    <>
-      {outputNode != null && !isVoidNode(outputNode) && (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        padding: '2px',
+        overflowY: 'auto',
+      }}>
+      {outputNode != null && !isVoidNode(outputNode) ? (
+        <PanelComp2
+          input={outputNode}
+          inputType={outputNode.type}
+          loading={props.loading}
+          panelSpec={childPanelHandler as PanelStack}
+          configMode={false}
+          config={props.config}
+          context={props.context}
+          updateConfig={props.updateConfig}
+          updateContext={props.updateContext}
+          updateInput={props.updateInput}
+        />
+      ) : (
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
             height: '100%',
-            padding: '2px',
-            overflowY: 'auto',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#666',
+            fontSize: '14px',
           }}>
-          <PanelComp2
-            input={outputNode}
-            inputType={outputNode.type}
-            loading={props.loading}
-            panelSpec={childPanelHandler as PanelStack}
-            configMode={false}
-            config={props.config}
-            context={props.context}
-            updateConfig={props.updateConfig}
-            updateContext={props.updateContext}
-            updateInput={props.updateInput}
-          />
-          {(config?.steps?.length || 0) > 0 && (
-            <div
-              style={{
-                padding: '8px',
-                borderTop: '1px solid #ddd',
-                backgroundColor: '#f8f8f8',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginTop: '8px',
-              }}>
-              Step:{' '}
-              <SliderInput
-                min={config!.steps![0]}
-                max={config!.steps![config!.steps!.length - 1]}
-                minLabel={config!.steps![0].toString()}
-                maxLabel={config!.steps![config!.steps!.length - 1].toString()}
-                hasInput={true}
-                value={config!.currentStep!}
-                step={1}
-                ticks={config!.steps}
-                onChange={val => {
-                  safeUpdateConfig({currentStep: val});
-                }}
-              />
-            </div>
-          )}
+          <div>
+            No data found for property <i>{config?.workingKeyAndType?.key}</i>{' '}
+            with slider key <i>{config?.workingSliderKey}</i>
+          </div>
         </div>
       )}
-    </>
+      {(config?.steps?.length || 0) > 0 && (
+        <div
+          style={{
+            padding: '8px',
+            borderTop: '1px solid #ddd',
+            backgroundColor: '#f8f8f8',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginTop: '8px',
+          }}>
+          Step:{' '}
+          <SliderInput
+            min={config!.steps![0]}
+            max={config!.steps![config!.steps!.length - 1]}
+            minLabel={config!.steps![0].toString()}
+            maxLabel={config!.steps![config!.steps!.length - 1].toString()}
+            hasInput={true}
+            value={config!.currentStep!}
+            step={1}
+            ticks={config!.steps}
+            onChange={val => {
+              safeUpdateConfig({currentStep: val});
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 };

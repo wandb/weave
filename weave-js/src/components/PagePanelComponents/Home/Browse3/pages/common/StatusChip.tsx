@@ -4,6 +4,7 @@
  */
 import {IconName} from '@wandb/weave/components/Icon';
 import {IconOnlyPill, Pill, TagColorName} from '@wandb/weave/components/Tag';
+import _ from 'lodash';
 import React from 'react';
 
 import {Tooltip} from '../../../../../Tooltip';
@@ -11,9 +12,18 @@ import {Tooltip} from '../../../../../Tooltip';
 export const CALL_STATUS = ['SUCCESS', 'DESCENDANT_ERROR', 'ERROR', 'UNSET'];
 export type CallStatusType = (typeof CALL_STATUS)[number];
 
+export const STATUS_TO_FILTER: Record<CallStatusType, string> = {
+  SUCCESS: 'success',
+  UNSET: 'running',
+  ERROR: 'error',
+};
+export const FILTER_TO_STATUS: Record<string, CallStatusType> =
+  _.invert(STATUS_TO_FILTER);
+
 type StatusChipProps = {
   value: CallStatusType;
   iconOnly?: boolean;
+  tooltipOverride?: string;
 };
 
 type CallStatusInfo = {
@@ -49,7 +59,11 @@ export const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
   },
 };
 
-export const StatusChip = ({value, iconOnly}: StatusChipProps) => {
+export const StatusChip = ({
+  value,
+  iconOnly,
+  tooltipOverride,
+}: StatusChipProps) => {
   const statusInfo = STATUS_INFO[value];
   const {icon, color, label, tooltip} = statusInfo;
 
@@ -58,5 +72,10 @@ export const StatusChip = ({value, iconOnly}: StatusChipProps) => {
   ) : (
     <Pill icon={icon} color={color} label={label} />
   );
-  return <Tooltip trigger={<span>{pill}</span>} content={tooltip} />;
+  return (
+    <Tooltip
+      trigger={<span>{pill}</span>}
+      content={tooltipOverride ?? tooltip}
+    />
+  );
 };

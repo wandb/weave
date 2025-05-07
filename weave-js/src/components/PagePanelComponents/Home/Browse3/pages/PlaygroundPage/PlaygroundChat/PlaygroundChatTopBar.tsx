@@ -12,11 +12,14 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
 import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
+import {ProviderOption} from './LLMDropdownOptions';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
+
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -27,7 +30,11 @@ type PlaygroundChatTopBarProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
   isTeamAdmin: boolean;
-  onConfigureProvider: () => void;
+  refetchConfiguredProviders: () => void;
+  refetchCustomLLMs: () => void;
+  llmDropdownOptions: ProviderOption[];
+  areProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -47,10 +54,13 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   playgroundStates,
   setPlaygroundStates,
   isTeamAdmin,
-  onConfigureProvider,
+  refetchConfiguredProviders,
+  refetchCustomLLMs,
+  llmDropdownOptions,
+  areProvidersLoading,
+  customProvidersResult,
 }) => {
   const history = useHistory();
-  const isLastChat = idx === playgroundStates.length - 1;
   const onlyOneChat = playgroundStates.length === 1;
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -63,15 +73,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         messages: [DEFAULT_SYSTEM_MESSAGE],
       },
     } as OptionalTraceCallSchema);
-  };
-
-  const handleCompare = () => {
-    if (onlyOneChat) {
-      setPlaygroundStates([
-        ...playgroundStates,
-        JSON.parse(JSON.stringify(playgroundStates[0])),
-      ]);
-    }
   };
 
   const handleModelChange = (
@@ -121,7 +122,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           backgroundColor: 'transparent',
         }}>
-        {!onlyOneChat && <Tag label={`${idx + 1}`} />}
+        <Tag label={`${idx + 1}`} />
         <LLMDropdown
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
@@ -130,11 +131,29 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           entity={entity}
           project={project}
           isTeamAdmin={isTeamAdmin}
-          onConfigureProvider={onConfigureProvider}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          refetchCustomLLMs={refetchCustomLLMs}
+          llmDropdownOptions={llmDropdownOptions}
+          areProvidersLoading={areProvidersLoading}
+          customProvidersResult={customProvidersResult}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
         )}
+        <Button
+          tooltip={'Chat settings'}
+          icon="settings-parameters"
+          size="medium"
+          variant="ghost"
+          active={settingsTab === idx}
+          onClick={() => {
+            if (settingsTab === idx) {
+              setSettingsTab(null);
+            } else {
+              setSettingsTab(idx);
+            }
+          }}
+        />
       </Box>
       <Box
         sx={{
@@ -145,53 +164,27 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         }}>
         <Button
           tooltip={'Clear chat'}
-          icon="sweeps-broom"
+          icon="randomize-reset-reload"
           size="medium"
           variant="ghost"
           onClick={() => setConfirmClear(true)}
         />
-        {onlyOneChat ? (
-          <Button
-            tooltip={'Add chat'}
-            endIcon="swap"
-            size="medium"
-            variant="ghost"
-            onClick={handleCompare}>
-            Compare
-          </Button>
-        ) : (
-          <Button
-            tooltip={'Remove chat'}
-            endIcon="close"
-            size="medium"
-            variant="ghost"
-            onClick={() => {
-              if (settingsTab === idx) {
-                setSettingsTab(0);
-              }
-              setPlaygroundStates(
-                playgroundStates.filter((_, index) => index !== idx)
-              );
-            }}>
-            Remove
-          </Button>
-        )}
-        {isLastChat && (
-          <Button
-            tooltip={'Chat settings'}
-            icon="settings-parameters"
-            size="medium"
-            variant="ghost"
-            active={settingsTab !== null}
-            onClick={() => {
-              if (settingsTab !== null) {
-                setSettingsTab(null);
-              } else {
-                setSettingsTab(idx);
-              }
-            }}
-          />
-        )}
+
+        <Button
+          endIcon="close"
+          size="medium"
+          variant="ghost"
+          disabled={onlyOneChat}
+          tooltip={onlyOneChat ? 'Cannot remove last chat' : 'Remove chat'}
+          onClick={() => {
+            if (settingsTab === idx) {
+              setSettingsTab(0);
+            }
+            setPlaygroundStates(
+              playgroundStates.filter((_, index) => index !== idx)
+            );
+          }}
+        />
       </Box>
       <ConfirmClearModal
         open={confirmClear}

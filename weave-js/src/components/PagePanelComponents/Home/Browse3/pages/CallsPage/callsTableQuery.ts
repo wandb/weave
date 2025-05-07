@@ -51,13 +51,21 @@ export const useCallsForQuery = (
   gridPage: GridPaginationModel,
   gridSort?: GridSortModel,
   expandedColumns?: Set<string>,
-  columns?: string[]
+  columns?: string[],
+  options?: {
+    includeTotalStorageSize?: boolean;
+  }
 ): {
   costsLoading: boolean;
   result: CallSchema[];
   loading: boolean;
   total: number;
   refetch: () => void;
+  storageSizeLoading: boolean;
+  storageSizeResults: Map<string, number> | null;
+  primaryError?: Error | null;
+  costsError?: Error | null;
+  storageSizeError?: Error | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -84,9 +92,16 @@ export const useCallsForQuery = (
     }
   );
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
-    refetchOnDelete: true,
-  });
+  const callsStats = useCallsStats(
+    entity,
+    project,
+    lowLevelFilter,
+    filterBy,
+    undefined, // limit
+    {
+      refetchOnDelete: true,
+    }
+  );
 
   const callResults = useMemo(() => {
     return getFeedbackMerged(calls.result ?? []);
@@ -130,6 +145,37 @@ export const useCallsForQuery = (
     }
   );
 
+  const storageSizeCols = useMemo(() => ['id', 'total_storage_size_bytes'], []);
+  const storageSizeFilter = costFilter;
+
+  const storageSize = useCalls(
+    entity,
+    project,
+    storageSizeFilter,
+    effectiveLimit,
+    undefined,
+    undefined,
+    undefined,
+    storageSizeCols,
+    undefined,
+    {
+      skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+      includeTotalStorageSize: true,
+    }
+  );
+
+  const storageSizeResults = useMemo(() => {
+    if (storageSize.loading) {
+      return null;
+    }
+    return new Map(
+      storageSize.result?.map(r => [
+        r.callId,
+        r.totalStorageSizeBytes as number,
+      ])
+    );
+  }, [storageSize]);
+
   const costResults = useMemo(() => {
     return getFeedbackMerged(costs.result ?? []);
   }, [costs]);
@@ -147,11 +193,15 @@ export const useCallsForQuery = (
         result: [],
         total: 0,
         refetch,
+        storageSizeLoading: storageSize.loading,
+        storageSizeResults: null,
       };
     }
 
     return {
       costsLoading: costs.loading,
+      storageSizeLoading: storageSize.loading,
+      storageSizeResults,
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
       result: calls.loading
@@ -161,8 +211,23 @@ export const useCallsForQuery = (
         : callResults,
       total,
       refetch,
+      primaryError: calls.error,
+      costsError: costs.error,
+      storageSizeError: storageSize.error,
     };
-  }, [callResults, calls.loading, total, costs.loading, costResults, refetch]);
+  }, [
+    callResults,
+    calls.loading,
+    total,
+    costs.loading,
+    costResults,
+    refetch,
+    storageSize.loading,
+    storageSizeResults,
+    calls.error,
+    costs.error,
+    storageSize.error,
+  ]);
 };
 
 export const useFilterSortby = (
@@ -233,7 +298,7 @@ const getFilterBy = (
   return {$expr: filterByRaw} as Query;
 };
 
-const convertHighLevelFilterToLowLevelFilter = (
+export const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   return {
@@ -245,6 +310,33 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+// Warning: This is a lossy conversion, there are things we
+// can represent in a low level filter that we cannot represent
+// in a high level filter.
+export const convertLowLevelFilterToHighLevelFilter = (
+  lowLevelFilter: CallFilter
+): WFHighLevelCallFilter => {
+  const highLevelFilter: WFHighLevelCallFilter = {};
+  if (lowLevelFilter.opVersionRefs) {
+    highLevelFilter.opVersionRefs = lowLevelFilter.opVersionRefs;
+  }
+  if (lowLevelFilter.inputObjectVersionRefs) {
+    highLevelFilter.inputObjectVersionRefs =
+      lowLevelFilter.inputObjectVersionRefs;
+  }
+  if (lowLevelFilter.outputObjectVersionRefs) {
+    highLevelFilter.outputObjectVersionRefs =
+      lowLevelFilter.outputObjectVersionRefs;
+  }
+  if (lowLevelFilter.parentIds) {
+    highLevelFilter.parentId = lowLevelFilter.parentIds[0];
+  }
+  if (lowLevelFilter.traceRootsOnly) {
+    highLevelFilter.traceRootsOnly = lowLevelFilter.traceRootsOnly;
+  }
+  return highLevelFilter;
 };
 
 const getFeedbackMerged = (calls: CallSchema[]) => {
@@ -321,12 +413,26 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
-    skip: skip || cachedFilter != null,
-  });
-  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
-    skip: skip || cachedFilter != null,
-  });
+  const callStats7Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d7filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
+  const callStats30Days = useCallsStats(
+    entity,
+    project,
+    filter,
+    d30filter,
+    undefined, // limit
+    {
+      skip: skip || cachedFilter != null,
+    }
+  );
 
   const defaultDatetimeFilter = useMemo(
     () => ({

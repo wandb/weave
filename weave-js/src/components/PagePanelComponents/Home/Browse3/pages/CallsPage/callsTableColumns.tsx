@@ -11,6 +11,7 @@ import {
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
+import {convertBytes} from '@wandb/weave/util';
 import React, {
   FC,
   useCallback,
@@ -39,7 +40,10 @@ import {
   RUNNABLE_FEEDBACK_OUTPUT_PART,
 } from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
+import {
+  CellFilterWrapper,
+  OnUpdateFilter,
+} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
   getCostsFromCellParams,
@@ -47,11 +51,12 @@ import {
 } from '../CallPage/cost';
 import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
-import {StatusChip} from '../common/StatusChip';
+import {STATUS_TO_FILTER, StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
+  traceCallLatencyMs,
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
@@ -81,8 +86,13 @@ export const useCallsTableColumns = (
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  onUpdateFilter?: OnUpdateFilter,
+  costsLoading: boolean = false,
+  costsHasError: boolean = false,
+  includeTotalStorageSizeBytes: boolean = false,
+  storageSizeResults: Map<string, number> | null = null,
+  storageSizeLoading: boolean = false,
+  storageHasError: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -158,8 +168,16 @@ export const useCallsTableColumns = (
         columnIsRefExpanded,
         userDefinedColumnWidths,
         allowedColumnPatterns,
-        onAddFilter,
-        costsLoading
+        onUpdateFilter,
+        costsLoading,
+        costsHasError,
+        includeTotalStorageSizeBytes
+          ? {
+              storageSizeResults,
+              storageSizeLoading,
+            }
+          : null,
+        storageHasError
       ),
     [
       entity,
@@ -175,8 +193,13 @@ export const useCallsTableColumns = (
       columnIsRefExpanded,
       userDefinedColumnWidths,
       allowedColumnPatterns,
-      onAddFilter,
+      onUpdateFilter,
       costsLoading,
+      includeTotalStorageSizeBytes,
+      storageSizeResults,
+      storageSizeLoading,
+      storageHasError,
+      costsHasError,
     ]
   );
 
@@ -236,8 +259,14 @@ function buildCallsTableColumns(
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter,
-  costsLoading: boolean = false
+  onUpdateFilter?: OnUpdateFilter,
+  costsLoading: boolean = false,
+  costsHasError: boolean = false,
+  storageSizeInfo: {
+    storageSizeResults: Map<string, number> | null;
+    storageSizeLoading: boolean;
+  } | null = null,
+  storageHasError: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -276,13 +305,29 @@ function buildCallsTableColumns(
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
+        const name =
+          rowParams.row.display_name ??
+          // Rows are flattened at this point, they DO NOT strictly
+          // follow the TraceCallSchema!
+          (rowParams.row as any)['summary.weave.trace_name'];
         return (
-          <CallLinkCell
-            rowParams={rowParams}
-            entity={entity}
-            project={project}
-            preservePath={preservePath}
-          />
+          <CellFilterWrapper
+            onUpdateFilter={onUpdateFilter}
+            field="summary.weave.trace_name"
+            rowId={rowParams.id.toString()}
+            operation={'(string): equals'}
+            value={name}
+            style={{
+              display: 'flex',
+              width: '100%',
+            }}>
+            <CallLinkCell
+              rowParams={rowParams}
+              entity={entity}
+              project={project}
+              preservePath={preservePath}
+            />
+          </CellFilterWrapper>
         );
       },
     },
@@ -340,10 +385,19 @@ function buildCallsTableColumns(
         return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
+        const valueStatus = traceCallStatusCode(cellParams.row);
+        const valueFilter = STATUS_TO_FILTER[valueStatus];
         return (
-          <div style={{margin: 'auto'}}>
-            <StatusChip value={traceCallStatusCode(cellParams.row)} iconOnly />
-          </div>
+          <CellFilterWrapper
+            onUpdateFilter={onUpdateFilter}
+            field="summary.weave.status"
+            rowId={cellParams.id.toString()}
+            operation={'(string): in'}
+            value={valueFilter}>
+            <div style={{margin: 'auto'}}>
+              <StatusChip value={valueStatus} iconOnly />
+            </div>
+          </CellFilterWrapper>
         );
       },
     },
@@ -363,7 +417,7 @@ function buildCallsTableColumns(
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
     (key, operator, value, rowId) => {
-      onAddFilter?.(key, operator, value, rowId);
+      onUpdateFilter?.(key, operator, value, rowId);
     }
   );
   cols.push(...newCols);
@@ -513,7 +567,7 @@ function buildCallsTableColumns(
             renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
               return (
                 <CellFilterWrapper
-                  onAddFilter={onAddFilter}
+                  onUpdateFilter={onUpdateFilter}
                   field={field}
                   rowId={params.id.toString()}
                   operation={null}
@@ -545,7 +599,7 @@ function buildCallsTableColumns(
       }
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="wb_user_id"
           rowId={cellParams.id.toString()}
           operation="(string): equals"
@@ -573,7 +627,7 @@ function buildCallsTableColumns(
       const value = date.getTime() / 1000;
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="started_at"
           rowId={cellParams.id.toString()}
           operation="(date): after"
@@ -628,6 +682,16 @@ function buildCallsTableColumns(
       if (costsLoading) {
         return <LoadingDots />;
       }
+      if (costsHasError) {
+        return (
+          <div className="flex h-full w-full items-center justify-center">
+            <StatusChip
+              value="ERROR"
+              tooltipOverride="There was an error fetching the cost for this call."
+            />
+          </div>
+        );
+      }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
       return (
         <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
@@ -658,9 +722,55 @@ function buildCallsTableColumns(
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      return monthRoundedTime(traceCallLatencyS(cellParams.row));
+      const timeMs = traceCallLatencyMs(cellParams.row);
+      const timeString = monthRoundedTime(traceCallLatencyS(cellParams.row));
+      return (
+        <CellFilterWrapper
+          onUpdateFilter={onUpdateFilter}
+          field="summary.weave.latency_ms"
+          rowId={cellParams.id.toString()}
+          operation={'(number): >='}
+          value={timeMs}>
+          <div>{timeString}</div>
+        </CellFilterWrapper>
+      );
     },
   });
+
+  if (storageSizeInfo) {
+    cols.push({
+      field: 'total_storage_size_bytes',
+      headerName: 'Trace Size',
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      align: 'right',
+      headerAlign: 'right',
+      // filtering and sorting are expensive for this column, hence disabled
+      filterable: false,
+      sortable: false,
+      renderCell: cellParams => {
+        if (storageSizeInfo.storageSizeLoading) {
+          return <LoadingDots />;
+        }
+        if (storageHasError) {
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <StatusChip
+                value="ERROR"
+                tooltipOverride="There was an error fetching the storage size for this call."
+              />
+            </div>
+          );
+        }
+        const storageSize =
+          storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;
+        return (
+          <div>{storageSize !== null ? convertBytes(storageSize) : ''}</div>
+        );
+      },
+    });
+  }
 
   cols.push({
     field: 'wb_run_id',
@@ -686,7 +796,7 @@ function buildCallsTableColumns(
       // that far would be if we had an "ends with" operator.
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="wb_run_id"
           rowId={cellParams.id.toString()}
           operation="(string): contains"

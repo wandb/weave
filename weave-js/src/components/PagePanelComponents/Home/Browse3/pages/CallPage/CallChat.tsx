@@ -11,11 +11,19 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 const DRAWER_ANIMATION_BUFFER_TIME = 400;
 
-type CallChatProps = {call: TraceCallSchema};
+type CallChatProps = {
+  call: TraceCallSchema;
+  useDrawerAnimationBuffer?: boolean;
+};
 
-export const CallChat = ({call}: CallChatProps) => {
+export const CallChat = ({
+  call,
+  useDrawerAnimationBuffer = false,
+}: CallChatProps) => {
   const chat = useCallAsChat(call);
-  const [drawerAnimationBuffer, setDrawerAnimationBuffer] = useState(true);
+  const [drawerAnimationBuffer, setDrawerAnimationBuffer] = useState(
+    useDrawerAnimationBuffer
+  );
 
   // HACK: Wait for the drawer animation to finish before rendering the chat
   useEffect(() => {
