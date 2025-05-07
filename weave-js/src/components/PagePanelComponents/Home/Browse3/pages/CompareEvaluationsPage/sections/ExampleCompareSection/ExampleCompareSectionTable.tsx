@@ -7,7 +7,7 @@ import {
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
@@ -21,10 +21,14 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
+import { IconButton } from '@wandb/weave/components/IconButton';
+import { Icon } from '@wandb/weave/components/Icon';
 
 type RowData = PivotedRow & {
   // simpleOutput: PivotedRow['output'][string]
   // dataRow: {[key: string]: any}
+  _type: 'trial' | 'summary';
+  _numTrials?: number;
 };
 
 const DatasetRowItemRenderer: React.FC<{
@@ -60,34 +64,65 @@ export const ExampleCompareSectionTable: React.FC<{
     })),
     0
   );
+  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>([]);
 
   const rows: RowData[] = useMemo(() => {
     return filteredRows.flatMap(filteredRow => {
-      return filteredRow.originalRows.flatMap(originalRow => {
-        // return Object.entries(row.evaluations).flatMap(([evaluationCallId, evaluationRow]) => {
-        //     return Object.entries(evaluationRow.predictAndScores).flatMap(([predictAndScoreCallId, predictAndScoreRow]) => {
-        return {
-          ...originalRow,
-          // TODO: this has to be more sophisticated.
-          // dataRow: props.state.loadableComparisonResults.result?.resultRows?.[originalRow.inputDigest]?.rawDataRow ?? {},
-          // simpleOutput: Object.fromEntries(Object.entries(originalRow.output).map(([k, v]) => {
-          //     return [k, v[originalRow.evaluationCallId]]
-          // }))
-        };
-        // {
-        //     predictAndScoreCallId,
-        //     datasetRowDigest,
-        //     evaluationCallId,
-        //     trials: 1, // TODO: make this actually real. Probably want an expand button for this. Can it be done with a group maybe?
-        //     // inputs: _.omit(predictAndScoreRow?._rawPredictTraceData?.inputs, 'self'),
-        //     output: predictAndScoreRow?._rawPredictTraceData?.output,
-        //     scores: predictAndScoreRow?.scoreMetrics,
-        // }
-        //     })
-        // })
-      });
-    });
-  }, [filteredRows]);
+      const evaluationCallIds = props.state.evaluationCallIdsOrdered;
+      const finalRows: RowData[] = [];
+      for (const evaluationCallId of evaluationCallIds) {
+        const originalRows = filteredRow.originalRows.filter(row => row.evaluationCallId === evaluationCallId).map(row => {
+          return {
+            _type: 'trial' as const,
+            ...row,
+          };
+        });
+        const digestEvalId = filteredRow.inputDigest + ":" + evaluationCallId;
+        if (originalRows.length > 0 && !expandedDigestEvalIds.includes(digestEvalId)) {
+          const summaryRow: RowData = {
+            ...originalRows[0],
+            _type: 'summary' as const,
+            _numTrials: originalRows.length,
+            id: digestEvalId,
+            output: filteredRow.output,
+            scores: filteredRow.scores,
+            // output: Object.fromEntries(Object.entries(filteredRow.output).map(([key, value]) => {
+            //   return [key, value[evaluationCallId]];
+            // })),
+            // scores: Object.fromEntries(Object.entries(filteredRow.scores).map(([key, value]) => {
+            //   return [key, value[evaluationCallId] ?? {}];
+            // })),
+          };
+          finalRows.push(summaryRow);
+        } else {
+          finalRows.push(...originalRows);
+        }
+      }
+      return finalRows;
+    }); 
+  }, [expandedDigestEvalIds, filteredRows, props.state.evaluationCallIdsOrdered]);
+  
+
+  // console.log(filteredRows);
+
+  // const rows: RowData[] = useMemo(() => {
+  //   // For each dataset + evaluation pair, add a summary over the trials.
+  //   const rowsByEvalAndDataset = _.groupBy(flatRows, row => [row.inputDigest + row.evaluationCallId]);
+  //   const rowsByEvalAndDatasetAndTrial = _.mapValues(rowsByEvalAndDataset, rows => {
+  //     return {
+  //       ...rows[0],
+  //       _summary: {
+  //         trials: rows.length,
+  //       }
+  //     };
+  //   });
+
+  //   // const finalRows: RowData[] = [];
+  //   // for (const [key, rows] of Object.entries(rowsByEvalAndDatasetAndTrial)) {
+  //   //   finalRows.push(...rows);
+  //   // }
+  //   return flatRows;
+  // }, [flatRows]);
 
   const inputSubFields = useMemo(() => {
     const exampleRow = firstExampleRow.targetRowValue ?? {};
@@ -210,10 +245,46 @@ export const ExampleCompareSectionTable: React.FC<{
         },
       },
       {
+        field: 'expandTrials',
+        headerName: '',
+        width: 50,
+        resizable: false,
+        valueGetter: (value: any, row: RowData) => {
+          return row.evaluationCallId;
+        },
+        renderCell: params => {
+          return (
+            <Box
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                width: '100%',
+              }}>
+              <IconButton
+                onClick={() => {
+                  const digestEvalId = params.row.inputDigest + ":" + params.row.evaluationCallId;
+                  setExpandedDigestEvalIds(prev => {
+                    if (prev.includes(digestEvalId)) {
+                      return prev.filter(id => id !== digestEvalId);
+                    } else {
+                      return [...prev, digestEvalId];
+                    }
+                  });
+                }}>
+                <Icon name="expand-uncollapse" />
+              </IconButton>
+            </Box>
+          );
+        },
+      },
+      {
         field: 'trialNdx',
         headerName: 'Trial',
         width: 60,
         // flex: 1,
+        resizable: false,
         rowSpanValueGetter: (value: any, row: RowData) => {
           // disable row spanning for now
           return row.id;
@@ -227,6 +298,9 @@ export const ExampleCompareSectionTable: React.FC<{
           // if (selectedTrial == null) {
           //   return null;
           // }
+          if (params.row._type === 'summary') {
+            return <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',}}>{params.row._numTrials}</div>;
+          }
           const trialPredict = params.row.predictAndScore._rawPredictTraceData;
           const [trialEntity, trialProject] =
             trialPredict?.project_id.split('/') ?? [];

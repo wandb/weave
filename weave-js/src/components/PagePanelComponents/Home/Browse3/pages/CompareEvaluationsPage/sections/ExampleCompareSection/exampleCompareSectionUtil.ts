@@ -42,7 +42,7 @@ type FlattenedRow = RowBase & {
 
 export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
-  scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+  scores: {[scoreId: string]: {[callId: string]: number | boolean | undefined}};
 };
 
 const aggregateGroupedNestedRows = <T>(
