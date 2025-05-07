@@ -1,13 +1,13 @@
 import {MOON_600} from '@wandb/weave/common/css/color.styles';
 import {
-  IDENTIFER_COLOR,
+  IDENTIFIER_COLOR,
   OPERATOR_COLOR,
   STRING_COLOR,
 } from '@wandb/weave/panel/WeaveExpression/styles';
 
 export const REGULAR_TEXT_COLOR = MOON_600; // #565C66
 
-const RUNS = {text: 'runs', color: IDENTIFER_COLOR};
+const RUNS = {text: 'runs', color: IDENTIFIER_COLOR};
 const SUMMARY = {text: 'summary', color: OPERATOR_COLOR};
 const DOT = {text: '.', color: REGULAR_TEXT_COLOR};
 const HISTORY = {text: 'history', color: OPERATOR_COLOR};
