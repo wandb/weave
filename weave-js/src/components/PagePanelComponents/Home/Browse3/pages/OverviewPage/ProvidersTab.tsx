@@ -150,10 +150,6 @@ export const ProvidersTabInner: React.FC<{
       missingSecrets,
       isAdmin,
       entityName,
-      configure: () => {
-        setIsConfiguringProviderDrawerOpen(true);
-        setConfiguringProvider(provider);
-      },
     })
   );
 
