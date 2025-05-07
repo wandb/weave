@@ -36,7 +36,7 @@ If the video object is in memory (no file on disk), Weave will encode it as an `
 The following code sample demonstrates how to trace a video processing function in Weave. The code sample:
 
 1. Initializes a Weave project `video-test`.
-2. Defines a `get_video` function tracked as a `weave.op` that extracts a 5-second subclip of the loaded `VideoFileClip` as a `VideoClip`.
+2. Defines a `get_video` function tracked as a `weave.op` that extracts a 1 second subclip of the loaded `VideoFileClip` as a `VideoClip`.
 3. Uploads and tracks the clip in Weave.
 4. Automatically generates a dummy MP4 video if none is found.
 
@@ -64,7 +64,7 @@ def get_video(clip: VideoFileClip) -> VideoClip:
     This ensures that the VideoFileClip is created and managed within the
     Weave op's thread context, avoiding thread-safety issues.
     """
-    new_clip = clip.subclipped(0, 5)
+    new_clip = clip.subclipped(0, 1)
     return new_clip
 
 if __name__ == "__main__":
@@ -86,4 +86,6 @@ if __name__ == "__main__":
 
 When the code sample runs successfully, you can view your video by clicking the link in the **Traces** table of your project.
 
-![A trace of a video processing function in the Weave dashboard.](imgs/video-trace.png)
+![A trace of a video processing function in the Traces table.](imgs/video-trace.png)
+
+![An MP4 video uploaded to Weave, accessed from the video player link in the Traces table.](imgs/video-trace-player.png)
