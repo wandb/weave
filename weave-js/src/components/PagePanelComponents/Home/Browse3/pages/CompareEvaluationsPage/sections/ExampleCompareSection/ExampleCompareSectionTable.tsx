@@ -4,7 +4,6 @@ import {
   GridColumnGroupingModel,
   GridColumnHeaderParams,
   GridRenderCellParams,
-  GridSlotsComponentsProps,
 } from '@mui/x-data-grid-pro';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
@@ -607,11 +606,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     })),
     0
   );
-  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
-    []
-  );
+  // const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
+  //   []
+  // );
   const rows = filteredRows;
-  const hasTrials = false;
+  // const hasTrials = false;
   // const {rows, hasTrials} = useMemo(() => {
   //   let hasTrials = false;
   //   const returnRows = filteredRows.flatMap(filteredRow => {
@@ -1017,11 +1016,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
               //     return null;
               // }
 
-                return evalAggScorerMetricCompGeneric(
-                  props.state.summary.scoreMetrics[key],
-                  params.row.scores[key][evaluationCallId],
-                  params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
-                );
+              return evalAggScorerMetricCompGeneric(
+                props.state.summary.scoreMetrics[key],
+                params.row.scores[key][evaluationCallId],
+                params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
+              );
 
               // return (
               //   <CellValue value={params.row.scores[key][evaluationCallId]} />
