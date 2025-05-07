@@ -154,7 +154,7 @@ export const PlaygroundChat = ({
   if (!hasConfiguredProviders && !isOpenInPlayground) {
     return (
       <div className="flex h-full w-full flex-col items-center overflow-hidden">
-        <div className="relative m-[8px] flex h-full max-h-[calc(100%-130px)] w-full min-w-[520px] max-w-[800px] rounded-[4px] border border-[MOON_200]">
+        <div className="relative m-[8px] flex h-full max-h-[calc(100%-130px)] w-full min-w-[520px] max-w-[800px] rounded-[4px] border border-moon-200">
           <div className="relative flex h-full w-full flex-col">
             <div className="absolute top-0 z-[10] w-full bg-white px-[8px] py-[16px]">
               <PlaygroundChatTopBar
