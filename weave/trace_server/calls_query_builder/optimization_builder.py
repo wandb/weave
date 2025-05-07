@@ -703,8 +703,7 @@ def build_object_ref_conditions(
     pb: "ParamBuilder",
     project_id: str,
     table_alias: str,
-    object_mapping: dict[str, "Condition"],
-    expand_columns: list[str] = [],
+    object_mapping: dict[str, tuple[Condition, bool]],
 ) -> dict[str, Any]:
     """
     Builds SQL components for filtering based on object references.
@@ -726,36 +725,16 @@ def build_object_ref_conditions(
     """
     project_param = pb.add_param(project_id)
     if not object_mapping:
-        if not expand_columns:
-            return {"cte_parts": [], "filter_sql": ""}
-
-        # must be an order by
-        cte_sql_str = f"""obj_order_by AS (
-            SELECT val_dump,
-                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-            FROM object_versions
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY project_id, object_id, digest
-        )"""
-        root_field = expand_columns[0].split(".")[0] + "_dump"
-        field_access = f"JSON_VALUE({table_alias}.{root_field}, '$.{expand_columns[0].split('.')[1]}')"
-        filter_sql_str = f"""
-        {field_access} IN (
-            SELECT full_ref 
-            FROM obj_order_by
-        )"""
-        return {"cte_parts": [cte_sql_str], "filter_sql": filter_sql_str}
+        return {"cte_parts": [], "filter_sql": ""}
 
     # Start building the CTEs from the deepest leaf values
     cte_parts = []
     filter_conditions = []
 
     # Process object mapping conditions
-    for i, (path_str, filter_condition) in enumerate(object_mapping.items()):
-        # Only proceed if this path is in expand_columns (when provided)
-        if not _is_expanded_column(path_str, expand_columns):
-            continue
-
+    for i, (path_str, (filter_condition, is_object_order_by)) in enumerate(
+        object_mapping.items()
+    ):
         path_parts = path_str.split(".")
         root_field = path_parts[0] + "_dump"
         # The property within the root field (model, name, etc.)
@@ -784,8 +763,9 @@ def build_object_ref_conditions(
                 op_str, _, val = processor.process_condition(path_str, operation, pb)
             else:
                 continue
-        except ValueError:
+        except ValueError as e:
             # Skip if we can't process the condition
+            print(f"Skipping {path_str} because of {e}")
             continue
 
         # Convert filter value to appropriate parameter
@@ -810,16 +790,23 @@ def build_object_ref_conditions(
 
         # The leaf level query directly checks the property value
         leaf_property = property_path[-1]
+        val_dump_select = "val_dump," if is_object_order_by else ""
+        val_dump_condition = f"JSON_VALUE(val_dump, '$.{leaf_property}') {op_str} {param_slot(filter_param, filter_type)}"
+        if is_object_order_by:
+            val_dump_condition = (
+                f"JSONType(JSON_VALUE(val_dump, '$.{leaf_property}')) != 'Null'"
+            )
 
         leaf_cte = f"""
         {cte_name} AS (
             SELECT
                 object_id,
                 digest,
+                {val_dump_select}
                 concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
             FROM object_versions
             WHERE project_id = {param_slot(project_param, "String")}
-                AND JSON_VALUE(val_dump, '$.{leaf_property}') {op_str} {param_slot(filter_param, filter_type)}
+                AND {val_dump_condition}
             GROUP BY project_id, object_id, digest
         )"""
         cte_parts.append(leaf_cte)

@@ -429,6 +429,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
+        if req.expand_columns:
+            cq.set_expand_columns(req.expand_columns)
 
         # Sort with empty list results in no sorting
         if req.sort_by is not None:
@@ -440,8 +442,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
-        if req.expand_columns:
-            cq.set_expand_columns(req.expand_columns)
 
         pb = ParamBuilder()
         raw_res = self._query_stream(

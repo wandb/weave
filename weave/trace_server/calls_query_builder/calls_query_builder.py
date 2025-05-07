@@ -356,6 +356,9 @@ class OrderField(BaseModel):
             res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
         return res
 
+    def is_object_order_by(self, expand_columns: list[str] = []) -> bool:
+        return _field_is_expanded_column(self.field, expand_columns)
+
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
@@ -743,7 +746,7 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        object_ref_join_conditions: Optional[dict[str, Condition]] = None,
+        object_ref_join_conditions: Optional[dict[str, tuple[Condition, bool]]] = None,
         id_subquery_name: Optional[str] = None,
     ) -> str:
         needs_feedback = False
@@ -807,27 +810,20 @@ class CallsQuery(BaseModel):
         str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
 
         order_by_sql = ""
-        print(f"{self.expand_columns=} {self.order_fields=}")
         if len(self.order_fields) > 0:
-            if self.expand_columns and len(self.expand_columns) > 0:
-                for order_field in self.order_fields:
-                    if not isinstance(order_field.field, CallsMergedDynamicField):
-                        print(f"{order_field.field=} NOT DYNAMIC")
-                        continue
-                    if _field_is_expanded_column(order_field, self.expand_columns):
-                        print(f"{order_field.field=} IS EXPANDED")
-                        extra_path = order_field.field.extra_path
-                        order_by_sql = f"ORDER BY JSON_VALUE(obj_order_by.val_dump, '$.{extra_path[-1]}') {order_field.direction.lower()}"
+            order_by_sql = "ORDER BY "
+            for order_field in self.order_fields:
+                if order_field.field.is_object_order_by(
+                    expand_columns=self.expand_columns
+                ):
+                    order_by_sql += order_field.as_sql(pb, "obj_filter_0") + ", "
+                else:
+                    order_by_sql += order_field.as_sql(pb, table_alias) + ", "
+            order_by_sql = order_by_sql[:-2]
 
-            # order_by_sql = "ORDER BY " + ", ".join(
-            #     [
-            #         order_field.as_sql(pb, table_alias)
-            #         for order_field in self.order_fields
-            #     ]
-            # )
-            # for order_field in self.order_fields:
-            #     if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
-            #         needs_feedback = True
+            for order_field in self.order_fields:
+                if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+                    needs_feedback = True
 
         limit_sql = ""
         if self.limit is not None:
@@ -884,7 +880,10 @@ class CallsQuery(BaseModel):
         object_filter_sql = ""
         if object_ref_join_conditions:
             object_refs_sql = build_object_ref_conditions(
-                pb, self.project_id, table_alias, object_ref_join_conditions
+                pb,
+                self.project_id,
+                table_alias,
+                object_ref_join_conditions,
             )
             object_filter_sql = object_refs_sql.get("filter_sql", "")
 
@@ -917,7 +916,7 @@ class CallsQuery(BaseModel):
 def filter_object_ref_join_conditions(
     query_conditions: list[Condition],
     expand_columns: list[str] = [],
-) -> dict[str, Condition]:
+) -> dict[str, tuple[Condition, bool]]:
     """
     Filter the query conditions to identify conditions involving object references.
 
@@ -1064,7 +1063,7 @@ def filter_object_ref_join_conditions(
                 if not should_expand:
                     continue
 
-            result[field_path] = condition
+            result[field_path] = (condition, False)
             to_remove.append(i)
 
     for i in sorted(to_remove, reverse=True):
