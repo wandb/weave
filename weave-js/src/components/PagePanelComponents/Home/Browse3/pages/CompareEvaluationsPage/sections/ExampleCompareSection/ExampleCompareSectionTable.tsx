@@ -25,6 +25,7 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
+import { useCompareEvaluationsState } from '../../compareEvaluationsContext';
 
 type RowData = PivotedRow & {
   // simpleOutput: PivotedRow['output'][string]
@@ -197,6 +198,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     // }
     // return keys
   }, [outputColumnKeys]);
+  const {setSelectedInputDigest} = useCompareEvaluationsState();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -217,10 +219,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
                 overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '4px'
+              }} onClick={() => {
+                setSelectedInputDigest(params.row.inputDigest);
               }}>
               <span style={{flexShrink: 1}}>
-                <IdPanel>{params.row.inputDigest.slice(-4)}</IdPanel>
+                <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
               </span>
             </Box>
           );

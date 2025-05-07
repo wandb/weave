@@ -9,6 +9,7 @@ import {
   MOON_100,
   MOON_200,
   MOON_300,
+  MOON_50,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRef, parseRefMaybe} from '../../../../../../../../react';
@@ -129,7 +130,7 @@ const stickyHeaderStyleMixin: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -137,7 +138,7 @@ const stickySidebarStyleMixin: React.CSSProperties = {
   position: 'sticky',
   left: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -669,7 +670,7 @@ export const ExampleCompareSectionDetail: React.FC<{
       sx={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        bgcolor: MOON_100,
+        bgcolor: MOON_50,
         padding: '16px',
         borderBottom: '1px solid #ccc',
       }}>
@@ -938,7 +939,7 @@ export const ExampleCompareSectionDetail: React.FC<{
                       <GridCell
                         key={metricIndex}
                         style={{
-                          backgroundColor: MOON_100,
+                          backgroundColor: MOON_50,
                         }}>
                         {scorerMetricKeyComp(scorerIndex, metricIndex)}
                       </GridCell>
