@@ -81,7 +81,7 @@ You can also get additional information for each feedback object in `client.get_
 - `id`: The feedback object ID.
 - `created_at`: The creation time information for the feedback object.
 - `feedback_type`: The type of feedback (reaction, note, custom).
-- `payload`: The feedback payload
+- `payload`: The feedback payload.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
