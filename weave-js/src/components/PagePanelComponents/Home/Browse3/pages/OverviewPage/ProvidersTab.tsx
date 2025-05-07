@@ -3,19 +3,19 @@ import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {useIsViewerTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {Button} from '@wandb/weave/components/Button';
-import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {useState} from 'react';
+import React, {createContext, useContext, useMemo, useState} from 'react';
 
 import {DeleteModal} from '../common/DeleteModal';
-import {Link} from '../common/Links';
+import {ProviderConfigDrawer} from '../PlaygroundPage/PlaygroundChat/ProviderConfigDrawer';
 import {useConfiguredProviders} from '../PlaygroundPage/useConfiguredProviders';
 import {WFDataModelAutoProvider} from '../wfReactInterface/context';
 import {AddProviderDrawer} from './AddProviderDrawer';
 import {ProviderTable} from './ProviderTable';
 import {useCustomProviders} from './useCustomProviders';
+
 const ProviderStatus = ({isActive}: {isActive: boolean}) => {
   return (
     <div className="flex items-center">
@@ -24,6 +24,30 @@ const ProviderStatus = ({isActive}: {isActive: boolean}) => {
         label={isActive ? 'Configured' : 'Not configured'}
         icon={isActive ? 'checkmark-circle' : 'failed'}
       />
+    </div>
+  );
+};
+
+const ConfigureProviderContext = createContext<{
+  configureProvider: (provider: string) => void;
+}>({
+  configureProvider: () => {},
+});
+
+const ConfigureProviderCell = (params: GridRenderCellParams) => {
+  const {configureProvider} = useContext(ConfigureProviderContext);
+  return (
+    <div className="flex h-full items-center justify-between">
+      {!params.row.status && params.row.isAdmin && (
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => {
+            configureProvider(params.row.name);
+          }}>
+          Configure
+        </Button>
+      )}
     </div>
   );
 };
@@ -47,36 +71,11 @@ const columns: GridColDef[] = [
     ),
   },
   {
-    field: 'missingSecrets',
-    headerName: 'Missing Secrets',
+    field: 'configured',
+    headerName: '',
     flex: 0.4,
     minWidth: 200,
-    renderCell: (params: GridRenderCellParams) => (
-      <div className="flex h-full items-center justify-between">
-        <span
-          className="text-moon-500"
-          style={{
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-            display: 'inline-block',
-          }}>
-          {params.value || 'None'}
-        </span>
-        {params.row.isAdmin && !params.row.status && (
-          <Link
-            to={`/${params.row.entityName}/settings`}
-            $variant="secondary"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2">
-            Add team secret
-            <Icon name="forward-next" />
-          </Link>
-        )}
-      </div>
-    ),
+    renderCell: ConfigureProviderCell,
   },
 ];
 
@@ -130,9 +129,18 @@ export const ProvidersTabInner: React.FC<{
   const [editingProvider, setEditingProvider] = useState<any>(null);
   const [deletingProvider, setDeletingProvider] = useState<any>(null);
 
+  const [configuringProvider, setConfiguringProvider] = useState<
+    string | undefined
+  >(undefined);
+  const [isConfiguringProviderDrawerOpen, setIsConfiguringProviderDrawerOpen] =
+    useState(false);
+
   const isAdmin = useIsViewerTeamAdmin(entityName);
-  const {result: configuredProviders, loading: configuredProvidersLoading} =
-    useConfiguredProviders(entityName);
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entityName);
 
   const providers = Object.entries(configuredProviders).map(
     ([provider, {status, missingSecrets}]) => ({
@@ -156,6 +164,14 @@ export const ProvidersTabInner: React.FC<{
     }
   );
 
+  const configureProviderContextValue = useMemo(() => {
+    const configureProvider = (provider: string) => {
+      setIsConfiguringProviderDrawerOpen(true);
+      setConfiguringProvider(provider);
+    };
+    return {configureProvider};
+  }, []);
+
   return (
     <Tailwind>
       <div className="mx-32 my-16 min-h-screen">
@@ -172,11 +188,14 @@ export const ProvidersTabInner: React.FC<{
             </div>
 
             <div className="flex h-full min-h-[200px] items-center justify-center">
-              <ProviderTable
-                columns={columns}
-                providers={providers}
-                loading={configuredProvidersLoading}
-              />
+              <ConfigureProviderContext.Provider
+                value={configureProviderContextValue}>
+                <ProviderTable
+                  columns={columns}
+                  providers={providers}
+                  loading={configuredProvidersLoading}
+                />
+              </ConfigureProviderContext.Provider>
             </div>
           </div>
 
@@ -229,6 +248,16 @@ export const ProvidersTabInner: React.FC<{
           'All custom models and provider models will also be deleted.',
         ]}
         onDelete={deletingProvider?.deleteAction}
+      />
+      <ProviderConfigDrawer
+        entity={entityName}
+        defaultProvider={configuringProvider}
+        isOpen={isConfiguringProviderDrawerOpen}
+        onClose={() => {
+          setIsConfiguringProviderDrawerOpen(false);
+          setConfiguringProvider(undefined);
+          refetchConfiguredProviders();
+        }}
       />
     </Tailwind>
   );
