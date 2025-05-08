@@ -10,16 +10,17 @@ from typing import (
     Literal,
     TypeVar,
     Union,
+    cast,
     get_args,
 )
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+SUPPORTED_FORMATS_TYPE = Literal["mp3", "wav"]
+SUPPORTED_FORMATS = cast(list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE)))
+T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
 
-SupportedFormatType = Literal["mp3", "wav"]
-
-
-def get_format_from_filename(filename: str) -> Union[str, None]:
+def get_format_from_filename(filename: str) -> str:
     """Get the file format from a filename.
     Args:
         filename: The filename to extract the format from
@@ -31,18 +32,23 @@ def get_format_from_filename(filename: str) -> Union[str, None]:
 
     # If there's no dot or it's the last character, return None
     if last_dot == -1 or last_dot == len(filename) - 1:
-        return None
+        return ""
 
-    fmt = filename[last_dot + 1 :].lower()
-
-    if not fmt in get_args(SupportedFormatType):
-        return None
-
-    return fmt
+    return filename[last_dot + 1 :].lower()
 
 
 def is_base64(data: Union[str, bytes, None]) -> bool:
-    # check if a string is base64 encoded.
+    """
+    Validates if a string is valid base64
+
+    ^: Matches the beginning of the string.
+    [A-Za-z0-9+/]{4}: Matches any group of four characters from the Base64 alphabet.
+    (?:[A-Za-z0-9+/]{4})*: Matches zero or more occurrences of the four-character group.
+    (?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=): Matches either a group of two characters followed by two equals signs (==), or a group of three characters followed by one equal sign (=).
+    ?: Makes the optional padding part of the regex optional (0 or 1 occurrence).
+    $: Matches the end of the string. 
+    """
+
     if not data:
         return False
 
@@ -54,10 +60,8 @@ def is_base64(data: Union[str, bytes, None]) -> bool:
     return bool(re.match(pattern, data))
 
 
-F = TypeVar("F", bound=SupportedFormatType)
 
-
-class Audio(Generic[F]):
+class Audio(Generic[T]):
     """
     Audio class to handle audio data.
     Can be initialized with a file path or raw audio data with a format
@@ -106,52 +110,50 @@ class Audio(Generic[F]):
     """
 
     # File Format
-    fmt: str
+    fmt: SUPPORTED_FORMATS_TYPE
 
-    # Base64 encoded audio data
-    data: str
+    # Raw audio data bytes
+    data: bytes
 
     def __init__(
         self,
-        path: Union[str, bytes, Path, os.PathLike, None] = None,
-        data: Union[bytes, str, None] = None,
-        fmt: Union[F, None] = None,
-    ):
-        if not path and not (data and fmt):
-            raise ValueError("Must provide either path or raw data and format")
-        elif data and not fmt:
-            raise ValueError("Format is required when passing raw data")
+        data: bytes,
+        fmt: T,
+    ) -> None:
+        self.data = data
+        self.fmt = fmt
 
-        if path:
-            if isinstance(path, bytes):
-                path = path.decode()
-            fmt_str = fmt or get_format_from_filename(str(path))
+    @classmethod
+    def _from_base64(cls, data: Union[str, bytes], fmt: T) -> "Audio":
+        data = base64.b64decode(data)
+        return cls(data=data, fmt=fmt)
 
-            if not fmt_str or fmt_str.lower() not in get_args(SupportedFormatType):
-                raise ValueError(
-                    f"Invalid file path {path}, file must end in one of: mp3 or wav"
-                )
-            if not os.path.exists(path):
-                raise ValueError(f"File {path} does not exist")
-            self.data = base64.b64encode(open(path, "rb").read()).decode("ascii")
-            self.fmt = fmt_str
-            return
+    @classmethod
+    def from_data(cls, data: Union[str, bytes], fmt: T) -> "Audio":
+        if is_base64(data):
+            return cls._from_base64(data, fmt)
+        elif isinstance(data, str):
+            data = data.encode()
+        return cls(data=data, fmt=fmt)
 
-        elif data and fmt:
-            # Case 1: Receive encoded audio data
-            is_encoded = is_base64(data)
+    @classmethod
+    def from_path(cls, path: Union[str, bytes, Path, os.PathLike]) -> "Audio":
+        if isinstance(path, bytes):
+            path = path.decode()
 
-            # Case 2: Receive raw audio data
-            if not is_encoded:
-                if isinstance(data, str):
-                    bytes_data = data.encode()
-                    self.data = base64.b64encode(bytes_data).decode("ascii")
-                    self.fmt = fmt
-                    return
-                else:
-                    self.data = base64.b64encode(data).decode("ascii")
-                    self.fmt = fmt
-                    return
+        if not os.path.exists(path):
+            raise ValueError(f"File {path} does not exist")
+
+        fmt_str = get_format_from_filename(str(path))
+
+        if fmt_str in SUPPORTED_FORMATS:
+            fmt: SUPPORTED_FORMATS_TYPE = fmt_str
+        else:
+            raise ValueError(f"Invalid file path {path}, file must end in one of: mp3 or wav")
+
+
+        data = open(path, "rb").read()
+        return cls(data=data, fmt=cast(T, fmt))
 
     def export(self, path: Union[str, bytes, Path, os.PathLike]) -> None:
         with open(path, "wb") as f:
@@ -201,7 +203,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio"
         if filename.startswith("audio."):
             if (not pytype and filename.endswith(".wav")) or pytype == "wave.Wave_read":
                 return wave.open(path, "rb")
-            return Audio(path=path)
+            return Audio.from_path(path=path)
 
     raise ValueError("No audio found for artifact")
 
@@ -214,3 +216,5 @@ def register() -> None:
     # Register the serializers for the various audio types
     serializer.register_serializer(Audio, save, load)
     serializer.register_serializer(wave.Wave_read, save, load)
+
+Audio[Literal["mp3"]](data=b"", fmt="mp3")
