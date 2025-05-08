@@ -15,9 +15,9 @@ export const TraceCountDisplay = ({
   const {result, loading: callsStatsLoading} = useCallsStats(
     entity,
     project,
-    {},
-    undefined,
-    undefined,
+    {}, // filter
+    undefined, // query
+    undefined, // limit
     {skip: !hasWeaveData}
   );
 

@@ -259,6 +259,11 @@ export type WFDataModelHooksInterface = {
     digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
+  useProjectHasCalls: (
+    entity: string,
+    project: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<boolean>;
   useRootObjectVersions: (
     entity: string,
     project: string,
