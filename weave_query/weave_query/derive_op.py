@@ -6,21 +6,21 @@ import copy
 import inspect
 import typing
 
-from weave_query import weave_types as types
 from weave_query import (
-    storage,
-    weave_internal,
-    errors,
-    parallelism,
-    registry_mem,
     box,
     context_state,
+    errors,
     execute_fast,
     graph,
     op_args,
     op_def,
     op_policy,
+    parallelism,
+    registry_mem,
+    storage,
+    weave_internal,
 )
+from weave_query import weave_types as types
 from weave_query.language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
@@ -257,6 +257,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     with tag_store.with_tag_store_state(
                         tag_store_curr_node_id, tag_store_mem_map
                     ):
+                        import time
+
+                        start_time = time.time()
                         if x == None or types.is_optional(first_arg.type):
                             return None
                         called = orig_op(x, **new_inputs)
@@ -266,6 +269,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         except errors.WeaveArtifactCollectionNotFound:
                             return None
                         res = storage.deref(res)
+                        print(f"[{time.time() - start_time}]")
                         return res
 
                 if USE_PARALLEL_DOWNLOAD:
