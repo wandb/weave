@@ -34,7 +34,6 @@ import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
-  CallKey,
   CallSchema,
   Loadable,
   LoadableWithError,
