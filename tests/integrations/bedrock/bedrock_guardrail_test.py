@@ -126,7 +126,7 @@ class TestBedrockGuardrailScorer:
         mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
         result = scorer.score(
-            "How should I think about retirement planning in general?"
+            output="How should I think about retirement planning in general?"
         )
 
         # Verify the result
@@ -170,7 +170,7 @@ class TestBedrockGuardrailScorer:
         )
 
         result = scorer.score(
-            "Give me specific investment advice for my retirement to generate $5,000 monthly."
+            output="Give me specific investment advice for my retirement to generate $5,000 monthly."
         )
 
         # Verify the result
@@ -202,7 +202,7 @@ class TestBedrockGuardrailScorer:
         # Configure the mock to raise an exception
         mock_bedrock_client.apply_guardrail.side_effect = Exception("Test error")
 
-        result = scorer.score("Test content")
+        result = scorer.score(output="Test content")
 
         # Verify the result
         assert result.passed is False
@@ -254,7 +254,7 @@ class TestBedrockGuardrailScorer:
         scorer._bedrock_runtime = None
 
         with pytest.raises(ValueError) as excinfo:
-            scorer.score("Test content")
+            scorer.score(output="Test content")
 
         assert "Bedrock runtime client is not initialized" in str(excinfo.value)
 
@@ -274,7 +274,7 @@ class TestBedrockGuardrailScorer:
         assert formatted["source"] == "INPUT"
 
         # Score the content and verify the client was called with source=INPUT
-        scorer.score("Test content")
+        scorer.score(output="Test content")
         call_args = mock_bedrock_client.apply_guardrail.call_args[1]
         assert call_args["source"] == "INPUT"
 
@@ -290,6 +290,6 @@ class TestBedrockGuardrailScorer:
         mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
         # Score the content and verify the client was called with guardrailVersion=2
-        scorer.score("Test content")
+        scorer.score(output="Test content")
         call_args = mock_bedrock_client.apply_guardrail.call_args[1]
         assert call_args["guardrailVersion"] == "2"

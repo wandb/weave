@@ -528,7 +528,8 @@ async function autosuggestNodes(
     if (node.nodeType === 'void') {
       const frame = toFrame(stack);
       const variableNames = Object.keys(frame).filter(
-        key => !key.includes('runColors') // runColors is used to color the row index in the table, but we don't want to suggest it (see WB-21774)
+        // runColors (see WB-21774) and customRunNames are only used internally within the panels
+        key => !key.includes('runColors') && !key.includes('customRunNames')
       );
       if (variableNames.length > 0) {
         for (const varName of variableNames) {

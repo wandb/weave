@@ -1,6 +1,4 @@
----
-title: Introduction to Traces
----
+
 
 :::tip[This is a notebook]
 
@@ -9,6 +7,9 @@ title: Introduction to Traces
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/Intro_to_Weave_Hello_Trace.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
+
+
+# Introduction to Traces
 
 <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 
@@ -37,27 +38,30 @@ Before you can begin tracing in Weave, complete the following prerequisites.
 # Install dependancies and imports
 !pip install wandb weave openai -q
 
-import os
 import json
-import weave
-
+import os
 from getpass import getpass
+
 from openai import OpenAI
+
+import weave
 
 # 🔑 Setup your API keys
 # Running this cell will prompt you for your API key with `getpass` and will not echo to the terminal.
 #####
 print("---")
-print("You can find your Weights and Biases API key here: https://wandb.ai/settings#api")
-os.environ["WANDB_API_KEY"] = getpass('Enter your Weights and Biases API key: ')
+print(
+    "You can find your Weights and Biases API key here: https://wandb.ai/settings#api"
+)
+os.environ["WANDB_API_KEY"] = getpass("Enter your Weights and Biases API key: ")
 print("---")
 print("You can generate your OpenAI API key here: https://platform.openai.com/api-keys")
-os.environ["OPENAI_API_KEY"] = getpass('Enter your OpenAI API key: ')
+os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
 print("---")
 #####
 
 # 🏠 Enter your W&B project name
-weave_client = weave.init('MY_PROJECT_NAME') # 🐝 Your W&B project name
+weave_client = weave.init("MY_PROJECT_NAME")  # 🐝 Your W&B project name
 ```
 
 ## 🐝 Run your first trace
@@ -66,21 +70,24 @@ The following code sample shows how to capture and visualize a trace in Weave us
 
 
 ```python
-@weave.op() # 🐝 Decorator to track requests
+@weave.op()  # 🐝 Decorator to track requests
 def extract_fruit(sentence: str) -> dict:
     client = OpenAI()
-    system_prompt = "Parse sentences into a JSON dict with keys: fruit, color and flavor."
+    system_prompt = (
+        "Parse sentences into a JSON dict with keys: fruit, color and flavor."
+    )
     response = client.chat.completions.create(
-      model="gpt-4o",
-      messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": sentence}
-      ],
-      temperature=0.7,
-      response_format={"type": "json_object"}
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": sentence},
+        ],
+        temperature=0.7,
+        response_format={"type": "json_object"},
     )
     extracted = response.choices[0].message.content
     return json.loads(extracted)
+
 
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
 extract_fruit(sentence)

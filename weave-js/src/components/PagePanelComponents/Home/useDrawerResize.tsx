@@ -115,8 +115,12 @@ export const useDrawerResize = (
     debouncedHandleResize();
   }, [windowSize.width, debouncedHandleResize]);
 
+  // Ensure the drawer width is at least MIN_DRAWER_WIDTH, this can get
+  // messed up by resizing the browser weirdly.
+  const drawerWidthPx = Math.max(currentWidthRef.current, MIN_DRAWER_WIDTH);
+
   return {
     handleMousedown,
-    drawerWidthPx: currentWidthRef.current,
+    drawerWidthPx,
   };
 };

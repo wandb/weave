@@ -23,6 +23,7 @@ export const FILTER_TO_STATUS: Record<string, CallStatusType> =
 type StatusChipProps = {
   value: CallStatusType;
   iconOnly?: boolean;
+  tooltipOverride?: string;
 };
 
 type CallStatusInfo = {
@@ -58,7 +59,11 @@ export const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
   },
 };
 
-export const StatusChip = ({value, iconOnly}: StatusChipProps) => {
+export const StatusChip = ({
+  value,
+  iconOnly,
+  tooltipOverride,
+}: StatusChipProps) => {
   const statusInfo = STATUS_INFO[value];
   const {icon, color, label, tooltip} = statusInfo;
 
@@ -67,5 +72,10 @@ export const StatusChip = ({value, iconOnly}: StatusChipProps) => {
   ) : (
     <Pill icon={icon} color={color} label={label} />
   );
-  return <Tooltip trigger={<span>{pill}</span>} content={tooltip} />;
+  return (
+    <Tooltip
+      trigger={<span>{pill}</span>}
+      content={tooltipOverride ?? tooltip}
+    />
+  );
 };

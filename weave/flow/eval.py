@@ -137,7 +137,7 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
-    @weave.op()
+    @weave.op
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input

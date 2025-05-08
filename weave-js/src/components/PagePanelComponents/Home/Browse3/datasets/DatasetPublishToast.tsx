@@ -22,6 +22,7 @@ export const DatasetPublishToast: React.FC<DatasetPublishToastProps> = ({
   message,
 }) => (
   <Box
+    data-testid="dataset-publish-toast"
     sx={{
       display: 'flex',
       flexDirection: 'column',
@@ -43,7 +44,10 @@ export const DatasetPublishToast: React.FC<DatasetPublishToastProps> = ({
         {message}
       </Typography>
     </Box>
-    <Link to={url} style={VIEW_DATASET_LINK_STYLES}>
+    <Link
+      to={url}
+      style={VIEW_DATASET_LINK_STYLES}
+      data-testid="dataset-publish-toast-link">
       View the dataset
     </Link>
   </Box>

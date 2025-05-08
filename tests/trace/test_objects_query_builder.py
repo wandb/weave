@@ -1,4 +1,5 @@
 import pytest
+import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.objects_query_builder import (
@@ -211,6 +212,13 @@ FROM (
         FROM object_versions"""
 
 
+def assert_sql(exp_query, actual_query):
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    actual_formatted = sqlparse.format(actual_query, reindent=True)
+
+    assert exp_formatted == actual_formatted
+
+
 def test_object_query_builder_metadata_query_basic():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_digests_conditions("latest")
@@ -222,11 +230,11 @@ def test_object_query_builder_metadata_query_basic():
         WHERE project_id = {{project_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((is_latest = 1) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {"project_id": "test_project"}
 
 
@@ -250,13 +258,13 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
         WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}) AND (deleted_at IS NULL))
 ORDER BY created_at DESC
 LIMIT 10
 OFFSET 5"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_id": "object_1",
@@ -280,11 +288,11 @@ def test_objects_query_metadata_op():
         WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_id": "my_op",
@@ -310,7 +318,7 @@ def test_make_objects_val_query_and_parameters():
         GROUP BY object_id, digest
     """
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_ids": ["object_1"],

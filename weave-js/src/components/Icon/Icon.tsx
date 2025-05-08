@@ -266,6 +266,7 @@ import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warnin
 import {ReactComponent as ImportWeave} from '../../assets/icons/icon-weave.svg';
 import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
+import {ReactComponent as ImportWrap} from '../../assets/icons/icon-wrap.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
@@ -1082,6 +1083,9 @@ export const IconWeaveGroupBoard = (props: SVGIconProps) => (
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
+export const IconWrap = (props: SVGIconProps) => (
+  <ImportWrap {...updateIconProps(props)} />
+);
 export const IconXAxiAlt = (props: SVGIconProps) => (
   <ImportXAxiAlt {...updateIconProps(props)} />
 );
@@ -1362,6 +1366,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   weave: IconWeave,
   'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
+  wrap: IconWrap,
   'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,

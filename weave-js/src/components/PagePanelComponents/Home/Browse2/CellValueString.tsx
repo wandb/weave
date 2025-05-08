@@ -102,6 +102,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     toast('Copied to clipboard');
   }, [value]);
 
+  const [wrapLines, setWrapLines] = useState(false);
   let content: ReactNode = <TooltipText isJSON={json}>{trimmed}</TooltipText>;
   if (format === 'Code') {
     let language;
@@ -119,6 +120,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
         readOnly
         handleMouseWheel
         alwaysConsumeMouseWheel={false}
+        wrapLines={wrapLines}
       />
     );
   } else if (format === 'Markdown') {
@@ -197,6 +199,31 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
                   }}
                 />
                 <Spacer />
+                {format === 'Code' && (
+                  <>
+                    <Button
+                      size="small"
+                      variant="ghost"
+                      active={!wrapLines}
+                      icon="pan-tool-1"
+                      tooltip="Don't wrap code"
+                      onClick={() => {
+                        setWrapLines(false);
+                      }}
+                    />
+                    <Button
+                      className="mr-4"
+                      size="small"
+                      variant="ghost"
+                      active={wrapLines}
+                      icon="wrap"
+                      tooltip="Wrap code"
+                      onClick={() => {
+                        setWrapLines(true);
+                      }}
+                    />
+                  </>
+                )}
                 <Button
                   size="small"
                   variant="ghost"

@@ -268,7 +268,10 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         if (node.parentId) {
           filteredCallIdsSet.add(node.parentId);
           if (!foundCallIds.has(node.parentId)) {
-            itemsToProcess.push(node.parentId);
+            // Check if the parent id exists before adding to the process queue
+            if (props.traceTreeFlat[node.parentId]) {
+              itemsToProcess.push(node.parentId);
+            }
           }
         }
 

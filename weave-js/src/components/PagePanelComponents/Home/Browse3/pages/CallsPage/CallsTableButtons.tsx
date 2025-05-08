@@ -437,7 +437,7 @@ export const CompareEvaluationsTableButton: FC<{
     }}>
     <Button
       size="medium"
-      variant="ghost"
+      variant="primary"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"

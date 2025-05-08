@@ -14,7 +14,7 @@ import {
   denestData,
   extractSourceSchema,
   FieldMapping,
-  getNestedValue,
+  generateFieldPreviews,
 } from './schemaUtils';
 
 export interface SchemaMappingStepProps {
@@ -147,30 +147,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   );
 
   const fieldPreviews = useMemo(() => {
-    const previews = new Map<string, Array<Record<string, any>>>();
-
-    sourceSchema.forEach(field => {
-      const fieldData = selectedCalls.map(call => {
-        let value: any;
-        if (field.name.startsWith('inputs.')) {
-          const path = field.name.slice(7).split('.');
-          value = getNestedValue(call.val.inputs, path);
-        } else if (field.name.startsWith('output.')) {
-          if (typeof call.val.output === 'object' && call.val.output !== null) {
-            const path = field.name.slice(7).split('.');
-            value = getNestedValue(call.val.output, path);
-          } else {
-            value = call.val.output;
-          }
-        } else {
-          const path = field.name.split('.');
-          value = getNestedValue(call.val, path);
-        }
-        return {[field.name]: value};
-      });
-      previews.set(field.name, fieldData);
-    });
-    return previews;
+    return generateFieldPreviews(sourceSchema, selectedCalls);
   }, [sourceSchema, selectedCalls]);
 
   const formatOptionLabel = useCallback(

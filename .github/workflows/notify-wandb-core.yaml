@@ -29,10 +29,11 @@ jobs:
           yarn generate
           cp package.json README.md .npmrc src/
           cd src
+          # E409 means the package already exists, in which case we don't want to fail this job
           if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            npm publish
+            npm publish 2>&1 | tee publish_output.log || grep -q "E409" publish_output.log
           else
-            npm publish --tag prerelease
+            npm publish --tag prerelease 2>&1 | tee publish_output.log || grep -q "E409" publish_output.log
           fi
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml

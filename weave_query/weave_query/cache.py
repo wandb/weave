@@ -6,29 +6,28 @@ import shutil
 import time
 import typing
 
-from weave_query import errors
-from weave_query import context_state, environment, wandb_api, engine_trace
+from weave_query import context_state, engine_trace, environment, errors, wandb_api
 
 statsd = engine_trace.statsd()  # type: ignore
 logger = logging.getLogger("root")
 
-"""
-Returns a timestamp bucketed by interval days that is calculated from epoch time. For example, if we want
-a bucket interval of 1 day, the anytime this function is called between 0 and 86399 seconds during the first
-day of unix time (Jan 1 1970), it will return Jan 2 1970. This function returns the END time of the bucket
-so it is easier for the caller to know when a cache interval will no longer be used. 
-
-For another example, if we want a bucket interval of 7 days, then here are some example values:
-system time             bucketed time
-11:22 Jan 1 1970       00:00 Jan 8 1970
-23:59 Jan 7 1970       00:00 Jan 14 1970
-00:00 Jan 8 1970       00:00 Jan 15 1970
-16:00 Jan 12 1970      00:00 Jan 19 1970
-12:00 Jan 3 2024       00:00 Jan 10 2024
-"""
-
 
 def bucket_timestamp(interval_days: int) -> str:
+    """
+    Returns a timestamp bucketed by interval days that is calculated from epoch time. For example, if we want
+    a bucket interval of 1 day, the anytime this function is called between 0 and 86399 seconds during the first
+    day of unix time (Jan 1 1970), it will return Jan 2 1970. This function returns the END time of the bucket
+    so it is easier for the caller to know when a cache interval will no longer be used.
+
+    For another example, if we want a bucket interval of 7 days, then here are some example values:
+    system time            bucketed time
+    11:22 Jan 1 1970       00:00 Jan 8 1970
+    00:00 Jan 2 1970       00:00 Jan 8 1970
+    23:59 Jan 7 1970       00:00 Jan 8 1970
+
+    00:00 Jan 8 1970       00:00 Jan 15 1970
+    16:00 Jan 12 1970      00:00 Jan 15 1970
+    """
     if interval_days == 0:
         return "0"
     now = time.time()

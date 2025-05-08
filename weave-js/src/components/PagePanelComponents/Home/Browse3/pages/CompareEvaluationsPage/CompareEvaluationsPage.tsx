@@ -17,7 +17,6 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
@@ -149,10 +148,9 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 }) => {
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
-  const evaluationsFilter = useEvaluationsFilter(entity, project);
   const onClick = useCallback(() => {
-    history.push(router.callsUIUrl(entity, project, evaluationsFilter));
-  }, [entity, evaluationsFilter, history, project, router]);
+    history.push(router.evaluationsUIUrl(entity, project));
+  }, [entity, history, project, router]);
   return (
     <Box
       sx={{

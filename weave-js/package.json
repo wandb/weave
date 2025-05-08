@@ -123,6 +123,7 @@
     "react-textarea-autosize": "8.3.4",
     "react-timeago": "^4.1.9",
     "react-toastify": "^4.4.3",
+    "react-use": "^17.6.0",
     "react-vega": "^7.4.1",
     "react-virtualized": "^9.10.1",
     "react-virtualized-auto-sizer": "^1.0.6",

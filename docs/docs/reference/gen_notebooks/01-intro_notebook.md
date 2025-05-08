@@ -1,5 +1,5 @@
 ---
-title: Quickstart
+title: Introduction Notebook
 ---
 
 
@@ -373,9 +373,9 @@ from weave import Evaluation
 
 # Define any custom scoring function
 @weave.op()
-def exact_match(expected: str, model_output: dict) -> dict:
+def exact_match(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {"match": expected == model_output}
+    return {"match": expected == output}
 
 
 # Score your examples using scoring functions

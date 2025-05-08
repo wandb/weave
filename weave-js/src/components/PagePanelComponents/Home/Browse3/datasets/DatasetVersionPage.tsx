@@ -1,9 +1,11 @@
 import {Box, Tooltip} from '@mui/material';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {useCallback, useState} from 'react';
+import {parseRefMaybe} from '@wandb/weave/react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {useDatasetStorageSizeCalculation} from '../../../../../common/hooks/useStorageSizeCalculation';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -17,6 +19,7 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
+import {StorageSizeSection} from '../pages/common/StorageSizeSection';
 import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectDeleteButtons';
 import {TabUseDataset} from '../pages/ObjectsPage/Tabs/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
@@ -50,8 +53,13 @@ export const DatasetVersionPage: React.FC<{
     convertEditsToTableUpdateSpec,
   } = useDatasetEditContext();
   const router = useWeaveflowCurrentRouteContext();
-  const {useRootObjectVersions, useRefsData, useTableUpdate, useObjCreate} =
-    useWFHooks();
+  const {
+    useRootObjectVersions,
+    useRefsData,
+    useTableUpdate,
+    useObjCreate,
+    useTableQueryStats,
+  } = useWFHooks();
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -67,7 +75,8 @@ export const DatasetVersionPage: React.FC<{
     projectName,
     {objectIds: [objectName]},
     undefined,
-    true
+    false,
+    {includeStorageSize: true}
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const refUri = objectVersionKeyToRefUri(objectVersion);
@@ -114,6 +123,41 @@ export const DatasetVersionPage: React.FC<{
     entityName,
     projectName,
   ]);
+
+  const tableDigests = useMemo(() => {
+    if (objectVersions.loading || objectVersions.result == null) {
+      return null;
+    }
+    return Array.from(
+      new Set(
+        objectVersions.result.map(v => {
+          const ref = parseRefMaybe(v.val.rows);
+          return ref?.artifactVersion;
+        })
+      )
+    ).filter(Boolean) as string[];
+  }, [objectVersions]);
+
+  const tableStats = useTableQueryStats(
+    entityName,
+    projectName,
+    tableDigests ?? [],
+    {
+      skip: tableDigests == null,
+      includeStorageSize: true,
+    }
+  );
+
+  const {
+    currentVersionSizeBytes,
+    allVersionsSizeBytes,
+    shouldShowAllVersions,
+    isLoading,
+  } = useDatasetStorageSizeCalculation(
+    objectVersions,
+    objectVersionIndex,
+    tableStats
+  );
 
   const renderEditingControls = () => {
     const editCountStr = String(Array.from(editedRows.keys()).length);
@@ -181,7 +225,9 @@ export const DatasetVersionPage: React.FC<{
             <div className="flex h-22 w-22 items-center justify-center rounded-full bg-moon-300/[0.48] text-moon-600">
               <Icon width={14} height={14} name="table" />
             </div>
-            {objectVersionText(objectName, objectVersionIndex)}
+            <span data-testid="dataset-version-page-name">
+              {objectVersionText(objectName, objectVersionIndex)}
+            </span>
           </div>
         </Tailwind>
       }
@@ -232,7 +278,14 @@ export const DatasetVersionPage: React.FC<{
                   <UserLink userId={objectVersion.userId} includeName />
                 </div>
               )}
+              <StorageSizeSection
+                isLoading={isLoading}
+                shouldShowAllVersions={shouldShowAllVersions}
+                currentVersionBytes={currentVersionSizeBytes}
+                allVersionsSizeBytes={allVersionsSizeBytes}
+              />
             </div>
+
             <div className="ml-auto flex-shrink-0">
               {isEditing ? (
                 renderEditingControls()

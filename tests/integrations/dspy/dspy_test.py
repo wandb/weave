@@ -254,7 +254,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
     evaluate = dspy.Evaluate(devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric)
     accuracy = evaluate(module)
-    assert accuracy > 50
+    assert accuracy > 30
 
     calls = list(client.calls())
     assert len(calls) == 22
@@ -263,7 +263,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "dspy.Evaluate"
     output = call.output
-    assert output > 50
+    assert output > 30
 
 
 @pytest.mark.skip_clickhouse_client

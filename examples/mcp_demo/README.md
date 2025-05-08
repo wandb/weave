@@ -61,4 +61,4 @@ The client provides a comprehensive command-line interface to interact with all 
 - `code-review <code>` - Get code review prompt
 - `debug <error>` - Get debug error prompt
 - `demo` - Run demos for all server features
-- `quit` - Exit the session
+- `q` - Exit the session

@@ -64,16 +64,11 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   return (
     <Box
       sx={{
-        position: 'fixed',
-        bottom: '0',
-        left: '58px',
-        paddingBottom: '16px',
-        paddingTop: '8px',
+        padding: '8px 16px 16px',
         backgroundColor: 'white',
-        width:
-          settingsTab !== null
-            ? 'calc(100% - 58px - 320px)'
-            : 'calc(100% - 58px)',
+        minHeight: '160px',
+        width: '100%',
+        flexShrink: 0,
         zIndex: 1, // WARN: z-index position of navbar overflow menu is `2`, check first if changing
       }}>
       <Box

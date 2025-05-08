@@ -1,16 +1,7 @@
 import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
-import {
-  GridColumnVisibilityModel,
-  GridFilterModel,
-  GridPaginationModel,
-  GridPinnedColumnFields,
-  GridSortModel,
-} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
-import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -21,14 +12,7 @@ import React, {
   useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
-import {
-  Redirect,
-  Route,
-  Switch,
-  useHistory,
-  useLocation,
-  useParams,
-} from 'react-router-dom';
+import {Redirect, Route, Switch, useHistory, useParams} from 'react-router-dom';
 
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
@@ -49,26 +33,9 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
-import {getValidFilterModel} from './Browse3/grid/filters';
-import {
-  DEFAULT_PAGE_SIZE,
-  getValidPaginationModel,
-} from './Browse3/grid/pagination';
-import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
-import {getValidSortModel} from './Browse3/grid/sort';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
-import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
-import {
-  ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_PIN_CALLS,
-  DEFAULT_SORT_CALLS,
-  filterHasCalledAfterDateFilter,
-} from './Browse3/pages/CallsPage/CallsTable';
-import {WFHighLevelCallFilter} from './Browse3/pages/CallsPage/callsTableFilter';
-import {
-  DEFAULT_FILTER_CALLS,
-  useMakeInitialDatetimeFilter,
-} from './Browse3/pages/CallsPage/callsTableQuery';
+import {CallsPageLoadView} from './Browse3/pages/CallsPage/CallsPageLoadView';
+import {RedirectToLastView} from './Browse3/pages/CallsPage/RedirectToLastView';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -757,161 +724,19 @@ const CallPageBinding = () => {
   );
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const isEvaluationsTab = tab === 'evaluations';
-  const initialFilter: WFHighLevelCallFilter = useMemo(() => {
-    if (isEvaluationsTab) {
-      return {
-        frozen: true,
-        opVersionRefs: [
-          opVersionKeyToRefUri({
-            entity,
-            project,
-            opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-            versionHash: '*',
-          }),
-        ],
-      };
-    }
-    if (query.filter === undefined) {
-      return {};
-    }
-    try {
-      return JSON.parse(query.filter);
-    } catch (e) {
-      console.log(e);
-      return {};
-    }
-  }, [query.filter, entity, project, isEvaluationsTab]);
-  const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
-
-  const {initialDatetimeFilter} = useMakeInitialDatetimeFilter(
-    entity,
-    project,
-    initialFilter,
-    isEvaluationsTab
-  );
-
-  const onFilterUpdate = useCallback(
-    filter => {
-      history.push(routerContext.callsUIUrl(entity, project, filter));
-    },
-    [history, entity, project, routerContext]
-  );
-
-  const location = useLocation();
-  const columnVisibilityModel = useMemo(() => {
-    try {
-      return JSON.parse(query.cols);
-    } catch (e) {
-      return {};
-    }
-  }, [query.cols]);
-  const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set('cols', JSON.stringify(newModel));
-    history.push({search: newQuery.toString()});
-  };
-
-  const pinModel = useMemo(
-    () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
-    [query.pin]
-  );
-  const setPinModel = (newModel: GridPinnedColumnFields) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set(
-      'pin',
-      JSON.stringify(removeAlwaysLeft(newModel, ALWAYS_PIN_LEFT_CALLS))
-    );
-    history.push({search: newQuery.toString()});
-  };
-
-  // Track if the user has explicitly removed the date filter
-  const hasRemovedDateFilter = useRef(false);
-
-  // Only show the date filter if not evals and we haven't explicitly removed it
-  const defaultFilter =
-    isEvaluationsTab || hasRemovedDateFilter.current
-      ? DEFAULT_FILTER_CALLS
-      : initialDatetimeFilter;
-
-  const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, defaultFilter),
-    [query.filters, defaultFilter]
-  );
-
-  const setFilterModel = (newModel: GridFilterModel) => {
-    // If there was a date filter and now there isn't, mark it as explicitly removed
-    // so we don't add it back on subsequent navigations
-    const hadDateFilter = filterHasCalledAfterDateFilter(filterModel);
-    if (hadDateFilter && !filterHasCalledAfterDateFilter(newModel)) {
-      hasRemovedDateFilter.current = true;
-    }
-
-    const newQuery = new URLSearchParams(location.search);
-    if (newModel.items.length === 0) {
-      newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
-    } else {
-      newQuery.set('filters', JSON.stringify(newModel));
-    }
-    history.push({search: newQuery.toString()});
-  };
-
-  const sortModel = useMemo(
-    () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
-    [query.sort]
-  );
-  const setSortModel = (newModel: GridSortModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    if (newModel.length === 0) {
-      newQuery.delete('sort');
-    } else {
-      newQuery.set('sort', JSON.stringify(newModel));
-    }
-    history.push({search: newQuery.toString()});
-  };
-
-  const paginationModel = useMemo(
-    () => getValidPaginationModel(query.page, query.pageSize),
-    [query.page, query.pageSize]
-  );
-  const setPaginationModel = (newModel: GridPaginationModel) => {
-    const newQuery = new URLSearchParams(location.search);
-    const {page, pageSize} = newModel;
-    // TODO: If we change page size, should we reset page to 0?
-    if (page === 0) {
-      newQuery.delete('page');
-    } else {
-      newQuery.set('page', page.toString());
-    }
-    if (pageSize === DEFAULT_PAGE_SIZE) {
-      newQuery.delete('pageSize');
-    } else {
-      newQuery.set('pageSize', pageSize.toString());
-    }
-    history.push({search: newQuery.toString()});
-  };
-
+  const loadLastView = Object.keys(query).length === 0;
+  if (loadLastView) {
+    return <RedirectToLastView entity={entity} project={project} tab={tab} />;
+  }
   return (
-    <CallsPage
+    <CallsPageLoadView
       entity={entity}
       project={project}
-      initialFilter={initialFilter}
-      onFilterUpdate={onFilterUpdate}
-      columnVisibilityModel={columnVisibilityModel}
-      setColumnVisibilityModel={setColumnVisibilityModel}
-      pinModel={pinModel}
-      setPinModel={setPinModel}
-      filterModel={filterModel}
-      setFilterModel={setFilterModel}
-      sortModel={sortModel}
-      setSortModel={setSortModel}
-      paginationModel={paginationModel}
-      setPaginationModel={setPaginationModel}
+      tab={tab}
+      view={query.view}
     />
   );
 };

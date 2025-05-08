@@ -5,7 +5,7 @@ import React, {FC} from 'react';
 
 import {sanitizeString} from '../../../../util/sanitizeSecrets';
 import {Alert} from '../../../Alert';
-import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+import {useWFHooks} from './pages/wfReactInterface/context';
 
 function detectLanguage(uri: string, code: string) {
   // Simple language detection based on file extension or content
@@ -24,7 +24,7 @@ function detectLanguage(uri: string, code: string) {
   return 'plaintext';
 }
 
-export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
+export const OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
   uri,
   maxRowsInView,
 }) => {

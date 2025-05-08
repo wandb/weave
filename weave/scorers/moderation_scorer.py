@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import Field, PrivateAttr, validate_call
 
@@ -31,7 +31,7 @@ class OpenAIModerationScorer(LLMScorer):
     )
 
     @weave.op
-    async def score(self, output: str) -> dict:
+    async def score(self, *, output: str, **kwargs: Any) -> dict:
         """
         Score the given text against the OpenAI moderation API.
 
@@ -156,7 +156,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
 
     @validate_call
     @weave.op
-    def score(self, output: str) -> WeaveScorerResult:
+    def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         passed: bool = True
         predictions: list[float] = self._predict(output)
         if (sum(predictions) >= self.total_threshold) or any(
@@ -246,7 +246,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
 
     @validate_call
     @weave.op
-    def score(self, output: str) -> WeaveScorerResult:
+    def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         """
         Score the output.
 

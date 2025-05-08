@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -170,7 +170,7 @@ class SummarizationScorer(LLMScorer):
         return text.split()
 
     @weave.op
-    async def score(self, input: str, output: str) -> dict:
+    async def score(self, *, input: str, output: str, **kwargs: Any) -> dict:
         """
         Evaluate a summary by combining entity density and LLM quality evaluation.
 

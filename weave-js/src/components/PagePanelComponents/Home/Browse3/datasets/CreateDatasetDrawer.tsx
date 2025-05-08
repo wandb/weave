@@ -153,6 +153,7 @@ const CreateDatasetDrawerContent: React.FC<{
 
   return (
     <ResizableDrawer
+      data-testid="create-dataset-drawer"
       open={open}
       onClose={wrappedOnClose}
       defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
@@ -329,6 +330,7 @@ const CreateDatasetDrawerContent: React.FC<{
                   </Typography>
                   <Box sx={{mt: 2}}>
                     <input
+                      data-testid="create-dataset-file-input"
                       accept={SUPPORTED_FILE_EXTENSIONS.map(
                         ext => `.${ext}`
                       ).join(',')}
@@ -390,6 +392,7 @@ const CreateDatasetDrawerContent: React.FC<{
                   flexShrink: 0,
                 }}>
                 <Button
+                  data-testid="create-dataset-submit-button"
                   onClick={handlePublishDataset}
                   variant="primary"
                   disabled={!parsedData || !datasetName || nameError !== null}

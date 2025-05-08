@@ -586,8 +586,9 @@ def create_client(
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        # This is disabled by default, but we explicitly enable it here for testing
-        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+        # Removing this as it lead to passing tests that were not passing in prod!
+        # Keeping off for now until it is the default behavior.
+        # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
         server = CachingMiddlewareTraceServer.from_env(server)
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)

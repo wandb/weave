@@ -19,6 +19,7 @@ type CodeEditorProps = {
   value: string;
   language?: string;
   readOnly?: boolean;
+  wrapLines?: boolean;
   onChange?: (value: string) => void;
   maxHeight?: number;
   minHeight?: number;
@@ -33,6 +34,7 @@ export const CodeEditor = ({
   value,
   language,
   readOnly,
+  wrapLines,
   onChange,
   maxHeight,
   minHeight,
@@ -84,6 +86,7 @@ export const CodeEditor = ({
       handleMouseWheel: handleMouseWheel ?? false,
       alwaysConsumeMouseWheel: alwaysConsumeMouseWheel ?? true,
     },
+    wordWrap: wrapLines ? ('on' as const) : ('off' as const),
   };
 
   const onValueChange = (newValue: string | undefined) => {

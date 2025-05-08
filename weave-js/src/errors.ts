@@ -5,6 +5,12 @@ import {WeaveApp} from './weave';
 
 export class UseNodeValueServerExecutionError extends Error {}
 
+export class HTTPError<T = unknown> extends Error {
+  constructor(message: string, public statusCode: number, public body?: T) {
+    super(message);
+  }
+}
+
 export function extractErrorMessageFromApolloError(
   err: unknown
 ): string | undefined {

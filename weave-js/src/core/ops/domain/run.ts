@@ -27,7 +27,12 @@ const runArgTypes = {
 const runArgDescriptions = `A ${docType('run')}`;
 
 const isTableTypeHistoryKeyType = (id: string) => {
-  return ['table-file', 'partitioned-table', 'joined-table'].includes(id);
+  return [
+    'table-file',
+    'partitioned-table',
+    'joined-table',
+    'incremental-table-file',
+  ].includes(id);
 };
 
 export const opGetRunTag = OpKinds.makeTagGetterOp({

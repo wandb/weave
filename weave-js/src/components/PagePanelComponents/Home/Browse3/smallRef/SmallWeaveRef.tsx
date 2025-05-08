@@ -14,6 +14,7 @@ import {IconName, IconNames} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
+import {Id} from '../pages/common/Id';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {SmallRefLoaded} from './SmallRefLoaded';
 
@@ -95,6 +96,30 @@ export const SmallWeaveRef = ({
   iconOnly = false,
   noLink = false,
 }: SmallWeaveRefProps) => {
+  return (
+    <TailwindContents>
+      {objRef.weaveKind === 'call' ? (
+        <SmallWeaveCallRef
+          objRef={objRef}
+          iconOnly={iconOnly}
+          noLink={noLink}
+        />
+      ) : (
+        <SmallWeaveObjectRef
+          objRef={objRef}
+          iconOnly={iconOnly}
+          noLink={noLink}
+        />
+      )}
+    </TailwindContents>
+  );
+};
+
+export const SmallWeaveObjectRef = ({
+  objRef,
+  iconOnly = false,
+  noLink = false,
+}: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjectVersion} = useWFHooks();
   const objectVersion = useObjectVersion(
@@ -136,15 +161,75 @@ export const SmallWeaveRef = ({
   const label = iconOnly
     ? undefined
     : getObjectVersionLabel(objRef, versionIndex);
+
   return (
-    <TailwindContents>
-      <SmallRefLoaded
-        icon={icon}
-        label={label}
-        url={url}
-        error={error}
-        noLink={noLink}
-      />
-    </TailwindContents>
+    <SmallRefLoaded
+      icon={icon}
+      label={label}
+      url={url}
+      error={error}
+      noLink={noLink}
+    />
+  );
+};
+
+export const SmallWeaveCallRef = ({
+  objRef,
+  iconOnly = false,
+  noLink = false,
+}: SmallWeaveRefProps) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const {useCall} = useWFHooks();
+
+  const callKey = {
+    entity: objRef.entityName,
+    project: objRef.projectName,
+    callId: objRef.artifactName,
+  };
+
+  const callResult = useCall(callKey);
+
+  const error = callResult.loading
+    ? null
+    : callResult.result
+    ? null
+    : new Error('Call not found');
+
+  if (callResult.loading) {
+    return <LoadingDots />;
+  }
+
+  const icon = IconNames.LayoutTabs;
+  const url = peekingRouter.callUIUrl(
+    objRef.entityName,
+    objRef.projectName,
+    objRef.artifactName,
+    objRef.artifactName
+  );
+
+  // For calls, we use the display name if available, otherwise the span name or call ID
+  const callData = callResult.result;
+  let label = undefined;
+
+  if (!iconOnly) {
+    if (callData) {
+      label = callData.displayName || callData.spanName || objRef.artifactName;
+    } else {
+      label = objRef.artifactName;
+    }
+  }
+
+  // Add an Id component as suffix
+  const suffix = iconOnly ? null : <Id id={objRef.artifactName} type="Call" />;
+
+  return (
+    <SmallRefLoaded
+      icon={icon}
+      label={label}
+      url={url}
+      error={error}
+      noLink={noLink}
+      suffix={suffix}
+    />
   );
 };

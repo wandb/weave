@@ -50,7 +50,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
   isActive,
 }) => {
-  // We have to play this game because
   const [inputValue, setInputValue] = useState(value);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -579,6 +578,11 @@ const useFireAnalyticsForDateFilterDropdownUsed = (
   const sentEvent = useRef(false);
   useEffect(() => {
     if (sentEvent.current) {
+      return;
+    }
+    // We only care about users opening the drawer and changing
+    // the value, ignore if not changed.
+    if (inputValue === date) {
       return;
     }
     userEvents.dateFilterDropdownUsed({

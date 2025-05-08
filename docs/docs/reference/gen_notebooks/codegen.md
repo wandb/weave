@@ -47,6 +47,15 @@ First, let's set up our environment and import the necessary libraries:
 
 
 ```python
+%%capture
+# Temporary workaround to fix bug in openai:
+# TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+# See https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/15
+!pip install "httpx<0.28"
+```
+
+
+```python
 import ast
 import os
 import re
@@ -290,8 +299,8 @@ if __name__ == "__main__":
 
 ```python
 @weave.op()
-async def score_humaneval_test(test: str, entry_point: str, model_output: str):
-    generated_code = model_output
+async def score_humaneval_test(test: str, entry_point: str, output: str):
+    generated_code = output
 
     # Extract test cases from the test string
     test_cases = re.findall(r"assert.*", test)

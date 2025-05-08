@@ -11,7 +11,7 @@ class PydanticScorer(weave.Scorer):
     model: type[BaseModel]
 
     @weave.op
-    def score(self, output: Any) -> dict:
+    def score(self, *, output: Any, **kwargs: Any) -> dict:
         if isinstance(output, str):
             try:
                 self.model.model_validate_json(output)

@@ -18,7 +18,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 
@@ -37,6 +37,11 @@ weave.init('intro-example')
 # Run the evaluation
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+
+:::info Looking for a less opinionated approach?
+
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
+:::
 
 ## Create an Evaluation
 
@@ -68,7 +73,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 ```
@@ -81,7 +86,7 @@ See the tutorial on defining a `Scorer` class in the next chapter on [Model-Base
 
 ### Define a Model to evaluate
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have parameters that you want to experiment with and capture in weave.
 
 ```python
 from weave import Model, Evaluation
@@ -159,11 +164,11 @@ examples = [
 ]
 
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()
-def match_score2(expected: dict, model_output: dict) -> dict:
+def match_score2(expected: dict, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 class MyModel(Model):
@@ -191,7 +196,13 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ### Using `preprocess_model_input` to format dataset rows before evaluating
 
+:::important
+The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
+Scorer functions always receive the original dataset example, without any preprocessing applied.
+:::
+
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
+
 - Rename fields to match your model's expected input
 - Transform data into the correct format
 - Add or remove fields
@@ -219,7 +230,7 @@ def preprocess_example(example):
     }
 
 @weave.op()
-def match_score(expected: str, model_output: dict) -> dict:
+def match_score(expected: str, output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()
@@ -241,6 +252,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 In this example, our dataset contains examples with an `input_text` field, but our evaluation function expects a `question` parameter. The `preprocess_example` function transforms each example by renaming the field, allowing the evaluation to work correctly.
 
 The preprocessing function:
+
 1. Receives the raw example from your dataset
 2. Returns a dictionary with the fields your model expects
 3. Is applied to each example before it's passed to your evaluation function
@@ -249,8 +261,12 @@ This is particularly useful when working with external datasets that may have di
 
 ### Using HuggingFace Datasets with evaluations
 
-We are continuously improving our integrations with third-party services and libraries. 
+We are continuously improving our integrations with third-party services and libraries.
 
-While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).

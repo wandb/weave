@@ -61,14 +61,14 @@ __init__(*args: 'Any', **kwargs: 'Any') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L75"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `map`
 
 ```python
 map(
     fn: 'Callable',
-    *iterables: 'Iterable[Iterable]',
+    *iterables: 'Iterable[Any]',
     timeout: 'float | None' = None,
     chunksize: 'int' = 1
 ) → Iterator
@@ -80,7 +80,7 @@ map(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L68"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L67"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `submit`
 
@@ -95,7 +95,7 @@ submit(fn: 'Callable', *args: 'Any', **kwargs: 'Any') → Any
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L96"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L99"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ContextAwareThread`
 A Thread that runs functions with the context of the caller. 
@@ -115,7 +115,7 @@ thread = threading.Thread(target=run_with_context(your_func, *args, **kwargs))
 thread.start()
 ``` 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L120"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L123"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -166,7 +166,7 @@ This is a non-negative integer. See the get_native_id() function. This represent
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L124"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L127"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `run`
 

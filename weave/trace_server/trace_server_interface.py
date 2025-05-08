@@ -198,6 +198,7 @@ class ObjSchema(BaseModel):
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    size_bytes: Optional[int] = None
 
 
 class ObjSchemaForInsert(BaseModel):
@@ -417,10 +418,13 @@ class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
+    limit: Optional[int] = None
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+    total_storage_size_bytes: Optional[int] = None
 
 
 class CallUpdateReq(BaseModel):
@@ -546,6 +550,10 @@ class ObjQueryReq(BaseModel):
         default=False,
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
+    )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="If true, the `size_bytes` column is returned.",
     )
 
 
@@ -751,12 +759,40 @@ class TableQueryStatsReq(BaseModel):
     )
     digest: str = Field(
         description="The digest of the table to query",
-        examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
+    )
+
+
+class TableQueryStatsBatchReq(BaseModel):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+
+    digests: Optional[list[str]] = Field(
+        description="The digests of the tables to query",
+        examples=[
+            "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+            "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiераnoa",
+        ],
+        default=[],
+    )
+    include_storage_size: Optional[bool] = Field(
+        default=False,
+        description="If true, the `storage_size_bytes` column is returned.",
     )
 
 
 class TableQueryStatsRes(BaseModel):
     count: int
+
+
+class TableStatsRow(BaseModel):
+    count: int
+    digest: str
+    storage_size_bytes: Optional[int] = None
+
+
+class TableQueryStatsBatchRes(BaseModel):
+    tables: list[TableStatsRow]
 
 
 class RefsReadBatchReq(BaseModel):
@@ -862,8 +898,16 @@ class FileContentReadReq(BaseModel):
     digest: str
 
 
+class FilesStatsReq(BaseModel):
+    project_id: str
+
+
 class FileContentReadRes(BaseModel):
     content: bytes
+
+
+class FilesStatsRes(BaseModel):
+    total_size_bytes: int
 
 
 class EnsureProjectExistsRes(BaseModel):
@@ -1005,6 +1049,9 @@ class TraceServerInterface(Protocol):
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
+    def table_query_stats_batch(
+        self, req: TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchRes: ...
 
     # Ref API
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
@@ -1012,6 +1059,7 @@ class TraceServerInterface(Protocol):
     # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...

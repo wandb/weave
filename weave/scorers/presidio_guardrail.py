@@ -136,7 +136,7 @@ class PresidioScorer(weave.Scorer):
 
     @weave.op
     def score(
-        self, output: str, entities: Optional[list[str]] = None
+        self, *, output: str, entities: Optional[list[str]] = None, **kwargs: Any
     ) -> WeaveScorerResult:
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")

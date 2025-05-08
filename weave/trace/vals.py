@@ -42,6 +42,8 @@ from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
 
+REMOTE_ITER_PAGE_SIZE = 100
+
 
 @dataclasses.dataclass
 class MutationSetitem:
@@ -286,7 +288,7 @@ class WeaveObject(Traceable):
 
 
 class WeaveTable(Traceable):
-    filter: TableRowFilter
+    filter: Optional[TableRowFilter] = None
     _known_length: Optional[int] = None
     _rows: Optional[Sequence[dict]] = None
     # _prefetched_rows is a local cache of rows that can be used to
@@ -295,11 +297,11 @@ class WeaveTable(Traceable):
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: TableRowFilter,
-        root: Optional[Traceable],
+        table_ref: Optional[TableRef] = None,
+        ref: Optional[RefWithExtra] = None,
+        filter: Optional[TableRowFilter] = None,
+        root: Optional[Traceable] = None,
         parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
@@ -465,7 +467,7 @@ class WeaveTable(Traceable):
         wc = require_weave_client()
 
         page_index = 0
-        page_size = 100
+        page_size = REMOTE_ITER_PAGE_SIZE
         while True:
             response = self.server.table_query(
                 TableQueryReq(

@@ -23,6 +23,7 @@ import {
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
+  EMPTY_PROPS_OBJECT_VERSIONS,
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
@@ -397,12 +398,14 @@ export const FilterableObjectVersionsTable: React.FC<{
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
+  const {setSelectedVersions} = props;
   const {useRootObjectVersions} = useWFHooks();
 
   const effectiveFilter = useMemo(() => {
     return {...props.initialFilter, ...props.frozenFilter};
   }, [props.initialFilter, props.frozenFilter]);
 
+  const isOneObject = effectiveFilter.objectName != null;
   const effectivelyLatestOnly = !effectiveFilter.objectName;
 
   const filteredObjectVersions = useRootObjectVersions(
@@ -421,6 +424,15 @@ export const FilterableObjectVersionsTable: React.FC<{
     effectivelyLatestOnly // metadata only when getting latest
   );
 
+  // When the table reloads, clear any selected versions.
+  // This is because we may be reloading because of a deletion, and
+  // we don't want the deleted version to remain in the selected state if it is there.
+  useEffect(() => {
+    if (filteredObjectVersions.loading && setSelectedVersions) {
+      setSelectedVersions([]);
+    }
+  }, [filteredObjectVersions.loading, setSelectedVersions]);
+
   if (filteredObjectVersions.loading) {
     return <Loading centered />;
   }
@@ -432,7 +444,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   const objectVersions = filteredObjectVersions.result ?? [];
   const isEmpty = objectVersions.length === 0;
   if (isEmpty) {
-    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    let propsEmpty = isOneObject
+      ? EMPTY_PROPS_OBJECT_VERSIONS
+      : EMPTY_PROPS_OBJECTS;
     const base = props.initialFilter?.baseObjectClass;
     if ('Prompt' === base) {
       propsEmpty = EMPTY_PROPS_PROMPTS;

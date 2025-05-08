@@ -5,6 +5,13 @@ import styled, {css} from 'styled-components';
 
 import OpDoc from './OpDoc';
 
+export const IDENTIFER_COLOR = globals.MAGENTA;
+export const PROPERTY_IDENTIFIER_COLOR = globals.SIENNA_DARK;
+export const OPERATOR_COLOR = globals.SIENNA_DARK;
+export const STRING_COLOR = globals.TEAL;
+export const BOOLEAN_COLOR = globals.TEAL;
+export const NUMBER_COLOR = globals.TEAL;
+
 export const EditableContainer = styled.div<{
   noBox?: boolean;
   isInvalid?: boolean;
@@ -19,13 +26,25 @@ export const EditableContainer = styled.div<{
   ${props =>
     !props.noBox &&
     css`
-      border: 1px solid;
       flex-grow: 1;
       border-color: ${(innerProps: {isInvalid?: boolean}) =>
         innerProps.isInvalid ? globals.error : '#bbb'};
       border-radius: 4px;
       padding: 6px 8px;
       min-width: 200px;
+      border: 1px solid ${globals.MOON_250};
+      border-radius: 4px;
+      box-sizing: border-box;
+
+      &:hover {
+        border-color: ${globals.TEAL_350};
+      }
+
+      &:focus-within {
+        border-color: ${globals.TEAL_350};
+        outline: 2px solid ${globals.TEAL_350};
+        outline-offset: -2px;
+      }
     `}
 `;
 EditableContainer.displayName = 'S.EditableContainer';
@@ -50,28 +69,28 @@ export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   }
 
   & span.identifier {
-    color: ${globals.MAGENTA};
+    color: ${IDENTIFER_COLOR};
   }
 
   span.property_identifier {
-    color: ${globals.SIENNA_DARK};
+    color: ${PROPERTY_IDENTIFIER_COLOR};
   }
 
   & span.operator {
-    color: ${globals.SIENNA_DARK};
+    color: ${OPERATOR_COLOR};
   }
 
   & span.string {
-    color: ${globals.TEAL};
+    color: ${STRING_COLOR};
   }
 
   & span.number,
   & span.null {
-    color: ${globals.TEAL};
+    color: ${NUMBER_COLOR};
   }
 
   & span.boolean {
-    color: ${globals.TEAL};
+    color: ${BOOLEAN_COLOR};
   }
 
   & span.ACTIVE_NODE {
@@ -98,11 +117,25 @@ WeaveEditable.displayName = 'S.WeaveEditable';
 
 export const ApplyButton = styled(Button)`
   display: none;
-  position: absolute;
   font-size: 13px !important;
   line-height: 20px !important;
-  padding: 0px 4px !important;
+  padding: 0px !important;
   height: 20px;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  width: 28px !important;
+
+  &:disabled {
+    color: ${globals.MOON_400} !important;
+    background-color: transparent !important;
+    opacity: 0.75 !important;
+  }
+
+  &:not(:disabled) {
+    color: ${globals.TEAL_600} !important;
+    background-color: rgba(169, 237, 242, 0.48) !important;
+  }
 `;
 ApplyButton.displayName = 'S.ApplyButton';
 

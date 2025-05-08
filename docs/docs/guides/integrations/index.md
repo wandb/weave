@@ -38,5 +38,12 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[Instructor](/guides/integrations/instructor)**
 - **[CrewAI](/guides/integrations/crewai)**
 - **[Smolagents](/guides/integrations/smolagents)**
+- **[PydanticAI](/guides/integrations/pydantic_ai)**
 
-Choose an integration from the lists above to learn more about how to use Weave with your preferred LLM provider or framework. Whether you're directly accessing LLM APIs or building complex pipelines with orchestration frameworks, Weave provides the tools to trace and analyze your AI applications effectively.
+## Protocols
+
+Weave integrates with standardized protocols that enable communication between AI applications and their supporting services:
+
+- **[Model Context Protocol (MCP)](/guides/integrations/mcp)**
+
+Choose an integration from the lists above to learn more about how to use Weave with your preferred LLM provider, framework, or protocol. Whether you're directly accessing LLM APIs, building complex pipelines, or using standardized protocols, Weave provides the tools to trace and analyze your AI applications effectively.

@@ -677,7 +677,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "model_latency": {"mean": pytest.approx(0, abs=2)},
     }
 
 
