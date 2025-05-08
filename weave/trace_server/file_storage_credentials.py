@@ -27,7 +27,7 @@ class AzureConnectionCredentials(TypedDict):
 class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
-    access_key: str
+    access_key: NotRequired[Optional[str]]
     account_url: NotRequired[Optional[str]]
 
 
@@ -110,7 +110,5 @@ def get_azure_credentials() -> (
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
     access_key = environment.wf_storage_bucket_azure_access_key()
-    if access_key is None:
-        raise ValueError("Azure access key not set")
     account_url = environment.wf_storage_bucket_azure_account_url()
     return AzureAccountCredentials(access_key=access_key, account_url=account_url)

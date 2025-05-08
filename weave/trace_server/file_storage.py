@@ -46,6 +46,7 @@ from abc import abstractmethod
 from typing import Any, Callable, Optional, Union, cast
 
 import boto3
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from google.cloud import storage
@@ -292,9 +293,13 @@ class AzureStorageClient(FileStorageClient):
                 account_url = account_creds["account_url"]
             else:
                 account_url = f"https://{account}.blob.core.windows.net/"
+            if "access_key" in account_creds and account_creds["access_key"]:
+                credential = account_creds["access_key"]
+            else:
+                credential = DefaultAzureCredential()
             return BlobServiceClient(
                 account_url=account_url,
-                credential=account_creds["access_key"],
+                credential=credential,
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
