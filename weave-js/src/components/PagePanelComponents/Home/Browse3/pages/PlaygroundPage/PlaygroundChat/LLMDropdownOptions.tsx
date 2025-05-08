@@ -105,7 +105,7 @@ const SubMenu = ({
       }}>
       {llms.map(llm => (
         <Box
-          key={llm.value + llm.versionIndex}
+          key={`${llm.value}${llm.versionIndex}`}
           onClick={e => {
             e.preventDefault();
             e.stopPropagation();
@@ -373,14 +373,12 @@ export const CustomOption = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}>
-              <Box>
+              <div>
                 {llm.label}
                 {llm.subLabel && (
-                  <Box sx={{fontSize: '12px', color: MOON_500}}>
-                    {llm.subLabel}
-                  </Box>
+                  <div className="text-sm text-moon-500">{llm.subLabel}</div>
                 )}
-              </Box>
+              </div>
               {llm.isLatest && <Pill label="Latest" color="moon" />}
             </Box>
           ))}

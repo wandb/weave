@@ -1,8 +1,8 @@
-import {Box, TextField, Tooltip} from '@mui/material';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {TextField} from '@mui/material';
 import {Button, Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useState} from 'react';
 
 import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
@@ -56,42 +56,20 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   );
 
   return (
-    <Box
-      sx={{
-        padding: '0 0 8px',
-        height: '100%',
-        borderLeft: `1px solid ${MOON_250}`,
-        display: 'flex',
-        flexDirection: 'column',
-        width: '320px',
-        flexShrink: 0,
-        position: 'relative',
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          justifyContent: 'space-between',
-          borderBottom: `1px solid ${MOON_250}`,
-          padding: '8px 16px',
-        }}>
+    <div className="relative flex h-full w-[320px] shrink-0 flex-col border-l border-moon-250 pb-4">
+      <div className="flex items-center justify-between gap-8 border-b border-moon-250 px-16 py-8">
         {/* Header */}
-        <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+        <div className="flex items-center gap-8">
           <Tag label={`${settingsTab + 1}`} />
-          <Tooltip title={playgroundStates[settingsTab].model}>
-            <Box
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontSize: '16px',
-                fontWeight: '600',
-              }}>
-              {playgroundStates[settingsTab].model}
-            </Box>
-          </Tooltip>
-        </Box>
+          <Tooltip
+            content={playgroundStates[settingsTab].model}
+            trigger={
+              <div className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-semibold">
+                {playgroundStates[settingsTab].model}
+              </div>
+            }
+          />
+        </div>
         <Button
           tooltip={'Close settings drawer'}
           variant="ghost"
@@ -101,21 +79,15 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
             setSettingsTab(null);
           }}
         />
-      </Box>
-      <Box sx={{padding: '0 16px', overflowY: 'scroll', height: '100%'}}>
+      </div>
+      <div className="h-full overflow-y-scroll px-16">
         <Tabs.Root value={settingsTab.toString()}>
           {playgroundStates.map((playgroundState, idx) => (
             <Tabs.Content key={idx} value={idx.toString()}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  my: 2,
-                }}>
+              <div className="my-8 flex flex-col gap-16">
                 {/* Model Name Input */}
                 <div className="flex w-full flex-col gap-2">
-                  <span style={{fontSize: '14px'}}>Model Name</span>
+                  <span className="text-sm">Model Name</span>
                   <div className="flex w-full flex-col rounded-md border border-moon-250">
                     <TextField
                       value={currentModelName}
@@ -242,12 +214,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   value={playgroundState.presencePenalty}
                 />
 
-                <Box
-                  sx={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
+                <div className="flex w-full items-center">
                   <Switch.Root
                     id="trackWithWeaveSwitch"
                     size="small"
@@ -269,19 +236,14 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     htmlFor="trackWithWeaveSwitch">
                     Track this LLM call with Weave
                   </label>
-                </Box>
-              </Box>
+                </div>
+              </div>
             </Tabs.Content>
           ))}
         </Tabs.Root>
-      </Box>
+      </div>
 
-      <Box
-        sx={{
-          p: 2,
-          borderTop: `1px solid ${MOON_250}`,
-          backgroundColor: 'white',
-        }}>
+      <div className="border-t border-moon-250 bg-white p-16">
         <Button
           variant="primary"
           onClick={() => saveModelConfiguration(currentModelName)}
@@ -293,8 +255,8 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           }>
           {isUpdatingPublishedModel ? 'Update model' : 'Publish model'}
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
 
