@@ -1,14 +1,13 @@
-import Box from '@mui/material/Box';
-import Tooltip from '@mui/material/Tooltip';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
-import {Button} from '@wandb/weave/components/Button';
+import {TextField} from '@mui/material';
+import {Button, Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
-import React from 'react';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import React, {useEffect, useState} from 'react';
 
 import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
-import {PlaygroundState} from '../types';
+import {PLAYGROUND_MODEL_PARAMS_KEYS, PlaygroundState} from '../types';
+import {useSaveModelConfiguration} from '../useSaveModelConfiguration';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
@@ -19,6 +18,8 @@ export type PlaygroundSettingsProps = {
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
   setSettingsTab: (tab: number | null) => void;
+  projectId: string;
+  refetchSavedModels: () => void;
 };
 
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
@@ -26,43 +27,49 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   setPlaygroundStateField,
   settingsTab,
   setSettingsTab,
+  projectId,
+  refetchSavedModels,
 }) => {
+  const [currentModelName, setCurrentModelName] = useState('');
+
+  useEffect(() => {
+    const objectId = playgroundStates[settingsTab]?.savedModel?.objectId;
+    if (objectId != null) {
+      setCurrentModelName(objectId);
+    }
+  }, [playgroundStates, settingsTab]);
+
+  const {saveModelConfiguration} = useSaveModelConfiguration({
+    setPlaygroundStateField,
+    playgroundStates,
+    settingsTab,
+    projectId,
+    refetchSavedModels,
+  });
+
+  const isUpdatingPublishedModel =
+    playgroundStates[settingsTab]?.savedModel?.llmModelId;
+
+  const areSettingsEqual = arePlaygroundSettingsEqual(
+    currentModelName,
+    playgroundStates[settingsTab]
+  );
+
   return (
-    <Box
-      sx={{
-        padding: '0 0 8px',
-        height: '100%',
-        borderLeft: `1px solid ${MOON_250}`,
-        display: 'flex',
-        flexDirection: 'column',
-        width: '320px',
-        overflowY: 'scroll',
-        flexShrink: 0,
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          justifyContent: 'space-between',
-          borderBottom: `1px solid ${MOON_250}`,
-          padding: '8px 16px',
-        }}>
-        <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+    <div className="relative flex h-full w-[320px] shrink-0 flex-col border-l border-moon-250 pb-4">
+      <div className="flex items-center justify-between gap-8 border-b border-moon-250 px-16 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-8">
           <Tag label={`${settingsTab + 1}`} />
-          <Tooltip title={playgroundStates[settingsTab ?? 0]?.model ?? ''}>
-            <Box
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontSize: '16px',
-                fontWeight: '600',
-              }}>
-              {playgroundStates[settingsTab].model}
-            </Box>
-          </Tooltip>
-        </Box>
+          <Tooltip
+            content={playgroundStates[settingsTab].model}
+            trigger={
+              <div className="overflow-hidden text-ellipsis whitespace-nowrap text-base font-semibold">
+                {playgroundStates[settingsTab].model}
+              </div>
+            }
+          />
+        </div>
         <Button
           tooltip={'Close settings drawer'}
           variant="ghost"
@@ -72,18 +79,48 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
             setSettingsTab(null);
           }}
         />
-      </Box>
-      <Box sx={{padding: '0 16px'}}>
+      </div>
+      <div className="h-full overflow-y-scroll px-16">
         <Tabs.Root value={settingsTab.toString()}>
           {playgroundStates.map((playgroundState, idx) => (
             <Tabs.Content key={idx} value={idx.toString()}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  mt: 2,
-                }}>
+              <div className="my-8 flex flex-col gap-16">
+                {/* Model Name Input */}
+                <div className="flex w-full flex-col gap-2">
+                  <span className="text-sm">Model Name</span>
+                  <div className="flex w-full flex-col rounded-md border border-moon-250">
+                    <TextField
+                      value={currentModelName}
+                      onChange={e => setCurrentModelName(e.target.value)}
+                      placeholder="Enter model name..."
+                      fullWidth
+                      variant="standard"
+                      sx={{
+                        fontFamily: 'Source Sans Pro',
+                        '& .MuiInputBase-root': {
+                          border: 'none',
+                          '&:before, &:after': {
+                            borderBottom: 'none',
+                          },
+                          '&:hover:not(.Mui-disabled):before': {
+                            borderBottom: 'none',
+                          },
+                        },
+                        '& .MuiInputBase-input': {
+                          padding: '8px',
+                          fontFamily: 'Source Sans Pro',
+                        },
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Parameters */}
+                <div className="font-[Source Sans Pro] mb-[-16px] text-sm font-semibold text-moon-500">
+                  PARAMETERS
+                </div>
+
+                {/* Response Format Editor */}
                 <ResponseFormatEditor
                   responseFormat={playgroundState.responseFormat}
                   setResponseFormat={value =>
@@ -177,12 +214,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   value={playgroundState.presencePenalty}
                 />
 
-                <Box
-                  sx={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
+                <div className="flex w-full items-center">
                   <Switch.Root
                     id="trackWithWeaveSwitch"
                     size="small"
@@ -204,12 +236,70 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     htmlFor="trackWithWeaveSwitch">
                     Track this LLM call with Weave
                   </label>
-                </Box>
-              </Box>
+                </div>
+              </div>
             </Tabs.Content>
           ))}
         </Tabs.Root>
-      </Box>
-    </Box>
+      </div>
+
+      <div className="border-t border-moon-250 bg-white p-16">
+        <Button
+          variant="primary"
+          onClick={() => saveModelConfiguration(currentModelName)}
+          className="w-full"
+          disabled={
+            playgroundStates.length === 0 ||
+            !currentModelName.trim() ||
+            areSettingsEqual
+          }>
+          {isUpdatingPublishedModel ? 'Update model' : 'Publish model'}
+        </Button>
+      </div>
+    </div>
   );
+};
+
+// Compares saved model default params with current params
+const arePlaygroundSettingsEqual = (
+  currentModelName: string,
+  currentPlaygroundState: PlaygroundState | undefined
+): boolean => {
+  const savedParams = currentPlaygroundState?.savedModel?.savedModelParams;
+  if (
+    !currentPlaygroundState ||
+    !savedParams ||
+    !currentPlaygroundState.savedModel?.llmModelId
+  ) {
+    return false; // Not equal if essential parts are missing
+  }
+
+  // First, check if the user is updating the objectId
+  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
+    return false;
+  }
+
+  // Check each key in the saved params for equality
+  for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    // messagesTemplate is a special case, because its stored in the trace call state
+    if (key === 'messagesTemplate') {
+      const messagesTemplate = savedParams.messagesTemplate;
+      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
+      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
+        return false;
+      }
+      continue;
+    }
+
+    const currentValue = currentPlaygroundState[key];
+    const savedValue = savedParams[key];
+
+    // We compare the JSON strings of the current and saved values, since some values are not primitive types
+    if (JSON.stringify(currentValue) !== JSON.stringify(savedValue)) {
+      return false;
+    }
+  }
+
+  // All compared keys are equal
+  return true;
 };

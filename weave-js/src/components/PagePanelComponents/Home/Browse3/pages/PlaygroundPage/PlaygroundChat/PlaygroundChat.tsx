@@ -17,7 +17,7 @@ import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
-import {getLLMDropdownOptions} from './LLMDropdownOptions';
+import {useLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -82,6 +82,8 @@ export type PlaygroundChatProps = {
   refetchConfiguredProviders: () => void;
   configuredProvidersLoading: boolean;
   configuredProviders: Record<string, ProviderStatus>;
+  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[];
+  savedModelsLoading: boolean;
 };
 
 export const PlaygroundChat = ({
@@ -100,6 +102,8 @@ export const PlaygroundChat = ({
   refetchConfiguredProviders,
   configuredProvidersLoading,
   configuredProviders,
+  savedModelsResult,
+  savedModelsLoading,
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
 
@@ -129,12 +133,14 @@ export const PlaygroundChat = ({
   );
   const isTeamAdmin = maybeTeamAdmin ?? false;
 
-  const llmDropdownOptions = getLLMDropdownOptions(
+  const llmDropdownOptions = useLLMDropdownOptions(
     configuredProviders,
     configuredProvidersLoading,
     customProvidersResult,
     customProviderModelsResult,
-    areCustomProvidersLoading
+    areCustomProvidersLoading,
+    savedModelsResult,
+    savedModelsLoading
   );
 
   // Check if any chat is loading
@@ -239,7 +245,9 @@ export const PlaygroundChat = ({
                     refetchCustomLLMs={refetchCustomLLMs}
                     llmDropdownOptions={llmDropdownOptions}
                     areProvidersLoading={
-                      configuredProvidersLoading || areCustomProvidersLoading
+                      configuredProvidersLoading ||
+                      areCustomProvidersLoading ||
+                      savedModelsLoading
                     }
                     customProvidersResult={customProvidersResult}
                   />

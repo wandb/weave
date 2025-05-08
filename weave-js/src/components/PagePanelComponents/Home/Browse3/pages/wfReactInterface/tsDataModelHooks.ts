@@ -280,6 +280,17 @@ const useCall = (
   }, [cachedCall, callRes, deepKey]);
 };
 
+const useCall2 = (
+  key: CallKey | null,
+  opts?: {
+    includeCosts?: boolean;
+    includeTotalStorageSize?: boolean;
+    refetchOnRename?: boolean;
+  }
+): Loadable<CallSchema | null> => {
+  return useCall(key, opts);
+};
+
 const useCallsNoExpansion = (
   entity: string,
   project: string,
@@ -2158,6 +2169,7 @@ export const convertISOToDate = (iso: string): Date => {
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
+  useCall2,
   useCalls,
   useCallsStats,
   useProjectHasCalls,

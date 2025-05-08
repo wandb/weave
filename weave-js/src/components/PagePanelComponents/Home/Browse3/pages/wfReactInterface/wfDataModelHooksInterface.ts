@@ -178,6 +178,14 @@ export type WFDataModelHooksInterface = {
       includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema | null>;
+  useCall2: (
+    key: CallKey | null,
+    opts?: {
+      includeCosts?: boolean;
+      refetchOnRename?: boolean;
+      includeTotalStorageSize?: boolean;
+    }
+  ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
     project: string,
