@@ -217,15 +217,14 @@ const DocsLink = () => (
 
 const useCallsTableNoRowsOpLookup = (entity: string, project: string) => {
   const {useOpVersions} = useWFHooks();
-  const {loading, result} = useOpVersions(
+  const {loading, result} = useOpVersions({
     entity,
     project,
-    {latestOnly: true},
-    1,
-    true,
-    [{field: 'created_at', direction: 'desc'}],
-    undefined
-  );
+    filter: {latestOnly: true},
+    limit: 1,
+    metadataOnly: true,
+    orderBy: [{field: 'created_at', direction: 'desc'}],
+  });
   if (loading) {
     return {opLoading: true, opCreatedAt: null};
   }

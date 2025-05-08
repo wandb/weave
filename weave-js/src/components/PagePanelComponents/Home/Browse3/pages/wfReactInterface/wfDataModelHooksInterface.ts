@@ -14,7 +14,6 @@ import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
-import {ContentType, TableUpdateSpec} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -103,7 +102,7 @@ type WandbArtifactObjectVersionKey = {
   scheme: 'wandb-artifact';
 } & CommonObjectVersionKey;
 
-type WeaveObjectVersionKey = {
+export type WeaveObjectVersionKey = {
   scheme: 'weave';
   weaveKind: WeaveKind;
 } & CommonObjectVersionKey;
@@ -169,15 +168,211 @@ export type Refetchable = {
   refetch: () => void;
 };
 
+export interface UseCallParams {
+  key: CallKey | null;
+  includeCosts?: boolean;
+  refetchOnRename?: boolean;
+  includeTotalStorageSize?: boolean;
+}
+
+export interface UseCallsParams {
+  entity: string;
+  project: string;
+  filter: CallFilter;
+  limit?: number;
+  offset?: number;
+  sortBy?: traceServerClientTypes.SortBy[];
+  query?: Query;
+  columns?: string[];
+  expandedRefColumns?: Set<string>;
+  skip?: boolean;
+  refetchOnDelete?: boolean;
+  includeCosts?: boolean;
+  includeFeedback?: boolean;
+  includeTotalStorageSize?: boolean;
+}
+
+export interface UseCallsStatsParams {
+  entity: string;
+  project: string;
+  filter?: CallFilter;
+  query?: Query;
+  limit?: number;
+  skip?: boolean;
+  refetchOnDelete?: boolean;
+  includeTotalStorageSize?: boolean;
+}
+
+export interface UseProjectHasCallsParams {
+  entity: string;
+  project: string;
+  skip?: boolean;
+}
+
+export interface UseCallsDeleteParams {
+  entity: string;
+  project: string;
+  callIDs: string[];
+}
+
+export interface UseCallUpdateParams {
+  entity: string;
+  project: string;
+  callID: string;
+  newName: string;
+}
+
+export interface UseCallsExportParams {
+  entity: string;
+  project: string;
+  contentType: traceServerClientTypes.ContentType;
+  filter: CallFilter;
+  limit?: number;
+  offset?: number;
+  sortBy?: traceServerClientTypes.SortBy[];
+  query?: Query;
+  columns?: string[];
+  expandedRefCols?: string[];
+  includeFeedback?: boolean;
+  includeCosts?: boolean;
+}
+
+export interface UseObjCreateParams {
+  projectId: string;
+  objectId: string;
+  val: any;
+  baseObjectClass?: string;
+}
+
+export interface UseOpVersionParams {
+  key: OpVersionKey | null;
+  metadataOnly?: boolean;
+}
+
+export interface UseOpVersionsParams {
+  entity: string;
+  project: string;
+  filter: OpVersionFilter;
+  limit?: number;
+  metadataOnly?: boolean;
+  orderBy?: traceServerClientTypes.SortBy[];
+  skip?: boolean;
+}
+
+export interface UseObjectVersionParams {
+  key: ObjectVersionKey | null;
+  metadataOnly?: boolean;
+}
+
+export interface UseTableQueryParams {
+  projectId: string;
+  digest: string;
+  filter: traceServerClientTypes.TraceTableQueryReq['filter'];
+  limit?: traceServerClientTypes.TraceTableQueryReq['limit'];
+  offset?: traceServerClientTypes.TraceTableQueryReq['offset'];
+  sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'];
+  skip?: boolean;
+}
+
+export interface UseTableRowsQueryParams {
+  entity: string;
+  project: string;
+  digest: string;
+  filter?: traceServerClientTypes.TraceTableQueryReq['filter'];
+  limit?: traceServerClientTypes.TraceTableQueryReq['limit'];
+  offset?: traceServerClientTypes.TraceTableQueryReq['offset'];
+  sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'];
+  skip?: boolean;
+}
+
+export interface UseTableQueryStatsParams {
+  entity: string;
+  project: string;
+  digests: string[];
+  skip?: boolean;
+  includeStorageSize?: boolean;
+}
+
+export interface UseRootObjectVersionsParams {
+  entity: string;
+  project: string;
+  filter?: ObjectVersionFilter;
+  limit?: number;
+  metadataOnly?: boolean;
+  skip?: boolean;
+  noAutoRefresh?: boolean;
+  includeStorageSize?: boolean;
+}
+
+export interface ObjectDeleteParams {
+  entity: string;
+  project: string;
+  objectId: string;
+  digests?: string[];
+}
+
+export interface ObjectDeleteAllVersionsParams {
+  key: ObjectVersionKey;
+}
+
+export interface OpVersionDeleteParams {
+  entity: string;
+  project: string;
+  opId: string;
+  digests?: string[];
+}
+
+export interface OpVersionDeleteAllVersionsParams {
+  key: OpVersionKey;
+}
+
+export interface UseRefsDataParams {
+  refUris: string[];
+  tableQuery?: TableQuery;
+}
+
+export interface UseRefsReadBatchParams {
+  refUris: string[];
+  skip?: boolean;
+}
+
+export interface UseApplyMutationsToRefParams {
+  refUri: string;
+  mutations: RefMutation[];
+}
+
+export interface UseFileContentParams {
+  entity: string;
+  project: string;
+  digest: string;
+  skip?: boolean;
+}
+
+export interface UseFeedbackParams {
+  key: FeedbackKey | null;
+  sortBy?: traceServerClientTypes.SortBy[];
+}
+
+export interface UseTableUpdateParams {
+  projectId: string;
+  baseDigest: string;
+  updates: traceServerClientTypes.TableUpdateSpec[];
+}
+
+export interface UseChildCallsForCompareParams {
+  entity: string;
+  project: string;
+  parentCallIds: string[];
+  selectedOpVersionRef: string | null;
+  selectedObjectVersionRef: string | null;
+}
+
+export interface UseGetRefsTypeParams {
+  refUris: string[];
+}
+
 export type WFDataModelHooksInterface = {
-  useCall: (
-    key: CallKey | null,
-    opts?: {
-      includeCosts?: boolean;
-      refetchOnRename?: boolean;
-      includeTotalStorageSize?: boolean;
-    }
-  ) => Loadable<CallSchema | null>;
+  useCall: (params: UseCallParams) => Loadable<CallSchema | null>;
   useCall2: (
     key: CallKey | null,
     opts?: {
@@ -186,178 +381,70 @@ export type WFDataModelHooksInterface = {
       includeTotalStorageSize?: boolean;
     }
   ) => Loadable<CallSchema | null>;
-  useCalls: (
-    entity: string,
-    project: string,
-    filter: CallFilter,
-    limit?: number,
-    offset?: number,
-    sortBy?: traceServerClientTypes.SortBy[],
-    query?: Query,
-    columns?: string[],
-    expandedRefColumns?: Set<string>,
-    opts?: {
-      skip?: boolean;
-      refetchOnDelete?: boolean;
-      includeCosts?: boolean;
-      includeFeedback?: boolean;
-      includeTotalStorageSize?: boolean;
-    }
-  ) => Loadable<CallSchema[]> & Refetchable;
+  useCalls: (params: UseCallsParams) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
-    entity: string,
-    project: string,
-    filter: CallFilter,
-    query?: Query,
-    limit?: number,
-    opts?: {
-      skip?: boolean;
-      refetchOnDelete?: boolean;
-      includeTotalStorageSize?: boolean;
-    }
+    params: UseCallsStatsParams
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
-  useProjectHasCalls: (
-    entity: string,
-    project: string,
-    opts?: {skip?: boolean}
-  ) => Loadable<boolean>;
-  useCallsDeleteFunc: () => (
-    entity: string,
-    project: string,
-    callIDs: string[]
-  ) => Promise<void>;
-  useCallUpdateFunc: () => (
-    entity: string,
-    project: string,
-    callID: string,
-    newName: string
-  ) => Promise<void>;
-  useCallsExport: () => (
-    entity: string,
-    project: string,
-    contentType: ContentType,
-    filter: CallFilter,
-    limit?: number,
-    offset?: number,
-    sortBy?: traceServerClientTypes.SortBy[],
-    query?: Query,
-    columns?: string[],
-    expandedRefCols?: string[],
-    includeFeedback?: boolean,
-    includeCosts?: boolean
-  ) => Promise<Blob>;
-  useObjCreate: () => (
-    projectId: string,
-    objectId: string,
-    val: any,
-    baseObjectClass?: string
-  ) => Promise<string>;
+  useProjectHasCalls: (params: UseProjectHasCallsParams) => Loadable<boolean>;
+  useCallsDeleteFunc: () => (params: UseCallsDeleteParams) => Promise<void>;
+  useCallUpdateFunc: () => (params: UseCallUpdateParams) => Promise<void>;
+  useCallsExport: () => (params: UseCallsExportParams) => Promise<Blob>;
+  useObjCreate: () => (params: UseObjCreateParams) => Promise<string>;
   useOpVersion: (
-    key: OpVersionKey | null,
-    metadataOnly?: boolean
+    params: UseOpVersionParams
   ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
-    entity: string,
-    project: string,
-    filter: OpVersionFilter,
-    limit?: number,
-    metadataOnly?: boolean,
-    orderBy?: traceServerClientTypes.SortBy[],
-    opts?: {skip?: boolean}
+    params: UseOpVersionsParams
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
-    key: ObjectVersionKey | null,
-    metadataOnly?: boolean
+    params: UseObjectVersionParams
   ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
-    entity: string,
-    project: string,
-    digest: string,
-    filter?: traceServerClientTypes.TraceTableQueryReq['filter'],
-    limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
-    offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
-    sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'],
-    opts?: {skip?: boolean}
+    params: UseTableRowsQueryParams
   ) => Loadable<traceServerClientTypes.TraceTableQueryRes>;
   useTableQueryStats: (
-    entity: string,
-    project: string,
-    digests: string[],
-    opts?: {skip?: boolean; includeStorageSize?: boolean}
+    params: UseTableQueryStatsParams
   ) => Loadable<traceServerClientTypes.TraceTableQueryStatsBatchRes>;
   useRootObjectVersions: (
-    entity: string,
-    project: string,
-    filter: ObjectVersionFilter,
-    limit?: number,
-    metadataOnly?: boolean,
-    opts?: {
-      skip?: boolean;
-      noAutoRefresh?: boolean;
-      includeStorageSize?: boolean;
-    }
+    params: UseRootObjectVersionsParams
   ) => LoadableWithError<ObjectVersionSchema[]>;
   useObjectDeleteFunc: () => {
     objectVersionsDelete: (
-      entity: string,
-      project: string,
-      objectId: string,
-      digests: string[]
+      params: ObjectDeleteParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     objectDeleteAllVersions: (
-      key: ObjectVersionKey
+      params: ObjectDeleteAllVersionsParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     opVersionsDelete: (
-      entity: string,
-      project: string,
-      opId: string,
-      digests: string[]
+      params: OpVersionDeleteParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
     opDeleteAllVersions: (
-      key: OpVersionKey
+      params: OpVersionDeleteAllVersionsParams
     ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
   };
-  // `useRefsData` is in beta while we integrate Shawn's new Object DB
-  useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
-  // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
+  useRefsData: (params: UseRefsDataParams) => Loadable<any[]>;
   useApplyMutationsToRef: () => (
-    refUri: string,
-    mutations: RefMutation[]
+    params: UseApplyMutationsToRefParams
   ) => Promise<string>;
-  // Derived are under a subkey because they are not directly from the data model
-  // and the logic should be pushed into the core APIs. This is a temporary solution
-  // during the transition period.
-  useFileContent: (
-    entity: string,
-    project: string,
-    digest: string,
-    opts?: {skip?: boolean}
-  ) => Loadable<ArrayBuffer>;
+  useFileContent: (params: UseFileContentParams) => Loadable<ArrayBuffer>;
   useFeedback: (
-    key: FeedbackKey | null,
-    sortBy?: traceServerClientTypes.SortBy[]
+    params: UseFeedbackParams
   ) => LoadableWithError<traceServerClientTypes.Feedback[] | null> &
     Refetchable;
   useTableUpdate: () => (
-    projectId: string,
-    baseDigest: string,
-    updates: traceServerClientTypes.TableUpdateSpec[]
+    params: UseTableUpdateParams
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
   useTableCreate: () => (
-    table: traceServerClientTypes.TableCreateReq
+    params: traceServerClientTypes.TableCreateReq
   ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
-      entity: string,
-      project: string,
-      parentCallIds: string[],
-      selectedOpVersionRef: string | null,
-      selectedObjectVersionRef: string | null
+      params: UseChildCallsForCompareParams
     ) => Loadable<CallSchema[]>;
-    // `useGetRefsType` is in beta while we integrate Shawn's new Object DB
-    useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
-    // `useRefsType` is in beta while we integrate Shawn's new Object DB
-    useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useGetRefsType: () => (
+      params: UseGetRefsTypeParams
+    ) => Promise<Types.Type[]>;
+    useRefsType: (params: UseGetRefsTypeParams) => Loadable<Types.Type[]>;
     useCodeForOpRef: (opVersionRef: string) => Loadable<string>;
   };
 };

@@ -144,20 +144,20 @@ export const ExportSelector = ({
       ? makeLeafColumns(visibleColumns)
       : undefined;
     const startTime = Date.now();
-    download(
-      callQueryParams.entity,
-      callQueryParams.project,
+    download({
+      entity: callQueryParams.entity,
+      project: callQueryParams.project,
       contentType,
-      lowLevelFilter,
+      filter: lowLevelFilter,
       limit,
       offset,
       sortBy,
-      filterBy,
-      leafColumns,
-      refColumnsToExpand,
+      query: filterBy,
+      columns: leafColumns,
+      expandedRefCols: refColumnsToExpand,
       includeFeedback,
-      includeCosts
-    ).then(blob => {
+      includeCosts,
+    }).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
       const fileName = `weave_export_${callQueryParams.project}_${date}.${fileExtension}`;
