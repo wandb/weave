@@ -361,6 +361,17 @@ export type CompletionsCreateRes = {
   weave_call_id?: string;
 };
 
+export type ProjectStatsReq = {
+  project_id: string;
+};
+
+export type ProjectStatsRes = {
+  trace_storage_size_bytes: number;
+  objects_storage_size_bytes: number;
+  tables_storage_size_bytes: number;
+  files_storage_size_bytes: number;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
