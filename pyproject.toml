@@ -143,7 +143,6 @@ modal = ["modal", "python-dotenv"]
 mcp = ["mcp[cli]>=1.6.0"]
 vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
-audio = ["pydub", "audioop-lts"]
 test = [
   "nox",
   "pytest>=8.2.0",
@@ -167,8 +166,6 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
-  "pydub",
-  "audioop-lts",
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
