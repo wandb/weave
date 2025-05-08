@@ -1398,20 +1398,32 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_close()  # type: ignore
             except Exception as e:
+                # Even if an exception occurs, we need to ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call is not None:
+                    call_context.pop_call(current_call.id)
+
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
-            self._on_finished_called = True
+            finally:
+                self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
             try:
                 self._on_error(e)
             except Exception as e:
+                # Even if an exception occurs, we need to ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call is not None:
+                    call_context.pop_call(current_call.id)
+
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
-            self._on_finished_called = True
+            finally:
+                self._on_finished_called = True
 
     def __iter__(self) -> _IteratorWrapper:
         return self
