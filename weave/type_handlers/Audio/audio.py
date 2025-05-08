@@ -194,9 +194,10 @@ def save(
                 wav_file.writeframes(frames)
         # Rewind to the original position
         obj.setpos(original_frame_position)
-    else:
-        with artifact.writeable_file_path(audio_filename(obj.fmt)) as fp:
-            obj.export(fp)
+        return
+
+    with artifact.writeable_file_path(audio_filename(obj.fmt)) as fp:
+        obj.export(fp)
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio":
