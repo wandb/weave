@@ -19,7 +19,7 @@ This guide demonstrates how to:
 1. Track different versions of a system prompts using Weave
 2. Get an image dataset from Weave
 3. Create a NER pipeline
-4. Set up Weave [Scorers](../../guides/evaluation/scorers.md) to peform a [Weave Evaluation](../../guides/core-types/evaluations) on the pipeline
+4. Set up Weave [Scorers](/docs/docs/guides/evaluation/scorers.md) to peform a [Weave Evaluation](docs/docs/guides/core-types/evaluations.md) on the pipeline
 5. Run an evaluation against our dataset of handwritten notes
 
 ##  Prerequisites
@@ -34,23 +34,26 @@ Before you begin, install and import the required libraries, get your W&B API ke
 
 
 ```python
-from openai import OpenAI
-import weave
-import os
-from google.colab import userdata
-from pathlib import Path
 import json
+import os
+
+from google.colab import userdata
+from openai import OpenAI
+
+import weave
 ```
 
 
 ```python
 # Get API Keys
-os.environ['OPENAI_API_KEY'] = userdata.get('OPENAI_API_KEY') #please set the keys as collab environment secrets from the menu on the left
-os.environ['WANDB_API_KEY'] = userdata.get('WANDB_API_KEY')
+os.environ["OPENAI_API_KEY"] = userdata.get(
+    "OPENAI_API_KEY"
+)  # please set the keys as collab environment secrets from the menu on the left
+os.environ["WANDB_API_KEY"] = userdata.get("WANDB_API_KEY")
 
 # Set project name
 # Replace the PROJECT value with your project name
-PROJECT = "vlm-handwritten-ner" 
+PROJECT = "vlm-handwritten-ner"
 
 # Initiatlize the Weave project
 weave.init(PROJECT)
@@ -63,7 +66,7 @@ Good prompt engineering is critical to guiding the model to properly extract ent
 
 ```python
 # Create your prompt object with Weave
-prompt="""
+prompt = """
 Extract all readable text from this image. Format the extracted entities as a valid JSON.
 Do not return any extra text, just the JSON. Do not include ```json```
 Use the following format:
@@ -78,7 +81,7 @@ Next, improve the prompt by adding more instructions and validation rules to hel
 
 
 ```python
-better_prompt="""
+better_prompt = """
 You are a precision OCR assistant. Given an image of patient information, extract exactly these fields into a single JSON object—and nothing else:
 
 - Patient Name
@@ -113,13 +116,16 @@ The images in the dataset are already `base64` encoded, which means the data can
 
 ```python
 # Retrieve the dataset from the following Weave project
-dataset = weave.ref("weave:///wandb-smle/vlm-handwritten-ner/object/NER-eval-dataset:G8MEkqWBtvIxPYAY23sXLvqp8JKZ37Cj0PgcG19dGjw").get()
+dataset = weave.ref(
+    "weave:///wandb-smle/vlm-handwritten-ner/object/NER-eval-dataset:G8MEkqWBtvIxPYAY23sXLvqp8JKZ37Cj0PgcG19dGjw"
+).get()
 
-# Access a specific example in the dataset 
-example_image = dataset.rows[3]['image_base64']
+# Access a specific example in the dataset
+example_image = dataset.rows[3]["image_base64"]
 
 # Display the example_image
-from IPython.display import display, HTML
+from IPython.display import HTML, display
+
 html = f'<img src="{example_image}" style="max-width: 100%; height: auto;">'
 display(HTML(html))
 ```
@@ -135,29 +141,27 @@ Next, build the NER pipeline. The pipeline will consist of two functions:
 ```python
 # Traceable function using GPT-4-Vision
 def extract_named_entities_from_image(image_base64) -> dict:
-
-    #init LLM Client
+    # init LLM Client
     client = OpenAI()
 
-    #Setup the instruction prompt
-    #You can optionally use a prompt stored in Weave withweave.ref("weave:///wandb-smle/vlm-handwritten-ner/object/NER-prompt:FmCv4xS3RFU21wmNHsIYUFal3cxjtAkegz2ylM25iB8").get().content.strip()
+    # Setup the instruction prompt
+    # You can optionally use a prompt stored in Weave withweave.ref("weave:///wandb-smle/vlm-handwritten-ner/object/NER-prompt:FmCv4xS3RFU21wmNHsIYUFal3cxjtAkegz2ylM25iB8").get().content.strip()
     prompt = better_prompt
 
     response = client.responses.create(
-    model="gpt-4.1",
-
-    input=[
-        {
-            "role": "user",
-            "content": [
-                { "type": "input_text", "text":prompt},
-                {
-                    "type": "input_image",
-                    "image_url": image_base64,
-                },
-            ],
-        }
-    ],
+        model="gpt-4.1",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {
+                        "type": "input_image",
+                        "image_url": image_base64,
+                    },
+                ],
+            }
+        ],
     )
 
     return response.output_text
@@ -173,10 +177,10 @@ Every `named_entity_recognation` is run, the full trace results are visible in t
 
 
 ```python
-#NER Function for evaluations
+# NER Function for evaluations
 @weave.op()
 def named_entity_recognation(image_base64, id):
-    result ={}
+    result = {}
     try:
         # 1) call the vision op, get back a JSON string
         output_text = extract_named_entities_from_image(image_base64)
@@ -199,13 +203,13 @@ The following code loops over the dataset and stores the results in a local file
 # Output results
 results = []
 
-#loop over all images in the dataset
+# loop over all images in the dataset
 for row in dataset.rows:
-      result = named_entity_recognation(row['image_base64'], str(row['id']))
-      result["image_id"]=str(row['id'])
-      results.append(result)
+    result = named_entity_recognation(row["image_base64"], str(row["id"]))
+    result["image_id"] = str(row["id"])
+    results.append(result)
 
-#Save all results to a JSON file
+# Save all results to a JSON file
 output_file = "processing_results.json"
 with open(output_file, "w") as f:
     json.dump(results, f, indent=2)
@@ -244,8 +248,12 @@ def check_for_missing_fields_programatically(model_output):
     required_fields = {"Patient Name", "Date", "Patient ID", "Group Number"}
 
     for key in required_fields:
-        if key not in model_output or model_output[key] is None or str(model_output[key]).strip() == "":
-            return False # This entry has a missing or empty field
+        if (
+            key not in model_output
+            or model_output[key] is None
+            or str(model_output[key]).strip() == ""
+        ):
+            return False  # This entry has a missing or empty field
 
     return True  # All required fields are present and non-empty
 ```
@@ -258,7 +266,7 @@ The Scorer used for this step, `check_for_missing_fields_with_llm`, use an LLM t
 
 
 ```python
-# The system prompt for the LLM-as-a-judge 
+# The system prompt for the LLM-as-a-judge
 
 eval_prompt = """
 You are an OCR validation system. Your role is to assess whether the structured text extracted from an image accurately reflects the information in that image.
@@ -288,44 +296,32 @@ OR
 {"Correct": false, "Reason": "EXPLANATION_HERE"}
 """
 
+
 # Add weave.op() to track execution of the Scorer
 @weave.op()
 def check_for_missing_fields_with_llm(model_output, image_base64):
-  client = OpenAI()
-  response = client.chat.completions.create(
-  model="gpt-4o",
-  messages=[
-    {
-      "role": "developer",
-      "content": [
-        {
-          "text": eval_prompt,
-          "type": "text"
-        }
-      ]
-    },
-    {
-      "role": "user",
-      "content": [
-        {
-          "type": "image_url",
-          "image_url": {
-            "url": image_base64,
-          }
-        },
-        {
-          "type": "text",
-          "text": str(model_output)
-        }
-      ]
-    },
-  ],
-  response_format={
-    "type": "json_object"
-  },
-  )
-  response = json.loads(response.choices[0].message.content)
-  return response
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "developer", "content": [{"text": eval_prompt, "type": "text"}]},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_base64,
+                        },
+                    },
+                    {"type": "text", "text": str(model_output)},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+    )
+    response = json.loads(response.choices[0].message.content)
+    return response
 ```
 
 ## 5. Run the Evaluation
@@ -337,9 +333,15 @@ The following code kicks off the evaluation and applies the two Scorers to every
 
 ```python
 evaluation = weave.Evaluation(
-   dataset=dataset, scorers=[check_for_missing_fields_with_llm, check_for_missing_fields_programatically], name="Evaluate_4.1_NER")
+    dataset=dataset,
+    scorers=[
+        check_for_missing_fields_with_llm,
+        check_for_missing_fields_programatically,
+    ],
+    name="Evaluate_4.1_NER",
+)
 
-print(await (evaluation.evaluate(named_entity_recognation)) )
+print(await evaluation.evaluate(named_entity_recognation))
 ```
 
 When the above code is run, a link to the Evaluation table in the Weave UI is generated. Follow the link to view the results and compare different iterations of the pipeline across models, prompts, and datasets of your choice. The Weave UI automatically creates a visualization like the one shown below for your team.   
