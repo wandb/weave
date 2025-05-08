@@ -200,7 +200,9 @@ DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE
+    or DEFAULT_MAX_MEMORY_USAGE,
+    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
+    or DEFAULT_MAX_EXECUTION_TIME,
 }
 
 
