@@ -27,26 +27,33 @@ import {
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
 
-type ModelAsRowsRowDataBase = Pick<
-  PivotedRow,
-  'evaluationCallId' | 'inputDigest' | 'output' | 'scores' | 'predictAndScore'
-> & {
+type RowDataBaseRow = Pick<PivotedRow, 'output' | 'scores' | 'inputDigest'> & {
   id: string;
   _expansionId: string;
 };
 
-type ModelsAsRowsRowDataTrial = ModelAsRowsRowDataBase & {
-  _type: 'trial';
+type ModelAsColumnsRowDataBase = RowDataBaseRow & {
+  _pivot: 'modelsAsColumns';
 };
 
-type ModelsAsRowsRowDataSummary = ModelAsRowsRowDataBase & {
+type ModelAsRowsRowDataBase = RowDataBaseRow &
+  Pick<PivotedRow, 'evaluationCallId' | 'predictAndScore'> & {
+    _pivot: 'modelsAsRows';
+  };
+
+type RowDataBase = ModelAsColumnsRowDataBase | ModelAsRowsRowDataBase;
+
+type RowDataTrial = RowDataBase & {
+  _type: 'trial';
+  _trialNdx: number;
+};
+
+type RowDataSummary = RowDataBase & {
   _type: 'summary';
   _numTrials: number;
 };
 
-type ModelsAsRowsRowData =
-  | ModelsAsRowsRowDataTrial
-  | ModelsAsRowsRowDataSummary;
+type RowData = RowDataTrial | RowDataSummary;
 
 const DatasetRowItemRenderer: React.FC<{
   state: EvaluationComparisonState;
@@ -63,6 +70,12 @@ const DatasetRowItemRenderer: React.FC<{
     0
   );
   return <CellValue value={row.targetRowValue?.[props.inputKey]} />;
+};
+
+const disabledRowSpanning = {
+  rowSpanValueGetter: (value: any, row: RowData) => {
+    return row.id;
+  },
 };
 
 export const ExampleCompareSectionTable: React.FC<{
@@ -117,18 +130,20 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     let hasTrials = false;
     const returnRows = filteredRows.flatMap(filteredRow => {
       const evaluationCallIds = props.state.evaluationCallIdsOrdered;
-      const finalRows: ModelsAsRowsRowData[] = [];
+      const finalRows: RowData[] = [];
       for (const evaluationCallId of evaluationCallIds) {
         const matchingRows = filteredRow.originalRows.filter(
           row => row.evaluationCallId === evaluationCallId
         );
         const numTrials = matchingRows.length;
         const expansionId = filteredRow.inputDigest + ':' + evaluationCallId;
-        const originalRows: ModelsAsRowsRowDataTrial[] = matchingRows.map(
-          row => {
+        const originalRows: RowDataTrial[] = matchingRows.map(
+          (row, trialNdx) => {
             return {
               _type: 'trial' as const,
               _expansionId: expansionId,
+              _trialNdx: trialNdx,
+              _pivot: 'modelsAsRows' as const,
               ...row,
             };
           }
@@ -136,11 +151,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
         const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
         hasTrials = hasTrials || numTrials > 1;
         if (numTrials > 1 && !expandedIds.includes(digestEvalId)) {
-          const summaryRow: ModelsAsRowsRowDataSummary = {
-            ...originalRows[0],
+          const summaryRow: RowDataSummary = {
+            ...matchingRows[0],
             _type: 'summary' as const,
             _numTrials: numTrials,
             _expansionId: expansionId,
+            _pivot: 'modelsAsRows' as const,
             id: digestEvalId,
             output: filteredRow.output,
             scores: filteredRow.scores,
@@ -164,7 +180,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
-  // console.log(inputSubFields);
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -183,30 +198,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     }
     return keys;
   }, [rows]);
-  console.log(props.state);
 
-  const outputSubFields = useMemo(() => {
-    return outputColumnKeys;
-    // const keys: string[] = []
-    // for (const row of rows) {
-    //     if (_.isObject(row.output)) {
-    //         for (const key in row.output) {
-    //             if (!keys.includes(key)) {
-    //                 keys.push(key)
-    //             }
-    //         }
-    //     } else {
-    //         if (!keys.includes('')) {
-    //             keys.push('')
-    //         }
-    //     }
-    // }
-    // return keys
-  }, [outputColumnKeys]);
   const {setSelectedInputDigest} = useCompareEvaluationsState();
 
-  const columns: GridColDef<ModelsAsRowsRowData>[] = useMemo(() => {
-    const res: GridColDef<ModelsAsRowsRowData>[] = [
+  const columns: GridColDef<RowData>[] = useMemo(() => {
+    const res: GridColDef<RowData>[] = [
       {
         field: 'inputDigest',
         headerName: 'Row',
@@ -236,20 +232,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       ...inputSubFields.map(key => ({
         field: `inputs.${key}`,
         headerName: key,
-        // width: 100,
         flex: 1,
-        valueGetter: (value: any, row: ModelsAsRowsRowData) => {
+        valueGetter: (value: any, row: RowData) => {
           return row.inputDigest;
-          // if (key === '') {
-          //     if (_.isObject(row.dataRow)) {
-          //         return ''
-          //     } else {
-          //         return row.dataRow
-          //     }
-          // }
-          // return row.dataRow[key]
         },
-        renderCell: (params: GridRenderCellParams<ModelsAsRowsRowData>) => {
+        renderCell: (params: GridRenderCellParams<RowData>) => {
           // console.log(key);
           return (
             <DatasetRowItemRenderer
@@ -263,12 +250,13 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       {
         field: 'evaluationCallId',
         headerName: 'Model',
-        // width: 100
         flex: 1,
         renderCell: params => {
-          // if (params.rowNode.type === 'group') {
-          //     return null;
-          // }
+          if (params.row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
+          }
+
           return (
             <EvaluationModelLink
               callId={params.row.evaluationCallId}
@@ -284,15 +272,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
               headerName: '',
               width: 50,
               resizable: false,
-              valueGetter: (value: any, row: ModelsAsRowsRowData) => {
-                return row.evaluationCallId;
+              valueGetter: (value: any, row: RowData) => {
+                return row._expansionId;
               },
-              renderCell: (
-                params: GridRenderCellParams<ModelsAsRowsRowData>
-              ) => {
-                // if (params.row._numTrials < 2) {
-                //   return null;
-                // }
+              renderCell: (params: GridRenderCellParams<RowData>) => {
                 const isExpanded = expandedIds.includes(
                   params.row._expansionId
                 );
@@ -331,21 +314,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
         field: 'trialNdx',
         headerName: 'Trial',
         width: 60,
-        // flex: 1,
         resizable: false,
-        rowSpanValueGetter: (value: any, row: ModelsAsRowsRowData) => {
-          // disable row spanning for now
-          return row.id;
-        },
+        ...disabledRowSpanning,
         renderCell: params => {
-          // if (params.rowNode.type === 'group') {
-          //     return null;
-          // }
-          // const currEvalCallId = orderedCallIds[evalIndex];
-          // const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-          // if (selectedTrial == null) {
-          //   return null;
-          // }
           if (params.row._type === 'summary') {
             return (
               <div
@@ -358,6 +329,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
                 {params.row._numTrials}
               </div>
             );
+          }
+          if (params.row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
           }
           const trialPredict = params.row.predictAndScore._rawPredictTraceData;
           const [trialEntity, trialProject] =
@@ -388,98 +363,26 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
           return null;
         },
       },
-      // {
-      //     field: 'predictAndScoreCallId',
-      //     headerName: 'Prediction',
-      //     // width: 100
-      //     flex: 1,
-      //     renderCell: (params) => {
-      //         // const currEvalCallId = orderedCallIds[evalIndex];
-      //         // const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-      //         // if (selectedTrial == null) {
-      //         //   return null;
-      //         // }
-      //         const trialPredict = params.row.predictAndScore._rawPredictTraceData;
-      //         const [trialEntity, trialProject] =
-      //           trialPredict?.project_id.split('/') ?? [];
-      //         const trialOpName = parseRefMaybe(
-      //           trialPredict?.op_name ?? ''
-      //         )?.artifactName;
-      //         const trialCallId = trialPredict?.id;
-      //         const evaluationCall = props.state.summary.evaluationCalls[params.row.evaluationCallId];
-      //         if (trialEntity && trialProject && trialOpName && trialCallId) {
-      //           return (
-      //             <Box
-      //               style={{
-      //                 overflow: 'hidden',
-      //               }}>
-      //               <CallLink
-      //                 entityName={trialEntity}
-      //                 projectName={trialProject}
-      //                 opName={trialOpName}
-      //                 callId={trialCallId}
-      //                 icon={<Icon name="filled-circle" color={evaluationCall.color} />}
-      //                 color={MOON_800}
-      //               />
-      //             </Box>
-      //           );
-      //         }
-      //         return null;
-      //     }
-      // },
-      // {
-      //     field: 'predictAndScoreCallId',
-      //     headerName: 'Predict and Score Call ID',
-      //     // width: 100
-      //     flex: 1
-      // },
-      ...outputSubFields.map(key => ({
+      ...outputColumnKeys.map(key => ({
         field: `output.${key}`,
         headerName: removePrefix(key, 'output.'),
-        // width: 100,
         flex: 1,
-        valueGetter: (value: any, row: ModelsAsRowsRowData) => {
-          // if (row.output === undefined) {
-          //     return null;
-          // }
-          return row.output[key]?.[row.evaluationCallId];
-        },
-        renderCell: (params: GridRenderCellParams<ModelsAsRowsRowData>) => {
-          // if (params.rowNode.type === 'group') {
-          //     return null;
-          // }
+        ...disabledRowSpanning,
+        // valueGetter: (value: any, row: RowData) => {
+        //   if (row._pivot === 'modelsAsColumns') {
+        //     // This does not make sense for models as columns
+        //     return null;
+        //   }
+        //   return row.output[key]?.[row.evaluationCallId];
+        // },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._type === 'summary') {
-            // sad
+            // TODO: What should we show for the summary rows output fields??
             return null;
-            // CODE COPY
-            // const digestEvalId =
-            //       params.row.inputDigest + ':' + params.row.evaluationCallId;
-            //     const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
-            //     return (
-            //       <Box
-            //         style={{
-            //           display: 'flex',
-            //           alignItems: 'center',
-            //           justifyContent: 'center',
-            //           height: '100%',
-            //           width: '100%',
-            //         }}>
-            //         <IconButton
-            //           onClick={() => {
-            //             setExpandedDigestEvalIds(prev => {
-            //               if (prev.includes(digestEvalId)) {
-            //                 return prev.filter(id => id !== digestEvalId);
-            //               } else {
-            //                 return [...prev, digestEvalId];
-            //               }
-            //             });
-            //           }}>
-            //           <Icon
-            //             name={isExpanded ? 'collapse' : 'expand-uncollapse'}
-            //           />
-            //         </IconButton>
-            //       </Box>
-            //     );
+          }
+          if (params.row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
           }
           return (
             <CellValue
@@ -487,31 +390,26 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
             />
           );
         },
-        rowSpanValueGetter: (value: any, row: ModelsAsRowsRowData) => {
-          // disable row spanning for now
-          return row.id;
-        },
       })),
       ...scoreSubFields.map(key => ({
         field: `scores.${key}`,
         headerName: flattenedDimensionPath(
           props.state.summary.scoreMetrics[key]
         ),
-        // width: 100,
         flex: 1,
-        valueGetter: (value: any, row: ModelsAsRowsRowData) => {
-          // if (key === '') {
-          //     retuen
-          // }
-          //   if (row.scores === undefined) {
-          //     return null;
-          // }
-          return row.scores[key][row.evaluationCallId];
-        },
-        renderCell: (params: GridRenderCellParams<ModelsAsRowsRowData>) => {
-          // if (params.rowNode.type === 'group') {
-          //     return null;
-          // }
+        ...disabledRowSpanning,
+        // valueGetter: (value: any, row: RowData) => {
+        //   if (row._pivot === 'modelsAsColumns') {
+        //     // This does not make sense for models as columns
+        //     return null;
+        //   }
+        //   return row.scores[key][row.evaluationCallId];
+        // },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          if (params.row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
+          }
           if (params.row._type === 'summary') {
             return evalAggScorerMetricCompGeneric(
               props.state.summary.scoreMetrics[key],
@@ -526,17 +424,13 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
             />
           );
         },
-        rowSpanValueGetter: (value: any, row: ModelsAsRowsRowData) => {
-          // disable row spanning for now
-          return row.id;
-        },
       })),
     ];
     return res;
   }, [
     inputSubFields,
     hasTrials,
-    outputSubFields,
+    outputColumnKeys,
     scoreSubFields,
     setSelectedInputDigest,
     props,
@@ -562,12 +456,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       {
         groupId: 'output',
         headerName: 'Output',
-        children: outputSubFields.map(key => ({
+        children: outputColumnKeys.map(key => ({
           field: `output.${key}`,
         })),
       },
     ];
-  }, [inputSubFields, scoreSubFields, outputSubFields]);
+  }, [inputSubFields, scoreSubFields, outputColumnKeys]);
 
   // console.log(props.state.summary.scoreMetrics);
 
@@ -584,26 +478,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
 
   return (
     <StyledDataGrid
-      //   treeData
-      //   getTreeDataPath={(row: RowData) => [row.inputDigest + row.evaluationCallId, row.id]}
-      //   groupingColDef={{
-      //     headerName: 'Row',
-      //     width: 60,
-      //     // flex: 1,
-      //   }}
-      //   getRowId={(row) => row.id}
       rowSelectionModel={selectedRow}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
-      // slots={{
-      //   footer: PivotModelButton,
-      // }}
-      // slotProps={{
-      //   // footer: { status },
-      // }}
       sx={{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
@@ -618,28 +498,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
   );
 };
 
-type ModelAsColumnsRowDataBase = Pick<
-  PivotedRow,
-  'output' | 'scores' | 'inputDigest'
-> & {
-  id: string;
-  _expansionId: string;
-};
-
-type ModelAsColumnsRowDataTrial = ModelAsColumnsRowDataBase & {
-  _type: 'trial';
-  _trialNdx: number;
-};
-
-type ModelAsColumnsRowDataSummary = ModelAsColumnsRowDataBase & {
-  _type: 'summary';
-  _numTrials: number;
-};
-
-type ModelAsColumnsRowData =
-  | ModelAsColumnsRowDataTrial
-  | ModelAsColumnsRowDataSummary;
-
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
   state: EvaluationComparisonState;
   shouldHighlightSelectedRow?: boolean;
@@ -651,12 +509,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
   const firstExampleRow = useFirstExampleRow(props.state);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  // const rows = filteredRows;
-  // const hasTrials = false;
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
-    const returnRows: ModelAsColumnsRowData[] = filteredRows.flatMap(
-      (filteredRow): ModelAsColumnsRowData[] => {
+    const returnRows: RowData[] = filteredRows.flatMap(
+      (filteredRow): RowData[] => {
         const groupedOriginalRows = _.groupBy(
           filteredRow.originalRows,
           row => row.evaluationCallId
@@ -665,11 +521,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           ...Object.values(groupedOriginalRows).map(rows => rows.length)
         );
 
-        const summaryRow: ModelAsColumnsRowDataSummary = {
+        const summaryRow: RowDataSummary = {
           ...filteredRow,
           _type: 'summary' as const,
           _numTrials: maxTrials,
           _expansionId: filteredRow.inputDigest,
+          _pivot: 'modelsAsColumns' as const,
           id: filteredRow.inputDigest + ':summary',
           output: filteredRow.output,
           scores: filteredRow.scores,
@@ -682,11 +539,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
         }
 
         return _.range(maxTrials).map(trialNdx => {
-          const res: ModelAsColumnsRowDataTrial = {
+          const res: RowDataTrial = {
             ...filteredRow,
             _type: 'trial' as const,
             _trialNdx: trialNdx,
             _expansionId: filteredRow.inputDigest,
+            _pivot: 'modelsAsColumns' as const,
             id: filteredRow.inputDigest + ':trial:' + trialNdx,
             // turn these into reducers
             output: Object.fromEntries(
@@ -732,29 +590,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     return {rows: returnRows, hasTrials};
   }, [expandedIds, filteredRows]);
 
-  // console.log(rows, hasTrials);
-
-  // console.log(filteredRows);
-
-  // const rows: RowData[] = useMemo(() => {
-  //   // For each dataset + evaluation pair, add a summary over the trials.
-  //   const rowsByEvalAndDataset = _.groupBy(flatRows, row => [row.inputDigest + row.evaluationCallId]);
-  //   const rowsByEvalAndDatasetAndTrial = _.mapValues(rowsByEvalAndDataset, rows => {
-  //     return {
-  //       ...rows[0],
-  //       _summary: {
-  //         trials: rows.length,
-  //       }
-  //     };
-  //   });
-
-  //   // const finalRows: RowData[] = [];
-  //   // for (const [key, rows] of Object.entries(rowsByEvalAndDatasetAndTrial)) {
-  //   //   finalRows.push(...rows);
-  //   // }
-  //   return flatRows;
-  // }, [flatRows]);
-
   const inputSubFields = useMemo(() => {
     const exampleRow = firstExampleRow.targetRowValue ?? {};
 
@@ -764,7 +599,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
-  // console.log(inputSubFields);
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -784,37 +618,16 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     return keys;
   }, [rows]);
 
-  const outputSubFields = useMemo(() => {
-    return outputColumnKeys;
-    // const keys: string[] = []
-    // for (const row of rows) {
-    //     if (_.isObject(row.output)) {
-    //         for (const key in row.output) {
-    //             if (!keys.includes(key)) {
-    //                 keys.push(key)
-    //             }
-    //         }
-    //     } else {
-    //         if (!keys.includes('')) {
-    //             keys.push('')
-    //         }
-    //     }
-    // }
-    // return keys
-  }, [outputColumnKeys]);
   const {setSelectedInputDigest} = useCompareEvaluationsState();
 
-  const columns: GridColDef<ModelAsColumnsRowData>[] = useMemo(() => {
-    const res: GridColDef<ModelAsColumnsRowData>[] = [
+  const columns: GridColDef<RowData>[] = useMemo(() => {
+    const res: GridColDef<RowData>[] = [
       {
         field: 'inputDigest',
         headerName: 'Row',
         width: 60,
         // flex: 1,
         renderCell: params => {
-          // if (params.rowNode.type === 'group') {
-          //     return null;
-          // }
           return (
             <Box
               style={{
@@ -841,18 +654,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
         headerName: key,
         // width: 100,
         flex: 1,
-        valueGetter: (value: any, row: ModelAsColumnsRowData) => {
+        valueGetter: (value: any, row: RowData) => {
           return row.inputDigest;
-          // if (key === '') {
-          //     if (_.isObject(row.dataRow)) {
-          //         return ''
-          //     } else {
-          //         return row.dataRow
-          //     }
-          // }
-          // return row.dataRow[key]
         },
-        renderCell: (params: GridRenderCellParams<ModelAsColumnsRowData>) => {
+        renderCell: (params: GridRenderCellParams<RowData>) => {
           // console.log(key);
           return (
             <DatasetRowItemRenderer
@@ -863,23 +668,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           );
         },
       })),
-      // {
-      //   field: 'evaluationCallId',
-      //   headerName: 'Model',
-      //   // width: 100
-      //   flex: 1,
-      //   renderCell: params => {
-      //     // if (params.rowNode.type === 'group') {
-      //     //     return null;
-      //     // }
-      //     return (
-      //       <EvaluationModelLink
-      //         callId={params.row.evaluationCallId}
-      //         state={props.state}
-      //       />
-      //     );
-      //   },
-      // },
       ...(hasTrials
         ? [
             {
@@ -887,12 +675,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
               headerName: '',
               width: 50,
               resizable: false,
-              valueGetter: (value: any, row: ModelAsColumnsRowData) => {
+              valueGetter: (value: any, row: RowData) => {
                 return row.inputDigest;
               },
-              renderCell: (
-                params: GridRenderCellParams<ModelAsColumnsRowData>
-              ) => {
+              renderCell: (params: GridRenderCellParams<RowData>) => {
                 const isExpanded = expandedIds.includes(
                   params.row._expansionId
                 );
@@ -927,120 +713,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
             },
           ]
         : []),
-      // {
-      //   field: 'trialNdx',
-      //   headerName: 'Trial',
-      //   width: 60,
-      //   // flex: 1,
-      //   resizable: false,
-      //   rowSpanValueGetter: (value: any, row: RowData) => {
-      //     // disable row spanning for now
-      //     return row.id;
-      //   },
-      //   renderCell: params => {
-      //     // if (params.rowNode.type === 'group') {
-      //     //     return null;
-      //     // }
-      //     // const currEvalCallId = orderedCallIds[evalIndex];
-      //     // const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-      //     // if (selectedTrial == null) {
-      //     //   return null;
-      //     // }
-      //     if (params.row._type === 'summary') {
-      //       return (
-      //         <div
-      //           style={{
-      //             height: '100%',
-      //             display: 'flex',
-      //             alignItems: 'center',
-      //             justifyContent: 'center',
-      //           }}>
-      //           {params.row._numTrials}
-      //         </div>
-      //       );
-      //     }
-      //     const trialPredict = params.row.predictAndScore._rawPredictTraceData;
-      //     const [trialEntity, trialProject] =
-      //       trialPredict?.project_id.split('/') ?? [];
-      //     const trialOpName = parseRefMaybe(
-      //       trialPredict?.op_name ?? ''
-      //     )?.artifactName;
-      //     const trialCallId = params.row.predictAndScore.callId;
-      //     if (trialEntity && trialProject && trialOpName && trialCallId) {
-      //       return (
-      //         <Box
-      //           style={{
-      //             overflow: 'hidden',
-      //             height: '100%',
-      //             display: 'flex',
-      //             alignItems: 'center',
-      //           }}>
-      //           <CallLink
-      //             entityName={trialEntity}
-      //             projectName={trialProject}
-      //             opName={trialOpName}
-      //             callId={trialCallId}
-      //             noName
-      //           />
-      //         </Box>
-      //       );
-      //     }
-      //     return null;
-      //   },
-      // },
-      // {
-      //     field: 'predictAndScoreCallId',
-      //     headerName: 'Prediction',
-      //     // width: 100
-      //     flex: 1,
-      //     renderCell: (params) => {
-      //         // const currEvalCallId = orderedCallIds[evalIndex];
-      //         // const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-      //         // if (selectedTrial == null) {
-      //         //   return null;
-      //         // }
-      //         const trialPredict = params.row.predictAndScore._rawPredictTraceData;
-      //         const [trialEntity, trialProject] =
-      //           trialPredict?.project_id.split('/') ?? [];
-      //         const trialOpName = parseRefMaybe(
-      //           trialPredict?.op_name ?? ''
-      //         )?.artifactName;
-      //         const trialCallId = trialPredict?.id;
-      //         const evaluationCall = props.state.summary.evaluationCalls[params.row.evaluationCallId];
-      //         if (trialEntity && trialProject && trialOpName && trialCallId) {
-      //           return (
-      //             <Box
-      //               style={{
-      //                 overflow: 'hidden',
-      //               }}>
-      //               <CallLink
-      //                 entityName={trialEntity}
-      //                 projectName={trialProject}
-      //                 opName={trialOpName}
-      //                 callId={trialCallId}
-      //                 icon={<Icon name="filled-circle" color={evaluationCall.color} />}
-      //                 color={MOON_800}
-      //               />
-      //             </Box>
-      //           );
-      //         }
-      //         return null;
-      //     }
-      // },
-      // {
-      //     field: 'predictAndScoreCallId',
-      //     headerName: 'Predict and Score Call ID',
-      //     // width: 100
-      //     flex: 1
-      // },
-      ...outputSubFields.flatMap(key => {
+      ...outputColumnKeys.flatMap(key => {
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `output.${key}.${evaluationCallId}`,
-            // headerName: evaluationCallId,
-            renderHeader: (
-              params: GridColumnHeaderParams<ModelAsColumnsRowData>
-            ) => {
+            ...disabledRowSpanning,
+            renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
                   callId={evaluationCallId}
@@ -1048,27 +726,20 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                 />
               );
             },
-            // width: 100,
             flex: 1,
-            valueGetter: (value: any, row: ModelAsColumnsRowData) => {
+            valueGetter: (value: any, row: RowData) => {
               // if (row.output === undefined) {
               //     return null;
               // }
               return row.output[key][evaluationCallId];
             },
-            renderCell: (
-              params: GridRenderCellParams<ModelAsColumnsRowData>
-            ) => {
+            renderCell: (params: GridRenderCellParams<RowData>) => {
               // if (params.rowNode.type === 'group') {
               //     return null;
               // }
               return (
                 <CellValue value={params.row.output[key][evaluationCallId]} />
               );
-            },
-            rowSpanValueGetter: (value: any, row: ModelAsColumnsRowData) => {
-              // disable row spanning for now
-              return row.id;
             },
           };
         });
@@ -1077,9 +748,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `scores.${key}.${evaluationCallId}`,
-            renderHeader: (
-              params: GridColumnHeaderParams<ModelAsColumnsRowData>
-            ) => {
+            ...disabledRowSpanning,
+            renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
                   callId={evaluationCallId}
@@ -1089,36 +759,16 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
             },
             // width: 100,
             flex: 1,
-            valueGetter: (value: any, row: ModelAsColumnsRowData) => {
-              // if (key === '') {
-              //     retuen
-              // }
-              //   if (row.scores === undefined) {
-              //     return null;
-              // }
+            valueGetter: (value: any, row: RowData) => {
               return row.scores[key][evaluationCallId];
             },
-            renderCell: (
-              params: GridRenderCellParams<ModelAsColumnsRowData>
-            ) => {
-              // if (params.rowNode.type === 'group') {
-              //     return null;
-              // }
-
+            renderCell: (params: GridRenderCellParams<RowData>) => {
               return evalAggScorerMetricCompGeneric(
                 props.state.summary.scoreMetrics[key],
                 params.row.scores[key][evaluationCallId],
                 // this compares directy to the peer
                 params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
               );
-
-              // return (
-              //   <CellValue value={params.row.scores[key][evaluationCallId]} />
-              // );
-            },
-            rowSpanValueGetter: (value: any, row: ModelAsColumnsRowData) => {
-              // disable row spanning for now
-              return row.id;
             },
           };
         });
@@ -1129,13 +779,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
   }, [
     inputSubFields,
     hasTrials,
-    outputSubFields,
+    outputColumnKeys,
     scoreSubFields,
     setSelectedInputDigest,
     props,
     expandedIds,
   ]);
-  // console.log(columns);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
@@ -1149,7 +798,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       {
         groupId: 'output',
         headerName: 'Output',
-        children: outputSubFields.map(key => {
+        children: outputColumnKeys.map(key => {
           return {
             groupId: `output.${key}`,
             headerName: removePrefix(key, 'output.'),
@@ -1185,7 +834,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     ];
   }, [
     inputSubFields,
-    outputSubFields,
+    outputColumnKeys,
     scoreSubFields,
     props.state.evaluationCallIdsOrdered,
     props.state.summary.scoreMetrics,
@@ -1206,26 +855,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
   return (
     <StyledDataGrid
-      //   treeData
-      //   getTreeDataPath={(row: RowData) => [row.inputDigest + row.evaluationCallId, row.id]}
-      //   groupingColDef={{
-      //     headerName: 'Row',
-      //     width: 60,
-      //     // flex: 1,
-      //   }}
-      //   getRowId={(row) => row.id}
       rowSelectionModel={selectedRow}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
-      // slots={{
-      //   footer: PivotModelButton,
-      // }}
-      // slotProps={{
-      //   // footer: { status },
-      // }}
       sx={{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
@@ -1239,9 +874,3 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     />
   );
 };
-
-// export function PivotModelButton(
-//   props: NonNullable<GridSlotsComponentsProps['footer']>,
-// ) {
-//   return <div>pivot</div>;
-// };

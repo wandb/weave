@@ -7,16 +7,7 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {debounce} from 'lodash';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -183,71 +174,6 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const useElementVisibility = (ref: React.RefObject<HTMLElement>) => {
-  const [topVisibility, setTopVisibility] = useState<number>(0);
-
-  const updateVisibility = useCallback(() => {
-    if (!ref.current) return;
-
-    const rect = ref.current.getBoundingClientRect();
-    const scrollableParent = findScrollableParent(ref.current);
-    if (scrollableParent) {
-      const parentRect = scrollableParent.getBoundingClientRect();
-      const parentTop = Math.max(0, parentRect.top);
-      const parentBottom = Math.min(window.innerHeight, parentRect.bottom);
-      const parentHeight = parentBottom - parentTop;
-
-      const topVisible = Math.max(
-        0,
-        Math.min(parentHeight, parentBottom - rect.top)
-      );
-      setTopVisibility(topVisible);
-    }
-  }, [ref]);
-
-  // Create a memoized debounced version of updateVisibility
-  const debouncedUpdateVisibility = useMemo(
-    () => debounce(updateVisibility, 20),
-    [updateVisibility]
-  );
-
-  useEffect(() => {
-    debouncedUpdateVisibility();
-
-    const scrollableParent = findScrollableParent(ref.current);
-    if (scrollableParent) {
-      scrollableParent.addEventListener('scroll', debouncedUpdateVisibility);
-    }
-    window.addEventListener('resize', debouncedUpdateVisibility);
-
-    return () => {
-      debouncedUpdateVisibility.cancel();
-      if (scrollableParent) {
-        scrollableParent.removeEventListener(
-          'scroll',
-          debouncedUpdateVisibility
-        );
-      }
-      window.removeEventListener('resize', debouncedUpdateVisibility);
-    };
-  }, [ref, debouncedUpdateVisibility]);
-
-  return topVisibility;
-};
-
-const findScrollableParent = (
-  element: HTMLElement | null
-): HTMLElement | null => {
-  if (!element) return null;
-
-  const {overflowY} = window.getComputedStyle(element);
-  if (overflowY === 'auto' || overflowY === 'scroll') {
-    return element;
-  }
-
-  return findScrollableParent(element.parentElement);
-};
-
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
@@ -329,8 +255,6 @@ const ResultExplorer: React.FC<{
     'table'
   );
   const [modelsAsRows, setModelsAsRows] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const topVisibility = useElementVisibility(boxRef);
 
   const toggleModelsAsRows = useCallback(() => {
     setModelsAsRows(!modelsAsRows);
@@ -361,7 +285,6 @@ const ResultExplorer: React.FC<{
         <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
       </HorizontalBox>
       <div
-        ref={boxRef}
         style={{
           height,
           overflow: 'hidden',
@@ -371,9 +294,7 @@ const ResultExplorer: React.FC<{
             display: 'flex',
             flexDirection: 'row',
             height: '100%',
-            // height: topVisibility,
             borderTop: '1px solid #e0e0e0',
-            // transition: 'height 100ms ease-out',
           }}>
           <Box
             style={{
