@@ -16,9 +16,16 @@ from typing import (
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+
+METADATA_FILE_NAME= "_metadata.json"
+AUDIO_FILE_PREFIX= "audio."
+
 SUPPORTED_FORMATS_TYPE = Literal["mp3", "wav"]
 SUPPORTED_FORMATS = cast(list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE)))
 T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
+
+def audio_filename(ext: str) -> str:
+    return f"{AUDIO_FILE_PREFIX}{ext}"
 
 def get_format_from_filename(filename: str) -> str:
     """Get the file format from a filename.
@@ -163,7 +170,7 @@ class Audio(Generic[T]):
 def save(
     obj: Union[wave.Wave_read, Audio], artifact: MemTraceFilesArtifact, name: str
 ) -> None:
-    with artifact.writeable_file_path("metadata.json") as metadata_path:
+    with artifact.writeable_file_path(METADATA_FILE_NAME) as metadata_path:
         obj_module = obj.__module__
         obj_class = obj.__class__.__name__
         with open(metadata_path, "w") as f:
@@ -175,7 +182,7 @@ def save(
         obj.rewind()
         frames = obj.readframes(obj.getnframes())
         params = obj.getparams()
-        with artifact.writeable_file_path("audio.wav") as fp:
+        with artifact.writeable_file_path(audio_filename('.wav')) as fp:
             with wave.open(fp, "w") as wav_file:
                 # Exclude nframes param, it is often set as the maximum number of frames
                 # which bumps into the 4GB max file size when creating the wave.Wave_write
@@ -188,20 +195,20 @@ def save(
         # Rewind to the original position
         obj.setpos(original_frame_position)
     else:
-        with artifact.writeable_file_path(f"audio.{obj.fmt}") as fp:
+        with artifact.writeable_file_path(audio_filename(obj.fmt)) as fp:
             obj.export(fp)
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio":
     pytype = None
-    if artifact.path_contents.get("metadata.json"):
-        with open(artifact.path("metadata.json")) as f:
+    if artifact.path_contents.get(METADATA_FILE_NAME):
+        with open(artifact.path(METADATA_FILE_NAME)) as f:
             pytype = json.load(f).get("_type")
 
     for filename in artifact.path_contents:
         path = artifact.path(filename)
-        if filename.startswith("audio."):
-            if (not pytype and filename.endswith(".wav")) or pytype == "wave.Wave_read":
+        if filename.startswith(AUDIO_FILE_PREFIX):
+            if (pytype is None and filename.endswith(".wav")) or pytype == "wave.Wave_read":
                 return wave.open(path, "rb")
             return Audio.from_path(path=path)
 
