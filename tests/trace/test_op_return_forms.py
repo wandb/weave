@@ -249,7 +249,8 @@ async def test_op_return_async_generator_never_iter(client):
             size -= 1
             yield size
 
-    fn()
+    async for item in fn():
+        return
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -366,6 +367,7 @@ async def test_op_return_async_generator_partial(client):
     async for item in fn():
         if item == 5:
             break
+        return  # This return is required to raise StopAsyncIteration
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
