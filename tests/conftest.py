@@ -621,7 +621,7 @@ def client(zero_stack, request):
 
 
 @pytest.fixture()
-def client_creator(request):
+def client_creator(zero_stack, request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
