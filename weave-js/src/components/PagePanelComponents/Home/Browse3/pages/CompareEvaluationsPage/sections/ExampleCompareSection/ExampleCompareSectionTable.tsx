@@ -160,7 +160,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
-  console.log(inputSubFields);
+  // console.log(inputSubFields);
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -247,7 +247,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
           // return row.dataRow[key]
         },
         renderCell: (params: GridRenderCellParams<RowData>) => {
-          console.log(key);
+          // console.log(key);
           return (
             <DatasetRowItemRenderer
               state={props.state}
@@ -561,7 +561,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     ];
   }, [inputSubFields, scoreSubFields, outputSubFields]);
 
-  console.log(props.state.summary.scoreMetrics);
+  // console.log(props.state.summary.scoreMetrics);
 
   return (
     <StyledDataGrid
@@ -610,58 +610,86 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     })),
     0
   );
-  // const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
-  //   []
-  // );
-  const rows = filteredRows;
+  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
+    []
+  );
+  // const rows = filteredRows;
   // const hasTrials = false;
-  // const {rows, hasTrials} = useMemo(() => {
-  //   let hasTrials = false;
-  //   const returnRows = filteredRows.flatMap(filteredRow => {
-  //     const evaluationCallIds = props.state.evaluationCallIdsOrdered;
-  //     const finalRows: RowData[] = [];
-  //     for (const evaluationCallId of evaluationCallIds) {
-  //       const matchingRows = filteredRow.originalRows.filter(
-  //         row => row.evaluationCallId === evaluationCallId
-  //       );
-  //       const numTrials = matchingRows.length;
-  //       const originalRows = matchingRows.map(row => {
-  //         return {
-  //           _type: 'trial' as const,
-  //           _numTrials: numTrials,
-  //           ...row,
-  //         };
-  //       });
-  //       const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
-  //       hasTrials = hasTrials || numTrials > 1;
-  //       if (numTrials > 1 && !expandedDigestEvalIds.includes(digestEvalId)) {
-  //         const summaryRow: RowData = {
-  //           ...originalRows[0],
-  //           _type: 'summary' as const,
-  //           _numTrials: numTrials,
-  //           id: digestEvalId,
-  //           output: filteredRow.output,
-  //           scores: filteredRow.scores,
-  //           // output: Object.fromEntries(Object.entries(filteredRow.output).map(([key, value]) => {
-  //           //   return [key, value[evaluationCallId]];
-  //           // })),
-  //           // scores: Object.fromEntries(Object.entries(filteredRow.scores).map(([key, value]) => {
-  //           //   return [key, value[evaluationCallId] ?? {}];
-  //           // })),
-  //         };
-  //         finalRows.push(summaryRow);
-  //       } else {
-  //         finalRows.push(...originalRows);
-  //       }
-  //     }
-  //     return finalRows;
-  //   });
-  //   return {rows: returnRows, hasTrials};
-  // }, [
-  //   expandedDigestEvalIds,
-  //   filteredRows,
-  //   props.state.evaluationCallIdsOrdered,
-  // ]);
+  const {rows, hasTrials} = useMemo(() => {
+    let hasTrials = false;
+    const returnRows: RowData[] = filteredRows.flatMap(filteredRow => {
+
+
+
+      const groupedOriginalRows = _.groupBy(filteredRow.originalRows, row => row.evaluationCallId);
+      const maxTrials = Math.max(...Object.values(groupedOriginalRows).map(rows => rows.length));
+
+      const summaryRow:  RowData = {
+        ...filteredRow,
+        _type: 'summary' as const,
+        // not really used
+        _numTrials: maxTrials,
+        // not really used
+        evaluationCallId: '',
+        // not really used
+        path: [],
+        // not really used
+        predictAndScore: filteredRow.originalRows[0].predictAndScore,
+        // not really used
+        inputRef: '',
+        id: filteredRow.inputDigest + ':summary',
+        output: filteredRow.output,
+        scores: filteredRow.scores,
+      }
+
+      hasTrials = hasTrials || maxTrials > 1;
+
+      if (maxTrials > 1 && !expandedDigestEvalIds.includes(filteredRow.inputDigest)) {
+        return [summaryRow];
+      }
+
+
+
+      return _.range(maxTrials).map(trialNdx => {
+
+        const res: RowData = {
+          ...filteredRow,
+          _type: 'trial' as const,
+          id: filteredRow.inputDigest + ':trial:' + trialNdx,
+          // turn these into reducers
+          output: Object.fromEntries(Object.entries(filteredRow.output).map(([key, value]) => {
+            return [key, Object.fromEntries(
+             Object.values(groupedOriginalRows).map((evalVal) => {
+                return [evalVal[trialNdx].evaluationCallId, evalVal[trialNdx].output[key][evalVal[trialNdx].evaluationCallId]]
+              })
+            )];
+          })),
+          scores: Object.fromEntries(Object.entries(filteredRow.scores).map(([key, value]) => {
+            return [key, Object.fromEntries(
+             Object.values(groupedOriginalRows).map((evalVal) => {
+                return [evalVal[trialNdx].evaluationCallId, evalVal[trialNdx].scores[key][evalVal[trialNdx].evaluationCallId]]
+              })
+            )];
+          })),
+          // not really used
+          _numTrials: maxTrials,
+          // not really used
+          evaluationCallId: '',
+          // not really used
+          path: [],
+          // not really used
+          predictAndScore: filteredRow.originalRows[0].predictAndScore,
+          // not really used
+          inputRef: '',
+        }
+        return res;
+      });
+    });
+
+    return {rows: returnRows, hasTrials};
+  }, [expandedDigestEvalIds, filteredRows]);
+
+  // console.log(rows, hasTrials);
 
   // console.log(filteredRows);
 
@@ -693,7 +721,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
-  console.log(inputSubFields);
+  // console.log(inputSubFields);
 
   const scoreSubFields = useMemo(() => {
     const keys: string[] = [];
@@ -777,7 +805,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           // return row.dataRow[key]
         },
         renderCell: (params: GridRenderCellParams<RowData>) => {
-          console.log(key);
+          // console.log(key);
           return (
             <DatasetRowItemRenderer
               state={props.state}
@@ -804,52 +832,52 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       //     );
       //   },
       // },
-      // ...(hasTrials
-      //   ? [
-      //       {
-      //         field: 'expandTrials',
-      //         headerName: '',
-      //         width: 50,
-      //         resizable: false,
-      //         valueGetter: (value: any, row: RowData) => {
-      //           return row.evaluationCallId;
-      //         },
-      //         renderCell: (params: GridRenderCellParams<RowData>) => {
-      //           if (params.row._numTrials < 2) {
-      //             return null;
-      //           }
-      //           const digestEvalId =
-      //             params.row.inputDigest + ':' + params.row.evaluationCallId;
-      //           const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
-      //           return (
-      //             <Box
-      //               style={{
-      //                 display: 'flex',
-      //                 alignItems: 'center',
-      //                 justifyContent: 'center',
-      //                 height: '100%',
-      //                 width: '100%',
-      //               }}>
-      //               <IconButton
-      //                 onClick={() => {
-      //                   setExpandedDigestEvalIds(prev => {
-      //                     if (prev.includes(digestEvalId)) {
-      //                       return prev.filter(id => id !== digestEvalId);
-      //                     } else {
-      //                       return [...prev, digestEvalId];
-      //                     }
-      //                   });
-      //                 }}>
-      //                 <Icon
-      //                   name={isExpanded ? 'collapse' : 'expand-uncollapse'}
-      //                 />
-      //               </IconButton>
-      //             </Box>
-      //           );
-      //         },
-      //       },
-      //     ]
-      //   : []),
+      ...(hasTrials
+        ? [
+            {
+              field: 'expandTrials',
+              headerName: '',
+              width: 50,
+              resizable: false,
+              valueGetter: (value: any, row: RowData) => {
+                return row.inputDigest;
+              },
+              renderCell: (params: GridRenderCellParams<RowData>) => {
+                if (params.row._numTrials < 2) {
+                  return null;
+                }
+                const digestEvalId =
+                  params.row.inputDigest ;
+                const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
+                return (
+                  <Box
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      width: '100%',
+                    }}>
+                    <IconButton
+                      onClick={() => {
+                        setExpandedDigestEvalIds(prev => {
+                          if (prev.includes(digestEvalId)) {
+                            return prev.filter(id => id !== digestEvalId);
+                          } else {
+                            return [...prev, digestEvalId];
+                          }
+                        });
+                      }}>
+                      <Icon
+                        name={isExpanded ? 'collapse' : 'expand-uncollapse'}
+                      />
+                    </IconButton>
+                  </Box>
+                );
+              },
+            },
+          ]
+        : []),
       // {
       //   field: 'trialNdx',
       //   headerName: 'Trial',
@@ -1023,6 +1051,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
               return evalAggScorerMetricCompGeneric(
                 props.state.summary.scoreMetrics[key],
                 params.row.scores[key][evaluationCallId],
+                // this compares directy to the peer
                 params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
               );
 
@@ -1041,7 +1070,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
     return res;
   }, [inputSubFields, outputSubFields, scoreSubFields, props.state]);
-  console.log(columns);
+  // console.log(columns);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
@@ -1097,7 +1126,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     props.state.summary.scoreMetrics,
   ]);
 
-  console.log(props.state.summary.scoreMetrics);
+  // console.log(props.state.summary.scoreMetrics);
 
   return (
     <StyledDataGrid
