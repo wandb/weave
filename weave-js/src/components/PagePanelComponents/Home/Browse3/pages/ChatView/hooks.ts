@@ -564,7 +564,7 @@ export const useCallAsChat = (
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();
-  const refsData = useRefsData(refs);
+  const refsData = useRefsData({refUris: refs});
   const refsMap = _.zipObject(refs, refsData.result ?? []);
   const request = normalizeChatRequest(deref(call.inputs, refsMap));
   const result = call.output

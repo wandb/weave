@@ -59,12 +59,12 @@ export const DeleteObjectButtonWithModal: React.FC<{
         onClose={() => setDeleteModalOpen(false)}
         deleteTitleStr={deleteStr}
         onDelete={() =>
-          objectVersionsDelete(
-            objVersionSchema.entity,
-            objVersionSchema.project,
-            objVersionSchema.objectId,
-            [objVersionSchema.versionHash]
-          )
+          objectVersionsDelete({
+            entity: objVersionSchema.entity,
+            project: objVersionSchema.project,
+            objectId: objVersionSchema.objectId,
+            digests: [objVersionSchema.versionHash],
+          })
         }
         onSuccess={onSuccess}
       />
@@ -103,7 +103,12 @@ export const DeleteObjectVersionsButtonWithModal: React.FC<{
         deleteTitleStr={deleteTitleStr}
         deleteBodyStrs={objectVersions}
         onDelete={() =>
-          objectVersionsDelete(entity, project, objectName, objectDigests)
+          objectVersionsDelete({
+            entity,
+            project,
+            objectId: objectName,
+            digests: objectDigests,
+          })
         }
         onSuccess={onSuccess}
       />
@@ -133,13 +138,15 @@ export const DeleteObjectsButtonWithModal: React.FC<{
     return Promise.all(
       objectIds.map(objectId =>
         objectDeleteAllVersions({
-          entity,
-          project,
-          objectId,
-          weaveKind: 'object',
-          scheme: 'weave',
-          versionHash: '',
-          path: '',
+          key: {
+            entity,
+            project,
+            objectId,
+            weaveKind: 'object',
+            scheme: 'weave',
+            versionHash: '',
+            path: '',
+          },
         })
       )
     );
