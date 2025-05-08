@@ -27,8 +27,9 @@ import {IdList} from './IdList';
 
 type FilterTagItemProps = {
   item: GridFilterItem;
-  onRemoveFilter: (id: FilterId) => void;
+  onRemoveFilter?: (id: FilterId) => void;
   isEditing?: boolean;
+  disableRemove?: boolean;
 };
 
 const quoteValue = (valueType: string, value: string): string => {
@@ -43,11 +44,11 @@ export const FilterTagItem = ({
   onRemoveFilter,
   isEditing = false,
   onClick,
+  disableRemove = false,
 }: FilterTagItemProps & {onClick?: () => void}) => {
   const field = getFieldLabel(item.field);
   const operator = getOperatorLabel(item.operator);
   let label: any = `${field} ${operator}`;
-  let disableRemove = false;
 
   let value: React.ReactNode = '';
   const fieldType = getFieldType(item.field);
@@ -100,7 +101,7 @@ export const FilterTagItem = ({
           <RemoveAction
             onClick={(e: any) => {
               e.stopPropagation();
-              onRemoveFilter(item.id);
+              onRemoveFilter?.(item.id);
             }}
           />
         )

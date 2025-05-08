@@ -7,12 +7,14 @@ from typing import Any, Callable, Optional, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
+from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, sanitize_object_name
 
 
@@ -33,6 +35,17 @@ class Scorer(Object):
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
+
+
+class BuiltInScorer(Scorer):
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
 
 
 def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:

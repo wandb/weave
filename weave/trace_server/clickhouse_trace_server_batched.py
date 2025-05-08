@@ -95,6 +95,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
@@ -317,6 +318,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        kafka_producer = KafkaProducer.from_env()
+        kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()

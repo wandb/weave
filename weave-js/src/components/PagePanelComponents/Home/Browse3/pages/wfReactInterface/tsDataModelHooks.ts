@@ -32,6 +32,7 @@ import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
+import {SortBy} from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
@@ -1150,7 +1151,12 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   metadataOnly?: boolean,
-  opts?: {skip?: boolean; noAutoRefresh?: boolean; includeStorageSize?: boolean}
+  opts?: {
+    skip?: boolean;
+    noAutoRefresh?: boolean;
+    includeStorageSize?: boolean;
+  },
+  sortBy?: SortBy[]
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1180,6 +1186,7 @@ const useRootObjectVersions = (
       },
       limit,
       metadata_only: metadataOnly,
+      sort_by: sortBy,
       ...(!!opts?.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1204,6 +1211,7 @@ const useRootObjectVersions = (
     project,
     limit,
     metadataOnly,
+    sortBy,
     opts?.includeStorageSize,
   ]);
 

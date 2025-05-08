@@ -160,7 +160,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
 
     const renderSlider = () => {
       return (
-        <div style={{display: 'flex', alignItems: 'center'}}>
+        <div style={{display: 'flex', flexGrow: 1, alignItems: 'center'}}>
           {minLabel && <label className="min">{minLabel}</label>}
           <input
             // Other code relies on this class to detect if the event
