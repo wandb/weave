@@ -1,16 +1,26 @@
 import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {CustomOption, ProviderOption} from './LLMDropdownOptions';
+import {SavedPlaygroundModelState} from '../types';
+import {
+  CustomOption,
+  LLMOption,
+  LLMOptionToSavedPlaygroundModelState,
+  ProviderOption,
+  SAVED_MODEL_OPTION_VALUE,
+} from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
-
 interface LLMDropdownProps {
-  value: LLMMaxTokensKey;
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  value: LLMMaxTokensKey | string;
+  onChange: (
+    value: LLMMaxTokensKey | string,
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
+  ) => void;
   entity: string;
   project: string;
   isTeamAdmin: boolean;
@@ -57,20 +67,50 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     refetchConfiguredProviders();
   }, [refetchConfiguredProviders]);
 
-  const isValueAvailable = llmDropdownOptions.find(
-    option =>
-      'llms' in option && option.llms?.some(llm => llm && llm.value === value)
+  const isValueAvailable = useMemo(
+    () =>
+      llmDropdownOptions.some(
+        (option: ProviderOption) =>
+          'llms' in option &&
+          option.llms?.some(llm => llm && llm.value === value)
+      ),
+    [llmDropdownOptions, value]
   );
 
   useEffect(() => {
     if (!isValueAvailable && !areProvidersLoading) {
-      for (const option of llmDropdownOptions) {
-        for (const llm of option.llms) {
-          if (llm && llm.value && llm.max_tokens) {
-            onChange(llm.value, llm.max_tokens);
+      let firstAvailableLlm: LLMOption | null = null;
+
+      // Check if the value is a saved model
+      const savedModelOption = llmDropdownOptions.find(
+        option => option.value === SAVED_MODEL_OPTION_VALUE
+      );
+      if (savedModelOption) {
+        firstAvailableLlm =
+          savedModelOption.llms.find(
+            llm => llm.objectId === value && llm.isLatest
+          ) ?? null;
+      }
+
+      // If the value is not a saved model, check if theres any available LLM
+      if (!firstAvailableLlm) {
+        for (const option of llmDropdownOptions) {
+          if (
+            'llms' in option &&
+            !option.isDisabled &&
+            option.llms.length > 0
+          ) {
+            firstAvailableLlm = option.llms[0];
             break;
           }
         }
+      }
+      if (firstAvailableLlm) {
+        onChange(
+          firstAvailableLlm.value,
+          firstAvailableLlm.max_tokens,
+          LLMOptionToSavedPlaygroundModelState(firstAvailableLlm)
+        );
       }
     }
   }, [
