@@ -7,7 +7,16 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import {debounce} from 'lodash';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -174,6 +183,71 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
+const useElementVisibility = (ref: React.RefObject<HTMLElement>) => {
+  const [topVisibility, setTopVisibility] = useState<number>(0);
+
+  const updateVisibility = useCallback(() => {
+    if (!ref.current) return;
+
+    const rect = ref.current.getBoundingClientRect();
+    const scrollableParent = findScrollableParent(ref.current);
+    if (scrollableParent) {
+      const parentRect = scrollableParent.getBoundingClientRect();
+      const parentTop = Math.max(0, parentRect.top);
+      const parentBottom = Math.min(window.innerHeight, parentRect.bottom);
+      const parentHeight = parentBottom - parentTop;
+
+      const topVisible = Math.max(
+        0,
+        Math.min(parentHeight, parentBottom - rect.top)
+      );
+      setTopVisibility(topVisible);
+    }
+  }, [ref]);
+
+  // Create a memoized debounced version of updateVisibility
+  const debouncedUpdateVisibility = useMemo(
+    () => debounce(updateVisibility, 20),
+    [updateVisibility]
+  );
+
+  useEffect(() => {
+    debouncedUpdateVisibility();
+
+    const scrollableParent = findScrollableParent(ref.current);
+    if (scrollableParent) {
+      scrollableParent.addEventListener('scroll', debouncedUpdateVisibility);
+    }
+    window.addEventListener('resize', debouncedUpdateVisibility);
+
+    return () => {
+      debouncedUpdateVisibility.cancel();
+      if (scrollableParent) {
+        scrollableParent.removeEventListener(
+          'scroll',
+          debouncedUpdateVisibility
+        );
+      }
+      window.removeEventListener('resize', debouncedUpdateVisibility);
+    };
+  }, [ref, debouncedUpdateVisibility]);
+
+  return topVisibility;
+};
+
+const findScrollableParent = (
+  element: HTMLElement | null
+): HTMLElement | null => {
+  if (!element) return null;
+
+  const {overflowY} = window.getComputedStyle(element);
+  if (overflowY === 'auto' || overflowY === 'scroll') {
+    return element;
+  }
+
+  return findScrollableParent(element.parentElement);
+};
+
 const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
@@ -255,12 +329,12 @@ const ResultExplorer: React.FC<{
     'table'
   );
   const [modelsAsRows, setModelsAsRows] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const topVisibility = useElementVisibility(boxRef);
+
   const toggleModelsAsRows = useCallback(() => {
     setModelsAsRows(!modelsAsRows);
   }, [modelsAsRows]);
-
-  const nextViewMode =
-    viewMode === 'split' ? 'table' : viewMode === 'table' ? 'detail' : 'split';
 
   return (
     <VerticalBox
@@ -284,52 +358,56 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        {/* <button onClick={() => setViewMode(nextViewMode)}>
-          Toggle Display ({nextViewMode})
-        </button>
-        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button> */}
+        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
       </HorizontalBox>
-
-      <Box
-        sx={{
+      <div
+        ref={boxRef}
+        style={{
           height,
           overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'row',
-          borderTop: '1px solid #e0e0e0',
         }}>
         <Box
           style={{
-            flex: 1,
-            width: '50%',
-            display: viewMode !== 'detail' ? 'block' : 'none',
-          }}>
-          <ExampleCompareSectionTable
-            state={state}
-            modelsAsRows={modelsAsRows}
-            shouldHighlightSelectedRow={viewMode === 'split'}
-            onShowSplitView={() => setViewMode('split')}
-          />
-        </Box>
-
-        <Box
-          style={{
-            flex: 1,
-            width: '50%',
-            borderLeft: '1px solid #e0e0e0',
+            display: 'flex',
+            flexDirection: 'row',
+            height: '100%',
+            // height: topVisibility,
             borderTop: '1px solid #e0e0e0',
-            display: viewMode !== 'table' ? 'block' : 'none',
+            // transition: 'height 100ms ease-out',
           }}>
-          <ExampleCompareSectionDetail
-            state={state}
-            onClose={() => setViewMode('table')}
-            onExpandToggle={() =>
-              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
-            }
-            isExpanded={viewMode === 'detail'}
-          />
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              display: viewMode !== 'detail' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionTable
+              state={state}
+              modelsAsRows={modelsAsRows}
+              shouldHighlightSelectedRow={viewMode === 'split'}
+              onShowSplitView={() => setViewMode('split')}
+            />
+          </Box>
+
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              borderLeft: '1px solid #e0e0e0',
+              borderTop: '1px solid #e0e0e0',
+              display: viewMode !== 'table' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionDetail
+              state={state}
+              onClose={() => setViewMode('table')}
+              onExpandToggle={() =>
+                setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+              }
+              isExpanded={viewMode === 'detail'}
+            />
+          </Box>
         </Box>
-      </Box>
+      </div>
     </VerticalBox>
   );
 };
