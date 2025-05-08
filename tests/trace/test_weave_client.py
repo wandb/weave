@@ -3451,3 +3451,27 @@ def test_files_stats(client):
     read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
 
     assert read_res.total_size_bytes == 10000005
+
+
+def test_no_400_on_invalid_artifact_url(client):
+    @weave.op()
+    def test() -> str:
+        # This url is too long, should be wandb-artifact:///entity/project/name:version
+        return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id
+
+
+def test_no_400_on_invalid_refs(client):
+    @weave.op()
+    def test() -> str:
+        # This ref is too long, should be weave:///entity/project/object/name:version
+        return "weave:///entity/project/object/toxic-extra-path/object:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id

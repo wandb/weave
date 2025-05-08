@@ -28,8 +28,7 @@ def _order_dict(dictionary: dict) -> dict:
     }
 
 
-valid_schemes = [
-    TRACE_REF_SCHEME,
+valid_internal_schemes = [
     ARTIFACT_REF_SCHEME,
     refs_internal.WEAVE_INTERNAL_SCHEME,
 ]
@@ -47,10 +46,16 @@ def extract_refs_from_values(
         elif isinstance(val, list):
             for v in val:
                 _visit(v)
-        elif isinstance(val, str) and any(
-            val.startswith(scheme + "://") for scheme in valid_schemes
-        ):
-            refs.append(val)
+        elif isinstance(val, str):
+            if any(
+                val.startswith(scheme + ":///") for scheme in valid_internal_schemes
+            ):
+                try:
+                    parsed = refs_internal.parse_internal_uri(val)
+                    if parsed.uri() == val:
+                        refs.append(val)
+                except Exception:
+                    pass
 
     _visit(vals)
     return refs
