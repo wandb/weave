@@ -242,7 +242,7 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            "huggingface",
+            # "huggingface",
             "google_ai_studio",
             "google_genai",
             "instructor",

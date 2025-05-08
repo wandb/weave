@@ -383,6 +383,7 @@ export const CustomLink: React.FC<{
   color?: string;
   variant?: LinkVariant;
   icon?: React.ReactNode;
+  fontWeight?: number | string;
 }> = props => {
   // Used to look like our other links, but delegate to a custom onClick
   return (
@@ -399,6 +400,7 @@ export const CustomLink: React.FC<{
             gap: '4px',
             // allow flex items to shrink below their minimum content size
             minWidth: 0,
+            fontWeight: props.fontWeight,
           }}>
           {props.icon}
           <span

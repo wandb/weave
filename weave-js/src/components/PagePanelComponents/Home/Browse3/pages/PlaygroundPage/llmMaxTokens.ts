@@ -624,6 +624,38 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
+
+  // Mistral models
+  'mistral/mistral-large-latest': {
+    provider: 'mistral',
+    max_tokens: 128000,
+    supports_function_calling: true,
+  },
+  'mistral/mistral-medium-latest': {
+    provider: 'mistral',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'mistral/mistral-small-latest': {
+    provider: 'mistral',
+    max_tokens: 8191,
+    supports_function_calling: true,
+  },
+  'mistral/codestral-mamba-latest': {
+    provider: 'mistral',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
+  'mistral/pixtral-large-latest': {
+    provider: 'mistral',
+    max_tokens: 128000,
+    supports_function_calling: true,
+  },
+  'mistral/open-mistral-nemo': {
+    provider: 'mistral',
+    max_tokens: 128000,
+    supports_function_calling: true,
+  },
 };
 
 export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4.1-mini-2025-04-14';
@@ -643,6 +675,7 @@ export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
   azure: ['AZURE_API_BASE', 'AZURE_API_VERSION', 'AZURE_API_KEY'],
   groq: ['GROQ_API_KEY'],
   deepseek: ['DEEPSEEK_API_KEY'],
+  mistral: ['MISTRAL_API_KEY'],
 };
 
 export const LLM_PROVIDERS = Object.keys(LLM_PROVIDER_SECRETS) as Array<
@@ -661,6 +694,7 @@ export const LLM_PROVIDER_LABELS: Record<
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
   deepseek: 'DeepSeek',
+  mistral: 'Mistral',
 };
 
 // Example usage:
