@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -48,11 +47,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
   return (
     <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-        </Box>
-      }
+      title="Playground"
       hideTabsIfSingle
       headerContent={null}
       tabs={[
