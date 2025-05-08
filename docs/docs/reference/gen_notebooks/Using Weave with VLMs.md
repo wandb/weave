@@ -2,9 +2,9 @@
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/Using VLMs for OCR+NER.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/Using VLMs with Weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/Using VLMs for OCR+NER.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/Using VLMs with Weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
 
@@ -42,12 +42,9 @@ We begin by installing and importing the required libraries. This sets up our en
 from openai import OpenAI
 import weave
 import os
-import base64
 from google.colab import userdata
 from pathlib import Path
 import json
-from io import BytesIO
-from PIL import Image
 ```
 
 
@@ -116,15 +113,21 @@ weave.publish(system_prompt, name="NER-prompt")
 ## 2. Get Dataset
 We'll load a sample dataset of handwritten notes from an existing Weave project. These notes will serve as input for our OCR pipeline.
 
+The images in our dataset are already base64 encoded which allows us to directly pass them to our LLM wihtout any pre-processing.
+
 
 
 ```python
 # Retrieve the dataset
-dataset = weave.ref("weave:///wandb-smle/vlm-handwritten-ner/object/NER-eval-dataset:BVdFx1e3XwdftsxlCEdUHCac5pWhL8jVGnUFSvIHkTI").get()
+dataset = weave.ref("weave:///wandb-smle/vlm-handwritten-ner/object/NER-eval-dataset:G8MEkqWBtvIxPYAY23sXLvqp8JKZ37Cj0PgcG19dGjw").get()
 
 # Access a specific example
-example_image = dataset.rows[0]['image']
-example_image
+example_image = dataset.rows[3]['image_base64']
+
+#display image
+from IPython.display import display, HTML
+html = f'<img src="{example_image}" style="max-width: 100%; height: auto;">'
+display(HTML(html))
 ```
 
 # 3. Let's build our Named Entity Recognition Pipeline
@@ -135,17 +138,8 @@ Our pipeline consists of two functions:
 
 
 ```python
-# Helper: Encode image to base64
-def encode_image(pil_image: Image.Image, format: str = "JPEG") -> str:
-    """Convert a PIL image to a base64 string."""
-    buffered = BytesIO()
-    pil_image.save(buffered, format=format)
-    encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return encoded_string
-
 # Traceable function using GPT-4-Vision
-def extract_named_entities_from_image(image) -> dict:
-    base64_image = encode_image(image)
+def extract_named_entities_from_image(image_base64) -> dict:
 
     #init LLM Client
     client = OpenAI()
@@ -164,7 +158,7 @@ def extract_named_entities_from_image(image) -> dict:
                 { "type": "input_text", "text":prompt},
                 {
                     "type": "input_image",
-                    "image_url": f"data:image/jpeg;base64,{base64_image}",
+                    "image_url": image_base64,
                 },
             ],
         }
@@ -184,11 +178,11 @@ Once you execute this pipeline you can view the traces from each execution in yo
 ```python
 #NER Function for evaluations
 @weave.op()
-def named_entity_recognation(image, id):
+def named_entity_recognation(image_base64, id):
     result ={}
     try:
         # 1) call the vision op, get back a JSON string
-        output_text = extract_named_entities_from_image(image)
+        output_text = extract_named_entities_from_image(image_base64)
 
         # 2) parse JSON exactly once
         result = json.loads(output_text)
@@ -210,7 +204,7 @@ results = []
 
 #loop over all images in the dataset
 for row in dataset.rows:
-      result = named_entity_recognation(row['image'], str(row['id']))
+      result = named_entity_recognation(row['image_base64'], str(row['id']))
       result["image_id"]=str(row['id'])
       results.append(result)
 
@@ -298,8 +292,7 @@ For this LLM-as-a-judge evaluator we will use OpenAI's `gpt-4o` since it offers 
 ```python
 #adding weave.op() to track execution of the scorer
 @weave.op()
-def check_for_missing_fields_with_llm(model_output, image):
-  base64_image = encode_image(image)
+def check_for_missing_fields_with_llm(model_output, image_base64):
   client = OpenAI()
   response = client.chat.completions.create(
   model="gpt-4o",
@@ -319,7 +312,7 @@ def check_for_missing_fields_with_llm(model_output, image):
         {
           "type": "image_url",
           "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_image}"
+            "url": image_base64,
           }
         },
         {
