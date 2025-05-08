@@ -216,5 +216,3 @@ def register() -> None:
     # Register the serializers for the various audio types
     serializer.register_serializer(Audio, save, load)
     serializer.register_serializer(wave.Wave_read, save, load)
-
-Audio[Literal["mp3"]](data=b"", fmt="mp3")
