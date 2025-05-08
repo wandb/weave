@@ -103,6 +103,7 @@ class Audio(Generic[F]):
 
             return completion.choices[0].message.audio.data
     """
+
     # File Format
     fmt: str
 
