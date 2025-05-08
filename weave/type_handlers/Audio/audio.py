@@ -58,6 +58,51 @@ F = TypeVar("F", bound=SupportedFormatType)
 
 
 class Audio(Generic[F]):
+    """
+    Audio class to handle audio data.
+    Can be initialized with a file path or raw audio data with a format
+
+    Direct initialization in Op pre or post-process function:
+
+        1. From a file with ext:
+        weave.Audio(path='some_file.mp3')
+
+        2. Filename without ext + format:
+        weave.Audio(path='some_file', fmt='mp3')
+
+        3. Base64 encoded bytes (Like what LLM generations return) + format:
+        weave.Audio(data=base64_str_or_bytes, fmt='mp3')
+
+        4. Raw decoded audio bytes + format:
+        with open('some_file.mp3', 'rb') as f:
+            raw_audio_bytes = f.read()
+        weave.Audio(data=raw_audio_bytes, fmt='mp3')
+
+    Annotated initialization
+        1. Input is treated as 'str' in weave while output is treated as weave.Audio
+        def read_example(path_to_mp3: str) -> Annotated[str, weave.Audio]:
+            return path_to_mp3
+
+        2. def read_example(path_to_mp3: str) -> Annotated[bytes, weave.Audio[Literal["mp3"]]]:
+            with open(path_to_mp3, "rb") as f:
+                raw_audio_bytes = f.read()
+            return raw_audio_bytes
+
+        3. def gen_audio(prompt: str) -> Annotated[str, weave.Audio[Literal["mp3"]]]:
+            completion = client.chat.completions.create(
+                model="gpt-4o-audio-preview",
+                modalities=["text", "audio"],
+                audio={"voice": "alloy", "format": "mp3"},
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Is a golden retriever a good family dog?"
+                    }
+                ]
+            )
+
+            return completion.choices[0].message.audio.data
+    """
     # File Format
     fmt: str
 
@@ -68,7 +113,7 @@ class Audio(Generic[F]):
         self,
         path: Union[str, bytes, Path, os.PathLike, None] = None,
         data: Union[bytes, str, None] = None,
-        fmt: Union[SupportedFormatType, None] = None,
+        fmt: Union[F, None] = None,
     ):
         if not path and not (data and fmt):
             raise ValueError("Must provide either path or raw data and format")
