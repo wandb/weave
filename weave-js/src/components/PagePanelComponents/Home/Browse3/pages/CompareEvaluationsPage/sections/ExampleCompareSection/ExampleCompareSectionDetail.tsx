@@ -1,5 +1,6 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
+import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
@@ -200,6 +201,9 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
 
 export const ExampleCompareSectionDetail: React.FC<{
   state: EvaluationComparisonState;
+  onClose: () => void;
+  onExpandToggle: () => void;
+  isExpanded: boolean;
 }> = props => {
   const {
     filteredRows,
@@ -678,20 +682,6 @@ export const ExampleCompareSectionDetail: React.FC<{
           alignItems: 'center',
           flex: 1,
         }}>
-        <Box
-          style={{
-            flex: 0,
-          }}>
-          {inputRef && <SmallRef objRef={inputRef} iconOnly />}
-        </Box>
-        <Box
-          style={{
-            flex: 1,
-          }}>
-          {`Example ${targetIndex + 1} of ${filteredRows.length}`}
-        </Box>
-      </HorizontalBox>
-      <Box>
         <Button
           className="mx-16"
           style={{
@@ -716,7 +706,37 @@ export const ExampleCompareSectionDetail: React.FC<{
           }}
           icon="chevron-next"
         />
-      </Box>
+        <Box
+          style={{
+            flex: 0,
+          }}>
+          {inputRef && <SmallRef objRef={inputRef} iconOnly />}
+        </Box>
+        <Box
+          style={{
+            flex: 1,
+          }}>
+          {`Example ${targetIndex + 1} of ${filteredRows.length}`}
+        </Box>
+        <Box></Box>
+      </HorizontalBox>
+
+      <HorizontalBox>
+        <IconButton
+          onClick={() => {
+            props.onExpandToggle();
+          }}>
+          <Icon
+            name={props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'}
+          />
+        </IconButton>
+        <IconButton
+          onClick={() => {
+            props.onClose();
+          }}>
+          <Icon name={'close'} />
+        </IconButton>
+      </HorizontalBox>
     </HorizontalBox>
   );
 

@@ -15,6 +15,7 @@ import React, {useMemo, useState} from 'react';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {EvaluationComparisonState} from '../../ecpState';
 import {flattenedDimensionPath} from '../../ecpUtil';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
@@ -25,7 +26,6 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './ExampleCompareSectionUtil';
-import { useCompareEvaluationsState } from '../../compareEvaluationsContext';
 
 type RowData = PivotedRow & {
   // simpleOutput: PivotedRow['output'][string]
@@ -54,16 +54,32 @@ const DatasetRowItemRenderer: React.FC<{
 export const ExampleCompareSectionTable: React.FC<{
   state: EvaluationComparisonState;
   modelsAsRows: boolean;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
 }> = props => {
   if (props.modelsAsRows) {
-    return <ExampleCompareSectionTableModelsAsRows state={props.state} />;
+    return (
+      <ExampleCompareSectionTableModelsAsRows
+        state={props.state}
+        shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+        onShowSplitView={props.onShowSplitView}
+      />
+    );
   } else {
-    return <ExampleCompareSectionTableModelsAsColumns state={props.state} />;
+    return (
+      <ExampleCompareSectionTableModelsAsColumns
+        state={props.state}
+        shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+        onShowSplitView={props.onShowSplitView}
+      />
+    );
   }
 };
 
 export const ExampleCompareSectionTableModelsAsRows: React.FC<{
   state: EvaluationComparisonState;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
 }> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
@@ -219,9 +235,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
                 overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
-              }} onClick={() => {
+                gap: '4px',
+              }}
+              onClick={() => {
                 setSelectedInputDigest(params.row.inputDigest);
+                props.onShowSplitView();
               }}>
               <span style={{flexShrink: 1}}>
                 <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
@@ -531,7 +549,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     hasTrials,
     outputSubFields,
     scoreSubFields,
-    props.state,
+    setSelectedInputDigest,
+    props,
     expandedDigestEvalIds,
   ]);
 
@@ -563,6 +582,17 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
 
   // console.log(props.state.summary.scoreMetrics);
 
+  const selectedRow = useMemo(() => {
+    if (!props.shouldHighlightSelectedRow) {
+      return [];
+    }
+    const assumedSelectedInputDigest =
+      props.state.selectedInputDigest ?? rows[0].inputDigest;
+    return rows
+      .filter(row => row.inputDigest === assumedSelectedInputDigest)
+      .map(row => row.id);
+  }, [props.shouldHighlightSelectedRow, props.state.selectedInputDigest, rows]);
+
   return (
     <StyledDataGrid
       //   treeData
@@ -573,6 +603,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       //     // flex: 1,
       //   }}
       //   getRowId={(row) => row.id}
+      rowSelectionModel={selectedRow}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
@@ -588,6 +619,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
         },
+        '& .MuiDataGrid-row.Mui-selected:hover': {
+          // match the non-hover background color
+          backgroundColor: 'rgba(169, 237, 242, 0.32)',
+        },
         width: '100%',
       }}
     />
@@ -596,6 +631,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
 
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
   state: EvaluationComparisonState;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
 }> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
@@ -618,13 +655,15 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
     const returnRows: RowData[] = filteredRows.flatMap(filteredRow => {
+      const groupedOriginalRows = _.groupBy(
+        filteredRow.originalRows,
+        row => row.evaluationCallId
+      );
+      const maxTrials = Math.max(
+        ...Object.values(groupedOriginalRows).map(rows => rows.length)
+      );
 
-
-
-      const groupedOriginalRows = _.groupBy(filteredRow.originalRows, row => row.evaluationCallId);
-      const maxTrials = Math.max(...Object.values(groupedOriginalRows).map(rows => rows.length));
-
-      const summaryRow:  RowData = {
+      const summaryRow: RowData = {
         ...filteredRow,
         _type: 'summary' as const,
         // not really used
@@ -640,37 +679,57 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
         id: filteredRow.inputDigest + ':summary',
         output: filteredRow.output,
         scores: filteredRow.scores,
-      }
+      };
 
       hasTrials = hasTrials || maxTrials > 1;
 
-      if (maxTrials > 1 && !expandedDigestEvalIds.includes(filteredRow.inputDigest)) {
+      if (
+        maxTrials > 1 &&
+        !expandedDigestEvalIds.includes(filteredRow.inputDigest)
+      ) {
         return [summaryRow];
       }
 
-
-
       return _.range(maxTrials).map(trialNdx => {
-
         const res: RowData = {
           ...filteredRow,
           _type: 'trial' as const,
           id: filteredRow.inputDigest + ':trial:' + trialNdx,
           // turn these into reducers
-          output: Object.fromEntries(Object.entries(filteredRow.output).map(([key, value]) => {
-            return [key, Object.fromEntries(
-             Object.values(groupedOriginalRows).map((evalVal) => {
-                return [evalVal[trialNdx].evaluationCallId, evalVal[trialNdx].output[key][evalVal[trialNdx].evaluationCallId]]
-              })
-            )];
-          })),
-          scores: Object.fromEntries(Object.entries(filteredRow.scores).map(([key, value]) => {
-            return [key, Object.fromEntries(
-             Object.values(groupedOriginalRows).map((evalVal) => {
-                return [evalVal[trialNdx].evaluationCallId, evalVal[trialNdx].scores[key][evalVal[trialNdx].evaluationCallId]]
-              })
-            )];
-          })),
+          output: Object.fromEntries(
+            Object.entries(filteredRow.output).map(([key, value]) => {
+              return [
+                key,
+                Object.fromEntries(
+                  Object.values(groupedOriginalRows).map(evalVal => {
+                    return [
+                      evalVal[trialNdx].evaluationCallId,
+                      evalVal[trialNdx].output[key][
+                        evalVal[trialNdx].evaluationCallId
+                      ],
+                    ];
+                  })
+                ),
+              ];
+            })
+          ),
+          scores: Object.fromEntries(
+            Object.entries(filteredRow.scores).map(([key, value]) => {
+              return [
+                key,
+                Object.fromEntries(
+                  Object.values(groupedOriginalRows).map(evalVal => {
+                    return [
+                      evalVal[trialNdx].evaluationCallId,
+                      evalVal[trialNdx].scores[key][
+                        evalVal[trialNdx].evaluationCallId
+                      ],
+                    ];
+                  })
+                ),
+              ];
+            })
+          ),
           // not really used
           _numTrials: maxTrials,
           // not really used
@@ -681,7 +740,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           predictAndScore: filteredRow.originalRows[0].predictAndScore,
           // not really used
           inputRef: '',
-        }
+        };
         return res;
       });
     });
@@ -759,6 +818,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     // }
     // return keys
   }, [outputColumnKeys]);
+  const {setSelectedInputDigest} = useCompareEvaluationsState();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -780,9 +840,13 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
+              }}
+              onClick={() => {
+                setSelectedInputDigest(params.row.inputDigest);
+                props.onShowSplitView();
               }}>
               <span style={{flexShrink: 1}}>
-                <IdPanel>{params.row.inputDigest.slice(-4)}</IdPanel>
+                <IdPanel clickable> {params.row.inputDigest.slice(-4)}</IdPanel>
               </span>
             </Box>
           );
@@ -846,8 +910,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                 if (params.row._numTrials < 2) {
                   return null;
                 }
-                const digestEvalId =
-                  params.row.inputDigest ;
+                const digestEvalId = params.row.inputDigest;
                 const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
                 return (
                   <Box
@@ -1069,7 +1132,15 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     ];
 
     return res;
-  }, [inputSubFields, outputSubFields, scoreSubFields, props.state]);
+  }, [
+    inputSubFields,
+    hasTrials,
+    outputSubFields,
+    scoreSubFields,
+    setSelectedInputDigest,
+    props,
+    expandedDigestEvalIds,
+  ]);
   // console.log(columns);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -1128,6 +1199,17 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
   // console.log(props.state.summary.scoreMetrics);
 
+  const selectedRow = useMemo(() => {
+    if (!props.shouldHighlightSelectedRow) {
+      return [];
+    }
+    const assumedSelectedInputDigest =
+      props.state.selectedInputDigest ?? rows[0].inputDigest;
+    return rows
+      .filter(row => row.inputDigest === assumedSelectedInputDigest)
+      .map(row => row.id);
+  }, [props.shouldHighlightSelectedRow, props.state.selectedInputDigest, rows]);
+
   return (
     <StyledDataGrid
       //   treeData
@@ -1138,6 +1220,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       //     // flex: 1,
       //   }}
       //   getRowId={(row) => row.id}
+      rowSelectionModel={selectedRow}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
@@ -1152,6 +1235,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
       sx={{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
+        },
+        '& .MuiDataGrid-row.Mui-selected:hover': {
+          // match the non-hover background color
+          backgroundColor: 'rgba(169, 237, 242, 0.32)',
         },
         width: '100%',
       }}

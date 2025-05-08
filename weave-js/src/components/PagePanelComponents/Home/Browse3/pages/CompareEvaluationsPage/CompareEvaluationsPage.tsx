@@ -296,25 +296,38 @@ const ResultExplorer: React.FC<{
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'row',
-          // width: '50%',
           borderTop: '1px solid #e0e0e0',
         }}>
         <Box
-          style={{flex: 1, display: viewMode !== 'detail' ? 'block' : 'none'}}>
+          style={{
+            flex: 1,
+            width: '50%',
+            display: viewMode !== 'detail' ? 'block' : 'none',
+          }}>
           <ExampleCompareSectionTable
             state={state}
             modelsAsRows={modelsAsRows}
+            shouldHighlightSelectedRow={viewMode === 'split'}
+            onShowSplitView={() => setViewMode('split')}
           />
         </Box>
 
         <Box
           style={{
             flex: 1,
+            width: '50%',
             borderLeft: '1px solid #e0e0e0',
             borderTop: '1px solid #e0e0e0',
             display: viewMode !== 'table' ? 'block' : 'none',
           }}>
-          <ExampleCompareSectionDetail state={state} />
+          <ExampleCompareSectionDetail
+            state={state}
+            onClose={() => setViewMode('table')}
+            onExpandToggle={() =>
+              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+            }
+            isExpanded={viewMode === 'detail'}
+          />
         </Box>
       </Box>
     </VerticalBox>
