@@ -647,7 +647,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                 props.onShowSplitView();
               }}>
               <span style={{flexShrink: 1}}>
-                <IdPanel clickable> {params.row.inputDigest.slice(-4)}</IdPanel>
+                <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
               </span>
             </Box>
           );
@@ -662,7 +662,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           return row.inputDigest;
         },
         renderCell: (params: GridRenderCellParams<RowData>) => {
-          // console.log(key);
           return (
             <DatasetRowItemRenderer
               state={props.state}
@@ -732,15 +731,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
             },
             flex: 1,
             valueGetter: (value: any, row: RowData) => {
-              // if (row.output === undefined) {
-              //     return null;
-              // }
               return row.output[key][evaluationCallId];
             },
             renderCell: (params: GridRenderCellParams<RowData>) => {
-              // if (params.rowNode.type === 'group') {
-              //     return null;
-              // }
               return (
                 <CellValue value={params.row.output[key][evaluationCallId]} />
               );
@@ -761,7 +754,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                 />
               );
             },
-            // width: 100,
             flex: 1,
             valueGetter: (value: any, row: RowData) => {
               return row.scores[key][evaluationCallId];
@@ -770,7 +762,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
               return evalAggScorerMetricCompGeneric(
                 props.state.summary.scoreMetrics[key],
                 params.row.scores[key][evaluationCallId],
-                // this compares directy to the peer
+                // this compares directly to the peer
                 params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
               );
             },
