@@ -1,14 +1,17 @@
-import Box from '@mui/material/Box';
-import Tooltip from '@mui/material/Tooltip';
+import {Box, TextField, Tooltip} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
-import {Button} from '@wandb/weave/components/Button';
+import {Button, Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import {Tag} from '@wandb/weave/components/Tag';
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {SetPlaygroundStateFieldFunctionType} from '../PlaygroundChat/useChatFunctions';
-import {PlaygroundState} from '../types';
+import {
+  JSON_PLAYGROUND_MODEL_PARAMS_KEYS,
+  PLAYGROUND_MODEL_PARAMS_KEYS,
+  PlaygroundState,
+} from '../types';
+import {useSaveModelConfiguration} from '../useSaveModelConfiguration';
 import {FunctionEditor} from './FunctionEditor';
 import {PlaygroundSlider} from './PlaygroundSlider';
 import {ResponseFormatEditor} from './ResponseFormatEditor';
@@ -19,6 +22,8 @@ export type PlaygroundSettingsProps = {
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
   setSettingsTab: (tab: number | null) => void;
+  projectId: string;
+  refetchSavedModels: () => void;
 };
 
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
@@ -26,7 +31,34 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   setPlaygroundStateField,
   settingsTab,
   setSettingsTab,
+  projectId,
+  refetchSavedModels,
 }) => {
+  const [currentModelName, setCurrentModelName] = useState('');
+
+  useEffect(() => {
+    const objectId = playgroundStates[settingsTab]?.savedModel?.objectId;
+    if (objectId != null) {
+      setCurrentModelName(objectId);
+    }
+  }, [playgroundStates, settingsTab]);
+
+  const {saveModelConfiguration} = useSaveModelConfiguration({
+    setPlaygroundStateField,
+    playgroundStates,
+    settingsTab,
+    projectId,
+    refetchSavedModels,
+  });
+
+  const isUpdatingPublishedModel =
+    playgroundStates[settingsTab]?.savedModel?.llmModelId;
+
+  const areSettingsEqual = arePlaygroundSettingsEqual(
+    currentModelName,
+    playgroundStates[settingsTab]
+  );
+
   return (
     <Box
       sx={{
@@ -36,8 +68,8 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         display: 'flex',
         flexDirection: 'column',
         width: '320px',
-        overflowY: 'scroll',
         flexShrink: 0,
+        position: 'relative',
       }}>
       <Box
         sx={{
@@ -48,9 +80,10 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           borderBottom: `1px solid ${MOON_250}`,
           padding: '8px 16px',
         }}>
+        {/* Header */}
         <Box sx={{display: 'flex', alignItems: 'center', gap: '8px'}}>
           <Tag label={`${settingsTab + 1}`} />
-          <Tooltip title={playgroundStates[settingsTab ?? 0]?.model ?? ''}>
+          <Tooltip title={playgroundStates[settingsTab].model}>
             <Box
               sx={{
                 overflow: 'hidden',
@@ -73,7 +106,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           }}
         />
       </Box>
-      <Box sx={{padding: '0 16px'}}>
+      <Box sx={{padding: '0 16px', overflowY: 'scroll', height: '100%'}}>
         <Tabs.Root value={settingsTab.toString()}>
           {playgroundStates.map((playgroundState, idx) => (
             <Tabs.Content key={idx} value={idx.toString()}>
@@ -82,8 +115,59 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '16px',
-                  mt: 2,
+                  my: 2,
                 }}>
+                {/* Model Name Input */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    width: '100%',
+                  }}>
+                  <span style={{fontSize: '14px'}}>Model Name</span>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: `1px solid ${MOON_250}`,
+                      borderRadius: '4px',
+                      width: '100%',
+                    }}>
+                    <TextField
+                      value={currentModelName}
+                      onChange={e => setCurrentModelName(e.target.value)}
+                      placeholder="Enter model name..."
+                      fullWidth
+                      variant="standard"
+                      sx={{
+                        fontFamily: 'Source Sans Pro',
+                        '& .MuiInputBase-root': {
+                          border: 'none',
+                          '&:before, &:after': {
+                            borderBottom: 'none',
+                          },
+                          '&:hover:not(.Mui-disabled):before': {
+                            borderBottom: 'none',
+                          },
+                        },
+                        '& .MuiInputBase-input': {
+                          padding: '8px',
+                          fontFamily: 'Source Sans Pro',
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Parameters */}
+                <Box sx={{display: 'flex', flexDirection: 'column'}}>
+                  <div className="font-[Source Sans Pro] mb-[-16px] text-sm font-semibold text-moon-500">
+                    PARAMETERS
+                  </div>
+                </Box>
+
+                {/* Response Format Editor */}
                 <ResponseFormatEditor
                   responseFormat={playgroundState.responseFormat}
                   setResponseFormat={value =>
@@ -210,6 +294,76 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
           ))}
         </Tabs.Root>
       </Box>
+
+      <Box
+        sx={{
+          p: 2,
+          borderTop: `1px solid ${MOON_250}`,
+          backgroundColor: 'white',
+        }}>
+        <Button
+          variant="primary"
+          onClick={() => saveModelConfiguration(currentModelName)}
+          className="w-full"
+          disabled={
+            playgroundStates.length === 0 ||
+            !currentModelName.trim() ||
+            areSettingsEqual
+          }>
+          {isUpdatingPublishedModel ? 'Update model' : 'Publish model'}
+        </Button>
+      </Box>
     </Box>
   );
+};
+
+// Compares saved model default params with current params
+const arePlaygroundSettingsEqual = (
+  currentModelName: string,
+  currentPlaygroundState: PlaygroundState | undefined
+): boolean => {
+  const savedParams = currentPlaygroundState?.savedModel?.savedModelParams;
+  if (
+    !currentPlaygroundState ||
+    !savedParams ||
+    !currentPlaygroundState.savedModel?.llmModelId
+  ) {
+    return false; // Not equal if essential parts are missing
+  }
+
+  // First, check if the user is updating the objectId
+  if (currentModelName !== currentPlaygroundState.savedModel.objectId) {
+    return false;
+  }
+
+  for (const key of PLAYGROUND_MODEL_PARAMS_KEYS) {
+    if (key === 'messagesTemplate') {
+      const messagesTemplate = savedParams.messagesTemplate;
+      const messages = currentPlaygroundState.traceCall?.inputs?.messages;
+      if (JSON.stringify(messagesTemplate) !== JSON.stringify(messages)) {
+        return false;
+      }
+      continue;
+    }
+
+    const currentValue = currentPlaygroundState[key];
+    const savedValue = savedParams[key];
+
+    if (JSON_PLAYGROUND_MODEL_PARAMS_KEYS.includes(key)) {
+      const currentValueObject = currentValue ?? {};
+      const savedValueObject = savedValue ?? {};
+      if (
+        JSON.stringify(currentValueObject) !== JSON.stringify(savedValueObject)
+      ) {
+        return false;
+      }
+    } else {
+      // For other primitive types, direct comparison
+      if (currentValue !== savedValue) {
+        return false;
+      }
+    }
+  }
+
+  return true; // All compared keys are equal
 };

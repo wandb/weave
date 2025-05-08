@@ -169,6 +169,14 @@ export const PlaygroundPageInner = ({
     },
   });
 
+  const {
+    result: savedModelsResult,
+    loading: savedModelsLoading,
+    refetch: refetchSavedModels,
+  } = useBaseObjectInstances('LLMStructuredCompletionModel', {
+    project_id: projectId,
+  });
+
   const refetchCustomLLMs = useCallback(() => {
     refetchCustomProviders();
     refetchCustomProviderModels();
@@ -248,6 +256,8 @@ export const PlaygroundPageInner = ({
           customProvidersResult={customProvidersResult || []}
           customProviderModelsResult={customProviderModelsResult || []}
           configuredProviders={configuredProviders}
+          savedModelsResult={savedModelsResult || []}
+          savedModelsLoading={savedModelsLoading}
         />
       )}
       {settingsTab !== null && (
@@ -256,6 +266,8 @@ export const PlaygroundPageInner = ({
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={projectId}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
     </div>
