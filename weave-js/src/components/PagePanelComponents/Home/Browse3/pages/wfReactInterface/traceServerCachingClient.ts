@@ -120,33 +120,49 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
     );
   }
 
-  public tableRowQuery(req: TraceTableRowQueryReq): Promise<TraceTableRowQueryRes> {
+  public tableRowQuery(
+    req: TraceTableRowQueryReq
+  ): Promise<TraceTableRowQueryRes> {
     // Directly cache the digest to row mapping
     const cachedResults = Object.fromEntries(
       req.row_digests.map(digest => [digest, this.tableDigestCache.get(digest)])
     );
 
-    const missingDigests = req.row_digests.filter(digest => !cachedResults[digest]);
+    const missingDigests = req.row_digests.filter(
+      digest => !cachedResults[digest]
+    );
 
-    const resultPromise = new Promise<TraceTableRowQueryRes>((resolve, reject) => {
-      if (missingDigests.length === 0) {
-        resolve({rows: req.row_digests.map(digest => ({digest, val: cachedResults[digest]}))});
-      } else {
-        const res = super.tableQuery({
-          ...req,
-          filter: {
-            row_digests: missingDigests,
-          },
-        });
-        res.then(res => {
-          for (const row of res.rows) {
-            this.tableDigestCache.set(row.digest, row.val);
-            cachedResults[row.digest] = row.val;
-          }
-          resolve({rows: req.row_digests.map(digest => ({digest, val: cachedResults[digest]}))});
-        });
+    const resultPromise = new Promise<TraceTableRowQueryRes>(
+      (resolve, reject) => {
+        if (missingDigests.length === 0) {
+          resolve({
+            rows: req.row_digests.map(digest => ({
+              digest,
+              val: cachedResults[digest],
+            })),
+          });
+        } else {
+          const res = super.tableQuery({
+            ...req,
+            filter: {
+              row_digests: missingDigests,
+            },
+          });
+          res.then(res => {
+            for (const row of res.rows) {
+              this.tableDigestCache.set(row.digest, row.val);
+              cachedResults[row.digest] = row.val;
+            }
+            resolve({
+              rows: req.row_digests.map(digest => ({
+                digest,
+                val: cachedResults[digest],
+              })),
+            });
+          });
+        }
       }
-    });
+    );
 
     return resultPromise;
   }

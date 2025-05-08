@@ -32,6 +32,7 @@ type ModelAsRowsRowDataBase = Pick<
   'evaluationCallId' | 'inputDigest' | 'output' | 'scores' | 'predictAndScore'
 > & {
   id: string;
+  _expansionId: string;
 };
 
 type ModelsAsRowsRowDataTrial = ModelAsRowsRowDataBase & {
@@ -89,6 +90,18 @@ export const ExampleCompareSectionTable: React.FC<{
   }
 };
 
+const useFirstExampleRow = (state: EvaluationComparisonState) => {
+  return useExampleCompareData(
+    state,
+    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {}).map(
+      digest => ({
+        inputDigest: digest,
+      })
+    ),
+    0
+  );
+};
+
 export const ExampleCompareSectionTableModelsAsRows: React.FC<{
   state: EvaluationComparisonState;
   shouldHighlightSelectedRow?: boolean;
@@ -97,19 +110,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
   );
-
-  const firstExampleRow = useExampleCompareData(
-    props.state,
-    Object.keys(
-      props.state.loadableComparisonResults.result?.resultRows ?? {}
-    ).map(digest => ({
-      inputDigest: digest,
-    })),
-    0
-  );
-  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
-    []
-  );
+  const firstExampleRow = useFirstExampleRow(props.state);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
@@ -121,21 +123,24 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
           row => row.evaluationCallId === evaluationCallId
         );
         const numTrials = matchingRows.length;
+        const expansionId = filteredRow.inputDigest + ':' + evaluationCallId;
         const originalRows: ModelsAsRowsRowDataTrial[] = matchingRows.map(
           row => {
             return {
               _type: 'trial' as const,
+              _expansionId: expansionId,
               ...row,
             };
           }
         );
         const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
         hasTrials = hasTrials || numTrials > 1;
-        if (numTrials > 1 && !expandedDigestEvalIds.includes(digestEvalId)) {
+        if (numTrials > 1 && !expandedIds.includes(digestEvalId)) {
           const summaryRow: ModelsAsRowsRowDataSummary = {
             ...originalRows[0],
             _type: 'summary' as const,
             _numTrials: numTrials,
+            _expansionId: expansionId,
             id: digestEvalId,
             output: filteredRow.output,
             scores: filteredRow.scores,
@@ -148,11 +153,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       return finalRows;
     });
     return {rows: returnRows, hasTrials};
-  }, [
-    expandedDigestEvalIds,
-    filteredRows,
-    props.state.evaluationCallIdsOrdered,
-  ]);
+  }, [expandedIds, filteredRows, props.state.evaluationCallIdsOrdered]);
 
   const inputSubFields = useMemo(() => {
     const exampleRow = firstExampleRow.targetRowValue ?? {};
@@ -292,9 +293,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
                 // if (params.row._numTrials < 2) {
                 //   return null;
                 // }
-                const digestEvalId =
-                  params.row.inputDigest + ':' + params.row.evaluationCallId;
-                const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
+                const isExpanded = expandedIds.includes(
+                  params.row._expansionId
+                );
                 return (
                   <Box
                     style={{
@@ -306,11 +307,13 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
                     }}>
                     <IconButton
                       onClick={() => {
-                        setExpandedDigestEvalIds(prev => {
-                          if (prev.includes(digestEvalId)) {
-                            return prev.filter(id => id !== digestEvalId);
+                        setExpandedIds(prev => {
+                          if (prev.includes(params.row._expansionId)) {
+                            return prev.filter(
+                              id => id !== params.row._expansionId
+                            );
                           } else {
-                            return [...prev, digestEvalId];
+                            return [...prev, params.row._expansionId];
                           }
                         });
                       }}>
@@ -537,7 +540,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     scoreSubFields,
     setSelectedInputDigest,
     props,
-    expandedDigestEvalIds,
+    expandedIds,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -620,6 +623,7 @@ type ModelAsColumnsRowDataBase = Pick<
   'output' | 'scores' | 'inputDigest'
 > & {
   id: string;
+  _expansionId: string;
 };
 
 type ModelAsColumnsRowDataTrial = ModelAsColumnsRowDataBase & {
@@ -645,18 +649,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     props.state
   );
 
-  const firstExampleRow = useExampleCompareData(
-    props.state,
-    Object.keys(
-      props.state.loadableComparisonResults.result?.resultRows ?? {}
-    ).map(digest => ({
-      inputDigest: digest,
-    })),
-    0
-  );
-  const [expandedDigestEvalIds, setExpandedDigestEvalIds] = useState<string[]>(
-    []
-  );
+  const firstExampleRow = useFirstExampleRow(props.state);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   // const rows = filteredRows;
   // const hasTrials = false;
   const {rows, hasTrials} = useMemo(() => {
@@ -675,6 +669,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
           ...filteredRow,
           _type: 'summary' as const,
           _numTrials: maxTrials,
+          _expansionId: filteredRow.inputDigest,
           id: filteredRow.inputDigest + ':summary',
           output: filteredRow.output,
           scores: filteredRow.scores,
@@ -682,10 +677,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
         hasTrials = hasTrials || maxTrials > 1;
 
-        if (
-          maxTrials > 1 &&
-          !expandedDigestEvalIds.includes(filteredRow.inputDigest)
-        ) {
+        if (maxTrials > 1 && !expandedIds.includes(filteredRow.inputDigest)) {
           return [summaryRow];
         }
 
@@ -694,6 +686,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
             ...filteredRow,
             _type: 'trial' as const,
             _trialNdx: trialNdx,
+            _expansionId: filteredRow.inputDigest,
             id: filteredRow.inputDigest + ':trial:' + trialNdx,
             // turn these into reducers
             output: Object.fromEntries(
@@ -737,7 +730,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     );
 
     return {rows: returnRows, hasTrials};
-  }, [expandedDigestEvalIds, filteredRows]);
+  }, [expandedIds, filteredRows]);
 
   // console.log(rows, hasTrials);
 
@@ -900,8 +893,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
               renderCell: (
                 params: GridRenderCellParams<ModelAsColumnsRowData>
               ) => {
-                const digestEvalId = params.row.inputDigest;
-                const isExpanded = expandedDigestEvalIds.includes(digestEvalId);
+                const isExpanded = expandedIds.includes(
+                  params.row._expansionId
+                );
                 return (
                   <Box
                     style={{
@@ -913,11 +907,13 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
                     }}>
                     <IconButton
                       onClick={() => {
-                        setExpandedDigestEvalIds(prev => {
-                          if (prev.includes(digestEvalId)) {
-                            return prev.filter(id => id !== digestEvalId);
+                        setExpandedIds(prev => {
+                          if (prev.includes(params.row._expansionId)) {
+                            return prev.filter(
+                              id => id !== params.row._expansionId
+                            );
                           } else {
-                            return [...prev, digestEvalId];
+                            return [...prev, params.row._expansionId];
                           }
                         });
                       }}>
@@ -1137,7 +1133,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     scoreSubFields,
     setSelectedInputDigest,
     props,
-    expandedDigestEvalIds,
+    expandedIds,
   ]);
   // console.log(columns);
 
