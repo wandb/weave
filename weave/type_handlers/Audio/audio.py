@@ -165,7 +165,7 @@ class Audio(Generic[T]):
 
     def export(self, path: Union[str, bytes, Path, os.PathLike]) -> None:
         with open(path, "wb") as f:
-            f.write(base64.b64decode(self.data))
+            f.write(self.data)
 
 
 def save(
