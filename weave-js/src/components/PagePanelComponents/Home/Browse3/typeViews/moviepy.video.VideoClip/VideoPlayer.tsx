@@ -37,7 +37,7 @@ const MIME_TYPES: Record<VideoFormat, string> = {
 };
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = props => (
-  <AutoSizer className="h-full w-full">
+  <AutoSizer style={{height: '100%', width: '100%'}}>
     {({width, height}) =>
       width === 0 || height === 0 ? null : (
         <VideoPlayerWithSize
@@ -89,7 +89,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
   const title = data.custom_name || entity.split('-')[0];
 
   // Link mode (default view)
-  if (!mode || mode !== 'object_viewer') {
+  if (!mode || mode !== 'object_viewer' || containerHeight < 50) {
     const videoText = `${fileExt.toUpperCase()} Video`;
 
     return (
