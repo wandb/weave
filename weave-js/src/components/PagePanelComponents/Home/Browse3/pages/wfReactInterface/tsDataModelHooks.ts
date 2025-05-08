@@ -2122,6 +2122,7 @@ export const convertISOToDate = (iso: string): Date => {
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
+  useCall2,
   useCalls,
   useCallsStats,
   useProjectHasCalls,

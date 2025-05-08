@@ -6,7 +6,7 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
 import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
-import React, {useContext, useEffect, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
@@ -37,7 +37,7 @@ const MIME_TYPES: Record<VideoFormat, string> = {
 };
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = props => (
-  <AutoSizer className="h-full w-full">
+  <AutoSizer style={{height: '100%', width: '100%'}}>
     {({width, height}) =>
       width === 0 || height === 0 ? null : (
         <VideoPlayerWithSize
@@ -74,12 +74,16 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
     | undefined;
 
   // Always call the hook with consistent arguments
-  const videoBinary = useFileContent(
+  const digest = useMemo(
+    () => (videoKey ? data.files[videoKey] : ''),
+    [videoKey, data.files]
+  );
+  const videoBinary = useFileContent({
     entity,
     project,
-    videoKey ? data.files[videoKey] : '',
-    {skip: !videoKey}
-  );
+    digest,
+    skip: !videoKey,
+  });
 
   if (!videoKey) {
     return <NotApplicable />;
@@ -89,7 +93,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
   const title = data.custom_name || entity.split('-')[0];
 
   // Link mode (default view)
-  if (!mode || mode !== 'object_viewer') {
+  if (!mode || mode !== 'object_viewer' || containerHeight < 50) {
     const videoText = `${fileExt.toUpperCase()} Video`;
 
     return (

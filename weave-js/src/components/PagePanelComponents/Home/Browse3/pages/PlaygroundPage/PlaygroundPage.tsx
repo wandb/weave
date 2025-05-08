@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -48,11 +47,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
   return (
     <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-        </Box>
-      }
+      title="Playground"
       hideTabsIfSingle
       headerContent={null}
       tabs={[
@@ -159,6 +154,14 @@ export const PlaygroundPageInner = ({
     },
   });
 
+  const {
+    result: savedModelsResult,
+    loading: savedModelsLoading,
+    refetch: refetchSavedModels,
+  } = useBaseObjectInstances('LLMStructuredCompletionModel', {
+    project_id: projectId,
+  });
+
   const refetchCustomLLMs = useCallback(() => {
     refetchCustomProviders();
     refetchCustomProviderModels();
@@ -238,6 +241,8 @@ export const PlaygroundPageInner = ({
           customProvidersResult={customProvidersResult || []}
           customProviderModelsResult={customProviderModelsResult || []}
           configuredProviders={configuredProviders}
+          savedModelsResult={savedModelsResult || []}
+          savedModelsLoading={savedModelsLoading}
         />
       )}
       {settingsTab !== null && (
@@ -246,6 +251,8 @@ export const PlaygroundPageInner = ({
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={projectId}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
     </div>
