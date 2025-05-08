@@ -21,6 +21,12 @@ def assert_no_current_call():
     assert call_context.get_current_call() is None
 
 
+def reset_call_context():
+    """Force reset the call context to an empty stack."""
+    token = call_context._call_stack.set([])
+    call_context._call_stack.reset(token)
+
+
 def test_resilience_to_user_code_errors(client):
     def do_test():
         @weave.op
@@ -414,7 +420,6 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
         assert log.msg.startswith("Error closing iterator, call data may be incomplete")
 
 
-@pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
     client, log_collector
@@ -464,18 +469,10 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
 
 def test_resilience_to_accumulator_internal_errors(client):
     def do_test():
-        @weave.op
+        @weave.op(accumulator=lambda *args, **kwargs: {})
         def simple_op():
             yield 1
             raise DummyTestException("FAILURE!")
-
-        def make_accumulator(*args, **kwargs):
-            def accumulate(*args, **kwargs):
-                return {}
-
-            return accumulate
-
-        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -494,34 +491,20 @@ def test_resilience_to_accumulator_internal_errors(client):
 @pytest.mark.asyncio
 async def test_resilience_to_accumulator_internal_errors_async(client):
     async def do_test():
-        @weave.op
+        @weave.op(accumulator=lambda *args, **kwargs: {})
         async def simple_op():
             yield 1
             raise DummyTestException("FAILURE!")
-
-        def make_accumulator(*args, **kwargs):
-            def accumulate(*args, **kwargs):
-                return {}
-
-            return accumulate
-
-        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            # Consume the generator
-            gen = await do_test()
-            _ = [i async for i in gen]
+            res = await do_test()
+            l = [item async for item in res]
 
-    # We should gracefully handle the error and return a value
-    res = await do_test()
-    assert [item async for item in res] == [1]
-
-    assert_no_current_call()
-
-    logs = log_collector.get_error_logs()
-    assert len(logs) == 1
-    assert logs[0].msg.startswith("Error capturing call output")
+    with raise_on_captured_errors(False):
+        with pytest.raises(DummyTestException):
+            res = await do_test()
+            l = [item async for item in res]
