@@ -19,7 +19,7 @@ from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 SupportedFormatType = Literal["mp3", "wav"]
 
 
-def get_format_from_filename(filename: str) -> str | None:
+def get_format_from_filename(filename: str) -> Union[str, None]:
     """Get the file format from a filename.
     Args:
         filename: The filename to extract the format from
@@ -41,7 +41,7 @@ def get_format_from_filename(filename: str) -> str | None:
     return fmt
 
 
-def is_base64(data: str | bytes | None) -> bool:
+def is_base64(data: Union[str, bytes, None]) -> bool:
     # check if a string is base64 encoded.
     if not data:
         return False
