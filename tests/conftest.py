@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException, client_is_sqlite
 from weave.trace import autopatch, weave_client, weave_init
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
@@ -601,8 +602,14 @@ def create_client(
     return inited_client
 
 
+@pytest.fixture
+def zero_stack():
+    with set_call_stack([]):
+        yield
+
+
 @pytest.fixture()
-def client(request):
+def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
     inited_client = create_client(request)
