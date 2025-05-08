@@ -9,6 +9,7 @@ from typing import (
     Generic,
     Literal,
     TypeVar,
+    ParamSpec,
     Union,
     cast,
     get_args,
@@ -222,5 +223,5 @@ def is_audio_instance(obj: Any) -> bool:
 
 def register() -> None:
     # Register the serializers for the various audio types
-    serializer.register_serializer(Audio, save, load)
+    serializer.register_serializer(Audio, save, load, is_audio_instance)
     serializer.register_serializer(wave.Wave_read, save, load)
