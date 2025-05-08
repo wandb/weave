@@ -2,7 +2,6 @@ import {Box} from '@mui/material';
 import {
   MOON_100,
   MOON_200,
-  MOON_500,
   MOON_800,
   OBLIVION,
 } from '@wandb/weave/common/css/color.styles';
