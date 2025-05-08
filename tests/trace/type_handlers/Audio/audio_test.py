@@ -102,9 +102,8 @@ def test_audio_publish(client: WeaveClient, make_wav_file: str) -> None:
     gotten_audio = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_audio.readframes(10)
 
-def test_audio_as_dataset_cell(
-    client: WeaveClient, make_wav_file: str
-) -> None:
+
+def test_audio_as_dataset_cell(client: WeaveClient, make_wav_file: str) -> None:
     client.project = "test_audio_as_dataset_cell"
     audio = wave.open(make_wav_file, "rb")
     dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
@@ -115,6 +114,7 @@ def test_audio_as_dataset_cell(
 
     gotten_dataset = weave.ref(ref.uri()).get()
     assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
+
 
 def test_audio_as_call_io(client: WeaveClient, make_wav_file: str) -> None:
     @weave.op
