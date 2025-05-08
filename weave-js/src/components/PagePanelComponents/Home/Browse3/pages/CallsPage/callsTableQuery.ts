@@ -358,6 +358,70 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
 const CACHE_KEY_PREFIX = 'weave_datetime_filter_';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 
+// Helper type for stats data passed to condition functions
+type StatsData = {
+  oneDayCount?: number;
+  sevenDaysCount?: number;
+  thirtyDaysCount?: number;
+  // Add more as new stats queries are introduced (e.g., ninetyDaysCount)
+};
+
+// Interface for a filter rule in the configuration
+interface FilterRule {
+  name: string; // For debugging/identification
+  condition: (stats: StatsData) => boolean;
+  getFilter: () => GridFilterModel;
+}
+
+const CALL_COUNT_THRESHOLD = 50;
+
+// Configuration array for datetime filter logic.
+// Rules are evaluated in order. The first rule whose condition is met determines the filter.
+const DATETIME_FILTER_LOGIC_CONFIG: FilterRule[] = [
+  // Example: Add a 1-day (24-hour) filter rule.
+  {
+    name: '1_day_sufficient_calls',
+    condition: stats =>
+      stats.oneDayCount != null && stats.oneDayCount >= CALL_COUNT_THRESHOLD,
+    getFilter: () => ({
+      items: [makeDateFilter(1)],
+      logicOperator: GridLogicOperator.And,
+    }),
+  },
+  {
+    name: '7_days_sufficient_calls',
+    condition: stats =>
+      stats.sevenDaysCount != null &&
+      stats.sevenDaysCount >= CALL_COUNT_THRESHOLD,
+    getFilter: () => ({
+      items: [makeDateFilter(7)],
+      logicOperator: GridLogicOperator.And,
+    }),
+  },
+  {
+    name: '30_days_sufficient_calls',
+    condition: stats =>
+      stats.thirtyDaysCount != null &&
+      stats.thirtyDaysCount >= CALL_COUNT_THRESHOLD,
+    getFilter: () => ({
+      items: [makeMonthFilter()],
+      logicOperator: GridLogicOperator.And,
+    }),
+  },
+  {
+    name: 'low_calls_in_30_days_no_filter',
+    // This rule applies if 30-day stats are available, the count is < 50,
+    // AND preceding rules (e.g., 7-day >= 50) were not met.
+    condition: stats =>
+      stats.thirtyDaysCount != null &&
+      stats.thirtyDaysCount < CALL_COUNT_THRESHOLD,
+    getFilter: () => ({
+      items: [], // No date filter
+      logicOperator: GridLogicOperator.And,
+    }),
+  },
+];
+
 const datetimeFilterCacheKey = (
   entity: string,
   project: string,
@@ -374,19 +438,15 @@ export const useMakeInitialDatetimeFilter = (
   highLevelFilter: WFHighLevelCallFilter,
   skip: boolean
 ): {initialDatetimeFilter: GridFilterModel} => {
-  // Fire off 2 stats queries, one for the # of calls in the last 7 days
-  // one for the  # of calls in the last 30 days.
-  // If the first query returns > 50 calls, set the default filter to 7 days
-  // Else if the second query returns > 50 calls, set to 30 days
-  // Else set a default filter to 6 months
-  // On the creation of a filter --> stash to browser history with 1 day expiry
-  // Use the cache preferentially when available
   const {useCallsStats} = useWFHooks();
-  const d30filter = useMemo(() => {
-    return makeRawDateFilter(30);
-  }, []);
-  const d7filter = useMemo(() => {
+
+  // Define raw filters for stats queries
+  const d1Filter = useMemo(() => makeRawDateFilter(1), []);
+  const d7Filter = useMemo(() => {
     return makeRawDateFilter(7);
+  }, []);
+  const d30Filter = useMemo(() => {
+    return makeRawDateFilter(30);
   }, []);
 
   const key = datetimeFilterCacheKey(entity, project, highLevelFilter);
@@ -398,22 +458,30 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
+  const callStats1Day = useCallsStats({
+    entity,
+    project,
+    filter,
+    query: d1Filter,
+    skip: skip || cachedFilter != null,
+  });
   const callStats7Days = useCallsStats({
     entity,
     project,
     filter,
-    query: d7filter,
+    query: d7Filter,
     skip: skip || cachedFilter != null,
   });
   const callStats30Days = useCallsStats({
     entity,
     project,
     filter,
-    query: d30filter,
+    query: d30Filter,
     skip: skip || cachedFilter != null,
   });
 
-  const defaultDatetimeFilter = useMemo(
+  // Fallback filter if stats are loading or no specific rule matches from config.
+  const initialFallbackFilter = useMemo(
     () => ({
       items: [makeDateFilter(7)],
       logicOperator: GridLogicOperator.And,
@@ -422,33 +490,45 @@ export const useMakeInitialDatetimeFilter = (
   );
 
   const computedDatetimeFilter = useMemo(() => {
-    // Wait for both stats queries to return
-    if (callStats7Days.loading || callStats30Days.loading) {
-      return defaultDatetimeFilter;
+    const isLoading =
+      callStats1Day.loading ||
+      callStats7Days.loading ||
+      callStats30Days.loading;
+
+    if (isLoading) {
+      // While loading, don't compute a new filter or touch the cache.
+      // Return null to let the outer logic use the initialFallbackFilter.
+      return null;
     }
 
-    // If no cache or expired, compute new filter
-    let newFilter = null;
-    if (callStats7Days.result && callStats7Days.result.count >= 50) {
-      newFilter = defaultDatetimeFilter;
-    } else if (callStats30Days.result && callStats30Days.result.count >= 50) {
-      newFilter = {
-        items: [makeMonthFilter()],
-        logicOperator: GridLogicOperator.And,
-      };
-    } else if (callStats30Days.result && callStats30Days.result.count < 50) {
-      // If there are no calls found in the last 30 days, just don't set a filter
-      newFilter = {
-        items: [],
-        logicOperator: GridLogicOperator.And,
-      };
+    const statsData: StatsData = {
+      sevenDaysCount: callStats7Days.result?.count,
+      thirtyDaysCount: callStats30Days.result?.count,
+      oneDayCount: callStats1Day.result?.count,
+    };
+
+    for (const rule of DATETIME_FILTER_LOGIC_CONFIG) {
+      if (rule.condition(statsData)) {
+        const newFilter = rule.getFilter();
+        // Cache the newly computed filter
+        setCacheByKeyWithExpiry(key, newFilter);
+        return newFilter;
+      }
     }
-    // Cache the new filter if we computed one
-    if (newFilter) {
-      setCacheByKeyWithExpiry(key, newFilter);
-    }
-    return newFilter;
-  }, [callStats7Days, callStats30Days, defaultDatetimeFilter, key]);
+
+    // If no rule from the configuration matched (e.g., stats are missing but not loading,
+    // or counts don't meet any specific criteria for a rule).
+    // Return null to fall back to initialFallbackFilter.
+    return null;
+  }, [
+    callStats7Days.loading,
+    callStats7Days.result,
+    callStats30Days.loading,
+    callStats30Days.result,
+    callStats1Day?.loading,
+    callStats1Day?.result,
+    key,
+  ]);
 
   if (cachedFilter) {
     return {
@@ -457,6 +537,6 @@ export const useMakeInitialDatetimeFilter = (
   }
 
   return {
-    initialDatetimeFilter: computedDatetimeFilter ?? defaultDatetimeFilter,
+    initialDatetimeFilter: computedDatetimeFilter ?? initialFallbackFilter,
   };
 };
