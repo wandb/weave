@@ -1,4 +1,9 @@
-import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
+import {
+  ObjectRef,
+  parseRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '@wandb/weave/react';
 import _, {isEmpty} from 'lodash';
 import {
   MutableRefObject,
@@ -127,7 +132,31 @@ const rowIsSelected = (
   });
 };
 
-export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
+export type FilteredAggregateRows = {
+  id: string;
+  count: number;
+  inputDigest: string;
+  inputRef: ObjectRef | null;
+  output: {
+    [k: string]: {
+      [k: string]: any;
+    };
+  };
+  scores: {
+    [k: string]: {
+      [k: string]: number | undefined;
+    };
+  };
+  originalRows: PivotedRow[];
+}[];
+
+export const useFilteredAggregateRows = (
+  state: EvaluationComparisonState
+): {
+  filteredRows: FilteredAggregateRows;
+  outputColumnKeys: string[];
+  leafDims: string[];
+} => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
     () => buildCompositeMetricsMap(state.summary, 'score'),

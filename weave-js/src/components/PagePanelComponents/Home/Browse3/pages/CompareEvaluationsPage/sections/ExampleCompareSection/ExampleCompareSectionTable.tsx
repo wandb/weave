@@ -21,6 +21,7 @@ import {flattenedDimensionPath} from '../../ecpUtil';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {evalAggScorerMetricCompGeneric} from './ExampleCompareSectionDetail';
 import {
+  FilteredAggregateRows,
   PivotedRow,
   removePrefix,
   useExampleCompareData,
@@ -115,21 +116,28 @@ const useFirstExampleRow = (state: EvaluationComparisonState) => {
   );
 };
 
-export const ExampleCompareSectionTableModelsAsRows: React.FC<{
-  state: EvaluationComparisonState;
-  shouldHighlightSelectedRow?: boolean;
-  onShowSplitView: () => void;
-}> = props => {
-  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
-    props.state
-  );
-  const firstExampleRow = useFirstExampleRow(props.state);
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+const useInputSubFields = (state: EvaluationComparisonState) => {
+  const firstExampleRow = useFirstExampleRow(state);
+  return useMemo(() => {
+    const exampleRow = firstExampleRow.targetRowValue ?? {};
 
+    if (_.isObject(exampleRow)) {
+      return Object.keys(exampleRow);
+    } else {
+      return [''];
+    }
+  }, [firstExampleRow.targetRowValue]);
+};
+
+const useTableDataForModelsAsRows = (
+  state: EvaluationComparisonState,
+  filteredRows: FilteredAggregateRows,
+  expandedIds: string[]
+): {rows: RowData[]; hasTrials: boolean} => {
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
     const returnRows = filteredRows.flatMap(filteredRow => {
-      const evaluationCallIds = props.state.evaluationCallIdsOrdered;
+      const evaluationCallIds = state.evaluationCallIdsOrdered;
       const finalRows: RowData[] = [];
       for (const evaluationCallId of evaluationCallIds) {
         const matchingRows = filteredRow.originalRows.filter(
@@ -169,19 +177,13 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
       return finalRows;
     });
     return {rows: returnRows, hasTrials};
-  }, [expandedIds, filteredRows, props.state.evaluationCallIdsOrdered]);
+  }, [expandedIds, filteredRows, state.evaluationCallIdsOrdered]);
 
-  const inputSubFields = useMemo(() => {
-    const exampleRow = firstExampleRow.targetRowValue ?? {};
+  return {rows, hasTrials};
+};
 
-    if (_.isObject(exampleRow)) {
-      return Object.keys(exampleRow);
-    } else {
-      return [''];
-    }
-  }, [firstExampleRow.targetRowValue]);
-
-  const scoreSubFields = useMemo(() => {
+const useScoreSubFields = (rows: RowData[]) => {
+  return useMemo(() => {
     const keys: string[] = [];
     for (const row of rows) {
       if (_.isObject(row.scores)) {
@@ -198,8 +200,52 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     }
     return keys;
   }, [rows]);
+};
 
+const useSelectedRowState = (
+  state: EvaluationComparisonState,
+  rows: RowData[],
+  shouldHighlightSelectedRow: boolean
+) => {
   const {setSelectedInputDigest} = useCompareEvaluationsState();
+  const selectedRowInputDigest = useMemo(() => {
+    if (!shouldHighlightSelectedRow) {
+      return [];
+    }
+    const assumedSelectedInputDigest =
+      state.selectedInputDigest ?? rows[0].inputDigest;
+    return rows
+      .filter(row => row.inputDigest === assumedSelectedInputDigest)
+      .map(row => row.id);
+  }, [shouldHighlightSelectedRow, state.selectedInputDigest, rows]);
+
+  return {
+    setSelectedInputDigest,
+    selectedRowInputDigest,
+  };
+};
+
+export const ExampleCompareSectionTableModelsAsRows: React.FC<{
+  state: EvaluationComparisonState;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
+}> = props => {
+  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
+    props.state
+  );
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const {rows, hasTrials} = useTableDataForModelsAsRows(
+    props.state,
+    filteredRows,
+    expandedIds
+  );
+  const inputSubFields = useInputSubFields(props.state);
+  const scoreSubFields = useScoreSubFields(rows);
+  const {selectedRowInputDigest, setSelectedInputDigest} = useSelectedRowState(
+    props.state,
+    rows,
+    props.shouldHighlightSelectedRow ?? false
+  );
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -368,13 +414,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
         headerName: removePrefix(key, 'output.'),
         flex: 1,
         ...disabledRowSpanning,
-        // valueGetter: (value: any, row: RowData) => {
-        //   if (row._pivot === 'modelsAsColumns') {
-        //     // This does not make sense for models as columns
-        //     return null;
-        //   }
-        //   return row.output[key]?.[row.evaluationCallId];
-        // },
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._type === 'summary') {
             // TODO: What should we show for the summary rows output fields??
@@ -398,13 +437,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
         ),
         flex: 1,
         ...disabledRowSpanning,
-        // valueGetter: (value: any, row: RowData) => {
-        //   if (row._pivot === 'modelsAsColumns') {
-        //     // This does not make sense for models as columns
-        //     return null;
-        //   }
-        //   return row.scores[key][row.evaluationCallId];
-        // },
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._pivot === 'modelsAsColumns') {
             // This does not make sense for models as columns
@@ -463,22 +495,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
     ];
   }, [inputSubFields, scoreSubFields, outputColumnKeys]);
 
-  // console.log(props.state.summary.scoreMetrics);
-
-  const selectedRow = useMemo(() => {
-    if (!props.shouldHighlightSelectedRow) {
-      return [];
-    }
-    const assumedSelectedInputDigest =
-      props.state.selectedInputDigest ?? rows[0].inputDigest;
-    return rows
-      .filter(row => row.inputDigest === assumedSelectedInputDigest)
-      .map(row => row.id);
-  }, [props.shouldHighlightSelectedRow, props.state.selectedInputDigest, rows]);
-
   return (
     <StyledDataGrid
-      rowSelectionModel={selectedRow}
+      rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
@@ -498,18 +517,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
   );
 };
 
-export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
-  state: EvaluationComparisonState;
-  shouldHighlightSelectedRow?: boolean;
-  onShowSplitView: () => void;
-}> = props => {
-  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
-    props.state
-  );
-
-  const firstExampleRow = useFirstExampleRow(props.state);
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  const {rows, hasTrials} = useMemo(() => {
+const useTableDataForModelsAsColumns = (
+  filteredRows: FilteredAggregateRows,
+  expandedIds: string[]
+): {rows: RowData[]; hasTrials: boolean} => {
+  return useMemo(() => {
     let hasTrials = false;
     const returnRows: RowData[] = filteredRows.flatMap(
       (filteredRow): RowData[] => {
@@ -589,36 +601,28 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
     return {rows: returnRows, hasTrials};
   }, [expandedIds, filteredRows]);
+};
 
-  const inputSubFields = useMemo(() => {
-    const exampleRow = firstExampleRow.targetRowValue ?? {};
-
-    if (_.isObject(exampleRow)) {
-      return Object.keys(exampleRow);
-    } else {
-      return [''];
-    }
-  }, [firstExampleRow.targetRowValue]);
-
-  const scoreSubFields = useMemo(() => {
-    const keys: string[] = [];
-    for (const row of rows) {
-      if (_.isObject(row.scores)) {
-        for (const key in row.scores) {
-          if (!keys.includes(key)) {
-            keys.push(key);
-          }
-        }
-      } else {
-        if (!keys.includes('')) {
-          keys.push('');
-        }
-      }
-    }
-    return keys;
-  }, [rows]);
-
-  const {setSelectedInputDigest} = useCompareEvaluationsState();
+export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
+  state: EvaluationComparisonState;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
+}> = props => {
+  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
+    props.state
+  );
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const {rows, hasTrials} = useTableDataForModelsAsColumns(
+    filteredRows,
+    expandedIds
+  );
+  const inputSubFields = useInputSubFields(props.state);
+  const scoreSubFields = useScoreSubFields(rows);
+  const {selectedRowInputDigest, setSelectedInputDigest} = useSelectedRowState(
+    props.state,
+    rows,
+    props.shouldHighlightSelectedRow ?? false
+  );
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -840,22 +844,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
     props.state.summary.scoreMetrics,
   ]);
 
-  // console.log(props.state.summary.scoreMetrics);
-
-  const selectedRow = useMemo(() => {
-    if (!props.shouldHighlightSelectedRow) {
-      return [];
-    }
-    const assumedSelectedInputDigest =
-      props.state.selectedInputDigest ?? rows[0].inputDigest;
-    return rows
-      .filter(row => row.inputDigest === assumedSelectedInputDigest)
-      .map(row => row.id);
-  }, [props.shouldHighlightSelectedRow, props.state.selectedInputDigest, rows]);
-
   return (
     <StyledDataGrid
-      rowSelectionModel={selectedRow}
+      rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
       rows={rows}
