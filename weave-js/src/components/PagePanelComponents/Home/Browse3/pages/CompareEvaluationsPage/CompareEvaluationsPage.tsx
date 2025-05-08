@@ -284,10 +284,10 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={() => setViewMode(nextViewMode)}>
+        {/* <button onClick={() => setViewMode(nextViewMode)}>
           Toggle Display ({nextViewMode})
         </button>
-        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
+        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button> */}
       </HorizontalBox>
 
       <Box
