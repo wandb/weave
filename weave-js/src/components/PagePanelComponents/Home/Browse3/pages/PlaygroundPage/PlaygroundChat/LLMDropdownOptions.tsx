@@ -132,7 +132,7 @@ const SubMenu = ({
           }}>
           {llm.label}
           {llm.subLabel && (
-            <Box sx={{fontSize: '12px', color: MOON_500}}>{llm.subLabel}</Box>
+            <div className="text-sm text-moon-500">{llm.subLabel}</div>
           )}
         </Box>
       ))}
