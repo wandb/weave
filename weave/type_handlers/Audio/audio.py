@@ -1,29 +1,25 @@
-from pathlib import Path
-import json
-from collections import namedtuple
-import os
-from typing import Optional, TypeVar, Literal, Union, Generic
-import re
 import base64
+import json
 import os
+import re
 import wave
-from typing import Any, Union
+from pathlib import Path
+from typing import (
+    Any,
+    Generic,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+)
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
-SUPPORTED_FORMATS = (
-    "mp3",
-    "wav",
-    "ogg",
-    "flac",
-    "aac"
-)
+SupportedFormatType = Literal["mp3", "wav"]
 
-SupportedFormatType = Literal["mp3", "wav", "ogg", "flac", "aac"]
-F = TypeVar("F", bound=SupportedFormatType)
 
-def get_format_from_filename(filename: str) -> SupportedFormatType | None:
+def get_format_from_filename(filename: str) -> str | None:
     """Get the file format from a filename.
     Args:
         filename: The filename to extract the format from
@@ -36,18 +32,17 @@ def get_format_from_filename(filename: str) -> SupportedFormatType | None:
     # If there's no dot or it's the last character, return None
     if last_dot == -1 or last_dot == len(filename) - 1:
         return None
+
     fmt = filename[last_dot + 1 :].lower()
 
-    if fmt not in SUPPORTED_FORMATS:
+    if not fmt in get_args(SupportedFormatType):
         return None
 
     return fmt
 
-# Case 1: Receive encoded audio data
+
 def is_base64(data: str | bytes | None) -> bool:
-    """
-    check if a string is base64 encoded.
-    """
+    # check if a string is base64 encoded.
     if not data:
         return False
 
@@ -58,9 +53,13 @@ def is_base64(data: str | bytes | None) -> bool:
 
     return bool(re.match(pattern, data))
 
+
+F = TypeVar("F", bound=SupportedFormatType)
+
+
 class Audio(Generic[F]):
     # File Format
-    fmt: SupportedFormatType
+    fmt: str
 
     # Base64 encoded audio data
     data: str
@@ -77,38 +76,49 @@ class Audio(Generic[F]):
             raise ValueError("Format is required when passing raw data")
 
         if path:
-            fmt = fmt or get_format_from_filename(str(path))
-            if not fmt or fmt.lower() not in SUPPORTED_FORMATS:
-                raise ValueError(f"Invalid file path {path}, file must end in one of: mp3, wav, ogg, flac, aac")
+            if isinstance(path, bytes):
+                path = path.decode()
+            fmt_str = fmt or get_format_from_filename(str(path))
+
+            if not fmt_str or fmt_str.lower() not in get_args(SupportedFormatType):
+                raise ValueError(
+                    f"Invalid file path {path}, file must end in one of: mp3 or wav"
+                )
             if not os.path.exists(path):
                 raise ValueError(f"File {path} does not exist")
-            self.data = base64.b64encode(open(path, "rb").read()).decode('ascii')
-            self.fmt = fmt
+            self.data = base64.b64encode(open(path, "rb").read()).decode("ascii")
+            self.fmt = fmt_str
             return
 
         elif data and fmt:
+            # Case 1: Receive encoded audio data
             is_encoded = is_base64(data)
+
+            # Case 2: Receive raw audio data
             if not is_encoded:
                 if isinstance(data, str):
                     bytes_data = data.encode()
-                    self.data = base64.b64encode(bytes_data).decode('ascii')
+                    self.data = base64.b64encode(bytes_data).decode("ascii")
                     self.fmt = fmt
                     return
                 else:
-                    self.data = base64.b64encode(data).decode('ascii')
+                    self.data = base64.b64encode(data).decode("ascii")
                     self.fmt = fmt
                     return
 
-    def export(self, path: Union[str, bytes, Path, os.PathLike]):
+    def export(self, path: Union[str, bytes, Path, os.PathLike]) -> None:
         with open(path, "wb") as f:
             f.write(base64.b64decode(self.data))
 
-def save(obj: Union[wave.Wave_read, Audio], artifact: MemTraceFilesArtifact, name: str) -> None:
+
+def save(
+    obj: Union[wave.Wave_read, Audio], artifact: MemTraceFilesArtifact, name: str
+) -> None:
     with artifact.writeable_file_path("metadata.json") as metadata_path:
         obj_module = obj.__module__
         obj_class = obj.__class__.__name__
         with open(metadata_path, "w") as f:
-            metadata = { "_type": f"{obj_module}.{obj_class}" }
+            metadata = {"_type": f"{obj_module}.{obj_class}"}
             json.dump(metadata, f)
 
     if isinstance(obj, wave.Wave_read):
@@ -132,23 +142,26 @@ def save(obj: Union[wave.Wave_read, Audio], artifact: MemTraceFilesArtifact, nam
         with artifact.writeable_file_path(f"audio.{obj.fmt}") as fp:
             obj.export(fp)
 
+
 def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio":
     pytype = None
-    if artifact.path_contents.get('metadata.json'):
-        with open(artifact.path('metadata.json'), "r") as f:
+    if artifact.path_contents.get("metadata.json"):
+        with open(artifact.path("metadata.json")) as f:
             pytype = json.load(f).get("_type")
 
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith("audio."):
-            if (not pytype and filename.endswith('.wav')) or pytype == "wave.Wave_read" :
+            if (not pytype and filename.endswith(".wav")) or pytype == "wave.Wave_read":
                 return wave.open(path, "rb")
             return Audio(path=path)
 
     raise ValueError("No audio found for artifact")
 
+
 def is_audio_instance(obj: Any) -> bool:
-    return isinstance(obj, Union[wave.Wave_read, Audio])
+    return isinstance(obj, (wave.Wave_read, Audio))
+
 
 def register() -> None:
     # Register the serializers for the various audio types
