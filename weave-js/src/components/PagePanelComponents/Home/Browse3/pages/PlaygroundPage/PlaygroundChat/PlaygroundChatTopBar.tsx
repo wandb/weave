@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogTitle,
 } from '@material-ui/core';
-import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
 import React, {useState} from 'react';
@@ -170,19 +169,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   };
 
   return (
-    <Box
-      sx={{
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'space-between',
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-          backgroundColor: 'transparent',
-        }}>
+    <div className="flex w-full justify-between">
+      <div className="flex items-center gap-8 bg-transparent">
         <Tag label={`${idx + 1}`} />
         <LLMDropdown
           value={playgroundStates[idx].model}
@@ -220,14 +208,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             }
           }}
         />
-      </Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          backgroundColor: 'transparent',
-        }}>
+      </div>
+      <div className="flex items-center gap-4 bg-transparent">
         <Button
           tooltip={'Clear chat'}
           icon="randomize-reset-reload"
@@ -253,7 +235,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
             );
           }}
         />
-      </Box>
+      </div>
       <ConfirmClearModal
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
@@ -262,6 +244,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           setConfirmClear(false);
         }}
       />
-    </Box>
+    </div>
   );
 };
