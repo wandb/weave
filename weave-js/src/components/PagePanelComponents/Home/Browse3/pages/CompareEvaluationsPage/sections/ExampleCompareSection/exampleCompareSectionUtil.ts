@@ -362,11 +362,10 @@ async function loadRowDataIntoCache(
   } | null>,
   getTraceServerClient: () => TraceServerClient
 ) {
-  const rowsRes = await getTraceServerClient().tableQuery({
+  console.log('loadRowDataIntoCache', rowDigests);
+  const rowsRes = await getTraceServerClient().tableRowQuery({
     ...cachedPartialTableRequest.current!,
-    filter: {
-      row_digests: rowDigests,
-    },
+    row_digests: rowDigests,
   });
   for (const row of rowsRes.rows) {
     setCachedRowData(row.digest, row.val);

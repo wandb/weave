@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-import {CachingTraceServerClient} from './traceServerCachingClient';
+import {CachingTraceServerClient, TraceTableRowQueryReq, TraceTableRowQueryRes} from './traceServerCachingClient';
 import {
   CompletionsCreateReq,
   CompletionsCreateRes,
@@ -35,6 +35,11 @@ export class TraceServerClient extends CachingTraceServerClient {
   private onRenameListeners: Array<() => void>;
   private onFeedbackListeners: Record<string, Array<() => void>>;
   private onObjectListeners: Array<() => void>;
+  private tableRowQueryCollectors: Array<{
+    req: TraceTableRowQueryReq;
+    resolvePromise: (res: TraceTableRowQueryRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
 
   constructor(baseUrl: string) {
     super(baseUrl);
@@ -44,6 +49,8 @@ export class TraceServerClient extends CachingTraceServerClient {
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
     this.onObjectListeners = [];
+    this.tableRowQueryCollectors = [];
+    this.scheduleTableRowQuery();
   }
 
   /**
@@ -168,6 +175,18 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.completionsCreate(req);
   }
 
+  public tableRowQuery(req: TraceTableRowQueryReq): Promise<TraceTableRowQueryRes> {
+    // Batch many requests together for the same table
+    console.log('tableRowQuery', req);
+    return new Promise<TraceTableRowQueryRes>((resolve, reject) => {
+      this.tableRowQueryCollectors.push({
+        req,
+        resolvePromise: resolve,
+        rejectPromise: reject,
+      });
+    });
+  }
+
   private requestReadBatch(
     req: TraceRefsReadBatchReq
   ): Promise<TraceRefsReadBatchRes> {
@@ -203,14 +222,54 @@ export class TraceServerClient extends CachingTraceServerClient {
     });
   }
 
+  private async doTableRowQuery() {
+    const collectors = [...this.tableRowQueryCollectors];
+    this.tableRowQueryCollectors = [];
+    if (collectors.length === 0) {
+      return;
+    }
+    console.log('doTableRowQuery', collectors.length, collectors);
+    const reqs = collectors.map(c => c.req);
+    const groupedReqs = _.groupBy(reqs, req => req.project_id + ":" + req.digest);
+    console.log('groupedReqs', groupedReqs);
+    await Promise.all(Object.entries(groupedReqs).map(async ([key, reqs]) => {
+      const uniqueDigests = _.uniq(reqs.map(r => r.row_digests).flat());
+      console.log('uniqueDigests', uniqueDigests);
+      const res = await this.tableRowQueryDirect({
+        ...reqs[0],
+        row_digests: uniqueDigests,
+      });
+      console.log('res', res);
+      const digestMap = new Map<string, any>();
+      res.rows.forEach(r => {
+        digestMap.set(r.digest, r.val);
+      });
+      collectors.forEach(collector => {
+        const rows = collector.req.row_digests.map(digest => ({digest, val: digestMap.get(digest)}));
+        collector.resolvePromise({rows});
+      });
+    }));
+  }
+
   private async scheduleReadBatch() {
     await this.doReadBatch();
     setTimeout(this.scheduleReadBatch.bind(this), DEFAULT_BATCH_INTERVAL);
+  }
+
+  private async scheduleTableRowQuery() {
+    await this.doTableRowQuery();
+    setTimeout(this.scheduleTableRowQuery.bind(this), DEFAULT_BATCH_INTERVAL);
   }
 
   private readBatchDirect(
     req: TraceRefsReadBatchReq
   ): Promise<TraceRefsReadBatchRes> {
     return super.readBatch(req);
+  }
+
+  private async tableRowQueryDirect(
+    req: TraceTableRowQueryReq
+  ): Promise<TraceTableRowQueryRes> {
+    return super.tableRowQuery(req);
   }
 }
