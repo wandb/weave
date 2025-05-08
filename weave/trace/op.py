@@ -30,6 +30,8 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
+from weave.trace.annotation_parser import parse_audio_annotation, parse_from_signature
+from weave.type_handlers.Audio.utils import Audio
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -263,8 +265,21 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
+
+        for arg, parsed_annotation in parse_from_signature(sig):
+            input_value = inputs.get(arg)
+            fmt = parsed_annotation.get("audio_format")
+            path = input_value if not fmt else None
+            data = input_value if fmt else None
+            inputs[arg] = Audio(
+                path=path,
+                data=data,
+                fmt=fmt,
+            )
+
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
+
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
     return ProcessedInputs(
@@ -415,6 +430,23 @@ def _call_sync_func(
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
+
+        sig = inspect.signature(op)
+        output_value = output
+        parse_result = parse_audio_annotation(str(sig.return_annotation))
+        if not parse_result or parse_result.get("error"):
+            finish(output)
+            return output
+
+        fmt = parse_result.get("audio_format")
+        path = output_value if not fmt else None
+        data = output_value if fmt else None
+        output = Audio(
+            path=path,
+            data=data,
+            fmt=fmt,
+        )
+
         finish(output)
         return output
 
