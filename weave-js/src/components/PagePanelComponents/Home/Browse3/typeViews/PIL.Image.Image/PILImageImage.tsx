@@ -60,12 +60,12 @@ const PILImageImageWithSize = ({
   const imageKey = Object.keys(data.files).find(key => key in imageTypes) as
     | keyof PILImageImageTypePayload['files']
     | undefined;
-  const imageBinary = useFileContent(
+  const imageBinary = useFileContent({
     entity,
     project,
-    imageKey ? data.files[imageKey] : '',
-    {skip: !imageKey}
-  );
+    digest: imageKey ? data.files[imageKey] : '',
+    skip: !imageKey,
+  });
   if (!imageKey) {
     return <NotApplicable />;
   } else if (imageBinary.loading) {
