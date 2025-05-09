@@ -51,7 +51,7 @@ import {
   removePrefix,
   useExampleCompareData,
   useFilteredAggregateRows,
-} from './ExampleCompareSectionUtil';
+} from './exampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
 const MIN_EVAL_WIDTH_PX = 350;
