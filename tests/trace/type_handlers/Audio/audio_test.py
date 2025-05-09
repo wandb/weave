@@ -1,5 +1,6 @@
 import base64
 import os
+import wave
 from pathlib import Path
 
 import pytest
@@ -32,52 +33,52 @@ def mp3_file(tmp_path: Path, mp3_bytes: bytes) -> str:
     return filename
 
 
-# class TestWaveRead:
-#     def test_audio_publish(self, client: WeaveClient, wav_file: str) -> None:
-#         client.project = "test_audio_publish"
-#         audio = wave.open(wav_file, "rb")
-#         weave.publish(audio)
-#
-#         ref = get_ref(audio)
-#         assert ref is not None
-#         gotten_audio = weave.ref(ref.uri()).get()
-#         assert audio.readframes(10) == gotten_audio.readframes(10)
-#
-#
-#     def test_audio_as_dataset_cell(self, client: WeaveClient, wav_file: str) -> None:
-#         client.project = "test_audio_as_dataset_cell"
-#         audio = wave.open(wav_file, "rb")
-#         dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
-#         weave.publish(dataset)
-#
-#         ref = get_ref(dataset)
-#         assert ref is not None
-#
-#         gotten_dataset = weave.ref(ref.uri()).get()
-#         assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
-#
-#
-#     def test_audio_as_call_io(self, client: WeaveClient, wav_file: str) -> None:
-#         @weave.op
-#         def audio_as_input_and_output_part(in_audio: wave.Wave_read) -> dict:
-#             return {"out_audio": in_audio}
-#
-#         client.project = "test_audio_as_call_io"
-#         audio = wave.open(wav_file, "rb")
-#
-#         exp_bytes = audio.readframes(5)
-#         audio.rewind()
-#
-#         audio_dict = audio_as_input_and_output_part(audio)
-#
-#         assert type(audio_dict["out_audio"]) is wave.Wave_read
-#         assert audio_dict["out_audio"].getparams() == audio.getparams()
-#         assert audio_dict["out_audio"].readframes(5) == exp_bytes
-#
-#         input_output_part_call = audio_as_input_and_output_part.calls()[0]
-#
-#         assert input_output_part_call.inputs["in_audio"].readframes(5) == exp_bytes
-#         assert input_output_part_call.output["out_audio"].readframes(5) == exp_bytes
+class TestWaveRead:
+    def test_audio_publish(self, client: WeaveClient, wav_file: str) -> None:
+        client.project = "test_audio_publish"
+        audio = wave.open(wav_file, "rb")
+        weave.publish(audio)
+
+        ref = get_ref(audio)
+        assert ref is not None
+        gotten_audio = weave.ref(ref.uri()).get()
+        assert audio.readframes(10) == gotten_audio.readframes(10)
+
+
+    def test_audio_as_dataset_cell(self, client: WeaveClient, wav_file: str) -> None:
+        client.project = "test_audio_as_dataset_cell"
+        audio = wave.open(wav_file, "rb")
+        dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
+        weave.publish(dataset)
+
+        ref = get_ref(dataset)
+        assert ref is not None
+
+        gotten_dataset = weave.ref(ref.uri()).get()
+        assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
+
+
+    def test_audio_as_call_io(self, client: WeaveClient, wav_file: str) -> None:
+        @weave.op
+        def audio_as_input_and_output_part(in_audio: wave.Wave_read) -> dict:
+            return {"out_audio": in_audio}
+
+        client.project = "test_audio_as_call_io"
+        audio = wave.open(wav_file, "rb")
+
+        exp_bytes = audio.readframes(5)
+        audio.rewind()
+
+        audio_dict = audio_as_input_and_output_part(audio)
+
+        assert type(audio_dict["out_audio"]) is wave.Wave_read
+        assert audio_dict["out_audio"].getparams() == audio.getparams()
+        assert audio_dict["out_audio"].readframes(5) == exp_bytes
+
+        input_output_part_call = audio_as_input_and_output_part.calls()[0]
+
+        assert input_output_part_call.inputs["in_audio"].readframes(5) == exp_bytes
+        assert input_output_part_call.output["out_audio"].readframes(5) == exp_bytes
 
 
 class TestWeaveAudio:
@@ -161,27 +162,25 @@ class TestWeaveAudio:
     def test_audio_as_call_io(self, client: WeaveClient, audio_file: str) -> None:
         client.project = "test_audio_as_call_io"
 
-        def postprocess_inputs(inputs: dict) -> dict:
+        def on_input(inputs: dict) -> dict:
             inputs["in_audiofile"] = Audio.from_path(inputs["in_audiofile"])
             return inputs
 
-        def postprocess_output(output: dict) -> dict:
-            output["out_audiofile"] = Audio.from_path(output["out_audiofile"])
-            return output
+        def on_output(output: str) -> Audio:
+            return Audio.from_path(output)
 
-        @weave.op(
-            postprocess_inputs=postprocess_inputs, postprocess_output=postprocess_output
-        )
-        def audio_as_input_and_output_part(in_audiofile: str) -> dict:
-            return {"out_audiofile": in_audiofile}
+        @weave.op(postprocess_inputs=on_input, postprocess_output=on_output)
+        def audio_as_input_and_output_part(in_audiofile: str) -> str:
+            return in_audiofile
 
-        audio_dict = audio_as_input_and_output_part(audio_file)
+        out_file = audio_as_input_and_output_part(audio_file)
 
         # Make sure we didn't modify the original outputs for runtime
-        # assert type(audio_dict["out_audiofile"]) is str
+        assert out_file == audio_file
+
 
         input_output_part_call = audio_as_input_and_output_part.calls()[0]
 
         # Make sure we interpretted the postprocess correctly
         assert isinstance(input_output_part_call.inputs["in_audiofile"], Audio)
-        assert isinstance(input_output_part_call.output["out_audiofile"], Audio)
+        assert isinstance(input_output_part_call.output, Audio)
