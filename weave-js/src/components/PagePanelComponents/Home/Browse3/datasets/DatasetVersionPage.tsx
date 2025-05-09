@@ -70,18 +70,16 @@ export const DatasetVersionPage: React.FC<{
   const projectId = `${entityName}/${projectName}`;
   const {createdAtMs} = objectVersion;
 
-  const objectVersions = useRootObjectVersions(
-    entityName,
-    projectName,
-    {objectIds: [objectName]},
-    undefined,
-    false,
-    {includeStorageSize: true}
-  );
+  const objectVersions = useRootObjectVersions({
+    entity: entityName,
+    project: projectName,
+    filter: {objectIds: [objectName]},
+    includeStorageSize: true,
+  });
   const objectVersionCount = (objectVersions.result ?? []).length;
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
-  const data = useRefsData([refUri]);
+  const data = useRefsData({refUris: [refUri]});
 
   const handleEditClick = useCallback(() => setIsEditing(true), []);
   const handleCancelClick = useCallback(() => {
@@ -138,15 +136,16 @@ export const DatasetVersionPage: React.FC<{
     ).filter(Boolean) as string[];
   }, [objectVersions]);
 
-  const tableStats = useTableQueryStats(
-    entityName,
-    projectName,
-    tableDigests ?? [],
-    {
-      skip: tableDigests == null,
-      includeStorageSize: true,
-    }
-  );
+  const digests = useMemo(() => {
+    return tableDigests ?? [];
+  }, [tableDigests]);
+  const tableStats = useTableQueryStats({
+    entity: entityName,
+    project: projectName,
+    digests,
+    skip: digests == null,
+    includeStorageSize: true,
+  });
 
   const {
     currentVersionSizeBytes,
