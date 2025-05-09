@@ -1,6 +1,10 @@
 import _ from 'lodash';
 
-import {CachingTraceServerClient} from './traceServerCachingClient';
+import {
+  CachingTraceServerClient,
+  TraceTableRowQueryReq,
+  TraceTableRowQueryRes,
+} from './traceServerCachingClient';
 import {
   CompletionsCreateReq,
   CompletionsCreateRes,
@@ -36,6 +40,16 @@ export class TraceServerClient extends CachingTraceServerClient {
   private onFeedbackListeners: Record<string, Array<() => void>>;
   private onObjectListeners: Array<() => void>;
 
+  // Similar to the readBatchCollectors, but for tableRowQuery.
+  // The fundamantal idea here is that some tableRowQuery requests
+  // can be batched together, reducing the number of requests we
+  // make to the trace server.
+  private tableRowQueryCollectors: Array<{
+    req: TraceTableRowQueryReq;
+    resolvePromise: (res: TraceTableRowQueryRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
+
   constructor(baseUrl: string) {
     super(baseUrl);
     this.readBatchCollectors = [];
@@ -44,6 +58,8 @@ export class TraceServerClient extends CachingTraceServerClient {
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
     this.onObjectListeners = [];
+    this.tableRowQueryCollectors = [];
+    this.scheduleTableRowQuery();
   }
 
   /**
@@ -168,6 +184,20 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.completionsCreate(req);
   }
 
+  public tableRowQuery(
+    req: TraceTableRowQueryReq
+  ): Promise<TraceTableRowQueryRes> {
+    // Rather than immediately making a request, we add the request to a
+    // queue of pending requests which will be batched together.
+    return new Promise<TraceTableRowQueryRes>((resolve, reject) => {
+      this.tableRowQueryCollectors.push({
+        req,
+        resolvePromise: resolve,
+        rejectPromise: reject,
+      });
+    });
+  }
+
   private requestReadBatch(
     req: TraceRefsReadBatchReq
   ): Promise<TraceRefsReadBatchRes> {
@@ -203,14 +233,65 @@ export class TraceServerClient extends CachingTraceServerClient {
     });
   }
 
+  private async doTableRowQuery() {
+    // This is the workhorse for the tableRowQuery batcher.
+    // We create N groups of results (where N is the number of table digests),
+    // Then for each group, we make a single tableRowQuery request to the
+    // trace server, and then use the results to populate the results for
+    // each of the individual requests.
+    const collectors = [...this.tableRowQueryCollectors];
+    this.tableRowQueryCollectors = [];
+    if (collectors.length === 0) {
+      return;
+    }
+    const reqs = collectors.map(c => c.req);
+    const groupedReqs = _.groupBy(
+      reqs,
+      req => req.project_id + ':' + req.digest
+    );
+    await Promise.all(
+      Object.entries(groupedReqs).map(async ([key, reqs]) => {
+        const uniqueDigests = _.uniq(reqs.map(r => r.row_digests).flat());
+        const res = await this.tableRowQueryDirect({
+          ...reqs[0],
+          row_digests: uniqueDigests,
+        });
+        const digestMap = new Map<string, any>();
+        res.rows.forEach(r => {
+          digestMap.set(r.digest, r.val);
+        });
+        collectors.forEach(collector => {
+          const rows = collector.req.row_digests.map(digest => ({
+            digest,
+            val: digestMap.get(digest),
+          }));
+          collector.resolvePromise({rows});
+        });
+      })
+    );
+  }
+
   private async scheduleReadBatch() {
     await this.doReadBatch();
     setTimeout(this.scheduleReadBatch.bind(this), DEFAULT_BATCH_INTERVAL);
+  }
+
+  private async scheduleTableRowQuery() {
+    // Responsible for scheduling the next batch of tableRowQuery requests.
+    await this.doTableRowQuery();
+    setTimeout(this.scheduleTableRowQuery.bind(this), DEFAULT_BATCH_INTERVAL);
   }
 
   private readBatchDirect(
     req: TraceRefsReadBatchReq
   ): Promise<TraceRefsReadBatchRes> {
     return super.readBatch(req);
+  }
+
+  private async tableRowQueryDirect(
+    req: TraceTableRowQueryReq
+  ): Promise<TraceTableRowQueryRes> {
+    // Proxies the tableRowQuery request to the super class
+    return super.tableRowQuery(req);
   }
 }
