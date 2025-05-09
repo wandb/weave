@@ -204,7 +204,7 @@ export class TraceServerClient extends CachingTraceServerClient {
         // and there are no other filter properties, we can use tableRowQuery instead.
         if (
           Object.entries(req.filter)
-            .map(([k, v]) => ['row_digests'].includes(k) || v == null)
+            .map(([k, v]) => 'row_digests' === k || v == null)
             .every(Boolean)
         ) {
           return this.tableRowQuery({
