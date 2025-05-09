@@ -150,15 +150,18 @@ class Http:
     def __init__(self, fs: filesystem.Filesystem) -> None:
         self.fs = fs
         self.session = requests.Session()
+        self.session.mount(
+            "http://", requests.adapters.HTTPAdapter(pool_maxsize=500000)
+        )
+        self.session.mount(
+            "https://", requests.adapters.HTTPAdapter(pool_maxsize=500000)
+        )
 
     def __enter__(self) -> "Http":
-        print(f"[Http.__enter__] self.session: {self.session}")
         return self
 
     def __exit__(self, *args: typing.Any) -> None:
-        print(f"[Http.__exit__] self.session: {self.session}")
         self.session.close()
-        print(f"[Http.__exit__] self.session closed: {self.session}")
 
     def download_file(
         self,
@@ -187,8 +190,6 @@ class Http:
                     )
                     with self.fs.open_write(path, mode="wb") as f:
                         f.write(r.content)  # type: ignore
-                    # with self.fs.open_read(path, mode="rb") as f:
-                    # print(f"[download_file] f.read(): {f.readline(100)}")
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status_code,

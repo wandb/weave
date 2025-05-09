@@ -71,11 +71,11 @@ class Filesystem:
     ) -> typing.Generator[typing.IO, None, None]:
         path = self.path(path)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp_name = f"{path}.tmp-{util.rand_string_n(16)}"
-        with open(tmp_name, mode) as f:
+        # tmp_name = f"{path}.tmp-{util.rand_string_n(16)}"
+        with open(path, mode) as f:
             yield f
-        with tracer.trace("rename"):
-            os.rename(tmp_name, path)
+        # with tracer.trace("rename"):
+        # os.rename(tmp_name, path)
 
     @contextlib.contextmanager
     def open_read(

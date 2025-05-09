@@ -38,12 +38,6 @@ from weave_query import (
     weave_http,
 )
 
-if __name__ == "__main__":
-    try:
-        multiprocessing.set_start_method("spawn")
-    except RuntimeError:
-        pass
-
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
 
@@ -225,74 +219,66 @@ def handle_direct_url(
     return file_manager.direct_url(uri)
 
 
-def handle_request(req: ServerRequest) -> None:
-    fs = filesystem.Filesystem()
-    net = weave_http.Http(fs)
+_server_fs = None
+_server_net = None
+_server_file_manager = None
+_server_handlers = {
+    "ensure_manifest": handle_ensure_manifest,
+    "ensure_file_downloaded": handle_ensure_file_downloaded,
+    "ensure_file": handle_ensure_file,
+    "direct_url": handle_direct_url,
+}
 
-    print(f"[handle_request] req: {req}")
+
+def handle_request(req: ServerRequest) -> ServerResponse:
+    global _server_fs, _server_net, _server_file_manager
+    if _server_fs is None:
+        _server_fs = filesystem.Filesystem()
+        _server_net = weave_http.Http(_server_fs)
+        _server_file_manager = wandb_file_manager.WandbFileManager(
+            _server_fs, _server_net, wandb_api.get_wandb_api_sync()
+        )
+
     tracer.context_provider.activate(req.context.trace_context)
-    print(f"[handle_request] tracer.context_provider: {tracer.context_provider}")
-    # with net:
-    file_manager = wandb_file_manager.WandbFileManager(
-        fs, net, wandb_api.get_wandb_api_sync()
-    )
-    print(f"[handle_request] file_manager: {file_manager}")
-
-    handlers = {
-        "ensure_manifest": handle_ensure_manifest,
-        "ensure_file_downloaded": handle_ensure_file_downloaded,
-        "ensure_file": handle_ensure_file,
-        "direct_url": handle_direct_url,
-    }
-
-    with wandb_api.wandb_api_context(req.context.wandb_api_context):
-        with cache.time_interval_cache_prefix(req.context.cache_prefix_context):
-            with tracer.trace(
-                "WBArtifactManager.handle.%s" % req.name, service="weave-am"
-            ):
-                try:
-                    print("[handle_request] trying to get handler")
-                    handler = handlers[req.name]
-                except KeyError as e:
-                    resp = req.error_response(404, e)
-                else:
-                    print(f"[handle_request] got handler: {handler}")
+    with _server_net:
+        with wandb_api.wandb_api_context(req.context.wandb_api_context):
+            with cache.time_interval_cache_prefix(req.context.cache_prefix_context):
+                with tracer.trace(
+                    "WBArtifactManager.handle.%s" % req.name, service="weave-am"
+                ):
                     try:
-                        print(f"[handle_request] req: {req}")
-                        val = handler(*req.args, file_manager=file_manager)
-                        print(f"[handle_request] complete: {val}")
-                    except Exception as e:
-                        logging.error(
-                            "WBArtifactManager request error: %s\n",
-                            traceback.format_exc(),
-                        )
-                        print(
-                            "WBArtifactManager request error: %s\n",
-                            traceback.format_exc(),
-                        )
-                        resp = req.error_response(
-                            server_error_handling.maybe_extract_code_from_exception(e)
-                            or 500,
-                            e,
-                        )
+                        handler = _server_handlers[req.name]
+                    except KeyError as e:
+                        resp = req.error_response(404, e)
                     else:
-                        resp = req.success_response(val)
+                        try:
+                            val = handler(*req.args, file_manager=_server_file_manager)
+                        except Exception as e:
+                            logging.error(
+                                "WBArtifactManager request error: %s\n",
+                                traceback.format_exc(),
+                            )
+                            print(
+                                "WBArtifactManager request error: %s\n",
+                                traceback.format_exc(),
+                            )
+                            resp = req.error_response(
+                                server_error_handling.maybe_extract_code_from_exception(
+                                    e
+                                )
+                                or 500,
+                                e,
+                            )
+                        else:
+                            resp = req.success_response(val)
 
-    return 0
-    # breakpoint()
-    # print(f"[handle_request] resp: {resp}")
-    # # breakpoint()
-    # return 0
-    # self.client_response_queues[resp.client_id].put(resp)
-    # print(f"[handle_request] resp put: {resp}")
+                    return resp
 
 
 class SyncServer:
     def __init__(self) -> None:
         self.handlers: Dict[str, HandlerFunction] = {}
-        # self.request_queue: aioprocessing.Queue[ServerRequest] = (
-        #     aioprocessing.AioQueue()
-        # )
+        # self.request_queue = async_queue.ThreadQueue()
         self.request_queue = queue.Queue()
         self.client_response_queues: Dict[
             str, aioprocessing.AioJoinableQueue[ServerResponse]
@@ -327,6 +313,7 @@ class SyncServer:
             self.request_queue.put(shutdown_request)
             self.request_handler_ready_to_shut_down_event.wait()
             self.request_handler.join()
+            # self.request_queue.join() # cleanup required, but hangs program currently
 
             statsd.flush()
 
@@ -337,79 +324,27 @@ class SyncServer:
             logging.exception(f"Error in request loop: {e}")
             raise e
 
-    # def handle_request(self, req: ServerRequest) -> None:
-    #     print("[handle_request] running handle_request")
-    #     tracer.context_provider.activate(req.context.trace_context)
-    #     with wandb_api.wandb_api_context(req.context.wandb_api_context):
-    #         with cache.time_interval_cache_prefix(req.context.cache_prefix_context):
-    #             with tracer.trace(
-    #                 "WBArtifactManager.handle.%s" % req.name, service="weave-am"
-    #             ):
-    #                 try:
-    #                     print("[handle_request] trying to get handler")
-    #                     handler = self.handlers[req.name]
-    #                 except KeyError as e:
-    #                     resp = req.error_response(404, e)
-    #                 else:
-    #                     print(f"[handle_request] got handler: {handler}")
-    #                     try:
-    #                         print(f"[handle_request] req: {req}")
-    #                         val = handler(
-    #                             *req.args, file_manager=self.wandb_file_manager
-    #                         )
-    #                         print(f"[handle_request] complete: {val}")
-    #                     except Exception as e:
-    #                         logging.error(
-    #                             "WBArtifactManager request error: %s\n",
-    #                             traceback.format_exc(),
-    #                         )
-    #                         print(
-    #                             "WBArtifactManager request error: %s\n",
-    #                             traceback.format_exc(),
-    #                         )
-    #                         resp = req.error_response(
-    #                             server_error_handling.maybe_extract_code_from_exception(
-    #                                 e
-    #                             )
-    #                             or 500,
-    #                             e,
-    #                         )
-    #                     else:
-    #                         resp = req.success_response(val)
-
-    #                 print(f"[handle_request] resp: {resp}")
-    #                 self.client_response_queues[resp.client_id].put(resp)
-    #                 print(f"[handle_request] resp put: {resp}")
-
-    # return resp
-
     async def _request_loop(self) -> None:
-        # fs = filesystem.Filesystem()
-        # net = weave_http.Http(fs)
+        import os
+
         loop = asyncio.get_running_loop()
-
-        # with net:
-        #     self.wandb_file_manager = wandb_file_manager.WandbFileManager(
-        #         fs, net, wandb_api.get_wandb_api_sync()
-        #     )
-
         self.request_handler_ready_event.set()
-        # print("[SyncServer] Request handler ready")
-        # print("request_loop", threading.current_thread())
-        # print("all threads before", threading.enumerate())
 
-        # with concurrent.futures.ThreadPoolExecutor() as executor:
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=os.cpu_count() * 2
+        ) as executor:
             while not self._shutting_down.is_set():
-                # print("all threads in loop", threading.enumerate())
                 try:
-                    print("[SyncServer] Request handler waiting for request")
-                    req = self.request_queue.get()
-                    # req = await self.request_queue.coro_get()
-                    # req = await loop.run_in_executor(
-                    #     None, self.request_queue.get, timeout=1
-                    # )
-                    print(f"[SyncServer] req: {req}")
+                    import functools
+
+                    req = await loop.run_in_executor(
+                        None,
+                        functools.partial(self.request_queue.get, timeout=0.1),
+                    )
+                    # req = await self.request_queue.async_get() # if using ThreadQueue
+                except queue.Empty:
+                    # print("[SyncServer] request_queue.get() empty")
+                    continue
                 except RuntimeError:
                     logging.error(
                         f"[SyncServer] request_queue.get() RuntimeError: {traceback.format_exc()}",
@@ -423,18 +358,16 @@ class SyncServer:
                     print("[SyncServer] Received shutdown request")
                     break
 
-                print("[SyncServer] running handle_request")
                 future = loop.run_in_executor(
                     executor,
                     handle_request,
                     req,
                 )
-                future.add_done_callback(lambda _: print("[SyncServer] future done"))
-            # future.add_done_callback(
-            #     lambda future: self.client_response_queues[req.client_id].put(
-            #         future.result()
-            #     )
-            # )
+                future.add_done_callback(
+                    lambda f: self.client_response_queues[f.result().client_id].put(
+                        f.result()
+                    )
+                )
 
         self.request_handler_ready_to_shut_down_event.set()
 
