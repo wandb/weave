@@ -8,6 +8,7 @@ import {
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
@@ -91,13 +92,13 @@ const DISABLED_ROW_SPANNING = {
 };
 
 const FREE_FORM_COLUMN_SETTINGS = {
-  flex: 1,
-  minWidth: 200,
+  // flex: 1,
+  width: 200,
 };
 
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
-  minWidth: 150,
+  minWidth: 120,
 };
 
 /**
@@ -113,6 +114,9 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
     ],
     0
   );
+  if (row.loading) {
+    return <LoadingDots />;
+  }
   return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
@@ -133,7 +137,7 @@ const DenseCellValue: React.FC<
         wordWrap: 'break-word',
         textOverflow: 'ellipsis',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         padding: '4px',
       }}
     />
@@ -147,31 +151,48 @@ export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
   const [modelsAsRows, setModelsAsRows] = useState(true);
-  const [rowHeight, setRowHeight] = useState(100);
+  const [rowHeight, setRowHeight] = useState(70);
   const increaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v + 50, 50, 500));
+    setRowHeight(v => clip(v * 2, 35, 35 * 2 ** 4));
   }, []);
   const decreaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v - 50, 50, 500));
+    setRowHeight(v => clip(v / 2, 35, 35 * 2 ** 4));
   }, []);
   const header = (
     <HorizontalBox
       sx={{
-        justifyContent: 'flex-start',
+        justifyContent: 'space-between',
         alignItems: 'center',
         bgcolor: MOON_50,
         padding: '16px',
         height: 50,
       }}>
-      <IconButton onClick={increaseRowHeight}>
-        <Icon name="expand-uncollapse" />
-      </IconButton>
-      <IconButton onClick={decreaseRowHeight}>
-        <Icon name="collapse" />
-      </IconButton>
-      <IconButton onClick={() => setModelsAsRows(v => !v)}>
-        <Icon name="table" />
-      </IconButton>
+      <HorizontalBox
+        sx={{
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+        }}>
+        <IconButton onClick={increaseRowHeight}>
+          <Icon name="expand-uncollapse" />
+        </IconButton>
+        <IconButton onClick={decreaseRowHeight}>
+          <Icon name="collapse" />
+        </IconButton>
+        <IconButton onClick={() => setModelsAsRows(v => !v)}>
+          <Icon name="table" />
+        </IconButton>
+      </HorizontalBox>
+      <HorizontalBox
+        sx={{
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+        }}>
+        {!props.shouldHighlightSelectedRow && (
+          <IconButton onClick={props.onShowSplitView}>
+            <Icon name="panel" />
+          </IconButton>
+        )}
+      </HorizontalBox>
     </HorizontalBox>
   );
   const inner = modelsAsRows ? (
@@ -215,7 +236,7 @@ const useFirstExampleRow = (state: EvaluationComparisonState) => {
 // Gets the input sub-fields from the first example row
 const useInputSubFields = (state: EvaluationComparisonState) => {
   const firstExampleRow = useFirstExampleRow(state);
-  return useMemo(() => {
+  const res = useMemo(() => {
     const exampleRow = firstExampleRow.targetRowValue ?? {};
 
     if (_.isObject(exampleRow)) {
@@ -224,6 +245,8 @@ const useInputSubFields = (state: EvaluationComparisonState) => {
       return [''];
     }
   }, [firstExampleRow.targetRowValue]);
+
+  return {loading: firstExampleRow.loading, inputSubFields: res};
 };
 
 // Gets score sub-fields from the rows
@@ -278,8 +301,7 @@ const useSelectedRowState = (
 // Prepares table data when models are displayed as rows
 const useTableDataForModelsAsRows = (
   state: EvaluationComparisonState,
-  filteredRows: FilteredAggregateRows,
-  isExpanded: (id: string) => boolean
+  filteredRows: FilteredAggregateRows
 ): {rows: RowData[]; hasTrials: boolean} => {
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
@@ -305,34 +327,32 @@ const useTableDataForModelsAsRows = (
         );
         const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
         hasTrials = hasTrials || numTrials > 1;
-        if (numTrials > 1 && !isExpanded(digestEvalId)) {
-          const summaryRow: SummaryRowData = {
-            ...matchingRows[0],
-            _type: 'summary' as const,
-            _numTrials: numTrials,
-            _expansionId: expansionId,
-            _pivot: 'modelsAsRows' as const,
-            id: digestEvalId,
-            output: filteredRow.output,
-            scores: filteredRow.scores,
-          };
-          finalRows.push(summaryRow);
-        } else {
-          finalRows.push(...originalRows);
-        }
+
+        const summaryRow: SummaryRowData = {
+          ...matchingRows[0],
+          _type: 'summary' as const,
+          _numTrials: numTrials,
+          _expansionId: expansionId,
+          _pivot: 'modelsAsRows' as const,
+          id: digestEvalId,
+          output: filteredRow.output,
+          scores: filteredRow.scores,
+        };
+        finalRows.push(summaryRow);
+
+        finalRows.push(...originalRows);
       }
       return finalRows;
     });
     return {rows: returnRows, hasTrials};
-  }, [isExpanded, filteredRows, state.evaluationCallIdsOrdered]);
+  }, [filteredRows, state.evaluationCallIdsOrdered]);
 
   return {rows, hasTrials};
 };
 
 // Prepares table data when models are displayed as columns
 const useTableDataForModelsAsColumns = (
-  filteredRows: FilteredAggregateRows,
-  isExpanded: (id: string) => boolean
+  filteredRows: FilteredAggregateRows
 ): {rows: RowData[]; hasTrials: boolean} => {
   return useMemo(() => {
     let hasTrials = false;
@@ -359,60 +379,59 @@ const useTableDataForModelsAsColumns = (
 
         hasTrials = hasTrials || maxTrials > 1;
 
-        if (maxTrials > 1 && !isExpanded(filteredRow.inputDigest)) {
-          return [summaryRow];
-        }
-
-        return _.range(maxTrials).map(trialNdx => {
-          const res: TrialRowData = {
-            ...filteredRow,
-            _type: 'trial' as const,
-            _trialNdx: trialNdx,
-            _expansionId: filteredRow.inputDigest,
-            _pivot: 'modelsAsColumns' as const,
-            id: filteredRow.inputDigest + ':trial:' + trialNdx,
-            output: Object.fromEntries(
-              Object.entries(filteredRow.output).map(([key, value]) => {
-                return [
-                  key,
-                  Object.fromEntries(
-                    Object.values(groupedOriginalRows).map(evalVal => {
-                      return [
-                        evalVal[trialNdx]?.evaluationCallId,
-                        evalVal[trialNdx]?.output?.[key]?.[
-                          evalVal[trialNdx]?.evaluationCallId
-                        ],
-                      ];
-                    })
-                  ),
-                ];
-              })
-            ),
-            scores: Object.fromEntries(
-              Object.entries(filteredRow.scores).map(([key, value]) => {
-                return [
-                  key,
-                  Object.fromEntries(
-                    Object.values(groupedOriginalRows).map(evalVal => {
-                      return [
-                        evalVal[trialNdx]?.evaluationCallId,
-                        evalVal[trialNdx]?.scores?.[key]?.[
-                          evalVal[trialNdx]?.evaluationCallId
-                        ],
-                      ];
-                    })
-                  ),
-                ];
-              })
-            ),
-          };
-          return res;
-        });
+        return [
+          summaryRow,
+          ..._.range(maxTrials).map(trialNdx => {
+            const res: TrialRowData = {
+              ...filteredRow,
+              _type: 'trial' as const,
+              _trialNdx: trialNdx,
+              _expansionId: filteredRow.inputDigest,
+              _pivot: 'modelsAsColumns' as const,
+              id: filteredRow.inputDigest + ':trial:' + trialNdx,
+              output: Object.fromEntries(
+                Object.entries(filteredRow.output).map(([key, value]) => {
+                  return [
+                    key,
+                    Object.fromEntries(
+                      Object.values(groupedOriginalRows).map(evalVal => {
+                        return [
+                          evalVal[trialNdx]?.evaluationCallId,
+                          evalVal[trialNdx]?.output?.[key]?.[
+                            evalVal[trialNdx]?.evaluationCallId
+                          ],
+                        ];
+                      })
+                    ),
+                  ];
+                })
+              ),
+              scores: Object.fromEntries(
+                Object.entries(filteredRow.scores).map(([key, value]) => {
+                  return [
+                    key,
+                    Object.fromEntries(
+                      Object.values(groupedOriginalRows).map(evalVal => {
+                        return [
+                          evalVal[trialNdx]?.evaluationCallId,
+                          evalVal[trialNdx]?.scores?.[key]?.[
+                            evalVal[trialNdx]?.evaluationCallId
+                          ],
+                        ];
+                      })
+                    ),
+                  ];
+                })
+              ),
+            };
+            return res;
+          }),
+        ];
       }
     );
 
     return {rows: returnRows, hasTrials};
-  }, [isExpanded, filteredRows]);
+  }, [filteredRows]);
 };
 
 const useExpandedIds = () => {
@@ -572,8 +591,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   } = useExpandedIds();
   const {rows, hasTrials} = useTableDataForModelsAsRows(
     props.state,
-    filteredRows,
-    isExpanded
+    filteredRows
   );
   const inputSubFields = useInputSubFields(props.state);
   const scoreSubFields = useScoreSubFields(rows);
@@ -587,14 +605,13 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         props.state,
-        inputSubFields,
+        inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView
       ),
       {
         field: 'evaluationCallId',
         headerName: 'Model',
-        flex: 1,
         disableColumnMenu: true,
         sortable: false,
         renderCell: params => {
@@ -756,7 +773,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       {
         groupId: 'inputs',
         headerName: 'Inputs',
-        children: inputSubFields.map(key => ({
+        children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
         })),
       },
@@ -777,6 +794,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     ];
   }, [inputSubFields, scoreSubFields, outputColumnKeys]);
 
+  const onlyExpandedRows = useOnlyExpandedRows(rows, isExpanded);
+
+  if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
+    return <LoadingDots />;
+  }
   return (
     <StyledDataGrid
       pinnedColumns={{
@@ -786,7 +808,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
-      rows={rows}
+      rows={onlyExpandedRows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination
@@ -809,6 +831,19 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   );
 };
 
+const useOnlyExpandedRows = (
+  rows: RowData[],
+  isExpanded: (id: string) => boolean
+) => {
+  return useMemo(() => {
+    return rows.filter(row =>
+      isExpanded(row._expansionId)
+        ? row._type === 'trial'
+        : row._type === 'summary'
+    );
+  }, [rows, isExpanded]);
+};
+
 // Component for displaying models as columns
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   ExampleCompareSectionTableProps & {rowHeight: number}
@@ -823,10 +858,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     toggleExpansion,
   } = useExpandedIds();
 
-  const {rows, hasTrials} = useTableDataForModelsAsColumns(
-    filteredRows,
-    isExpanded
-  );
+  const {rows, hasTrials} = useTableDataForModelsAsColumns(filteredRows);
   const inputSubFields = useInputSubFields(props.state);
   const scoreSubFields = useScoreSubFields(rows);
   const {selectedRowInputDigest, setSelectedInputDigest} = useSelectedRowState(
@@ -839,7 +871,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         props.state,
-        inputSubFields,
+        inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView
       ),
@@ -869,7 +901,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 />
               );
             },
-            flex: 1,
             valueGetter: (value: any, row: RowData) => {
               return row.output[key][evaluationCallId];
             },
@@ -903,7 +934,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 />
               );
             },
-            flex: 1,
             valueGetter: (value: any, row: RowData) => {
               return row.scores[key][evaluationCallId];
             },
@@ -939,7 +969,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       {
         groupId: 'inputs',
         headerName: 'Inputs',
-        children: inputSubFields.map(key => ({
+        children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
         })),
       },
@@ -988,6 +1018,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     props.state.summary.scoreMetrics,
   ]);
 
+  const onlyExpandedRows = useOnlyExpandedRows(rows, isExpanded);
+
+  if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
+    return <LoadingDots />;
+  }
+
   return (
     <StyledDataGrid
       pinnedColumns={{
@@ -997,7 +1033,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
-      rows={rows}
+      rows={onlyExpandedRows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination

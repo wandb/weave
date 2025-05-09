@@ -252,7 +252,7 @@ const ResultExplorer: React.FC<{
   height: number;
 }> = ({state, height}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'table'
+    'detail'
   );
   const headerHeight = 0;
   return (
