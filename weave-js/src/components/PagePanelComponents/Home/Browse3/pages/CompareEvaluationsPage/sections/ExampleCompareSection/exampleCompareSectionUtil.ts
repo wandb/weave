@@ -412,8 +412,7 @@ function useExampleCompareData(
       partialTableRequest
     ).then(rows => {
       if (mounted) {
-        const data = rows[0]?.val;
-        // If the value is already loaded, don't fetch again
+        const data = rows[0];
         if (data != null) {
           setTargetRowValue(flattenObjectPreservingWeaveTypes(data));
         }
