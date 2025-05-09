@@ -43,7 +43,7 @@ export class TraceServerClient extends CachingTraceServerClient {
   private onObjectListeners: Array<() => void>;
 
   // Similar to the readBatchCollectors, but for tableRowQuery.
-  // The fundamantal idea here is that some tableRowQuery requests
+  // The fundamental idea here is that some tableRowQuery requests
   // can be batched together, reducing the number of requests we
   // make to the trace server.
   private tableRowQueryCollectors: Array<{
