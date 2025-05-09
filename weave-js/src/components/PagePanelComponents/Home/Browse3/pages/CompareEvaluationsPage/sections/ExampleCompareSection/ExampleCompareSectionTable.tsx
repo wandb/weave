@@ -97,7 +97,7 @@ const FREE_FORM_COLUMN_SETTINGS = {
 
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
-  minWidth: 100,
+  minWidth: 150,
 };
 
 /**
@@ -132,6 +132,9 @@ const DenseCellValue: React.FC<
         whiteSpace: 'pre-wrap',
         wordWrap: 'break-word',
         textOverflow: 'ellipsis',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '4px',
       }}
     />
   );
@@ -447,6 +450,113 @@ const useExpandedIds = () => {
  * Table Components
  */
 
+const inputFields = (
+  state: EvaluationComparisonState,
+  inputSubFields: string[],
+  setSelectedInputDigest: (inputDigest: string) => void,
+  onShowSplitView: () => void
+): GridColDef<RowData>[] => [
+  {
+    field: 'inputDigest',
+    headerName: 'Row',
+    width: 60,
+    headerAlign: 'center',
+    resizable: false,
+    disableColumnMenu: true,
+    disableReorder: true,
+    sortable: false,
+    renderCell: params => {
+      return (
+        <Box
+          style={{
+            height: '100%',
+            width: '100%',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+          onClick={() => {
+            setSelectedInputDigest(params.row.inputDigest);
+            onShowSplitView();
+          }}>
+          <span style={{flexShrink: 1}}>
+            <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
+          </span>
+        </Box>
+      );
+    },
+  },
+  ...inputSubFields.map(key => ({
+    field: `inputs.${key}`,
+    headerName: key,
+    disableColumnMenu: true,
+    sortable: false,
+    ...FREE_FORM_COLUMN_SETTINGS,
+    valueGetter: (value: any, row: RowData) => {
+      return row.inputDigest;
+    },
+    renderCell: (params: GridRenderCellParams<RowData>) => {
+      return (
+        <DatasetRowItemRenderer
+          state={state}
+          digest={params.row.inputDigest}
+          inputKey={key}
+        />
+      );
+    },
+  })),
+];
+
+const expansionField = (
+  toggleDefaultExpansionState: () => void,
+  defaultExpandState: 'expanded' | 'collapsed',
+  isExpanded: (id: string) => boolean,
+  toggleExpansion: (id: string) => void
+): GridColDef<RowData> => ({
+  field: 'expandTrials',
+  headerName: '',
+  width: 50,
+  resizable: false,
+  disableColumnMenu: true,
+  disableReorder: true,
+  sortable: false,
+  renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+    return (
+      <IconButton onClick={toggleDefaultExpansionState}>
+        <Icon
+          name={
+            defaultExpandState === 'expanded' ? 'collapse' : 'expand-uncollapse'
+          }
+        />
+      </IconButton>
+    );
+  },
+  valueGetter: (value: any, row: RowData) => {
+    return row._expansionId;
+  },
+  renderCell: (params: GridRenderCellParams<RowData>) => {
+    const itemIsExpanded = isExpanded(params.row._expansionId);
+    return (
+      <Box
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          width: '100%',
+        }}>
+        <IconButton
+          onClick={() => {
+            toggleExpansion(params.row._expansionId);
+          }}>
+          <Icon name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'} />
+        </IconButton>
+      </Box>
+    );
+  },
+});
+
 // Component for displaying models as rows
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
   ExampleCompareSectionTableProps & {rowHeight: number}
@@ -475,54 +585,18 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
-      {
-        field: 'inputDigest',
-        headerName: 'Row',
-        width: 60,
-        renderCell: params => {
-          return (
-            <Box
-              style={{
-                height: '100%',
-                width: '100%',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              onClick={() => {
-                setSelectedInputDigest(params.row.inputDigest);
-                props.onShowSplitView();
-              }}>
-              <span style={{flexShrink: 1}}>
-                <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
-              </span>
-            </Box>
-          );
-        },
-      },
-      ...inputSubFields.map(key => ({
-        field: `inputs.${key}`,
-        headerName: key,
-        ...FREE_FORM_COLUMN_SETTINGS,
-        valueGetter: (value: any, row: RowData) => {
-          return row.inputDigest;
-        },
-        renderCell: (params: GridRenderCellParams<RowData>) => {
-          // console.log(key);
-          return (
-            <DatasetRowItemRenderer
-              state={props.state}
-              digest={params.row.inputDigest}
-              inputKey={key}
-            />
-          );
-        },
-      })),
+      ...inputFields(
+        props.state,
+        inputSubFields,
+        setSelectedInputDigest,
+        props.onShowSplitView
+      ),
       {
         field: 'evaluationCallId',
         headerName: 'Model',
         flex: 1,
+        disableColumnMenu: true,
+        sortable: false,
         renderCell: params => {
           if (params.row._pivot === 'modelsAsColumns') {
             // This does not make sense for models as columns
@@ -539,60 +613,22 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       },
       ...(hasTrials
         ? [
-            {
-              field: 'expandTrials',
-              headerName: '',
-              width: 50,
-              resizable: false,
-              disableColumnMenu: true,
-              disableReorder: true,
-              sortable: false,
-              renderHeader: (params: GridColumnHeaderParams<RowData>) => {
-                return (
-                  <IconButton onClick={toggleDefaultExpansionState}>
-                    <Icon
-                      name={
-                        defaultExpandState === 'expanded'
-                          ? 'collapse'
-                          : 'expand-uncollapse'
-                      }
-                    />
-                  </IconButton>
-                );
-              },
-              valueGetter: (value: any, row: RowData) => {
-                return row._expansionId;
-              },
-              renderCell: (params: GridRenderCellParams<RowData>) => {
-                const itemIsExpanded = isExpanded(params.row._expansionId);
-                return (
-                  <Box
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <IconButton
-                      onClick={() => {
-                        toggleExpansion(params.row._expansionId);
-                      }}>
-                      <Icon
-                        name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'}
-                      />
-                    </IconButton>
-                  </Box>
-                );
-              },
-            },
+            expansionField(
+              toggleDefaultExpansionState,
+              defaultExpandState,
+              isExpanded,
+              toggleExpansion
+            ),
           ]
         : []),
       {
         field: 'trialNdx',
-        headerName: 'Trial',
+        headerName: 'Trials',
         width: 60,
         resizable: false,
+        disableColumnMenu: true,
+        disableReorder: true,
+        sortable: false,
         ...DISABLED_ROW_SPANNING,
         renderCell: params => {
           if (params.row._type === 'summary') {
@@ -609,7 +645,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
             );
           }
           if (params.row._pivot === 'modelsAsColumns') {
-            // This does not make sense for models as columns
+            // This does not make sense for models as columns as you would need
+            // one column per model and it is not really worth the space
             return null;
           }
           const trialPredict = params.row.predictAndScore._rawPredictTraceData;
@@ -646,6 +683,15 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         headerName: removePrefix(key, 'output.'),
         ...FREE_FORM_COLUMN_SETTINGS,
         ...DISABLED_ROW_SPANNING,
+        disableColumnMenu: true,
+        disableReorder: true,
+        valueGetter: (value: any, row: RowData) => {
+          if (row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
+          }
+          return row.output[key]?.[row.evaluationCallId];
+        },
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._type === 'summary') {
             // TODO: What should we show for the summary rows output fields??
@@ -669,23 +715,24 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         ),
         ...SCORE_COLUMN_SETTINGS,
         ...DISABLED_ROW_SPANNING,
+        disableColumnMenu: true,
+        disableReorder: true,
+        valueGetter: (value: any, row: RowData) => {
+          if (row._pivot === 'modelsAsColumns') {
+            // This does not make sense for models as columns
+            return null;
+          }
+          return row.scores[key]?.[row.evaluationCallId];
+        },
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._pivot === 'modelsAsColumns') {
             // This does not make sense for models as columns
             return null;
           }
-          if (params.row._type === 'summary') {
-            return evalAggScorerMetricCompGeneric(
-              props.state.summary.scoreMetrics[key],
-              params.row.scores[key][params.row.evaluationCallId],
-              params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
-            );
-          }
-
-          return (
-            <CellValue
-              value={params.row.scores[key][params.row.evaluationCallId]}
-            />
+          return evalAggScorerMetricCompGeneric(
+            props.state.summary.scoreMetrics[key],
+            params.row.scores[key][params.row.evaluationCallId],
+            params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
           );
         },
       })),
@@ -750,6 +797,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           // match the non-hover background color
           backgroundColor: 'rgba(169, 237, 242, 0.32)',
         },
+        '& .MuiDataGrid-cell--pinnedLeft': {
+          backgroundColor: 'white',
+          zIndex: '7 !important',
+        },
         width: '100%',
       }}
     />
@@ -784,99 +835,20 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
-      {
-        field: 'inputDigest',
-        headerName: 'Row',
-        width: 60,
-        // flex: 1,
-        renderCell: params => {
-          return (
-            <Box
-              style={{
-                height: '100%',
-                width: '100%',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              onClick={() => {
-                setSelectedInputDigest(params.row.inputDigest);
-                props.onShowSplitView();
-              }}>
-              <span style={{flexShrink: 1}}>
-                <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
-              </span>
-            </Box>
-          );
-        },
-      },
-      ...inputSubFields.map(key => ({
-        field: `inputs.${key}`,
-        headerName: key,
-        ...FREE_FORM_COLUMN_SETTINGS,
-        valueGetter: (value: any, row: RowData) => {
-          return row.inputDigest;
-        },
-        renderCell: (params: GridRenderCellParams<RowData>) => {
-          return (
-            <DatasetRowItemRenderer
-              state={props.state}
-              digest={params.row.inputDigest}
-              inputKey={key}
-            />
-          );
-        },
-      })),
+      ...inputFields(
+        props.state,
+        inputSubFields,
+        setSelectedInputDigest,
+        props.onShowSplitView
+      ),
       ...(hasTrials
         ? [
-            {
-              field: 'expandTrials',
-              headerName: '',
-              width: 50,
-              resizable: false,
-              disableColumnMenu: true,
-              disableReorder: true,
-              sortable: false,
-              renderHeader: (params: GridColumnHeaderParams<RowData>) => {
-                return (
-                  <IconButton onClick={toggleDefaultExpansionState}>
-                    <Icon
-                      name={
-                        defaultExpandState === 'expanded'
-                          ? 'collapse'
-                          : 'expand-uncollapse'
-                      }
-                    />
-                  </IconButton>
-                );
-              },
-              valueGetter: (value: any, row: RowData) => {
-                return row.inputDigest;
-              },
-              renderCell: (params: GridRenderCellParams<RowData>) => {
-                const itemIsExpanded = isExpanded(params.row._expansionId);
-                return (
-                  <Box
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <IconButton
-                      onClick={() => {
-                        toggleExpansion(params.row._expansionId);
-                      }}>
-                      <Icon
-                        name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'}
-                      />
-                    </IconButton>
-                  </Box>
-                );
-              },
-            },
+            expansionField(
+              toggleDefaultExpansionState,
+              defaultExpandState,
+              isExpanded,
+              toggleExpansion
+            ),
           ]
         : []),
       ...outputColumnKeys.flatMap(key => {
@@ -885,6 +857,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             field: `output.${key}.${evaluationCallId}`,
             ...FREE_FORM_COLUMN_SETTINGS,
             ...DISABLED_ROW_SPANNING,
+            disableColumnMenu: true,
+            disableReorder: true,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
@@ -917,6 +891,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             field: `scores.${key}.${evaluationCallId}`,
             ...SCORE_COLUMN_SETTINGS,
             ...DISABLED_ROW_SPANNING,
+            disableColumnMenu: true,
+            disableReorder: true,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
@@ -1029,6 +1005,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         '& .MuiDataGrid-row.Mui-selected:hover': {
           // match the non-hover background color
           backgroundColor: 'rgba(169, 237, 242, 0.32)',
+        },
+        '& .MuiDataGrid-cell--pinnedLeft': {
+          backgroundColor: 'white',
+          zIndex: 7,
         },
         width: '100%',
       }}
