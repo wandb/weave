@@ -8,10 +8,12 @@
 
 import asyncio
 import atexit
+import concurrent.futures
 import contextlib
 import dataclasses
 import logging
 import multiprocessing
+import os
 import queue
 import threading
 import time
@@ -23,18 +25,18 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 import aioprocessing
 
 from weave_query import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -173,6 +175,206 @@ HandlerFunction = Callable[..., Any]
 
 class HandlerNotFoundException(Exception):
     pass
+
+
+def handle_ensure_manifest(
+    artifact_uri: str,
+    file_manager: wandb_file_manager.WandbFileManager,
+) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(
+        uri,
+        (
+            artifact_wandb.WeaveWBArtifactURI,
+            artifact_wandb.WeaveWBArtifactByIDURI,
+        ),
+    ):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+    return file_manager.manifest(uri)
+
+
+def handle_ensure_file_downloaded(
+    download_url: str,
+    file_manager: wandb_file_manager.WandbFileManager,
+) -> typing.Optional[str]:
+    return file_manager.ensure_file_downloaded(download_url)
+
+
+def handle_ensure_file(
+    artifact_uri: str,
+    file_manager: wandb_file_manager.WandbFileManager,
+) -> typing.Optional[str]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+    return file_manager.ensure_file(uri)
+
+
+def handle_direct_url(
+    artifact_uri: str,
+    file_manager: wandb_file_manager.WandbFileManager,
+) -> typing.Optional[str]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+    return file_manager.direct_url(uri)
+
+
+class SyncServer:
+    def __init__(self) -> None:
+        self.handlers: Dict[str, HandlerFunction] = {}
+        self.request_queue: aioprocessing.Queue[ServerRequest] = (
+            aioprocessing.AioQueue()
+        )
+        self.client_response_queues: Dict[
+            str, aioprocessing.AioJoinableQueue[ServerResponse]
+        ] = {}
+
+        self.handlers = {
+            "ensure_manifest": handle_ensure_manifest,
+            "ensure_file_downloaded": handle_ensure_file_downloaded,
+            "ensure_file": handle_ensure_file,
+            "direct_url": handle_direct_url,
+        }
+
+        self.request_handler_ready_event = multiprocessing.Event()
+        self.request_handler_ready_to_shut_down_event = multiprocessing.Event()
+        self.request_handler = threading.Thread(
+            target=self.run_request_loop,
+            name="IO SyncServer Request Handler",
+            daemon=True,
+        )
+
+        self._shutting_down = multiprocessing.Event()
+        self._shutdown_lock = multiprocessing.Lock()
+
+    def start(self) -> None:
+        self.request_handler.start()
+        self.request_handler_ready_event.wait()
+        atexit.register(self.shutdown)
+
+    def shutdown(self) -> None:
+        with self._shutdown_lock:
+            self._shutting_down.set()
+            self.request_queue.put(shutdown_request)
+            self.request_handler_ready_to_shut_down_event.wait()
+            self.request_handler.join()
+
+            statsd.flush()
+
+    def run_request_loop(self) -> None:
+        try:
+            asyncio.run(self._request_loop(), debug=True)
+        except Exception as e:
+            logging.exception(f"Error in request loop: {e}")
+            raise e
+
+    def handle_request(self, req: ServerRequest) -> ServerResponse:
+        print("handle_request", threading.current_thread())
+        with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
+            try:
+                handler = self.handlers[req.name]
+            except KeyError as e:
+                resp = req.error_response(404, e)
+            else:
+                try:
+                    val = handler(*req.args, file_manager=self.wandb_file_manager)
+                except Exception as e:
+                    logging.error(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    print(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    resp = req.error_response(
+                        server_error_handling.maybe_extract_code_from_exception(e)
+                        or 500,
+                        e,
+                    )
+                else:
+                    resp = req.success_response(val)
+
+            return resp
+
+    async def _request_loop(self) -> None:
+        fs = filesystem.Filesystem()
+        net = weave_http.Http(fs)
+        loop = asyncio.get_running_loop()
+
+        with net:
+            self.wandb_file_manager = wandb_file_manager.WandbFileManager(
+                fs, net, wandb_api.get_wandb_api_sync()
+            )
+
+            self.request_handler_ready_event.set()
+            print("[SyncServer] Request handler ready")
+            print("request_loop", threading.current_thread())
+            print("all threads", threading.enumerate())
+
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=int(os.cpu_count() * 2)
+            ) as executor:
+                while not self._shutting_down.is_set():
+                    try:
+                        print("[SyncServer] Request handler waiting for request")
+                        req = await self.request_queue.coro_get()
+                    except RuntimeError:
+                        logging.error(
+                            f"[SyncServer] request_queue.get() RuntimeError: {traceback.format_exc()}",
+                        )
+                        print(
+                            f"[SyncServer] request_queue.get() RuntimeError: {traceback.format_exc()}",
+                        )
+                        break
+
+                    if req.name == "shutdown":
+                        print("[SyncServer] Received shutdown request")
+                        break
+
+                    tracer.context_provider.activate(req.context.trace_context)
+                    with wandb_api.wandb_api_context(req.context.wandb_api_context):
+                        with cache.time_interval_cache_prefix(
+                            req.context.cache_prefix_context
+                        ):
+                            with tracer.trace(
+                                "WBArtifactManager.handle.%s" % req.name,
+                                service="weave-am",
+                            ):
+                                response = await loop.run_in_executor(
+                                    None,
+                                    self.handle_request,
+                                    req,
+                                )
+                                self.client_response_queues[req.client_id].put(response)
+
+        self.request_handler_ready_to_shut_down_event.set()
+
+    @contextlib.contextmanager
+    def registered_client(
+        self, client: typing.Union["AsyncClient", "SyncClient"]
+    ) -> Iterator[None]:
+        self.register_client(client)
+        try:
+            yield
+        finally:
+            self.unregister_client(client)
+
+    def register_client(
+        self, client: typing.Union["SyncClient", "AsyncClient"]
+    ) -> None:
+        if client.client_id not in self.client_response_queues:
+            self.client_response_queues[client.client_id] = (
+                aioprocessing.AioJoinableQueue()
+            )
+
+    def unregister_client(
+        self, client: typing.Union["SyncClient", "AsyncClient"]
+    ) -> None:
+        if client.client_id in self.client_response_queues:
+            self.client_response_queues[client.client_id].close()
+            del self.client_response_queues[client.client_id]
 
 
 # Server class is responsible for managing server lifecycle and handling requests
@@ -388,9 +590,9 @@ class Server:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]
@@ -446,7 +648,8 @@ def get_server() -> Server:
     global SERVER
     with SERVER_START_LOCK:
         if SERVER is None:
-            SERVER = Server(process=False)
+            # SERVER = Server(process=False)
+            SERVER = SyncServer()
             SERVER.start()
         return SERVER
 
