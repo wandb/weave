@@ -99,12 +99,17 @@ const SCORE_COLUMN_SETTINGS = {
 // Constants for column width calculations
 const MIN_COLUMN_WIDTH = 100;
 const MAX_COLUMN_WIDTH = 400;
+const DYNAMIC_COLUMN_MAX_WIDTH = 500;
 const BASE_CHAR_WIDTH = 8; // Approximate width of a character in pixels
 const PADDING = 32; // Padding for cell content
 
 // Helper to estimate content width
 const estimateContentWidth = (content: any): number => {
   if (content == null) return MIN_COLUMN_WIDTH;
+
+  if (typeof content === 'object' && '_type' in content) {
+    return MIN_COLUMN_WIDTH;
+  }
 
   // Convert content to string for length estimation
   const contentStr =
@@ -543,6 +548,7 @@ const inputFields = (
     field: 'inputDigest',
     headerName: 'Row',
     width: 60,
+    maxWidth: 60,
     headerAlign: 'center',
     resizable: false,
     disableColumnMenu: true,
@@ -576,6 +582,7 @@ const inputFields = (
     disableColumnMenu: true,
     sortable: false,
     width: columnWidths[key],
+    maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
     valueGetter: (value: any, row: RowData) => {
       return row.inputDigest;
     },
@@ -600,10 +607,12 @@ const expansionField = (
   field: 'expandTrials',
   headerName: '',
   width: 50,
+  maxWidth: 50,
   resizable: false,
   disableColumnMenu: true,
   disableReorder: true,
   sortable: false,
+  headerAlign: 'center',
   renderHeader: (params: GridColumnHeaderParams<RowData>) => {
     return (
       <IconButton onClick={toggleDefaultExpansionState}>
@@ -714,6 +723,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         field: 'trialNdx',
         headerName: 'Trials',
         width: 60,
+        maxWidth: 60,
         resizable: false,
         disableColumnMenu: true,
         disableReorder: true,
@@ -771,6 +781,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         field: `output.${key}`,
         headerName: removePrefix(key, 'output.'),
         width: outputWidths[key],
+        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
         ...DISABLED_ROW_SPANNING,
         disableColumnMenu: true,
         disableReorder: true,
@@ -880,6 +891,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   }
   return (
     <StyledDataGrid
+      // autosizeOnMount
+      // autosizeOptions={{
+      //   expand: true,
+      // }}
       onColumnWidthChange={onColumnWidthChange}
       pinnedColumns={{
         left: ['inputDigest'],
@@ -978,6 +993,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           return {
             field: `output.${key}.${evaluationCallId}`,
             width: outputWidths[key],
+            maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: true,
             disableReorder: true,
