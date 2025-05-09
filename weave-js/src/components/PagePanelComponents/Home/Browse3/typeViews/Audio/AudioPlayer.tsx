@@ -2,7 +2,7 @@ import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {FC, useEffect, useMemo,useRef, useState} from 'react';
+import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -29,11 +29,14 @@ export const AudioPlayer: FC<{
   );
 
   // Memoize the params to prevent unnecessary re-queries
-  const fileContentParams = useMemo(() => ({
-    entity,
-    project,
-    digest: audioFile ? data.files[audioFile] : '',
-  }), [entity, project, audioFile, data.files]);
+  const fileContentParams = useMemo(
+    () => ({
+      entity,
+      project,
+      digest: audioFile ? data.files[audioFile] : '',
+    }),
+    [entity, project, audioFile, data.files]
+  );
 
   const audioBinary = useFileContent(fileContentParams);
 
@@ -57,8 +60,9 @@ export const AudioPlayer: FC<{
 
   const downloadFile = () => {
     if (!audioUrl) {
-      return console.error('Audio URL is not available');
-    };
+      console.error('Audio URL is not available');
+      return;
+    }
     const a = document.createElement('a');
     a.href = audioUrl;
     const date = new Date().toISOString().split('T')[0];
