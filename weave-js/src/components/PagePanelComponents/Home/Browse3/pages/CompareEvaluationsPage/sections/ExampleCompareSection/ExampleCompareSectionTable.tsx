@@ -93,12 +93,12 @@ const DISABLED_ROW_SPANNING = {
 const FREE_FORM_COLUMN_SETTINGS = {
   flex: 1,
   minWidth: 200,
-}
+};
 
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
   minWidth: 100,
-}
+};
 
 /**
  * Renders a cell value from the dataset
@@ -116,8 +116,13 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
   return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
-const DenseCellValue: React.FC<React.ComponentProps<typeof CellValue>> = props => {
-     return  <CellValue value={props.value} collapsedStyle={{
+const DenseCellValue: React.FC<
+  React.ComponentProps<typeof CellValue>
+> = props => {
+  return (
+    <CellValue
+      value={props.value}
+      collapsedStyle={{
         height: '100%',
         width: '100%',
         overflow: 'auto',
@@ -127,8 +132,10 @@ const DenseCellValue: React.FC<React.ComponentProps<typeof CellValue>> = props =
         whiteSpace: 'pre-wrap',
         wordWrap: 'break-word',
         textOverflow: 'ellipsis',
-      }}/>
-}
+      }}
+    />
+  );
+};
 /**
  * Main component for displaying comparison data in a table format
  * Can display models as either rows or columns
@@ -159,19 +166,13 @@ export const ExampleCompareSectionTable: React.FC<
       <IconButton onClick={decreaseRowHeight}>
         <Icon name="collapse" />
       </IconButton>
-      <IconButton
-        onClick={() => setModelsAsRows(v => !v)}
-      >
+      <IconButton onClick={() => setModelsAsRows(v => !v)}>
         <Icon name="table" />
       </IconButton>
-      
     </HorizontalBox>
   );
   const inner = modelsAsRows ? (
-    <ExampleCompareSectionTableModelsAsRows
-      {...props}
-      rowHeight={rowHeight}
-    />
+    <ExampleCompareSectionTableModelsAsRows {...props} rowHeight={rowHeight} />
   ) : (
     <ExampleCompareSectionTableModelsAsColumns
       {...props}
@@ -275,7 +276,7 @@ const useSelectedRowState = (
 const useTableDataForModelsAsRows = (
   state: EvaluationComparisonState,
   filteredRows: FilteredAggregateRows,
-  expandedIds: string[]
+  isExpanded: (id: string) => boolean
 ): {rows: RowData[]; hasTrials: boolean} => {
   const {rows, hasTrials} = useMemo(() => {
     let hasTrials = false;
@@ -301,7 +302,7 @@ const useTableDataForModelsAsRows = (
         );
         const digestEvalId = filteredRow.inputDigest + ':' + evaluationCallId;
         hasTrials = hasTrials || numTrials > 1;
-        if (numTrials > 1 && !expandedIds.includes(digestEvalId)) {
+        if (numTrials > 1 && !isExpanded(digestEvalId)) {
           const summaryRow: SummaryRowData = {
             ...matchingRows[0],
             _type: 'summary' as const,
@@ -320,7 +321,7 @@ const useTableDataForModelsAsRows = (
       return finalRows;
     });
     return {rows: returnRows, hasTrials};
-  }, [expandedIds, filteredRows, state.evaluationCallIdsOrdered]);
+  }, [isExpanded, filteredRows, state.evaluationCallIdsOrdered]);
 
   return {rows, hasTrials};
 };
@@ -328,7 +329,7 @@ const useTableDataForModelsAsRows = (
 // Prepares table data when models are displayed as columns
 const useTableDataForModelsAsColumns = (
   filteredRows: FilteredAggregateRows,
-  expandedIds: string[]
+  isExpanded: (id: string) => boolean
 ): {rows: RowData[]; hasTrials: boolean} => {
   return useMemo(() => {
     let hasTrials = false;
@@ -355,7 +356,7 @@ const useTableDataForModelsAsColumns = (
 
         hasTrials = hasTrials || maxTrials > 1;
 
-        if (maxTrials > 1 && !expandedIds.includes(filteredRow.inputDigest)) {
+        if (maxTrials > 1 && !isExpanded(filteredRow.inputDigest)) {
           return [summaryRow];
         }
 
@@ -408,23 +409,61 @@ const useTableDataForModelsAsColumns = (
     );
 
     return {rows: returnRows, hasTrials};
-  }, [expandedIds, filteredRows]);
+  }, [isExpanded, filteredRows]);
 };
 
+const useExpandedIds = () => {
+  const [toggledIds, setToggledIds] = useState<string[]>([]);
+  const [defaultExpandState, setDefaultExpandState] = useState<
+    'expanded' | 'collapsed'
+  >('collapsed');
+  const toggleDefaultExpansionState = useCallback(() => {
+    setToggledIds([]);
+    setDefaultExpandState(v => (v === 'expanded' ? 'collapsed' : 'expanded'));
+  }, []);
+  const toggleExpansion = useCallback((id: string) => {
+    setToggledIds(prev =>
+      prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+    );
+  }, []);
+  const isExpanded = useCallback(
+    (id: string) => {
+      if (defaultExpandState === 'expanded') {
+        return !toggledIds.includes(id);
+      } else {
+        return toggledIds.includes(id);
+      }
+    },
+    [toggledIds, defaultExpandState]
+  );
+  return {
+    isExpanded,
+    toggleDefaultExpansionState,
+    defaultExpandState,
+    toggleExpansion,
+  };
+};
 /**
  * Table Components
  */
 
 // Component for displaying models as rows
-export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSectionTableProps & {rowHeight: number}> = props => {
+export const ExampleCompareSectionTableModelsAsRows: React.FC<
+  ExampleCompareSectionTableProps & {rowHeight: number}
+> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
   );
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const {
+    isExpanded,
+    toggleDefaultExpansionState,
+    defaultExpandState,
+    toggleExpansion,
+  } = useExpandedIds();
   const {rows, hasTrials} = useTableDataForModelsAsRows(
     props.state,
     filteredRows,
-    expandedIds
+    isExpanded
   );
   const inputSubFields = useInputSubFields(props.state);
   const scoreSubFields = useScoreSubFields(rows);
@@ -505,13 +544,27 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
               headerName: '',
               width: 50,
               resizable: false,
+              disableColumnMenu: true,
+              disableReorder: true,
+              sortable: false,
+              renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+                return (
+                  <IconButton onClick={toggleDefaultExpansionState}>
+                    <Icon
+                      name={
+                        defaultExpandState === 'expanded'
+                          ? 'collapse'
+                          : 'expand-uncollapse'
+                      }
+                    />
+                  </IconButton>
+                );
+              },
               valueGetter: (value: any, row: RowData) => {
                 return row._expansionId;
               },
               renderCell: (params: GridRenderCellParams<RowData>) => {
-                const isExpanded = expandedIds.includes(
-                  params.row._expansionId
-                );
+                const itemIsExpanded = isExpanded(params.row._expansionId);
                 return (
                   <Box
                     style={{
@@ -523,18 +576,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
                     }}>
                     <IconButton
                       onClick={() => {
-                        setExpandedIds(prev => {
-                          if (prev.includes(params.row._expansionId)) {
-                            return prev.filter(
-                              id => id !== params.row._expansionId
-                            );
-                          } else {
-                            return [...prev, params.row._expansionId];
-                          }
-                        });
+                        toggleExpansion(params.row._expansionId);
                       }}>
                       <Icon
-                        name={isExpanded ? 'collapse' : 'expand-uncollapse'}
+                        name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'}
                       />
                     </IconButton>
                   </Box>
@@ -653,7 +698,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
     scoreSubFields,
     setSelectedInputDigest,
     props,
-    expandedIds,
+    toggleDefaultExpansionState,
+    defaultExpandState,
+    isExpanded,
+    toggleExpansion,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -706,14 +754,22 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
 };
 
 // Component for displaying models as columns
-export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareSectionTableProps & {rowHeight: number}> = props => {
+export const ExampleCompareSectionTableModelsAsColumns: React.FC<
+  ExampleCompareSectionTableProps & {rowHeight: number}
+> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
   );
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const {
+    isExpanded,
+    toggleDefaultExpansionState,
+    defaultExpandState,
+    toggleExpansion,
+  } = useExpandedIds();
+
   const {rows, hasTrials} = useTableDataForModelsAsColumns(
     filteredRows,
-    expandedIds
+    isExpanded
   );
   const inputSubFields = useInputSubFields(props.state);
   const scoreSubFields = useScoreSubFields(rows);
@@ -776,13 +832,27 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
               headerName: '',
               width: 50,
               resizable: false,
+              disableColumnMenu: true,
+              disableReorder: true,
+              sortable: false,
+              renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+                return (
+                  <IconButton onClick={toggleDefaultExpansionState}>
+                    <Icon
+                      name={
+                        defaultExpandState === 'expanded'
+                          ? 'collapse'
+                          : 'expand-uncollapse'
+                      }
+                    />
+                  </IconButton>
+                );
+              },
               valueGetter: (value: any, row: RowData) => {
                 return row.inputDigest;
               },
               renderCell: (params: GridRenderCellParams<RowData>) => {
-                const isExpanded = expandedIds.includes(
-                  params.row._expansionId
-                );
+                const itemIsExpanded = isExpanded(params.row._expansionId);
                 return (
                   <Box
                     style={{
@@ -794,18 +864,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
                     }}>
                     <IconButton
                       onClick={() => {
-                        setExpandedIds(prev => {
-                          if (prev.includes(params.row._expansionId)) {
-                            return prev.filter(
-                              id => id !== params.row._expansionId
-                            );
-                          } else {
-                            return [...prev, params.row._expansionId];
-                          }
-                        });
+                        toggleExpansion(params.row._expansionId);
                       }}>
                       <Icon
-                        name={isExpanded ? 'collapse' : 'expand-uncollapse'}
+                        name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'}
                       />
                     </IconButton>
                   </Box>
@@ -838,7 +900,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
                 return null;
               }
               return (
-                <DenseCellValue value={params.row.output[key][evaluationCallId]} />
+                <DenseCellValue
+                  value={params.row.output[key][evaluationCallId]}
+                />
               );
             },
           };
@@ -883,7 +947,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
     scoreSubFields,
     setSelectedInputDigest,
     props,
-    expandedIds,
+    toggleDefaultExpansionState,
+    defaultExpandState,
+    isExpanded,
+    toggleExpansion,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -962,7 +1029,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
     />
   );
 };
-
 
 const clip = (value: number, min: number, max: number) => {
   return Math.max(min, Math.min(value, max));
