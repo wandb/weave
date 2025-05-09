@@ -2,7 +2,7 @@ import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {FC, useEffect, useRef, useState} from 'react';
+import React, {FC, useEffect, useMemo,useRef, useState} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -28,11 +28,14 @@ export const AudioPlayer: FC<{
     fileName.startsWith('audio.')
   );
 
-  const audioBinary = useFileContent({
+  // Memoize the params to prevent unnecessary re-queries
+  const fileContentParams = useMemo(() => ({
     entity,
     project,
     digest: audioFile ? data.files[audioFile] : '',
-  });
+  }), [entity, project, audioFile, data.files]);
+
+  const audioBinary = useFileContent(fileContentParams);
 
   useEffect(() => {
     if (audioFile) {
