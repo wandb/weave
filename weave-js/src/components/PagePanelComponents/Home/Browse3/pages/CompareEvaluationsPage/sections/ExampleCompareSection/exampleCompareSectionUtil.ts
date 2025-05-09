@@ -1,17 +1,11 @@
-import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
-import _, {isEmpty} from 'lodash';
-import {
-  MutableRefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import _ from 'lodash';
+import {useEffect, useMemo, useState} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
 import {TraceServerClient} from '../../../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {TraceTableQueryReq} from '../../../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
 import {
   buildCompositeMetricsMap,
@@ -316,21 +310,158 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   }, [filteredRows, leafDims, outputColumnKeys]);
 };
 
+/**
+ * The following functions are used to fetch data rows (and cache them in the state - Note: caching them in
+ * the state is a little hacky since it is not reactive, but it does work for our use case)
+ *
+ * Anyway, there are the following methods:
+ * * `useExampleCompareDataAndPrefetch` - This is used to fetch a target row and prefetch the adjacent rows.
+ *   * This is the primary exported hook from this section.
+ * * `useExampleCompareData` - This is used to fetch a single row.
+ * * `loadMissingRowDataIntoCache` - This is used to asynchronously load rows that are not yet in our cache.
+ * * Then there are a few helper functions that are used to make the above hooks work:
+ *   * `makePartialTableReq` - This is used to make a partial table request for a dataset.
+ *   * `usePartialTableRequest` - This is used to wrap the `makePartialTableReq` hook and provide a reactive partial table request.
+ *   * `loadRowDataIntoCache` - This is used to directly load rows into our cache.
+ *   * `getCachedRowData` - This is used to directly get a row from our cache.
+ */
+
+// React hook to wrap the `useExampleCompareData` and `prefetchRowData`
+// to provide a single hook that fetches the target row and prefetches the adjacent rows
+// This is a convenience hook for the `ExampleCompareSection` component
+export function useExampleCompareDataAndPrefetch(
+  state: EvaluationComparisonState,
+  filteredRows: Array<{
+    inputDigest: string;
+  }>,
+  targetIndex: number
+) {
+  // Step 1: Fetch the target row
+  const targetDigest = filteredRows[targetIndex].inputDigest;
+  const {targetRowValue, loading} = useExampleCompareData(state, targetDigest);
+
+  // Step 2: Prefetch the adjacent rows
+  const prefetchDigests = useMemo(() => {
+    const digests = [];
+    if (targetIndex > 0) {
+      digests.push(filteredRows[targetIndex - 1].inputDigest);
+    }
+    if (targetIndex < filteredRows.length - 1) {
+      digests.push(filteredRows[targetIndex + 1].inputDigest);
+    }
+    return digests;
+  }, [filteredRows, targetIndex]);
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const partialTableRequest = usePartialTableRequest(state);
+
+  useEffect(() => {
+    (async () => {
+      // Nothing we can do if the partial table request is not set
+      if (partialTableRequest == null) {
+        return;
+      }
+      await loadMissingRowDataIntoCache(
+        client,
+        state,
+        prefetchDigests,
+        partialTableRequest
+      );
+    })();
+  }, [partialTableRequest, client, prefetchDigests, state]);
+
+  return {
+    targetRowValue,
+    loading,
+  };
+}
+
+// Primary method for fetching and caching a single row
+function useExampleCompareData(
+  state: EvaluationComparisonState,
+  targetDigest: string
+) {
+  const initialValue = getCachedRowData(state, targetDigest);
+  const [loading, setLoading] = useState<boolean>(initialValue == null);
+  const [targetRowValue, setTargetRowValue] = useState<any>(
+    initialValue ? flattenObjectPreservingWeaveTypes(initialValue) : null
+  );
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const partialTableRequest = usePartialTableRequest(state);
+
+  useEffect(() => {
+    let mounted = true;
+    let cachedRowData = getCachedRowData(state, targetDigest);
+    // If the value is already loaded, don't fetch again
+    if (cachedRowData != null) {
+      setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
+      return;
+    }
+    // Nothing we can do if the partial table request is not set
+    if (partialTableRequest == null) {
+      return;
+    }
+    // immediately fetch the current row
+    setLoading(true);
+
+    loadRowDataIntoCache(
+      client,
+      state,
+      [targetDigest],
+      partialTableRequest
+    ).then(rows => {
+      if (mounted) {
+        const data = rows[0]?.val;
+        // If the value is already loaded, don't fetch again
+        if (data != null) {
+          setTargetRowValue(flattenObjectPreservingWeaveTypes(data));
+        }
+        setLoading(false);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [partialTableRequest, client, state, targetDigest]);
+
+  return {
+    targetRowValue,
+    loading,
+  };
+}
+
+// Helper to load rows that are not yet in our cache
+async function loadMissingRowDataIntoCache(
+  client: TraceServerClient,
+  state: EvaluationComparisonState,
+  rowDigests: string[],
+  partialTableRequest: PartialTableRequestType
+): Promise<any[]> {
+  const neededRows = rowDigests.filter(
+    row => getCachedRowData(state, row) == null
+  );
+
+  if (neededRows.length > 0) {
+    // we load the data into the cache, but don't trigger a re-render
+    await loadRowDataIntoCache(client, state, neededRows, partialTableRequest);
+  }
+
+  return rowDigests.map(row => getCachedRowData(state, row));
+}
+
+type PartialTableRequestType = Pick<
+  TraceTableQueryReq,
+  'project_id' | 'digest'
+>;
+
 // Get the table digest used in the dataset of the first evaluation,
 // which prepares a request for actually fetching the table rows later
 async function makePartialTableReq(
-  evaluations: UseExampleCompareDataParams[0]['summary']['evaluations'],
-  filteredRows: UseExampleCompareDataParams[1],
-  targetIndex: UseExampleCompareDataParams[2],
-  getTraceServerClient: () => TraceServerClient
-) {
-  const targetRow = filteredRows[targetIndex];
-  if (targetRow == null) {
-    return null;
-  }
-  const datasetRef = Object.values(evaluations)[0].datasetRef as string;
-
-  const datasetObjRes = await getTraceServerClient().readBatch({
+  client: TraceServerClient,
+  datasetRef: string
+): Promise<PartialTableRequestType | null> {
+  const datasetObjRes = await client.readBatch({
     refs: [datasetRef],
   });
   if (!datasetObjRes.vals[0]) {
@@ -339,166 +470,84 @@ async function makePartialTableReq(
   }
 
   const rowsRef = datasetObjRes.vals[0].rows;
-  const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
+  const parsedRef = parseRefMaybe(rowsRef);
+  if (parsedRef == null) {
+    console.error('Invalid rows ref', rowsRef);
+    return null;
+  }
+  if (!isWeaveObjectRef(parsedRef)) {
+    console.error('Ref is not a weave object ref', rowsRef);
+    return null;
+  }
+  if (parsedRef.weaveKind !== 'table') {
+    console.error('Ref is not a table ref', rowsRef);
+    return null;
+  }
 
   return {
     project_id: projectIdFromParts({
-      entity: parsedRowsRef.entityName,
-      project: parsedRowsRef.projectName,
+      entity: parsedRef.entityName,
+      project: parsedRef.projectName,
     }),
-    digest: parsedRowsRef.artifactVersion,
+    digest: parsedRef.artifactVersion,
   };
 }
 
+// React hook to wrap the `makePartialTableReq`
+const usePartialTableRequest = (state: EvaluationComparisonState) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const [partialTableRequest, setPartialTableRequest] =
+    useState<PartialTableRequestType | null>(null);
+
+  const datasetRef = useMemo(() => {
+    return Object.values(state.summary.evaluations)[0].datasetRef as string;
+  }, [state.summary.evaluations]);
+
+  useEffect(() => {
+    let mounted = true;
+    makePartialTableReq(client, datasetRef).then(res => {
+      if (mounted) {
+        setPartialTableRequest(res);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [client, datasetRef]);
+
+  return partialTableRequest;
+};
+
+// Helper to fetch and store row data in our state cache
 async function loadRowDataIntoCache(
+  client: TraceServerClient,
+  state: EvaluationComparisonState,
   rowDigests: string[],
-  cachedRowData: MutableRefObject<Record<string, any>>,
-  cachedPartialTableRequest: MutableRefObject<{
-    project_id: string;
-    digest: string;
-  } | null>,
-  getTraceServerClient: () => TraceServerClient
-) {
-  const rowsRes = await getTraceServerClient().tableQuery({
-    ...cachedPartialTableRequest.current!,
+  partialTableRequest: PartialTableRequestType
+): Promise<any[]> {
+  const setCachedRowData = (digest: string, data: any) => {
+    const currentRow =
+      state.loadableComparisonResults.result?.resultRows?.[digest];
+    if (currentRow == null) {
+      return;
+    }
+    currentRow.rawDataRow = data;
+  };
+  const rowsRes = await client.tableQuery({
+    ...partialTableRequest,
     filter: {
       row_digests: rowDigests,
     },
   });
   for (const row of rowsRes.rows) {
-    cachedRowData.current[row.digest] = row.val;
+    setCachedRowData(row.digest, row.val);
   }
+  return rowsRes.rows.map(row => row.val);
 }
 
-type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
-
-export function useExampleCompareData(
-  state: EvaluationComparisonState,
-  filteredRows: Array<{
-    inputDigest: string;
-  }>,
-  targetIndex: number
-) {
-  const getTraceServerClient = useGetTraceServerClientContext();
-
-  // cache the row data for the current target row and adjacent rows,
-  // this is to allow for fast re-renders during pagination
-  const cachedRowData = useRef<Record<string, any>>({});
-  const cachedPartialTableRequest = useRef<{
-    project_id: string;
-    digest: string;
-  } | null>(null);
-
-  // This is to provide a way to manually control the re-render of the target row
-  const [cacheVersion, setCacheVersion] = useState<number>(0);
-  const increaseCacheVersion = useCallback(() => {
-    setCacheVersion(prev => prev + 1);
-  }, []);
-
-  const [loading, setLoading] = useState<boolean>(false);
-
-  const targetRowValue = useMemo(() => {
-    if (isEmpty(filteredRows)) {
-      return undefined;
-    }
-    const digest = filteredRows[targetIndex].inputDigest;
-    return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
-    // Including `cacheVersion` in the dependency array ensures the memo recalculates
-    // when it changes, even though it's not directly used in the calculation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheVersion, filteredRows, targetIndex]);
-
-  useEffect(() => {
-    (async () => {
-      const targetRow = filteredRows[targetIndex];
-      if (targetRow == null) {
-        return;
-      }
-
-      const selectedRowDigest = targetRow.inputDigest;
-
-      // Check if we can get the data from the results directly.
-      // This is most commonly true for imperative evaluations
-      const rawDataRow =
-        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest]
-          ?.rawDataRow;
-      if (!(selectedRowDigest in cachedRowData.current) && rawDataRow) {
-        cachedRowData.current[selectedRowDigest] = rawDataRow;
-        increaseCacheVersion();
-        return;
-      }
-
-      if (!cachedPartialTableRequest.current) {
-        cachedPartialTableRequest.current = await makePartialTableReq(
-          state.summary.evaluations,
-          filteredRows,
-          targetIndex,
-          getTraceServerClient
-        );
-      }
-
-      if (cachedPartialTableRequest.current == null) {
-        // couldn't get the table digest, no way to proceed
-        return;
-      }
-
-      if (!(selectedRowDigest in cachedRowData.current)) {
-        // immediately fetch the current row
-        setLoading(true);
-
-        await loadRowDataIntoCache(
-          [selectedRowDigest],
-          cachedRowData,
-          cachedPartialTableRequest,
-          getTraceServerClient
-        );
-
-        // This trigger a re-calculation of the `target` and a re-render immediately
-        increaseCacheVersion();
-        setLoading(false);
-      }
-
-      // check if there is a need to fetch adjacent rows
-      const adjacentRows = [];
-      if (targetIndex > 0) {
-        adjacentRows.push(filteredRows[targetIndex - 1].inputDigest);
-      }
-      if (targetIndex < filteredRows.length - 1) {
-        adjacentRows.push(filteredRows[targetIndex + 1].inputDigest);
-      }
-
-      const adjacentRowsToFetch = adjacentRows.filter(
-        row => !(row in cachedRowData.current)
-      );
-
-      if (adjacentRowsToFetch.length > 0) {
-        // we load the data into the cache, but don't trigger a re-render
-        await loadRowDataIntoCache(
-          adjacentRowsToFetch,
-          cachedRowData,
-          cachedPartialTableRequest,
-          getTraceServerClient
-        );
-      }
-
-      // evict the obsolete cache
-      const newCache: Record<string, any> = {};
-      for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
-        newCache[rowDigest] = cachedRowData.current[rowDigest];
-      }
-      cachedRowData.current = newCache;
-    })();
-  }, [
-    state.summary.evaluations,
-    state.loadableComparisonResults.result,
-    filteredRows,
-    targetIndex,
-    increaseCacheVersion,
-    getTraceServerClient,
-  ]);
-
-  return {
-    targetRowValue,
-    loading,
-  };
-}
+// Helper to get row data from our state cache
+const getCachedRowData = (state: EvaluationComparisonState, digest: string) => {
+  return state.loadableComparisonResults.result?.resultRows?.[digest]
+    ?.rawDataRow;
+};
