@@ -47,11 +47,10 @@ type ModelAsColumnsRowData = BaseRowData & {
 };
 
 // Row data when models are displayed as rows
-type ModelAsRowsRowData = BaseRowData & {
-  _pivot: 'modelsAsRows';
-  evaluationCallId: string;
-  predictAndScore: any;
-};
+type ModelAsRowsRowData = BaseRowData &
+  Pick<PivotedRow, 'evaluationCallId' | 'predictAndScore'> & {
+    _pivot: 'modelsAsRows';
+  };
 
 type RowDataBase = ModelAsColumnsRowData | ModelAsRowsRowData;
 
