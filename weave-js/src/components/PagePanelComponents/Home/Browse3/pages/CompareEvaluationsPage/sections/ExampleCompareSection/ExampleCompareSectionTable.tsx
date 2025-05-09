@@ -3,6 +3,7 @@ import {
   GridColDef,
   GridColumnGroupingModel,
   GridColumnHeaderParams,
+  GridEventListener,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
@@ -12,7 +13,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
@@ -90,14 +91,77 @@ const DISABLED_ROW_SPANNING = {
   rowSpanValueGetter: (value: any, row: RowData) => row.id,
 };
 
-const FREE_FORM_COLUMN_SETTINGS = {
-  // flex: 1,
-  width: 200,
-};
-
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
   minWidth: 120,
+};
+
+// Constants for column width calculations
+const MIN_COLUMN_WIDTH = 100;
+const MAX_COLUMN_WIDTH = 400;
+const BASE_CHAR_WIDTH = 8; // Approximate width of a character in pixels
+const PADDING = 32; // Padding for cell content
+
+// Helper to estimate content width
+const estimateContentWidth = (content: any): number => {
+  if (content == null) return MIN_COLUMN_WIDTH;
+
+  // Convert content to string for length estimation
+  const contentStr =
+    typeof content === 'string' ? content : JSON.stringify(content);
+
+  // Calculate width based on content length
+  const estimatedWidth = Math.min(
+    Math.max(contentStr.length * BASE_CHAR_WIDTH + PADDING, MIN_COLUMN_WIDTH),
+    MAX_COLUMN_WIDTH
+  );
+
+  return estimatedWidth;
+};
+
+// Hook to calculate column widths based on first row
+const useColumnWidths = (
+  state: EvaluationComparisonState,
+  inputSubFields: string[],
+  outputColumnKeys: string[],
+  rows: RowData[]
+) => {
+  const firstRow = useFirstExampleRow(state);
+
+  return useMemo(() => {
+    // Calculate input widths from fetched data
+    const inputWidths =
+      firstRow.loading || !firstRow.targetRowValue
+        ? Object.fromEntries(inputSubFields.map(key => [key, MIN_COLUMN_WIDTH]))
+        : Object.fromEntries(
+            inputSubFields.map(key => [
+              key,
+              estimateContentWidth(firstRow.targetRowValue?.[key]),
+            ])
+          );
+
+    // Calculate output widths from actual row data
+    const outputWidths = Object.fromEntries(
+      outputColumnKeys.map(key => {
+        // Find the first non-summary row with output data
+        const firstOutputRow = rows.find(
+          row =>
+            row._type !== 'summary' &&
+            row.output[key] &&
+            Object.values(row.output[key]).some(v => v != null)
+        );
+
+        // Get the first non-null output value
+        const firstOutputValue = firstOutputRow?.output[key]
+          ? Object.values(firstOutputRow.output[key]).find(v => v != null)
+          : null;
+
+        return [key, estimateContentWidth(firstOutputValue)];
+      })
+    );
+
+    return {inputWidths, outputWidths};
+  }, [firstRow, inputSubFields, outputColumnKeys, rows]);
 };
 
 /**
@@ -472,7 +536,8 @@ const inputFields = (
   state: EvaluationComparisonState,
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
-  onShowSplitView: () => void
+  onShowSplitView: () => void,
+  columnWidths: {[key: string]: number}
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -510,7 +575,7 @@ const inputFields = (
     headerName: key,
     disableColumnMenu: true,
     sortable: false,
-    ...FREE_FORM_COLUMN_SETTINGS,
+    width: columnWidths[key],
     valueGetter: (value: any, row: RowData) => {
       return row.inputDigest;
     },
@@ -600,13 +665,21 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     props.shouldHighlightSelectedRow ?? false
   );
 
+  const {inputWidths, outputWidths} = useColumnWidths(
+    props.state,
+    inputSubFields.inputSubFields,
+    outputColumnKeys,
+    rows
+  );
+
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         props.state,
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
-        props.onShowSplitView
+        props.onShowSplitView,
+        inputWidths
       ),
       {
         field: 'evaluationCallId',
@@ -697,25 +770,27 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       ...outputColumnKeys.map(key => ({
         field: `output.${key}`,
         headerName: removePrefix(key, 'output.'),
-        ...FREE_FORM_COLUMN_SETTINGS,
+        width: outputWidths[key],
         ...DISABLED_ROW_SPANNING,
         disableColumnMenu: true,
         disableReorder: true,
         valueGetter: (value: any, row: RowData) => {
           if (row._pivot === 'modelsAsColumns') {
-            // This does not make sense for models as columns
             return null;
           }
           return row.output[key]?.[row.evaluationCallId];
         },
         renderCell: (params: GridRenderCellParams<RowData>) => {
-          if (params.row._type === 'summary') {
-            // TODO: What should we show for the summary rows output fields??
+          if (params.row._pivot === 'modelsAsColumns') {
             return null;
           }
-          if (params.row._pivot === 'modelsAsColumns') {
-            // This does not make sense for models as columns
-            return null;
+          if (params.row._type === 'summary') {
+            // TODO: Should we indicate that this is just the first trial?
+            return (
+              <DenseCellValue
+                value={params.row.output[key]?.[params.row.evaluationCallId]}
+              />
+            );
           }
           return (
             <DenseCellValue
@@ -765,6 +840,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     defaultExpandState,
     isExpanded,
     toggleExpansion,
+    inputWidths,
+    outputWidths,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -795,18 +872,22 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
 
   const onlyExpandedRows = useOnlyExpandedRows(rows, isExpanded);
 
+  const {columnsWithControlledWidths, onColumnWidthChange} =
+    useColumnsWithControlledWidths(columns);
+
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;
   }
   return (
     <StyledDataGrid
+      onColumnWidthChange={onColumnWidthChange}
       pinnedColumns={{
         left: ['inputDigest'],
       }}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
-      columns={columns}
+      columns={columnsWithControlledWidths}
       rows={onlyExpandedRows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
@@ -866,13 +947,21 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     props.shouldHighlightSelectedRow ?? false
   );
 
+  const {inputWidths, outputWidths} = useColumnWidths(
+    props.state,
+    inputSubFields.inputSubFields,
+    outputColumnKeys,
+    rows
+  );
+
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         props.state,
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
-        props.onShowSplitView
+        props.onShowSplitView,
+        inputWidths
       ),
       ...(hasTrials
         ? [
@@ -888,7 +977,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `output.${key}.${evaluationCallId}`,
-            ...FREE_FORM_COLUMN_SETTINGS,
+            width: outputWidths[key],
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: true,
             disableReorder: true,
@@ -905,8 +994,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             },
             renderCell: (params: GridRenderCellParams<RowData>) => {
               if (params.row._type === 'summary') {
-                // TODO: add a summary renderer
-                return null;
+                // TODO: Should we indicate that this is just the first trial?
+                return (
+                  <DenseCellValue
+                    value={params.row.output[key][evaluationCallId]}
+                  />
+                );
               }
               return (
                 <DenseCellValue
@@ -940,7 +1033,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
               return evalAggScorerMetricCompGeneric(
                 props.state.summary.scoreMetrics[key],
                 params.row.scores[key][evaluationCallId],
-                // this compares directly to the peer
                 params.row.scores[key][props.state.evaluationCallIdsOrdered[0]]
               );
             },
@@ -961,6 +1053,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     defaultExpandState,
     isExpanded,
     toggleExpansion,
+    inputWidths,
+    outputWidths,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -1019,19 +1113,23 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
 
   const onlyExpandedRows = useOnlyExpandedRows(rows, isExpanded);
 
+  const {columnsWithControlledWidths, onColumnWidthChange} =
+    useColumnsWithControlledWidths(columns);
+
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;
   }
 
   return (
     <StyledDataGrid
+      onColumnWidthChange={onColumnWidthChange}
       pinnedColumns={{
         left: ['inputDigest'],
       }}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
-      columns={columns}
+      columns={columnsWithControlledWidths}
       rows={onlyExpandedRows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
@@ -1053,6 +1151,30 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       }}
     />
   );
+};
+
+const useColumnsWithControlledWidths = (columns: GridColDef<RowData>[]) => {
+  const columnWdithOverrides = useRef<{[key: string]: number}>({});
+
+  const columnsWithControlledWidths = useMemo(() => {
+    return columns.map(col => {
+      return {
+        ...col,
+        width: columnWdithOverrides.current[col.field] ?? col.width,
+      };
+    });
+  }, [columns]);
+
+  const onColumnWidthChange: GridEventListener<
+    'columnWidthChange'
+  > = params => {
+    columnWdithOverrides.current[params.colDef.field] = params.width;
+  };
+
+  return {
+    columnsWithControlledWidths,
+    onColumnWidthChange,
+  };
 };
 
 const clip = (value: number, min: number, max: number) => {
