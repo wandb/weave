@@ -313,6 +313,7 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
+        print(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
@@ -560,7 +561,6 @@ def load_instance(
 
     sys.path.insert(0, os.path.abspath(module_dir))
     try:
-        print("importing", import_name)
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
         print("Op loading exception. This might be fine!", e)
