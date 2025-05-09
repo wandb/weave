@@ -313,7 +313,6 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
-        print(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
