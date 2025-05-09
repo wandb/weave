@@ -6,8 +6,6 @@ import csv
 import locale
 import os
 import sys
-import termios
-import tty
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -68,24 +66,31 @@ def get_terminal_height() -> int:
     return os.get_terminal_size().lines - 5  # Adjust for headers & padding
 
 
-def get_key() -> str:
-    """Reads a single keypress from the user without requiring Enter."""
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        # Check if it might be an arrow key (starts with escape sequence)
-        if ch == "\x1b":
-            # Read the next two characters for arrow keys
-            next_chars = sys.stdin.read(2)
-            return ch + next_chars
-        else:
-            return ch
-    except KeyboardInterrupt:
-        return "q"  # Handle Ctrl+C gracefully
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+if os.name == "nt":  # Windows
+    # TODO: Implement a Windows-compatible implementation
+    pass
+else:  # Unix/Linux/MacOS
+    import termios
+    import tty
+
+    def get_key() -> str:
+        """Reads a single keypress from the user without requiring Enter."""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            # Check if it might be an arrow key (starts with escape sequence)
+            if ch == "\x1b":
+                # Read the next two characters for arrow keys
+                next_chars = sys.stdin.read(2)
+                return ch + next_chars
+            else:
+                return ch
+        except KeyboardInterrupt:
+            return "q"  # Handle Ctrl+C gracefully
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 class Row:
@@ -536,6 +541,11 @@ class Grid:
         return pydantic_util.table_to_str(table)
 
     def show(self, rows_per_page: int | None = None) -> None:
+        if os.name == "nt":  # Windows
+            raise NotImplementedError(
+                "Interactive grid pagination is not yet supported on Windows."
+            )
+
         height = get_terminal_height()
         if self.num_rows < height:
             print(self.to_rich_table_str())
