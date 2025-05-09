@@ -2,9 +2,9 @@
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs//Users/anu/Projects/weave/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
 
@@ -19,7 +19,7 @@ This guide demonstrates how to:
 1. Track different versions of a system prompts using Weave
 2. Get an image dataset from Weave
 3. Create a NER pipeline
-4. Set up Weave [Scorers](/docs/docs/guides/evaluation/scorers.md) to peform a [Weave Evaluation](docs/docs/guides/core-types/evaluations.md) on the pipeline
+4. Set up Weave [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers) to peform a [Weave Evaluation](https://weave-docs.wandb.ai/guides/core-types/evaluations) on the pipeline
 5. Run an evaluation against our dataset of handwritten notes
 
 ##  Prerequisites
@@ -171,7 +171,7 @@ Now, create a function called `named_entity_recognation` that:
 - Passes the image data to the NER pipeline
 - Returns correctly formatted JSON with the results
 
-Use the [`@weave.op()` decorator](/../docs/guides/tracking/ops.md) decorator to automatically track and trace function execution in the W&B UI. 
+Use the [`@weave.op()` decorator](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.op) decorator to automatically track and trace function execution in the W&B UI. 
 
 Every `named_entity_recognation` is run, the full trace results are visible in the Weave UI. To view the traces, navigate to the **Traces** tab of your Weave project. 
 
@@ -223,9 +223,9 @@ You will see something similar to the following in the **Traces** table in the W
 
 ## 4. Evaluate the pipeline using Weave
 
-Now that you have created a pipeline to perform NER using a VLM, you can use Weave to systematically evaluate it and find out how well it performs. You can learn more about Evaluations in Weave in [Evaluations Overview](/../docs/guides/core-types/evaluations). 
+Now that you have created a pipeline to perform NER using a VLM, you can use Weave to systematically evaluate it and find out how well it performs. You can learn more about Evaluations in Weave in [Evaluations Overview](https://weave-docs.wandb.ai/guides/core-types/evaluations). 
 
-A fundamental part of a Weave Evaluation are [Scorers](/../docs/guides/evaluation/scorers). Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
+A fundamental part of a Weave Evaluation are [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers). Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
 In this section, you will create two Scorers to evaluate the pipeline:
 1. Programatic Scorer 
