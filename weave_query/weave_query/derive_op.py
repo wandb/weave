@@ -23,7 +23,7 @@ from weave_query import (
 from weave_query import weave_types as types
 from weave_query.language_features.tagging import tag_store
 
-USE_PARALLEL_DOWNLOAD = False
+USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
 USE_PARALLEL_RESOLVE = True
 
@@ -257,9 +257,6 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     with tag_store.with_tag_store_state(
                         tag_store_curr_node_id, tag_store_mem_map
                     ):
-                        import time
-
-                        start_time = time.time()
                         if x == None or types.is_optional(first_arg.type):
                             return None
                         called = orig_op(x, **new_inputs)
@@ -269,11 +266,6 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         except errors.WeaveArtifactCollectionNotFound:
                             return None
                         res = storage.deref(res)
-                        end_time = time.time()
-                        print(
-                            f"[MappedDeriveOpHandler] download_one time: {end_time - start_time} seconds"
-                        )
-                        print(f"[MappedDeriveOpHandler] res: {res}")
                         return res
 
                 if USE_PARALLEL_DOWNLOAD:

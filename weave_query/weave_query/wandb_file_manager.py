@@ -455,8 +455,6 @@ class WandbFileManager:
             self.http.download_file(
                 download_url, file_path, headers=headers, cookies=cookies, auth=auth
             )
-            # with open(file_path, "rb") as f:
-            # print(f"[WandbFileManager] file: {f.read()}")
             return file_path
 
     def direct_url(
