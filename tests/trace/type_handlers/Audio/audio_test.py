@@ -84,10 +84,7 @@ class TestWeaveAudio:
         client.project = "test_audio_publish_from_bytes"
         audio_file, format = audio_file_and_format
         audio_bytes = open(audio_file, "rb").read()
-        if format == "wav":
-            audio = Audio(data=audio_bytes, format="wav")
-        else:
-            audio = Audio(data=audio_bytes, format="mp3")
+        audio = Audio.from_data(data=audio_bytes, format=format)
 
         ref = weave.publish(audio)
         assert ref is not None
@@ -105,15 +102,11 @@ class TestWeaveAudio:
     def test_publish_audio_from_encoded_bytes(
         self, client: WeaveClient, audio_file_and_format: str
     ) -> None:
-        client.project = "test_audio_publish_from_bytes"
+        client.project = "test_audio_publish_from_encoded_bytes"
         audio_file, format = audio_file_and_format
         audio_bytes = open(audio_file, "rb").read()
         encoded_bytes = base64.b64encode(audio_bytes)
-
-        if format == "wav":
-            audio = Audio(data=encoded_bytes, format="wav")
-        else:
-            audio = Audio(data=encoded_bytes, format="mp3")
+        audio = Audio.from_data(data=encoded_bytes, format=format)
 
         ref = weave.publish(audio)
         assert ref is not None
@@ -121,6 +114,18 @@ class TestWeaveAudio:
 
         # Ensure at least the first 10 bytes of the original file and decoded data are the same
         assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
+
+    def test_audio_fails_on_unsupported_format(self, client: WeaveClient) -> None:
+        client.project = "test_audio_fails_on_unsupported_format"
+        assert pytest.raises(
+            ValueError, lambda: Audio.from_data(data=b"example", format="invalid")
+        )
+
+    def test_audio_fails_on_empty_data(self, client: WeaveClient) -> None:
+        client.project = "test_audio_fails_on_empty_data"
+        assert pytest.raises(
+            ValueError, lambda: Audio.from_data(data=b"", format="mp3")
+        )
 
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_audio_as_dataset_cell(self, client: WeaveClient, audio_file: str) -> None:

@@ -116,25 +116,33 @@ class Audio(Generic[T]):
     # Raw audio data bytes
     data: bytes
 
-    # TODO: Should format accept any string and coerce here instead?
-    # It ruins the type info, but it's more usable
     def __init__(
         self,
         data: bytes,
         format: SUPPORTED_FORMATS_TYPE,
         validate_base64: bool = True,
     ) -> None:
+        if len(data) == 0:
+            raise ValueError("Audio data cannot be empty")
+
         if validate_base64:
             data = try_decode(data)
+
         self.data = data
-        self.format = cast(SUPPORTED_FORMATS_TYPE, format)
+        self.format = format
 
     @classmethod
-    def from_data(cls, data: str | bytes, format: SUPPORTED_FORMATS_TYPE) -> Audio:
+    def from_data(cls, data: str | bytes, format: str) -> Audio:
         data = try_decode(data)
+        if not format in list(map(str, SUPPORTED_FORMATS)):
+            raise ValueError("Unknown format {format}, must be one of: mp3 or wav")
 
         # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
-        return cls(data=data, format=format, validate_base64=False)
+        return cls(
+            data=data,
+            format=cast(SUPPORTED_FORMATS_TYPE, format),
+            validate_base64=False,
+        )
 
     @classmethod
     def from_path(cls, path: str | bytes | Path | os.PathLike) -> Audio:
