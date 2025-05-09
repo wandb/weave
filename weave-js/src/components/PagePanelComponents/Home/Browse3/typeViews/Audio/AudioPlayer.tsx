@@ -56,7 +56,9 @@ export const AudioPlayer: FC<{
   }
 
   const downloadFile = () => {
-    if (!audioUrl || !audioFileName) return;
+    if (!audioUrl) {
+      return console.error('Audio URL is not available');
+    };
     const a = document.createElement('a');
     a.href = audioUrl;
     const date = new Date().toISOString().split('T')[0];
