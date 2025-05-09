@@ -152,12 +152,17 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     };
   }, [parsedRef]);
 
-  const numRowsQuery = useTableQueryStats(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ? [lookupKey?.digest] : [],
-    {skip: lookupKey == null}
+  const tableQueryParams = useMemo(
+    () => ({
+      entity: lookupKey?.entity ?? '',
+      project: lookupKey?.project ?? '',
+      digests: lookupKey?.digest ? [lookupKey?.digest] : [],
+      skip: lookupKey == null,
+    }),
+    [lookupKey]
   );
+
+  const numRowsQuery = useTableQueryStats(tableQueryParams);
 
   const totalRows = useMemo(() => {
     if (numRowsQuery.result == null) {
@@ -187,16 +192,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return {numRowsToFetch: rowsToFetch, offset: offsetVal};
   }, [paginationModel, numAddedRows]);
 
-  const fetchQuery = useTableRowsQuery(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    undefined,
-    numRowsToFetch,
+  const fetchQuery = useTableRowsQuery({
+    entity: lookupKey?.entity ?? '',
+    project: lookupKey?.project ?? '',
+    digest: lookupKey?.digest ?? '',
+    limit: numRowsToFetch,
     offset,
     sortBy,
-    {skip: lookupKey == null}
-  );
+    skip: lookupKey == null,
+  });
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
   const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
