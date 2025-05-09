@@ -110,27 +110,31 @@ export const useCustomProviders = ({
 
                 try {
                   await objectDeleteAllVersions({
-                    entity: entityName,
-                    project: projectName,
-                    objectId: provider.val.name || '',
-                    weaveKind: 'object',
-                    scheme: 'weave',
-                    versionHash: '',
-                    path: '',
+                    key: {
+                      entity: entityName,
+                      project: projectName,
+                      objectId: provider.val.name || '',
+                      weaveKind: 'object',
+                      scheme: 'weave',
+                      versionHash: '',
+                      path: '',
+                    },
                   });
                   // Delete all related models in parallel
                   await Promise.all([
                     ...providerModels.map(model =>
                       objectDeleteAllVersions({
-                        entity: entityName,
-                        project: projectName,
-                        objectId: `${provider.val.name || ''}-${
-                          model.val.name || ''
-                        }`,
-                        weaveKind: 'object',
-                        scheme: 'weave',
-                        versionHash: '',
-                        path: '',
+                        key: {
+                          entity: entityName,
+                          project: projectName,
+                          objectId: `${provider.val.name || ''}-${
+                            model.val.name || ''
+                          }`,
+                          weaveKind: 'object',
+                          scheme: 'weave',
+                          versionHash: '',
+                          path: '',
+                        },
                       })
                     ),
                   ]);

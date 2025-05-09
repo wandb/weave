@@ -1,4 +1,4 @@
-# Send OpenTelemetry Traces to Weave
+# Send OpenTelemetry Traces
 
 ## Overview
 Weave supports ingestion of OpenTelemetry compatible trace data through a dedicated endpoint. This endpoint allows you to send OTLP (OpenTelemetry Protocol) formatted trace data directly to your Weave project.

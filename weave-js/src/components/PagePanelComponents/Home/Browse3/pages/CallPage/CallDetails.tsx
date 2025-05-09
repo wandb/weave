@@ -91,19 +91,15 @@ export const CallDetails: FC<{
   );
   const {otelSpan} = useMemo(() => getDisplayOtelSpan(call), [call]);
   const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
-  const childCalls = useCalls(
-    call.entity,
-    call.project,
-    {
+  const childCalls = useCalls({
+    entity: call.entity,
+    project: call.project,
+    filter: {
       traceId: call.traceId,
       parentIds: [call.callId],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    columns
-  );
+    columns,
+  });
 
   const {multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),

@@ -18,6 +18,7 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
+from tests.conftest import DummyIdConverter
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -4307,3 +4308,61 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # Unfortunate that we can't assert the exact value here, because of the
     # uncertainty of the clickhouse materialized view merging moment.
     assert result.total_storage_size_bytes is not None
+
+
+def test_project_stats_clickhouse(client, clickhouse_client):
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    project_id = get_client_project_id(client)
+    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
+
+    # Insert test data directly into stats tables
+    attr_size = 100
+    inputs_size = 200
+    output_size = 300
+    summary_size = 400
+    trace_size = attr_size + inputs_size + output_size + summary_size
+    object_size = 5678
+    file_size = 4321
+    table_size = 1234  # New test data for table storage size
+
+    # directly insert into stats tables to avoid materialized views's consistency issue
+    # Insert into calls_merged_stats
+    clickhouse_client.command(
+        f"INSERT INTO calls_merged_stats (project_id, attributes_size_bytes, inputs_size_bytes, output_size_bytes, summary_size_bytes) "
+        f"VALUES ('{internal_project_id}', {attr_size}, {inputs_size}, {output_size}, {summary_size})"
+    )
+    # Insert into object_versions_stats
+    clickhouse_client.command(
+        f"INSERT INTO object_versions_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {object_size})"
+    )
+    # Insert into files_stats
+    clickhouse_client.command(
+        f"INSERT INTO files_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {file_size})"
+    )
+    # Insert into table_rows_stats
+    clickhouse_client.command(
+        f"INSERT INTO table_rows_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {table_size})"
+    )
+
+    # Query project stats with all storage sizes included
+    res = client.server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+
+    # Assert the result fields match the inserted values
+    assert res.trace_storage_size_bytes == trace_size
+    assert res.objects_storage_size_bytes == object_size
+    assert res.tables_storage_size_bytes == table_size
+    assert res.files_storage_size_bytes == file_size
+
+    # test that requesting with none of the include_* params returns an error
+    with pytest.raises(ValueError):
+        client.server.project_stats(
+            tsi.ProjectStatsReq(
+                project_id=project_id,
+                include_trace_storage_size=False,
+                include_object_storage_size=False,
+                include_table_storage_size=False,
+                include_file_storage_size=False,
+            )
+        )

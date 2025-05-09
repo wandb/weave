@@ -408,10 +408,10 @@ export const FilterableObjectVersionsTable: React.FC<{
   const isOneObject = effectiveFilter.objectName != null;
   const effectivelyLatestOnly = !effectiveFilter.objectName;
 
-  const filteredObjectVersions = useRootObjectVersions(
-    props.entity,
-    props.project,
-    {
+  const filteredObjectVersions = useRootObjectVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: {
       baseObjectClasses: effectiveFilter.baseObjectClass
         ? [effectiveFilter.baseObjectClass]
         : undefined,
@@ -420,9 +420,8 @@ export const FilterableObjectVersionsTable: React.FC<{
         : undefined,
       latestOnly: effectivelyLatestOnly,
     },
-    undefined,
-    effectivelyLatestOnly // metadata only when getting latest
-  );
+    metadataOnly: effectivelyLatestOnly,
+  });
 
   // When the table reloads, clear any selected versions.
   // This is because we may be reloading because of a deletion, and
@@ -491,15 +490,15 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
   // the meantime we will just fetch the first 100 versions and display 99+ if
   // there are at least 100. Someone can come back and add `count` to the 3
   // query APIs which will make this faster.
-  const objectVersionsNode = useRootObjectVersions(
-    obj.entity,
-    obj.project,
-    {
+  const objectVersionsNode = useRootObjectVersions({
+    entity: obj.entity,
+    project: obj.project,
+    filter: {
       objectIds: [obj.objectId],
     },
-    100,
-    true // metadataOnly
-  );
+    limit: 100,
+    metadataOnly: true,
+  });
   if (objectVersionsNode.loading) {
     return <LoadingDots />;
   }

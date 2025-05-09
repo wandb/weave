@@ -5,7 +5,7 @@ import styled, {css} from 'styled-components';
 
 import OpDoc from './OpDoc';
 
-export const IDENTIFER_COLOR = globals.MAGENTA;
+export const IDENTIFIER_COLOR = globals.MAGENTA;
 export const PROPERTY_IDENTIFIER_COLOR = globals.SIENNA_DARK;
 export const OPERATOR_COLOR = globals.SIENNA_DARK;
 export const STRING_COLOR = globals.TEAL;
@@ -69,7 +69,7 @@ export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   }
 
   & span.identifier {
-    color: ${IDENTIFER_COLOR};
+    color: ${IDENTIFIER_COLOR};
   }
 
   span.property_identifier {

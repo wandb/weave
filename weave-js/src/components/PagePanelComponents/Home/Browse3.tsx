@@ -538,9 +538,11 @@ const useCallPeekRedirect = () => {
   const history = useHistory();
   const {useCall} = useWFHooks();
   const {result: call} = useCall({
-    entity: params.entity,
-    project: params.project,
-    callId: params.itemName,
+    key: {
+      entity: params.entity,
+      project: params.project,
+      callId: params.itemName,
+    },
   });
   const query = useURLSearchParamsDict();
   useEffect(() => {

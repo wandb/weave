@@ -21,7 +21,11 @@ export const AudioPlayer: FC<{
 }> = ({entity, project, data}) => {
   const {useFileContent} = useWFHooks();
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const audioBinary = useFileContent(entity, project, data.files['audio.wav']);
+  const audioBinary = useFileContent({
+    entity,
+    project,
+    digest: data.files['audio.wav'],
+  });
 
   useEffect(() => {
     if (audioBinary.result) {

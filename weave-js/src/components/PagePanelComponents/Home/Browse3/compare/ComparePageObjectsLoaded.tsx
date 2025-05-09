@@ -142,7 +142,7 @@ export const ComparePageObjectsLoaded = ({
 
   // finally, we get the ref data for all refs. This function is highly memoized and
   // cached. Therefore, we only ever make network calls for new refs in the list.
-  const refsData = useRefsData(refs);
+  const refsData = useRefsData({refUris: refs});
 
   // This effect is responsible for resolving the refs in the data. It iteratively
   // replaces refs with their resolved values. It also adds a `_ref` key to the resolved

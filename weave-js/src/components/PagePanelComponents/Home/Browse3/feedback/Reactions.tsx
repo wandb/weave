@@ -40,14 +40,14 @@ export const Reactions = ({
   const projectId = `${entity}/${project}`;
 
   const {useFeedback} = useWFHooks();
-  const query = useFeedback(
-    {
+  const query = useFeedback({
+    key: {
       entity,
       project,
       weaveRef,
     },
-    SORT_BY
-  );
+    sortBy: SORT_BY,
+  });
   const getTsClient = useGetTraceServerClientContext();
   useEffect(() => {
     return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);

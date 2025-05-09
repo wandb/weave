@@ -81,16 +81,15 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
-  const filteredOpVersions = useOpVersions(
-    props.entity,
-    props.project,
-    {
+  const filteredOpVersions = useOpVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: {
       opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
       latestOnly: effectivelyLatestOnly,
     },
-    undefined,
-    true
-  );
+    metadataOnly: true,
+  });
 
   const rows: GridRowsProp = useMemo(() => {
     return (filteredOpVersions.result ?? []).map((ov, i) => {
@@ -267,15 +266,15 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
   // the meantime we will just fetch the first 100 versions and display 99+ if
   // there are at least 100. Someone can come back and add `count` to the 3
   // query APIs which will make this faster.
-  const ops = useOpVersions(
-    obj.entity,
-    obj.project,
-    {
+  const ops = useOpVersions({
+    entity: obj.entity,
+    project: obj.project,
+    filter: {
       opIds: [obj.opId],
     },
-    100,
-    true // metadataOnly
-  );
+    limit: 100,
+    metadataOnly: true,
+  });
   if (ops.loading) {
     return <LoadingDots />;
   }
@@ -303,8 +302,12 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
 
-  const calls = useCallsStats(obj.entity, obj.project, {
-    opVersionRefs: [refUri],
+  const calls = useCallsStats({
+    entity: obj.entity,
+    project: obj.project,
+    filter: {
+      opVersionRefs: [refUri],
+    },
   });
   if (calls.loading) {
     return <LoadingDots />;

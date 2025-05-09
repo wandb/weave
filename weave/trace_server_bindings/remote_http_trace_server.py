@@ -596,6 +596,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateRes,
         )
 
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        return self._generic_request(
+            "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

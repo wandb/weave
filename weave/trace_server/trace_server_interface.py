@@ -1007,6 +1007,21 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class ProjectStatsReq(BaseModel):
+    project_id: str
+    include_trace_storage_size: Optional[bool] = True
+    include_object_storage_size: Optional[bool] = True
+    include_table_storage_size: Optional[bool] = True
+    include_file_storage_size: Optional[bool] = True
+
+
+class ProjectStatsRes(BaseModel):
+    trace_storage_size_bytes: int
+    objects_storage_size_bytes: int
+    tables_storage_size_bytes: int
+    files_storage_size_bytes: int
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1074,3 +1089,6 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Project statistics API
+    def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

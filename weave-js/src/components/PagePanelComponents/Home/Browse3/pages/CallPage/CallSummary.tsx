@@ -58,16 +58,14 @@ export const CallSummary: React.FC<{
   // TODO: Once the server responds with costs even for unfinished calls,
   // we can remove this second call. See the comment in CallPage.tsx.
   // with `(This results in a second query in CallSummary.tsx)`
-  const callWithCosts = useCall(
-    {
+  const callWithCosts = useCall({
+    key: {
       entity: call.entity,
       project: call.project,
       callId: call.callId,
     },
-    {
-      includeCosts: true,
-    }
-  );
+    includeCosts: true,
+  });
 
   const costData = useMemo(() => {
     return callWithCosts.result?.traceCall?.summary?.weave?.costs;

@@ -87,17 +87,13 @@ export const useObjectVersions = (
   // TODO: Need to introduce a backend query (/objs/read?) to bulk get specific versions of objects
   const {useRootObjectVersions} = useWFHooks();
   const objectIds = getUniqueNames(objectVersionSpecifiers);
-  const rootObjectVersions = useRootObjectVersions(
+  const rootObjectVersions = useRootObjectVersions({
     entity,
     project,
-    {
-      objectIds,
-    },
-    undefined, // limit
+    filter: {objectIds},
     // TODO: This is super wasteful - getting all the data for all versions of every object mentioned
-    // but hooks on array would be a pain, proper solution is new read API
-    false // metadataOnly
-  );
+    metadataOnly: false,
+  });
   if (rootObjectVersions.loading) {
     return {loading: true, objectVersions: [], lastVersionIndices: {}};
   }

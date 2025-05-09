@@ -13,9 +13,9 @@ const useOpVersionText = (
   spanName: string
 ): string => {
   const {useOpVersion} = useWFHooks();
-  const opVersion = useOpVersion(
-    opVersionRef ? refUriToOpVersionKey(opVersionRef) : null
-  );
+  const opVersion = useOpVersion({
+    key: opVersionRef ? refUriToOpVersionKey(opVersionRef) : null,
+  });
   if (opVersion.result) {
     const {opId, versionIndex} = opVersion.result;
     return `${opId}:v${versionIndex}`;

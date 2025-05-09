@@ -76,32 +76,27 @@ export const useCallsForQuery = (
     gridSort
   );
 
-  const calls = useCalls(
+  const calls = useCalls({
     entity,
     project,
-    lowLevelFilter,
-    effectiveLimit,
-    effectiveOffset,
+    filter: lowLevelFilter,
+    limit: effectiveLimit,
+    offset: effectiveOffset,
     sortBy,
-    filterBy,
+    query: filterBy,
     columns,
-    expandedColumns,
-    {
-      refetchOnDelete: true,
-      includeFeedback: true,
-    }
-  );
+    expandedRefColumns: expandedColumns,
+    refetchOnDelete: true,
+    includeFeedback: true,
+  });
 
-  const callsStats = useCallsStats(
+  const callsStats = useCallsStats({
     entity,
     project,
-    lowLevelFilter,
-    filterBy,
-    undefined, // limit
-    {
-      refetchOnDelete: true,
-    }
-  );
+    filter: lowLevelFilter,
+    query: filterBy,
+    refetchOnDelete: true,
+  });
 
   const callResults = useMemo(() => {
     return getFeedbackMerged(calls.result ?? []);
@@ -129,40 +124,30 @@ export const useCallsForQuery = (
 
   const costCols = useMemo(() => ['id'], []);
   const noCalls = calls.result == null || calls.result.length === 0;
-  const costs = useCalls(
+  const costs = useCalls({
     entity,
     project,
-    costFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    costCols,
-    expandedColumns,
-    {
-      skip: calls.loading || noCalls,
-      includeCosts: true,
-    }
-  );
+    filter: costFilter,
+    limit: effectiveLimit,
+    columns: costCols,
+    expandedRefColumns: expandedColumns,
+    skip: calls.loading || noCalls,
+    includeCosts: true,
+  });
 
   const storageSizeCols = useMemo(() => ['id', 'total_storage_size_bytes'], []);
   const storageSizeFilter = costFilter;
 
-  const storageSize = useCalls(
+  const storageSize = useCalls({
     entity,
     project,
-    storageSizeFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    storageSizeCols,
-    undefined,
-    {
-      skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
-      includeTotalStorageSize: true,
-    }
-  );
+    filter: storageSizeFilter,
+    limit: effectiveLimit,
+    columns: storageSizeCols,
+    expandedRefColumns: expandedColumns,
+    skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+    includeTotalStorageSize: true,
+  });
 
   const storageSizeResults = useMemo(() => {
     if (storageSize.loading) {
@@ -413,26 +398,20 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(
+  const callStats7Days = useCallsStats({
     entity,
     project,
     filter,
-    d7filter,
-    undefined, // limit
-    {
-      skip: skip || cachedFilter != null,
-    }
-  );
-  const callStats30Days = useCallsStats(
+    query: d7filter,
+    skip: skip || cachedFilter != null,
+  });
+  const callStats30Days = useCallsStats({
     entity,
     project,
     filter,
-    d30filter,
-    undefined, // limit
-    {
-      skip: skip || cachedFilter != null,
-    }
-  );
+    query: d30filter,
+    skip: skip || cachedFilter != null,
+  });
 
   const defaultDatetimeFilter = useMemo(
     () => ({

@@ -15,14 +15,11 @@ export const WeaveStatsSummarySection = ({
   project: string;
 }) => {
   const {useCallsStats} = useWFHooks();
-  const {result, loading: callsStatsLoading} = useCallsStats(
+  const {result, loading: callsStatsLoading} = useCallsStats({
     entity,
     project,
-    {}, // filter
-    undefined, // query
-    undefined, // limit
-    {includeTotalStorageSize: true}
-  );
+    includeTotalStorageSize: true,
+  });
 
   const {value: filesStatsResult, loading: filesStatsLoading} = useFilesStats(
     projectIdFromParts({entity, project})

@@ -115,7 +115,7 @@ const ModelRefLabel: React.FC<{modelRef: string}> = props => {
     objRef.projectName,
     objRef.weaveKind,
   ]);
-  const objectVersion = useObjectVersion(objVersionKey);
+  const objectVersion = useObjectVersion({key: objVersionKey});
   return (
     <span className="ml-2">
       {objectVersion.result?.objectId}:v{objectVersion.result?.versionIndex}

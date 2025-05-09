@@ -6,7 +6,7 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
 import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
-import React, {useContext, useEffect, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
@@ -74,12 +74,16 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
     | undefined;
 
   // Always call the hook with consistent arguments
-  const videoBinary = useFileContent(
+  const digest = useMemo(
+    () => (videoKey ? data.files[videoKey] : ''),
+    [videoKey, data.files]
+  );
+  const videoBinary = useFileContent({
     entity,
     project,
-    videoKey ? data.files[videoKey] : '',
-    {skip: !videoKey}
-  );
+    digest,
+    skip: !videoKey,
+  });
 
   if (!videoKey) {
     return <NotApplicable />;

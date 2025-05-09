@@ -59,6 +59,7 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
+            "guides/tracking/video"
           ]
         },
         {
