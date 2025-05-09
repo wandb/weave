@@ -1,9 +1,9 @@
-# Video Support in Weave
+# Video Support
 
-Weave now supports video tracing using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
+Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
 
 :::note
-Video support in Weave is currently only available in Python.
+Video support is currently only available in Python.
 :::
 
 ## Supported video types

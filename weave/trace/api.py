@@ -263,6 +263,10 @@ def finish() -> None:
     """
     weave_init.finish()
 
+    # Flush any remaining calls
+    if wc := weave_client_context.get_weave_client():
+        wc.finish()
+
 
 # As of this writing, most important symbols are
 # re-exported in __init__.py.
