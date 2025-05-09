@@ -16,11 +16,22 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import {HTTPError} from '@wandb/weave/errors';
 import fetch from 'isomorphic-unfetch';
 
+import {urlPrefixed} from '../../../../../../config';
 import {
   ActionsExecuteBatchReq,
   ActionsExecuteBatchRes,
   CompletionsCreateReq,
   CompletionsCreateRes,
+  ConfigurationCreateReq,
+  ConfigurationCreateRes,
+  ConfigurationDeleteReq,
+  ConfigurationDeleteRes,
+  ConfigurationGetReq,
+  ConfigurationGetRes,
+  ConfigurationListReq,
+  ConfigurationListRes,
+  ConfigurationUpdateReq,
+  ConfigurationUpdateRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -373,23 +384,26 @@ export class DirectTraceServerClient {
 
   private makeRequest = async <QT, ST>(
     endpoint: string,
-    req: QT,
+    req: QT | undefined,
     responseReturnType: 'json' | 'text' | 'arrayBuffer' = 'json',
-    contentType?: ContentType
+    contentType?: ContentType,
+    method: 'POST' | 'GET' | 'PUT' | 'DELETE' = 'POST'
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
-    const reqBody = JSON.stringify(req);
+    const reqBody = req !== undefined ? JSON.stringify(req) : undefined;
     let needsFetch = false;
+    // Use reqBody as key only if defined, otherwise use a special key for GET with no body
+    const reqKey = reqBody !== undefined ? reqBody : '__NO_BODY__';
     if (!this.inFlightFetchesRequests[endpoint]) {
       this.inFlightFetchesRequests[endpoint] = {};
     }
-    if (!this.inFlightFetchesRequests[endpoint][reqBody]) {
-      this.inFlightFetchesRequests[endpoint][reqBody] = [];
+    if (!this.inFlightFetchesRequests[endpoint][reqKey]) {
+      this.inFlightFetchesRequests[endpoint][reqKey] = [];
       needsFetch = true;
     }
 
     const prom = new Promise<ST>((resolve, reject) => {
-      this.inFlightFetchesRequests[endpoint][reqBody].push({resolve, reject});
+      this.inFlightFetchesRequests[endpoint][reqKey].push({resolve, reject});
     });
 
     if (!needsFetch) {
@@ -398,9 +412,6 @@ export class DirectTraceServerClient {
 
     const headers: {[key: string]: string} = {
       'Content-Type': 'application/json',
-      // This is a dummy auth header, the trace server requires
-      // that we send a basic auth header, but it uses cookies for
-      // authentication.
       Authorization: 'Basic ' + btoa(':'),
     };
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
@@ -408,12 +419,15 @@ export class DirectTraceServerClient {
       headers['use-admin-privileges'] = 'true';
     }
     // eslint-disable-next-line wandb/no-unprefixed-urls
-    fetch(url, {
-      method: 'POST',
+    const fetchOptions: RequestInit = {
+      method,
       credentials: 'include',
       headers,
-      body: reqBody,
-    })
+    };
+    if (method !== 'GET' && reqBody !== undefined) {
+      fetchOptions.body = reqBody;
+    }
+    fetch(urlPrefixed(url), fetchOptions)
       .then(async response => {
         if (!response.ok) {
           throw new HTTPError(
@@ -429,16 +443,15 @@ export class DirectTraceServerClient {
         } else if (responseReturnType === 'json') {
           return response.json();
         } else {
-          // Should never happen with correct type checking
           throw new Error('Invalid responseReturnType: ' + responseReturnType);
         }
       })
       .then(res => {
         try {
           const inFlightRequest = [
-            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+            ...this.inFlightFetchesRequests[endpoint]?.[reqKey],
           ];
-          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          delete this.inFlightFetchesRequests[endpoint][reqKey];
           if (inFlightRequest) {
             inFlightRequest.forEach(({resolve}) => {
               resolve(res);
@@ -451,9 +464,9 @@ export class DirectTraceServerClient {
       .catch(err => {
         try {
           const inFlightRequest = [
-            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+            ...this.inFlightFetchesRequests[endpoint]?.[reqKey],
           ];
-          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          delete this.inFlightFetchesRequests[endpoint][reqKey];
           if (inFlightRequest) {
             inFlightRequest.forEach(({reject}) => {
               reject(err);
@@ -466,6 +479,64 @@ export class DirectTraceServerClient {
 
     return prom;
   };
+
+  public configurationCreate(
+    req: ConfigurationCreateReq
+  ): Promise<ConfigurationCreateRes> {
+    return this.makeRequest<ConfigurationCreateReq, ConfigurationCreateRes>(
+      '/configurations',
+      req,
+      'json',
+      undefined,
+      'POST'
+    );
+  }
+
+  public configurationDelete(
+    req: ConfigurationDeleteReq
+  ): Promise<ConfigurationDeleteRes> {
+    return this.makeRequest<ConfigurationDeleteReq, ConfigurationDeleteRes>(
+      `/configurations/${req.id}`,
+      req,
+      'json',
+      undefined,
+      'DELETE'
+    );
+  }
+
+  public configurationGet(id: string): Promise<ConfigurationGetRes> {
+    return this.makeRequest<ConfigurationGetReq, ConfigurationGetRes>(
+      `/configurations/${id}`,
+      undefined,
+      'json',
+      undefined,
+      'GET'
+    );
+  }
+
+  public configurationUpdate(
+    req: ConfigurationUpdateReq
+  ): Promise<ConfigurationUpdateRes> {
+    return this.makeRequest<ConfigurationUpdateReq, ConfigurationUpdateRes>(
+      `/configurations/${req.id}`,
+      req,
+      'json',
+      undefined,
+      'PUT'
+    );
+  }
+
+  public configurationList(
+    req: ConfigurationListReq
+  ): Promise<ConfigurationListRes> {
+    return this.makeRequest<ConfigurationListReq, ConfigurationListRes>(
+      '/configurations/list',
+      req,
+      'json',
+      undefined,
+      'POST'
+    );
+  }
 }
 
 /**

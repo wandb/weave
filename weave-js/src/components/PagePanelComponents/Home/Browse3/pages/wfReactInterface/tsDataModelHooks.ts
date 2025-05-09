@@ -2150,6 +2150,72 @@ export const useFilesStats = (projectId: string) => {
   }, [getTsClient, projectId]);
 };
 
+export const useConfiguration = (projectId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(
+    async (id: string) => {
+      return getTsClient().configurationGet({project_id: projectId, id});
+    },
+    [getTsClient, projectId]
+  );
+};
+
+export const useConfigurationCreate = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    async (projectId: string, type: string, value: any) => {
+      return getTsClient().configurationCreate({
+        project_id: projectId,
+        type,
+        value,
+      });
+    },
+    [getTsClient]
+  );
+};
+
+export const useConfigurationUpdate = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    async (projectId: string, type: string, value: any) => {
+      return getTsClient().configurationUpdate({
+        project_id: projectId,
+        id: type,
+        value,
+      });
+    },
+    [getTsClient]
+  );
+};
+
+export const useConfigurationDelete = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    async (projectId: string, type: string) => {
+      return getTsClient().configurationDelete({
+        project_id: projectId,
+        id: type,
+      });
+    },
+    [getTsClient]
+  );
+};
+
+export const useConfigurationList = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    async (projectId: string, type?: string) => {
+      return getTsClient().configurationList({project_id: projectId, type});
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {

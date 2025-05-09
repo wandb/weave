@@ -1,0 +1,4 @@
+trace_server_metadata.db
+trace_server_metadata.db-journal
+trace_server_metadata.db-shm
+trace_server_metadata.db-wal

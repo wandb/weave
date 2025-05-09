@@ -76,6 +76,11 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
+  # Metadata server support
+  "sqlalchemy>=2.0.28",
+  "alembic>=1.13.1",
+  "psycopg2-binary>=2.9.9",
+  "mysqlclient>=2.2.4",
 ]
 trace_server_tests = [
   # BYOB - S3
