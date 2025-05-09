@@ -11,7 +11,7 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type AudioPlayerTypePayload = CustomWeaveTypePayload<
   'openai._legacy_response.HttpxBinaryResponseContent',
-  {'audio.wav': string}
+  Record<string, string>
 >;
 
 export const AudioPlayer: FC<{
@@ -21,11 +21,24 @@ export const AudioPlayer: FC<{
 }> = ({entity, project, data}) => {
   const {useFileContent} = useWFHooks();
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
+
+  // Find the first audio file in the files object
+  const audioFile = Object.keys(data.files).find(fileName =>
+    fileName.startsWith('audio.')
+  );
+
   const audioBinary = useFileContent({
     entity,
     project,
-    digest: data.files['audio.wav'],
+    digest: audioFile ? data.files[audioFile] : '',
   });
+
+  useEffect(() => {
+    if (audioFile) {
+      setAudioFileName(audioFile);
+    }
+  }, [audioFile]);
 
   useEffect(() => {
     if (audioBinary.result) {
@@ -40,10 +53,11 @@ export const AudioPlayer: FC<{
   }
 
   const downloadFile = () => {
+    if (!audioUrl || !audioFileName) return;
     const a = document.createElement('a');
     a.href = audioUrl;
     const date = new Date().toISOString().split('T')[0];
-    a.download = `${project}_${date}_audio.wav`;
+    a.download = `${project}_${date}_${entity}_${audioFileName}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
