@@ -60,12 +60,22 @@ export const EditableCallName: React.FC<{
       if (newName === '' || newName === defaultDisplayName) {
         setCurrNameToDisplay(defaultDisplayName);
         if (!displayNameIsEmpty) {
-          callRename(call.entity, call.project, call.callId, '');
+          callRename({
+            entity: call.entity,
+            project: call.project,
+            callID: call.callId,
+            newName: '',
+          });
         }
       } else if (newName !== call.displayName) {
         // Else, update the name only if it is different from the current name.
         setCurrNameToDisplay(newName);
-        callRename(call.entity, call.project, call.callId, newName);
+        callRename({
+          entity: call.entity,
+          project: call.project,
+          callID: call.callId,
+          newName,
+        });
       }
       setIsEditing(false);
     },
