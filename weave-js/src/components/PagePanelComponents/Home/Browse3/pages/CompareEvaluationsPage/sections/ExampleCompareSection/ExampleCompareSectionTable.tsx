@@ -732,6 +732,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
 
   return (
     <StyledDataGrid
+      pinnedColumns={{
+        left: ['inputDigest'],
+      }}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
@@ -1009,6 +1012,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
 
   return (
     <StyledDataGrid
+      pinnedColumns={{
+        left: ['inputDigest'],
+      }}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
