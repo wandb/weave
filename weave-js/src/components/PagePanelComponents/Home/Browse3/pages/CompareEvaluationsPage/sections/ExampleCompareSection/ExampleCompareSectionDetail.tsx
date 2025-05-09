@@ -675,7 +675,8 @@ export const ExampleCompareSectionDetail: React.FC<{
         alignItems: 'center',
         bgcolor: MOON_50,
         padding: '16px',
-        borderBottom: '1px solid #ccc',
+        // borderBottom: '1px solid #ccc',
+        height: 50,
       }}>
       <HorizontalBox
         sx={{
@@ -687,18 +688,14 @@ export const ExampleCompareSectionDetail: React.FC<{
           onClick={() => {
             setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
           }}>
-          <Icon
-            name='chevron-up'
-          />
+          <Icon name="chevron-up" />
         </IconButton>
         <IconButton
           // disabled={targetIndex === filteredRows.length - 1}
           onClick={() => {
             setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
           }}>
-          <Icon
-            name='chevron-down'
-          />
+          <Icon name="chevron-down" />
         </IconButton>
         <Box
           style={{

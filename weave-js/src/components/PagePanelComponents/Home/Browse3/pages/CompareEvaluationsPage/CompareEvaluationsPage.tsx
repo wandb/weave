@@ -254,17 +254,13 @@ const ResultExplorer: React.FC<{
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'table'
   );
-  const [modelsAsRows, setModelsAsRows] = useState(false);
-
-  const toggleModelsAsRows = useCallback(() => {
-    setModelsAsRows(!modelsAsRows);
-  }, [modelsAsRows]);
-
+  const headerHeight = 0;
   return (
     <VerticalBox
       sx={{
         width: '100%',
         overflow: 'hidden',
+        // height,
       }}>
       <HorizontalBox
         sx={{
@@ -274,6 +270,8 @@ const ResultExplorer: React.FC<{
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
+          // height: headerHeight,
+          paddingTop: 15,
         }}>
         <Box
           sx={{
@@ -282,11 +280,10 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-        <button onClick={toggleModelsAsRows}>Toggle Models as Rows</button>
       </HorizontalBox>
       <div
         style={{
-          height,
+          height: height - headerHeight,
           overflow: 'hidden',
         }}>
         <Box
@@ -304,7 +301,6 @@ const ResultExplorer: React.FC<{
             }}>
             <ExampleCompareSectionTable
               state={state}
-              modelsAsRows={modelsAsRows}
               shouldHighlightSelectedRow={viewMode === 'split'}
               onShowSplitView={() => setViewMode('split')}
             />
@@ -315,7 +311,6 @@ const ResultExplorer: React.FC<{
               flex: 1,
               width: '50%',
               borderLeft: '1px solid #e0e0e0',
-              borderTop: '1px solid #e0e0e0',
               display: viewMode !== 'table' ? 'block' : 'none',
             }}>
             <ExampleCompareSectionDetail

@@ -5,12 +5,13 @@ import {
   GridColumnHeaderParams,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
@@ -18,6 +19,7 @@ import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {EvaluationComparisonState} from '../../ecpState';
 import {flattenedDimensionPath} from '../../ecpUtil';
+import {HorizontalBox, VerticalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {evalAggScorerMetricCompGeneric} from './ExampleCompareSectionDetail';
 import {
@@ -77,7 +79,6 @@ interface DatasetRowItemRendererProps {
 
 interface ExampleCompareSectionTableProps {
   state: EvaluationComparisonState;
-  modelsAsRows: boolean;
   shouldHighlightSelectedRow?: boolean;
   onShowSplitView: () => void;
 }
@@ -105,6 +106,10 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
   return <CellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
+const clip = (value: number, min: number, max: number) => {
+  return Math.max(min, Math.min(value, max));
+};
+
 /**
  * Main component for displaying comparison data in a table format
  * Can display models as either rows or columns
@@ -112,23 +117,59 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
 export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
-  if (props.modelsAsRows) {
-    return (
-      <ExampleCompareSectionTableModelsAsRows
-        state={props.state}
-        shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
-        onShowSplitView={props.onShowSplitView}
-      />
-    );
-  } else {
-    return (
-      <ExampleCompareSectionTableModelsAsColumns
-        state={props.state}
-        shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
-        onShowSplitView={props.onShowSplitView}
-      />
-    );
-  }
+  const [modelsAsRows, setModelsAsRows] = useState(true);
+  const [rowHeight, setRowHeight] = useState(100);
+  const increaseRowHeight = useCallback(() => {
+    setRowHeight(v => clip(v + 50, 50, 500));
+  }, []);
+  const decreaseRowHeight = useCallback(() => {
+    setRowHeight(v => clip(v - 50, 50, 500));
+  }, []);
+  const header = (
+    <HorizontalBox
+      sx={{
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        bgcolor: MOON_50,
+        padding: '16px',
+        height: 50,
+      }}>
+      <IconButton onClick={increaseRowHeight}>
+        <Icon name="expand-uncollapse" />
+      </IconButton>
+      <IconButton onClick={decreaseRowHeight}>
+        <Icon name="collapse" />
+      </IconButton>
+      <IconButton
+        onClick={() => setModelsAsRows(v => !v)}
+      >
+        <Icon name="table" />
+      </IconButton>
+      
+    </HorizontalBox>
+  );
+  const inner = modelsAsRows ? (
+    <ExampleCompareSectionTableModelsAsRows
+      {...props}
+      rowHeight={rowHeight}
+    />
+  ) : (
+    <ExampleCompareSectionTableModelsAsColumns
+      {...props}
+      rowHeight={rowHeight}
+    />
+  );
+  return (
+    <VerticalBox
+      sx={{
+        height: '100%',
+        width: '100%',
+        gridGap: '0px',
+      }}>
+      {header}
+      {inner}
+    </VerticalBox>
+  );
 };
 
 /**
@@ -356,11 +397,7 @@ const useTableDataForModelsAsColumns = (
  */
 
 // Component for displaying models as rows
-export const ExampleCompareSectionTableModelsAsRows: React.FC<{
-  state: EvaluationComparisonState;
-  shouldHighlightSelectedRow?: boolean;
-  onShowSplitView: () => void;
-}> = props => {
+export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSectionTableProps & {rowHeight: number}> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
   );
@@ -628,6 +665,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
 
   return (
     <StyledDataGrid
+      rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
@@ -649,11 +687,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<{
 };
 
 // Component for displaying models as columns
-export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
-  state: EvaluationComparisonState;
-  shouldHighlightSelectedRow?: boolean;
-  onShowSplitView: () => void;
-}> = props => {
+export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareSectionTableProps & {rowHeight: number}> = props => {
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
     props.state
   );
@@ -888,6 +922,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<{
 
   return (
     <StyledDataGrid
+      rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columns}
