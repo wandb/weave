@@ -6,21 +6,21 @@ import copy
 import inspect
 import typing
 
+from weave_query import weave_types as types
 from weave_query import (
+    storage,
+    weave_internal,
+    errors,
+    parallelism,
+    registry_mem,
     box,
     context_state,
-    errors,
     execute_fast,
     graph,
     op_args,
     op_def,
     op_policy,
-    parallelism,
-    registry_mem,
-    storage,
-    weave_internal,
 )
-from weave_query import weave_types as types
 from weave_query.language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
