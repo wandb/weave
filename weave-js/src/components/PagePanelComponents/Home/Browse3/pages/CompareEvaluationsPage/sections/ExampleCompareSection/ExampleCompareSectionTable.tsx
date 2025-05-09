@@ -789,6 +789,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       rows={rows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
+      pagination
+      pageSizeOptions={[50]}
       sx={{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
@@ -998,6 +1000,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       rows={rows}
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
+      pagination
+      pageSizeOptions={[50]}
       sx={{
         '& .MuiDataGrid-row:hover': {
           backgroundColor: 'white',
