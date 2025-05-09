@@ -66,50 +66,6 @@ def try_decode(data: str | bytes) -> bytes:
 
 
 class Audio(Generic[T]):
-    """
-    Audio class to handle audio data.
-    Can be initialized with a file path or raw audio data with a format
-
-    Direct initialization in Op pre or post-process function:
-
-    From a file with ext:
-    weave.Audio.from_path(path='some_file.mp3')
-
-    Base64 encoded bytes (Like what LLM generation returns) + format:
-    weave.Audio.from_data(data=base64_str_or_bytes, format='mp3')
-
-    Raw decoded audio bytes + format:
-    with open('some_file.mp3', 'rb') as f:
-        raw_audio_bytes = f.read()
-    weave.Audio.from_data(data=raw_audio_bytes, format='mp3')
-
-
-    Annotated initialization performed by SDK:
-
-    def read_example(path_to_mp3: str) -> Annotated[str, weave.Audio]:
-        return path_to_mp3
-
-    def read_example(path_to_mp3: str) -> Annotated[bytes, weave.Audio[Literal["mp3"]]]:
-        with open(path_to_mp3, "rb") as f:
-            raw_audio_bytes = f.read()
-        return raw_audio_bytes
-
-    def gen_audio(prompt: str) -> Annotated[str, weave.Audio[Literal["mp3"]]]:
-        completion = client.chat.completions.create(
-            model="gpt-4o-audio-preview",
-            modalities=["text", "audio"],
-            audio={"voice": "alloy", "format": "mp3"},
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Is a golden retriever a good family dog?"
-                }
-            ]
-        )
-
-        return completion.choices[0].message.audio.data
-    """
-
     # File Format
     format: SUPPORTED_FORMATS_TYPE
 
