@@ -88,4 +88,4 @@ When the code sample runs successfully, you can view your video by clicking the 
 
 ![A trace of a video processing function in the Traces table.](imgs/video-trace.png)
 
-![An MP4 video uploaded to Weave, accessed from the video player link in the Traces table.](imgs/video-trace-player.png)
+![An MP4 video uploaded to Weave, viewed in the Traces popout.](imgs/video-trace-popout.png)
