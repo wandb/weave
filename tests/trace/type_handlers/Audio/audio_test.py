@@ -44,7 +44,6 @@ class TestWaveRead:
         gotten_audio = weave.ref(ref.uri()).get()
         assert audio.readframes(10) == gotten_audio.readframes(10)
 
-
     def test_audio_as_dataset_cell(self, client: WeaveClient, wav_file: str) -> None:
         client.project = "test_audio_as_dataset_cell"
         audio = wave.open(wav_file, "rb")
@@ -56,7 +55,6 @@ class TestWaveRead:
 
         gotten_dataset = weave.ref(ref.uri()).get()
         assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
-
 
     def test_audio_as_call_io(self, client: WeaveClient, wav_file: str) -> None:
         @weave.op
@@ -177,7 +175,6 @@ class TestWeaveAudio:
 
         # Make sure we didn't modify the original outputs for runtime
         assert out_file == audio_file
-
 
         input_output_part_call = audio_as_input_and_output_part.calls()[0]
 
