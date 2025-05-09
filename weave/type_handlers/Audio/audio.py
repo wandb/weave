@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import binascii
 import json
@@ -9,7 +11,6 @@ from typing import (
     Generic,
     Literal,
     TypeVar,
-    Union,
     cast,
     get_args,
 )
@@ -48,7 +49,7 @@ def get_format_from_filename(filename: str) -> str:
     return filename[last_dot + 1 :].lower()
 
 
-def try_decode(data: Union[str, bytes]) -> bytes:
+def try_decode(data: str | bytes) -> bytes:
     """
     Attempts to decode the data as base64 in validation mode
     Otherwise, returns the data as is if bytes, or encodes to bytes if str
@@ -75,15 +76,15 @@ class Audio(Generic[T]):
     weave.Audio(path='some_file.mp3')
 
     Filename without ext + format:
-    weave.Audio(path='some_file', fmt='mp3')
+    weave.Audio(path='some_file', format='mp3')
 
     Base64 encoded bytes (Like what LLM generations return) + format:
-    weave.Audio(data=base64_str_or_bytes, fmt='mp3')
+    weave.Audio(data=base64_str_or_bytes, format='mp3')
 
     Raw decoded audio bytes + format:
     with open('some_file.mp3', 'rb') as f:
         raw_audio_bytes = f.read()
-    weave.Audio(data=raw_audio_bytes, fmt='mp3')
+    weave.Audio(data=raw_audio_bytes, format='mp3')
 
 
     Annotated initialization performed by SDK:
@@ -113,55 +114,55 @@ class Audio(Generic[T]):
     """
 
     # File Format
-    fmt: SUPPORTED_FORMATS_TYPE
+    format: SUPPORTED_FORMATS_TYPE
 
     # Raw audio data bytes
     data: bytes
 
-    # TODO: Should fmt really accept any string and coerce here?
+    # TODO: Should format accept any string and coerce here instead?
     # It ruins the type info, but it's more usable
     def __init__(
         self,
         data: bytes,
-        fmt: SUPPORTED_FORMATS_TYPE,
+        format: SUPPORTED_FORMATS_TYPE,
         validate_base64: bool = True,
     ) -> None:
         if validate_base64:
             data = try_decode(data)
         self.data = data
-        self.fmt = cast(SUPPORTED_FORMATS_TYPE, fmt)
+        self.format = cast(SUPPORTED_FORMATS_TYPE, format)
 
     @classmethod
-    def from_data(cls, data: Union[str, bytes], fmt: SUPPORTED_FORMATS_TYPE) -> "Audio":
+    def from_data(cls, data: str | bytes, format: SUPPORTED_FORMATS_TYPE) -> Audio:
         data = try_decode(data)
 
         # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
-        return cls(data=data, fmt=fmt, validate_base64=False)
+        return cls(data=data, format=format, validate_base64=False)
 
     @classmethod
-    def from_path(cls, path: Union[str, bytes, Path, os.PathLike]) -> "Audio":
+    def from_path(cls, path: str | bytes | Path | os.PathLike) -> Audio:
         if isinstance(path, bytes):
             path = path.decode()
 
         if not os.path.exists(path):
             raise ValueError(f"File {path} does not exist")
 
-        fmt_str = get_format_from_filename(str(path))
-        if not fmt_str in list(map(str, SUPPORTED_FORMATS)):
+        format_str = get_format_from_filename(str(path))
+        if not format_str in list(map(str, SUPPORTED_FORMATS)):
             raise ValueError(
                 f"Invalid file path {path}, file must end in one of: mp3 or wav"
             )
 
         data = open(path, "rb").read()
-        return cls(data=data, fmt=cast(SUPPORTED_FORMATS_TYPE, fmt_str))
+        return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
 
-    def export(self, path: Union[str, bytes, Path, os.PathLike]) -> None:
+    def export(self, path: str | bytes | Path | os.PathLike) -> None:
         with open(path, "wb") as f:
             f.write(self.data)
 
 
 def save(
-    obj: Union[wave.Wave_read, Audio], artifact: MemTraceFilesArtifact, name: str
+    obj: wave.Wave_read | Audio, artifact: MemTraceFilesArtifact, name: str
 ) -> None:
     with artifact.writeable_file_path(METADATA_FILE_NAME) as metadata_path:
         obj_module = obj.__module__
@@ -189,11 +190,11 @@ def save(
         obj.setpos(original_frame_position)
         return
 
-    with artifact.writeable_file_path(audio_filename(obj.fmt)) as fp:
+    with artifact.writeable_file_path(audio_filename(obj.format)) as fp:
         obj.export(fp)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio":
+def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | Audio:
     pytype = None
     if artifact.path_contents.get(METADATA_FILE_NAME):
         with open(artifact.path(METADATA_FILE_NAME)) as f:
