@@ -90,6 +90,16 @@ const DISABLED_ROW_SPANNING = {
   rowSpanValueGetter: (value: any, row: RowData) => row.id,
 };
 
+const FREE_FORM_COLUMN_SETTINGS = {
+  flex: 1,
+  minWidth: 200,
+}
+
+const SCORE_COLUMN_SETTINGS = {
+  flex: 1,
+  minWidth: 100,
+}
+
 /**
  * Renders a cell value from the dataset
  */
@@ -103,13 +113,22 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
     ],
     0
   );
-  return <CellValue value={row.targetRowValue?.[props.inputKey]} />;
+  return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} />;
 };
 
-const clip = (value: number, min: number, max: number) => {
-  return Math.max(min, Math.min(value, max));
-};
-
+const DenseCellValue: React.FC<React.ComponentProps<typeof CellValue>> = props => {
+     return  <CellValue value={props.value} collapsedStyle={{
+        height: '100%',
+        width: '100%',
+        overflow: 'auto',
+        textAlign: 'left',
+        lineHeight: '1.2',
+        flex: 1,
+        whiteSpace: 'pre-wrap',
+        wordWrap: 'break-word',
+        textOverflow: 'ellipsis',
+      }}/>
+}
 /**
  * Main component for displaying comparison data in a table format
  * Can display models as either rows or columns
@@ -446,7 +465,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
       ...inputSubFields.map(key => ({
         field: `inputs.${key}`,
         headerName: key,
-        flex: 1,
+        ...FREE_FORM_COLUMN_SETTINGS,
         valueGetter: (value: any, row: RowData) => {
           return row.inputDigest;
         },
@@ -580,7 +599,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
       ...outputColumnKeys.map(key => ({
         field: `output.${key}`,
         headerName: removePrefix(key, 'output.'),
-        flex: 1,
+        ...FREE_FORM_COLUMN_SETTINGS,
         ...DISABLED_ROW_SPANNING,
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._type === 'summary') {
@@ -592,7 +611,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
             return null;
           }
           return (
-            <CellValue
+            <DenseCellValue
               value={params.row.output[key]?.[params.row.evaluationCallId]}
             />
           );
@@ -603,7 +622,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<ExampleCompareSect
         headerName: flattenedDimensionPath(
           props.state.summary.scoreMetrics[key]
         ),
-        flex: 1,
+        ...SCORE_COLUMN_SETTINGS,
         ...DISABLED_ROW_SPANNING,
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._pivot === 'modelsAsColumns') {
@@ -736,8 +755,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
       ...inputSubFields.map(key => ({
         field: `inputs.${key}`,
         headerName: key,
-        // width: 100,
-        flex: 1,
+        ...FREE_FORM_COLUMN_SETTINGS,
         valueGetter: (value: any, row: RowData) => {
           return row.inputDigest;
         },
@@ -800,6 +818,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `output.${key}.${evaluationCallId}`,
+            ...FREE_FORM_COLUMN_SETTINGS,
             ...DISABLED_ROW_SPANNING,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
@@ -819,7 +838,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
                 return null;
               }
               return (
-                <CellValue value={params.row.output[key][evaluationCallId]} />
+                <DenseCellValue value={params.row.output[key][evaluationCallId]} />
               );
             },
           };
@@ -829,6 +848,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `scores.${key}.${evaluationCallId}`,
+            ...SCORE_COLUMN_SETTINGS,
             ...DISABLED_ROW_SPANNING,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
@@ -941,4 +961,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<ExampleCompareS
       }}
     />
   );
+};
+
+
+const clip = (value: number, min: number, max: number) => {
+  return Math.max(min, Math.min(value, max));
 };
