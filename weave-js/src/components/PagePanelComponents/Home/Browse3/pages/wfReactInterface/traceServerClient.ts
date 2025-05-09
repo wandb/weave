@@ -183,7 +183,6 @@ export class TraceServerClient extends CachingTraceServerClient {
     req: TraceTableRowQueryReq
   ): Promise<TraceTableRowQueryRes> {
     // Batch many requests together for the same table
-    console.log('tableRowQuery', req);
     return new Promise<TraceTableRowQueryRes>((resolve, reject) => {
       this.tableRowQueryCollectors.push({
         req,
@@ -234,22 +233,18 @@ export class TraceServerClient extends CachingTraceServerClient {
     if (collectors.length === 0) {
       return;
     }
-    console.log('doTableRowQuery', collectors.length, collectors);
     const reqs = collectors.map(c => c.req);
     const groupedReqs = _.groupBy(
       reqs,
       req => req.project_id + ':' + req.digest
     );
-    console.log('groupedReqs', groupedReqs);
     await Promise.all(
       Object.entries(groupedReqs).map(async ([key, reqs]) => {
         const uniqueDigests = _.uniq(reqs.map(r => r.row_digests).flat());
-        console.log('uniqueDigests', uniqueDigests);
         const res = await this.tableRowQueryDirect({
           ...reqs[0],
           row_digests: uniqueDigests,
         });
-        console.log('res', res);
         const digestMap = new Map<string, any>();
         res.rows.forEach(r => {
           digestMap.set(r.digest, r.val);
