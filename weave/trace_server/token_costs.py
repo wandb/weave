@@ -240,48 +240,48 @@ def get_ranked_prices(
     select_query = (
         llm_usage_table.select()
         .fields(["*", *ltp_fields, row_number_clause])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$or": [
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": project_id},
-                                ]
-                            },
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": DEFAULT_PRICING_LEVEL_ID},
-                                ]
-                            },
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": ""},
-                                ]
-                            },
-                        ]
-                    }
-                }
-            )
-        )
         .join(
             LLM_TOKEN_PRICES_TABLE,
             tsi.Query(
                 **{
                     "$expr": {
-                        "$eq": [
-                            {"$getField": f"{llm_usage_table_alias}.llm_id"},
-                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"},
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": f"{llm_usage_table_alias}.llm_id"},
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"
+                                    },
+                                ]
+                            },
+                            {
+                                "$or": [
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": project_id},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": DEFAULT_PRICING_LEVEL_ID},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": ""},
+                                        ]
+                                    },
+                                ]
+                            },
                         ]
                     }
                 }
@@ -391,8 +391,9 @@ def final_call_select_with_cost(
         )
     """
 
+    # If no cost was found dont add a costs object
     summary_dump_snippet = f"""
-    if( any(llm_id) = '{DUMMY_LLM_ID}',
+    if( any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
     any(summary_dump),
     concat(
         left(any(summary_dump), length(any(summary_dump)) - 1),

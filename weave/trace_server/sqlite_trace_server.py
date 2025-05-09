@@ -1432,6 +1432,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Return the empty ExportTraceServiceResponse as per the OTLP spec
         return tsi.OtelExportRes()
 
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        raise NotImplementedError(
+            "project_stats is not implemented for SQLite trace server"
+        )
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows

@@ -12,14 +12,11 @@ export const TraceCountDisplay = ({
   hasWeaveData: boolean;
 }) => {
   const {useCallsStats} = useWFHooks();
-  const {result, loading: callsStatsLoading} = useCallsStats(
+  const {result, loading: callsStatsLoading} = useCallsStats({
     entity,
     project,
-    {}, // filter
-    undefined, // query
-    undefined, // limit
-    {skip: !hasWeaveData}
-  );
+    skip: !hasWeaveData,
+  });
 
   return <div>{callsStatsLoading ? <LoadingDots /> : result?.count ?? 0}</div>;
 };
