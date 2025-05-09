@@ -105,16 +105,29 @@ export const EditableCallName: React.FC<{
   if (!isEditing) {
     return (
       <Tailwind>
-        <div
-          className="group flex cursor-pointer items-center rounded px-[8px] py-[4px] hover:bg-moon-100 dark:hover:bg-moon-800"
-          onClick={() => setIsEditing(true)}>
-          {currNameToDisplay}
-          <Icon
-            name="pencil-edit"
-            width={16}
-            height={16}
-            className="ml-[8px] min-w-[16px] text-moon-500 opacity-0 group-hover:opacity-100"
-          />
+        <div className="group flex items-center">
+          <div
+            title={`Click to edit: ${currNameToDisplay}`}
+            style={{
+              minWidth: '150px',
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              WebkitLineClamp: 4,
+              lineClamp: 4 /* Not supported in all browsers yet, but added for future compatibility */,
+            }}
+            className="flex cursor-pointer items-center rounded px-[8px] py-[4px] hover:bg-moon-100 dark:hover:bg-moon-800"
+            onClick={() => setIsEditing(true)}>
+            {currNameToDisplay}
+          </div>
+          <div>
+            <Icon
+              name="pencil-edit"
+              width={16}
+              height={16}
+              className="ml-[8px] min-w-[16px] text-moon-500 opacity-0 group-hover:opacity-100"
+            />
+          </div>
         </div>
       </Tailwind>
     );
@@ -140,7 +153,7 @@ export const EditableCallName: React.FC<{
           placeholder={defaultDisplayName}
           autoGrow={true}
           rows={1}
-          className="w-full px-[8px] py-[4px]"
+          className="w-full min-w-[150px] px-[8px] py-[4px]"
         />
       </div>
     </Tailwind>
