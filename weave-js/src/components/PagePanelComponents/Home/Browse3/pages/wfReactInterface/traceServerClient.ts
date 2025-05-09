@@ -281,7 +281,7 @@ export class TraceServerClient extends CachingTraceServerClient {
     const reqs = collectors.map(c => c.req);
     const groupedReqs = _.groupBy(
       reqs,
-      req => req.project_id + ':' + req.digest
+      req => `${req.project_id}:{req.digest}`
     );
     await Promise.all(
       Object.entries(groupedReqs).map(async ([key, reqs]) => {
