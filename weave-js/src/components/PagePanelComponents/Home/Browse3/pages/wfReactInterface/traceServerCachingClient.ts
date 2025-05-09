@@ -151,7 +151,8 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
           });
         } else {
           const res = super.tableQuery({
-            ...req,
+            project_id: req.project_id,
+            digest: req.digest,
             filter: {
               row_digests: missingDigests,
             },
