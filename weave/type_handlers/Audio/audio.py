@@ -161,6 +161,24 @@ class Audio(Generic[T]):
             f.write(self.data)
 
 
+def export_wave_read(obj: wave.Wave_read, fp: str, name: str) -> None:
+    original_frame_position = obj.tell()
+    obj.rewind()
+    frames = obj.readframes(obj.getnframes())
+    params = obj.getparams()
+    with wave.open(fp, "w") as wav_file:
+        # Exclude nframes param, it is often set as the maximum number of frames
+        # which bumps into the 4GB max file size when creating the wave.Wave_write
+        # header on close.
+        wav_file.setframerate(params.framerate)
+        wav_file.setnchannels(params.nchannels)
+        wav_file.setsampwidth(params.sampwidth)
+        wav_file.setcomptype(params.comptype, params.compname)
+        wav_file.writeframes(frames)
+    # Rewind to the original position
+    obj.setpos(original_frame_position)
+
+
 def save(
     obj: wave.Wave_read | Audio, artifact: MemTraceFilesArtifact, name: str
 ) -> None:
@@ -172,23 +190,8 @@ def save(
             json.dump(metadata, f)
 
     if isinstance(obj, wave.Wave_read):
-        original_frame_position = obj.tell()
-        obj.rewind()
-        frames = obj.readframes(obj.getnframes())
-        params = obj.getparams()
         with artifact.writeable_file_path(audio_filename(".wav")) as fp:
-            with wave.open(fp, "w") as wav_file:
-                # Exclude nframes param, it is often set as the maximum number of frames
-                # which bumps into the 4GB max file size when creating the wave.Wave_write
-                # header on close.
-                wav_file.setframerate(params.framerate)
-                wav_file.setnchannels(params.nchannels)
-                wav_file.setsampwidth(params.sampwidth)
-                wav_file.setcomptype(params.comptype, params.compname)
-                wav_file.writeframes(frames)
-        # Rewind to the original position
-        obj.setpos(original_frame_position)
-        return
+            return export_wave_read(obj, fp, name)
 
     with artifact.writeable_file_path(audio_filename(obj.format)) as fp:
         obj.export(fp)
