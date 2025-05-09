@@ -128,7 +128,7 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
   public tableRowQuery(
     req: TraceTableRowQueryReq
   ): Promise<TraceTableRowQueryRes> {
-    // In order ot maximize cache hits, we first split the request into
+    // In order to maximize cache hits, we first split the request into
     // the subset of digests that are already cached and the subset that
     // are not. We then only make a single tableQuery request for the
     // missing digests, and reconstruct the correct results before returning.
