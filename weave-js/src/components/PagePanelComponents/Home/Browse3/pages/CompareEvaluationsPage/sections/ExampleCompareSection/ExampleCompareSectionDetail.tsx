@@ -682,30 +682,24 @@ export const ExampleCompareSectionDetail: React.FC<{
           alignItems: 'center',
           flex: 1,
         }}>
-        <Button
-          className="mx-16"
-          style={{
-            marginLeft: '0px',
-          }}
-          size="small"
-          disabled={targetIndex === 0}
+        <IconButton
+          // disabled={targetIndex === 0}
           onClick={() => {
             setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-          }}
-          icon="chevron-back"
-        />
-
-        <Button
-          style={{
-            marginLeft: '0px',
-          }}
-          disabled={targetIndex === filteredRows.length - 1}
-          size="small"
+          }}>
+          <Icon
+            name='chevron-up'
+          />
+        </IconButton>
+        <IconButton
+          // disabled={targetIndex === filteredRows.length - 1}
           onClick={() => {
             setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-          }}
-          icon="chevron-next"
-        />
+          }}>
+          <Icon
+            name='chevron-down'
+          />
+        </IconButton>
         <Box
           style={{
             flex: 0,
