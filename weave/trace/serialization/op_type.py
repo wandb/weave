@@ -561,6 +561,7 @@ def load_instance(
 
     sys.path.insert(0, os.path.abspath(module_dir))
     try:
+        print('importing', import_name)
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
         print("Op loading exception. This might be fine!", e)

@@ -2,8 +2,10 @@ import base64
 import json
 import os
 import re
+from typing_extensions import Annotated
 import wave
 from pathlib import Path
+import binascii
 from typing import (
     Any,
     Generic,
@@ -45,29 +47,20 @@ def get_format_from_filename(filename: str) -> str:
     return filename[last_dot + 1 :].lower()
 
 
-def is_base64(data: Union[str, bytes, None]) -> bool:
+def try_decode(data: Union[str, bytes]) -> bytes:
     """
-    Validates if a string is valid base64
-
-    ^: Matches the beginning of the string.
-    [A-Za-z0-9+/]{4}: Matches any group of four characters from the Base64 alphabet.
-    (?:[A-Za-z0-9+/]{4})*: Matches zero or more occurrences of the four-character group.
-    (?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=): Matches either a group of two characters followed by two equals signs (==), or a group of three characters followed by one equal sign (=).
-    ?: Makes the optional padding part of the regex optional (0 or 1 occurrence).
-    $: Matches the end of the string. 
+    Attempts to decode the data as base64 in validation mode
+    Otherwise, returns the data as is if bytes, or encodes to bytes if str
     """
+    try:
+        data = base64.b64decode(data, validate=True)
+    except binascii.Error:
+        pass
 
-    if not data:
-        return False
+    if isinstance(data, str):
+        data = data.encode("utf-8")
 
-    pattern = "^(?:[a-za-z0-9+/]{4})*(?:[a-za-z0-9+/]{2}==|[a-za-z0-9+/]{3}=)?$"
-
-    if isinstance(data, bytes):
-        return bool(re.match(pattern.encode(), data))
-
-    return bool(re.match(pattern, data))
-
-
+    return data
 
 class Audio(Generic[T]):
     """
@@ -123,26 +116,25 @@ class Audio(Generic[T]):
     # Raw audio data bytes
     data: bytes
 
+    # TODO: Should fmt really accept any string and coerce here?
+    # It ruins the type info, but it's more usable
     def __init__(
         self,
         data: bytes,
-        fmt: T,
+        fmt: SUPPORTED_FORMATS_TYPE,
+        validate_base64: bool = True,
     ) -> None:
+        if validate_base64:
+            data = try_decode(data)
         self.data = data
-        self.fmt = fmt
+        self.fmt = cast(SUPPORTED_FORMATS_TYPE, fmt)
 
     @classmethod
-    def _from_base64(cls, data: Union[str, bytes], fmt: T) -> "Audio":
-        data = base64.b64decode(data)
-        return cls(data=data, fmt=fmt)
+    def from_data(cls, data: Union[str, bytes], fmt: SUPPORTED_FORMATS_TYPE) -> "Audio":
+        data = try_decode(data)
 
-    @classmethod
-    def from_data(cls, data: Union[str, bytes], fmt: T) -> "Audio":
-        if is_base64(data):
-            return cls._from_base64(data, fmt)
-        elif isinstance(data, str):
-            data = data.encode()
-        return cls(data=data, fmt=fmt)
+        # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
+        return cls(data=data, fmt=fmt, validate_base64=False)
 
     @classmethod
     def from_path(cls, path: Union[str, bytes, Path, os.PathLike]) -> "Audio":
