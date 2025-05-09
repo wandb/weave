@@ -98,6 +98,7 @@ class Audio(Generic[T]):
     Raises:
         ValueError: If audio data is empty or format is not supported
     """
+
     # File Format
     format: SUPPORTED_FORMATS_TYPE
 
