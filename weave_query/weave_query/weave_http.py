@@ -85,7 +85,7 @@ class HttpAsync:
     def __init__(self, fs: filesystem.FilesystemAsync) -> None:
         self.fs = fs
 
-        conn = aiohttp.TCPConnector(limit=50)
+        conn = aiohttp.TCPConnector(limit=500000)
         trace_configs = []
         if ENABLE_REQUEST_TRACING:
             trace_configs.append(logging_trace_config())
@@ -152,10 +152,13 @@ class Http:
         self.session = requests.Session()
 
     def __enter__(self) -> "Http":
+        print(f"[Http.__enter__] self.session: {self.session}")
         return self
 
     def __exit__(self, *args: typing.Any) -> None:
+        print(f"[Http.__exit__] self.session: {self.session}")
         self.session.close()
+        print(f"[Http.__exit__] self.session closed: {self.session}")
 
     def download_file(
         self,
@@ -184,6 +187,8 @@ class Http:
                     )
                     with self.fs.open_write(path, mode="wb") as f:
                         f.write(r.content)  # type: ignore
+                    # with self.fs.open_read(path, mode="rb") as f:
+                    # print(f"[download_file] f.read(): {f.readline(100)}")
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status_code,
