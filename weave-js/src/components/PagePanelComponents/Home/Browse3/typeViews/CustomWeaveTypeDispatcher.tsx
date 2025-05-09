@@ -46,6 +46,9 @@ const customWeaveTypeRegistry: {
   'wave.Wave_read': {
     component: AudioPlayer,
   },
+  'weave.type_handlers.Audio.audio.Audio': {
+    component: AudioPlayer,
+  },
   'datetime.datetime': {
     component: DateTimeView,
   },
