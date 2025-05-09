@@ -30,7 +30,7 @@ import {
   removePrefix,
   useExampleCompareData,
   useFilteredAggregateRows,
-} from './ExampleCompareSectionUtil';
+} from './exampleCompareSectionUtil';
 
 /**
  * Types for the comparison table data structure
