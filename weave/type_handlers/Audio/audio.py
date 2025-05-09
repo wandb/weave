@@ -29,6 +29,14 @@ T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
 
 
 def audio_filename(ext: str) -> str:
+    """Generate the standard filename for an audio file.
+
+    Args:
+        ext: The file extension (e.g., '.wav', '.mp3')
+
+    Returns:
+        str: The formatted filename
+    """
     return f"{AUDIO_FILE_PREFIX}{ext}"
 
 
@@ -50,9 +58,16 @@ def get_format_from_filename(filename: str) -> str:
 
 
 def try_decode(data: str | bytes) -> bytes:
-    """
-    Attempts to decode the data as base64 in validation mode
-    Otherwise, returns the data as is if bytes, or encodes to bytes if str
+    """Attempt to decode data as base64 or convert to bytes.
+
+    This function tries to decode the input as base64 first. If that fails,
+    it will return the data as bytes, converting if needed.
+
+    Args:
+        data: Input data as string or bytes, potentially base64 encoded
+
+    Returns:
+        bytes: The decoded data as bytes
     """
     try:
         data = base64.b64decode(data, validate=True)
@@ -66,6 +81,23 @@ def try_decode(data: str | bytes) -> bytes:
 
 
 class Audio(Generic[T]):
+    """A class representing audio data in a supported format (wav or mp3).
+
+    This class handles audio data storage and provides methods for loading from
+    different sources and exporting to files.
+
+    Attributes:
+        format: The audio format (currently supports 'wav' or 'mp3')
+        data: The raw audio data as bytes
+
+    Args:
+        data: The audio data (bytes or base64 encoded string)
+        format: The audio format ('wav' or 'mp3')
+        validate_base64: Whether to attempt base64 decoding of the input data
+
+    Raises:
+        ValueError: If audio data is empty or format is not supported
+    """
     # File Format
     format: SUPPORTED_FORMATS_TYPE
 
@@ -89,6 +121,18 @@ class Audio(Generic[T]):
 
     @classmethod
     def from_data(cls, data: str | bytes, format: str) -> Audio:
+        """Create an Audio object from raw data and specified format.
+
+        Args:
+            data: Audio data as bytes or base64 encoded string
+            format: Audio format ('wav' or 'mp3')
+
+        Returns:
+            Audio: A new Audio instance
+
+        Raises:
+            ValueError: If format is not supported
+        """
         data = try_decode(data)
         if not format in list(map(str, SUPPORTED_FORMATS)):
             raise ValueError("Unknown format {format}, must be one of: mp3 or wav")
@@ -102,6 +146,17 @@ class Audio(Generic[T]):
 
     @classmethod
     def from_path(cls, path: str | bytes | Path | os.PathLike) -> Audio:
+        """Create an Audio object from a file path.
+
+        Args:
+            path: Path to an audio file (must have .wav or .mp3 extension)
+
+        Returns:
+            Audio: A new Audio instance loaded from the file
+
+        Raises:
+            ValueError: If file doesn't exist or has unsupported extension
+        """
         if isinstance(path, bytes):
             path = path.decode()
 
@@ -118,11 +173,26 @@ class Audio(Generic[T]):
         return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
 
     def export(self, path: str | bytes | Path | os.PathLike) -> None:
+        """Export audio data to a file.
+
+        Args:
+            path: Path where the audio file should be written
+        """
         with open(path, "wb") as f:
             f.write(self.data)
 
 
 def export_wave_read(obj: wave.Wave_read, fp: str, name: str) -> None:
+    """Export a wave.Wave_read object to a file.
+
+    Args:
+        obj: The wave.Wave_read object to export
+        fp: File path to write to
+        name: Name for the audio file
+
+    Note:
+        This preserves the original frame position of the wave reader.
+    """
     original_frame_position = obj.tell()
     obj.rewind()
     frames = obj.readframes(obj.getnframes())
@@ -143,6 +213,13 @@ def export_wave_read(obj: wave.Wave_read, fp: str, name: str) -> None:
 def save(
     obj: wave.Wave_read | Audio, artifact: MemTraceFilesArtifact, name: str
 ) -> None:
+    """Save an audio object to a trace files artifact.
+
+    Args:
+        obj: The audio object to save (either wave.Wave_read or Audio)
+        artifact: The artifact to save the audio to
+        name: Name for the audio file in the artifact
+    """
     with artifact.writeable_file_path(METADATA_FILE_NAME) as metadata_path:
         obj_module = obj.__module__
         obj_class = obj.__class__.__name__
@@ -159,6 +236,18 @@ def save(
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | Audio:
+    """Load an audio object from a trace files artifact.
+
+    Args:
+        artifact: The artifact containing the audio data
+        name: Name of the audio file in the artifact
+
+    Returns:
+        Either a wave.Wave_read object or an Audio object, depending on the stored type
+
+    Raises:
+        ValueError: If no audio is found in the artifact
+    """
     pytype = None
     if artifact.path_contents.get(METADATA_FILE_NAME):
         with open(artifact.path(METADATA_FILE_NAME)) as f:
@@ -177,10 +266,22 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | Audio:
 
 
 def is_audio_instance(obj: Any) -> bool:
+    """Check if an object is an audio instance.
+
+    Args:
+        obj: The object to check
+
+    Returns:
+        bool: True if the object is a wave.Wave_read or Audio instance
+    """
     return isinstance(obj, (wave.Wave_read, Audio))
 
 
 def register() -> None:
+    """Register serializers for audio types with the Weave serialization system.
+
+    This function must be called to enable serialization of Audio and wave.Wave_read objects.
+    """
     # Register the serializers for the various audio types
     serializer.register_serializer(Audio, save, load, is_audio_instance)
     serializer.register_serializer(wave.Wave_read, save, load)
