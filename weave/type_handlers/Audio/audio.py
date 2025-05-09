@@ -73,18 +73,15 @@ class Audio(Generic[T]):
     Direct initialization in Op pre or post-process function:
 
     From a file with ext:
-    weave.Audio(path='some_file.mp3')
+    weave.Audio.from_path(path='some_file.mp3')
 
-    Filename without ext + format:
-    weave.Audio(path='some_file', format='mp3')
-
-    Base64 encoded bytes (Like what LLM generations return) + format:
-    weave.Audio(data=base64_str_or_bytes, format='mp3')
+    Base64 encoded bytes (Like what LLM generation returns) + format:
+    weave.Audio.from_data(data=base64_str_or_bytes, format='mp3')
 
     Raw decoded audio bytes + format:
     with open('some_file.mp3', 'rb') as f:
         raw_audio_bytes = f.read()
-    weave.Audio(data=raw_audio_bytes, format='mp3')
+    weave.Audio.from_data(data=raw_audio_bytes, format='mp3')
 
 
     Annotated initialization performed by SDK:
