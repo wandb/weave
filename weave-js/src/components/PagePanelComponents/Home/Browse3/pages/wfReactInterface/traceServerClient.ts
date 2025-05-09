@@ -24,6 +24,8 @@ import {
   TraceObjDeleteRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
+  TraceTableQueryReq,
+  TraceTableQueryRes,
 } from './traceServerClientTypes';
 
 const DEFAULT_BATCH_INTERVAL = 150;
@@ -182,6 +184,38 @@ export class TraceServerClient extends CachingTraceServerClient {
     req: CompletionsCreateReq
   ): Promise<CompletionsCreateRes> {
     return super.completionsCreate(req);
+  }
+
+  public override tableQuery(
+    req: TraceTableQueryReq
+  ): Promise<TraceTableQueryRes> {
+    // Specific case for optimization:
+    // If the request contains a row_digest filter
+    if (req.filter?.row_digests) {
+      // and there are no other properties of the request
+      if (
+        Object.entries(req)
+          .map(
+            ([k, v]) =>
+              ['project_id', 'digest', 'filter'].includes(k) || v == null
+          )
+          .every(Boolean)
+      ) {
+        // and there are no other filter properties, we can use tableRowQuery instead.
+        if (
+          Object.entries(req.filter)
+            .map(([k, v]) => ['row_digests'].includes(k) || v == null)
+            .every(Boolean)
+        ) {
+          return this.tableRowQuery({
+            project_id: req.project_id,
+            digest: req.digest,
+            row_digests: req.filter.row_digests,
+          });
+        }
+      }
+    }
+    return super.tableQuery(req);
   }
 
   public tableRowQuery(
