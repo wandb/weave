@@ -1,17 +1,14 @@
 import base64
+import binascii
 import json
 import os
-import re
-from typing_extensions import Annotated
 import wave
 from pathlib import Path
-import binascii
 from typing import (
     Any,
     Generic,
     Literal,
     TypeVar,
-    ParamSpec,
     Union,
     cast,
     get_args,
@@ -20,15 +17,19 @@ from typing import (
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
-METADATA_FILE_NAME= "_metadata.json"
-AUDIO_FILE_PREFIX= "audio."
+METADATA_FILE_NAME = "_metadata.json"
+AUDIO_FILE_PREFIX = "audio."
 
 SUPPORTED_FORMATS_TYPE = Literal["mp3", "wav"]
-SUPPORTED_FORMATS = cast(list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE)))
+SUPPORTED_FORMATS = cast(
+    list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE))
+)
 T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
+
 
 def audio_filename(ext: str) -> str:
     return f"{AUDIO_FILE_PREFIX}{ext}"
+
 
 def get_format_from_filename(filename: str) -> str:
     """Get the file format from a filename.
@@ -61,6 +62,7 @@ def try_decode(data: Union[str, bytes]) -> bytes:
         data = data.encode("utf-8")
 
     return data
+
 
 class Audio(Generic[T]):
     """
@@ -145,15 +147,13 @@ class Audio(Generic[T]):
             raise ValueError(f"File {path} does not exist")
 
         fmt_str = get_format_from_filename(str(path))
-
-        if fmt_str in SUPPORTED_FORMATS:
-            fmt: SUPPORTED_FORMATS_TYPE = fmt_str
-        else:
-            raise ValueError(f"Invalid file path {path}, file must end in one of: mp3 or wav")
-
+        if not fmt_str in list(map(str, SUPPORTED_FORMATS)):
+            raise ValueError(
+                f"Invalid file path {path}, file must end in one of: mp3 or wav"
+            )
 
         data = open(path, "rb").read()
-        return cls(data=data, fmt=cast(T, fmt))
+        return cls(data=data, fmt=cast(SUPPORTED_FORMATS_TYPE, fmt_str))
 
     def export(self, path: Union[str, bytes, Path, os.PathLike]) -> None:
         with open(path, "wb") as f:
@@ -175,7 +175,7 @@ def save(
         obj.rewind()
         frames = obj.readframes(obj.getnframes())
         params = obj.getparams()
-        with artifact.writeable_file_path(audio_filename('.wav')) as fp:
+        with artifact.writeable_file_path(audio_filename(".wav")) as fp:
             with wave.open(fp, "w") as wav_file:
                 # Exclude nframes param, it is often set as the maximum number of frames
                 # which bumps into the 4GB max file size when creating the wave.Wave_write
@@ -202,7 +202,9 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "wave.Wave_read | Audio"
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith(AUDIO_FILE_PREFIX):
-            if (pytype is None and filename.endswith(".wav")) or pytype == "wave.Wave_read":
+            if (
+                pytype is None and filename.endswith(".wav")
+            ) or pytype == "wave.Wave_read":
                 return wave.open(path, "rb")
             return Audio.from_path(path=path)
 
