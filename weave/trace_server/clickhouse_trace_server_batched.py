@@ -110,6 +110,7 @@ from weave.trace_server.objects_query_builder import (
 )
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -1120,6 +1121,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         vals = self._parsed_refs_read_batch(parsed_refs)
 
         return tsi.RefsReadBatchRes(vals=vals)
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        def _default_true(val: Union[bool, None]) -> bool:
+            return True if val is None else val
+
+        pb = ParamBuilder()
+        query, columns = make_project_stats_query(
+            req.project_id,
+            pb,
+            include_trace_storage_size=_default_true(req.include_trace_storage_size),
+            include_objects_storage_size=_default_true(req.include_object_storage_size),
+            include_tables_storage_size=_default_true(req.include_table_storage_size),
+            include_files_storage_size=_default_true(req.include_file_storage_size),
+        )
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
+
+        if len(query_result.result_rows) != 1:
+            raise RuntimeError("Unexpected number of results", query_result)
+
+        return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(

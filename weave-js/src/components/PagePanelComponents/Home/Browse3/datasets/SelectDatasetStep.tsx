@@ -7,7 +7,10 @@ import {Select} from '../../../../Form/Select';
 import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
 import {useWFHooks} from '../pages/wfReactInterface/context';
-import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionSchema,
+  WeaveObjectVersionKey,
+} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRef} from '../smallRef/SmallRef';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
@@ -45,29 +48,26 @@ const DatasetOption: React.FC<DatasetOptionProps> = ({
 }) => {
   const {useObjectVersion, useTableRowsQuery} = useWFHooks();
 
-  const datasetObjectVersion = useObjectVersion(
-    dataset
-      ? {
-          scheme: 'weave',
-          weaveKind: 'object',
-          entity: dataset.entity,
-          project: dataset.project,
-          objectId: dataset.objectId,
-          versionHash: dataset.versionHash,
-          path: dataset.path,
-        }
-      : null,
-    undefined
-  );
+  const objVersionKey = dataset
+    ? {
+        scheme: 'weave' as WeaveObjectVersionKey['scheme'],
+        weaveKind: 'object' as WeaveObjectVersionKey['weaveKind'],
+        entity: dataset.entity,
+        project: dataset.project,
+        objectId: dataset.objectId,
+        versionHash: dataset.versionHash,
+        path: dataset.path,
+      }
+    : null;
+  const datasetObjectVersion = useObjectVersion({key: objVersionKey});
 
   const tableDigest = datasetObjectVersion.result?.val?.rows?.split('/')?.pop();
-  const tableRowsQuery = useTableRowsQuery(
-    entity || '',
-    project || '',
-    tableDigest || '',
-    undefined,
-    5 // Limit to 5 rows for preview
-  );
+  const tableRowsQuery = useTableRowsQuery({
+    entity: entity || '',
+    project: project || '',
+    digest: tableDigest || '',
+    limit: 5,
+  });
 
   const previewRows = tableRowsQuery?.result?.rows.map(row => row.val) || [];
   const isLoading = datasetObjectVersion.loading || tableRowsQuery?.loading;

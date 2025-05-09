@@ -49,6 +49,7 @@ import {
   CallSchema,
   KnownBaseObjectClassType,
   ObjectVersionSchema,
+  WeaveObjectVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
 import {TabPrompt} from './Tabs/TabPrompt';
@@ -104,14 +105,16 @@ export const ObjectVersionPage: React.FC<{
 
   const objectVersion = useObjectVersion({
     // Blindly assume this is weave object?
-    scheme: 'weave',
-    entity: props.entity,
-    project: props.project,
-    weaveKind: 'object',
-    objectId: props.objectName,
-    versionHash: props.version,
-    path: props.filePath,
-    refExtra: props.refExtra,
+    key: {
+      scheme: 'weave' as WeaveObjectVersionKey['scheme'],
+      weaveKind: 'object' as WeaveObjectVersionKey['weaveKind'],
+      entity: props.entity,
+      project: props.project,
+      objectId: props.objectName,
+      versionHash: props.version,
+      path: props.filePath,
+      refExtra: props.refExtra,
+    },
   });
   if (isObjDeleteError(objectVersion.error)) {
     const deletedAtMessage = objectVersion.error?.message ?? 'Object deleted';
@@ -136,18 +139,15 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
   const {refExtra, createdAtMs} = objectVersion;
-  const objectVersions = useRootObjectVersions(
-    entityName,
-    projectName,
-    {
+  const objectVersions = useRootObjectVersions({
+    entity: entityName,
+    project: projectName,
+    filter: {
       objectIds: [objectName],
     },
-    undefined,
-    true,
-    {
-      includeStorageSize: true,
-    }
-  );
+    metadataOnly: true,
+    includeStorageSize: true,
+  });
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
     const s = objectVersion.baseObjectClass;
@@ -162,38 +162,30 @@ const ObjectVersionPageInner: React.FC<{
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
   }, []);
-  const producingCalls = useCalls(
-    entityName,
-    projectName,
-    {
+  const producingCalls = useCalls({
+    entity: entityName,
+    project: projectName,
+    filter: {
       outputObjectVersionRefs: [refUri],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    minimalColumns
-  );
+    columns: minimalColumns,
+  });
 
-  const consumingCalls = useCalls(
-    entityName,
-    projectName,
-    {
+  const consumingCalls = useCalls({
+    entity: entityName,
+    project: projectName,
+    filter: {
       inputObjectVersionRefs: [refUri],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    minimalColumns
-  );
+    columns: minimalColumns,
+  });
 
   const showCallsTab =
     !(producingCalls.loading || consumingCalls.loading) &&
     (producingCalls.result?.length ?? 0) +
       (consumingCalls.result?.length ?? 0) >
       0;
-  const data = useRefsData([refUri]);
+  const data = useRefsData({refUris: [refUri]});
   const viewerData = useMemo(() => {
     if (data.loading) {
       return {};
@@ -694,7 +686,9 @@ const OpVersionCallsLink: React.FC<{
   partialFilter?: WFHighLevelCallFilter;
 }> = ({val, partialFilter}) => {
   const {useOpVersion} = useWFHooks();
-  const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
+  const opVersion = useOpVersion({
+    key: refUriToOpVersionKey(val.opVersionRef),
+  });
   if (opVersion.loading) {
     return null;
   } else if (opVersion.result == null) {

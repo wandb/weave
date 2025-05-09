@@ -18,6 +18,7 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
+from tests.conftest import DummyIdConverter
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -50,6 +51,21 @@ from weave.trace_server.trace_server_interface_util import (
 )
 
 ## Hacky interface compatibility helpers
+
+
+def extract_weave_refs_from_value(value):
+    """Extract all strings that start with 'weave:///' from a value."""
+    refs = []
+    if isinstance(value, str) and value.startswith("weave:///"):
+        refs.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            refs.extend(extract_weave_refs_from_value(v))
+    elif isinstance(value, list):
+        for v in value:
+            refs.extend(extract_weave_refs_from_value(v))
+    return refs
+
 
 ClientType = weave_client.WeaveClient
 
@@ -444,7 +460,11 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+        [
+            ref
+            for call in res.calls
+            for ref in extract_weave_refs_from_value(call.inputs)
+        ]
     )
     assert len(input_object_version_refs) > 3  # > 3
 
@@ -461,7 +481,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs),
+                        extract_weave_refs_from_value(call.inputs),
                         input_object_version_refs[:1],
                     )
                 ]
@@ -475,7 +495,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs),
+                        extract_weave_refs_from_value(call.inputs),
                         input_object_version_refs[:3],
                     )
                 ]
@@ -498,7 +518,11 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+        [
+            ref
+            for call in res.calls
+            for ref in extract_weave_refs_from_value(call.output)
+        ]
     )
     assert len(output_object_version_refs) > 3
 
@@ -515,7 +539,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output),
+                        extract_weave_refs_from_value(call.output),
                         output_object_version_refs[:1],
                     )
                 ]
@@ -529,7 +553,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output),
+                        extract_weave_refs_from_value(call.output),
                         output_object_version_refs[:3],
                     )
                 ]
@@ -2312,6 +2336,26 @@ def test_call_query_stream_columns_with_costs(client):
     calls = list(calls)
     assert len(calls) == 2
     assert calls[0].summary is not None
+    # Costs should be None because we don't have a cost entry for test_model
+    assert calls[0].summary.get("weave").get("costs") is None
+
+    client.add_cost(
+        "test_model",
+        Decimal("0.00001"),
+        Decimal("0.00003"),
+        datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
 
     # also assert that derived summary fields are included when getting costs
@@ -2438,6 +2482,59 @@ def test_read_call_start_with_cost(client):
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
     )
     client.purge_costs(price_id)
+
+
+def test_call_read_with_unkown_llm(client):
+    """Tests that if an op reports usage for an LLM ID that has no cost entry
+    in the database, the cost calculation handles it gracefully (by not adding cost info).
+    """
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    # Generate a unique LLM ID unlikely to exist
+    llm_id_no_cost = f"non_existent_llm_{generate_id()}"
+
+    @weave.op()
+    def op_with_usage_no_cost(input_val: int) -> dict[str, Any]:
+        usage_details = {
+            "requests": 1,
+            "prompt_tokens": 15,
+            "completion_tokens": 25,
+            "total_tokens": 40,
+        }
+        # WeaveClient should automatically extract 'usage' from the return dict
+        # and place it into the call's summary.
+        return {
+            "output_val": input_val * 3,
+            "usage": usage_details,
+            "model": llm_id_no_cost,
+        }
+
+    op_with_usage_no_cost(10)
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary", "output_dump"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 1
+    assert calls[0].output["output_val"] == 30
+    assert calls[0].summary is not None
+
+    summary = calls[0].summary
+    # Basic checks on the summary
+    assert summary is not None
+    assert "usage" in summary
+    assert llm_id_no_cost in summary["usage"]
+    assert summary["usage"][llm_id_no_cost]["prompt_tokens"] == 15
+
+    # Check the cost calculation part
+    assert "weave" in summary
+    assert "costs" not in summary["weave"]
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
@@ -4211,3 +4308,61 @@ def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_clie
     # Unfortunate that we can't assert the exact value here, because of the
     # uncertainty of the clickhouse materialized view merging moment.
     assert result.total_storage_size_bytes is not None
+
+
+def test_project_stats_clickhouse(client, clickhouse_client):
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    project_id = get_client_project_id(client)
+    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
+
+    # Insert test data directly into stats tables
+    attr_size = 100
+    inputs_size = 200
+    output_size = 300
+    summary_size = 400
+    trace_size = attr_size + inputs_size + output_size + summary_size
+    object_size = 5678
+    file_size = 4321
+    table_size = 1234  # New test data for table storage size
+
+    # directly insert into stats tables to avoid materialized views's consistency issue
+    # Insert into calls_merged_stats
+    clickhouse_client.command(
+        f"INSERT INTO calls_merged_stats (project_id, attributes_size_bytes, inputs_size_bytes, output_size_bytes, summary_size_bytes) "
+        f"VALUES ('{internal_project_id}', {attr_size}, {inputs_size}, {output_size}, {summary_size})"
+    )
+    # Insert into object_versions_stats
+    clickhouse_client.command(
+        f"INSERT INTO object_versions_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {object_size})"
+    )
+    # Insert into files_stats
+    clickhouse_client.command(
+        f"INSERT INTO files_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {file_size})"
+    )
+    # Insert into table_rows_stats
+    clickhouse_client.command(
+        f"INSERT INTO table_rows_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {table_size})"
+    )
+
+    # Query project stats with all storage sizes included
+    res = client.server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+
+    # Assert the result fields match the inserted values
+    assert res.trace_storage_size_bytes == trace_size
+    assert res.objects_storage_size_bytes == object_size
+    assert res.tables_storage_size_bytes == table_size
+    assert res.files_storage_size_bytes == file_size
+
+    # test that requesting with none of the include_* params returns an error
+    with pytest.raises(ValueError):
+        client.server.project_stats(
+            tsi.ProjectStatsReq(
+                project_id=project_id,
+                include_trace_storage_size=False,
+                include_object_storage_size=False,
+                include_table_storage_size=False,
+                include_file_storage_size=False,
+            )
+        )
