@@ -430,3 +430,53 @@ export type TableCreateRes = {
   digest: string;
   row_digests: string[];
 };
+
+export type Configuration = {
+  id: string;
+  project_id: string;
+  type: string;
+  value: Record<string, any>;
+};
+
+export type ConfigurationCreateReq = {
+  project_id: string;
+  type: string;
+  value: Record<string, any>;
+};
+
+export type ConfigurationCreateRes = {
+  id: string;
+};
+
+export type ConfigurationUpdateReq = {
+  id: string;
+  project_id: string;
+  value: Record<string, any>;
+};
+
+export type ConfigurationUpdateRes = {};
+
+export type ConfigurationDeleteReq = {
+  id: string;
+  project_id: string;
+};
+
+export type ConfigurationDeleteRes = {};
+
+export type ConfigurationListReq = {
+  project_id: string;
+  type?: string;
+};
+
+export type ConfigurationListRes = {
+  configurations: Configuration[];
+};
+
+export type ConfigurationGetReq = {
+  id: string;
+  project_id: string;
+};
+
+export type ConfigurationGetRes = {
+  configuration: Configuration;
+};

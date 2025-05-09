@@ -1007,6 +1007,88 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class Configuration(BaseModel):
+    id: str
+    project_id: str
+    type: str
+    value: dict[str, Any]
+
+
+class ConfigurationCreateReq(BaseModel):
+    project_id: str
+    type: str
+    value: dict[str, Any]
+
+
+class ConfigurationCreateRes(BaseModel):
+    id: str
+
+
+class ConfigurationUpdateReq(BaseModel):
+    id: str
+    project_id: str
+    value: dict[str, Any]
+
+
+class ConfigurationUpdateRes(BaseModel):
+    pass
+
+
+class ConfigurationDeleteReq(BaseModel):
+    id: str
+    project_id: str
+
+
+class ConfigurationListReq(BaseModel):
+    project_id: str
+    type: Optional[str] = None
+
+
+class ConfigurationListRes(BaseModel):
+    configurations: list[Configuration]
+
+
+class ConfigurationGetReq(BaseModel):
+    id: str
+    project_id: str
+
+
+class ConfigurationCreateRes(BaseModel):
+    id: str
+
+
+class ConfigurationUpdateReq(BaseModel):
+    id: str
+    project_id: str
+    value: dict[str, Any]
+
+
+class ConfigurationUpdateRes(BaseModel):
+    pass
+
+
+class ConfigurationDeleteReq(BaseModel):
+    id: str
+    project_id: str
+
+
+class ConfigurationDeleteRes(BaseModel):
+    pass
+
+
+class ConfigurationListReq(BaseModel):
+    project_id: str
+    type: Optional[str] = None
+
+
+class ConfigurationListRes(BaseModel):
+    configurations: list[Configuration]
+
+
+class ConfigurationGetRes(BaseModel):
+    configuration: Configuration
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1074,3 +1156,16 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Configuration API
+    def configuration_create(
+        self, req: ConfigurationCreateReq
+    ) -> ConfigurationCreateRes: ...
+    def configuration_update(
+        self, req: ConfigurationUpdateReq
+    ) -> ConfigurationUpdateRes: ...
+    def configuration_delete(
+        self, req: ConfigurationDeleteReq
+    ) -> ConfigurationDeleteRes: ...
+    def configuration_list(self, req: ConfigurationListReq) -> ConfigurationListRes: ...
+    def configuration_get(self, req: ConfigurationGetReq) -> ConfigurationGetRes: ...

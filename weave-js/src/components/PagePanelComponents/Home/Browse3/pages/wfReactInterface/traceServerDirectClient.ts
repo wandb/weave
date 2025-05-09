@@ -21,6 +21,16 @@ import {
   ActionsExecuteBatchRes,
   CompletionsCreateReq,
   CompletionsCreateRes,
+  ConfigurationCreateReq,
+  ConfigurationCreateRes,
+  ConfigurationDeleteReq,
+  ConfigurationDeleteRes,
+  ConfigurationGetReq,
+  ConfigurationGetRes,
+  ConfigurationListReq,
+  ConfigurationListRes,
+  ConfigurationUpdateReq,
+  ConfigurationUpdateRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -466,6 +476,51 @@ export class DirectTraceServerClient {
 
     return prom;
   };
+
+  public configurationCreate(
+    req: ConfigurationCreateReq
+  ): Promise<ConfigurationCreateRes> {
+    return this.makeRequest<ConfigurationCreateReq, ConfigurationCreateRes>(
+      '/configurations/create',
+      req
+    );
+  }
+
+  public configurationDelete(
+    req: ConfigurationDeleteReq
+  ): Promise<ConfigurationDeleteRes> {
+    return this.makeRequest<ConfigurationDeleteReq, ConfigurationDeleteRes>(
+      '/configurations/delete',
+      req
+    );
+  }
+
+  public configurationGet(
+    req: ConfigurationGetReq
+  ): Promise<ConfigurationGetRes> {
+    return this.makeRequest<ConfigurationGetReq, ConfigurationGetRes>(
+      '/configurations/get',
+      req
+    );
+  }
+
+  public configurationUpdate(
+    req: ConfigurationUpdateReq
+  ): Promise<ConfigurationUpdateRes> {
+    return this.makeRequest<ConfigurationUpdateReq, ConfigurationUpdateRes>(
+      '/configurations/update',
+      req
+    );
+  }
+
+  public configurationList(
+    req: ConfigurationListReq
+  ): Promise<ConfigurationListRes> {
+    return this.makeRequest<ConfigurationListReq, ConfigurationListRes>(
+      '/configurations/list',
+      req
+    );
+  }
 }
 
 /**
