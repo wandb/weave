@@ -5,6 +5,7 @@ import moment from 'moment';
 import React from 'react';
 import TimeAgo, {Formatter} from 'react-timeago';
 
+import {parseDate} from '../util/date';
 import {Icon} from './Icon';
 import {Tooltip} from './Tooltip';
 
@@ -28,63 +29,6 @@ type TimestampProps = {
   dropTimeWhenDefault?: boolean;
 };
 
-// Format a time difference to a micro string (1h, 1d, 1w, etc.)
-const formatSmallTime = (then: moment.Moment): string | null => {
-  const now = moment();
-  const diffMs = now.diff(then);
-
-  const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(diffMs / (1000 * 60));
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  const years = now.diff(then, 'years');
-  if (years > 0) {
-    return `${years}y`;
-  }
-
-  const monthDiff = now.diff(then, 'months');
-
-  // Always show months if 3 or more
-  if (monthDiff >= 3) {
-    return `${monthDiff}mo`;
-  }
-
-  // Get remaining days by moving forward the months and checking what's left
-  const afterMonths = then.clone().add(monthDiff, 'months');
-  const remainingDays = now.diff(afterMonths, 'days');
-
-  // Show months if exact multiple
-  if (monthDiff > 0 && remainingDays === 0) {
-    return `${monthDiff}mo`;
-  }
-
-  // Show weeks when more than 14 days or exact
-  const weeks = Math.round(days / 7);
-  if (weeks >= 2) {
-    return `${weeks}w`;
-  }
-
-  // Show weeks when exact multiple
-  if (days >= 7 && days % 7 === 0) {
-    return `${weeks}w`;
-  }
-
-  // Otherwise use days or more precise units
-  if (days >= 1) {
-    return days === 1 ? '1d' : `${days}d`;
-  } else if (hours >= 1) {
-    return hours === 1 ? '1h' : `${hours}h`;
-  } else if (minutes >= 1) {
-    return minutes === 1 ? '1m' : `${minutes}m`;
-  } else if (seconds >= 1) {
-    return seconds === 1 ? '1s' : `${seconds}s`;
-  } else {
-    // If the time is in the future, return null
-    return null;
-  }
-};
-
 // Return short and long formatted versions of the provided timestamp.
 export const formatTimestamp = (value: string, overrideFormat?: string) => {
   const then = moment.utc(value, 'YYYY-MM-DDTHH:mm:ss').local();
@@ -104,8 +48,6 @@ const formatTimestampInternal = (
     }
   }
 
-  const small = formatSmallTime(then);
-
   return {
     // TODO: It would be nice if we could display a timezone string here to
     //       make it clear to the user this is local time. However, we don't have
@@ -114,7 +56,6 @@ const formatTimestampInternal = (
     //       REF: https://github.com/moment/moment/issues/162
     long: then.format('dddd, MMMM Do YYYY [at] h:mm:ss a'),
     short: then.format(format),
-    small,
   };
 };
 
@@ -173,28 +114,16 @@ export const Timestamp = ({
   return <Tooltip content={long} trigger={text} />;
 };
 
-export const TimestampSmall = ({
-  value,
-  label,
-}: TimestampProps & {label?: string}) => {
-  /* TimestampSmall displays a small timestamp format, e.g. "1d" or "1w".
-     in a nice gray tooltip
-   */
-  const localValueMoment = moment(value);
-  const {long, small} = formatTimestampInternal(localValueMoment);
-  if (!small) {
-    // default to regular timestamp, which expects utc
-    return <Timestamp value={value} dropTimeWhenDefault />;
-  }
+export const TimestampRelative = ({value}: {value: string}) => {
+  /* Assume relative format, just display str */
+  const tooltip = parseDate(value);
   const text = (
     <div className="flex items-center">
       <Icon name="date" className="mr-3" />
-      <span className="font-semibold">
-        {label} {small}
-      </span>
+      <span className="font-semibold">{value}</span>
     </div>
   );
-  return <Tooltip content={long} trigger={text} />;
+  return <Tooltip content={tooltip} trigger={text} />;
 };
 
 export const TimestampRange = ({value, field}: {value: any; field: string}) => {

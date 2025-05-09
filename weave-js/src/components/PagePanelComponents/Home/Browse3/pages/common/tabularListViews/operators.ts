@@ -1,4 +1,5 @@
 import {GridFilterItem} from '@mui/x-data-grid';
+import {parseDate} from '@wandb/weave/util/date';
 import _ from 'lodash';
 
 import {Query} from '../../wfReactInterface/traceServerClientInterface/query';
@@ -121,7 +122,11 @@ export const operationConverter = (
     if (item.value === '') {
       return null;
     }
-    const millisecs = new Date(item.value).getTime();
+    // Handle relative time values
+    const millisecs = parseDate(item.value)?.getTime();
+    if (millisecs == null) {
+      return null;
+    }
     return {
       $gt: [{$getField: item.field}, {$literal: millisecs / 1000}],
     };
@@ -129,7 +134,11 @@ export const operationConverter = (
     if (item.value === '') {
       return null;
     }
-    const millisecs = new Date(item.value).getTime();
+    // Handle relative time values
+    const millisecs = parseDate(item.value)?.getTime();
+    if (millisecs == null) {
+      return null;
+    }
     return {
       $not: [
         {
