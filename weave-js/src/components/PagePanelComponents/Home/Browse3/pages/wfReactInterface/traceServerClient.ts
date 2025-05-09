@@ -190,30 +190,12 @@ export class TraceServerClient extends CachingTraceServerClient {
     req: TraceTableQueryReq
   ): Promise<TraceTableQueryRes> {
     // Specific case for optimization:
-    // If the request contains a row_digest filter
-    if (req.filter?.row_digests) {
-      // and there are no other properties of the request
-      if (
-        Object.entries(req)
-          .map(
-            ([k, v]) =>
-              ['project_id', 'digest', 'filter'].includes(k) || v == null
-          )
-          .every(Boolean)
-      ) {
-        // and there are no other filter properties, we can use tableRowQuery instead.
-        if (
-          Object.entries(req.filter)
-            .map(([k, v]) => 'row_digests' === k || v == null)
-            .every(Boolean)
-        ) {
-          return this.tableRowQuery({
-            project_id: req.project_id,
-            digest: req.digest,
-            row_digests: req.filter.row_digests,
-          });
-        }
-      }
+    if (tableQuerySuitableForBatching(req)) {
+      return this.tableRowQuery({
+        project_id: req.project_id,
+        digest: req.digest,
+        row_digests: req.filter.row_digests,
+      });
     }
     return super.tableQuery(req);
   }
@@ -329,3 +311,33 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.tableRowQuery(req);
   }
 }
+
+const tableQuerySuitableForBatching = (
+  req: TraceTableQueryReq
+): req is TraceTableQueryReq & {
+  filter: {
+    row_digests: NonNullable<
+      NonNullable<TraceTableQueryReq['filter']>['row_digests']
+    >;
+  };
+} => {
+  // If the request does not contain a row_digests filter, return false
+  if (!req.filter?.row_digests) {
+    return false;
+  }
+
+  // If the request contains anything other than project_id, digest, and filter, return false
+  // We can't support sorting/pagination, etc.
+  if (
+    Object.keys(req).some(k => !['project_id', 'digest', 'filter'].includes(k))
+  ) {
+    return false;
+  }
+
+  // If the filter contains anything other than row_digests, return false
+  // Forward protection (there are no other filter properties yet)
+  if (Object.keys(req.filter).some(k => k !== 'row_digests')) {
+    return false;
+  }
+  return true;
+};
