@@ -29,7 +29,8 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
+import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
@@ -250,11 +251,16 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
+    'detail'
+  );
+  const headerHeight = 0;
   return (
     <VerticalBox
       sx={{
         width: '100%',
         overflow: 'hidden',
+        // height,
       }}>
       <HorizontalBox
         sx={{
@@ -264,6 +270,8 @@ const ResultExplorer: React.FC<{
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
+          // height: headerHeight,
+          paddingTop: 15,
         }}>
         <Box
           sx={{
@@ -273,13 +281,49 @@ const ResultExplorer: React.FC<{
           Output Comparison
         </Box>
       </HorizontalBox>
-      <Box
-        sx={{
-          height,
-          overflow: 'auto',
+      <div
+        style={{
+          height: height - headerHeight,
+          overflow: 'hidden',
         }}>
-        <ExampleCompareSection state={state} />
-      </Box>
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            height: '100%',
+            borderTop: '1px solid #e0e0e0',
+          }}>
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              display: viewMode !== 'detail' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionTable
+              state={state}
+              shouldHighlightSelectedRow={viewMode === 'split'}
+              onShowSplitView={() => setViewMode('split')}
+            />
+          </Box>
+
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              borderLeft: '1px solid #e0e0e0',
+              display: viewMode !== 'table' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionDetail
+              state={state}
+              onClose={() => setViewMode('table')}
+              onExpandToggle={() =>
+                setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+              }
+              isExpanded={viewMode === 'detail'}
+            />
+          </Box>
+        </Box>
+      </div>
     </VerticalBox>
   );
 };

@@ -1,4 +1,9 @@
-import {parseRef, parseRefMaybe, WeaveObjectRef} from '@wandb/weave/react';
+import {
+  ObjectRef,
+  parseRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '@wandb/weave/react';
 import _, {isEmpty} from 'lodash';
 import {
   MutableRefObject,
@@ -37,11 +42,12 @@ type RowBase = {
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
+  trialNdx: number;
 };
 
 export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
-  scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+  scores: {[scoreId: string]: {[callId: string]: number | boolean | undefined}};
 };
 
 const aggregateGroupedNestedRows = <T>(
@@ -126,7 +132,31 @@ const rowIsSelected = (
   });
 };
 
-export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
+export type FilteredAggregateRows = {
+  id: string;
+  count: number;
+  inputDigest: string;
+  inputRef: ObjectRef | null;
+  output: {
+    [k: string]: {
+      [k: string]: any;
+    };
+  };
+  scores: {
+    [k: string]: {
+      [k: string]: number | undefined;
+    };
+  };
+  originalRows: PivotedRow[];
+}[];
+
+export const useFilteredAggregateRows = (
+  state: EvaluationComparisonState
+): {
+  filteredRows: FilteredAggregateRows;
+  outputColumnKeys: string[];
+  leafDims: string[];
+} => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
     () => buildCompositeMetricsMap(state.summary, 'score'),
@@ -140,7 +170,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     ).forEach(([rowDigest, rowCollection]) => {
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
-          predictAndScoreRes => {
+          (predictAndScoreRes, trialNdx) => {
             const output = predictAndScoreRes._rawPredictTraceData?.output;
             rows.push({
               id: predictAndScoreRes.callId,
@@ -168,6 +198,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                 predictAndScoreRes.callId,
               ],
               predictAndScore: predictAndScoreRes,
+              trialNdx,
             });
           }
         );
@@ -352,25 +383,42 @@ async function makePartialTableReq(
 
 async function loadRowDataIntoCache(
   rowDigests: string[],
-  cachedRowData: MutableRefObject<Record<string, any>>,
+  // cachedRowData: MutableRefObject<Record<string, any>>,
+  setCachedRowData: (digest: string, data: any) => void,
   cachedPartialTableRequest: MutableRefObject<{
     project_id: string;
     digest: string;
   } | null>,
   getTraceServerClient: () => TraceServerClient
 ) {
-  const rowsRes = await getTraceServerClient().tableQuery({
+  const rowsRes = await getTraceServerClient().tableRowQuery({
     ...cachedPartialTableRequest.current!,
-    filter: {
-      row_digests: rowDigests,
-    },
+    row_digests: rowDigests,
   });
   for (const row of rowsRes.rows) {
-    cachedRowData.current[row.digest] = row.val;
+    setCachedRowData(row.digest, row.val);
   }
 }
 
 type UseExampleCompareDataParams = Parameters<typeof useExampleCompareData>;
+
+const getCachedRowData = (state: EvaluationComparisonState, digest: string) => {
+  return state.loadableComparisonResults.result?.resultRows?.[digest]
+    ?.rawDataRow;
+};
+
+const setCachedRowData = (
+  state: EvaluationComparisonState,
+  digest: string,
+  data: any
+) => {
+  const currentRow =
+    state.loadableComparisonResults.result?.resultRows?.[digest];
+  if (currentRow == null) {
+    return;
+  }
+  currentRow.rawDataRow = data;
+};
 
 export function useExampleCompareData(
   state: EvaluationComparisonState,
@@ -383,7 +431,7 @@ export function useExampleCompareData(
 
   // cache the row data for the current target row and adjacent rows,
   // this is to allow for fast re-renders during pagination
-  const cachedRowData = useRef<Record<string, any>>({});
+  // const cachedRowData = useRef<Record<string, any>>({});
   const cachedPartialTableRequest = useRef<{
     project_id: string;
     digest: string;
@@ -402,7 +450,7 @@ export function useExampleCompareData(
       return undefined;
     }
     const digest = filteredRows[targetIndex].inputDigest;
-    return flattenObjectPreservingWeaveTypes(cachedRowData.current[digest]);
+    return flattenObjectPreservingWeaveTypes(getCachedRowData(state, digest));
     // Including `cacheVersion` in the dependency array ensures the memo recalculates
     // when it changes, even though it's not directly used in the calculation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -419,12 +467,9 @@ export function useExampleCompareData(
 
       // Check if we can get the data from the results directly.
       // This is most commonly true for imperative evaluations
-      const rawDataRow =
-        state.loadableComparisonResults.result?.resultRows?.[selectedRowDigest]
-          ?.rawDataRow;
-      if (!(selectedRowDigest in cachedRowData.current) && rawDataRow) {
-        cachedRowData.current[selectedRowDigest] = rawDataRow;
-        increaseCacheVersion();
+      const rawDataRow = getCachedRowData(state, selectedRowDigest);
+      if (rawDataRow) {
+        // increaseCacheVersion();
         return;
       }
 
@@ -442,21 +487,21 @@ export function useExampleCompareData(
         return;
       }
 
-      if (!(selectedRowDigest in cachedRowData.current)) {
-        // immediately fetch the current row
-        setLoading(true);
+      // if (rawDataRow == null) {
+      // immediately fetch the current row
+      setLoading(true);
 
-        await loadRowDataIntoCache(
-          [selectedRowDigest],
-          cachedRowData,
-          cachedPartialTableRequest,
-          getTraceServerClient
-        );
+      await loadRowDataIntoCache(
+        [selectedRowDigest],
+        (digest, data) => setCachedRowData(state, digest, data),
+        cachedPartialTableRequest,
+        getTraceServerClient
+      );
 
-        // This trigger a re-calculation of the `target` and a re-render immediately
-        increaseCacheVersion();
-        setLoading(false);
-      }
+      // This trigger a re-calculation of the `target` and a re-render immediately
+      increaseCacheVersion();
+      setLoading(false);
+      // }
 
       // check if there is a need to fetch adjacent rows
       const adjacentRows = [];
@@ -468,25 +513,18 @@ export function useExampleCompareData(
       }
 
       const adjacentRowsToFetch = adjacentRows.filter(
-        row => !(row in cachedRowData.current)
+        row => getCachedRowData(state, row) == null
       );
 
       if (adjacentRowsToFetch.length > 0) {
         // we load the data into the cache, but don't trigger a re-render
         await loadRowDataIntoCache(
           adjacentRowsToFetch,
-          cachedRowData,
+          (digest, data) => setCachedRowData(state, digest, data),
           cachedPartialTableRequest,
           getTraceServerClient
         );
       }
-
-      // evict the obsolete cache
-      const newCache: Record<string, any> = {};
-      for (const rowDigest of [selectedRowDigest, ...adjacentRows]) {
-        newCache[rowDigest] = cachedRowData.current[rowDigest];
-      }
-      cachedRowData.current = newCache;
     })();
   }, [
     state.summary.evaluations,
@@ -495,6 +533,7 @@ export function useExampleCompareData(
     targetIndex,
     increaseCacheVersion,
     getTraceServerClient,
+    state,
   ]);
 
   return {
@@ -502,3 +541,10 @@ export function useExampleCompareData(
     loading,
   };
 }
+
+export const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
+};

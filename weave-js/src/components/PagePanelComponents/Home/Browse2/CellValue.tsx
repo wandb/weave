@@ -19,9 +19,10 @@ import {CellValueString} from './CellValueString';
 type CellValueProps = {
   value: any;
   noLink?: boolean;
+  collapsedStyle?: React.CSSProperties;
 };
 
-export const CellValue = ({value, noLink}: CellValueProps) => {
+export const CellValue = ({value, noLink, collapsedStyle}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -47,7 +48,7 @@ export const CellValue = ({value, noLink}: CellValueProps) => {
     if (value.startsWith('data:image/')) {
       return <CellValueImage value={value} />;
     }
-    return <CellValueString value={value} />;
+    return <CellValueString value={value} collapsedStyle={collapsedStyle} />;
   }
   if (typeof value === 'number') {
     if (isProbablyTimestamp(value)) {
