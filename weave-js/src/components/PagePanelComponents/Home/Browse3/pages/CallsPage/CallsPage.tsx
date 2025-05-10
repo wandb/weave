@@ -310,6 +310,7 @@ export const CallsPage: FC<{
                   setSortModel={props.setSortModel}
                   paginationModel={props.paginationModel}
                   setPaginationModel={props.setPaginationModel}
+                  currentViewId={savedViewsInfo.currentViewId}
                 />
               ),
             },

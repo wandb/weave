@@ -186,6 +186,8 @@ export const CallsTable: FC<{
 
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
+
+  currentViewId?: string;
 }> = ({
   entity,
   project,
@@ -205,6 +207,7 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  currentViewId,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -287,6 +290,7 @@ export const CallsTable: FC<{
   );
 
   const shouldIncludeTotalStorageSize = effectiveFilter.traceRootsOnly;
+  const currentViewIdResolved = currentViewId ?? '';
 
   // Fetch the calls
   const calls = useCallsForQuery(
@@ -318,11 +322,18 @@ export const CallsTable: FC<{
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
   const callsEffectiveFilter = useRef(effectiveFilter);
+  const prevViewIdRef = useRef(currentViewIdResolved);
+  // A structural change is one where we don't want the set of columns to persist.
+  // This can be because of a view change or effective filter (e.g. selected Op) change.
+  const hasStructuralChange =
+    callsEffectiveFilter.current !== effectiveFilter ||
+    prevViewIdRef.current !== currentViewIdResolved;
   useEffect(() => {
-    if (callsEffectiveFilter.current !== effectiveFilter) {
+    if (hasStructuralChange) {
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
       // Refetch the calls IFF the filter has changed, this is a
       // noop if the calls query is already loading, but if the filter
       // has no effective impact (frozen vs. not frozen) we need to
@@ -332,13 +343,15 @@ export const CallsTable: FC<{
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
     }
-  }, [calls, effectiveFilter]);
+  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
-    [callsResult]
+    () =>
+      prepareFlattenedCallDataForTable(hasStructuralChange ? [] : callsResult),
+    [callsResult, hasStructuralChange]
   );
 
   // This is a specific helper that is used when the user attempts to option-click
@@ -475,6 +488,7 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
+    currentViewIdResolved,
     tableData,
     expandedRefCols,
     onCollapse,
