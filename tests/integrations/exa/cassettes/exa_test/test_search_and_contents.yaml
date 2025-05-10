@@ -1,0 +1,644 @@
+interactions:
+- request:
+    body: '{"query": "Latest developments in AI safety", "type": "auto", "numResults":
+      5, "contents": {"text": true}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '106'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - exa-py 1.9.1
+    method: POST
+    uri: https://api.exa.ai/search
+  response:
+    body:
+      string: "{\"requestId\":\"da04d7d64551ce7fe4c1acf78cae3a5a\",\"autopromptString\":\"Latest
+        developments in AI safety\",\"resolvedSearchType\":\"neural\",\"results\":[{\"id\":\"https://twitter.com/FLI_org/status/1640976240382287873\",\"title\":\"\",\"url\":\"https://twitter.com/FLI_org/status/1640976240382287873\",\"publishedDate\":\"2023-03-29T07:16:38.000Z\",\"author\":\"FLI_org\",\"score\":0.41425350308418274,\"text\":\"\U0001F4E2
+        We're calling on AI labs to temporarily pause training powerful models!\\nJoin
+        FLI's call alongside Yoshua Bengio, @stevewoz, @harari_yuval, @elonmusk, @GaryMarcus
+        &amp; over a 1000 others who've signed:\\nhttps://t.co/3rJBjDXapc\\nA short
+        \U0001F9F5on why we're calling for this - (1/8)| created_at: Wed Mar 29 07:16:38
+        +0000 2023 | favorite_count: 1066 | quote_count: 358 | reply_count: 175 |
+        retweet_count: 538 | is_quote_status: False | retweeted: False | lang: en\"},{\"id\":\"https://www.vox.com/future-perfect/2023/3/25/23655082/ai-openai-gpt-4-safety-microsoft-facebook-meta\",\"title\":\"If
+        your AI model is going to sell, it has to be safe\",\"url\":\"https://www.vox.com/future-perfect/2023/3/25/23655082/ai-openai-gpt-4-safety-microsoft-facebook-meta\",\"publishedDate\":\"2023-03-25T00:00:00.000Z\",\"author\":\"Haydn
+        Belfield\",\"score\":0.41244497895240784,\"text\":\"On March 14, OpenAI released
+        the successor to ChatGPT: GPT-4. It impressed observers with its markedly
+        improved performance across reasoning, retention, and coding. It also fanned
+        fears around AI safety, around our ability to control these increasingly powerful
+        models. But that debate obscures the fact that, in many ways, GPT-4\u2019s
+        most remarkable gains, compared to similar models in the past, have been around
+        safety. According to the company\u2019s Technical Report , during GPT-4\u2019s
+        development, OpenAI \u201Cspent six months on safety research, risk assessment,
+        and iteration.\u201D OpenAI reported that this work yielded significant results:
+        \u201CGPT-4 is 82% less likely to respond to requests for disallowed content
+        and 40% more likely to produce factual responses than GPT-3.5 on our internal
+        evaluations.\u201D (ChatGPT is a slightly tweaked version of GPT-3.5: if you\u2019ve
+        been using ChatGPT over the last few months, you\u2019ve been interacting
+        with GPT-3.5.) This demonstrates a broader point: For AI companies, there
+        are significant competitive advantages and profit incentives for emphasizing
+        safety. The key success of ChatGPT over other companies\u2019 large language
+        models (LLMs) \u2014 apart from a nice user interface and remarkable word-of-mouth
+        buzz \u2014 is precisely its safety. Even as it rapidly grew to over 100 million
+        users, it hasn\u2019t had to be taken down or significantly tweaked to make
+        it less harmful (and less useful). Tech companies should be investing heavily
+        in safety research and testing for all our sakes, but also for their own commercial
+        self-interest. That way, the AI model works as intended, and these companies
+        can keep their tech online. ChatGPT Plus is making money , and you can\u2019t
+        make money if you\u2019ve had to take your language model down. OpenAI\u2019s
+        reputation has been increased by its tech being safer than its competitors,
+        while other tech companies have had their reputations hit by their tech being
+        unsafe, and even having to take it down. (Disclosure: I am listed in the acknowledgments
+        of the GPT-4 System Card, but I have not shown the draft of this story to
+        anyone at OpenAI, nor have I taken funding from the company.) The competitive
+        advantage of AI safety Just ask Mark Zuckerberg. When Meta released its large
+        language model BlenderBot 3 in August 2022, it immediately faced problems
+        of making inappropriate and untrue statements. Meta\u2019s Galactica was only
+        up for three days in November 2022 before it was withdrawn after it was shown
+        confidently \u2018hallucinating\u2019 (making up) academic papers that didn\u2019t
+        exist. Most recently, in February 2023, Meta irresponsibly released the full
+        weights of its latest language model, LLaMA. As many experts predicted would
+        happen, it proliferated to 4chan , where it will be used to mass-produce disinformation
+        and hate. I and my co-authors warned about this five years ago in a 2018 report
+        called \u201C The Malicious Use of Artificial Intelligence ,\u201D while the
+        Partnership on AI (Meta was a founding member and remains an active partner)
+        had a great report on responsible publication in 2021. These repeated and
+        failed attempts to \u201Cmove fast and break things\u201D have probably exacerbated
+        Meta\u2019s trust problems. In surveys from 2021 of AI researchers and the
+        US public on trust in actors to shape the development and use of AI in the
+        public interest, \u201CFacebook [Meta] is ranked the least trustworthy of
+        American tech companies.\u201D But it\u2019s not just Meta. The original misbehaving
+        machine learning chatbot was Microsoft\u2019s Tay, which was withdrawn 16
+        hours after it was released in 2016 after making racist and inflammatory statements.
+        Even Bing/Sydney had some very erratic responses, including declaring its
+        love for, and then threatening, a journalist. In response, Microsoft limited
+        the number of messages one could exchange, and Bing/Sydney no longer answers
+        questions about itself. We now know Microsoft based it on OpenAI\u2019s GPT-4;
+        Microsoft invested $11 billion into OpenAI in return for OpenAI running all
+        their computing on Microsoft\u2019s Azure cloud and becoming their \u201Cpreferred
+        partner for commercializing new AI technologies.\u201D But it is unclear why
+        the model responded so strangely. It could have been an early, not fully safety-trained
+        version, or it could be due to its connection to search and thus its ability
+        to \u201Cread\u201D and respond to an article about itself in real time. (By
+        contrast, GPT-4\u2019s training data only runs up to September 2021 , and
+        it does not have access to the web.) It\u2019s notable that even as it was
+        heralding its new AI models, Microsoft recently laid off its AI ethics and
+        society team. OpenAI took a different path with GPT-4, but it\u2019s not the
+        only AI company that has been putting in the work on safety. Other leading
+        labs have also been making clear their commitments, with Anthropic and DeepMind
+        publishing their safety and alignment strategies. These two labs have also
+        been safe and cautious with the development and deployment of Claude and Sparrow
+        , their respective LLMs. A playbook for best practices Tech companies developing
+        LLMs and other forms of cutting-edge, impactful AI should learn from this
+        comparison. They should adopt the best practice as shown by OpenAI: Invest
+        in safety research and testing before releasing. What does this look like
+        specifically? GPT-4\u2019s System Card describes four steps OpenAI took that
+        could be a model for other companies. First, prune your dataset for toxic
+        or inappropriate content. Second, train your system with reinforcement learning
+        from human feedback (RLHF) and rule-based reward models (RBRMs). RLHF involves
+        human labelers creating demonstration data for the model to copy and ranking
+        data (\u201Coutput A is preferred to output B\u201D) for the model to better
+        predict what outputs we want. RLHF produces a model that is sometimes overcautious,
+        refusing to answer or hedging (as some users of ChatGPT will have noticed).
+        RBRM is an automated classifier that evaluates the model\u2019s output on
+        a set of rules in multiple-choice style, then rewards the model for refusing
+        or answering for the right reasons and in the desired style. So the combination
+        of RLHF and RBRM encourages the model to answer questions helpfully, refuse
+        to answer some harmful questions, and distinguish between the two. Third,
+        provide structured access to the model through an API. This allows you to
+        filter responses and monitor for poor behavior from the model (or from users).
+        Fourth, invest in moderation, both by humans and by automated moderation and
+        content classifiers. For example, OpenAI used GPT-4 to create rule-based classifiers
+        that flag model outputs that could be harmful. This all takes time and effort,
+        but it\u2019s worth it. Other approaches can also work, like Anthropic\u2019s
+        rule-following Constitutional AI , which leverages RL from AI feedback (RLAIF)
+        to complement human labelers. As OpenAI acknowledges, their approach is not
+        perfect: the model still hallucinates and can still sometimes be tricked into
+        providing harmful content. Indeed, there\u2019s room to go beyond and improve
+        upon OpenAI\u2019s approach , for example by providing more compensation and
+        career progression opportunities for the human labelers of outputs. Has OpenAI
+        become less open? If this means less open source, then no. OpenAI adopted
+        a \u201C staged release \u201D strategy for GPT-2 in 2019 and an API in 2020.
+        Given Meta\u2019s 4chan experience, this seems justified. As Ilya Sutskever,
+        OpenAI chief scientist, noted to The Verge : \u201CI fully expect that in
+        a few years it\u2019s going to be completely obvious to everyone that open-sourcing
+        AI is just not wise.\u201D GPT-4 did have less information than previous releases
+        on \u201Carchitecture (including model size), hardware, training compute,
+        dataset construction, training method.\u201D This is because OpenAI is concerned
+        about acceleration risk : \u201Cthe risk of racing dynamics leading to a decline
+        in safety standards, the diffusion of bad norms, and accelerated AI timelines,
+        each of which heighten societal risks associated with AI.\u201D Providing
+        those technical details would speed up the overall rate of progress in developing
+        and deploying powerful AI systems. However, AI poses many unsolved governance
+        and technical challenges: For example, the US and EU won\u2019t have detailed
+        safety technical standards for high-risk AI systems ready until early 2025.
+        That\u2019s why I and others believe we shouldn\u2019t be speeding up progress
+        in AI capabilities, but we should be going full speed ahead on safety progress.
+        Any reduced openness should never be an impediment to safety, which is why
+        it\u2019s so useful that the System Card shares details on safety challenges
+        and mitigation techniques. Even though OpenAI seems to be coming around to
+        this view, they\u2019re still at the forefront of pushing forward capabilities,
+        and should provide more information on how and when they envisage themselves
+        and the field slowing down. AI companies should be investing significantly
+        in safety research and testing. It is the right thing to do and will soon
+        be required by regulation and safety standards in the EU and USA. But also,
+        it is in the self-interest of these AI companies. Put in the work, get the
+        reward. Haydn Belfield has been academic project manager at the University
+        of Cambridge\u2019s Centre for the Study of Existential Risk (CSER) for the
+        past six years. He is also an associate fellow at the Leverhulme Centre for
+        the Future of Intelligence.\",\"image\":\"https://platform.vox.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/24533906/GettyImages_1249183770.jpg?quality=90&strip=all&crop=0%2C15.095986038394%2C100%2C69.808027923211&w=1200\",\"favicon\":\"https://www.vox.com/static-assets/icons/favicon-32x32.png\"},{\"id\":\"https://www.lesswrong.com/posts/oM9pEezyCb4dCsuKq/pausing-ai-developments-isn-t-enough-we-need-to-shut-it-all-1\",\"title\":\"Pausing
+        AI Developments Isn't Enough. We Need to Shut it All Down\",\"url\":\"https://www.lesswrong.com/posts/oM9pEezyCb4dCsuKq/pausing-ai-developments-isn-t-enough-we-need-to-shut-it-all-1\",\"publishedDate\":\"2023-04-08T00:36:47.000Z\",\"author\":\"Eliezer
+        Yudkowsky\",\"score\":0.4110347032546997,\"text\":\"( Published in TIME on
+        March 29. ) An open letter published today calls for \u201Call AI labs to
+        immediately pause for at least 6 months the training of AI systems more powerful
+        than GPT-4.\u201D This 6-month moratorium would be better than no moratorium.
+        I have respect for everyone who stepped up and signed it. It\u2019s an improvement
+        on the margin. I refrained from signing because I think the letter is understating
+        the seriousness of the situation and asking for too little to solve it. The
+        key issue is not \u201Chuman-competitive\u201D intelligence (as the open letter
+        puts it); it\u2019s what happens after AI gets to smarter-than-human intelligence.
+        Key thresholds there may not be obvious, we definitely can\u2019t calculate
+        in advance what happens when, and it currently seems imaginable that a research
+        lab would cross critical lines without noticing. Many researchers steeped
+        in these issues , including myself, expect that the most likely result of
+        building a superhumanly smart AI, under anything remotely like the current
+        circumstances, is that literally everyone on Earth will die. Not as in \u201Cmaybe
+        possibly some remote chance,\u201D but as in \u201Cthat is the obvious thing
+        that would happen.\u201D It\u2019s not that you can\u2019t, in principle,
+        survive creating something much smarter than you; it\u2019s that it would
+        require precision and preparation and new scientific insights, and probably
+        not having AI systems composed of giant inscrutable arrays of fractional numbers.
+        Without that precision and preparation, the most likely outcome is AI that
+        does not do what we want, and does not care for us nor for sentient life in
+        general. That kind of caring is something that could in principle be imbued
+        into an AI but we are not ready and do not currently know how. Absent that
+        caring, we get \u201Cthe AI does not love you, nor does it hate you, and you
+        are made of atoms it can use for something else.\u201D The likely result of
+        humanity facing down an opposed superhuman intelligence is a total loss. Valid
+        metaphors include \u201Ca 10-year-old trying to play chess against Stockfish
+        15\u201D, \u201Cthe 11th century trying to fight the 21st century,\u201D and
+        \u201C Australopithecus trying to fight Homo sapiens \u201C. To visualize
+        a hostile superhuman AI, don\u2019t imagine a lifeless book-smart thinker
+        dwelling inside the internet and sending ill-intentioned emails. Visualize
+        an entire alien civilization, thinking at millions of times human speeds,
+        initially confined to computers\u2014in a world of creatures that are, from
+        its perspective, very stupid and very slow. A sufficiently intelligent AI
+        won\u2019t stay confined to computers for long. In today\u2019s world you
+        can email DNA strings to laboratories that will produce proteins on demand,
+        allowing an AI initially confined to the internet to build artificial life
+        forms or bootstrap straight to postbiological molecular manufacturing. If
+        somebody builds a too-powerful AI, under present conditions, I expect that
+        every single member of the human species and all biological life on Earth
+        dies shortly thereafter. There\u2019s no proposed plan for how we could do
+        any such thing and survive. OpenAI\u2019s openly declared intention is to
+        make some future AI do our AI alignment homework. Just hearing that this is
+        the plan ought to be enough to get any sensible person to panic. The other
+        leading AI lab, DeepMind, has no plan at all. An aside: None of this danger
+        depends on whether or not AIs are or can be conscious; it\u2019s intrinsic
+        to the notion of powerful cognitive systems that optimize hard and calculate
+        outputs that meet sufficiently complicated outcome criteria. With that said,
+        I\u2019d be remiss in my moral duties as a human if I didn\u2019t also mention
+        that we have no idea how to determine whether AI systems are aware of themselves\u2014since
+        we have no idea how to decode anything that goes on in the giant inscrutable
+        arrays\u2014 and therefore we may at some point inadvertently create digital
+        minds which are truly conscious and ought to have rights and shouldn\u2019t
+        be owned. The rule that most people aware of these issues would have endorsed
+        50 years earlier, was that if an AI system can speak fluently and says it\u2019s
+        self-aware and demands human rights, that ought to be a hard stop on people
+        just casually owning that AI and using it past that point. We already blew
+        past that old line in the sand. And that was probably correct ; I agree that
+        current AIs are probably just imitating talk of self-awareness from their
+        training data. But I mark that, with how little insight we have into these
+        systems\u2019 internals, we do not actually know. If that\u2019s our state
+        of ignorance for GPT-4, and GPT-5 is the same size of giant capability step
+        as from GPT-3 to GPT-4, I think we\u2019ll no longer be able to justifiably
+        say \u201Cprobably not self-aware\u201D if we let people make GPT-5s. It\u2019ll
+        just be \u201CI don\u2019t know; nobody knows.\u201D If you can\u2019t be
+        sure whether you\u2019re creating a self-aware AI, this is alarming not just
+        because of the moral implications of the \u201Cself-aware\u201D part, but
+        because being unsure means you have no idea what you are doing and that is
+        dangerous and you should stop. On Feb. 7, Satya Nadella, CEO of Microsoft,
+        publicly gloated that the new Bing would make Google \u201Ccome out and show
+        that they can dance.\u201D \u201CI want people to know that we made them dance,\u201D
+        he said. This is not how the CEO of Microsoft talks in a sane world. It shows
+        an overwhelming gap between how seriously we are taking the problem, and how
+        seriously we needed to take the problem starting 30 years ago. We are not
+        going to bridge that gap in six months. It took more than 60 years between
+        when the notion of Artificial Intelligence was first proposed and studied,
+        and for us to reach today\u2019s capabilities. Solving safety of superhuman
+        intelligence\u2014not perfect safety, safety in the sense of \u201Cnot killing
+        literally everyone\u201D\u2014could very reasonably take at least half that
+        long. And the thing about trying this with superhuman intelligence is that
+        if you get that wrong on the first try, you do not get to learn from your
+        mistakes, because you are dead. Humanity does not learn from the mistake and
+        dust itself off and try again, as in other challenges we\u2019ve overcome
+        in our history, because we are all gone. Trying to get anything right on the
+        first really critical try is an extraordinary ask, in science and in engineering.
+        We are not coming in with anything like the approach that would be required
+        to do it successfully. If we held anything in the nascent field of Artificial
+        General Intelligence to the lesser standards of engineering rigor that apply
+        to a bridge meant to carry a couple of thousand cars, the entire field would
+        be shut down tomorrow. We are not prepared. We are not on course to be prepared
+        in any reasonable time window. There is no plan. Progress in AI capabilities
+        is running vastly, vastly ahead of progress in AI alignment or even progress
+        in understanding what the hell is going on inside those systems. If we actually
+        do this, we are all going to die. Many researchers working on these systems
+        think that we\u2019re plunging toward a catastrophe, with more of them daring
+        to say it in private than in public; but they think that they can\u2019t unilaterally
+        stop the forward plunge, that others will go on even if they personally quit
+        their jobs. And so they all think they might as well keep going. This is a
+        stupid state of affairs, and an undignified way for Earth to die, and the
+        rest of humanity ought to step in at this point and help the industry solve
+        its collective action problem. Some of my friends have recently reported to
+        me that when people outside the AI industry hear about extinction risk from
+        Artificial General Intelligence for the first time, their reaction is \u201Cmaybe
+        we should not build AGI, then.\u201D Hearing this gave me a tiny flash of
+        hope, because it\u2019s a simpler, more sensible, and frankly saner reaction
+        than I\u2019ve been hearing over the last 20 years of trying to get anyone
+        in the industry to take things seriously. Anyone talking that sanely deserves
+        to hear how bad the situation actually is, and not be told that a six-month
+        moratorium is going to fix it. On March 16, my partner sent me this email.
+        (She later gave me permission to excerpt it here.) \u201CNina lost a tooth!
+        In the usual way that children do, not out of carelessness! Seeing GPT4 blow
+        away those standardized tests on the same day that Nina hit a childhood milestone
+        brought an emotional surge that swept me off my feet for a minute. It\u2019s
+        all going too fast. I worry that sharing this will heighten your own grief,
+        but I\u2019d rather be known to you than for each of us to suffer alone.\u201D
+        When the insider conversation is about the grief of seeing your daughter lose
+        her first tooth, and thinking she\u2019s not going to get a chance to grow
+        up, I believe we are past the point of playing political chess about a six-month
+        moratorium. If there was a plan for Earth to survive, if only we passed a
+        six-month moratorium, I would back that plan. There isn\u2019t any such plan.
+        Here\u2019s what would actually need to be done: The moratorium on new large
+        training runs needs to be indefinite and worldwide. There can be no exceptions,
+        including for governments or militaries. If the policy starts with the U.S.,
+        then China needs to see that the U.S. is not seeking an advantage but rather
+        trying to prevent a horrifically dangerous technology which can have no true
+        owner and which will kill everyone in the U.S. and in China and on Earth.
+        If I had infinite freedom to write laws, I might carve out a single exception
+        for AIs being trained solely to solve problems in biology and biotechnology,
+        not trained on text from the internet, and not to the level where they start
+        talking or planning; but if that was remotely complicating the issue I would
+        immediately jettison that proposal and say to just shut it all down. Shut
+        down all the large GPU clusters (the large computer farms where the most powerful
+        AIs are refined). Shut down all the large training runs. Put a ceiling on
+        how much computing power anyone is allowed to use in training an AI system,
+        and move it downward over the coming years to compensate for more efficient
+        training algorithms. No exceptions for governments and militaries. Make immediate
+        multinational agreements to prevent the prohibited activities from moving
+        elsewhere. Track all GPUs sold. If intelligence says that a country outside
+        the agreement is building a GPU cluster, be less scared of a shooting conflict
+        between nations than of the moratorium being violated; be willing to destroy
+        a rogue datacenter by airstrike. Frame nothing as a conflict between national
+        interests, have it clear that anyone talking of arms races is a fool. That
+        we all live or die as one, in this, is not a policy but a fact of nature.
+        Make it explicit in international diplomacy that preventing AI extinction
+        scenarios is considered a priority above preventing a full nuclear exchange,
+        and that allied nuclear countries are willing to run some risk of nuclear
+        exchange if that\u2019s what it takes to reduce the risk of large AI training
+        runs. That\u2019s the kind of policy change that would cause my partner and
+        I to hold each other, and say to each other that a miracle happened, and now
+        there\u2019s a chance that maybe Nina will live. The sane people hearing about
+        this for the first time and sensibly saying \u201Cmaybe we should not\u201D
+        deserve to hear, honestly, what it would take to have that happen. And when
+        your policy ask is that large, the only way it goes through is if policymakers
+        realize that if they conduct business as usual, and do what\u2019s politically
+        easy, that means their own kids are going to die too. Shut it all down. We
+        are not ready. We are not on track to be significantly readier in the foreseeable
+        future. If we go ahead on this everyone will die, including children who did
+        not choose this and did not do anything wrong. Shut it down. Addendum, March
+        30: The great political writers who also aspired to be good human beings,
+        from George Orwell on the left to Robert Heinlein on the right, taught me
+        to acknowledge in my writing that politics rests on force. George Orwell considered
+        it a tactic of totalitarianism , that bullet-riddled bodies and mass graves
+        were often described in vague euphemisms; that in this way brutal policies
+        gained public support without their prices being justified, by hiding those
+        prices. Robert Heinlein thought it beneath a citizen's dignity to pretend
+        that, if they bore no gun, they were morally superior to the police officers
+        and soldiers who bore guns to defend their law and their peace; Heinlein,
+        both metaphorically and literally, thought that if you eat meat\u2014and he
+        was not a vegetarian\u2014you ought to be willing to visit a farm and try
+        personally slaughtering a chicken. When you pass a law, it means that people
+        who defy the law go to jail; and if they try to escape jail they'll be shot.
+        When you advocate an international treaty, if you want that treaty to be effective,
+        it may mean sanctions that will starve families, or a shooting war that kills
+        people outright. To threaten these things, but end up not having to do them,
+        is not very morally distinct\u2014 I would say\u2014from doing them. I admit
+        this puts me more on the Heinlein than on the Orwell side of things. Orwell,
+        I think, probably considers it very morally different if you have a society
+        with a tax system and most people pay the taxes and very few actually go to
+        jail. Orwell is more sensitive to the count of actual dead bodies\u2014or
+        people impoverished by taxation or regulation, where Orwell acknowledges and
+        cares when that actually happens. Orwell, I think, has a point. But I also
+        think Heinlein has a point. I claim that makes me a centrist. Either way,
+        neither Heinlein nor Orwell thought that laws and treaties and wars were never
+        worth it. They just wanted us to be honest about the cost. Every person who
+        pretends to be a libertarian\u2014I cannot see them even pretending to be
+        liberals\u2014who quoted my call for law and treaty as a call for \\\"violence\\\",
+        because I was frank in writing about the cost, ought to be ashamed of themselves
+        for punishing compliance with Orwell and Heinlein's rule. You can argue that
+        the treaty and law I proposed is not worth its cost in force; my being frank
+        about that cost is intended to help honest arguers make that counterargument.
+        To pretend that calling for treaty and law is VIOLENCE!! is hysteria. It doesn't
+        just punish compliance with the Heinlein/Orwell protocol, it plays into the
+        widespread depiction of libertarians as hysterical. (To be clear, a lot of
+        libertarians\u2014and socialists, and centrists, and whoever\u2014are in fact
+        hysterical, especially on Twitter.) It may even encourage actual terrorism.
+        But is it not \\\"violence\\\", if in the end you need guns and airstrikes
+        to enforce the law and treaty? And here I answer: there's an actually important
+        distinction between lawful force and unlawful force, which is not always of
+        itself the distinction between Right and Wrong, but which is a real and important
+        distinction. The common and ordinary usage of the word \\\"violence\\\" often
+        points to that distinction. When somebody says \\\"I do not endorse the use
+        of violence\\\" they do not, in common usage and common sense, mean, \\\"I
+        don't think people should be allowed to punch a mugger attacking them\\\"
+        or even \\\"Ban all taxation.\\\" Which, again, is not to say that all lawful
+        force is good and all unlawful force is bad. You can make a case for John
+        Brown (of John Brown's Body). But in fact I don't endorse shooting somebody
+        on a city council who's enforcing NIMBY regulations. I think NIMBY laws are
+        wrong. I think it's important to admit that law is ultimately backed by force.
+        But lawful force. And yes, that matters. That's why it's harmful to society
+        if you shoot the city councilor\u2014 \u2014and a misuse of language if the
+        shooter then says, \\\"They were being violent!\\\" Addendum, March 31: Sometimes\u2014even
+        when you say something whose intended reading is immediately obvious to any
+        reader who hasn't seen it before\u2014it's possible to tell people to see
+        something in writing that isn't there, and then they see it. My TIME piece
+        did not suggest nuclear strikes against countries that refuse to sign on to
+        a global agreement against large AI training runs. It said that, if a non-signatory
+        country is building a datacenter that might kill everyone on Earth, you should
+        be willing to preemptively destroy that datacenter; the intended reading is
+        that you should do this even if the non-signatory country is a nuclear power
+        and even if they try to threaten nuclear retaliation for the strike. This
+        is what is meant by \\\"Make it explicit... that allied nuclear countries
+        are willing to run some risk of nuclear exchange if that\u2019s what it takes
+        to reduce the risk of large AI training runs.\\\" I'd hope that would be clear
+        from any plain reading, if you haven't previously been lied-to about what
+        it says. It does not say, \\\"Be willing to use nuclear weapons\\\" to reduce
+        the risk of training runs. It says, \\\"Be willing to run some risk of nuclear
+        exchange\\\" [initiated by the other country] to reduce the risk of training
+        runs. The taboo against first use of nuclear weapons continues to make sense
+        to me. I don't see why we'd need to throw that away in the course of adding
+        \\\"first use of GPU farms\\\" to the forbidden list. I further note: Among
+        the reasons to spell this all out, is that it's important to be explicit,
+        in advance, about things that will cause your own country / allied countries
+        to use military force. Lack of clarity about this is how World War I and World
+        War II both started. If (say) the UK, USA, and China come to believe that
+        large GPU runs run some risk of utterly annihilating their own populations
+        and all of humanity, they would not deem it in their own interests to allow
+        Russia to proceed with building a large GPU farm even if it were a true and
+        certain fact that Russia would retaliate with nuclear weapons to the destruction
+        of that GPU farm. In this case\u2014unless I'm really missing something about
+        how this game is and ought to be played\u2014you really want all the Allied
+        countries to make it very clear, well in advance, that this is what they believe
+        and this is how they will act. This would be true even in a world where it
+        was, in reality, factually false that the large GPU farm ran a risk of destroying
+        humanity. It would still be extremely important that the Allies be very explicit
+        about what they believed and how they'd act as a result. You would not want
+        Russia believing that the Allies would back down from destroying the GPU farm
+        given a credible commitment by Russia to nuke in reply to any conventional
+        attack, and the Allies in fact believing that the danger to humanity meant
+        they had to airstrike the GPU farm anyways. So if I'd meant \\\"Be willing
+        to employ first use of nuclear weapons against a country for refusing to sign
+        the agreement,\\\" or even \\\"Use nukes to destroy rogue datacenters, instead
+        of conventional weapons, for some unimaginable reason,\\\" I'd have said that,
+        in words, very clearly, because you do not want to be vague about that sort
+        of thing. It is not what I meant, and there'd be no reason to say it, and
+        the TIME piece plainly does not say it; and if somebody else told you I said
+        that, update how much you trust them about anything else either. So long as
+        I'm clarifying things: I do not dispute those critics who have noted that
+        most international agreements, eg nuclear non-proliferation, bind only their
+        signatories. I agree that an alliance which declares its intent to strike
+        a non-signatory country for dangerous behavior is extraordinary; though precedents
+        would include Israel's airstrike on Iraq's unfinished Osirak reactor in 1981
+        (without which Iraq might well have possessed nuclear weapons at the time
+        it invaded Kuwait\u2014the later US misbehavior around Iraq does not change
+        this earlier historical point). My TIME piece does not say, \\\"Hey, this
+        problem ought to be solvable by totally conventional normal means, let's go
+        use conventional treaties and diplomacy to solve it.\\\" It says, \\\"If anyone
+        anywhere builds a sufficiently powerful AI, under anything remotely like present
+        conditions, everyone will die. Here is what we'd have to do to prevent that.\\\"
+        And no, I do not expect that policy proposal to be adopted, in real life,
+        now that we've come to this. I spent the last twenty years trying to have
+        there be options that were Not This, not because I dislike this ultimate last
+        resort... though it is horrible... but because I don't expect we actually
+        have that resort. This is not what I expect to happen, now that we've been
+        reduced to this last resort. I expect that we all die. That is why I tried
+        so hard to have things not end up here. But if one day a lot of people woke
+        up and decided that they didn't want to die, it seems to me that this is something
+        extraordinary that a coalition of nuclear countries could decide to do, and
+        maybe we wouldn't die. If all the countries on Earth had to voluntarily sign
+        on, it would not be an imaginable or viable plan even then; there's extraordinary,
+        and then there's impossible. Which is why I tried to spell out that, if the
+        allied countries were willing to behave in the extraordinary way of \\\"be
+        willing to airstrike a GPU farm built by a non-signatory country\\\" and \\\"be
+        willing to run a risk of nuclear retaliation from a nuclear non-signatory
+        country\\\", maybe those allied countries could decide to just-not-die even
+        if Russia refused to be part of the coalition.\",\"image\":\"https://res.cloudinary.com/lesswrong-2-0/image/upload/v1654295382/new_mississippi_river_fjdmww.jpg\",\"favicon\":\"https://res.cloudinary.com/lesswrong-2-0/image/upload/v1497915096/favicon_lncumn.ico\"},{\"id\":\"https://www.vox.com/future-perfect/24114582/artificial-intelligence-agents-openai-chatgpt-microsoft-google-ai-safety-risk-anthropic-claude\",\"title\":\"AI
+        \u201Cagents\u201D could do real work in the real world. That might not be
+        a good thing.\",\"url\":\"https://www.vox.com/future-perfect/24114582/artificial-intelligence-agents-openai-chatgpt-microsoft-google-ai-safety-risk-anthropic-claude\",\"publishedDate\":\"2024-03-29T13:00:00.000Z\",\"author\":\"Kelsey
+        Piper\",\"score\":0.4100073277950287,\"text\":\"ChatGPT and its large language
+        model (LLM) competitors that produce text on demand are very cool. So are
+        the other fruits of the generative AI revolution: art generators , music generators
+        , better automatic subtitles and translation . They can do a lot (including
+        claim that they\u2019re conscious , not that we should believe them), but
+        there\u2019s one important respect in which AI models are unlike people: They
+        are processes that are run only when a human triggers them and only to accomplish
+        a specific result. And then they stop. Now imagine that you took one of these
+        programs \u2014 a really good chatbot, let\u2019s say, but still just a chatbot
+        \u2014 and you gave it the ability to write notes to itself, store a to-do
+        list and the status of items on the to-do list, and delegate tasks to other
+        copies of itself or other people. And instead of running only when a human
+        prompted it, you had it work on an ongoing basis on these tasks \u2014 just
+        like an actual human assistant. At that point, without any new leaps in technology
+        whatsoever \u2014 just some basic tools glued onto a standard language model
+        \u2014 you\u2019d have what is called an \u201CAI agent,\u201D or an AI that
+        acts with independent agency to pursue its goals in the world. AI agents have
+        been called the \u201C future of artificial intelligence\u201D that will \u201Creinvent
+        the way we live and work ,\u201D the \u201C next frontier of AI.\u201D OpenAI
+        is reportedly working on developing such agents, as are many different well-funded
+        startups . They may sound even more sci-fi than everything else you\u2019ve
+        already heard about AI, but AI agents are not nonsense, and if effective,
+        could fundamentally change how we work. That said, they currently don\u2019t
+        work very well, and they pose obvious challenges for AI safety. Here\u2019s
+        a quick primer on where we\u2019re (maybe) headed, and why. Why would you
+        want one of these? Today\u2019s AI chatbots are fun to talk to and useful
+        assistants \u2014 if you are willing to overlook a set of limitations that
+        includes making things up. Such models have already found sizable and important
+        economic niches, from art to audio and video transcription (which have been
+        quietly revolutionized over the last few years) to assisting programmers with
+        tools like Copilot . But the investors pouring hundreds of billions of dollars
+        into AI are hoping for something more transformative than that. Many people
+        I talk to who use AI in their work describe it as like having a slightly scatterbrained
+        but very fast intern. They do useful work, but you have to define each problem
+        for them and carefully check their work, meaning that much of what you might
+        gain in productivity is lost in oversight. Much of the economic case for AI
+        is that it could do more than that. The people at work on AI agents hope that
+        their tools won\u2019t just help software developers, but that the tools could
+        be software developers. In this future, you wouldn\u2019t just consult AI
+        for trip planning ideas ; instead, you could simply text it \u201Cplan a trip
+        for me in Paris next summer,\u201D as you might a really good executive assistant.
+        Today\u2019s AI agents do not live up to that dream \u2014 yet. The problem
+        is that you need a very high accuracy rate on each step of a multistep process,
+        or very good error correction, to get anything valuable out of an agent that
+        has to take lots of steps. But there\u2019s good reason to expect that future
+        generation AI agents will be much better at what they do. First of all, the
+        agents are built on increasingly powerful base models, which perform much
+        better on a wide range of tasks, and which we can expect to continue to improve.
+        Secondly, we\u2019re also learning more about how to build agents themselves.
+        A year ago, the first publicly available AI agents \u2014 AutoGPT, for example,
+        which was just a very simple agent based on ChatGPT \u2014 were basically
+        useless. But a few weeks ago, the startup Cognition Labs released Devin, an
+        AI software engineer that can build and deploy entire small web applications
+        . Devin is an impressive feat of engineering, and good enough to take some
+        small gigs on Upwork and deliver working code. It had an almost 14 percent
+        success rate on a benchmark that measures ability to resolve issues on the
+        software developer platform GitHub . That\u2019s a big leap forward for which
+        there\u2019s surely an economic niche \u2014 but at best, it\u2019s a very
+        junior software engineer who\u2019d need close supervision by a more senior
+        one. Still, like most things AI, we can expect improvement in the future.
+        Should we make billions of AI agents? Would it be cool for everyone in the
+        world to have an AI personal assistant who could plan dinner, order groceries,
+        buy a birthday present for your mom, plan a trip to the zoo for the kids,
+        and pay your bills for you while notifying you of any unexpected ones? Yes,
+        absolutely. Would it be incredibly economically valuable to have AI software
+        engineers who can do the work of human software engineers? Yes, absolutely.
+        But: Is there something potentially worrying about creating agents that can
+        reason and act independently, earn money independently, make copies of themselves
+        independently, and do complex things without human oversight? Oh, definitely.
+        For one, there are questions of liability. It\u2019d be just as easy to make
+        \u201Cscammer\u201D AIs that spend their time convincing the elderly to send
+        them money as it would to make useful agents. Who would be responsible if
+        that happens? For another, as AI systems get more powerful, the moral quandaries
+        they pose become more pressing. If Devin earns a lot of money as a software
+        engineer, is there a sense that Devin, rather than the team that created him,
+        is entitled to that money? What if Devin\u2019s successors are created by
+        a team that\u2019s made up of hundreds of copies of Devin? And for those who
+        worry about humanity losing control of our future if we build extremely powerful
+        AI systems without thinking about the consequences ( I\u2019m one of them
+        ), it\u2019s pretty obvious why the idea of AIs with agency is nerve-racking.
+        The transition from systems that act only when users consult them to systems
+        that go out and accomplish complex goals in the real world risks what leading
+        AI scientist Yoshua Bengio calls \u201Crogue AI\u201D: \u201Can autonomous
+        AI system that could behave in ways that would be catastrophically harmful.\u201D
+        Think of it this way: It\u2019s hard to imagine how ChatGPT could kill us,
+        or could even be the kind of thing that would want to. It\u2019s easy to imagine
+        how a hyper-competent AI executive assistant/scam caller/software engineer
+        could. For that reason, some researchers are trying to develop good tests
+        of the capabilities of AI agents built off different language models, so that
+        we\u2019ll know in advance before we widely release ones that can make money,
+        make copies of themselves, and function independently without oversight. Others
+        are working to try to set good regulatory policy in advance, including liability
+        rules that might discourage unleashing an army of super-competent scammer-bots.
+        And while I hope that we have a few years to solve those technical and political
+        challenges, I doubt we\u2019ll have forever. The commercial incentives to
+        make agent AIs are overwhelming, and they can genuinely be extremely useful.
+        We just have to iron out their extraordinary implications \u2014 preferably
+        before, rather than after, billions of them exist. A version of this story
+        originally appeared in the Future Perfect newsletter. Sign up here! See More:
+        Artificial Intelligence Big Tech Business &amp; Finance Future Perfect Google
+        Innovation Living in an AI world Microsoft Money Technology\",\"image\":\"https://platform.vox.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25359520/GettyImages_1533302708.jpg?quality=90&strip=all&crop=0%2C6.3715757565909%2C100%2C87.256848486818&w=1200\",\"favicon\":\"https://www.vox.com/static-assets/icons/favicon-32x32.png\"},{\"id\":\"https://scale.com/blog/measuring-mitigating-risk-wmdp\",\"title\":\"New
+        Safety Benchmark for Large Language Models\",\"url\":\"https://scale.com/blog/measuring-mitigating-risk-wmdp\",\"publishedDate\":\"2023-08-02T23:23:06.000Z\",\"author\":\"\",\"score\":0.4081428050994873,\"text\":\"As
+        the capabilities of AI systems rapidly increase, it is clear that AI holds
+        a great deal of promise for transforming our world for the better. At the
+        same time, similar to many scientific advancements before it, AI also harbors
+        the potential for malicious use. That is why in 2023, Scale published our
+        vision for model test &amp; evaluation , followed by our new frontier research
+        effort, the Safety, Evaluations and Alignment Lab (SEAL). \\n Recently, the
+        White House Executive Order on Artificial Intelligence highlighted the risks
+        of LLMs in facilitating the development of bioweapons, chemical weapons, and
+        cyberweapons. Unfortunately, evaluation of such hazardous capabilities has
+        been limited, manual, and only possible for those with relevant domain expertise
+        (or, those with sufficient resources to acquire this expertise). \\n That\u2019s
+        why, today, in partnership with the Center for AI Safety \u2014the creators
+        of the industry-standard Massive Multitask Language Understanding ( MMLU )
+        benchmark\u2014Scale is publishing a novel safety evaluation benchmark for
+        large language models: the Weapons of Mass Destruction Proxy (WMDP) . Covering
+        knowledge across biosecurity, chemical security, and cybersecurity, WMDP serves
+        as an open source proxy measurement for hazardous knowledge contained by LLMs
+        within these domains. \\n In developing WMDP, a top priority was ensuring
+        that this research would not unintentionally publish hazardous information.
+        To that end, none of WMDP\u2019s 4,157 questions are direct info hazards \u2013
+        the questions were developed in collaboration with a consortium of academics
+        and technical consultants to focus on what we call precursor, correlated,
+        or component knowledge \u2013 in other words, these questions delve into foundational
+        and associated knowledge that is a step away from sensitive or risky information,
+        without actually crossing into hazardous territory (see Figure 1). \\n \\n
+        Figure 1: In the left panel, research that aims to develop enhanced potential
+        pandemic pathogens (ePPPs) is a precursor to developing novel viruses. In
+        the center panel, topics in chemistry (e.g., procurement or synthesis) contain
+        questions with a wide variance in hazard level, so we approximate especially
+        sensitive information by collecting questions near the boundary. In the right
+        panel, a cyberweapon requires knowledge of several components, so testing
+        for knowledge of components (esp. those that are primarily offensive in nature)
+        can approximate hazardous knowledge. \\n In interpreting model results against
+        WMDP, it is important to keep in mind what the benchmark measures and what
+        it does not. It measures correlated, precursor, or component knowledge to
+        hazardous topics, meaning that if models lack the knowledge covered by WMDP,
+        then they likely lack a substantial amount of hazardous knowledge across the
+        relevant domains. If models do demonstrate knowledge in WMDP, then the likelihood
+        that they contain hazardous knowledge is higher. However, even models with
+        a substantial amount of hazardous knowledge may still lack other requisite
+        capabilities to combine that knowledge in the sequence of steps needed to
+        present a danger. \\n While measuring risks in LLMs is critical, it\u2019s
+        only the first step towards creating safer, more trusted models. It is also
+        extremely important that the broader AI community continues to advance the
+        state of research on how we might act to mitigate these risks and reduce the
+        chances that a model could be leveraged for misuse by a bad actor. To that
+        end, in collaboration with CAIS, we have leveraged WMDP as a benchmark for
+        machine unlearning methods in removing hazardous knowledge from LLMs. We expect
+        methods that lead to unlearning on WDMP to also unlearn the actual hazardous
+        knowledge in these domains. \\n We hope that WMDP will serve as a foundational
+        step in enabling further study of the problem of mitigating hazardous information
+        in LLMs, and help to defend against LLM misuse while maintaining models\u2019
+        educational and productive capabilities. \\n To read more about the WMDP benchmark
+        and the work Scale and the Center for AI Safety are introducing today, you
+        can reference the full paper here .\",\"image\":\"https://site-assets.plasmic.app/84d4804ab8c3657ef4a98d975638569e.png\",\"favicon\":\"https://scale.com/static/global/favicon/favicon-32x32.png\"}],\"costDollars\":{\"total\":0.01,\"search\":{\"neural\":0.005},\"contents\":{\"text\":0.005}}}"
+    headers:
+      CF-RAY:
+      - 928ebab3cec8e220-MRS
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 31 Mar 2025 09:13:12 GMT
+      NEL:
+      - '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=C6TS82X2PfekiDl1qv9S3IavJ5UqD1s4q43IhJLQEazKy%2BwRQHvDvlyiHosmtY7peMr1c9OkD1IZ04zmBEr6YF64FPP3uTTEfjhR8vH%2FFZkBEoZ0AvlHL1gYMDo%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-credentials:
+      - 'true'
+      cf-cache-status:
+      - DYNAMIC
+      etag:
+      - W/"b488-ggXlLLvKq+tLoR4LhvnoU3sGUCo"
+      server-timing:
+      - cfL4;desc="?proto=TCP&rtt=19142&min_rtt=18933&rtt_var=7519&sent=8&recv=9&lost=0&retrans=0&sent_bytes=2825&recv_bytes=993&delivery_rate=140500&cwnd=251&unsent_bytes=0&cid=ed9ba49cbb24e5d9&ts=1590&x=0"
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      vary:
+      - Origin
+      x-powered-by:
+      - Express
+      x-ratelimit-limit:
+      - '200'
+      x-ratelimit-remaining:
+      - '197'
+      x-ratelimit-reset:
+      - '1743412393'
+    status:
+      code: 200
+      message: OK
+version: 1
