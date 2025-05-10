@@ -712,11 +712,11 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
-        # started_at field after grouping in the HAVING clause. These filters remove
-        # call starts before grouping, creating orphan call ends. By conditioning
-        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
-        # all rows returned at least have a call start.
+        # The op_name, trace_id, trace_roots, parent_id conditions REQUIRE
+        # conditioning on the started_at field after grouping in the HAVING clause.
+        # These filters remove call starts before grouping, creating orphan call ends.
+        # By conditioning on `NOT any(started_at) is NULL`, we filter out orphaned
+        # call ends, ensuring all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter,
             pb,
@@ -730,6 +730,11 @@ class CallsQuery(BaseModel):
         # ref filters also have group by filters, because output_refs exist on the
         # call end parts.
         ref_filter_opt_sql = process_ref_filters_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        parent_id_filter_sql = process_parent_id_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -824,6 +829,7 @@ class CallsQuery(BaseModel):
         {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
+        {parent_id_filter_sql}
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
@@ -1187,6 +1193,28 @@ def process_trace_roots_only_filter_to_sql(
     )
 
     return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_parent_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    parent_id_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+
+    return f"AND ({parent_id_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
