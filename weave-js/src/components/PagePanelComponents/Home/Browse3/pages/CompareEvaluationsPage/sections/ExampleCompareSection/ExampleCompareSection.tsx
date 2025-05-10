@@ -105,6 +105,10 @@ const GridCellSubgrid = styled.div<{
   grid-template-rows: ${props => props.rowsTemp || 'subgrid'};
   grid-template-columns: ${props => props.colsTemp || 'subgrid'};
   overflow: auto;
+  position: relative;
+  top: auto;
+  z-index: auto;
+  contain: none;
 `;
 GridCellSubgrid.displayName = 'S.GridCellSubgrid';
 
@@ -856,19 +860,23 @@ export const ExampleCompareSection: React.FC<{
           rowSpan={1}
           colSpan={1}
           rowsTemp={`${HEADER_HEIGHT_PX}px repeat(${totalMetrics}, auto)`}
-          colsTemp={`${SIDEBAR_WIDTH_PX}px repeat(${numEvals}, minmax(${MIN_EVAL_WIDTH_PX}px, 1fr))`}>
+          colsTemp={`${SIDEBAR_WIDTH_PX}px repeat(${numEvals}, minmax(${MIN_EVAL_WIDTH_PX}px, 1fr))`}
+          style={{
+            scrollbarWidth: 'none',
+            position: 'relative',
+            overflowX: 'auto',
+            overflowY: 'auto',
+            contain: 'paint style layout',
+          }}>
           {/* METRIC HEADER */}
           <React.Fragment>
             <GridCell
               style={{
-                // in a perfect world, this would be STICKY_SIDEBAR_HEADER,
-                // but I can't get the eval metric headers to be sticky. I
-                // have spent many hours trying to pull this one off and need
-                // to move on. The result is that the metrics headers (and trial selection
-                // buttons) will scroll off the screen. Not horrible, but a defeat.
-                ...stickySidebarStyleMixin,
-                ...centeredTextStyleMixin,
-                zIndex: 3,
+                ...stickySidebarHeaderMixin,
+                position: 'sticky',
+                top: 0,
+                left: 0,
+                zIndex: 5,
               }}>
               Metrics
             </GridCell>
@@ -882,16 +890,32 @@ export const ExampleCompareSection: React.FC<{
                   key={evalMapKey(evalIndex)}
                   rowSpan={totalMetrics + 1}
                   colSpan={1}
-                  colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
+                  colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}
+                  style={{
+                    overflow: 'visible',
+                  }}>
                   {/* TRIALS HEADER */}
-                  <GridCell style={{...stickySidebarHeaderMixin}}>
+                  <GridCell
+                    style={{
+                      ...stickySidebarHeaderMixin,
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 5,
+                      backgroundColor: MOON_100,
+                    }}>
                     Trials
                   </GridCell>
                   {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                     return (
                       <GridCell
                         key={trialIndex}
-                        style={{...stickyHeaderStyleMixin}}>
+                        style={{
+                          ...stickyHeaderStyleMixin,
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 5,
+                          backgroundColor: MOON_100,
+                        }}>
                         {evalTrialSelectComp(evalIndex, trialIndex)}
                       </GridCell>
                     );
@@ -950,12 +974,22 @@ export const ExampleCompareSection: React.FC<{
             rowSpan={totalMetrics}
             colSpan={1}
             colsTemp={`45px ${SIDEBAR_WIDTH_PX - 45}px`}
-            style={{...stickySidebarStyleMixin}}>
+            style={{
+              ...stickySidebarStyleMixin,
+              position: 'sticky',
+              left: 0,
+              zIndex: 4,
+            }}>
             {numMetricsPerScorer.map((NUM_METRICS_FOR_SCORER, scorerIndex) => {
               return (
                 <React.Fragment key={scorerIndex}>
                   <GridCell
-                    style={{...stickySidebarStyleMixin}}
+                    style={{
+                      ...stickySidebarStyleMixin,
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 4,
+                    }}
                     rowSpan={NUM_METRICS_FOR_SCORER}>
                     {scorerComp(scorerIndex)}
                   </GridCell>
@@ -964,6 +998,7 @@ export const ExampleCompareSection: React.FC<{
                       <GridCell
                         key={metricIndex}
                         style={{
+                          ...stickySidebarStyleMixin,
                           backgroundColor: MOON_100,
                         }}>
                         {scorerMetricKeyComp(scorerIndex, metricIndex)}
