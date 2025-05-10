@@ -103,5 +103,6 @@ export interface OpDefGeneratedWeave extends OpDefBase {
 export type ExpansionFunction = (
   inputs: OpInputs,
   refineNode: ExpansionRefineNodeCallback,
-  client: Client
+  client: Client,
+  stack: Stack
 ) => Promise<Node>;

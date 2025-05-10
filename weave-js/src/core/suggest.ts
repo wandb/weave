@@ -529,7 +529,10 @@ async function autosuggestNodes(
       const frame = toFrame(stack);
       const variableNames = Object.keys(frame).filter(
         // runColors (see WB-21774) and customRunNames are only used internally within the panels
-        key => !key.includes('runColors') && !key.includes('customRunNames')
+        key =>
+          !key.includes('runColors') &&
+          !key.includes('customRunNames') &&
+          !key.includes('singleRunWorkspace')
       );
       if (variableNames.length > 0) {
         for (const varName of variableNames) {

@@ -99,7 +99,8 @@ export type ConfiguredTransform<
   inputNode: I,
   config: any,
   refineNode: GraphTypes.ExpansionRefineNodeCallback,
-  client: Client
+  client: Client,
+  stack: TypeHelpers.Stack
 ) => Promise<O>;
 
 export function registerPanelFunction(
@@ -114,12 +115,18 @@ export function registerPanelFunction(
     name: panelIdToPanelOpName(panelId),
     inputTypes: {input: inputType, config: 'any'},
     outputType: 'any',
-    expansionFn: (inputs, refineNode, client) => {
+    expansionFn: (inputs, refineNode, client, stack) => {
       const {input, config} = inputs;
       if (config.nodeType !== 'const') {
         throw new Error('panel config must be const node');
       }
-      return configuredTransform(input, config.val, refineNode, client) as any;
+      return configuredTransform(
+        input,
+        config.val,
+        refineNode,
+        client,
+        stack
+      ) as any;
     },
   });
 }
