@@ -18,6 +18,12 @@ def test_publish_round_trip_query_object(client) -> None:
     query = Query(**query_raw)
     ref = weave.publish(query)
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
+    assert res.vals[0] == {
+        "_type": "Query",
+        **query_raw,
+        "_class_name": "Query",
+        "_bases": ["BaseModel"],
+    }
     query_2 = Query.model_validate(res.vals[0])
     assert query_2 == query
 
