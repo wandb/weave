@@ -18,23 +18,29 @@ import time
 import traceback
 import typing
 import uuid
-from typing import Any, Callable, Dict, Iterator, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    TypeVar,
+)
 
 import aioprocessing
 
 from weave_query import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -175,6 +181,183 @@ class HandlerNotFoundException(Exception):
     pass
 
 
+async def _handle_request(
+    req: ServerRequest,
+    handlers: Dict[str, HandlerFunction],
+    wandb_file_manager_async: wandb_file_manager.WandbFileManagerAsync,
+    internal_response_queue: async_queue.Queue[ServerResponse],
+    task_semaphore: asyncio.Semaphore,
+) -> None:
+    async with task_semaphore:
+        with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
+            try:
+                handler = handlers[req.name]
+            except KeyError as e:
+                resp = req.error_response(404, e)
+            else:
+                try:
+                    val = await handler(
+                        *req.args,
+                        wandb_file_manager_async=wandb_file_manager_async,
+                    )
+                except Exception as e:
+                    logging.error(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    print(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    resp = req.error_response(
+                        server_error_handling.maybe_extract_code_from_exception(e)
+                        or 500,
+                        e,
+                    )
+                else:
+                    resp = req.success_response(val)
+
+        if isinstance(internal_response_queue, async_queue.ThreadQueue):
+            # this is fast
+            internal_response_queue.put(resp)
+        else:
+            # this needs to perform IPC
+            await internal_response_queue.async_put(resp)
+
+
+def _request_handler_process(
+    request_queue: async_queue.Queue[ServerRequest],
+    internal_response_queue: async_queue.Queue[ServerResponse],
+    request_handler_ready_event,  # multiprocessing.Event
+    request_handler_ready_to_shut_down_event,  # multiprocessing.Event
+):
+    try:
+        asyncio.run(
+            _request_handler_process_main(
+                request_queue,
+                internal_response_queue,
+                request_handler_ready_event,
+                request_handler_ready_to_shut_down_event,
+            ),
+            debug=True,
+        )
+    except Exception as e:
+        logging.error(f"IO SERVER: Error in request handler process: {e}")
+        traceback.print_exc()
+        request_handler_ready_to_shut_down_event.set()
+        raise
+
+
+async def _handle_ensure_manifest(
+    artifact_uri: str,
+    wandb_file_manager_async: wandb_file_manager.WandbFileManagerAsync,
+) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(
+        uri, (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI)
+    ):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+    return await wandb_file_manager_async.manifest(uri)
+
+
+async def _handle_ensure_file_downloaded(
+    download_url: str,
+    wandb_file_manager_async: wandb_file_manager.WandbFileManagerAsync,
+) -> typing.Optional[str]:
+    return await wandb_file_manager_async.ensure_file_downloaded(download_url)
+
+
+async def _handle_ensure_file(
+    artifact_uri: str,
+    wandb_file_manager_async: wandb_file_manager.WandbFileManagerAsync,
+) -> typing.Optional[str]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(
+        uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+    ):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+
+    return await wandb_file_manager_async.ensure_file(uri)
+
+
+async def _handle_direct_url(
+    artifact_uri: str,
+    wandb_file_manager_async: wandb_file_manager.WandbFileManagerAsync,
+) -> typing.Optional[str]:
+    uri = uris.WeaveURI.parse(artifact_uri)
+    if not isinstance(
+        uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+    ):
+        raise errors.WeaveInternalError("invalid scheme ", uri)
+    return await wandb_file_manager_async.direct_url(uri)
+
+
+async def _handle_sleep(
+    seconds: float,
+) -> float:
+    return await asyncio.sleep(seconds)
+
+
+async def _request_handler_process_main(
+    request_queue: async_queue.Queue[ServerRequest],
+    internal_response_queue: async_queue.Queue[ServerResponse],
+    request_handler_ready_event: multiprocessing.Event,  # type: ignore
+    request_handler_ready_to_shut_down_event: multiprocessing.Event,  # type: ignore
+):
+    fs = filesystem.FilesystemAsync()
+    net = weave_http.HttpAsync(fs)
+    loop = asyncio.get_running_loop()
+
+    handlers = {
+        "ensure_manifest": _handle_ensure_manifest,
+        "ensure_file_downloaded": _handle_ensure_file_downloaded,
+        "ensure_file": _handle_ensure_file,
+        "direct_url": _handle_direct_url,
+        "sleep": _handle_sleep,
+    }
+
+    task_semaphore = asyncio.Semaphore(8)
+
+    async with net:
+        api_instance = await wandb_api.get_wandb_api()
+        wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
+            fs, net, api_instance
+        )
+
+        request_handler_ready_event.set()
+
+        while True:
+            try:
+                request = await request_queue.async_get()
+            except RuntimeError as e:
+                print("[Process Main] IO SERVICE RuntimeError", e)
+                break
+            if request.name == "shutdown":
+                request_queue.task_done()
+                await request_queue.async_join()
+                break
+            tracer.context_provider.activate(request.context.trace_context)
+            with wandb_api.wandb_api_context(request.context.wandb_api_context):
+                with cache.time_interval_cache_prefix(
+                    request.context.cache_prefix_context
+                ):
+                    loop.create_task(
+                        _handle_request,
+                        args=(
+                            request,
+                            handlers,
+                            wandb_file_manager_async,
+                            internal_response_queue,
+                            task_semaphore,
+                        ),
+                    )
+            request_queue.task_done()
+
+    request_handler_ready_to_shut_down_event.set()
+
+
 # Server class is responsible for managing server lifecycle and handling requests
 class Server:
     def __init__(
@@ -219,11 +402,19 @@ class Server:
         self.register_handler_fn("sleep", self.handle_sleep)
 
         if process:
-            self.request_handler = aioprocessing.AioProcess(
-                target=self._request_handler_fn, name="IO Server", daemon=True
-            )
             self.request_queue = async_queue.ProcessQueue()
             self._internal_response_queue = async_queue.ProcessQueue()
+            self.request_handler = aioprocessing.AioProcess(
+                target=_request_handler_process,
+                name="IO Server",
+                daemon=True,
+                args=(
+                    self.request_queue,
+                    self._internal_response_queue,
+                    self._request_handler_ready_event,
+                    self._request_handler_ready_to_shut_down_event,
+                ),
+            )
         else:
             self.request_handler = threading.Thread(
                 target=self._request_handler_fn, name="IO Server", daemon=True
@@ -388,9 +579,9 @@ class Server:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]
@@ -440,13 +631,14 @@ class Server:
 
 SERVER = None
 SERVER_START_LOCK = threading.Lock()
+USE_PROCESS_QUEUE = True
 
 
 def get_server() -> Server:
     global SERVER
     with SERVER_START_LOCK:
         if SERVER is None:
-            SERVER = Server(process=False)
+            SERVER = Server(process=USE_PROCESS_QUEUE)
             SERVER.start()
         return SERVER
 
