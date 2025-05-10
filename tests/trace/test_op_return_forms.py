@@ -1,7 +1,6 @@
 import pytest
 
 import weave
-from weave.trace.op import _add_accumulator
 from weave.trace.ref_util import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -103,14 +102,12 @@ def simple_list_accumulator(acc, value):
 
 
 def test_op_return_sync_generator(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         pass
@@ -130,14 +127,12 @@ def test_op_return_sync_generator(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         pass
@@ -168,11 +163,9 @@ def test_op_return_sync_iterator(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         pass
@@ -204,11 +197,9 @@ async def test_op_return_async_iterator(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyAsyncIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         pass
@@ -227,14 +218,12 @@ async def test_op_return_async_iterator(client):
 
 
 def test_op_return_sync_generator_never_iter(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -253,16 +242,15 @@ def test_op_return_sync_generator_never_iter(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_never_iter(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
-    fn()
+    async for item in fn():
+        return
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -290,11 +278,9 @@ def test_op_return_sync_iterator_never_iter(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -325,11 +311,9 @@ async def test_op_return_async_iterator_never_iter(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyAsyncIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -347,14 +331,12 @@ async def test_op_return_async_iterator_never_iter(client):
 
 
 def test_op_return_sync_generator_partial(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         if item == 5:
@@ -375,18 +357,17 @@ def test_op_return_sync_generator_partial(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_partial(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
             size -= 1
             yield size
 
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
     async for item in fn():
         if item == 5:
             break
+        return  # This return is required to raise StopAsyncIteration
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -414,11 +395,9 @@ def test_op_return_sync_iterator_partial(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         if item == 5:
@@ -451,11 +430,9 @@ async def test_op_return_async_iterator_partial(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyAsyncIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         if item == 5:
@@ -475,7 +452,7 @@ async def test_op_return_async_iterator_partial(client):
 
 
 def test_op_return_sync_generator_exception(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         size = 10
         while size > 0:
@@ -483,8 +460,6 @@ def test_op_return_sync_generator_exception(client):
             yield size
             if size == 5:
                 raise ValueError("test")
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
@@ -508,7 +483,7 @@ def test_op_return_sync_generator_exception(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_generator_exception(client):
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     async def fn():
         size = 10
         while size > 0:
@@ -516,8 +491,6 @@ async def test_op_return_async_generator_exception(client):
             yield size
             if size == 5:
                 raise ValueError("test")
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         async for item in fn():
@@ -554,11 +527,9 @@ def test_op_return_sync_iterator_exception(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
@@ -596,11 +567,9 @@ async def test_op_return_async_iterator_exception(client):
             self.size -= 1
             return self.size
 
-    @weave.op()
+    @weave.op(accumulator=simple_list_accumulator)
     def fn():
         return MyAsyncIterator()
-
-    _add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         async for item in fn():
