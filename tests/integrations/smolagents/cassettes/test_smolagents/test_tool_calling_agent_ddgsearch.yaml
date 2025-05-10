@@ -1,0 +1,360 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using tool calls. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to some
+      tools.\n\nThe tool call you write is an action: after the tool is executed,
+      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
+      can repeat N times, you should take several steps when needed.\n\nYou can use
+      the result of the previous action as input for the next action.\nThe observation
+      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
+      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
+      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
+      use an action blob with \"name\": \"final_answer\" tool. It is the only way
+      to complete the task, else you will be stuck on a loop. So your final output
+      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
+      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
+      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
+      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
+      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
+      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
+      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
+      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
+      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
+      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
+      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
+      for you. You only have access to these tools:\n- web_search: Performs a duckduckgo
+      web search based on your query (think a Google search) then returns the top
+      search results.\n    Takes inputs: {''query'': {''type'': ''string'', ''description'':
+      ''The search query to perform.''}}\n    Returns an output of type: string\n-
+      final_answer: Provides a final answer to the given problem.\n    Takes inputs:
+      {''answer'': {''type'': ''any'', ''description'': ''The final answer to the
+      problem''}}\n    Returns an output of type: any\n\nHere are the rules you should
+      always follow to solve your task:\n1. ALWAYS provide a tool call, else you will
+      fail.\n2. Always use the right arguments for the tools. Never use variable names
+      as the action arguments, use the value instead.\n3. Call a tool only when needed:
+      do not call the search agent if you do not need information, try to solve the
+      task yourself.\nIf no tool call is needed, use final_answer tool to return your
+      answer.\n4. Never re-do a tool call that you previously did with the exact same
+      parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
+      a duckduckgo web search based on your query (think a Google search) then returns
+      the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
+      search query to perform."}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
+      final answer to the problem"}},"required":["answer"]}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '4602'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNNb9swDL37Vwg8J0XiuY3rW3Lo1gFbLxswYCkMRqIdrbLkSXS7LMh/
+        H2ynsdMPYD4YAp8e+fhI7SMhQCvIBMgtsqxqM13dFZvl8tvy7kt6e2c+fUi//rgKJlZ2tXtMYNIy
+        3OYXSX5mXUhX1YZYO9vD0hMytVnni+Qynl8ni6sOqJwi09LKmqeJm8azOJnO0uns6kjcOi0pQCZ+
+        RkIIse/+rUSr6A9kYjZ5jlQUApYE2emSEOCdaSOAIejAaBkmAyidZbKtatsYMwLYOZNLNGYo3H/7
+        0XnwCY3J/2LhCpvam10cu+8PN83tgtL559moXp96V3eCisbKkz8j/BTPXhQTAixWHfeJNnkg9HL7
+        gi0EoC+biiy3ymG/ht8N+d0asjUEzZQ9oVWbC9Ri1WijtC0Fio9kl7fT3iFSAht2FbKWIrDzO6GN
+        aQJ7ZOcFaza0hgOclT1Eb53vR4Z6KpqA5rXTaK1jbBvurL4/IofTVI0ra+824QUVCm112OaeMHRm
+        jWcWPQvpJEBzthZQe1fVnLN7oK7o9XXSZ4Vhawc0To8gO0YzxOezOJ68kTBXxKi7xTntqkS5JTVw
+        h53FRmk3AqJR86/lvJW7N0Db8n/SD4CUVDOpvPaktDxvebjmqX3V71072dwJhkD+UUvKWZNvB6Ko
+        wMb0Dw7CLjBVeaFtSb72unt1UNR5scDLNJHFvIDoEP0DAAD//wMAL9a+V34EAAA=
+    headers:
+      CF-RAY:
+      - 933b10fec8247aff-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 21 Apr 2025 07:11:17 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=zYPLlmoFsPiiASAPPu0Ag1u8EhdukcDVB3APMDt0z20-1745219477-1.0.1.1-F9FHsGBezJTjyc4Or2r54sS6R5W8bsso3teMawI7FjaqnbsbaBm2JD6uwm3o1mr1v5qdkls6dkO_fmfUhpwSXdw5wFTDjFiVi1q8QkrWMAM;
+        path=/; expires=Mon, 21-Apr-25 07:41:17 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=lEU2MBd7XM7HEGXaKEVD_57e3XylHNHWluvY2VwHvV8-1745219477561-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '948'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '30000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '29999100'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_1147586637f5c443c4e3315bda594291
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using tool calls. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to some
+      tools.\n\nThe tool call you write is an action: after the tool is executed,
+      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
+      can repeat N times, you should take several steps when needed.\n\nYou can use
+      the result of the previous action as input for the next action.\nThe observation
+      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
+      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
+      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
+      use an action blob with \"name\": \"final_answer\" tool. It is the only way
+      to complete the task, else you will be stuck on a loop. So your final output
+      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
+      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
+      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
+      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
+      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
+      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
+      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
+      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
+      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
+      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
+      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
+      for you. You only have access to these tools:\n- web_search: Performs a duckduckgo
+      web search based on your query (think a Google search) then returns the top
+      search results.\n    Takes inputs: {''query'': {''type'': ''string'', ''description'':
+      ''The search query to perform.''}}\n    Returns an output of type: string\n-
+      final_answer: Provides a final answer to the given problem.\n    Takes inputs:
+      {''answer'': {''type'': ''any'', ''description'': ''The final answer to the
+      problem''}}\n    Returns an output of type: any\n\nHere are the rules you should
+      always follow to solve your task:\n1. ALWAYS provide a tool call, else you will
+      fail.\n2. Always use the right arguments for the tools. Never use variable names
+      as the action arguments, use the value instead.\n3. Call a tool only when needed:
+      do not call the search agent if you do not need information, try to solve the
+      task yourself.\nIf no tool call is needed, use final_answer tool to return your
+      answer.\n4. Never re-do a tool call that you previously did with the exact same
+      parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
+      Tool: ''web_search'' with arguments: {''query'': ''site:wandb.ai Building a
+      GenAI-assisted automatic story illustrator title''}\nCalling tools:\n[{''id'':
+      ''call_zafofn8nFy22oUkFuI7e81J0'', ''type'': ''function'', ''function'': {''name'':
+      ''web_search'', ''arguments'': {''query'': ''site:wandb.ai Building a GenAI-assisted
+      automatic story illustrator title''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Observation:\n##
+      Search Results\n\n[Building a GenAI-assisted automatic story illustrator](https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-Automatic-Story-Illustrator--Vmlldzo5MTYxNTkw)\nArchitecture
+      of the story illustrator Given the fact that we have access to quite powerful
+      large language models besides text-to-image generation models that pretty accurate
+      in following detailed prompts, writing an auto-illustration workflow might seem
+      simple at a first glance.\n\n[Tutorial Articles & Tutorials by Weights & Biases
+      - W&B](https://wandb.ai/fully-connected/blog/tutorial)\nBrett Young Sep 11 Articles,
+      LLM, GenAI, Tutorial, Weave Building a system of record for ML Abraham Leal
+      Sep 10 Articles, W&B Features, W&B Meta, Sweeps, Experiment, Tutorial, Model
+      Registry Building a GenAI-assisted automatic story illustrator Soumik Rakshit
+      Sep 05 Articles, GenAI, Image Generation, Tutorial, Intermediate\n\n[Image Generation
+      Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/blog/image-generation)\nPopular
+      Stable Diffusion Settings and Storing Your Images Morgan Aug 22 Computer Vision,
+      Image Generation, Articles, Stable Diffusion Clear Search English Building a
+      GenAI-assisted automatic story illustrator Soumik Rakshit Sep 05 Articles, GenAI,
+      Image Generation, Tutorial, Intermediate Prompt upsampling for diffusion models\n\n[Tutorials
+      | Weights & Biases Documentation](https://docs.wandb.ai/tutorials/)\n2 minute
+      read Fundamentals The following tutorials take you through the fundamentals
+      of W&B for machine learning experiment tracking, model evaluation, hyperparameter
+      tuning, model and dataset versioning, and more.\n\n[Stable Diffusion Articles
+      & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/stable-diffusion?page=2)\nPopular
+      Building a GenAI-assisted automatic story illustrator Soumik Rakshit Sep 5 Articles,
+      GenAI, Image Generation, Tutorial, Intermediate Testing o1-preview on difficult
+      coding problems Morgan Sep 13 Articles, Weave, GenAI, Experiment Product newsletter:
+      Updates and new features from September 2024 Kimberly Madia Oct 2 Articles,
+      W&B Features\n\n[Molecule Generation Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/molecule-generation)\nPopular
+      Building a GenAI-assisted automatic story illustrator Soumik Rakshit Sep 5 Articles,
+      GenAI, Image Generation, Tutorial, Intermediate Testing o1-preview on difficult
+      coding problems Morgan Sep 13 Articles, Weave, GenAI, Experiment Product newsletter:
+      Updates and new features from September 2024 Kimberly Madia Oct 2 Articles,
+      W&B Features\n\n[MLOps, LLM and generative AI courses - Weights & Biases](https://wandb.ai/site/courses/)\nLearn
+      to train, fine-tune, and deploy LLMs and tackle real-world MLOps and LLMOps
+      challenges with free Weights & Biases AI Academy courses.\n\n[Generating High-quality
+      Images with SD.Next, HuggingFace ... - W&B](https://wandb.ai/ml-colabs/automatic/reports/Generating-High-quality-Images-with-SD-Next-HuggingFace-Diffusers-and-W-B--Vmlldzo1NTYzMzQy)\nA
+      walkthrough of using SD.Next (Advanced webUI for Stable Diffusion) for generating
+      high-quality images using HuggingFace Diffusers and managing experiments with
+      W&B. .\n\n[GenAI Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/blog/generative-modeling)\nFind
+      GenAI articles & tutorials from leading machine learning practitioners. Fully
+      Connected: An ML community from Weights & Biases.\n\n[The Lifecycle of a GenAI
+      Project | learn-with-me-llms - W&B](https://wandb.ai/wandb_fc/learn-with-me-llms/reports/The-Lifecycle-of-a-GenAI-Project--Vmlldzo3NDc5NTU1)\nOne
+      thing we didn''t cover is the lifecycle of a GenAI project and why so many companies
+      are prioritizing projects like ours. That''s what we''re going to do today.
+      We''ll begin by explaining the benefits of building with LLMs, then walking
+      through the common steps to doing so. This is informed by our own work here
+      at W&B building LLMs for internal processes as well as what we see our ..."}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
+      a duckduckgo web search based on your query (think a Google search) then returns
+      the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
+      search query to perform."}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
+      final answer to the problem"}},"required":["answer"]}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '9096'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=zYPLlmoFsPiiASAPPu0Ag1u8EhdukcDVB3APMDt0z20-1745219477-1.0.1.1-F9FHsGBezJTjyc4Or2r54sS6R5W8bsso3teMawI7FjaqnbsbaBm2JD6uwm3o1mr1v5qdkls6dkO_fmfUhpwSXdw5wFTDjFiVi1q8QkrWMAM;
+        _cfuvid=lEU2MBd7XM7HEGXaKEVD_57e3XylHNHWluvY2VwHvV8-1745219477561-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNRb9owEH7Pr7DumUwhg8HyRivYuq2t1EqdulFFxrkEF8eO7MtahPjv
+        U5KSBMqk5SGy7rvv7rvP553HGMgEIgZizUnkhfIvbtPV5bUcf5zcflvc0+Lu54/Fr/XDbKW/zm5g
+        UDHM6hkFHVgfhMkLhSSNbmBhkRNWVYeT0Tgcfh5NpjWQmwRVRcsK8kfGD4Nw5AdTP/j0RlwbKdBB
+        xH57jDG2q/+VRJ3gK0QsGBwiOTrHM4SoTWIMrFFVBLhz0hHXBIMOFEYT6kq1LpXqAWSMigVXqmvc
+        fLveufOJKxXPi+n04XFz93izoZf55XzzPA8X36+3vX5N6W1RC0pLLVp/engbj06aMQaa5w1Xaq5i
+        rt0L2hM+Y8BtVuaoqdIOuyU0eUuIlnBRSpVInTHOvqCeXfmNLZiwWUkm5yQFuydjt+xKqdKR5WTs
+        EvZw1GPvnTs/9fyzmJaOq/fGcq0N8Wq+2tmnN2TfXqIyWWHNyp1Qq5GlW8cWuau96V+RdxBSS4Dy
+        aAugsCYvKCazwbppGATjpix0W9qDwzeQDHHVp4WTwZmKcYLEZb0o7W4KLtaYdNxuR3mZSNMDvN70
+        7+Wcq904IHX2P+U7QAgsCJO4sJhIcTxyl2axesX/Smt9rgWDQ/tHCoxJoq1uJMGUl6p5YOC2jjCP
+        U6kztIWV9SuDtIjTCR9PRyIdpuDtvb8AAAD//wMAv0W5pm4EAAA=
+    headers:
+      CF-RAY:
+      - 933b110e5aa87aff-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 21 Apr 2025 07:11:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '816'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '30000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '29998011'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 3ms
+      x-request-id:
+      - req_df6325134bb30c97f0f770e361cf36f0
+    status:
+      code: 200
+      message: OK
+version: 1

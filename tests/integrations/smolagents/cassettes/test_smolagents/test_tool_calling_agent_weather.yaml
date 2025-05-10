@@ -1,0 +1,317 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using tool calls. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to some
+      tools.\n\nThe tool call you write is an action: after the tool is executed,
+      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
+      can repeat N times, you should take several steps when needed.\n\nYou can use
+      the result of the previous action as input for the next action.\nThe observation
+      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
+      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
+      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
+      use an action blob with \"name\": \"final_answer\" tool. It is the only way
+      to complete the task, else you will be stuck on a loop. So your final output
+      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
+      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
+      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
+      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
+      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
+      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
+      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
+      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
+      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
+      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
+      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
+      for you. You only have access to these tools:\n- get_weather: Get weather in
+      the next days at given location.\n    Takes inputs: {''location'': {''type'':
+      ''string'', ''description'': ''the location''}, ''celsius'': {''type'': ''boolean'',
+      ''nullable'': True, ''description'': ''whether to use Celsius for temperature''}}\n    Returns
+      an output of type: string\n- final_answer: Provides a final answer to the given
+      problem.\n    Takes inputs: {''answer'': {''type'': ''any'', ''description'':
+      ''The final answer to the problem''}}\n    Returns an output of type: any\n\nHere
+      are the rules you should always follow to solve your task:\n1. ALWAYS provide
+      a tool call, else you will fail.\n2. Always use the right arguments for the
+      tools. Never use variable names as the action arguments, use the value instead.\n3.
+      Call a tool only when needed: do not call the search agent if you do not need
+      information, try to solve the task yourself.\nIf no tool call is needed, use
+      final_answer tool to return your answer.\n4. Never re-do a tool call that you
+      previously did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nWhat is the weather in Tokyo?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"get_weather","description":"Get
+      weather in the next days at given location.","parameters":{"type":"object","properties":{"location":{"type":"string","description":"the
+      location"},"celsius":{"type":"boolean","nullable":true,"description":"whether
+      to use Celsius for temperature"}},"required":["location"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
+      final answer to the problem"}},"required":["answer"]}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '4513'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNNi9swEL37V4g5JyU2zibxcdlCCy2l7V7SejGKPHLUlSVFkjcbQv57
+        sZzYTnYL9cGIeXpv3nzoGBECooSMANtSz2ojp/ff+ObjrsQDXx/mC1zvzB33v37udbKLHUxaht78
+        QeYvrA9M10aiF1p1MLNIPbaq8SKdJ/EqXc4CUOsSZUurjJ+meprMknQ6W05nd2fiVguGDjLyOyKE
+        kGP4txZVia+QkSATIjU6RyuErL9ECFgt2whQ54TzVHmYDCDTyqNqXatGyhHgtZYFo1IOibvvODoP
+        faJSFsnL/kGtmLI/6i/fX0Xz8Lim8dfPn0b5OumDCYZ4o1jfnxHex7ObZISAonXgVuiLPVK/RXtD
+        JwSorZoalW+twzEHqRltBXPIcnjUzwedwyQHhtKJxuWQedvgCa5kTtF756dRhyzyxlH5tnVUKe1D
+        wtC7pzNy6sckdWWs3rgbKnChhNsWFqkL1Y+HEF2MBAvQXM0ZjNW18YXXzxiSruZppwrDGg5oct4Y
+        8NpTOWItLqwrvaJET0VYhH73GGVbLAfqsIO0KYUeAdGo9rdu3tPu6heq+h/5AWAMjceyMBZLwa4r
+        Hq5ZbF/pv671XQ6GwaF9EQwLL9C28yiR00Z2DwjcwXmsCy5UhdZYEV4RcFPwBZ0vU8ZjDtEp+gsA
+        AP//AwC5wg6rTgQAAA==
+    headers:
+      CF-RAY:
+      - 933b11177a987ffe-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 21 Apr 2025 07:11:21 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=pO7iE2TMCYK3ZqJM.6hQbMR1QGUqIGGIW9dimbAiX7o-1745219481-1.0.1.1-9jQM9rd8I4eaK8xkv9mmCxryohkos.1USfLCZ.YOC6BFnBJ0CDFCWzy2iPFiQWnYvdjv_MuqDrCxRdXexHX2dovHPsRYyQboe0xEphwxWmw;
+        path=/; expires=Mon, 21-Apr-25 07:41:21 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=SupmnG9eKjZI.GjnS5agtknMxbjI2.FM0rO7TEabliA-1745219481340-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '797'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '30000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '29999129'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_9a13920680b9df9226b3d2c93f9174c7
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "{\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You
+      are an expert assistant who can solve any task using tool calls. You will be
+      given a task to solve as best you can.\\nTo do so, you have been given access
+      to some tools.\\n\\nThe tool call you write is an action: after the tool is
+      executed, you will get the result of the tool call as an \\\"observation\\\".\\nThis
+      Action/Observation can repeat N times, you should take several steps when needed.\\n\\nYou
+      can use the result of the previous action as input for the next action.\\nThe
+      observation will always be a string: it can represent a file, like \\\"image_1.jpg\\\".\\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\\n\\nObservation:
+      \\\"image_1.jpg\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_transformer\\\",\\n
+      \ \\\"arguments\\\": {\\\"image\\\": \\\"image_1.jpg\\\"}\\n}\\n\\nTo provide
+      the final answer to the task, use an action blob with \\\"name\\\": \\\"final_answer\\\"
+      tool. It is the only way to complete the task, else you will be stuck on a loop.
+      So your final output should look like this:\\nAction:\\n{\\n  \\\"name\\\":
+      \\\"final_answer\\\",\\n  \\\"arguments\\\": {\\\"answer\\\": \\\"insert your
+      final answer here\\\"}\\n}\\n\\n\\nHere are a few examples using notional tools:\\n---\\nTask:
+      \\\"Generate an image of the oldest person in this document.\\\"\\n\\nAction:\\n{\\n
+      \ \\\"name\\\": \\\"document_qa\\\",\\n  \\\"arguments\\\": {\\\"document\\\":
+      \\\"document.pdf\\\", \\\"question\\\": \\\"Who is the oldest person mentioned?\\\"}\\n}\\nObservation:
+      \\\"The oldest person in the document is John Doe, a 55 year old lumberjack
+      living in Newfoundland.\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_generator\\\",\\n
+      \ \\\"arguments\\\": {\\\"prompt\\\": \\\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\\\"}\\n}\\nObservation: \\\"image.png\\\"\\n\\nAction:\\n{\\n
+      \ \\\"name\\\": \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"image.png\\\"\\n}\\n\\n---\\nTask:
+      \\\"What is the result of the following operation: 5 + 3 + 1294.678?\\\"\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"python_interpreter\\\",\\n    \\\"arguments\\\": {\\\"code\\\":
+      \\\"5 + 3 + 1294.678\\\"}\\n}\\nObservation: 1302.678\\n\\nAction:\\n{\\n  \\\"name\\\":
+      \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"1302.678\\\"\\n}\\n\\n---\\nTask:
+      \\\"Which city has the highest population , Guangzhou or Shanghai?\\\"\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Guangzhou\\\"\\n}\\nObservation:
+      ['Guangzhou has a population of 15 million inhabitants as of 2021.']\\n\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Shanghai\\\"\\n}\\nObservation:
+      '26 million (2019)'\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"final_answer\\\",\\n
+      \ \\\"arguments\\\": \\\"Shanghai\\\"\\n}\\n\\nAbove example were using notional
+      tools that might not exist for you. You only have access to these tools:\\n-
+      get_weather: Get weather in the next days at given location.\\n    Takes inputs:
+      {'location': {'type': 'string', 'description': 'the location'}, 'celsius': {'type':
+      'boolean', 'nullable': True, 'description': 'whether to use Celsius for temperature'}}\\n
+      \   Returns an output of type: string\\n- final_answer: Provides a final answer
+      to the given problem.\\n    Takes inputs: {'answer': {'type': 'any', 'description':
+      'The final answer to the problem'}}\\n    Returns an output of type: any\\n\\nHere
+      are the rules you should always follow to solve your task:\\n1. ALWAYS provide
+      a tool call, else you will fail.\\n2. Always use the right arguments for the
+      tools. Never use variable names as the action arguments, use the value instead.\\n3.
+      Call a tool only when needed: do not call the search agent if you do not need
+      information, try to solve the task yourself.\\nIf no tool call is needed, use
+      final_answer tool to return your answer.\\n4. Never re-do a tool call that you
+      previously did with the exact same parameters.\\n\\nNow Begin!\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
+      task:\\nWhat is the weather in Tokyo?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Called
+      Tool: 'get_weather' with arguments: {'location': 'Tokyo', 'celsius': True}\\nCalling
+      tools:\\n[{'id': 'call_2vwDn9cnrRmLQxiuDTYa1MIH', 'type': 'function', 'function':
+      {'name': 'get_weather', 'arguments': {'location': 'Tokyo', 'celsius': True}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Observation:\\nThe
+      weather in Tokyo is sunny with temperatures around 7\xB0C.\"}]}],\"model\":\"gpt-4o\",\"stop\":[\"Observation:\",\"Calling
+      tools:\"],\"tool_choice\":\"required\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get
+      weather in the next days at given location.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"the
+      location\"},\"celsius\":{\"type\":\"boolean\",\"nullable\":true,\"description\":\"whether
+      to use Celsius for temperature\"}},\"required\":[\"location\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"final_answer\",\"description\":\"Provides
+      a final answer to the given problem.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"answer\":{\"type\":\"string\",\"description\":\"The
+      final answer to the problem\"}},\"required\":[\"answer\"]}}}]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '4950'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=pO7iE2TMCYK3ZqJM.6hQbMR1QGUqIGGIW9dimbAiX7o-1745219481-1.0.1.1-9jQM9rd8I4eaK8xkv9mmCxryohkos.1USfLCZ.YOC6BFnBJ0CDFCWzy2iPFiQWnYvdjv_MuqDrCxRdXexHX2dovHPsRYyQboe0xEphwxWmw;
+        _cfuvid=SupmnG9eKjZI.GjnS5agtknMxbjI2.FM0rO7TEabliA-1745219481340-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFPBjtowEL3nK6w5wypQKNkct1W1VZF2K9GVqrKKBmeSGBw7sh0oRfxT
+        v6FfViWBJLBUag6RNW/ezJvn8cFjDEQMIQOeoeN5IYcPT8nqE//6/Iz+ejvni4/f7Cqm+cv94+df
+        MxhUDL1aE3dn1h3XeSHJCa0amBtCR1XV0WwyHY/uJ8GoBnIdk6xoaeGGEz0c++PJ0A+G/vsTMdOC
+        k4WQ/fAYY+xQ/yuJKqafEDJ/cI7kZC2mBGGbxBgYLasIoLXCOlQOBh3ItXKkKtWqlLIHOK1lxFHK
+        rnHzHXrnzieUMpq7l/gpSzfb/GW3Vsnjl4189/BdB71+Tel9UQtKSsVbf3p4Gw+vmjEGCvOGKxTK
+        CJXdkbniMwZo0jIn5SrtcFhCk7eEcAmLjNiO0GVkmFBsoTd7zYRltlRqz3bCZcxRXpBBVxqyDI0u
+        Vcxmf35/uFvCES5aHb1b59eejYaS0qJ86y8qpR1WY9YGv56QY3uXUqeF0St7Ra0mFzaLDKGtLerf
+        lHcWUkuA8mIZoDA6L1zk9IbqpiN/GjRloVvWDh7PTqDTDmWfFkwHNypGMTkU9b60K8qRZxR33G5V
+        sYyF7gFeb/q3cm7VbhwQKv2f8h3AORWO4qgwFAt+OXKXZqh6zP9Ka32uBYMlsxWcIifIVDcSU4Kl
+        bN4Z2L11lEeJUCmZwoj6sUFSRMkMp8GEJ6MEvKP3FwAA//8DAAl1yMh1BAAA
+    headers:
+      CF-RAY:
+      - 933b111f4aef7ffe-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 21 Apr 2025 07:11:22 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '701'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '30000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '29999046'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_5686916127db89978c674cce9592e129
+    status:
+      code: 200
+      message: OK
+version: 1
