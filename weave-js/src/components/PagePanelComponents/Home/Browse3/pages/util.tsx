@@ -15,15 +15,6 @@ export const useURLSearchParamsDict = () => {
   }, [search]);
 };
 
-export const truncateID = (id: string, maxLen: number = 9) => {
-  if (id.length < maxLen) {
-    return id;
-  }
-  const startLen = Math.floor((maxLen - 3) / 2);
-  const endLen = maxLen - 3 - startLen;
-  return `${id.slice(0, startLen)}...${id.slice(-endLen)}`;
-};
-
 /**
  * A hook that returns a state that can be controlled by an external component.
  * The usage is the same as useState, but with an additional optional parameter
