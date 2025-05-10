@@ -47,7 +47,7 @@ import {
 } from '../ScorecardSection/ScorecardSection';
 import {
   PivotedRow,
-  useExampleCompareData,
+  useExampleCompareDataAndPrefetch,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
 
@@ -223,11 +223,8 @@ export const ExampleCompareSection: React.FC<{
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
 
-  const {targetRowValue, loading: loadingInputValue} = useExampleCompareData(
-    props.state,
-    filteredRows,
-    targetIndex
-  );
+  const {targetRowValue, loading: loadingInputValue} =
+    useExampleCompareDataAndPrefetch(props.state, filteredRows, targetIndex);
 
   const inputColumnKeys = useMemo(() => {
     return Object.keys(targetRowValue ?? {});
