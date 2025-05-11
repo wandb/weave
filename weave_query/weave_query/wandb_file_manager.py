@@ -12,8 +12,16 @@ from aiohttp import BasicAuth
 from requests.auth import HTTPBasicAuth
 from wandb.sdk.lib import hashutil
 
+from weave_query import (
+    artifact_wandb,
+    cache,
+    engine_trace,
+    errors,
+    filesystem,
+    wandb_api,
+    weave_http,
+)
 from weave_query import environment as weave_env
-from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 
@@ -76,7 +84,7 @@ def _local_path_and_download_url(
                 urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
                 md5_hex,
                 urllib.parse.quote(file_name),
-                )
+            )
         # For artifactsV2 (which is all artifacts now), the file download handler ignores the entity
         # parameter while parsing the url, and fetches the files directly via the artifact id
         # Refer to: https://github.com/wandb/core/blob/7cfee1cd07ddc49fe7ba70ce3d213d2a11bd4456/services/gorilla/api/handler/artifacts.go#L179
@@ -223,6 +231,41 @@ class WandbFileManagerAsync:
                 auth=auth,
             )
             return file_path
+
+    async def ensure_file_content(
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
+    ) -> typing.Optional[bytes]:
+        path = art_uri.path
+        if path is None:
+            raise errors.WeaveInternalError(
+                "Artifact URI has no path in call to ensure_file"
+            )
+        with tracer.trace("wandb_file_manager.ensure_file_content") as span:
+            span.set_tag("uri", str(art_uri))
+            res = await self.local_path_and_download_url(art_uri)
+            if res is None:
+                return None
+            file_path, download_url = res
+            wandb_api_context = wandb_api.get_wandb_api_context()
+            headers = None
+            cookies = None
+            auth = None
+            if wandb_api_context is not None:
+                headers = wandb_api_context.headers
+                cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = BasicAuth("api", wandb_api_context.api_key)
+            content = await self.http.download_file(
+                download_url,
+                file_path,
+                headers=headers,
+                cookies=cookies,
+                auth=auth,
+            )
+            return content
 
     async def ensure_file_downloaded(
         self,

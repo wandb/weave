@@ -85,7 +85,7 @@ class HttpAsync:
     def __init__(self, fs: filesystem.FilesystemAsync) -> None:
         self.fs = fs
 
-        conn = aiohttp.TCPConnector(limit=50)
+        conn = aiohttp.TCPConnector(limit=500000)
         trace_configs = []
         if ENABLE_REQUEST_TRACING:
             trace_configs.append(logging_trace_config())
@@ -108,7 +108,7 @@ class HttpAsync:
         headers: typing.Optional[dict[str, str]] = None,
         cookies: typing.Optional[dict[str, str]] = None,
         auth: typing.Optional[aiohttp.BasicAuth] = None,
-    ) -> None:
+    ) -> bytes:
         await self.fs.makedirs(os.path.dirname(path), exist_ok=True)
         with tracer.trace("async_download_file_task") as span:
             # TODO: Error handling when no file or manifest
@@ -128,7 +128,9 @@ class HttpAsync:
                             with tracer.trace("async_download_file_task.iter_chunked"):
                                 chunk_size = 8 * 1024 * 1024
                                 buffer = bytearray()
+                                content = bytearray()
                                 async for data in r.content.iter_chunked(chunk_size):
+                                    content.extend(data)
                                     buffer.extend(data)
                                     if len(buffer) >= chunk_size:
                                         with tracer.trace(
@@ -140,6 +142,8 @@ class HttpAsync:
                                 if buffer:
                                     with tracer.trace("async_download_file_task.write"):
                                         await f.write(buffer)
+
+                    return content
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status, "Download failed"
