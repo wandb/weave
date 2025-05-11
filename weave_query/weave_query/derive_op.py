@@ -2,25 +2,33 @@
 # These derived ops are not yet fully Weave serializable due to some non-json stuff
 #     in their closure. So we disable legacy_strict_op_saving when deriving them.
 
+import asyncio
+import concurrent.futures
 import copy
 import inspect
+import json
 import typing
 
-from weave_query import weave_types as types
 from weave_query import (
-    storage,
-    weave_internal,
-    errors,
-    parallelism,
-    registry_mem,
+    artifact_fs,
     box,
     context_state,
+    errors,
     execute_fast,
+    filesystem,
     graph,
     op_args,
     op_def,
     op_policy,
+    parallelism,
+    registry_mem,
+    storage,
+    wandb_api,
+    wandb_file_manager,
+    weave_http,
+    weave_internal,
 )
+from weave_query import weave_types as types
 from weave_query.language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
@@ -82,6 +90,43 @@ disallow_mapping_type_name_list = [
     "dataframeTable",
     "ArrowWeaveList",
 ]
+
+
+async def maybe_download_file(file, wandb_file_manager_async):
+    if isinstance(file, artifact_fs.FilesystemArtifactFile):
+        return await wandb_file_manager_async.ensure_file_content(
+            file.artifact._read_artifact_uri.with_path(file.path)
+        )
+
+    return None
+
+
+async def pre_download_async(files):
+    fs_async = filesystem.FilesystemAsync()
+    http_async = weave_http.HttpAsync(fs_async)
+    api_async = wandb_api.WandbApiAsync()
+    wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
+        fs_async, http_async, api_async
+    )
+
+    async with http_async:
+        with wandb_api.wandb_api_context(wandb_api.get_wandb_api_context()):
+            file_contents = await asyncio.gather(
+                *[maybe_download_file(file, wandb_file_manager_async) for file in files]
+            )
+
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                file_contents = list(executor.map(json.loads, file_contents))
+
+            return dict(
+                zip(
+                    [
+                        file.artifact._read_artifact_uri.with_path(file.path)
+                        for file in files
+                    ],
+                    file_contents,
+                )
+            )
 
 
 # This class implements a nullable mappable derived op handler. It will create a new op
@@ -252,21 +297,31 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history2")
                 or orig_op.name.endswith("run-history3")
             ):
+                files = {}
+                if orig_op.name.endswith("file-table"):
+                    files = asyncio.run(pre_download_async(list_))
 
                 def download_one(x):
                     with tag_store.with_tag_store_state(
                         tag_store_curr_node_id, tag_store_mem_map
                     ):
-                        if x == None or types.is_optional(first_arg.type):
-                            return None
-                        called = orig_op(x, **new_inputs)
-                        # Use the use path to get caching.
-                        try:
-                            res = weave_internal.use(called)
-                        except errors.WeaveArtifactCollectionNotFound:
-                            return None
-                        res = storage.deref(res)
-                        return res
+                        with context_state.file_table_predownload(files):
+                            import time
+
+                            start_time = time.time()
+                            if x == None or types.is_optional(first_arg.type):
+                                return None
+
+                            called = orig_op(x, **new_inputs)
+                            # Use the use path to get caching.
+                            try:
+                                res = weave_internal.use(called)
+                            except errors.WeaveArtifactCollectionNotFound:
+                                return None
+                            res = storage.deref(res)
+                            end_time = time.time()
+                            print(f"Download time: {end_time - start_time}")
+                            return res
 
                 if USE_PARALLEL_DOWNLOAD:
                     res = list(parallelism.do_in_parallel(download_one, list_))
