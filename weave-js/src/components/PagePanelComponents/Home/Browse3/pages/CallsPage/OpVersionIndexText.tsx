@@ -21,7 +21,7 @@ export const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
       versionHash: ref.artifactVersion,
     };
   }
-  const opVersion = useOpVersion(opVersionKey);
+  const opVersion = useOpVersion({key: opVersionKey});
   if (opVersion.loading) {
     return <LoadingDots />;
   }
