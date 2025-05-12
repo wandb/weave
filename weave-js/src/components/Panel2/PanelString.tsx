@@ -46,7 +46,7 @@ const inputType = {
 
 type JsonExpansionLevel = number | 'all';
 interface PanelStringConfigState {
-  mode: 'plaintext' | 'markdown' | 'diff';
+  mode: 'plaintext' | 'markdown' | 'diff' | 'json';
 
   // Diff only: expression to compare against
   diffComparand?: Node;
@@ -55,6 +55,8 @@ interface PanelStringConfigState {
   // Plaintext only:
   // Render escaped whitespace
   renderWhitespace?: boolean;
+
+  // json only:
   // Expansion level for JSON
   jsonExpansionLevel?: JsonExpansionLevel;
 }
@@ -168,6 +170,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
             {text: 'Plain Text', value: 'plaintext'},
             {text: 'Markdown', value: 'markdown'},
             {text: 'Diff', value: 'diff'},
+            {text: 'JSON', value: 'json'},
           ]}
           value={config.mode}
           onChange={(e, {value}) => {
@@ -176,7 +179,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
         />
       </ConfigPanel.ConfigOption>
       {config.mode === 'plaintext' && (
-        <ConfigPanel.ConfigOption label="Render white-space">
+        <ConfigPanel.ConfigOption label="Render whitespace">
           <ConfigPanel.ModifiedDropdownConfigField
             selection
             data-test="render-whitespace"
@@ -192,7 +195,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
           />
         </ConfigPanel.ConfigOption>
       )}
-      {config.mode === 'plaintext' && (
+      {config.mode === 'json' && (
         <ConfigPanel.ConfigOption label="JSON Expansion Level">
           <ConfigPanel.ModifiedDropdownConfigField
             selection
@@ -370,6 +373,29 @@ export const PanelString: React.FC<PanelStringProps> = props => {
           </S.StringItem>
         </S.StringContainer>
       );
+    } else if (config.mode === 'json') {
+      if (parsed) {
+        return (
+          <JsonView
+            data={parsed}
+            style={{
+              ...defaultStyles,
+              container: 'background: white;',
+            }}
+            shouldExpandNode={getJsonExpandMode()}
+          />
+        );
+      }
+      return (
+        <JsonView
+          data={{unparsable: trimmedStr}}
+          style={{
+            ...defaultStyles,
+            container: 'background: white;',
+          }}
+          shouldExpandNode={getJsonExpandMode()}
+        />
+      );
     }
 
     // Check if the first 100 characters contain any characters from an RTL script
@@ -379,34 +405,21 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       : {};
     let contentPlaintext;
     // Show collapsable JSON
-    if (parsed) {
+
+    // Handle plaintext with renderWhitespace option
+    if (config.renderWhitespace && !parsed) {
       contentPlaintext = (
-        <JsonView
-          data={parsed}
-          style={{
-            ...defaultStyles,
-            ...textStyle,
-            container: 'background: white;',
-          }}
-          shouldExpandNode={getJsonExpandMode()}
-        />
+        <S.PreformattedMonoString
+          style={{...textStyle, whiteSpace: 'pre-wrap'}}>
+          {convertWhitespaceChars(fullStr)}
+        </S.PreformattedMonoString>
       );
     } else {
-      // Handle plaintext with renderWhitespace option
-      if (config.renderWhitespace && !parsed) {
-        contentPlaintext = (
-          <S.PreformattedMonoString
-            style={{...textStyle, whiteSpace: 'pre-wrap'}}>
-            {convertWhitespaceChars(fullStr)}
-          </S.PreformattedMonoString>
-        );
-      } else {
-        contentPlaintext = (
-          <S.PreformattedProportionalString style={textStyle}>
-            {fullStr}
-          </S.PreformattedProportionalString>
-        );
-      }
+      contentPlaintext = (
+        <S.PreformattedProportionalString style={textStyle}>
+          {fullStr}
+        </S.PreformattedProportionalString>
+      );
     }
 
     // plaintext
@@ -429,6 +442,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     config.renderWhitespace,
     config.jsonExpansionLevel,
     parsed,
+    trimmedStr,
   ]);
 
   const textIsURL = config.mode === 'plaintext' && isURL(fullStr);
