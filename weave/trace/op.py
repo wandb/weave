@@ -1181,7 +1181,7 @@ def op(
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
-        is_generator = inspect.isgeneratorfunction(func)
+        is_sync_generator = inspect.isgeneratorfunction(func)
         is_async_generator = inspect.isasyncgenfunction(func)
 
         # Create the appropriate wrapper based on function type
@@ -1194,7 +1194,7 @@ def op(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
-            elif is_generator:
+            elif is_sync_generator:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
@@ -1271,7 +1271,7 @@ def op(
 
             # Mark what type of function this is for runtime type checking
             wrapper._is_async = is_async  # type: ignore
-            wrapper._is_generator = is_generator  # type: ignore
+            wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
             return cast(Op[P, R], wrapper)
