@@ -851,8 +851,8 @@ const useAllDynamicColumnNames = (
   resetDep: any
 ) => {
   const prevColumnsRef = useRef<string[]>([]);
-  const prevResetDepRef = useRef<any>(resetDep);
   const memoedDep = useDeepMemo(resetDep);
+  const prevResetDepRef = useRef<any>(memoedDep);
 
   // If resetDep changed, clear the previous columns
   if (prevResetDepRef.current !== memoedDep) {
