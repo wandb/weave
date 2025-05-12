@@ -20,7 +20,6 @@ from weave_query import weave_types as types
 from weave_query.api import op, weave_class
 from weave_query.ops_domain import trace_tree, wbmedia
 
-
 @dataclasses.dataclass(frozen=True)
 class TableType(types.ObjectType):
     name = "table"
@@ -687,33 +686,33 @@ def _get_incremental_table_awl_from_file(
 ) -> ops_arrow.ArrowWeaveList:
     from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
     all_awls: list[ops_arrow.ArrowWeaveList] = []
-    increment_dir = file.artifact.path_info("")
-    if isinstance(increment_dir, artifact_fs.FilesystemArtifactDir):
-        files = {}
-        current_incr_num_str, incremental_table_root_filename = file.path.split('.', 1)
-        current_incr_num = int(current_incr_num_str)
-        # Only load the latest 100 increments
-        for i in range(max(0, current_incr_num - 99), current_incr_num + 1):
-            try:
-                files[f"{i}.{incremental_table_root_filename}"] = increment_dir.files[f"{i}.{incremental_table_root_filename}"]
-            except KeyError:
-                # Skip if the file doesn't exist in the increment directory
-                continue
+    files = {}
+    if "previous_increments_paths" in data:
+        # Get the last 100 increments (including the current file)
+        # If we have more than 100, otherwise use all increments
+        all_increment_paths = data["previous_increments_paths"]
+        MAX_PREVIOUS_INCREMENTS = 99
+        increment_paths = all_increment_paths[-MAX_PREVIOUS_INCREMENTS:] if len(all_increment_paths) > MAX_PREVIOUS_INCREMENTS else all_increment_paths
+        escaped_paths = [escape_artifact_path(path) for path in increment_paths]
+        for path in escaped_paths:
+            fs_art_file = _filesystem_artifact_file_from_artifact_path(path)
+            files[fs_art_file.path] = fs_art_file
 
-        asyncio.run(ensure_files(files))
-        rrows: list[list] = []
-        object_types: list[types.Type] = []
-        for incremental_file in files.values():
-            incremental_data = _get_table_data_from_file(incremental_file)
-            rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
-            rrows.append(rows)
-            object_types.append(object_type)
+    files[file.path] = file
+    
+    asyncio.run(ensure_files(files))
+    rrows: list[list] = []
+    object_types: list[types.Type] = []
+    for incremental_file in files.values():
+        incremental_data = _get_table_data_from_file(incremental_file)
+        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+        rrows.append(rows)
+        object_types.append(object_type)
 
-            
-        object_type = types.union(*object_types)
+    object_type = types.union(*object_types)
 
-        for rows, file in zip(rrows, files.values()):
-            all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
+    for rows, file in zip(rrows, files.values()):
+        all_awls.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
 
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_awls)
     return arrow_weave_list
