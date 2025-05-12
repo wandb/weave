@@ -3,7 +3,17 @@ import TabItem from '@theme/TabItem';
 
 # Logging media
 
-Weave supports logging and displaying multiple first class media types. Log images with `PIL.Image.Image` and audio with `wave.Wave_read` either directly with the object API, or as the inputs or output of an op.
+Weave supports logging and displaying video, images, and audio.
+
+## Video
+
+Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
+
+:::note
+Video support is currently only available in Python.
+:::
+
+For usage information, see [Video Support](../tracking/video).
 
 ## Images
 
