@@ -16,12 +16,13 @@ import React, {
   FC,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {useDeepMemo} from '../../../../../../common/state/hooks';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
@@ -64,6 +65,7 @@ import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {
   insertPath,
   isDynamicCallColumn,
+  Path,
   pathToString,
   stringToPath,
 } from './callsTableColumnsUtil';
@@ -80,6 +82,7 @@ export const useCallsTableColumns = (
   entity: string,
   project: string,
   effectiveFilter: WFHighLevelCallFilter,
+  currentViewId: string,
   tableData: TraceCallSchema[],
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
@@ -128,10 +131,12 @@ export const useCallsTableColumns = (
     [columnsWithRefs]
   );
 
+  // If either of these values has changed we'll reset the dynamic columns.
+  const resetDep = {effectiveFilter, currentViewId};
   const allDynamicColumnNames = useAllDynamicColumnNames(
     tableData,
     shouldIgnoreColumn,
-    effectiveFilter
+    resetDep
   );
 
   // Determine what sort of view we are looking at based on the filter
@@ -845,39 +850,36 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
-    []
-  );
+  const prevColumnsRef = useRef<string[]>([]);
+  const memoedDep = useDeepMemo(resetDep);
+  const prevResetDepRef = useRef<any>(memoedDep);
 
-  useEffect(() => {
-    setAllDynamicColumnNames(last => {
-      let nextAsPaths = last
-        .filter(c => !shouldIgnoreColumn(c))
-        .map(stringToPath);
-      tableData.forEach(row => {
-        Object.keys(row).forEach(key => {
-          const keyAsPath = stringToPath(key);
-          if (isDynamicCallColumn(keyAsPath)) {
-            nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
-          }
-        });
-      });
+  // If resetDep changed, clear the previous columns
+  if (prevResetDepRef.current !== memoedDep) {
+    prevColumnsRef.current = [];
+    prevResetDepRef.current = memoedDep;
+  }
 
-      return nextAsPaths.map(pathToString);
+  // Start with any previous columns
+  let currentColumnPaths: Path[] = prevColumnsRef.current
+    .filter(c => !shouldIgnoreColumn(c))
+    .map(stringToPath);
+
+  // Add new columns from the current table data
+  tableData.forEach(row => {
+    Object.keys(row).forEach(key => {
+      const keyAsPath = stringToPath(key);
+      if (isDynamicCallColumn(keyAsPath)) {
+        currentColumnPaths = insertPath(currentColumnPaths, keyAsPath);
+      }
     });
-  }, [shouldIgnoreColumn, tableData]);
+  });
 
-  useEffect(() => {
-    // Here, we reset the dynamic column names when the filter changes.
-    // Both branches of the if statement are the same. I just wanted to
-    // ensure that the `resetDep` is included in the dependency array.
-    // Perhaps there is a better way to do this?
-    if (resetDep) {
-      setAllDynamicColumnNames([]);
-    } else {
-      setAllDynamicColumnNames([]);
-    }
-  }, [resetDep]);
+  // Convert paths back to strings
+  const allDynamicColumnNames = currentColumnPaths.map(pathToString);
+
+  // Store the current columns for the next render
+  prevColumnsRef.current = allDynamicColumnNames;
 
   return allDynamicColumnNames;
 };
