@@ -691,10 +691,7 @@ def _call_sync_gen(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if (
-                    hasattr(op, "_on_finish_post_processor")
-                    and op._on_finish_post_processor
-                ):
+                if getattr(op, "_on_finish_post_processor", None) is not None:
                     output = op._on_finish_post_processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
