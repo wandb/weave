@@ -1,5 +1,3 @@
-import {Box, Divider} from '@mui/material';
-import {MOON_250, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 
@@ -32,7 +30,6 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
-  settingsTab,
   hasConfiguredProviders = true,
 }) => {
   const [addMessageRole, setAddMessageRole] =
@@ -62,29 +59,12 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   };
 
   return (
-    <Box
-      sx={{
-        padding: '8px 16px 16px',
-        backgroundColor: 'white',
-        minHeight: '160px',
-        width: '100%',
-        flexShrink: 0,
-        zIndex: 1, // WARN: z-index position of navbar overflow menu is `2`, check first if changing
-      }}>
-      <Box
-        sx={{
-          maxWidth: '800px',
-          marginX: 'auto',
-        }}>
-        <Box
-          sx={{
-            marginBottom: '4px',
-            textAlign: 'right',
-            fontSize: '12px',
-            color: MOON_500,
-          }}>
+    // WARN: z-index position of navbar overflow menu is `2`, check first if changing
+    <div className="z-1 flex min-h-[160px] w-full flex-shrink-0 bg-white p-16 pt-8">
+      <div className="mx-auto w-full max-w-[800px]">
+        <div className="mb-8 text-right text-xs text-moon-500">
           Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
-        </Box>
+        </div>
         <StyledTextArea
           onChange={e => setChatText(e.target.value)}
           value={chatText}
@@ -99,19 +79,13 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           reset={shouldReset}
           disabled={!hasConfiguredProviders}
         />
-        <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-          <Box sx={{display: 'flex', gap: '8px'}}>
+        <div className="flex justify-between">
+          <div className="flex gap-8">
             {/* TODO: Add image upload */}
             {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
-          </Box>
-          <Box sx={{display: 'flex', gap: '8px'}}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                color: MOON_500,
-                fontSize: '12px',
-              }}>
+          </div>
+          <div className="flex gap-8">
+            <div className="flex items-center text-xs text-moon-500">
               Add as
               <Button
                 className="ml-4 rounded-r-none"
@@ -137,7 +111,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
                 onClick={() => setAddMessageRole('user')}>
                 User
               </Button>
-            </Box>
+            </div>
             <Button
               variant="secondary"
               size="medium"
@@ -148,7 +122,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               onClick={() => handleAdd(addMessageRole, chatText)}>
               Add
             </Button>
-            <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
+            <div className="h-full w-px bg-moon-250" />
             <Button
               size="medium"
               onClick={() => handleSend(addMessageRole)}
@@ -158,9 +132,9 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               startIcon={isLoading ? 'loading' : undefined}>
               {isLoading ? 'Sending...' : 'Send'}
             </Button>
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
