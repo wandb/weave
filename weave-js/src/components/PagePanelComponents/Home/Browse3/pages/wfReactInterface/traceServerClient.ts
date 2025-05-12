@@ -268,7 +268,7 @@ export class TraceServerClient extends CachingTraceServerClient {
     await Promise.all(
       Object.entries(groupedReqs).map(async ([key, reqs]) => {
         const uniqueDigests = _.uniq(reqs.map(r => r.row_digests).flat());
-        const res = await this.tableRowQueryDirect({
+        const res = await super.tableRowQuery({
           ...reqs[0],
           row_digests: uniqueDigests,
         });
@@ -276,6 +276,10 @@ export class TraceServerClient extends CachingTraceServerClient {
         res.rows.forEach(r => {
           digestMap.set(r.digest, r.val);
         });
+
+        // each collector is guaranteed to get data for all its row digests,
+        // nothing will be missed, because several collectors who share the
+        // same table are fetched in a single request
         collectors.forEach(collector => {
           const rows = collector.req.row_digests.map(digest => ({
             digest,
@@ -303,13 +307,6 @@ export class TraceServerClient extends CachingTraceServerClient {
   ): Promise<TraceRefsReadBatchRes> {
     return super.readBatch(req);
   }
-
-  private async tableRowQueryDirect(
-    req: TraceTableRowQueryReq
-  ): Promise<TraceTableRowQueryRes> {
-    // Proxies the tableRowQuery request to the super class
-    return super.tableRowQuery(req);
-  }
 }
 
 const tableQuerySuitableForBatching = (
@@ -329,14 +326,20 @@ const tableQuerySuitableForBatching = (
   // If the request contains anything other than project_id, digest, and filter, return false
   // We can't support sorting/pagination, etc.
   if (
-    Object.keys(req).some(k => !['project_id', 'digest', 'filter'].includes(k))
+    !Object.entries(req).every(
+      ([k, v]) => ['project_id', 'digest', 'filter'].includes(k) || v == null
+    )
   ) {
     return false;
   }
 
   // If the filter contains anything other than row_digests, return false
   // Forward protection (there are no other filter properties yet)
-  if (Object.keys(req.filter).some(k => k !== 'row_digests')) {
+  if (
+    !Object.entries(req.filter).every(
+      ([k, v]) => k === 'row_digests' || v == null
+    )
+  ) {
     return false;
   }
   return true;
