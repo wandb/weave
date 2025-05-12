@@ -991,7 +991,7 @@ class WeaveClient:
 
         Returns:
             `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
-        
+
         Example:
             ```python
             calls = client.get_calls(

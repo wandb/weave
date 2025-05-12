@@ -44,6 +44,7 @@ class LiteralOperation(BaseModel):
     Example:
         {"$literal": "predict"}
     """
+
     literal_: typing.Union[
         str,
         int,
@@ -84,6 +85,7 @@ class GetFieldOperator(BaseModel):
     Example:
         {"$getField": "op_name"}
     """
+
     get_field_: str = Field(alias="$getField")
 
 
@@ -100,6 +102,7 @@ class ConvertOperation(BaseModel):
             }
         }
     """
+
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
@@ -113,6 +116,7 @@ class ConvertSpec(BaseModel):
     - `input`: The operand to convert.
     - `to`: The type to convert to.
     """
+
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
     to: CastTo
@@ -131,6 +135,7 @@ class AndOperation(BaseModel):
             ]
         }
     """
+
     and_: list["Operand"] = Field(alias="$and")
 
 
@@ -147,6 +152,7 @@ class OrOperation(BaseModel):
             ]
         }
     """
+
     or_: list["Operand"] = Field(alias="$or")
 
 
@@ -162,6 +168,7 @@ class NotOperation(BaseModel):
             ]
         }
     """
+
     not_: tuple["Operand"] = Field(alias="$not")
 
 
@@ -175,6 +182,7 @@ class EqOperation(BaseModel):
             "$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]
         }
     """
+
     eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
 
 
@@ -188,6 +196,7 @@ class GtOperation(BaseModel):
             "$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
         }
     """
+
     gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
@@ -201,6 +210,7 @@ class GteOperation(BaseModel):
             "$gte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
         }
     """
+
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
@@ -219,6 +229,7 @@ class InOperation(BaseModel):
             ]
         }
     """
+
     in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
 
 
@@ -241,6 +252,7 @@ class ContainsOperation(BaseModel):
             }
         }
     """
+
     contains_: "ContainsSpec" = Field(alias="$contains")
 
 
@@ -252,6 +264,7 @@ class ContainsSpec(BaseModel):
     - `substr`: The substring to search for.
     - `case_insensitive`: If true, match is case-insensitive.
     """
+
     input: "Operand"
     substr: "Operand"
     case_insensitive: typing.Optional[bool] = False
@@ -317,6 +330,7 @@ class Query(BaseModel):
             }
         }
     """
+
     expr_: Operation = Field(alias="$expr")
     # In the future, we could have other top-level Query Operators as described here:
     # https://www.mongodb.com/docs/manual/reference/operator/query/
