@@ -103,7 +103,6 @@ const defaultConfig = (): PanelStringConfigState => {
   return {
     mode: 'plaintext',
     renderWhitespace: false,
-    jsonExpansionLevel: 1,
   };
 };
 
