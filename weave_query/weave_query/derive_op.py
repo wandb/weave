@@ -7,6 +7,7 @@ import concurrent.futures
 import copy
 import inspect
 import json
+import os
 import typing
 
 from weave_query import (
@@ -92,41 +93,96 @@ disallow_mapping_type_name_list = [
 ]
 
 
-async def maybe_download_file(file, wandb_file_manager_async):
-    if isinstance(file, artifact_fs.FilesystemArtifactFile):
-        return await wandb_file_manager_async.ensure_file_content(
-            file.artifact._read_artifact_uri.with_path(file.path)
-        )
-
-    return None
-
-
-async def pre_download_async(files):
-    fs_async = filesystem.FilesystemAsync()
-    http_async = weave_http.HttpAsync(fs_async)
-    api_async = wandb_api.WandbApiAsync()
-    wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
-        fs_async, http_async, api_async
+def write_files_to_disk(uris):
+    fs_sync = filesystem.Filesystem()
+    http_sync = weave_http.Http(fs_sync)
+    api_sync = wandb_api.WandbApi()
+    wandb_file_manager_sync = wandb_file_manager.WandbFileManager(
+        fs_sync, http_sync, api_sync
     )
 
-    async with http_async:
-        with wandb_api.wandb_api_context(wandb_api.get_wandb_api_context()):
-            file_contents = await asyncio.gather(
-                *[maybe_download_file(file, wandb_file_manager_async) for file in files]
+    def write_file(uri_with_file_content):
+        uri, file_content = uri_with_file_content
+        path = wandb_file_manager_sync.local_path_and_download_url(uri)
+        if path is None:
+            return None
+        file_path, _ = path
+        fs_sync.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with fs_sync.open_write(file_path, mode="wb") as f:
+            f.write(file_content)
+
+        return (uri, json.loads(file_content))
+
+    try:
+        with http_sync:
+            return list(map(write_file, uris))
+    finally:
+        http_sync.session.close()
+
+
+async def download_content_single(uri_tuple, wandb_file_manager_async):
+    uri, _ = uri_tuple
+    content = await wandb_file_manager_async.ensure_file_content(uri)
+    return (uri, content)
+
+
+def download_contents(artifact_uris):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+
+        async def download_contents_async(artifact_uris):
+            fs_async = filesystem.FilesystemAsync()
+            http_async = weave_http.HttpAsync(fs_async)
+            api_async = wandb_api.WandbApiAsync()
+            wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
+                fs_async, http_async, api_async
             )
 
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                file_contents = list(executor.map(json.loads, file_contents))
+            try:
+                async with http_async:
+                    res = await asyncio.gather(
+                        *[
+                            download_content_single(uri, wandb_file_manager_async)
+                            for uri in artifact_uris
+                        ]
+                    )
+                    return res
+            finally:
+                await http_async.session.close()
 
-            return dict(
-                zip(
-                    [
-                        file.artifact._read_artifact_uri.with_path(file.path)
-                        for file in files
-                    ],
-                    file_contents,
-                )
-            )
+        uris_with_file_content = loop.run_until_complete(
+            download_contents_async(artifact_uris)
+        )
+
+        return dict(write_files_to_disk(uris_with_file_content))
+    finally:
+        loop.close()
+
+
+def pre_download_with_processes(files):
+    artifact_uris = [
+        (file.artifact._read_artifact_uri.with_path(file.path), None)
+        for file in files
+        if isinstance(file, artifact_fs.FilesystemArtifactFile)
+    ]
+
+    WORKER_COUNT = os.cpu_count()
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=WORKER_COUNT,
+    ) as executor:
+        batch_size = max(1, len(artifact_uris) // WORKER_COUNT)
+        batches = [
+            artifact_uris[i : i + batch_size]
+            for i in range(0, len(artifact_uris), batch_size)
+        ]
+
+        file_contents = {}
+        batch_results = list(executor.map(download_contents, batches))
+        for batch_result in batch_results:
+            file_contents.update(batch_result)
+        return file_contents
 
 
 # This class implements a nullable mappable derived op handler. It will create a new op
@@ -299,7 +355,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             ):
                 files = {}
                 if orig_op.name.endswith("file-table"):
-                    files = asyncio.run(pre_download_async(list_))
+                    files = pre_download_with_processes(list_)
 
                 def download_one(x):
                     with tag_store.with_tag_store_state(

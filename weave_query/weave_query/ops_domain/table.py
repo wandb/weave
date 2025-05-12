@@ -743,6 +743,7 @@ def _get_table_like_awl_from_file(
     maybe_file_content = file_table_predownload.get(
         file.artifact._read_artifact_uri.with_path(file.path), None
     )
+    print(f"maybe_file_content: {maybe_file_content is not None}")
     data = maybe_file_content or _get_table_data_from_file(file)
 
     if "log_mode" in data and data["log_mode"] == "INCREMENTAL":
