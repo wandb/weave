@@ -7,7 +7,6 @@ import typing
 from weave_query import (
     artifact_fs,
     artifact_wandb,
-    context_state,
     engine_trace,
     errors,
     io_service,
@@ -739,12 +738,7 @@ def _get_table_like_awl_from_file(
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
 
-    file_table_predownload = context_state.get_file_table_predownload()
-    maybe_file_content = file_table_predownload.get(
-        file.artifact._read_artifact_uri.with_path(file.path), None
-    )
-    print(f"maybe_file_content: {maybe_file_content is not None}")
-    data = maybe_file_content or _get_table_data_from_file(file)
+    data = _get_table_data_from_file(file)
 
     if "log_mode" in data and data["log_mode"] == "INCREMENTAL":
         awl = _get_incremental_table_awl_from_file(data, file)

@@ -85,7 +85,7 @@ class HttpAsync:
     def __init__(self, fs: filesystem.FilesystemAsync) -> None:
         self.fs = fs
 
-        conn = aiohttp.TCPConnector(limit=500000, force_close=False)
+        conn = aiohttp.TCPConnector(limit=1000000)
         trace_configs = []
         if ENABLE_REQUEST_TRACING:
             trace_configs.append(logging_trace_config())

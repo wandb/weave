@@ -213,6 +213,7 @@ class WandbFileManagerAsync:
                 return None
             file_path, download_url = res
             if await self.fs.exists(file_path):
+                print(f"File already exists: {file_path}")
                 return file_path
             wandb_api_context = wandb_api.get_wandb_api_context()
             headers = None

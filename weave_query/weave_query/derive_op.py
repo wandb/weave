@@ -6,7 +6,6 @@ import asyncio
 import concurrent.futures
 import copy
 import inspect
-import json
 import os
 import typing
 
@@ -93,77 +92,34 @@ disallow_mapping_type_name_list = [
 ]
 
 
-def write_files_to_disk(uris):
-    fs_sync = filesystem.Filesystem()
-    http_sync = weave_http.Http(fs_sync)
-    api_sync = wandb_api.WandbApi()
-    wandb_file_manager_sync = wandb_file_manager.WandbFileManager(
-        fs_sync, http_sync, api_sync
-    )
-
-    def write_file(uri_with_file_content):
-        uri, file_content = uri_with_file_content
-        path = wandb_file_manager_sync.local_path_and_download_url(uri)
-        if path is None:
-            return None
-        file_path, _ = path
-        fs_sync.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with fs_sync.open_write(file_path, mode="wb") as f:
-            f.write(file_content)
-
-        return (uri, json.loads(file_content))
-
-    try:
-        with http_sync:
-            return list(map(write_file, uris))
-    finally:
-        http_sync.session.close()
-
-
-async def download_content_single(uri_tuple, wandb_file_manager_async):
-    uri, _ = uri_tuple
-    content = await wandb_file_manager_async.ensure_file_content(uri)
-    return (uri, content)
-
-
 def download_contents(artifact_uris):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    try:
-
-        async def download_contents_async(artifact_uris):
-            fs_async = filesystem.FilesystemAsync()
-            http_async = weave_http.HttpAsync(fs_async)
-            api_async = wandb_api.WandbApiAsync()
-            wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
-                fs_async, http_async, api_async
-            )
-
-            try:
-                async with http_async:
-                    res = await asyncio.gather(
-                        *[
-                            download_content_single(uri, wandb_file_manager_async)
-                            for uri in artifact_uris
-                        ]
-                    )
-                    return res
-            finally:
-                await http_async.session.close()
-
-        uris_with_file_content = loop.run_until_complete(
-            download_contents_async(artifact_uris)
+    async def download_contents_async(artifact_uris):
+        fs_async = filesystem.FilesystemAsync()
+        http_async = weave_http.HttpAsync(fs_async)
+        api_async = wandb_api.WandbApiAsync()
+        wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
+            fs_async, http_async, api_async
         )
 
-        return dict(write_files_to_disk(uris_with_file_content))
-    finally:
-        loop.close()
+        async with api_async.connector:
+            async with http_async:
+                await asyncio.gather(
+                    *[
+                        wandb_file_manager_async.ensure_file(uri)
+                        for uri in artifact_uris
+                    ]
+                )
+
+    loop.run_until_complete(download_contents_async(artifact_uris))
+    loop.close()
 
 
 def pre_download_with_processes(files):
     artifact_uris = [
-        (file.artifact._read_artifact_uri.with_path(file.path), None)
+        file.artifact._read_artifact_uri.with_path(file.path)
         for file in files
         if isinstance(file, artifact_fs.FilesystemArtifactFile)
     ]
@@ -178,11 +134,7 @@ def pre_download_with_processes(files):
             for i in range(0, len(artifact_uris), batch_size)
         ]
 
-        file_contents = {}
-        batch_results = list(executor.map(download_contents, batches))
-        for batch_result in batch_results:
-            file_contents.update(batch_result)
-        return file_contents
+        list(executor.map(download_contents, batches))
 
 
 # This class implements a nullable mappable derived op handler. It will create a new op
@@ -353,31 +305,29 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history2")
                 or orig_op.name.endswith("run-history3")
             ):
-                files = {}
                 if orig_op.name.endswith("file-table"):
-                    files = pre_download_with_processes(list_)
+                    pre_download_with_processes(list_)
 
                 def download_one(x):
                     with tag_store.with_tag_store_state(
                         tag_store_curr_node_id, tag_store_mem_map
                     ):
-                        with context_state.file_table_predownload(files):
-                            import time
+                        import time
 
-                            start_time = time.time()
-                            if x == None or types.is_optional(first_arg.type):
-                                return None
+                        start_time = time.time()
+                        if x == None or types.is_optional(first_arg.type):
+                            return None
 
-                            called = orig_op(x, **new_inputs)
-                            # Use the use path to get caching.
-                            try:
-                                res = weave_internal.use(called)
-                            except errors.WeaveArtifactCollectionNotFound:
-                                return None
-                            res = storage.deref(res)
-                            end_time = time.time()
-                            print(f"Download time: {end_time - start_time}")
-                            return res
+                        called = orig_op(x, **new_inputs)
+                        # Use the use path to get caching.
+                        try:
+                            res = weave_internal.use(called)
+                        except errors.WeaveArtifactCollectionNotFound:
+                            return None
+                        res = storage.deref(res)
+                        end_time = time.time()
+                        print(f"Download time: {end_time - start_time}")
+                        return res
 
                 if USE_PARALLEL_DOWNLOAD:
                     res = list(parallelism.do_in_parallel(download_one, list_))
