@@ -182,6 +182,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
         <ConfigPanel.ConfigOption label="Render whitespace">
           <ConfigPanel.ModifiedDropdownConfigField
             selection
+            search={false}
             data-test="render-whitespace"
             multiple={false}
             options={[
@@ -199,6 +200,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
         <ConfigPanel.ConfigOption label="JSON Expansion Level">
           <ConfigPanel.ModifiedDropdownConfigField
             selection
+            search={false}
             data-test="json-expansion-level"
             multiple={false}
             options={expandLevelOptions}
@@ -388,7 +390,7 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       }
       return (
         <JsonView
-          data={{unparsable: trimmedStr}}
+          data={{invalidJSON: trimmedStr}}
           style={{
             ...defaultStyles,
             container: 'background: white;',
@@ -398,16 +400,17 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
     }
 
+    // Default mode: Plaintext
+
     // Check if the first 100 characters contain any characters from an RTL script
     // and set the text direction accordingly.
     const textStyle: React.CSSProperties = isRTL(fullStr.slice(0, 100))
       ? {direction: 'rtl', textAlign: 'right'}
       : {};
     let contentPlaintext;
-    // Show collapsable JSON
 
     // Handle plaintext with renderWhitespace option
-    if (config.renderWhitespace && !parsed) {
+    if (config.renderWhitespace) {
       contentPlaintext = (
         <S.PreformattedMonoString
           style={{...textStyle, whiteSpace: 'pre-wrap'}}>
@@ -422,7 +425,6 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
     }
 
-    // plaintext
     return (
       <S.StringContainer data-test-weave-id="string" $spacing={spacing}>
         <S.StringItem $spacing={spacing}>
