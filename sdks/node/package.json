@@ -17,6 +17,8 @@
     "test": "jest --silent",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:legacy": "jest --selectProjects legacy",
+    "test:modern": "jest --selectProjects modern",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
     "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
@@ -32,16 +34,45 @@
   "author": "",
   "license": "Apache-2.0",
   "jest": {
+    "projects": [
+      {
+        "displayName": "legacy",
+        "testMatch": ["<rootDir>/src/__tests__/legacy/**/*.test.ts"],
+        "transform": {
+          "^.+\\.tsx?$": ["ts-jest", {
+            "tsconfig": "<rootDir>/src/__tests__/legacy/tsconfig.json"
+          }]
+        }
+      },
+      {
+        "displayName": "modern",
+        "testMatch": ["<rootDir>/src/__tests__/modern/**/*.test.ts"],
+        "transform": {
+          "^.+\\.tsx?$": ["ts-jest", {
+            "tsconfig": "<rootDir>/src/__tests__/modern/tsconfig.json"
+          }]
+        }
+      },
+      {
+        "displayName": "default",
+        "testMatch": [
+          "<rootDir>/src/**/__tests__/**/*.test.ts",
+          "<rootDir>/src/**/*.test.ts"
+        ],
+        "testPathIgnorePatterns": [
+          "/legacy/",
+          "/modern/"
+        ],
+        "transform": {
+          "^.+\\.tsx?$": ["ts-jest", {
+            "tsconfig": "<rootDir>/tsconfig.json"
+          }]
+        }
+      }
+    ],
     "testEnvironment": "node",
     "setupFilesAfterEnv": [
       "<rootDir>/jest.setup.js"
-    ],
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "testMatch": [
-      "**/__tests__/**/*.test.ts?(x)",
-      "**/?(*.)+(spec|test).ts?(x)"
     ],
     "moduleFileExtensions": [
       "js",
@@ -101,6 +132,7 @@
     "ts-jest": "^29.2.5",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.19.1",
+    "typescript": "^5.3.3",
     "typedoc": "^0.26.10",
     "typedoc-plugin-markdown": "^4.2.9"
   },

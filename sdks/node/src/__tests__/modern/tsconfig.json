@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.test.json",
+  "compilerOptions": {
+    "target": "es2022",
+    "experimentalDecorators": false,
+    "rootDir": "../../../src",
+    "outDir": "../../../dist/__tests__/modern",
+    "tsBuildInfoFile": "../../../dist/__tests__/modern/.tsbuildinfo"
+  },
+  "include": ["../../../src/**/*"]
+} 

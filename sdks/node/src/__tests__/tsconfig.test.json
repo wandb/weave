@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "types": ["jest", "node"],
+    "composite": true,
+    "declaration": true,
+    "sourceMap": true,
+    "paths": {
+      "weave": ["../../src/index.ts"]
+    }
+  }
+} 
