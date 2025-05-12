@@ -1,7 +1,6 @@
 ---
-sidebar_label: feedback
+sidebar_label: User Feedback API
 ---
-    
 
 # weave.trace.feedback
 

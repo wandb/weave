@@ -1,7 +1,6 @@
 ---
-sidebar_label: weave
+sidebar_label: Weave Core
 ---
-    
 
 # weave
 
@@ -23,12 +22,9 @@ The top-level functions and classes for working with Weave.
 - [`prompt.StringPrompt`](#class-stringprompt)
 - [`prompt.MessagesPrompt`](#class-messagesprompt)
 - [`eval.Evaluation`](#class-evaluation): Sets up an evaluation which includes a set of scorers and a dataset.
-- [`eval_imperative.EvaluationLogger`](#class-evaluationlogger): This class provides an imperative interface for logging evaluations.
 - [`scorer.Scorer`](#class-scorer)
 - [`annotation_spec.AnnotationSpec`](#class-annotationspec)
 - [`markdown.Markdown`](#class-markdown): A Markdown renderable.
-- [`monitor.Monitor`](#class-monitor): Sets up a monitor to score incoming calls automatically.
-- [`saved_view.SavedView`](#class-savedview): A fluent-style class for working with SavedView objects.
 
 ## Functions
 
@@ -163,7 +159,7 @@ def hello(name: str) -> None:
 
 It is also possible to access a Call after the Op has returned. 
 
-If you have the Call's id, perhaps from the UI, you can use the `get_call` method on the `WeaveClient` returned from `weave.init` to retrieve the Call object. 
+If you have the Call's id, perhaps from the UI, you can use the `call` method on the `WeaveClient` returned from `weave.init` to retrieve the Call object. 
 
 ```python
 client = weave.init("<project>")
@@ -174,11 +170,11 @@ Alternately, after defining your Op you can use its `call` method. For example:
 
 ```python
 @weave.op
-def add(a: int, b: int) -> int:
-     return a + b
+def hello(name: str) -> None:
+     print(f"Hello {name}!")
 
-result, call = add.call(1, 2)
-print(call.id)
+mycall = hello.call("world")
+print(mycall.id)
 ``` 
 
 
@@ -211,7 +207,7 @@ Get the Call object for the currently executing Op, within that Op.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L256"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L231"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `finish`
 
@@ -225,27 +221,27 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L640"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L630"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `op`
 
 ```python
 op(
-    func: 'Callable[P, R] | None' = None,
+    func: 'Callable | None' = None,
     name: 'str | None' = None,
     call_display_name: 'str | CallDisplayNameFunc | None' = None,
     postprocess_inputs: 'PostprocessInputsFunc | None' = None,
     postprocess_output: 'PostprocessOutputFunc | None' = None,
     tracing_sample_rate: 'float' = 1.0,
     enable_code_capture: 'bool' = True
-) → Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]
+) → Callable[[Callable], Op] | Op
 ```
 
 A decorator to weave op-ify a function or method. Works for both sync and async. Automatically detects iterator functions and applies appropriate behavior. 
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/docs/weave/trace/api/attributes#L234"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/../../../../weave/docs/weave/trace/api/attributes#L209"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `attributes`
 
@@ -282,6 +278,10 @@ with weave.attributes({'env': 'production'}):
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 ---
 
+---
+
+---
+
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/obj.py#L59"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `from_uri`
@@ -315,7 +315,7 @@ handle_relocatable_object(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L22"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L19"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Dataset`
 Dataset object with easy saving and automatic versioning 
@@ -352,32 +352,11 @@ example_label = dataset_ref.rows[2]['sentence']
 - `rows`: `typing.Union[trace.table.Table, trace.vals.WeaveTable]`
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L77"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `add_rows`
-
-```python
-add_rows(rows: Iterable[dict]) → Dataset
-```
-
-Create a new dataset version by appending rows to the existing dataset. 
-
-This is useful for adding examples to large datasets without having to load the entire dataset into memory. 
-
-
-
-**Args:**
- 
- - <b>`rows`</b>:  The rows to add to the dataset. 
-
-
-
-**Returns:**
- The updated dataset. 
+---
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L119"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L74"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `convert_to_table`
 
@@ -391,7 +370,7 @@ convert_to_table(rows: Any) → Union[Table, WeaveTable]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L59"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L56"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `from_calls`
 
@@ -405,7 +384,7 @@ from_calls(calls: Iterable[Call]) → Self
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L50"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L47"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `from_obj`
 
@@ -419,7 +398,7 @@ from_obj(obj: WeaveObject) → Self
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L64"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L61"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `from_pandas`
 
@@ -433,7 +412,7 @@ from_pandas(df: 'DataFrame') → Self
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L69"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L66"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `to_pandas`
 
@@ -480,6 +459,10 @@ class YourModel(Model):
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 ---
 
+---
+
+---
+
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L50"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_infer_method`
@@ -508,6 +491,10 @@ get_infer_method() → Callable
 - `name`: `typing.Optional[str]`
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
+---
+
+---
+
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/prompt/prompt.py#L78"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -551,6 +538,10 @@ __init__(content: str)
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `content`: `<class 'str'>`
+---
+
+---
+
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/prompt/prompt.py#L90"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -608,6 +599,10 @@ __init__(messages: list[dict])
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `messages`: `list[dict]`
+---
+
+---
+
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/prompt/prompt.py#L119"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -706,10 +701,14 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `dataset`: `<class 'flow.dataset.Dataset'>`
-- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x146df4f70>, json_schema_input_type=PydanticUndefined)]]]`
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x10dbeaca0>, json_schema_input_type=PydanticUndefined)]]]`
 - `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
 - `trials`: `<class 'int'>`
 - `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`
+---
+
+---
+
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L235"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -754,6 +753,20 @@ get_eval_results(model: Union[Op, Model]) → EvaluationResults
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/pydantic/_internal/_model_construction.py#L123"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `model_post_init`
+
+```python
+model_post_init(_Evaluation__context: Any) → None
+```
+
+
+
+
+
+---
+
 <a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L140"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `predict_and_score`
@@ -783,86 +796,6 @@ summarize(eval_table: EvaluationResults) → dict
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval_imperative.py#L277"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-## <kbd>class</kbd> `EvaluationLogger`
-This class provides an imperative interface for logging evaluations. 
-
-An evaluation is started automatically when the first prediction is logged using the `log_prediction` method, and finished when the `log_summary` method is called. 
-
-Each time you log a prediction, you will get back a `ScoreLogger` object. You can use this object to log scores and metadata for that specific prediction. For more information, see the `ScoreLogger` class. 
-
-
-
-**Example:**
- ```python
-     ev = EvaluationLogger()
-     pred = ev.log_prediction(inputs, output)
-     pred.log_score(scorer_name, score)
-     ev.log_summary(summary)
-    ``` 
-
-
-**Pydantic Fields:**
-
-- `name`: `str | None`
-- `model`: `flow.model.Model | dict | str`
-- `dataset`: `flow.dataset.Dataset | list[dict] | str`
----
-
-#### <kbd>property</kbd> ui_url
-
-
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval_imperative.py#L527"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `finish`
-
-```python
-finish() → None
-```
-
-Clean up the evaluation resources explicitly without logging a summary. 
-
-Ensures all prediction calls and the main evaluation call are finalized. This is automatically called if the logger is used as a context manager. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval_imperative.py#L461"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `log_prediction`
-
-```python
-log_prediction(inputs: 'dict', output: 'Any') → ScoreLogger
-```
-
-Log a prediction to the Evaluation, and return a reference. 
-
-The reference can be used to log scores which are attached to the specific prediction instance. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval_imperative.py#L492"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `log_summary`
-
-```python
-log_summary(summary: 'dict | None' = None) → None
-```
-
-Log a summary dict to the Evaluation. 
-
-This will calculate the summary, call the summarize op, and then finalize the evaluation, meaning no more predictions or scores can be logged. 
-
-
----
-
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/scorer.py#L19"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Scorer`
@@ -877,6 +810,10 @@ This will calculate the summary, call the summarize op, and then finalize the ev
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `column_map`: `typing.Optional[dict[str, str]]`
+---
+
+---
+
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/scorer.py#L25"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -939,6 +876,10 @@ summarize(score_rows: list) → Optional[dict]
 - `op_scope`: `typing.Optional[list[str]]`
 ---
 
+---
+
+---
+
 <a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/builtin_object_classes/annotation_spec.py#L47"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `preprocess_field_schema`
@@ -992,7 +933,7 @@ Validates a payload against this annotation spec's schema.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/docs/rich/markdown/Markdown#L503"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/rich/markdown.py#L503"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Markdown`
 A Markdown renderable. 
@@ -1009,7 +950,7 @@ A Markdown renderable.
  - <b>`inline_code_lexer`</b>:  (str, optional): Lexer to use if inline code highlighting is  enabled. Defaults to None. 
  - <b>`inline_code_theme`</b>:  (Optional[str], optional): Pygments theme for inline code  highlighting, or None for no highlighting. Defaults to None. 
 
-<a href="https://github.com/wandb/weave/blob/master/docs/rich/markdown/__init__#L539"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/rich/markdown.py#L539"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -1027,569 +968,6 @@ __init__(
 
 
 
-
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/monitor.py#L14"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-## <kbd>class</kbd> `Monitor`
-Sets up a monitor to score incoming calls automatically. 
-
-
-
-**Examples:**
- 
-
-```python
-import weave
-from weave.scorers import ValidJSONScorer
-
-json_scorer = ValidJSONScorer()
-
-my_monitor = weave.Monitor(
-     name="my-monitor",
-     description="This is a test monitor",
-     sampling_rate=0.5,
-     op_names=["my_op"],
-     query={
-         "$expr": {
-             "$gt": [
-                 {
-                         "$getField": "started_at"
-                     },
-                     {
-                         "$literal": 1742540400
-                     }
-                 ]
-             }
-         }
-     },
-     scorers=[json_scorer],
-)
-
-my_monitor.activate()
-``` 
-
-
-**Pydantic Fields:**
-
-- `name`: `typing.Optional[str]`
-- `description`: `typing.Optional[str]`
-- `ref`: `typing.Optional[trace.refs.ObjectRef]`
-- `sampling_rate`: `<class 'float'>`
-- `scorers`: `list[flow.scorer.Scorer]`
-- `op_names`: `list[str]`
-- `query`: `typing.Optional[trace_server.interface.query.Query]`
-- `active`: `<class 'bool'>`
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/monitor.py#L58"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `activate`
-
-```python
-activate() → ObjectRef
-```
-
-Activates the monitor. 
-
-
-
-**Returns:**
-  The ref to the monitor. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/monitor.py#L68"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `deactivate`
-
-```python
-deactivate() → ObjectRef
-```
-
-Deactivates the monitor. 
-
-
-
-**Returns:**
-  The ref to the monitor. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/monitor.py#L78"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>classmethod</kbd> `from_obj`
-
-```python
-from_obj(obj: WeaveObject) → Self
-```
-
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L531"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-## <kbd>class</kbd> `SavedView`
-A fluent-style class for working with SavedView objects. 
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L537"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `__init__`
-
-```python
-__init__(view_type: 'str' = 'traces', label: 'str' = 'SavedView') → None
-```
-
-
-
-
-
-
----
-
-#### <kbd>property</kbd> entity
-
-
-
-
-
----
-
-#### <kbd>property</kbd> label
-
-
-
-
-
----
-
-#### <kbd>property</kbd> project
-
-
-
-
-
----
-
-#### <kbd>property</kbd> view_type
-
-
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L661"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `add_column`
-
-```python
-add_column(path: 'str | ObjectPath', label: 'str | None' = None) → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L670"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `add_columns`
-
-```python
-add_columns(*columns: 'str') → SavedView
-```
-
-Convenience method for adding multiple columns to the grid. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L562"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `add_filter`
-
-```python
-add_filter(
-    field: 'str',
-    operator: 'str',
-    value: 'Any | None' = None
-) → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L636"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `add_sort`
-
-```python
-add_sort(field: 'str', direction: 'SortDirection') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L701"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `column_index`
-
-```python
-column_index(path: 'int | str | ObjectPath') → int
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L616"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `filter_op`
-
-```python
-filter_op(op_name: 'str | None') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L885"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `get_calls`
-
-```python
-get_calls(
-    limit: 'int | None' = None,
-    offset: 'int | None' = None,
-    include_costs: 'bool' = False,
-    include_feedback: 'bool' = False,
-    all_columns: 'bool' = False
-) → CallsIter
-```
-
-Get calls matching this saved view's filters and settings. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L943"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `get_known_columns`
-
-```python
-get_known_columns(num_calls_to_query: 'int | None' = None) → list[str]
-```
-
-Get the set of columns that are known to exist. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L953"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `get_table_columns`
-
-```python
-get_table_columns() → list[TableColumn]
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L655"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `hide_column`
-
-```python
-hide_column(col_name: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L676"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `insert_column`
-
-```python
-insert_column(
-    idx: 'int',
-    path: 'str | ObjectPath',
-    label: 'str | None' = None
-) → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L1010"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>classmethod</kbd> `load`
-
-```python
-load(ref: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L779"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `page_size`
-
-```python
-page_size(page_size: 'int') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L749"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `pin_column_left`
-
-```python
-pin_column_left(col_name: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L759"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `pin_column_right`
-
-```python
-pin_column_right(col_name: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L721"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `remove_column`
-
-```python
-remove_column(path: 'int | str | ObjectPath') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L740"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `remove_columns`
-
-```python
-remove_columns(*columns: 'str') → SavedView
-```
-
-Remove columns from the saved view. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L585"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `remove_filter`
-
-```python
-remove_filter(index_or_field: 'int | str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L600"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `remove_filters`
-
-```python
-remove_filters() → SavedView
-```
-
-Remove all filters from the saved view. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L558"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `rename`
-
-```python
-rename(label: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L715"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `rename_column`
-
-```python
-rename_column(path: 'int | str | ObjectPath', label: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L870"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `save`
-
-```python
-save() → SavedView
-```
-
-Publish the saved view to the server. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L695"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `set_columns`
-
-```python
-set_columns(*columns: 'str') → SavedView
-```
-
-Set the columns to be displayed in the grid. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L649"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `show_column`
-
-```python
-show_column(col_name: 'str') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L643"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `sort_by`
-
-```python
-sort_by(field: 'str', direction: 'SortDirection') → SavedView
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L926"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `to_grid`
-
-```python
-to_grid(limit: 'int | None' = None) → Grid
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L807"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `to_rich_table_str`
-
-```python
-to_rich_table_str() → str
-```
-
-
-
-
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L791"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `ui_url`
-
-```python
-ui_url() → str | None
-```
-
-URL to show this saved view in the UI. 
-
-Note this is the "result" page with traces etc, not the URL for the view object. 
-
----
-
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/saved_view.py#L769"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
-
-### <kbd>method</kbd> `unpin_column`
-
-```python
-unpin_column(col_name: 'str') → SavedView
-```
 
 
 

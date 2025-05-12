@@ -1,7 +1,6 @@
 ---
-sidebar_label: util
+sidebar_label: Utilities
 ---
-    
 
 # weave.trace.util
 
