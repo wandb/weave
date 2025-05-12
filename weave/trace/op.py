@@ -421,11 +421,8 @@ def _call_sync_func(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if (
-                    hasattr(op, "_on_finish_post_processor")
-                    and op._on_finish_post_processor
-                ):
-                    output = op._on_finish_post_processor(output)
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
@@ -558,11 +555,8 @@ async def _call_async_func(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if (
-                    hasattr(op, "_on_finish_post_processor")
-                    and op._on_finish_post_processor
-                ):
-                    output = op._on_finish_post_processor(output)
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
@@ -688,8 +682,8 @@ def _call_sync_gen(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if getattr(op, "_on_finish_post_processor", None) is not None:
-                    output = op._on_finish_post_processor(output)
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
@@ -894,11 +888,8 @@ async def _call_async_gen(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if (
-                    hasattr(op, "_on_finish_post_processor")
-                    and op._on_finish_post_processor
-                ):
-                    output = op._on_finish_post_processor(output)
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
