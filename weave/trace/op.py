@@ -25,6 +25,7 @@ from typing import (
     Any,
     Callable,
     Generic,
+    NotRequired,
     Optional,
     Protocol,
     TypedDict,
@@ -162,7 +163,8 @@ def _apply_fn_defaults_to_inputs(
 
 
 class WeaveKwargs(TypedDict):
-    display_name: str | None
+    display_name: NotRequired[str | None]
+    attributes: NotRequired[dict[str, Any]]
 
 
 @runtime_checkable
@@ -286,11 +288,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
 
 def _create_call(
-    func: Op,
-    *args: Any,
-    __weave: WeaveKwargs | None = None,
-    extra_attributes: dict[str, Any] | None = None,
-    **kwargs: Any,
+    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
 ) -> Call:
     client = weave_client_context.require_weave_client()
 
@@ -306,6 +304,7 @@ def _create_call(
         inputs_with_defaults["api_key"] = "REDACTED"
 
     call_time_display_name = __weave.get("display_name") if __weave else None
+    call_attrs = __weave.get("attributes") if __weave else None
 
     # If/When we do memoization, this would be a good spot
 
@@ -315,8 +314,8 @@ def _create_call(
 
     attributes = dictify(call_attributes.get())
 
-    if extra_attributes is not None:
-        attributes = {**attributes, **extra_attributes}
+    if call_attrs is not None:
+        attributes = {**attributes, **call_attrs}
 
     return client.create_call(
         func,
@@ -655,15 +654,13 @@ def _call_sync_gen(
             call.output = gen
             return gen, call
 
+    if __weave is None:
+        __weave = {}
+    __weave["attributes"] = {"is_generator": True}
+
     # Proceed with tracing
     try:
-        call = _create_call(
-            op,
-            *args,
-            __weave=__weave,
-            extra_attributes={"is_generator": True},
-            **kwargs,
-        )
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError:
         raise
     except Exception:
@@ -862,6 +859,10 @@ async def _call_async_gen(
             gen = func(*args, **kwargs)
             call.output = gen
             return gen, call
+
+    if __weave is None:
+        __weave = {}
+    __weave["attributes"] = {"is_async_generator": True}
 
     # Proceed with tracing
     try:
