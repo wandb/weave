@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import _, {memoize} from 'lodash';
 
 import {
   CachingTraceServerClient,
@@ -61,7 +61,6 @@ export class TraceServerClient extends CachingTraceServerClient {
     this.onFeedbackListeners = {};
     this.onObjectListeners = [];
     this.tableRowQueryCollectors = [];
-    this.scheduleTableRowQuery();
   }
 
   /**
@@ -211,6 +210,7 @@ export class TraceServerClient extends CachingTraceServerClient {
         resolvePromise: resolve,
         rejectPromise: reject,
       });
+      this.ensureTableRowQueryBatchLoopStarted();
     });
   }
 
@@ -296,11 +296,14 @@ export class TraceServerClient extends CachingTraceServerClient {
     setTimeout(this.scheduleReadBatch.bind(this), DEFAULT_BATCH_INTERVAL);
   }
 
-  private async scheduleTableRowQuery() {
+  private ensureTableRowQueryBatchLoopStarted = memoize(() => {
     // Responsible for scheduling the next batch of tableRowQuery requests.
-    await this.doTableRowQuery();
-    setTimeout(this.scheduleTableRowQuery.bind(this), DEFAULT_BATCH_INTERVAL);
-  }
+    const iter = async () => {
+      await this.doTableRowQuery();
+      setTimeout(iter, DEFAULT_BATCH_INTERVAL);
+    };
+    iter();
+  });
 
   private readBatchDirect(
     req: TraceRefsReadBatchReq
