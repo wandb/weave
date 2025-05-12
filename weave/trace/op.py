@@ -413,6 +413,9 @@ def _call_sync_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             return
@@ -547,6 +550,9 @@ async def _call_async_func(
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             return
@@ -631,6 +637,7 @@ def _call_sync_gen(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any, None, None], Call]:
     func = op.resolve_fn
@@ -674,6 +681,9 @@ def _call_sync_gen(
     acc = op._accumulator
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             return
@@ -837,6 +847,7 @@ async def _call_async_gen(
     *args: Any,
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
     func = op.resolve_fn
@@ -880,6 +891,9 @@ async def _call_async_gen(
     acc = op._accumulator
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
         nonlocal has_finished
         if has_finished:
             return
