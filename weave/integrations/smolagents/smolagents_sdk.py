@@ -42,33 +42,33 @@ def get_symbol_patcher(
 ) -> SymbolPatcher | None:
     try:
         module = importlib.import_module(base_symbol)
-        class_name, _, method_name = attribute_name.partition(".")
-
-        # Check if the class exists in the module
-        if not hasattr(module, class_name):
-            return None
-
-        cls = getattr(module, class_name)
-
-        # Check if the method exists in the class
-        if method_name and not hasattr(cls, method_name):
-            return None
-
-        display_name = base_symbol + "." + attribute_name
-        display_name = (
-            display_name.replace(".__call__", "")
-            if attribute_name.endswith(".__call__")
-            else display_name
-        )
-        return SymbolPatcher(
-            lambda: module,
-            attribute_name,
-            smolagents_wrapper(
-                settings.model_copy(update={"name": settings.name or display_name})
-            ),
-        )
     except ImportError:
         return None
+    class_name, _, method_name = attribute_name.partition(".")
+
+    # Check if the class exists in the module
+    if not hasattr(module, class_name):
+        return None
+
+    cls = getattr(module, class_name)
+
+    # Check if the method exists in the class
+    if method_name and not hasattr(cls, method_name):
+        return None
+
+    display_name = base_symbol + "." + attribute_name
+    display_name = (
+        display_name.replace(".__call__", "")
+        if attribute_name.endswith(".__call__")
+        else display_name
+    )
+    return SymbolPatcher(
+        lambda: module,
+        attribute_name,
+        smolagents_wrapper(
+            settings.model_copy(update={"name": settings.name or display_name})
+        ),
+    )
 
 
 def get_multi_step_agent_patchers(
@@ -136,6 +136,13 @@ def get_smolagents_patcher(
             get_symbol_patcher("smolagents", "SpeechToTextTool.forward", base),
             get_symbol_patcher("smolagents", "SpeechToTextTool.__call__", base),
         ]
+        # Filter out None values
+        # Some symbols may not exist in every Agent type for example
+        # `execute_tool_call` is available only in ToolCallingAgent and it's subtypes
+        # We don't want to raise an error if the symbol doesn't exist
+        # and we don't want to add a patcher for it
+        # so we filter out None values when `get_multi_step_agent_patchers` returns None for that symbol
+        # this should keep it generic for all Agent types
         if patcher is not None
     ]
 
