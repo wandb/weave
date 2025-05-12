@@ -3,7 +3,7 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useCallback, useEffect, useState} from 'react';
 
 import {convertBytes} from '../../../../../../util';
-import {Icon, IconName} from '../../../../../Icon';
+import {Icon, IconName, IconNames} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {TailwindContents} from '../../../../../Tailwind';
 import {CustomLink} from '../../pages/common/Links';
@@ -12,10 +12,10 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {PDFView} from './PDFView';
 
 const ICON_MAP: Record<string, IconName> = {
-  'application/json': 'job-program-code',
-  'text/csv': 'table',
-  'text/html': 'job-program-code',
-  'text/xml': 'job-program-code',
+  'application/json': IconNames.JobProgramCode,
+  'text/csv': IconNames.Table,
+  'text/html': IconNames.JobProgramCode,
+  'text/xml': IconNames.JobProgramCode,
 };
 
 const getIconName = (mimetype: string): IconName => {
@@ -26,16 +26,16 @@ const getIconName = (mimetype: string): IconName => {
 
   const [type] = mimetype.split('/', 2);
   if (type === 'image') {
-    return 'photo';
+    return IconNames.Photo;
   } else if (type === 'audio') {
-    return 'music-audio';
+    return IconNames.MusicAudio;
   } else if (type === 'video') {
-    return 'video-play';
+    return IconNames.VideoPlay;
   } else if (type === 'text') {
-    return 'document';
+    return IconNames.Document;
   }
 
-  return 'document';
+  return IconNames.Document;
 };
 
 type FileTypePayload = CustomWeaveTypePayload<
