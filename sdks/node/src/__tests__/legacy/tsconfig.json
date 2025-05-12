@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.test.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "rootDir": "../../../src",
+    "outDir": "../../../dist/__tests__/legacy",
+    "tsBuildInfoFile": "../../../dist/__tests__/legacy/.tsbuildinfo"
+  },
+  "include": ["../../../src/**/*"]
+} 

@@ -33,9 +33,11 @@ export const FeedbackGrid = ({
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
-    entity,
-    project,
-    weaveRef,
+    key: {
+      entity,
+      project,
+      weaveRef,
+    },
   });
 
   const getTsClient = useGetTraceServerClientContext();
