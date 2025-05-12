@@ -1,5 +1,6 @@
 import asyncio
-import inspect  # Added for function signature inspection
+import copy
+import inspect
 import traceback
 import warnings
 from collections.abc import Iterable, Iterator
@@ -201,7 +202,7 @@ class Dataset(Object):
         return self.__class__(rows=selected_rows)
 
     @weave.op
-    def map(
+    async def map(
         self, func: Callable, num_procs: int = get_weave_parallelism()
     ) -> "Dataset":
         """
@@ -225,11 +226,6 @@ class Dataset(Object):
         Parallelism:
             Processing happens in parallel across multiple processors, controlled by `num_procs`.
             A rich progress bar is displayed during processing.
-
-        Traceability:
-            For best traceability in Weave's UI and lineage tracking, use named functions
-            instead of lambda functions. Named functions provide clear operation names in the
-            Weave UI, while lambda functions appear as generic "<lambda>" operations.
 
         Immutability:
             The original dataset remains unchanged. A new Dataset instance is returned with
@@ -298,10 +294,8 @@ class Dataset(Object):
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
 
-        # Check if a lambda function is being used and warn about traceability
         if func.__name__ == "<lambda>":
             warnings.warn(
-                "Lambda functions in Dataset.map reduce traceability in Weave. "
                 "For better tracking and visualization in the UI, use named functions instead. "
                 "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
                 UserWarning,
@@ -345,22 +339,9 @@ class Dataset(Object):
                 traceback.print_exc()
                 raise e
             else:
-                # Update the original row with the results
-                row_copy = row.copy()
+                row_copy = copy.deepcopy(row)
                 row_copy.update(result)
                 return row_copy
-
-        async def main(progress: Progress) -> "Dataset":
-            async for _, processed_row in async_foreach(
-                self.rows,
-                process_row,
-                num_procs,
-                progress=progress,
-                progress_desc="Mapping dataset",
-            ):
-                processed_rows.append(processed_row)
-
-            return self.__class__(rows=processed_rows)
 
         # Setup and run the progress bar and async processing
         with Progress(
@@ -373,4 +354,14 @@ class Dataset(Object):
             console=console,  # Use the instantiated console
             transient=True,  # Remove progress bar when done
         ) as progress:
-            return asyncio.run(main(progress))
+            # Return the coroutine so the caller can await it
+            async for _, processed_row in async_foreach(
+                self.rows,
+                process_row,
+                num_procs,
+                progress=progress,
+                progress_desc="Mapping dataset",
+            ):
+                processed_rows.append(processed_row)
+
+        return self.__class__(rows=processed_rows)

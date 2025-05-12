@@ -8,8 +8,6 @@ from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
 from rich.console import Console
-from rich.panel import Panel
-from rich.pretty import Pretty
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
