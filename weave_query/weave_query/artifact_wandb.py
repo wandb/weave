@@ -13,24 +13,27 @@ from wandb import Artifact
 from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
+from weave_query import weave_types as types
 from weave_query import (
-    artifact_fs,
-    engine_trace,
+    filesystem,
+    urls,
     errors,
+    engine_trace,
+    artifact_fs,
+    eager,
     file_base,
     file_util,
-    filesystem,
     memo,
     uris,
-    urls,
-    util,
     wandb_client_api,
+    util,
 )
-from weave_query import weave_types as types
 from weave_query.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:
     from weave_query.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -160,7 +163,7 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
                 "clientID": art_id,
             },
         )
-    if not (res and res["clientIDMapping"]):
+    if not (res and res['clientIDMapping']):
         raise errors.WeaveArtifactCollectionNotFound
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
@@ -974,9 +977,6 @@ class WeaveWBArtifactURI(uris.WeaveURI):
             uri += f"#{'/'.join([quote_slashes(e) for e in self.extra])}"
         return uri
 
-    def __hash__(self) -> int:
-        return hash(str(self))
-
     def with_path(self, path: str) -> "WeaveWBArtifactURI":
         return WeaveWBArtifactURI(
             self.name,
@@ -994,9 +994,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and (
-            likely_commit_hash(self.version) or is_valid_version_index(self.version)
-        ):
+        if self.version and (likely_commit_hash(self.version) or is_valid_version_index(self.version)):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"

@@ -6,7 +6,7 @@ import typing
 from weave_query import server_interface
 
 if typing.TYPE_CHECKING:
-    from weave_query import client_interface
+    from weave_query import client_interface, uris
     from weave_query.graph_client import GraphClient
 
 
@@ -131,9 +131,9 @@ def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
-_http_server: contextvars.ContextVar[typing.Optional["server_interface.BaseServer"]] = (
-    contextvars.ContextVar("http_server", default=None)
-)
+_http_server: contextvars.ContextVar[
+    typing.Optional["server_interface.BaseServer"]
+] = contextvars.ContextVar("http_server", default=None)
 
 
 @contextlib.contextmanager
@@ -226,9 +226,9 @@ def disable_analytics() -> contextvars.Token:
     return _analytics_enabled.set(False)
 
 
-_client_cache_key: contextvars.ContextVar[typing.Optional[str]] = (
-    contextvars.ContextVar("client_cache_key", default=None)
-)
+_client_cache_key: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("client_cache_key", default=None)
 
 
 @contextlib.contextmanager
@@ -264,9 +264,9 @@ class WandbApiContext:
 
 
 ## wandb_api.py context
-_wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = (
-    contextvars.ContextVar("wandb_api_context", default=None)
-)
+_wandb_api_context: contextvars.ContextVar[
+    typing.Optional[WandbApiContext]
+] = contextvars.ContextVar("wandb_api_context", default=None)
 
 ## urls.py Context
 _use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -274,14 +274,14 @@ _use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 ## graph_client_context.py Context
-_graph_client: contextvars.ContextVar[typing.Optional["GraphClient"]] = (
-    contextvars.ContextVar("graph_client", default=None)
-)
+_graph_client: contextvars.ContextVar[
+    typing.Optional["GraphClient"]
+] = contextvars.ContextVar("graph_client", default=None)
 
 
-_cache_prefix_context: contextvars.ContextVar[typing.Optional[str]] = (
-    contextvars.ContextVar("cache_prefix", default=None)
-)
+_cache_prefix_context: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("cache_prefix", default=None)
 
 _ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "ref_tracking_enabled", default=False
@@ -324,21 +324,3 @@ def legacy_strict_op_saving(enabled: bool):
     token = _legacy_strict_op_saving.set(enabled)
     yield _legacy_strict_op_saving.get()
     _legacy_strict_op_saving.reset(token)
-
-
-_file_table_predownload: contextvars.ContextVar[typing.Optional[dict[str, str]]] = (
-    contextvars.ContextVar("file_table_predownload", default=dict())
-)
-
-
-@contextlib.contextmanager
-def file_table_predownload(predownload: typing.Optional[dict[str, str]] = dict()):
-    token = _file_table_predownload.set(predownload)
-    try:
-        yield
-    finally:
-        _file_table_predownload.reset(token)
-
-
-def get_file_table_predownload():
-    return _file_table_predownload.get()

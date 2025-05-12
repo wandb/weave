@@ -124,7 +124,7 @@ def pre_download_with_processes(files):
         if isinstance(file, artifact_fs.FilesystemArtifactFile)
     ]
 
-    WORKER_COUNT = os.cpu_count()
+    WORKER_COUNT = os.cpu_count() // 2
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=WORKER_COUNT,
     ) as executor:

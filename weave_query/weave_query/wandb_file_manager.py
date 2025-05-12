@@ -233,62 +233,6 @@ class WandbFileManagerAsync:
             )
             return file_path
 
-    async def ensure_file_content(
-        self,
-        art_uri: typing.Union[
-            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
-        ],
-    ) -> typing.Optional[bytes]:
-        import yarl
-
-        path = art_uri.path
-        if path is None:
-            raise errors.WeaveInternalError(
-                "Artifact URI has no path in call to ensure_file"
-            )
-        with tracer.trace("wandb_file_manager.ensure_file_content") as span:
-            span.set_tag("uri", str(art_uri))
-            res = await self.local_path_and_download_url(art_uri)
-            if res is None:
-                return None
-            file_path, download_url = res
-            wandb_api_context = wandb_api.get_wandb_api_context()
-            headers = None
-            cookies = None
-            auth = None
-            if wandb_api_context is not None:
-                headers = wandb_api_context.headers
-                cookies = wandb_api_context.cookies
-                if wandb_api_context.api_key is not None:
-                    auth = BasicAuth("api", wandb_api_context.api_key)
-
-            with tracer.trace("async_download_file_task") as span:
-                async with self.http.session.get(
-                    yarl.URL(download_url, encoded=True),
-                    headers=headers,
-                    cookies=cookies,
-                    auth=auth,
-                ) as r:
-                    if r.status == 200:
-                        span.set_metric(
-                            "content_length", r.headers.get("content-length", 0), True
-                        )
-                        with tracer.trace("async_download_file_task.open_write"):
-                            return await r.content.read()
-
-                    else:
-                        raise errors.WeaveInternalHttpException.from_code(
-                            r.status, "Download failed"
-                        )
-            # content = await self.http.download_file(
-            #     download_url,
-            #     file_path,
-            #     headers=headers,
-            #     cookies=cookies,
-            #     auth=auth,
-            # )
-            # return content
-
     async def ensure_file_downloaded(
         self,
         download_url: str,
