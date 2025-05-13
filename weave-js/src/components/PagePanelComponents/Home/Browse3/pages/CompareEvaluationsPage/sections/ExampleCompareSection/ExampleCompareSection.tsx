@@ -47,7 +47,7 @@ import {
 } from '../ScorecardSection/ScorecardSection';
 import {
   PivotedRow,
-  useExampleCompareData,
+  useExampleCompareDataAndPrefetch,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
 
@@ -198,14 +198,21 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  */
 
 export const ExampleCompareSection: React.FC<{
+  // Not to future devs: `state` here can be derived from the context.
+  // This should be removed in a future PR. There are probably other places
+  // that can be cleaned up as well.
   state: EvaluationComparisonState;
 }> = props => {
+  const ctx = useCompareEvaluationsState();
+  // Prefer the method below (since `state` diverging from the
+  // context would certainly be a bug)
+  // const {state} = ctx;
   const {
     filteredRows,
     outputColumnKeys,
     leafDims: orderedCallIds,
   } = useFilteredAggregateRows(props.state);
-  const {setSelectedInputDigest} = useCompareEvaluationsState();
+  const {setSelectedInputDigest} = ctx;
   const targetIndex = useMemo(() => {
     const selectedDigest = props.state.selectedInputDigest;
     if (selectedDigest) {
@@ -223,11 +230,8 @@ export const ExampleCompareSection: React.FC<{
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
 
-  const {targetRowValue, loading: loadingInputValue} = useExampleCompareData(
-    props.state,
-    filteredRows,
-    targetIndex
-  );
+  const {targetRowValue, loading: loadingInputValue} =
+    useExampleCompareDataAndPrefetch(ctx, filteredRows, targetIndex);
 
   const inputColumnKeys = useMemo(() => {
     return Object.keys(targetRowValue ?? {});
