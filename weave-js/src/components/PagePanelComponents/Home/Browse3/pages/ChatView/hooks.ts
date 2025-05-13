@@ -14,6 +14,7 @@ import {
   ChatRequest,
   Choice,
   Message,
+  MessagePart,
   ToolCall,
 } from './types';
 
@@ -22,7 +23,34 @@ export enum ChatFormat {
   OpenAI = 'OpenAI',
   Gemini = 'Gemini',
   Mistral = 'Mistral',
+  OTEL = 'OTEL',
 }
+
+// OTEL specific keys for finding prompts
+// Must be kept in sync with backend
+export const OTEL_INPUT_KEYS = [
+  'ai.prompt',
+  'gen_ai.prompt',
+  'input.value',
+  'mlflow.spanInputs',
+  'traceloop.entity.input',
+  'gcp.vertex.agent.tool_call_args',
+  'gcp.vertex.agent.llm_request',
+  'input',
+];
+
+// OTEL specific keys for finding completions
+export const OTEL_OUTPUT_KEYS = [
+  'ai.response',
+  'gen_ai.completion',
+  'output.value',
+  'mlflow.spanOutputs',
+  'gen_ai.content.completion',
+  'traceloop.entity.output',
+  'gcp.vertex.agent.tool_response',
+  'gcp.vertex.agent.llm_response',
+  'output',
+];
 
 export const hasStringProp = (obj: any, prop: string): boolean => {
   if (!(prop in obj)) {
@@ -356,6 +384,9 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (isTraceCallChatFormatGemini(call.traceCall)) {
     return ChatFormat.Gemini;
   }
+  if (isTraceCallChatFormatOTEL(call.traceCall)) {
+    return ChatFormat.OTEL;
+  }
   return ChatFormat.None;
 };
 
@@ -404,6 +435,80 @@ const deref = (object: any, refsMap: Record<string, any>): any => {
     return context.value;
   };
   return mapObject(object, mapper);
+};
+
+// Normalize an OTEL span's input to a ChatRequest
+export const normalizeOTELChatRequest = (
+  call: TraceCallSchema
+): ChatRequest => {
+  // Find prompt value from any of the expected OTEL input keys
+  const promptValue = findOTELValue(call.inputs, OTEL_INPUT_KEYS);
+
+  if (!promptValue) {
+    // Fallback with an empty request if no prompt found
+    return {
+      model: 'unknown',
+      messages: [],
+    };
+  }
+
+  // Try to extract model name from attributes or name
+  let modelName = 'unknown';
+  if (call.attributes?.['ai.model.name']) {
+    modelName = call.attributes['ai.model.name'];
+  } else if (call.attributes?.['gen_ai.model']) {
+    modelName = call.attributes['gen_ai.model'];
+  } else if (call.op_name && _.isString(call.op_name)) {
+    // Sometimes the model name is part of the operation name
+    const possibleModelNames = [
+      'gpt-4',
+      'gpt-3.5',
+      'claude',
+      'gemini',
+      'mistral',
+      'llama',
+      'palm',
+    ];
+    const opNameLower = call.op_name.toLowerCase();
+    const foundModel = possibleModelNames.find(model =>
+      opNameLower.includes(model.toLowerCase())
+    );
+    if (foundModel) {
+      modelName = foundModel;
+    }
+  }
+
+  if (
+    _.isPlainObject(promptValue) &&
+    'messages' in promptValue &&
+    _.isArray(promptValue.messages)
+  ) {
+    // If the prompt has an OpenAI-like messages array, use it directly
+    if (promptValue.model) {
+      modelName = promptValue.model;
+    }
+
+    return {
+      model: modelName,
+      messages: promptValue.messages,
+    };
+  }
+
+  // Process the content from the prompt value
+  const content = processOTELContent(promptValue);
+
+  // Determine the appropriate role (default to user)
+  const role = 'user';
+
+  return {
+    model: modelName,
+    messages: [
+      {
+        role,
+        content,
+      },
+    ],
+  };
 };
 
 export const normalizeChatRequest = (request: any): ChatRequest => {
@@ -457,6 +562,99 @@ export const isMistralDelta = (delta: any): boolean => {
     return false;
   }
   return true;
+};
+
+// Normalize an OTEL span's output to a ChatCompletion
+export const normalizeOTELChatCompletion = (
+  call: TraceCallSchema,
+  request: ChatRequest
+): ChatCompletion => {
+  // Find completion value from any of the expected OTEL output keys
+  const completionValue = findOTELValue(call.output, OTEL_OUTPUT_KEYS);
+
+  if (!completionValue) {
+    // Return empty completion if no output is found
+    return {
+      id: `${request.model}-${Date.now()}`,
+      choices: [],
+      created: Math.floor(Date.now() / 1000),
+      model: request.model,
+      system_fingerprint: '',
+      usage: {prompt_tokens: 0, completion_tokens: 0, total_tokens: 0},
+    };
+  }
+
+  // Try to extract token usage information
+  let usage = {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+  };
+
+  // Look for token usage in various locations and formats
+  if (call.summary?.weave?.costs) {
+    // Try to get from costs in summary
+    const modelCosts = Object.values(call.summary.weave.costs)[0];
+    if (modelCosts) {
+      usage.prompt_tokens =
+        modelCosts.prompt_tokens || modelCosts.input_tokens || 0;
+      usage.completion_tokens =
+        modelCosts.completion_tokens || modelCosts.output_tokens || 0;
+      usage.total_tokens =
+        modelCosts.total_tokens ||
+        usage.prompt_tokens + usage.completion_tokens;
+    }
+  } else if (
+    call.attributes?.['ai.usage.prompt_tokens'] &&
+    call.attributes?.['ai.usage.completion_tokens']
+  ) {
+    // Try to get from OpenAI-like attributes
+    usage.prompt_tokens =
+      Number(call.attributes['ai.usage.prompt_tokens']) || 0;
+    usage.completion_tokens =
+      Number(call.attributes['ai.usage.completion_tokens']) || 0;
+    usage.total_tokens =
+      Number(call.attributes['ai.usage.total_tokens']) ||
+      usage.prompt_tokens + usage.completion_tokens;
+  }
+
+  // If completion is already in OpenAI-like format, use it directly
+  if (
+    _.isPlainObject(completionValue) &&
+    'choices' in completionValue &&
+    _.isArray(completionValue.choices)
+  ) {
+    return {
+      id: completionValue.id || `${request.model}-${Date.now()}`,
+      choices: completionValue.choices,
+      created: completionValue.created || Math.floor(Date.now() / 1000),
+      model: completionValue.model || request.model,
+      system_fingerprint: completionValue.system_fingerprint || '',
+      usage: completionValue.usage || usage,
+    };
+  }
+
+  // Process the content from the completion value
+  const content = processOTELContent(completionValue);
+
+  // Create a standardized choice from the processed content
+  const choice: Choice = {
+    index: 0,
+    message: {
+      role: 'assistant',
+      content: content,
+    },
+    finish_reason: 'stop',
+  };
+
+  return {
+    id: `${request.model}-${Date.now()}`,
+    choices: [choice],
+    created: Math.floor(Date.now() / 1000),
+    model: request.model,
+    system_fingerprint: '',
+    usage,
+  };
 };
 
 export const normalizeChatCompletion = (
@@ -566,10 +764,23 @@ export const useCallAsChat = (
   const {useRefsData} = useWFHooks();
   const refsData = useRefsData({refUris: refs});
   const refsMap = _.zipObject(refs, refsData.result ?? []);
-  const request = normalizeChatRequest(deref(call.inputs, refsMap));
-  const result = call.output
-    ? normalizeChatCompletion(request, deref(call.output, refsMap))
-    : null;
+
+  // Handle OTEL span format differently
+  let request: ChatRequest;
+  let result: ChatCompletion | null = null;
+
+  // Check if this is an OTEL span
+  if (call.attributes && 'otel_span' in call.attributes) {
+    // Use specialized OTEL handlers
+    request = normalizeOTELChatRequest(call);
+    result = call.output ? normalizeOTELChatCompletion(call, request) : null;
+  } else {
+    // Use standard handlers
+    request = normalizeChatRequest(deref(call.inputs, refsMap));
+    result = call.output
+      ? normalizeChatCompletion(request, deref(call.output, refsMap))
+      : null;
+  }
 
   // TODO: It is possible that all of the choices are refs again, handle this better.
   if (
@@ -700,4 +911,114 @@ export const isTraceCallChatFormatMistral = (
     isMistralRequestFormat(call.inputs) &&
     isMistralCompletionFormat(call.output)
   );
+};
+
+// Find a prompt/completion value from OTEL attributes using the specified keys
+export const findOTELValue = (obj: any, searchKeys: string[]): any | null => {
+  if (!obj || !_.isPlainObject(obj)) {
+    return null;
+  }
+
+  // Direct check in the object
+  for (const key of searchKeys) {
+    if (key in obj) {
+      return obj[key];
+    }
+  }
+
+  // Check in attributes object if it exists
+  if (obj.attributes && _.isPlainObject(obj.attributes)) {
+    for (const key of searchKeys) {
+      if (key in obj.attributes) {
+        return obj.attributes[key];
+      }
+    }
+  }
+
+  return null;
+};
+
+// Process OTEL chat data to find content
+export const processOTELContent = (content: any): string | MessagePart[] => {
+  if (_.isString(content)) {
+    return content;
+  }
+
+  if (_.isPlainObject(content)) {
+    // Handle common patterns in OTEL traces
+    if ('messages' in content && _.isArray(content.messages)) {
+      // Extract text from OpenAI-like message format
+      const messages = content.messages.map((msg: any) => {
+        if (_.isString(msg)) {
+          return msg;
+        }
+        if (_.isPlainObject(msg) && 'content' in msg) {
+          return msg.content;
+        }
+        return JSON.stringify(msg);
+      });
+      return messages.join('\n');
+    }
+
+    if ('prompt' in content && _.isString(content.prompt)) {
+      return content.prompt;
+    }
+
+    if ('text' in content && _.isString(content.text)) {
+      return content.text;
+    }
+
+    // Fallback to JSON string
+    return JSON.stringify(content);
+  }
+
+  if (_.isArray(content)) {
+    // If it's an array of messages, try to extract content from each
+    if (content.some(item => _.isPlainObject(item) && 'role' in item)) {
+      // It looks like OpenAI format messages
+      return content.map(msg => {
+        if (_.isPlainObject(msg) && 'content' in msg) {
+          return {
+            type: 'text',
+            text: _.isString(msg.content)
+              ? msg.content
+              : JSON.stringify(msg.content),
+          };
+        }
+        return {
+          type: 'text',
+          text: _.isString(msg) ? msg : JSON.stringify(msg),
+        };
+      });
+    }
+
+    // Simple array of strings or objects
+    return content
+      .map(item => {
+        if (_.isString(item)) {
+          return item;
+        }
+        return JSON.stringify(item);
+      })
+      .join('\n');
+  }
+
+  // Fallback for other types
+  return JSON.stringify(content);
+};
+
+// Detect OTEL span format based on presence of 'otel_span' attribute
+export const isTraceCallChatFormatOTEL = (call: TraceCallSchema): boolean => {
+  // Check if this is an OTEL span
+  if (!call.attributes || !('otel_span' in call.attributes)) {
+    return false;
+  }
+  // Look for a prompt/input in the expected locations
+  const promptValue = findOTELValue(call.inputs, OTEL_INPUT_KEYS);
+
+  // Look for a completion/output in the expected locations
+  const completionValue = findOTELValue(call.output, OTEL_OUTPUT_KEYS);
+
+  // If we found either prompt or completion data, consider it valid
+  return promptValue !== null || completionValue !== null;
 };
