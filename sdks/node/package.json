@@ -42,6 +42,10 @@
           "^.+\\.tsx?$": ["ts-jest", {
             "tsconfig": "<rootDir>/src/__tests__/legacy/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.+)$": "<rootDir>/src/$1"
         }
       },
       {
@@ -51,6 +55,10 @@
           "^.+\\.tsx?$": ["ts-jest", {
             "tsconfig": "<rootDir>/src/__tests__/modern/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.+)$": "<rootDir>/src/$1"
         }
       },
       {
@@ -65,8 +73,12 @@
         ],
         "transform": {
           "^.+\\.tsx?$": ["ts-jest", {
-            "tsconfig": "<rootDir>/tsconfig.json"
+            "tsconfig": "<rootDir>/src/__tests__/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.*)$": "<rootDir>/src/$1"
         }
       }
     ],
@@ -82,9 +94,6 @@
       "json",
       "node"
     ],
-    "moduleNameMapper": {
-      "^weave$": "<rootDir>/src/index.ts"
-    },
     "collectCoverage": true,
     "coveragePathIgnorePatterns": [
       "<rootDir>/src/generated",

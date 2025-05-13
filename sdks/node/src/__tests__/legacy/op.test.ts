@@ -1,13 +1,22 @@
-import * as weave from '../../../src';
-import type {Op} from '../../../src/opType';
-import {getGlobalClient} from '../../../src/clientApi';
+import * as weave from 'weave';
+import {getGlobalClient} from 'weave/clientApi';
+import {Op} from 'weave/opType';
 
 // Mock the client to capture callDisplayName
 let capturedDisplayName: string | undefined;
-jest.mock('../../../src/clientApi', () => ({
+jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => ({
     pushNewCall: () => ({currentCall: {}, parentCall: null, newStack: []}),
-    createCall: (_: any, __: any, ___: any, ____: any, _____: any, ______: any, _______: any, displayName: string) => {
+    createCall: (
+      _: any,
+      __: any,
+      ___: any,
+      ____: any,
+      _____: any,
+      ______: any,
+      _______: any,
+      displayName: string
+    ) => {
       capturedDisplayName = displayName;
       return Promise.resolve();
     },
@@ -15,8 +24,8 @@ jest.mock('../../../src/clientApi', () => ({
     finishCall: () => Promise.resolve(),
     finishCallWithException: () => Promise.resolve(),
     settings: {shouldPrintCallLink: false},
-    waitForBatchProcessing: () => Promise.resolve()
-  }))
+    waitForBatchProcessing: () => Promise.resolve(),
+  })),
 }));
 
 describe('op legacy decorators', () => {
@@ -59,7 +68,7 @@ describe('op legacy decorators', () => {
 
       @weave.op({
         name: 'powerOp',
-        callDisplayName: (...args: any[]) => `Computing ${args[0]}^${args[1]}`
+        callDisplayName: (...args: any[]) => `Computing ${args[0]}^${args[1]}`,
       })
       static async power(base: number, exponent: number) {
         return Math.pow(base, exponent);
@@ -99,7 +108,7 @@ describe('op legacy decorators', () => {
       @weave.op({
         name: 'customOpName',
         callDisplayName: (...args: any[]) => `Processing: ${args[0]}`,
-        parameterNames: ['inputText']
+        parameterNames: ['inputText'],
       })
       async addPrefix(text: string) {
         return this.prefix + text;
@@ -127,10 +136,10 @@ describe('op legacy decorators', () => {
       }
 
       @weave.op({
-        name: 'multiplyAndAdd'
+        name: 'multiplyAndAdd',
       })
       async calculate(value: number, addend: number) {
-        return (value * this.multiplier) + addend;
+        return value * this.multiplier + addend;
       }
     }
 
@@ -138,4 +147,4 @@ describe('op legacy decorators', () => {
     const result = await instance.calculate(5, 3);
     expect(result).toBe(13); // (5 * 2) + 3
   });
-}); 
+});
