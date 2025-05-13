@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -21,6 +21,7 @@
     "test:modern": "jest --selectProjects modern",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
+    "prettier-check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
     "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
     "dev": "nodemon"
   },

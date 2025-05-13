@@ -26,7 +26,9 @@ export async function login(apiKey: string, host?: string) {
     host = defaultHost;
   }
   if (!apiKey) {
-    throw new Error('API key is required for login. Please provide a valid API key.');
+    throw new Error(
+      'API key is required for login. Please provide a valid API key.'
+    );
   }
   const {traceBaseUrl} = getUrls(host);
 
