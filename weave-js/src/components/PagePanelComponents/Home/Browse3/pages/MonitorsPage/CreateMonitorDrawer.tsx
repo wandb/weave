@@ -44,7 +44,7 @@ const PAGE_OFFSET = 0;
 
 enum BuiltInScorers {
   ValidJSONScorer = 'ValidJSONScorer',
-  PydanticScorer = 'PydanticScorer',
+  ValidXMLScorer = 'ValidXMLScorer',
 }
 
 export const CreateMonitorDrawer = ({
