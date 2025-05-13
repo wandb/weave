@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
 
 import sentry_sdk
@@ -64,10 +64,40 @@ class ActiveMonitor(TypedDict):
     wb_user_id: Optional[str]
 
 
-# This should be cached to avoid hitting ClickHouse for each ended call.
-def get_active_monitors(
-    project_id: str,
-) -> list[ActiveMonitor]:
+class MonitorsCache:
+    """Cache for active monitors."""
+
+    _cache: dict[str, tuple[datetime, list[ActiveMonitor]]] = {}
+    _ttl_seconds = 60
+
+    @classmethod
+    def get(cls, project_id: str) -> list[ActiveMonitor] | None:
+        if (cached_value := cls._cache.get(project_id)) is not None:
+            if cached_value[0] > datetime.now() - timedelta(seconds=cls._ttl_seconds):
+                return cached_value[1]
+            else:
+                del cls._cache[project_id]
+
+        return None
+
+    @classmethod
+    def set(cls, project_id: str, monitors: list[ActiveMonitor]) -> None:
+        cls._cache[project_id] = (datetime.now(), monitors)
+
+
+def get_active_monitors(project_id: str) -> list[ActiveMonitor]:
+    """Returns cached active monitors for a given project."""
+    if (cached_monitors := MonitorsCache.get(project_id)) is not None:
+        return cached_monitors
+
+    monitors = fetch_active_monitors(project_id)
+
+    MonitorsCache.set(project_id, monitors)
+
+    return monitors
+
+
+def fetch_active_monitors(project_id: str) -> list[ActiveMonitor]:
     """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
         project_id=project_id,
@@ -175,7 +205,7 @@ def get_filtered_call(
     calls = server.calls_query(req).calls
 
     if len(calls) == 0:
-        logger.warning("No matching calls found for call id %s", ended_call.id)
+        logger.info("No matching calls found for call id %s", ended_call.id)
         return None
 
     if len(calls) > 1:
@@ -347,7 +377,7 @@ async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert) -> None:
         )
 
 
-def _call_processor_done_callback(
+def _task_done_callback(
     task: asyncio.Task,
     msg: Message,
     consumer: KafkaConsumer,
@@ -364,26 +394,19 @@ def _call_processor_done_callback(
         )
 
 
-async def process_kafka_message(
-    msg: Message, consumer: KafkaConsumer, call_processors: set[asyncio.Task]
-) -> bool:
+def create_task(
+    msg: Message, consumer: KafkaConsumer, tasks: set[asyncio.Task]
+) -> asyncio.Task:
     """Process a single Kafka message and create a task for it."""
-    try:
-        ended_call = tsi.EndedCallSchemaForInsert.model_validate_json(
-            msg.value().decode("utf-8")
-        )
-        logger.info("Processing ended call %s", ended_call.id)
+    ended_call = tsi.EndedCallSchemaForInsert.model_validate_json(
+        msg.value().decode("utf-8")
+    )
+    logger.info("Processing ended call %s", ended_call.id)
 
-        task = asyncio.create_task(process_ended_call(ended_call))
-        call_processors.add(task)
-        task.add_done_callback(
-            lambda t: _call_processor_done_callback(t, msg, consumer, call_processors)
-        )
+    task = asyncio.create_task(process_ended_call(ended_call))
+    task.add_done_callback(lambda t: _task_done_callback(t, msg, consumer, tasks))
 
-        return True  # noqa: TRY300
-    except Exception as e:
-        logger.exception("Error processing message: %s", e, exc_info=e)
-        return False
+    return task
 
 
 async def handle_kafka_errors(msg: Message) -> bool:
@@ -402,14 +425,12 @@ async def handle_kafka_errors(msg: Message) -> bool:
     return True
 
 
-async def cleanup_tasks(call_processors: set[asyncio.Task]) -> set[asyncio.Task]:
+async def cleanup_tasks(tasks: set[asyncio.Task]) -> set[asyncio.Task]:
     """Clean up completed tasks and wait for pending ones."""
-    call_processors = {t for t in call_processors if not t.done()}
+    done_tasks = {t for t in tasks if not t.done()}
 
-    if call_processors:
-        _, pending = await asyncio.wait(
-            call_processors, return_when=asyncio.FIRST_COMPLETED
-        )
+    if done_tasks:
+        _, pending = await asyncio.wait(done_tasks, return_when=asyncio.FIRST_COMPLETED)
         return pending
 
     return set()
@@ -418,7 +439,7 @@ async def cleanup_tasks(call_processors: set[asyncio.Task]) -> set[asyncio.Task]
 async def run_consumer() -> None:
     """This is the main loop consuming the ended calls from the Kafka topic."""
     consumer = KafkaConsumer.from_env()
-    call_processors: set[asyncio.Task] = set()
+    tasks: set[asyncio.Task] = set()
 
     consumer.subscribe([CALL_ENDED_TOPIC])
     logger.info("Subscribed to %s", CALL_ENDED_TOPIC)
@@ -432,11 +453,15 @@ async def run_consumer() -> None:
             if not await handle_kafka_errors(msg):
                 continue
 
-            if await process_kafka_message(msg, consumer, call_processors):
-                call_processors = await cleanup_tasks(call_processors)
+            try:
+                task = create_task(msg, consumer, tasks)
+                tasks.add(task)
+                tasks = await cleanup_tasks(tasks)
+            except Exception as e:
+                logger.exception("Error processing message: %s", e, exc_info=e)
     finally:
-        if call_processors:
-            await asyncio.gather(*call_processors)
+        if tasks:
+            await asyncio.gather(*tasks)
         consumer.close()
 
 
