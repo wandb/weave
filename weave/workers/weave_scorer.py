@@ -3,7 +3,7 @@ import inspect
 import logging
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 import sentry_sdk
 from confluent_kafka import KafkaError, Message
@@ -56,10 +56,18 @@ def get_trace_server() -> TraceServerInterface:
     return _TRACE_SERVER
 
 
+class ActiveMonitor(TypedDict):
+    """Type definition for the output of get_active_monitors."""
+
+    monitor: Monitor
+    internal_ref: InternalObjectRef
+    wb_user_id: Optional[str]
+
+
 # This should be cached to avoid hitting ClickHouse for each ended call.
 def get_active_monitors(
     project_id: str,
-) -> list[tuple[Monitor, InternalObjectRef, Optional[str]]]:
+) -> list[ActiveMonitor]:
     """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
         project_id=project_id,
@@ -74,9 +82,9 @@ def get_active_monitors(
 
     monitor_objects = server.objs_query(obj_query)
 
-    active_monitors_ref_user_ids = [
-        (
-            Monitor(
+    active_monitors = [
+        ActiveMonitor(
+            monitor=Monitor(
                 name=obj.val["name"],
                 description=obj.val["description"],
                 sampling_rate=obj.val["sampling_rate"],
@@ -85,16 +93,16 @@ def get_active_monitors(
                 query=obj.val["query"],
                 active=obj.val["active"],
             ),
-            InternalObjectRef(
+            internal_ref=InternalObjectRef(
                 project_id=project_id, name=obj.val["name"], version=obj.digest
             ),
-            obj.wb_user_id,
+            wb_user_id=obj.wb_user_id,
         )
         for obj in monitor_objects.objs
         if obj.val["active"]
     ]
 
-    return active_monitors_ref_user_ids
+    return active_monitors
 
 
 def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Scorer]:
@@ -328,10 +336,15 @@ async def apply_scorer(
 async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert) -> None:
     project_id = ended_call.project_id
 
-    active_monitors_ref_user_ids = get_active_monitors(project_id)
+    active_monitors = get_active_monitors(project_id)
 
-    for monitor, monitor_internal_ref, wb_user_id in active_monitors_ref_user_ids:
-        await process_monitor(monitor, monitor_internal_ref, ended_call, wb_user_id)  # type: ignore
+    for active_monitor in active_monitors:
+        await process_monitor(
+            active_monitor["monitor"],
+            active_monitor["internal_ref"],
+            ended_call,
+            active_monitor["wb_user_id"],  # type: ignore
+        )
 
 
 def _call_processor_done_callback(
