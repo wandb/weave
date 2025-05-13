@@ -936,45 +936,11 @@ export const processOTELContent = (
   } else if (_.isArray(content)) {
     return content.flatMap(item => processOTELContent(item, defaultRole));
   }
-  return [];
-  //
-  // if (_.isPlainObject(content)) {
-  //   // Handle common patterns in OTEL traces
-  //   if ('messages' in content && _.isArray(content.messages)) {
-  //     // Extract text from OpenAI-like message format
-  //     const messages = content.messages.map((msg: any) => {
-  //       if (_.isString(msg)) {
-  //         return msg;
-  //       }
-  //       if (_.isPlainObject(msg) && 'content' in msg) {
-  //         return msg.content;
-  //       }
-  //       return JSON.stringify(msg);
-  //     });
-  //     return messages;
-  //   }
-  //
-  //   if ('prompt' in content && _.isString(content.prompt)) {
-  //     return content.prompt;
-  //   }
-  //
-  //   if ('text' in content && _.isString(content.text)) {
-  //     return content.text;
-  //   }
-  //
-  //   // Fallback to JSON string
-  //   return JSON.stringify(content);
-  // }
-  //
-  // if (_.isArray(content)) {
-  //   // If it's an array of messages, try to extract content from each
-  //   if (content.some(item => _.isPlainObject(item) && 'role' in item)) {
-  //     return content
-  //   }
-  // }
-  //
-  // // Fallback for other types
-  // return JSON.stringify(content);
+  // Fallback to prevent empty display for unhandled types/schemas
+  return [{
+    role: defaultRole,
+    content: JSON.stringify(content)
+  }];
 };
 
 // Detect OTEL span format based on presence of 'otel_span' attribute
