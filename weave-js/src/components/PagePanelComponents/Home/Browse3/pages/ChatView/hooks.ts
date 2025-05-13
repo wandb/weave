@@ -14,7 +14,6 @@ import {
   ChatRequest,
   Choice,
   Message,
-  MessagePart,
   ToolCall,
 } from './types';
 
@@ -452,40 +451,30 @@ export const normalizeOTELChatRequest = (
     };
   }
 
-  // Try to extract model name from attributes or name
-  let modelName = 'unknown';
-  if (call.attributes?.['ai.model.name']) {
-    modelName = call.attributes['ai.model.name'];
-  } else if (call.attributes?.['gen_ai.model']) {
-    modelName = call.attributes['gen_ai.model'];
-  } else if (call.op_name && _.isString(call.op_name)) {
-    // Sometimes the model name is part of the operation name
-    const possibleModelNames = [
-      'gpt-4',
-      'gpt-3.5',
-      'claude',
-      'gemini',
-      'mistral',
-      'llama',
-      'palm',
-    ];
-    const opNameLower = call.op_name.toLowerCase();
-    const foundModel = possibleModelNames.find(model =>
-      opNameLower.includes(model.toLowerCase())
-    );
-    if (foundModel) {
-      modelName = foundModel;
-    }
-  }
-
+  let modelName = call.attributes['model'] || 'unknown';
   if (
     _.isPlainObject(promptValue) &&
     'messages' in promptValue &&
     _.isArray(promptValue.messages)
   ) {
+
     // If the prompt has an OpenAI-like messages array, use it directly
     if (promptValue.model) {
       modelName = promptValue.model;
+    }
+
+    const anthropicSystemPrompt = call.attributes?.model_parameters?.system
+
+    const messages = promptValue.messages
+    if (anthropicSystemPrompt !== undefined && !messages.some((msg: any) => { return msg.role == 'system' })) {
+      const systemMsg = {
+        role: 'system',
+        content: anthropicSystemPrompt
+      }
+      return {
+        model: modelName,
+        messages: [systemMsg,...messages]
+      }
     }
 
     return {
@@ -495,20 +484,25 @@ export const normalizeOTELChatRequest = (
   }
 
   // Process the content from the prompt value
-  const content = processOTELContent(promptValue);
+  let content = processOTELContent(promptValue, 'user');
 
-  // Determine the appropriate role (default to user)
-  const role = 'user';
-
-  return {
-    model: modelName,
-    messages: [
-      {
-        role,
-        content,
-      },
-    ],
-  };
+  if (_.isString(content)) {
+    return {
+      model: modelName,
+      messages: [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+    }
+  }
+  else {
+    return {
+      model: modelName,
+      messages: content
+    }
+  }
 };
 
 export const normalizeChatRequest = (request: any): ChatRequest => {
@@ -604,18 +598,6 @@ export const normalizeOTELChatCompletion = (
         modelCosts.total_tokens ||
         usage.prompt_tokens + usage.completion_tokens;
     }
-  } else if (
-    call.attributes?.['ai.usage.prompt_tokens'] &&
-    call.attributes?.['ai.usage.completion_tokens']
-  ) {
-    // Try to get from OpenAI-like attributes
-    usage.prompt_tokens =
-      Number(call.attributes['ai.usage.prompt_tokens']) || 0;
-    usage.completion_tokens =
-      Number(call.attributes['ai.usage.completion_tokens']) || 0;
-    usage.total_tokens =
-      Number(call.attributes['ai.usage.total_tokens']) ||
-      usage.prompt_tokens + usage.completion_tokens;
   }
 
   // If completion is already in OpenAI-like format, use it directly
@@ -624,32 +606,32 @@ export const normalizeOTELChatCompletion = (
     'choices' in completionValue &&
     _.isArray(completionValue.choices)
   ) {
+    const modelName = call.attributes['model'] ?? "unknown";
     return {
       id: completionValue.id || `${request.model}-${Date.now()}`,
       choices: completionValue.choices,
       created: completionValue.created || Math.floor(Date.now() / 1000),
-      model: completionValue.model || request.model,
+      model: modelName,
       system_fingerprint: completionValue.system_fingerprint || '',
       usage: completionValue.usage || usage,
     };
   }
 
   // Process the content from the completion value
-  const content = processOTELContent(completionValue);
+  const messages = processOTELContent(completionValue, 'assistant');
+  const choices: Choice[] = messages.map((message, index) => {
+    return {
+      index,
+      message,
+      finish_reason: "stop"
+    }
+  })
 
   // Create a standardized choice from the processed content
-  const choice: Choice = {
-    index: 0,
-    message: {
-      role: 'assistant',
-      content: content,
-    },
-    finish_reason: 'stop',
-  };
 
   return {
     id: `${request.model}-${Date.now()}`,
-    choices: [choice],
+    choices: [choices[0]],
     created: Math.floor(Date.now() / 1000),
     model: request.model,
     system_fingerprint: '',
@@ -926,85 +908,68 @@ export const findOTELValue = (obj: any, searchKeys: string[]): any | null => {
     }
   }
 
-  // Check in attributes object if it exists
-  if (obj.attributes && _.isPlainObject(obj.attributes)) {
-    for (const key of searchKeys) {
-      if (key in obj.attributes) {
-        return obj.attributes[key];
-      }
-    }
-  }
-
   return null;
 };
 
 // Process OTEL chat data to find content
-export const processOTELContent = (content: any): string | MessagePart[] => {
+export const processOTELContent = (content: any, defaultRole: string): Message[] => {
   if (_.isString(content)) {
-    return content;
+    return [
+      {
+        role: defaultRole,
+        content: content
+      }
+    ]
   }
-
-  if (_.isPlainObject(content)) {
-    // Handle common patterns in OTEL traces
-    if ('messages' in content && _.isArray(content.messages)) {
-      // Extract text from OpenAI-like message format
-      const messages = content.messages.map((msg: any) => {
-        if (_.isString(msg)) {
-          return msg;
-        }
-        if (_.isPlainObject(msg) && 'content' in msg) {
-          return msg.content;
-        }
-        return JSON.stringify(msg);
-      });
-      return messages.join('\n');
+  else if (_.isPlainObject(content) && 'role' in content) {
+    if ('content' in content && _.isArray(content.content)) {
+      return content.content.flatMap((item: any) => processOTELContent(item.text, content.role))
     }
-
-    if ('prompt' in content && _.isString(content.prompt)) {
-      return content.prompt;
-    }
-
-    if ('text' in content && _.isString(content.text)) {
-      return content.text;
-    }
-
-    // Fallback to JSON string
-    return JSON.stringify(content);
-  }
-
-  if (_.isArray(content)) {
-    // If it's an array of messages, try to extract content from each
-    if (content.some(item => _.isPlainObject(item) && 'role' in item)) {
-      // It looks like OpenAI format messages
-      return content.map(msg => {
-        if (_.isPlainObject(msg) && 'content' in msg) {
-          return {
-            type: 'text',
-            text: _.isString(msg.content)
-              ? msg.content
-              : JSON.stringify(msg.content),
-          };
-        }
-        return {
-          type: 'text',
-          text: _.isString(msg) ? msg : JSON.stringify(msg),
-        };
-      });
-    }
-
-    // Simple array of strings or objects
     return content
-      .map(item => {
-        if (_.isString(item)) {
-          return item;
-        }
-        return JSON.stringify(item);
-      })
-      .join('\n');
   }
 
-  // Fallback for other types
-  return JSON.stringify(content);
+  else if (_.isArray(content)) {
+    return content.flatMap(item => processOTELContent(item, defaultRole))
+  }
+  return []
+  //
+  // if (_.isPlainObject(content)) {
+  //   // Handle common patterns in OTEL traces
+  //   if ('messages' in content && _.isArray(content.messages)) {
+  //     // Extract text from OpenAI-like message format
+  //     const messages = content.messages.map((msg: any) => {
+  //       if (_.isString(msg)) {
+  //         return msg;
+  //       }
+  //       if (_.isPlainObject(msg) && 'content' in msg) {
+  //         return msg.content;
+  //       }
+  //       return JSON.stringify(msg);
+  //     });
+  //     return messages;
+  //   }
+  //
+  //   if ('prompt' in content && _.isString(content.prompt)) {
+  //     return content.prompt;
+  //   }
+  //
+  //   if ('text' in content && _.isString(content.text)) {
+  //     return content.text;
+  //   }
+  //
+  //   // Fallback to JSON string
+  //   return JSON.stringify(content);
+  // }
+  //
+  // if (_.isArray(content)) {
+  //   // If it's an array of messages, try to extract content from each
+  //   if (content.some(item => _.isPlainObject(item) && 'role' in item)) {
+  //     return content
+  //   }
+  // }
+  //
+  // // Fallback for other types
+  // return JSON.stringify(content);
 };
 
 // Detect OTEL span format based on presence of 'otel_span' attribute
