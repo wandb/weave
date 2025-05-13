@@ -10,7 +10,7 @@ type WeaveImageInput = {
   imageType?: ImageType;
 };
 
-interface WeaveImage extends WeaveImageInput {
+export interface WeaveImage extends WeaveImageInput {
   _weaveType: 'Image';
 }
 
