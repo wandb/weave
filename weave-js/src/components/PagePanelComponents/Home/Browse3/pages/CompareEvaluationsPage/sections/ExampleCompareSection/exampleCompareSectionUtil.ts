@@ -312,10 +312,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 };
 
 /**
- * The following functions are used to fetch data rows (and cache them in the state - Note: caching them in
- * the state is a little hacky since it is not reactive, but it does work for our use case)
- *
- * Anyway, there are the following methods:
+ * The following functions are used to fetch data rows There are the following methods:
  * * `useExampleCompareDataAndPrefetch` - This is used to fetch a target row and prefetch the adjacent rows.
  *   * This is the primary exported hook from this section.
  * * `useExampleCompareData` - This is used to fetch a single row.
