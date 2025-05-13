@@ -9,6 +9,7 @@ import random
 import sys
 import traceback
 import weakref
+from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -164,6 +165,15 @@ def _apply_fn_defaults_to_inputs(
 class WeaveKwargs(TypedDict):
     display_name: NotRequired[str | None]
     attributes: NotRequired[dict[str, Any]]
+
+
+def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
+    """Sets up a __weave dict used to pass WeaveKwargs to ops."""
+    if d is None:
+        d = {}
+    d.setdefault("attributes", defaultdict(dict))
+    d.setdefault("display_name", None)
+    return d
 
 
 @runtime_checkable
@@ -390,6 +400,9 @@ def _call_sync_func(
             call.output = res
             return res, call
 
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "function"
+
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
@@ -529,6 +542,9 @@ async def _call_async_func(
             call.output = res
             return res, call
 
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "async_function"
+
     # Proceed with tracing
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
@@ -654,9 +670,8 @@ def _call_sync_gen(
             call.output = gen
             return gen, call
 
-    if __weave is None:
-        __weave = {}
-    __weave["attributes"] = {"is_generator": True}
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "generator"
 
     # Proceed with tracing
     try:
@@ -864,9 +879,8 @@ async def _call_async_gen(
             call.output = gen
             return gen, call
 
-    if __weave is None:
-        __weave = {}
-    __weave["attributes"] = {"is_async_generator": True}
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "async_generator"
 
     # Proceed with tracing
     try:
