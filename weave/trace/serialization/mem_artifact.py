@@ -5,6 +5,7 @@ import os
 import tempfile
 from collections.abc import Generator, Iterator, Mapping
 from io import BytesIO, StringIO
+from typing import Literal, overload
 
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
@@ -31,6 +32,16 @@ class MemTraceFilesArtifact:
             metadata = {}
         self._metadata = metadata
         self.temp_read_dir = None
+
+    @overload
+    @contextlib.contextmanager
+    def new_file(
+        self, path: str, binary: Literal[False] = False
+    ) -> Iterator[StringIO]: ...
+
+    @overload
+    @contextlib.contextmanager
+    def new_file(self, path: str, binary: Literal[True]) -> Iterator[BytesIO]: ...
 
     @contextlib.contextmanager
     def new_file(self, path: str, binary: bool = False) -> Iterator[StringIO | BytesIO]:
@@ -66,12 +77,12 @@ class MemTraceFilesArtifact:
         yield f
         f.close()
 
-    def path(self, path: str) -> str:
+    def path(self, path: str, filename: str | None = None) -> str:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
         self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, path)
+        write_path = os.path.join(self.temp_read_dir.name, filename or path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
             f.flush()
