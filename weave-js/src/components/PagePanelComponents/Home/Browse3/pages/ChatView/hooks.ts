@@ -937,10 +937,12 @@ export const processOTELContent = (
     return content.flatMap(item => processOTELContent(item, defaultRole));
   }
   // Fallback to prevent empty display for unhandled types/schemas
-  return [{
-    role: defaultRole,
-    content: JSON.stringify(content)
-  }];
+  return [
+    {
+      role: defaultRole,
+      content: JSON.stringify(content),
+    },
+  ];
 };
 
 // Detect OTEL span format based on presence of 'otel_span' attribute
