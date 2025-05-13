@@ -392,33 +392,34 @@ function useExampleCompareData(
 
   useEffect(() => {
     let mounted = true;
-    let cachedRowData = getCachedRowData(state, targetDigest);
-    // If the value is already loaded, don't fetch again
-    if (cachedRowData != null) {
-      setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
-      return;
-    }
-    // Nothing we can do if the partial table request is not set
-    if (partialTableRequest == null) {
-      return;
-    }
-    // immediately fetch the current row
-    setLoading(true);
+    (async () => {
+      let cachedRowData = getCachedRowData(state, targetDigest);
+      // If the value is already loaded, don't fetch again
+      if (cachedRowData != null) {
+        setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
+        return;
+      }
+      // Nothing we can do if the partial table request is not set
+      if (partialTableRequest == null) {
+        return;
+      }
+      // immediately fetch the current row
+      setLoading(true);
 
-    loadRowDataIntoCache(
-      client,
-      state,
-      [targetDigest],
-      partialTableRequest
-    ).then(rows => {
+      const singleRows = await loadRowDataIntoCache(
+        client,
+        state,
+        [targetDigest],
+        partialTableRequest
+      );
       if (mounted) {
-        const data = rows[0];
+        const data = singleRows[0];
         if (data != null) {
           setTargetRowValue(flattenObjectPreservingWeaveTypes(data));
         }
         setLoading(false);
       }
-    });
+    })();
     return () => {
       mounted = false;
     };
