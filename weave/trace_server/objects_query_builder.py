@@ -293,7 +293,7 @@ FROM (
         ) as version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
-            ORDER BY created_at DESC
+            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (

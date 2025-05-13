@@ -32,7 +32,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
         conf = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
-            "group.id": "weave-scorer-worker",
+            "group.id": "weave-worker-scorer",
             "auto.offset.reset": "earliest",
         }
         consumer = cls(conf)

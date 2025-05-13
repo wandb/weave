@@ -97,14 +97,14 @@ export const CreateMonitorDrawer = ({
     );
   }, [monitor, setMonitorName]);
 
-  const {result: callsResults, loading: callsLoading} = useCalls(
+  const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
     project,
-    lowLevelFilter,
-    PAGE_SIZE,
-    PAGE_OFFSET,
-    sortBy
-  );
+    filter: lowLevelFilter,
+    limit: PAGE_SIZE,
+    offset: PAGE_OFFSET,
+    sortBy,
+  });
 
   const tableData = useMemo(() => {
     if (callsLoading || callsResults === null) {
@@ -177,11 +177,11 @@ export const CreateMonitorDrawer = ({
           _bases: ['Scorer', 'Object', 'BaseModel'],
         };
 
-        scorerDigest = await objCreate(
-          `${entity}/${project}`,
-          scorerName,
-          scorerObj
-        );
+        scorerDigest = await objCreate({
+          projectId: `${entity}/${project}`,
+          objectId: scorerName,
+          val: scorerObj,
+        });
       }
 
       const objectVersionKey: WeaveObjectVersionKey = {
@@ -228,7 +228,12 @@ export const CreateMonitorDrawer = ({
         active: active,
       };
 
-      await objCreate(`${entity}/${project}`, monitorName, monitorObj);
+      await objCreate({
+        projectId: `${entity}/${project}`,
+        objectId: monitorName,
+        val: monitorObj,
+        baseObjectClass: 'Monitor',
+      });
 
       setIsCreating(false);
 
@@ -435,7 +440,6 @@ export const CreateMonitorDrawer = ({
                           unused,
                           newScorers: string | string[] | null
                         ) => {
-                          console.log(newScorers);
                           if (newScorers === null) {
                             setScorers([]);
                             return;

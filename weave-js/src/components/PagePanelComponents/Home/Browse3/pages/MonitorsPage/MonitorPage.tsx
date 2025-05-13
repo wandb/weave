@@ -50,15 +50,12 @@ export const MonitorPage = (props: {
     [props.objectName]
   );
 
-  const objectVersionResults = useRootObjectVersions(
-    props.entity,
-    props.project,
-    monitorVersionFilter,
-    undefined,
-    undefined,
-    undefined,
-    MONITOR_VERSIONS_SORT_KEY
-  );
+  const objectVersionResults = useRootObjectVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: monitorVersionFilter,
+    sortBy: MONITOR_VERSIONS_SORT_KEY,
+  });
 
   const monitorVersions = objectVersionResults.result || [];
   return monitorVersions === null || monitorVersions.length === 0 ? (
@@ -97,7 +94,7 @@ const MonitorPageInner = ({
     }),
     [allVersionRefs]
   );
-  console.log(monitorVersions[0]);
+
   const filterItems: GridFilterItem[] = useMemo(
     () => queryToGridFilterModel(monitorVersions[0].val['query'])?.items || [],
     [monitorVersions]
@@ -129,12 +126,12 @@ const MonitorPageInner = ({
     };
   }, [allVersionRefs]);
 
-  const {result: callCountResult} = useCallsStats(
+  const {result: callCountResult} = useCallsStats({
     entity,
     project,
-    {},
-    callCountQuery
-  );
+    filter: {},
+    query: callCountQuery,
+  });
 
   return (
     <SimplePageLayoutWithHeader

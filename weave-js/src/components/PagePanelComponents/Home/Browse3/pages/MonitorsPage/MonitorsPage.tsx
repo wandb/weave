@@ -184,7 +184,12 @@ const CallCountCell = ({
       },
     };
   }, [monitorRef]);
-  const callsStats = useCallsStats(entity, project, {}, query);
+  const callsStats = useCallsStats({
+    entity,
+    project,
+    filter: {},
+    query,
+  });
   if (callsStats.loading) {
     return <LoadingDots />;
   }
