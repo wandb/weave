@@ -2,7 +2,6 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import * as Tabs from '@wandb/weave/components/Tabs';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -18,7 +17,6 @@ import {Redirect, Route, Switch, useHistory, useParams} from 'react-router-dom';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Tailwind} from '../../Tailwind';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,

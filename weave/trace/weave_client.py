@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import json
 import logging
 import os
@@ -10,7 +11,6 @@ import sys
 import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
-from datetime import datetime, timezone
 from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
@@ -483,9 +483,9 @@ class CallDict(TypedDict):
     summary: dict | None
     display_name: str | None
     attributes: dict | None
-    started_at: datetime | None
-    ended_at: datetime | None
-    deleted_at: datetime | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
 
 
 @dataclasses.dataclass
@@ -503,9 +503,9 @@ class Call:
     summary: dict | None = None
     _display_name: str | Callable[[Call], str] | None = None
     attributes: dict | None = None
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-    deleted_at: datetime | None = None
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    deleted_at: datetime.datetime | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -1168,7 +1168,7 @@ class WeaveClient:
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
-        started_at = datetime.now(tz=timezone.utc)
+        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
         _should_print_call_link = should_print_call_link()
@@ -1236,7 +1236,7 @@ class WeaveClient:
 
         from weave.trace.api import _global_postprocess_output
 
-        ended_at = datetime.now(tz=timezone.utc)
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
 
@@ -1474,7 +1474,9 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime | None = datetime.now(timezone.utc),
+        effective_date: datetime.datetime | None = datetime.datetime.now(
+            datetime.timezone.utc
+        ),
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
