@@ -161,11 +161,7 @@ export const useProjectSidebar = (
           {
             type: 'button' as const,
             name: 'Evals',
-            slug: 'weave/evaluations/evals',
-            additionalSlugs: [
-              'weave/evaluations/monitors',
-              'weave/evaluations',
-            ],
+            slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.BaselineAlt,
           },
@@ -175,6 +171,13 @@ export const useProjectSidebar = (
             slug: 'weave/playground',
             isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.RobotServiceMember,
+          },
+          {
+            type: 'button' as const,
+            name: 'Monitors',
+            slug: 'weave/monitors',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.JobAutomation,
           },
           {
             type: 'button' as const,

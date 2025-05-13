@@ -31,7 +31,6 @@ import {
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import * as traceServerTypes from './traceServerClientTypes';
-import {SortBy} from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {

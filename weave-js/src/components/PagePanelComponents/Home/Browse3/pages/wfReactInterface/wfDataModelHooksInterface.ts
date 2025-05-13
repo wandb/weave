@@ -14,7 +14,7 @@ import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
-import {ContentType, SortBy, TableUpdateSpec} from './traceServerClientTypes';
+import {SortBy} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =

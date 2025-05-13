@@ -414,11 +414,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route path={`${projectRoot}/:tab(traces|calls)`}>
+        <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
-        <Route path={`${projectRoot}/evaluations/:tab(evals|monitors)`}>
-          <EvaluationsPageBinding />
+        <Route path={`${projectRoot}/monitors`}>
+          <MonitorsPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
@@ -729,51 +729,6 @@ const CallPageBinding = () => {
       showFeedback={showFeedback}
       setShowFeedback={setShowFeedback}
     />
-  );
-};
-
-const EvaluationsPageBinding = () => {
-  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
-  const tabs: Record<string, {label: string; content: React.ReactNode}> = {
-    evals: {
-      label: 'Evals',
-      content: <CallsPageBinding />,
-    },
-    monitors: {
-      label: 'Monitors',
-      content: <MonitorsPageBinding />,
-    },
-  };
-
-  const history = useHistory();
-
-  const navigateToTab = useCallback(
-    (clickedTab: string) => {
-      history.push(`/${entity}/${project}/weave/evaluations/${clickedTab}`);
-    },
-    [entity, project, history]
-  );
-
-  return (
-    <>
-      <Tabs.Root
-        value={tab}
-        onValueChange={navigateToTab}
-        className="mx-16 mt-12">
-        <Tabs.List className="border-b-0">
-          {Object.entries(tabs).map(([key, tab]) => (
-            <Tabs.Trigger value={key} className="border-b-4 text-lg" key={key}>
-              {tab.label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-      </Tabs.Root>
-      <Tailwind>
-        <Box className="pt-8">
-          <ErrorBoundary>{tabs[tab].content}</ErrorBoundary>
-        </Box>
-      </Tailwind>
-    </>
   );
 };
 
