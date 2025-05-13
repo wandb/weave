@@ -206,7 +206,10 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
 
   onNextExitFullscreen(() => {
     canvas.remove();
+    fullScreenElement.remove();
   });
+
+  document.body.appendChild(fullScreenElement);
 
   try {
     await fullScreenElement.requestFullscreen();
