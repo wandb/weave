@@ -7,6 +7,7 @@ import {TraceServerClient} from '../../../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
 import {TraceTableQueryReq} from '../../../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
+import {CompareEvaluationContext} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
@@ -330,15 +331,16 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 // to provide a single hook that fetches the target row and prefetches the adjacent rows
 // This is a convenience hook for the `ExampleCompareSection` component
 export function useExampleCompareDataAndPrefetch(
-  state: EvaluationComparisonState,
+  ctx: CompareEvaluationContext,
   filteredRows: Array<{
     inputDigest: string;
   }>,
   targetIndex: number
 ) {
+  const {state} = ctx;
   // Step 1: Fetch the target row
   const targetDigest = filteredRows[targetIndex].inputDigest;
-  const {targetRowValue, loading} = useExampleCompareData(state, targetDigest);
+  const {targetRowValue, loading} = useExampleCompareData(ctx, targetDigest);
 
   // Step 2: Prefetch the adjacent rows
   const prefetchDigests = useMemo(() => {
@@ -363,12 +365,12 @@ export function useExampleCompareDataAndPrefetch(
       }
       await loadMissingRowDataIntoCache(
         client,
-        state,
+        ctx,
         prefetchDigests,
         partialTableRequest
       );
     })();
-  }, [partialTableRequest, client, prefetchDigests, state]);
+  }, [partialTableRequest, client, prefetchDigests, state, ctx]);
 
   return {
     targetRowValue,
@@ -378,10 +380,11 @@ export function useExampleCompareDataAndPrefetch(
 
 // Primary method for fetching and caching a single row
 function useExampleCompareData(
-  state: EvaluationComparisonState,
+  ctx: CompareEvaluationContext,
   targetDigest: string
 ) {
-  const initialValue = getCachedRowData(state, targetDigest);
+  const {state} = ctx;
+  const initialValue = ctx.getCachedRowData(targetDigest);
   const [loading, setLoading] = useState<boolean>(initialValue == null);
   const [targetRowValue, setTargetRowValue] = useState<any>(
     initialValue ? flattenObjectPreservingWeaveTypes(initialValue) : null
@@ -393,7 +396,7 @@ function useExampleCompareData(
   useEffect(() => {
     let mounted = true;
     (async () => {
-      let cachedRowData = getCachedRowData(state, targetDigest);
+      let cachedRowData = ctx.getCachedRowData(targetDigest);
       // If the value is already loaded, don't fetch again
       if (cachedRowData != null) {
         setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
@@ -408,7 +411,7 @@ function useExampleCompareData(
 
       const singleRows = await loadRowDataIntoCache(
         client,
-        state,
+        ctx,
         [targetDigest],
         partialTableRequest
       );
@@ -423,7 +426,7 @@ function useExampleCompareData(
     return () => {
       mounted = false;
     };
-  }, [partialTableRequest, client, state, targetDigest]);
+  }, [partialTableRequest, client, ctx, targetDigest]);
 
   return {
     targetRowValue,
@@ -434,20 +437,20 @@ function useExampleCompareData(
 // Helper to load rows that are not yet in our cache
 async function loadMissingRowDataIntoCache(
   client: TraceServerClient,
-  state: EvaluationComparisonState,
+  ctx: CompareEvaluationContext,
   rowDigests: string[],
   partialTableRequest: PartialTableRequestType
 ): Promise<any[]> {
   const neededRows = rowDigests.filter(
-    row => getCachedRowData(state, row) == null
+    row => ctx.getCachedRowData(row) == null
   );
 
   if (neededRows.length > 0) {
     // we load the data into the cache, but don't trigger a re-render
-    await loadRowDataIntoCache(client, state, neededRows, partialTableRequest);
+    await loadRowDataIntoCache(client, ctx, neededRows, partialTableRequest);
   }
 
-  return rowDigests.map(row => getCachedRowData(state, row));
+  return rowDigests.map(row => ctx.getCachedRowData(row));
 }
 
 type PartialTableRequestType = Pick<
@@ -522,18 +525,10 @@ const usePartialTableRequest = (state: EvaluationComparisonState) => {
 // Helper to fetch and store row data in our state cache
 async function loadRowDataIntoCache(
   client: TraceServerClient,
-  state: EvaluationComparisonState,
+  ctx: CompareEvaluationContext,
   rowDigests: string[],
   partialTableRequest: PartialTableRequestType
 ): Promise<any[]> {
-  const setCachedRowData = (digest: string, data: any) => {
-    const currentRow =
-      state.loadableComparisonResults.result?.resultRows?.[digest];
-    if (currentRow == null) {
-      return;
-    }
-    currentRow.rawDataRow = data;
-  };
   const rowsRes = await client.tableQuery({
     ...partialTableRequest,
     filter: {
@@ -541,13 +536,7 @@ async function loadRowDataIntoCache(
     },
   });
   for (const row of rowsRes.rows) {
-    setCachedRowData(row.digest, row.val);
+    ctx.setCachedRowData(row.digest, row.val);
   }
   return rowsRes.rows.map(row => row.val);
 }
-
-// Helper to get row data from our state cache
-const getCachedRowData = (state: EvaluationComparisonState, digest: string) => {
-  return state.loadableComparisonResults.result?.resultRows?.[digest]
-    ?.rawDataRow;
-};
