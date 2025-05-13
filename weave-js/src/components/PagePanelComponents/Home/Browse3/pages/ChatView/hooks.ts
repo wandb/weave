@@ -457,24 +457,28 @@ export const normalizeOTELChatRequest = (
     'messages' in promptValue &&
     _.isArray(promptValue.messages)
   ) {
-
     // If the prompt has an OpenAI-like messages array, use it directly
     if (promptValue.model) {
       modelName = promptValue.model;
     }
 
-    const anthropicSystemPrompt = call.attributes?.model_parameters?.system
+    const anthropicSystemPrompt = call.attributes?.model_parameters?.system;
 
-    const messages = promptValue.messages
-    if (anthropicSystemPrompt !== undefined && !messages.some((msg: any) => { return msg.role == 'system' })) {
+    const messages = promptValue.messages;
+    if (
+      anthropicSystemPrompt !== undefined &&
+      !messages.some((msg: any) => {
+        return msg.role == 'system';
+      })
+    ) {
       const systemMsg = {
         role: 'system',
-        content: anthropicSystemPrompt
-      }
+        content: anthropicSystemPrompt,
+      };
       return {
         model: modelName,
-        messages: [systemMsg,...messages]
-      }
+        messages: [systemMsg, ...messages],
+      };
     }
 
     return {
@@ -495,13 +499,12 @@ export const normalizeOTELChatRequest = (
           content,
         },
       ],
-    }
-  }
-  else {
+    };
+  } else {
     return {
       model: modelName,
-      messages: content
-    }
+      messages: content,
+    };
   }
 };
 
@@ -606,7 +609,7 @@ export const normalizeOTELChatCompletion = (
     'choices' in completionValue &&
     _.isArray(completionValue.choices)
   ) {
-    const modelName = call.attributes['model'] ?? "unknown";
+    const modelName = call.attributes['model'] ?? 'unknown';
     return {
       id: completionValue.id || `${request.model}-${Date.now()}`,
       choices: completionValue.choices,
@@ -623,9 +626,9 @@ export const normalizeOTELChatCompletion = (
     return {
       index,
       message,
-      finish_reason: "stop"
-    }
-  })
+      finish_reason: 'stop',
+    };
+  });
 
   // Create a standardized choice from the processed content
 
@@ -912,26 +915,28 @@ export const findOTELValue = (obj: any, searchKeys: string[]): any | null => {
 };
 
 // Process OTEL chat data to find content
-export const processOTELContent = (content: any, defaultRole: string): Message[] => {
+export const processOTELContent = (
+  content: any,
+  defaultRole: string
+): Message[] => {
   if (_.isString(content)) {
     return [
       {
         role: defaultRole,
-        content: content
-      }
-    ]
-  }
-  else if (_.isPlainObject(content) && 'role' in content) {
+        content: content,
+      },
+    ];
+  } else if (_.isPlainObject(content) && 'role' in content) {
     if ('content' in content && _.isArray(content.content)) {
-      return content.content.flatMap((item: any) => processOTELContent(item.text, content.role))
+      return content.content.flatMap((item: any) =>
+        processOTELContent(item.text, content.role)
+      );
     }
-    return content
+    return content;
+  } else if (_.isArray(content)) {
+    return content.flatMap(item => processOTELContent(item, defaultRole));
   }
-
-  else if (_.isArray(content)) {
-    return content.flatMap(item => processOTELContent(item, defaultRole))
-  }
-  return []
+  return [];
   //
   // if (_.isPlainObject(content)) {
   //   // Handle common patterns in OTEL traces
