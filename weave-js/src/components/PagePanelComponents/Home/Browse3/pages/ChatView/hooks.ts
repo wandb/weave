@@ -468,7 +468,7 @@ export const normalizeOTELChatRequest = (
     if (
       anthropicSystemPrompt !== undefined &&
       !messages.some((msg: any) => {
-        return msg.role == 'system';
+        return msg.role === 'system';
       })
     ) {
       const systemMsg = {
