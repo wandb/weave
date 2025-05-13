@@ -51,6 +51,7 @@ export const FIELD_LABELS: Record<string, string> = {
   'summary.weave.status': 'Status',
   'summary.weave.trace_name': 'Name',
   started_at: 'Called',
+  wb_run_id: 'Run',
   wb_user_id: 'User',
 };
 
