@@ -208,6 +208,8 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
     canvas.remove();
   });
 
+  document.body.appendChild(fullScreenElement);
+
   try {
     await fullScreenElement.requestFullscreen();
   } catch (e) {
