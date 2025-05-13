@@ -25,7 +25,6 @@ from typing import (
     Any,
     Callable,
     Generic,
-    NotRequired,
     Optional,
     Protocol,
     TypedDict,
@@ -35,7 +34,7 @@ from typing import (
     runtime_checkable,
 )
 
-from typing_extensions import ParamSpec
+from typing_extensions import NotRequired, ParamSpec
 
 from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
