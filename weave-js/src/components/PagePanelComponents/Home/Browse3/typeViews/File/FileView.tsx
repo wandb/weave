@@ -38,6 +38,21 @@ const getIconName = (mimetype: string): IconName => {
   return IconNames.Document;
 };
 
+// Save a Blob as a file in the user's downloads folder in a
+// cross-browser compatible way.
+const saveBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  });
+};
+
 type FileTypePayload = CustomWeaveTypePayload<
   'weave.type_handlers.File.file.File',
   {file: string; 'metadata.json': string}
@@ -148,16 +163,7 @@ const FileViewMetadataLoaded = ({
       console.error('No file result');
       return;
     }
-    const url = URL.createObjectURL(fileResult);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    });
+    saveBlob(fileResult, filename);
   }, [fileResult, filename]);
 
   useEffect(() => {
