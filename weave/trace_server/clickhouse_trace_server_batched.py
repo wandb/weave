@@ -222,6 +222,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
+        self._kafka_producer: Optional[KafkaProducer] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -242,6 +243,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def kafka_producer(self) -> KafkaProducer:
+        if self._kafka_producer is not None:
+            return self._kafka_producer
+        self._kafka_producer = KafkaProducer.from_env()
+        return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -320,8 +328,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
-        kafka_producer = KafkaProducer.from_env()
-        kafka_producer.produce_call_end(req.end)
+        self.kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()

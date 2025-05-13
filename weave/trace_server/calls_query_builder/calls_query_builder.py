@@ -181,7 +181,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """Expected format: `[feedback.type].dot.path`"""
+        """
+        Expected format: `[feedback.type].dot.path`
+
+        feedback.type can be '*' to select all feedback types.
+        """
         regex = re.compile(r"^(\[.+\])\.(.+)$")
         match = regex.match(path)
         if not match:
