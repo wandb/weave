@@ -413,7 +413,63 @@ You can also manually create Calls using the API directly.
     </TabItem>
 </Tabs>
 
+### 4. Track class and object methods
 
+You can also track class and object methods.
+
+<Tabs groupId="programming-language">
+    <TabItem value="python" label="Python" default>
+    
+    ```plaintext
+    This feature is not available in Python yet. Stay tuned!
+    ```
+
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+    
+    #### Decorate a class method
+
+    Use `@weave.op` to trace instance methods.
+
+    ```typescript
+    class Foo {
+        @weave.op
+        async predict(prompt: string) {
+            return "bar"
+        }
+    }
+    ```
+
+    #### Decorate a static class method
+
+    Apply `@weave.op` to static methods to monitor utility functions within a class.
+
+    ```typescript
+    class MathOps {
+        @weave.op
+        static square(n: number): number {
+            return n * n;
+        }
+    }
+    ```
+
+    #### Decorate a method in an object literal
+
+    Use `@weave.op` on methods defined in object literals.
+
+    ```typescript
+    const actions = {
+        @weave.op
+        greet(name: string): string {
+            return `Hello, ${name}!`;
+        }
+    };
+
+    actions.greet("Bill");
+    ```
+
+    </TabItem>
+</Tabs>
 
 
 ## Viewing Calls
