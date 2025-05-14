@@ -19,6 +19,7 @@ import {CellValueString} from './CellValueString';
 type CellValueProps = {
   value: any;
   noLink?: boolean;
+  /** Optional style overrides for string values */
   stringStyle?: React.CSSProperties;
 };
 

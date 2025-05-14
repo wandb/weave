@@ -254,10 +254,11 @@ const ResultExplorer: React.FC<{
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'detail'
   );
-  const headerHeight = 0;
+
   return (
     <VerticalBox
       sx={{
+        height: '100%',
         width: '100%',
         overflow: 'hidden',
       }}>
@@ -273,7 +274,7 @@ const ResultExplorer: React.FC<{
         }}>
         <Box
           sx={{
-            fontSize: '1.5em',
+            fontSize: '16px',
             fontWeight: 'bold',
           }}>
           Output Comparison
@@ -281,7 +282,7 @@ const ResultExplorer: React.FC<{
       </HorizontalBox>
       <div
         style={{
-          height: height - headerHeight,
+          height,
           overflow: 'hidden',
         }}>
         <Box

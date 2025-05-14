@@ -713,7 +713,6 @@ export const ExampleCompareSectionDetail: React.FC<{
           }}>
           {`Example ${targetIndex + 1} of ${filteredRows.length}`}
         </Box>
-        <Box></Box>
       </HorizontalBox>
 
       <HorizontalBox>
