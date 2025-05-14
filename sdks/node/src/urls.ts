@@ -5,11 +5,18 @@ export function getUrls(host?: string) {
   const resolvedHost = host ?? defaultHost;
   const isDefault = resolvedHost === defaultHost;
 
+  let traceBaseUrl = process.env.WF_TRACE_SERVER_URL;
+
+  if (traceBaseUrl === undefined || traceBaseUrl === null) {
+    traceBaseUrl =isDefault
+      ? `https://trace.wandb.ai`
+      : `https://${resolvedHost}/traces`
+  }
+
+
   return {
     baseUrl: isDefault ? `https://api.wandb.ai` : `https://${resolvedHost}`,
-    traceBaseUrl: isDefault
-      ? `https://trace.wandb.ai`
-      : `https://${resolvedHost}/traces`,
+    traceBaseUrl,
     domain: isDefault ? defaultDomain : resolvedHost,
     host: isDefault ? defaultHost : resolvedHost,
   };

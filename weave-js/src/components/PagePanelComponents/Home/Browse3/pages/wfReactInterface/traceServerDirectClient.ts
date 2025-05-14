@@ -30,6 +30,8 @@ import {
   FeedbackQueryRes,
   FilesStatsReq,
   FilesStatsRes,
+  ProjectStatsReq,
+  ProjectStatsRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -369,6 +371,13 @@ export class DirectTraceServerClient {
       }
       return Promise.reject(error);
     }
+  }
+
+  public projectStats(req: ProjectStatsReq): Promise<ProjectStatsRes> {
+    return this.makeRequest<ProjectStatsReq, ProjectStatsRes>(
+      '/project/stats',
+      req
+    );
   }
 
   private makeRequest = async <QT, ST>(

@@ -20,7 +20,7 @@ examples = [
 @weave.op()
 def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
 def function_to_evaluate(question: str):
@@ -55,9 +55,9 @@ First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries w
 
 ### Defining scoring functions
 
-Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+Then, create a list of scoring functions. These are used to score each example. Each function should have a `output` and optionally, other inputs from your examples, and return a dictionary with the scores.
 
-Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
+Scoring functions need to have a `output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
 This will take `expected` from the dictionary for scoring.
 
@@ -75,7 +75,7 @@ examples = [
 @weave.op()
 def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 ```
 
 ### Optional: Define a custom `Scorer` class
@@ -165,11 +165,11 @@ examples = [
 
 @weave.op()
 def match_score1(expected: str, output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
 def match_score2(expected: dict, output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 
 class MyModel(Model):
     prompt: str
@@ -231,7 +231,7 @@ def preprocess_example(example):
 
 @weave.op()
 def match_score(expected: str, output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
 def function_to_evaluate(question: str):

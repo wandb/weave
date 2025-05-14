@@ -35,6 +35,11 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
     string,
     {cache: LRUCache<string, any>; config: CacheConfig}
   >;
+  // The `tableDigestCache` is distinct from the general purpose method caches
+  // as we are applying custom logic beyond simply keying on the request.
+  // In particular, since table rows are keyed by their digest (and the same
+  // digest can appear in multiple tables), we only need to key on the digest
+  // of the row itself!.
   private tableDigestCache: LRUCache<string, any>;
 
   constructor(baseUrl: string) {
@@ -123,42 +128,49 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
   public tableRowQuery(
     req: TraceTableRowQueryReq
   ): Promise<TraceTableRowQueryRes> {
-    // Directly cache the digest to row mapping
-    const cachedResults = Object.fromEntries(
-      req.row_digests.map(digest => [digest, this.tableDigestCache.get(digest)])
-    );
+    // In order to maximize cache hits, we first split the request into
+    // the subset of digests that are already cached and the subset that
+    // are not. We then only make a single tableQuery request for the
+    // missing digests, and reconstruct the correct results before returning.
+    const cachedResults = new Map<string, any>();
+    for (const digest of req.row_digests) {
+      const cached = this.tableDigestCache.get(digest);
+      if (cached) {
+        cachedResults.set(digest, cached);
+      }
+    }
 
     const missingDigests = req.row_digests.filter(
-      digest => !cachedResults[digest]
+      digest => !cachedResults.has(digest)
     );
 
     const resultPromise = new Promise<TraceTableRowQueryRes>(
-      (resolve, reject) => {
+      async (resolve, reject) => {
         if (missingDigests.length === 0) {
           resolve({
             rows: req.row_digests.map(digest => ({
               digest,
-              val: cachedResults[digest],
+              val: cachedResults.get(digest),
             })),
           });
         } else {
-          const res = super.tableQuery({
-            ...req,
+          const res = await super.tableQuery({
+            project_id: req.project_id,
+            digest: req.digest,
             filter: {
               row_digests: missingDigests,
             },
           });
-          res.then(res => {
-            for (const row of res.rows) {
-              this.tableDigestCache.set(row.digest, row.val);
-              cachedResults[row.digest] = row.val;
-            }
-            resolve({
-              rows: req.row_digests.map(digest => ({
-                digest,
-                val: cachedResults[digest],
-              })),
-            });
+
+          for (const row of res.rows) {
+            this.tableDigestCache.set(row.digest, row.val);
+            cachedResults.set(row.digest, row.val);
+          }
+          resolve({
+            rows: req.row_digests.map(digest => ({
+              digest,
+              val: cachedResults.get(digest),
+            })),
           });
         }
       }

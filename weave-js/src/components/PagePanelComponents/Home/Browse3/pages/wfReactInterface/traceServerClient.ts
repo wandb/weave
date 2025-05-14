@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import _, {memoize} from 'lodash';
 
 import {
   CachingTraceServerClient,
@@ -24,6 +24,8 @@ import {
   TraceObjDeleteRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
+  TraceTableQueryReq,
+  TraceTableQueryRes,
 } from './traceServerClientTypes';
 
 const DEFAULT_BATCH_INTERVAL = 150;
@@ -45,6 +47,16 @@ export class TraceServerClient extends CachingTraceServerClient {
     rejectPromise: (err: any) => void;
   }> = [];
 
+  // Similar to the readBatchCollectors, but for tableRowQuery.
+  // The fundamental idea here is that some tableRowQuery requests
+  // can be batched together, reducing the number of requests we
+  // make to the trace server.
+  private tableRowQueryCollectors: Array<{
+    req: TraceTableRowQueryReq;
+    resolvePromise: (res: TraceTableRowQueryRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
+
   constructor(baseUrl: string) {
     super(baseUrl);
     this.readBatchCollectors = [];
@@ -54,7 +66,6 @@ export class TraceServerClient extends CachingTraceServerClient {
     this.onFeedbackListeners = {};
     this.onObjectListeners = [];
     this.tableRowQueryCollectors = [];
-    this.scheduleTableRowQuery();
   }
 
   /**
@@ -179,16 +190,32 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.completionsCreate(req);
   }
 
+  public override tableQuery(
+    req: TraceTableQueryReq
+  ): Promise<TraceTableQueryRes> {
+    // Specific case for optimization:
+    if (tableQuerySuitableForBatching(req)) {
+      return this.tableRowQuery({
+        project_id: req.project_id,
+        digest: req.digest,
+        row_digests: req.filter.row_digests,
+      });
+    }
+    return super.tableQuery(req);
+  }
+
   public tableRowQuery(
     req: TraceTableRowQueryReq
   ): Promise<TraceTableRowQueryRes> {
-    // Batch many requests together for the same table
+    // Rather than immediately making a request, we add the request to a
+    // queue of pending requests which will be batched together.
     return new Promise<TraceTableRowQueryRes>((resolve, reject) => {
       this.tableRowQueryCollectors.push({
         req,
         resolvePromise: resolve,
         rejectPromise: reject,
       });
+      this.ensureTableRowQueryBatchLoopStarted();
     });
   }
 
@@ -228,6 +255,11 @@ export class TraceServerClient extends CachingTraceServerClient {
   }
 
   private async doTableRowQuery() {
+    // This is the workhorse for the tableRowQuery batcher.
+    // We create N groups of results (where N is the number of table digests),
+    // Then for each group, we make a single tableRowQuery request to the
+    // trace server, and then use the results to populate the results for
+    // each of the individual requests.
     const collectors = [...this.tableRowQueryCollectors];
     this.tableRowQueryCollectors = [];
     if (collectors.length === 0) {
@@ -236,12 +268,12 @@ export class TraceServerClient extends CachingTraceServerClient {
     const reqs = collectors.map(c => c.req);
     const groupedReqs = _.groupBy(
       reqs,
-      req => req.project_id + ':' + req.digest
+      req => `${req.project_id}:{req.digest}`
     );
     await Promise.all(
       Object.entries(groupedReqs).map(async ([key, reqs]) => {
         const uniqueDigests = _.uniq(reqs.map(r => r.row_digests).flat());
-        const res = await this.tableRowQueryDirect({
+        const res = await super.tableRowQuery({
           ...reqs[0],
           row_digests: uniqueDigests,
         });
@@ -249,6 +281,10 @@ export class TraceServerClient extends CachingTraceServerClient {
         res.rows.forEach(r => {
           digestMap.set(r.digest, r.val);
         });
+
+        // each collector is guaranteed to get data for all its row digests,
+        // nothing will be missed, because several collectors who share the
+        // same table are fetched in a single request
         collectors.forEach(collector => {
           const rows = collector.req.row_digests.map(digest => ({
             digest,
@@ -265,10 +301,14 @@ export class TraceServerClient extends CachingTraceServerClient {
     setTimeout(this.scheduleReadBatch.bind(this), DEFAULT_BATCH_INTERVAL);
   }
 
-  private async scheduleTableRowQuery() {
-    await this.doTableRowQuery();
-    setTimeout(this.scheduleTableRowQuery.bind(this), DEFAULT_BATCH_INTERVAL);
-  }
+  private ensureTableRowQueryBatchLoopStarted = memoize(() => {
+    // Responsible for scheduling the next batch of tableRowQuery requests.
+    const iter = async () => {
+      await this.doTableRowQuery();
+      setTimeout(iter, DEFAULT_BATCH_INTERVAL);
+    };
+    iter();
+  });
 
   private readBatchDirect(
     req: TraceRefsReadBatchReq
@@ -282,3 +322,39 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.tableRowQuery(req);
   }
 }
+
+const tableQuerySuitableForBatching = (
+  req: TraceTableQueryReq
+): req is TraceTableQueryReq & {
+  filter: {
+    row_digests: NonNullable<
+      NonNullable<TraceTableQueryReq['filter']>['row_digests']
+    >;
+  };
+} => {
+  // If the request does not contain a row_digests filter, return false
+  if (!req.filter?.row_digests) {
+    return false;
+  }
+
+  // If the request contains anything other than project_id, digest, and filter, return false
+  // We can't support sorting/pagination, etc.
+  if (
+    !Object.entries(req).every(
+      ([k, v]) => ['project_id', 'digest', 'filter'].includes(k) || v == null
+    )
+  ) {
+    return false;
+  }
+
+  // If the filter contains anything other than row_digests, return false
+  // Forward protection (there are no other filter properties yet)
+  if (
+    !Object.entries(req.filter).every(
+      ([k, v]) => k === 'row_digests' || v == null
+    )
+  ) {
+    return false;
+  }
+  return true;
+};

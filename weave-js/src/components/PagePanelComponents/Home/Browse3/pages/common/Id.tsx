@@ -5,6 +5,7 @@
 import {GREEN_600, MOON_150} from '@wandb/weave/common/css/color.styles';
 import {IconCheckmark} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import copyToClipboard from 'copy-to-clipboard';
 import React, {useCallback, useState} from 'react';
 import styled from 'styled-components';
@@ -91,5 +92,6 @@ export const CopyableId = ({id, type, className}: IdProps) => {
       {prefix}: <TooltipId>{id}</TooltipId>
     </TooltipText>
   );
-  return <Tooltip trigger={trigger} content={content} />;
+  // TODO: Consider updating this component to use a toast instead of changing the tooltip content.
+  return <TooltipDeprecated trigger={trigger} content={content} />;
 };
