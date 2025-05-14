@@ -889,21 +889,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       })),
     ];
     return res;
-  }, [
-    inputSubFields.inputSubFields,
-    setSelectedInputDigest,
-    props.onShowSplitView,
-    props.state,
-    inputWidths,
-    hasTrials,
-    toggleDefaultExpansionState,
-    defaultExpandState,
-    isExpanded,
-    toggleExpansion,
-    outputColumnKeys,
-    scoreSubFields,
-    outputWidths,
-  ]);
+  }, [inputSubFields.inputSubFields, setSelectedInputDigest, props.onShowSplitView, props.state, inputWidths, onlyOneModel, hasTrials, toggleDefaultExpansionState, defaultExpandState, isExpanded, toggleExpansion, outputColumnKeys, scoreSubFields, outputWidths]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
