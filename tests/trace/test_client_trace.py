@@ -117,11 +117,15 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "my_op",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         attributes={
             "weave": {

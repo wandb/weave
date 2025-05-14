@@ -278,11 +278,15 @@ def test_call_create(client):
         output="hello",
         exception=None,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "x",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         _children=[],
         attributes={
@@ -326,10 +330,14 @@ def test_calls_query(client):
             },
         },
         summary={
+            "status_counts": {
+                "success": 25,
+                "error": 0,
+            },
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -352,10 +360,14 @@ def test_calls_query(client):
             },
         },
         summary={
+            "status_counts": {
+                "success": 25,
+                "error": 0,
+            },
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
