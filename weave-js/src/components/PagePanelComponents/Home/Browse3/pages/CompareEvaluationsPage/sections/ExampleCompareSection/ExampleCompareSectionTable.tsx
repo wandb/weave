@@ -299,14 +299,19 @@ export const ExampleCompareSectionTable: React.FC<
       </HorizontalBox>
     </HorizontalBox>
   );
-  const inner = modelsAsRows ? (
-    <ExampleCompareSectionTableModelsAsRows {...props} rowHeight={rowHeight} />
-  ) : (
-    <ExampleCompareSectionTableModelsAsColumns
-      {...props}
-      rowHeight={rowHeight}
-    />
-  );
+  const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
+  const inner =
+    modelsAsRows || onlyOneModel ? (
+      <ExampleCompareSectionTableModelsAsRows
+        {...props}
+        rowHeight={rowHeight}
+      />
+    ) : (
+      <ExampleCompareSectionTableModelsAsColumns
+        {...props}
+        rowHeight={rowHeight}
+      />
+    );
   return (
     <VerticalBox
       sx={{
@@ -690,6 +695,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   ExampleCompareSectionTableProps & {rowHeight: number}
 > = props => {
   const ctx = useCompareEvaluationsState();
+  const onlyOneModel = ctx.state.evaluationCallIdsOrdered.length === 1;
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
   const {
     isExpanded,
@@ -724,27 +730,31 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         props.onShowSplitView,
         inputWidths
       ),
-      {
-        field: 'evaluationCallId',
-        headerName: 'Eval/Model',
-        disableColumnMenu: true,
-        sortable: false,
-        filterable: false,
-        hideable: false,
-        renderCell: params => {
-          if (params.row._pivot === 'modelsAsColumns') {
-            // This does not make sense for models as columns
-            return null;
-          }
+      ...(onlyOneModel
+        ? []
+        : [
+            {
+              field: 'evaluationCallId',
+              headerName: 'Eval/Model',
+              disableColumnMenu: true,
+              sortable: false,
+              filterable: false,
+              hideable: false,
+              renderCell: (params: GridRenderCellParams<RowData>) => {
+                if (params.row._pivot === 'modelsAsColumns') {
+                  // This does not make sense for models as columns
+                  return null;
+                }
 
-          return (
-            <EvaluationModelLink
-              callId={params.row.evaluationCallId}
-              state={props.state}
-            />
-          );
-        },
-      },
+                return (
+                  <EvaluationModelLink
+                    callId={params.row.evaluationCallId}
+                    state={props.state}
+                  />
+                );
+              },
+            },
+          ]),
       ...(hasTrials
         ? [
             expansionField(
