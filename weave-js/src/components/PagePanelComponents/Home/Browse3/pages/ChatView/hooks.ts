@@ -2,6 +2,7 @@ import _ from 'lodash';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
+import { OptionalTraceCallSchema } from '../PlaygroundPage/types';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -82,14 +83,14 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
 };
 
 export const normalizeChatCompletion = (
-  request: ChatRequest,
+  request: ChatRequest | any,
   completion: any
 ): ChatCompletion => {
+  if (isAnthropicCompletionFormat(completion)) {
+    return normalizeAnthropicChatCompletion(completion);
+  }
   if (isGeminiCompletionFormat(completion)) {
     return normalizeGeminiChatCompletion(request, completion);
-  }
-  if (isAnthropicCompletionFormat(completion)) {
-    return normalizeAnthropicChatCompletion(request, completion);
   }
   if (isMistralCompletionFormat(completion)) {
     return normalizeMistralChatCompletion(request, completion);
@@ -155,3 +156,15 @@ export const useCallAsChat = (
     result,
   };
 };
+
+export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
+  if (!traceCall.output || !traceCall.inputs) {
+    return traceCall;
+  }
+  const { inputs, output, ...rest } = traceCall;
+  return {
+    input: normalizeChatRequest(traceCall.inputs),
+    output: normalizeChatCompletion(traceCall.inputs, traceCall.output),
+    ...rest
+  }
+}

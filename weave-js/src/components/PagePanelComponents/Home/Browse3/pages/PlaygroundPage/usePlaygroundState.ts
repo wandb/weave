@@ -3,7 +3,9 @@ import {SetStateAction, useCallback, useState} from 'react';
 import {
   normalizeChatCompletion,
   normalizeChatRequest,
+  normalizeChatTraceCall,
 } from '../ChatView/hooks';
+import { ChatRequest } from '../ChatView/types';
 import {
   DEFAULT_LLM_MODEL,
   LLM_MAX_TOKENS_KEYS,
@@ -127,11 +129,7 @@ export const usePlaygroundState = () => {
       // pulled from litellm
       setPlaygroundStates(prevState => {
         const newState = {...prevState[0]};
-        newState.traceCall.inputs = normalizeChatRequest(inputs);
-        newState.traceCall.output = normalizeChatCompletion(
-          newState.traceCall.inputs,
-          traceCall.output
-        );
+        newState.traceCall = normalizeChatTraceCall(traceCall);
 
         if (!inputs) {
           return [newState];

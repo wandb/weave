@@ -9,6 +9,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { normalizeChatTraceCall } from '../ChatView/hooks';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -19,7 +20,6 @@ import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
 import {
   DEFAULT_SYSTEM_MESSAGE,
-  parseTraceCall,
   usePlaygroundState,
 } from './usePlaygroundState';
 
@@ -208,7 +208,7 @@ export const PlaygroundPageInner = ({
           if (state.traceCall.id === c.callId) {
             newStates[idx] = {
               ...state,
-              traceCall: parseTraceCall(c.traceCall || {}),
+              traceCall: normalizeChatTraceCall(c.traceCall || {}),
             };
             break;
           }

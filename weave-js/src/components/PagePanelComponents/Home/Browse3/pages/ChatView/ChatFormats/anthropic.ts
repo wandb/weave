@@ -81,7 +81,6 @@ export const isTraceCallChatFormatAnthropic = (
 };
 
 export const normalizeAnthropicChatCompletion = (
-  _: ChatRequest,
   completion: any
 ): ChatCompletion => {
   return {
