@@ -260,7 +260,6 @@ const ResultExplorer: React.FC<{
       sx={{
         width: '100%',
         overflow: 'hidden',
-        // height,
       }}>
       <HorizontalBox
         sx={{
@@ -270,7 +269,6 @@ const ResultExplorer: React.FC<{
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          // height: headerHeight,
           paddingTop: 15,
         }}>
         <Box
