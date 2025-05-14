@@ -10,7 +10,7 @@ import React, {
   useState,
 } from 'react';
 
-import { normalizeChatTraceCall } from '../ChatView/hooks';
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
@@ -18,10 +18,7 @@ import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
-import {
-  DEFAULT_SYSTEM_MESSAGE,
-  usePlaygroundState,
-} from './usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
