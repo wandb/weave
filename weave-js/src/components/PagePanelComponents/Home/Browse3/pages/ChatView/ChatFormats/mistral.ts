@@ -5,6 +5,10 @@ import {
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {
+    ChatCompletion,
+  ChatRequest,
+  Choice,
+  Message,
   ToolCall,
 } from '../types';
 import {hasStringProp, hasNumberProp, isToolCalls, isMessage} from './utils';
@@ -145,3 +149,62 @@ export const isTraceCallChatFormatMistral = (
     isMistralCompletionFormat(call.output)
   );
 };
+
+export const normalizeMistralChatCompletion = (
+  request: ChatRequest,
+  completion: any
+): ChatCompletion => {
+  if (completion === null) {
+    // Handle cases where an SDK error or stream issue results in a null output
+    // for a call that is otherwise identified as Mistral.
+    return {
+      id: request.model + '-' + Date.now(), // Generate a placeholder ID
+      choices: [],
+      created: Math.floor(Date.now() / 1000),
+      model: request.model, // Use model from the request
+      system_fingerprint: '',
+      usage: {prompt_tokens: 0, completion_tokens: 0, total_tokens: 0},
+    };
+  }
+
+  const choices: Choice[] = completion.choices.map((choicePart: any) => {
+    let message: Message;
+    if (choicePart.message) {
+      message = choicePart.message as Message;
+    } else if (choicePart.delta) {
+      message = {
+        role: choicePart.delta.role ?? 'assistant',
+        content: choicePart.delta.content ?? '',
+      };
+      if (choicePart.delta.tool_calls) {
+        message.tool_calls = choicePart.delta.tool_calls;
+      }
+    } else {
+      message = {role: 'assistant', content: ''};
+    }
+    return {
+      index: choicePart.index,
+      message,
+      finish_reason: choicePart.finish_reason ?? 'stop',
+    };
+  });
+
+  return {
+    id: completion.id,
+    choices,
+    created: completion.created,
+    model: completion.model,
+    system_fingerprint: completion.system_fingerprint ?? '',
+    usage: completion.usage
+      ? {
+          prompt_tokens: completion.usage.prompt_tokens,
+          completion_tokens: completion.usage.completion_tokens,
+          total_tokens: completion.usage.total_tokens,
+        }
+      : {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        },
+    };
+  }
