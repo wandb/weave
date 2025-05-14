@@ -1,22 +1,10 @@
-import _ from 'lodash';
-
-import {isWeaveRef} from '../../filters/common';
-import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
-import {useWFHooks} from '../wfReactInterface/context';
-import {
-  KeyedDictType,
-  TraceCallSchema,
-} from '../wfReactInterface/traceServerClientTypes';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {
-  Chat,
-  ChatCompletion,
-  ChatRequest,
-  Choice,
-  Message,
-  ToolCall,
-} from './types';
-import {ChatFormat} from './ChatFormats/types'
+export enum ChatFormat {
+  None = 'None',
+  OpenAI = 'OpenAI',
+  Gemini = 'Gemini',
+  Anthropic = 'Anthropic',
+  Mistral = 'Mistral',
+}
 
 // Does this call look like a chat formatted object?
 export const isCallChat = (call: CallSchema): boolean => {
