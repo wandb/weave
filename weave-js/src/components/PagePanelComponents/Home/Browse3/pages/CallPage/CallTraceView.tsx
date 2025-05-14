@@ -380,21 +380,16 @@ export const useCallFlattenedTraceTree = (
     ],
     []
   );
-  const traceCalls = useCalls(
-    call.entity,
-    call.project,
-    {
+  const traceCalls = useCalls({
+    entity: call.entity,
+    project: call.project,
+    filter: {
       traceId: call.traceId,
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
     columns,
-    undefined,
     // Refetch the trace tree on delete or rename
-    {refetchOnDelete: true}
-  );
+    refetchOnDelete: true,
+  });
 
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
@@ -413,21 +408,14 @@ export const useCallFlattenedTraceTree = (
   );
 
   const costCols = useMemo(() => ['id'], []);
-  const costs = useCalls(
-    call.entity,
-    call.project,
-    costFilter,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    costCols,
-    undefined,
-    {
-      skip: traceCalls.loading,
-      includeCosts: true,
-    }
-  );
+  const costs = useCalls({
+    entity: call.entity,
+    project: call.project,
+    filter: costFilter,
+    columns: costCols,
+    skip: traceCalls.loading,
+    includeCosts: true,
+  });
 
   const costResult = useMemo(() => {
     return addCostsToCallResults(traceCallsResult, costs.result ?? []);

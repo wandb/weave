@@ -6,13 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {
-  Autocomplete,
-  Chip,
-  FormControl,
-  ListItem,
-  Tooltip,
-} from '@mui/material';
+import {Autocomplete, FormControl, ListItem, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -47,6 +41,8 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {RemovableTag} from '../../../../../Tag';
+import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -69,11 +65,7 @@ import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
-import {
-  truncateID,
-  useControllableState,
-  useURLSearchParamsDict,
-} from '../util';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
@@ -187,6 +179,8 @@ export const CallsTable: FC<{
 
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
+
+  currentViewId?: string;
 }> = ({
   entity,
   project,
@@ -206,6 +200,7 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  currentViewId,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -288,6 +283,7 @@ export const CallsTable: FC<{
   );
 
   const shouldIncludeTotalStorageSize = effectiveFilter.traceRootsOnly;
+  const currentViewIdResolved = currentViewId ?? '';
 
   // Fetch the calls
   const calls = useCallsForQuery(
@@ -319,11 +315,18 @@ export const CallsTable: FC<{
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
   const callsEffectiveFilter = useRef(effectiveFilter);
+  const prevViewIdRef = useRef(currentViewIdResolved);
+  // A structural change is one where we don't want the set of columns to persist.
+  // This can be because of a view change or effective filter (e.g. selected Op) change.
+  const hasStructuralChange =
+    callsEffectiveFilter.current !== effectiveFilter ||
+    prevViewIdRef.current !== currentViewIdResolved;
   useEffect(() => {
-    if (callsEffectiveFilter.current !== effectiveFilter) {
+    if (hasStructuralChange) {
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
       // Refetch the calls IFF the filter has changed, this is a
       // noop if the calls query is already loading, but if the filter
       // has no effective impact (frozen vs. not frozen) we need to
@@ -333,13 +336,15 @@ export const CallsTable: FC<{
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
     }
-  }, [calls, effectiveFilter]);
+  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
-    [callsResult]
+    () =>
+      prepareFlattenedCallDataForTable(hasStructuralChange ? [] : callsResult),
+    [callsResult, hasStructuralChange]
   );
 
   // This is a specific helper that is used when the user attempts to option-click
@@ -476,6 +481,7 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
+    currentViewIdResolved,
     tableData,
     expandedRefCols,
     onCollapse,
@@ -980,40 +986,60 @@ export const CallsTable: FC<{
           )}
           <div className="ml-auto flex items-center gap-8">
             {selectedInputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Input: ${objectVersionNiceString(
                   selectedInputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    inputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        inputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             {selectedOutputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Output: ${objectVersionNiceString(
                   selectedOutputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    outputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        outputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             {selectedParentId && (
-              <Chip
+              <RemovableTag
+                maxChars={48}
+                truncatedPart="middle"
+                color="moon"
                 label={`Parent: ${selectedParentId}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    parentId: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        parentId: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             <div className="flex items-center gap-6">
@@ -1254,23 +1280,23 @@ const useParentIdOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   const {useCall} = useWFHooks();
-  const parentCall = useCall(
-    effectiveFilter.parentId
-      ? {
-          entity,
-          project,
-          callId: effectiveFilter.parentId,
-        }
-      : null
-  );
+  const callKey = effectiveFilter.parentId
+    ? {
+        entity,
+        project,
+        callId: effectiveFilter.parentId,
+      }
+    : null;
+  const parentCall = useCall({key: callKey});
   return useMemo(() => {
     if (parentCall.loading || parentCall.result == null) {
       return {};
     }
+    const call = parentCall.result;
+    const truncatedId = call.callId.slice(-4);
+    const label = `${call.displayName} (${truncatedId})`;
     return {
-      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
-        parentCall.result.callId
-      )})`,
+      [call.callId]: label,
     };
   }, [parentCall.loading, parentCall.result]);
 };

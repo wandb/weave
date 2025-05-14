@@ -77,9 +77,10 @@ def mistral_accumulator(
         )
         target_choice.message.content += delta_choice.delta.content or ""
         if delta_choice.delta.tool_calls:
-            if target_choice.message.tool_calls is None:
+            # treat UNSET or None as empty
+            if not isinstance(target_choice.message.tool_calls, list):
                 target_choice.message.tool_calls = []
-            target_choice.message.tool_calls += delta_choice.delta.tool_calls
+            target_choice.message.tool_calls.extend(delta_choice.delta.tool_calls)
 
     return acc
 

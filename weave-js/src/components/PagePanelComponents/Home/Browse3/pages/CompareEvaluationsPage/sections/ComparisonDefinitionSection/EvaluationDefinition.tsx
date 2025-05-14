@@ -68,7 +68,7 @@ export const EvaluationModelLink: React.FC<{
     objRef.projectName,
     objRef.weaveKind,
   ]);
-  const objectVersion = useObjectVersion(objVersionKey);
+  const objectVersion = useObjectVersion({key: objVersionKey});
 
   if (isObjDeleteError(objectVersion.error)) {
     return (

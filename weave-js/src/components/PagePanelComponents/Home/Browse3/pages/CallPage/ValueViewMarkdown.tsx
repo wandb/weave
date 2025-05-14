@@ -46,6 +46,11 @@ const PreserveWrapping = styled.div`
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
 
+const EnableWrapping = styled.div`
+  white-space: normal;
+`;
+EnableWrapping.displayName = 'S.EnableWrapping';
+
 export const ValueViewMarkdown = ({value}: ValueViewMarkdownProps) => {
   const trimmed = value.trim();
 
@@ -83,7 +88,11 @@ export const ValueViewMarkdown = ({value}: ValueViewMarkdownProps) => {
 
   let content: ReactNode = trimmed;
   if (format === 'Markdown') {
-    content = <Markdown content={trimmed} />;
+    content = (
+      <EnableWrapping>
+        <Markdown content={trimmed} />
+      </EnableWrapping>
+    );
   } else if (format === 'Code') {
     content = <CodeEditor value={trimmed} language="markdown" readOnly />;
   } else {

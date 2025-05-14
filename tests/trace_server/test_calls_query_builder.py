@@ -386,8 +386,8 @@ def test_query_light_column_with_costs() -> None:
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
             -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS (
-                SELECT
+            ranked_prices AS
+                (SELECT
                     *,
                     llm_token_prices.id,
                     llm_token_prices.pricing_level,
@@ -419,15 +419,14 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id)
-                WHERE ((llm_token_prices.pricing_level_id = {pb_2:String})
+                LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
                     OR (llm_token_prices.pricing_level_id = {pb_3:String})
-                    OR (llm_token_prices.pricing_level_id = {pb_4:String})))
+                    OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
                 id,
                 started_at,
-                if( any(llm_id) = 'weave_dummy_llm_id',
+                if( any(llm_id) = 'weave_dummy_llm_id' or any(llm_token_prices.id) == '',
                 any(summary_dump),
                 concat(
                     left(any(summary_dump), length(any(summary_dump)) - 1),

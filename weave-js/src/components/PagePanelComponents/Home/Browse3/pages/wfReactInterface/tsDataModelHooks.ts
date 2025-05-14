@@ -30,27 +30,46 @@ import {
 } from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
-  CallFilter,
-  CallKey,
   CallSchema,
-  FeedbackKey,
   Loadable,
   LoadableWithError,
-  ObjectVersionFilter,
+  ObjectDeleteAllVersionsParams,
+  ObjectDeleteParams,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpVersionFilter,
+  OpVersionDeleteAllVersionsParams,
+  OpVersionDeleteParams,
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   Refetchable,
-  RefMutation,
-  TableQuery,
+  UseApplyMutationsToRefParams,
+  UseCallParams,
+  UseCallsDeleteParams,
+  UseCallsExportParams,
+  UseCallsParams,
+  UseCallsStatsParams,
+  UseCallUpdateParams,
+  UseChildCallsForCompareParams,
+  UseFeedbackParams,
+  UseFileContentParams,
+  UseGetRefsTypeParams,
+  UseObjCreateParams,
+  UseObjectVersionParams,
+  UseOpVersionParams,
+  UseOpVersionsParams,
+  UseProjectHasCallsParams,
+  UseRefsDataParams,
+  UseRefsReadBatchParams,
+  UseRootObjectVersionsParams,
+  UseTableQueryParams,
+  UseTableQueryStatsParams,
+  UseTableRowsQueryParams,
+  UseTableUpdateParams,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -75,24 +94,22 @@ type TraceServerClientPromiseKeys = {
 
 const makeTraceServerEndpointHook = <
   FN extends TraceServerClientPromiseKeys,
-  Input extends any[],
+  Params extends object,
   Output
 >(
   traceServerFnName: FN,
-  preprocessFn: (...input: Input) => {
+  preprocessFn: (params: Params) => {
     params: Parameters<traceServerClient.TraceServerClient[FN]>[0];
     skip?: boolean;
   },
   postprocessFn: (
     res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>,
-    ...input: Input
+    params: Params
   ) => Output
 ) => {
-  const useTraceServerRequest = (
-    ...input: Input
-  ): LoadableWithError<Output> => {
-    input = useDeepMemo(input);
-    const loadingInputRef = useRef<Input | null>(null);
+  const useTraceServerRequest = (params: Params): LoadableWithError<Output> => {
+    params = useDeepMemo(params);
+    const loadingInputRef = useRef<Params | null>(null);
     const getTsClient = useGetTraceServerClientContext();
     const [state, setState] = useState<LoadableWithError<Output>>({
       loading: true,
@@ -101,9 +118,9 @@ const makeTraceServerEndpointHook = <
     });
 
     useEffect(() => {
-      loadingInputRef.current = input;
+      loadingInputRef.current = params;
       setState({loading: true, result: null, error: null});
-      const req = preprocessFn(...input);
+      const req = preprocessFn(params);
       if (req.skip) {
         setState({loading: false, result: null, error: null});
         return;
@@ -111,25 +128,25 @@ const makeTraceServerEndpointHook = <
       const client = getTsClient();
       client[traceServerFnName](req.params as any)
         .then(res => {
-          if (input !== loadingInputRef.current) {
+          if (params !== loadingInputRef.current) {
             return;
           }
-          const output = postprocessFn(res as any, ...input);
+          const output = postprocessFn(res as any, params);
           setState({loading: false, result: output, error: null});
         })
         .catch(err => {
-          if (input !== loadingInputRef.current) {
+          if (params !== loadingInputRef.current) {
             return;
           }
           setState({loading: false, result: null, error: err});
         });
-    }, [getTsClient, input]);
+    }, [getTsClient, params]);
 
     const loadingReturn = useMemo(
       () => ({loading: true, result: null, error: null}),
       []
     );
-    if (loadingInputRef.current !== input) {
+    if (loadingInputRef.current !== params) {
       return loadingReturn;
     }
     return state;
@@ -165,27 +182,20 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (
-  key: CallKey | null,
-  opts?: {
-    includeCosts?: boolean;
-    includeTotalStorageSize?: boolean;
-    refetchOnRename?: boolean;
-  }
-): Loadable<CallSchema | null> => {
+const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
   const effectiveKey = useMemo(() => {
-    if (key == null) {
+    if (params.key == null) {
       return null;
     }
     return {
-      ...key,
-      withCosts: !!opts?.includeCosts,
-      withTotalStorageSize: !!opts?.includeTotalStorageSize,
+      ...params.key,
+      withCosts: !!params.includeCosts,
+      withTotalStorageSize: !!params.includeTotalStorageSize,
     };
-  }, [key, opts?.includeCosts, opts?.includeTotalStorageSize]);
+  }, [params.key, params.includeCosts, params.includeTotalStorageSize]);
   const deepKey = useDeepMemo(effectiveKey);
 
   const cachedCall = deepKey ? callCache.get(deepKey) : null;
@@ -204,8 +214,8 @@ const useCall = (
           .callRead({
             project_id: projectIdFromParts(deepKey),
             id: deepKey.callId,
-            include_costs: opts?.includeCosts,
-            ...(opts?.includeTotalStorageSize
+            include_costs: params.includeCosts,
+            ...(params.includeTotalStorageSize
               ? {include_total_storage_size: true}
               : null),
           })
@@ -215,7 +225,7 @@ const useCall = (
           });
       }
     },
-    [deepKey, getTsClient, opts?.includeCosts, opts?.includeTotalStorageSize]
+    [deepKey, getTsClient, params.includeCosts, params.includeTotalStorageSize]
   );
 
   useEffect(() => {
@@ -223,7 +233,7 @@ const useCall = (
   }, [doFetch]);
 
   useEffect(() => {
-    if (opts?.refetchOnRename) {
+    if (params.refetchOnRename) {
       const client = getTsClient();
       const unregisterRename = client.registerOnRenameListener(() =>
         doFetch({invalidateCache: true})
@@ -233,7 +243,7 @@ const useCall = (
       };
     }
     return undefined;
-  }, [getTsClient, doFetch, deepKey, opts?.refetchOnRename]);
+  }, [getTsClient, doFetch, deepKey, params.refetchOnRename]);
 
   return useMemo(() => {
     if (deepKey == null) {
@@ -281,32 +291,21 @@ const useCall = (
 };
 
 const useCallsNoExpansion = (
-  entity: string,
-  project: string,
-  filter: CallFilter,
-  limit?: number,
-  offset?: number,
-  sortBy?: traceServerTypes.SortBy[],
-  query?: Query,
-  columns?: string[],
-  opts?: {
-    skip?: boolean;
-    refetchOnDelete?: boolean;
-    includeCosts?: boolean;
-    includeFeedback?: boolean;
-    includeTotalStorageSize?: boolean;
-  }
+  params: UseCallsParams
 ): Loadable<CallSchema[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerTypes.TraceCallsQueryRes | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const deepFilter = useDeepMemo(filter);
+  const deepFilter = useDeepMemo(params.filter);
 
   const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
     return {
-      project_id: projectIdFromParts({entity, project}),
+      project_id: projectIdFromParts({
+        entity: params.entity,
+        project: params.project,
+      }),
       filter: {
         op_names: deepFilter.opVersionRefs,
         input_refs: deepFilter.inputObjectVersionRefs,
@@ -318,29 +317,29 @@ const useCallsNoExpansion = (
         wb_run_ids: deepFilter.runIds,
         wb_user_ids: deepFilter.userIds,
       },
-      limit,
-      offset,
-      sort_by: sortBy,
-      query,
-      columns,
-      include_costs: opts?.includeCosts,
-      include_feedback: opts?.includeFeedback,
-      ...(opts?.includeTotalStorageSize
+      limit: params.limit,
+      offset: params.offset,
+      sort_by: params.sortBy,
+      query: params.query,
+      columns: params.columns,
+      include_costs: params.includeCosts,
+      include_feedback: params.includeFeedback,
+      ...(params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
     };
   }, [
-    entity,
-    project,
+    params.entity,
+    params.project,
     deepFilter,
-    limit,
-    offset,
-    sortBy,
-    query,
-    columns,
-    opts?.includeCosts,
-    opts?.includeFeedback,
-    opts?.includeTotalStorageSize,
+    params.limit,
+    params.offset,
+    params.sortBy,
+    params.query,
+    params.columns,
+    params.includeCosts,
+    params.includeFeedback,
+    params.includeTotalStorageSize,
   ]);
 
   // Keep track of the request we're waiting for, so that we
@@ -373,7 +372,7 @@ const useCallsNoExpansion = (
 
   // register doFetch as a callback after deletion
   useEffect(() => {
-    if (opts?.refetchOnDelete) {
+    if (params.refetchOnDelete) {
       const client = getTsClient();
       const unregisterDelete = client.registerOnDeleteListener(doFetch);
       const unregisterRename = client.registerOnRenameListener(doFetch);
@@ -383,21 +382,21 @@ const useCallsNoExpansion = (
       };
     }
     return () => {};
-  }, [opts?.refetchOnDelete, getTsClient, doFetch]);
+  }, [params.refetchOnDelete, getTsClient, doFetch]);
 
   useEffect(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
     doFetch();
-  }, [opts?.skip, doFetch]);
+  }, [params.skip, doFetch]);
 
   const refetch = useCallback(() => {
     doFetch();
   }, [doFetch]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {
         loading: false,
         result: [],
@@ -419,12 +418,12 @@ const useCallsNoExpansion = (
       // Check if the query contained a column request. Only cache calls
       // if no columns were requested, only then are we guaranteed to get
       // all the call data
-      if (!columns) {
+      if (!params.columns) {
         allResults.forEach(call => {
           callCache.set(
             {
-              entity,
-              project,
+              entity: params.entity,
+              project: params.project,
               callId: call.callId,
             },
             call
@@ -438,45 +437,28 @@ const useCallsNoExpansion = (
         error,
       };
     }
-  }, [opts?.skip, callRes, columns, refetch, entity, project, error]);
+  }, [
+    params.skip,
+    callRes,
+    params.columns,
+    refetch,
+    params.entity,
+    params.project,
+    error,
+  ]);
 };
 
 const useCalls = (
-  entity: string,
-  project: string,
-  filter: CallFilter,
-  limit?: number,
-  offset?: number,
-  sortBy?: traceServerTypes.SortBy[],
-  query?: Query,
-  columns?: string[],
-  expandedRefColumns?: Set<string>,
-  opts?: {
-    skip?: boolean;
-    refetchOnDelete?: boolean;
-    includeCosts?: boolean;
-    includeFeedback?: boolean;
-    includeTotalStorageSize?: boolean;
-  }
+  params: UseCallsParams
 ): Loadable<CallSchema[]> & Refetchable => {
-  const calls = useCallsNoExpansion(
-    entity,
-    project,
-    filter,
-    limit,
-    offset,
-    sortBy,
-    query,
-    columns,
-    opts
-  );
+  const calls = useCallsNoExpansion(params);
 
   // This is a temporary solution until the trace server supports
   // backend expansions of refs. We should expect to see this go away, and
   // this entire function replaced with the contents of `useCallsNoExpansion`.
   const {expandedCalls, isExpanding} = useClientSideCallRefExpansion(
     calls,
-    expandedRefColumns
+    params.expandedRefColumns
   );
 
   const loading = calls.loading || isExpanding;
@@ -491,16 +473,7 @@ const useCalls = (
 };
 
 const useCallsStats = (
-  entity: string,
-  project: string,
-  filter: CallFilter,
-  query?: Query,
-  limit?: number,
-  opts?: {
-    skip?: boolean;
-    refetchOnDelete?: boolean;
-    includeTotalStorageSize?: boolean;
-  }
+  params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -508,10 +481,10 @@ const useCallsStats = (
     useState<LoadableWithError<traceServerTypes.TraceCallsQueryStatsRes> | null>(
       null
     );
-  const deepFilter = useDeepMemo(filter);
+  const deepFilter = useDeepMemo(params.filter);
 
   const doFetch = useCallback(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       setCallStatsRes({loading: false, result: null, error: null});
       return;
     }
@@ -519,21 +492,24 @@ const useCallsStats = (
     setCallStatsRes(null);
 
     const req: traceServerTypes.TraceCallsQueryStatsReq = {
-      project_id: projectIdFromParts({entity, project}),
+      project_id: projectIdFromParts({
+        entity: params.entity,
+        project: params.project,
+      }),
       filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
+        op_names: deepFilter?.opVersionRefs,
+        input_refs: deepFilter?.inputObjectVersionRefs,
+        output_refs: deepFilter?.outputObjectVersionRefs,
+        parent_ids: deepFilter?.parentIds,
+        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter?.callIds,
+        trace_roots_only: deepFilter?.traceRootsOnly,
+        wb_run_ids: deepFilter?.runIds,
+        wb_user_ids: deepFilter?.userIds,
       },
-      query,
-      limit,
-      ...(!!opts?.includeTotalStorageSize
+      query: params.query,
+      limit: params.limit,
+      ...(!!params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
     };
@@ -549,13 +525,13 @@ const useCallsStats = (
         setCallStatsRes({loading: false, result: null, error: err});
       });
   }, [
-    opts?.skip,
-    opts?.includeTotalStorageSize,
-    entity,
-    project,
+    params.skip,
+    params.includeTotalStorageSize,
+    params.entity,
+    params.project,
     deepFilter,
-    query,
-    limit,
+    params.query,
+    params.limit,
     getTsClient,
   ]);
 
@@ -564,18 +540,18 @@ const useCallsStats = (
   }, [doFetch]);
 
   useEffect(() => {
-    if (!opts?.refetchOnDelete) {
+    if (!params.refetchOnDelete) {
       return;
     }
     return getTsClient().registerOnDeleteListener(doFetch);
-  }, [getTsClient, doFetch, opts?.refetchOnDelete]);
+  }, [getTsClient, doFetch, params.refetchOnDelete]);
 
   const refetch = useCallback(() => {
     doFetch();
   }, [doFetch]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {loading: false, result: null, error: null, refetch};
     } else {
       if (callStatsRes == null || loadingRef.current) {
@@ -583,20 +559,19 @@ const useCallsStats = (
       }
       return {...callStatsRes, refetch};
     }
-  }, [callStatsRes, opts?.skip, refetch]);
+  }, [callStatsRes, params.skip, refetch]);
 };
 
-/*
-  Helper that calls the call stats hook with limit: 1, returning a boolean
-  if there are any calls in the project. This uses a highly optimized
-  query in the backend. 
-*/
 const useProjectHasCalls = (
-  entity: string,
-  project: string,
-  opts?: {skip?: boolean}
+  params: UseProjectHasCallsParams
 ): Loadable<boolean> => {
-  const callsStats = useCallsStats(entity, project, {}, undefined, 1, opts);
+  const callsStats = useCallsStats({
+    entity: params.entity,
+    project: params.project,
+    filter: {},
+    limit: 1,
+    skip: params.skip,
+  });
   const count = callsStats.result?.count ?? 0;
   return useMemo(() => {
     return {
@@ -611,17 +586,20 @@ const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callsDelete = useCallback(
-    (entity: string, project: string, callIDs: string[]): Promise<void> => {
+    (params: UseCallsDeleteParams): Promise<void> => {
       return getTsClient()
         .callsDelete({
-          project_id: projectIdFromParts({entity, project}),
-          call_ids: callIDs,
+          project_id: projectIdFromParts({
+            entity: params.entity,
+            project: params.project,
+          }),
+          call_ids: params.callIDs,
         })
         .then(() => {
-          callIDs.forEach(callId => {
+          params.callIDs.forEach(callId => {
             callCache.del({
-              entity,
-              project,
+              entity: params.entity,
+              project: params.project,
               callId,
             });
           });
@@ -637,23 +615,21 @@ const useCallUpdateFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callUpdate = useCallback(
-    (
-      entity: string,
-      project: string,
-      callID: string,
-      newName: string
-    ): Promise<void> => {
+    (params: UseCallUpdateParams): Promise<void> => {
       return getTsClient()
         .callUpdate({
-          project_id: projectIdFromParts({entity, project}),
-          call_id: callID,
-          display_name: newName,
+          project_id: projectIdFromParts({
+            entity: params.entity,
+            project: params.project,
+          }),
+          call_id: params.callID,
+          display_name: params.newName,
         })
         .then(() => {
           callCache.del({
-            entity,
-            project,
-            callId: callID,
+            entity: params.entity,
+            project: params.project,
+            callId: params.callID,
           });
         });
     },
@@ -667,43 +643,35 @@ const useCallsExport = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const downloadCallsExport = useCallback(
-    (
-      entity: string,
-      project: string,
-      contentType: traceServerTypes.ContentType,
-      filter: CallFilter,
-      limit?: number,
-      offset?: number,
-      sortBy?: traceServerTypes.SortBy[],
-      query?: Query,
-      columns?: string[],
-      expandedRefCols?: string[],
-      includeFeedback?: boolean,
-      includeCosts?: boolean
-    ) => {
+    (params: UseCallsExportParams) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
-        project_id: projectIdFromParts({entity, project}),
+        project_id: projectIdFromParts({
+          entity: params.entity,
+          project: params.project,
+        }),
         filter: {
-          op_names: filter.opVersionRefs,
-          input_refs: filter.inputObjectVersionRefs,
-          output_refs: filter.outputObjectVersionRefs,
-          parent_ids: filter.parentIds,
-          trace_ids: filter.traceId ? [filter.traceId] : undefined,
-          call_ids: filter.callIds,
-          trace_roots_only: filter.traceRootsOnly,
-          wb_run_ids: filter.runIds,
-          wb_user_ids: filter.userIds,
+          op_names: params.filter.opVersionRefs,
+          input_refs: params.filter.inputObjectVersionRefs,
+          output_refs: params.filter.outputObjectVersionRefs,
+          parent_ids: params.filter.parentIds,
+          trace_ids: params.filter.traceId
+            ? [params.filter.traceId]
+            : undefined,
+          call_ids: params.filter.callIds,
+          trace_roots_only: params.filter.traceRootsOnly,
+          wb_run_ids: params.filter.runIds,
+          wb_user_ids: params.filter.userIds,
         },
-        limit,
-        offset,
-        sort_by: sortBy,
-        query,
-        columns: columns ?? undefined,
-        expand_columns: expandedRefCols ?? undefined,
-        include_feedback: includeFeedback ?? false,
-        include_costs: includeCosts ?? false,
+        limit: params.limit,
+        offset: params.offset,
+        sort_by: params.sortBy,
+        query: params.query,
+        columns: params.columns ?? undefined,
+        expand_columns: params.expandedRefCols ?? undefined,
+        include_feedback: params.includeFeedback ?? false,
+        include_costs: params.includeCosts ?? false,
       };
-      return getTsClient().callsStreamDownload(req, contentType);
+      return getTsClient().callsStreamDownload(req, params.contentType);
     },
     [getTsClient]
   );
@@ -712,8 +680,7 @@ const useCallsExport = () => {
 };
 
 const useFeedback = (
-  key: FeedbackKey | null,
-  sortBy?: traceServerTypes.SortBy[]
+  params: UseFeedbackParams
 ): LoadableWithError<traceServerTypes.Feedback[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -729,7 +696,7 @@ const useFeedback = (
     setDoReload(true);
   }, [setDoReload]);
 
-  const deepKey = useDeepMemo(key);
+  const deepKey = useDeepMemo(params.key);
 
   useEffect(() => {
     let mounted = true;
@@ -751,7 +718,7 @@ const useFeedback = (
             $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
           },
         },
-        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
+        sort_by: params.sortBy ?? [{field: 'created_at', direction: 'desc'}],
       })
       .then(res => {
         if (!mounted) {
@@ -771,23 +738,21 @@ const useFeedback = (
     return () => {
       mounted = false;
     };
-  }, [deepKey, getTsClient, doReload, sortBy]);
+  }, [deepKey, getTsClient, doReload, params.sortBy]);
 
   return {...result, refetch};
 };
 
 const useOpVersion = (
-  // Null value skips
-  key: OpVersionKey | null,
-  metadataOnly?: boolean
+  params: UseOpVersionParams
 ): LoadableWithError<OpVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedOpVersion = key ? opVersionCache.get(key) : null;
+  const cachedOpVersion = params.key ? opVersionCache.get(params.key) : null;
   const [opVersionRes, setOpVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
   const [error, setError] = useState<any>(null);
-  const deepKey = useDeepMemo(key);
+  const deepKey = useDeepMemo(params.key);
   useEffect(() => {
     if (deepKey) {
       setOpVersionRes(null);
@@ -800,12 +765,12 @@ const useOpVersion = (
           }),
           object_id: deepKey?.opId ?? '',
           digest: deepKey?.versionHash ?? '',
-          metadata_only: metadataOnly ?? false,
+          metadata_only: params.metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
-          if (res.obj == null && !metadataOnly) {
+          if (res.obj == null && !params.metadataOnly) {
             setError(new Error(JSON.stringify(res)));
             // be conservative and unset the cache when there's an error
             if (deepKey) {
@@ -814,10 +779,10 @@ const useOpVersion = (
           }
         });
     }
-  }, [deepKey, getTsClient, metadataOnly]);
+  }, [deepKey, getTsClient, params.metadataOnly]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (params.key == null) {
       return {
         loading: false,
         result: null,
@@ -852,10 +817,10 @@ const useOpVersion = (
     );
 
     if (
-      key.entity !== returnedResult.entity ||
-      key.project !== returnedResult.project ||
-      key.opId !== returnedResult.opId ||
-      key.versionHash !== returnedResult.versionHash
+      params.key.entity !== returnedResult.entity ||
+      params.key.project !== returnedResult.project ||
+      params.key.opId !== returnedResult.opId ||
+      params.key.versionHash !== returnedResult.versionHash
     ) {
       return {
         loading: true,
@@ -865,12 +830,12 @@ const useOpVersion = (
     }
 
     const cacheableResult: OpVersionSchema = {
-      ...key,
+      ...params.key,
       ...returnedResult,
     };
 
     // Skip setting the cache if metadata only
-    if (metadataOnly) {
+    if (params.metadataOnly) {
       return {
         loading: false,
         result: cacheableResult,
@@ -878,23 +843,17 @@ const useOpVersion = (
       };
     }
 
-    opVersionCache.set(key, cacheableResult);
+    opVersionCache.set(params.key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedOpVersion, key, opVersionRes, error, metadataOnly]);
+  }, [cachedOpVersion, params.key, opVersionRes, error, params.metadataOnly]);
 };
 
 const useOpVersions = (
-  entity: string,
-  project: string,
-  filter: OpVersionFilter,
-  limit?: number,
-  metadataOnly?: boolean,
-  orderBy?: traceServerTypes.SortBy[],
-  opts?: {skip?: boolean}
+  params: UseOpVersionsParams
 ): LoadableWithError<OpVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -905,25 +864,28 @@ const useOpVersions = (
     error: null,
     result: null,
   });
-  const deepFilter = useDeepMemo(filter);
-  const deepOrderBy = useDeepMemo(orderBy);
+  const deepFilter = useDeepMemo(params.filter);
+  const deepOrderBy = useDeepMemo(params.orderBy);
 
   const doFetch = useCallback(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
     setOpVersionRes({loading: true, error: null, result: null});
     loadingRef.current = true;
 
     const req: traceServerTypes.TraceObjQueryReq = {
-      project_id: projectIdFromParts({entity, project}),
+      project_id: projectIdFromParts({
+        entity: params.entity,
+        project: params.project,
+      }),
       filter: {
         object_ids: deepFilter.opIds,
         latest_only: deepFilter.latestOnly,
         is_op: true,
       },
-      limit,
-      metadata_only: metadataOnly,
+      limit: params.limit,
+      metadata_only: params.metadataOnly,
       sort_by: deepOrderBy,
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -943,11 +905,11 @@ const useOpVersions = (
   }, [
     deepFilter,
     getTsClient,
-    opts?.skip,
-    entity,
-    project,
-    limit,
-    metadataOnly,
+    params.skip,
+    params.entity,
+    params.project,
+    params.limit,
+    params.metadataOnly,
     deepOrderBy,
   ]);
 
@@ -960,14 +922,14 @@ const useOpVersions = (
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {loading: false, error: null, result: null};
     }
     if (opVersionRes == null || loadingRef.current) {
       return {loading: true, error: null, result: null};
     }
     return opVersionRes;
-  }, [opVersionRes, opts?.skip]);
+  }, [opVersionRes, params.skip]);
 };
 
 // Helper function to convert trace server object version to op schema
@@ -986,39 +948,62 @@ const convertTraceServerObjectVersionToOpSchema = (
   };
 };
 
-const useFileContent = makeTraceServerEndpointHook<
-  'fileContent',
-  [string, string, string, {skip?: boolean}?],
-  ArrayBuffer
->(
-  'fileContent',
-  (
-    entity: string,
-    project: string,
-    digest: string,
-    opts?: {skip?: boolean}
-  ) => ({
-    params: {
-      project_id: projectIdFromParts({entity, project}),
-      digest,
-    },
-    skip: opts?.skip,
-  }),
-  res => res.content
-);
+const useFileContent = (
+  params: UseFileContentParams
+): LoadableWithError<ArrayBuffer> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [fileContentRes, setFileContentRes] =
+    useState<traceServerTypes.TraceFileContentReadRes | null>(null);
+  const [error, setError] = useState<any>(null);
+
+  useEffect(() => {
+    if (params.skip) {
+      return;
+    }
+    setFileContentRes(null);
+    loadingRef.current = true;
+    getTsClient()
+      .fileContent({
+        project_id: projectIdFromParts({
+          entity: params.entity,
+          project: params.project,
+        }),
+        digest: params.digest,
+      })
+      .then(res => {
+        loadingRef.current = false;
+        setFileContentRes(res);
+      })
+      .catch(err => {
+        loadingRef.current = false;
+        setError(err);
+      });
+  }, [getTsClient, params.entity, params.project, params.digest, params.skip]);
+
+  return useMemo(() => {
+    if (params.skip) {
+      return {loading: false, result: null, error: null};
+    }
+    if (fileContentRes == null || loadingRef.current) {
+      return {loading: true, result: null, error};
+    }
+    return {loading: false, result: fileContentRes.content, error};
+  }, [fileContentRes, params.skip, error]);
+};
 
 const useObjectVersion = (
-  // Null value skips
-  key: ObjectVersionKey | null,
-  metadataOnly?: boolean
+  params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
+  const cachedObjectVersion = params.key
+    ? objectVersionCache.get(params.key)
+    : null;
   const [objectVersionRes, setObjectVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const deepKey = useDeepMemo(key);
+  const deepKey = useDeepMemo(params.key);
   useEffect(() => {
     if (deepKey) {
       setObjectVersionRes(null);
@@ -1031,7 +1016,7 @@ const useObjectVersion = (
           }),
           object_id: deepKey?.objectId ?? '',
           digest: deepKey?.versionHash ?? '',
-          metadata_only: metadataOnly ?? false,
+          metadata_only: params.metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
@@ -1049,10 +1034,10 @@ const useObjectVersion = (
           setError(new Error(JSON.stringify(err)));
         });
     }
-  }, [deepKey, getTsClient, metadataOnly]);
+  }, [deepKey, getTsClient, params.metadataOnly]);
 
   return useMemo(() => {
-    if (key == null) {
+    if (params.key == null) {
       return {
         loading: false,
         result: null,
@@ -1086,10 +1071,10 @@ const useObjectVersion = (
       convertTraceServerObjectVersionToSchema(objectVersionRes.obj);
 
     if (
-      key.entity !== returnedResult.entity ||
-      key.project !== returnedResult.project ||
-      key.objectId !== returnedResult.objectId ||
-      key.versionHash !== returnedResult.versionHash
+      params.key.entity !== returnedResult.entity ||
+      params.key.project !== returnedResult.project ||
+      params.key.objectId !== returnedResult.objectId ||
+      params.key.versionHash !== returnedResult.versionHash
     ) {
       return {
         loading: true,
@@ -1099,12 +1084,12 @@ const useObjectVersion = (
     }
 
     const cacheableResult: ObjectVersionSchema = {
-      ...key,
+      ...params.key,
       ...returnedResult,
     };
 
     // Skip setting the cache if metadata only
-    if (metadataOnly) {
+    if (params.metadataOnly) {
       return {
         loading: false,
         result: cacheableResult,
@@ -1112,13 +1097,19 @@ const useObjectVersion = (
       };
     }
 
-    objectVersionCache.set(key, cacheableResult);
+    objectVersionCache.set(params.key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedObjectVersion, key, objectVersionRes, error, metadataOnly]);
+  }, [
+    cachedObjectVersion,
+    params.key,
+    objectVersionRes,
+    error,
+    params.metadataOnly,
+  ]);
 };
 
 export const convertTraceServerObjectVersionToSchema = <
@@ -1145,12 +1136,7 @@ export const convertTraceServerObjectVersionToSchema = <
 };
 
 const useRootObjectVersions = (
-  entity: string,
-  project: string,
-  filter: ObjectVersionFilter,
-  limit?: number,
-  metadataOnly?: boolean,
-  opts?: {skip?: boolean; noAutoRefresh?: boolean; includeStorageSize?: boolean}
+  params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -1161,26 +1147,29 @@ const useRootObjectVersions = (
     error: null,
     result: null,
   });
-  const deepFilter = useDeepMemo(filter);
+  const deepFilter = useDeepMemo(params.filter);
 
   const doFetch = useCallback(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
     setObjectVersionRes({loading: true, error: null, result: null});
     loadingRef.current = true;
 
     const req: traceServerTypes.TraceObjQueryReq = {
-      project_id: projectIdFromParts({entity, project}),
+      project_id: projectIdFromParts({
+        entity: params.entity,
+        project: params.project,
+      }),
       filter: {
-        base_object_classes: deepFilter.baseObjectClasses,
-        object_ids: deepFilter.objectIds,
-        latest_only: deepFilter.latestOnly,
+        base_object_classes: deepFilter?.baseObjectClasses,
+        object_ids: deepFilter?.objectIds,
+        latest_only: deepFilter?.latestOnly,
         is_op: false,
       },
-      limit,
-      metadata_only: metadataOnly,
-      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : null),
+      limit: params.limit,
+      metadata_only: params.metadataOnly,
+      ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
       loadingRef.current = false;
@@ -1197,14 +1186,14 @@ const useRootObjectVersions = (
     };
     getTsClient().objsQuery(req).then(onSuccess).catch(onError);
   }, [
+    params.skip,
+    params.entity,
+    params.project,
     deepFilter,
+    params.limit,
+    params.metadataOnly,
+    params.includeStorageSize,
     getTsClient,
-    opts?.skip,
-    entity,
-    project,
-    limit,
-    metadataOnly,
-    opts?.includeStorageSize,
   ]);
 
   useEffect(() => {
@@ -1212,24 +1201,24 @@ const useRootObjectVersions = (
   }, [doFetch]);
 
   useEffect(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
-    if (opts?.noAutoRefresh) {
+    if (params.noAutoRefresh) {
       return;
     }
     return getTsClient().registerOnObjectListener(doFetch);
-  }, [getTsClient, doFetch, opts?.skip, opts?.noAutoRefresh]);
+  }, [getTsClient, doFetch, params.skip, params.noAutoRefresh]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {loading: false, error: null, result: null};
     }
     if (objectVersionRes == null || loadingRef.current) {
       return {loading: true, error: null, result: null};
     }
     return objectVersionRes;
-  }, [objectVersionRes, opts?.skip]);
+  }, [objectVersionRes, params.skip]);
 };
 
 const useObjectDeleteFunc = () => {
@@ -1272,39 +1261,39 @@ const useObjectDeleteFunc = () => {
   }, []);
 
   const objectVersionsDelete = useCallback(
-    (entity: string, project: string, objectId: string, digests: string[]) => {
-      digests.forEach(digest => {
+    (params: ObjectDeleteParams) => {
+      params.digests?.forEach(digest => {
         updateObjectCaches({
           scheme: 'weave',
           weaveKind: 'object',
-          entity,
-          project,
-          objectId,
+          entity: params.entity,
+          project: params.project,
+          objectId: params.objectId,
           versionHash: digest,
           path: '',
         });
       });
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity,
-          project,
+          entity: params.entity,
+          project: params.project,
         }),
-        object_id: objectId,
-        digests,
+        object_id: params.objectId,
+        digests: params.digests,
       });
     },
     [getTsClient, updateObjectCaches]
   );
 
   const objectDeleteAllVersions = useCallback(
-    (key: ObjectVersionKey) => {
-      updateObjectCaches(key);
+    (params: ObjectDeleteAllVersionsParams) => {
+      updateObjectCaches(params.key);
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
+          entity: params.key.entity,
+          project: params.key.project,
         }),
-        object_id: key.objectId,
+        object_id: params.key.objectId,
         digests: [],
       });
     },
@@ -1312,36 +1301,36 @@ const useObjectDeleteFunc = () => {
   );
 
   const opVersionsDelete = useCallback(
-    (entity: string, project: string, opId: string, digests: string[]) => {
-      digests.forEach(digest => {
+    (params: OpVersionDeleteParams) => {
+      params.digests?.forEach(digest => {
         updateOpCaches({
-          entity,
-          project,
-          opId,
+          entity: params.entity,
+          project: params.project,
+          opId: params.opId,
           versionHash: digest,
         });
       });
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity,
-          project,
+          entity: params.entity,
+          project: params.project,
         }),
-        object_id: opId,
-        digests,
+        object_id: params.opId,
+        digests: params.digests,
       });
     },
     [getTsClient, updateOpCaches]
   );
 
   const opDeleteAllVersions = useCallback(
-    (key: OpVersionKey) => {
-      updateOpCaches(key);
+    (params: OpVersionDeleteAllVersionsParams) => {
+      updateOpCaches(params.key);
       return getTsClient().objDelete({
         project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
+          entity: params.key.entity,
+          project: params.key.project,
         }),
-        object_id: key.opId,
+        object_id: params.key.opId,
         digests: [],
       });
     },
@@ -1356,114 +1345,106 @@ const useObjectDeleteFunc = () => {
   };
 };
 
-const useRefsReadBatch = makeTraceServerEndpointHook<
-  'readBatch',
-  [string[], {skip?: boolean}?],
-  any[]
->(
-  'readBatch',
-  (refs: string[], opts?: {skip?: boolean}) => ({
-    params: {
-      refs,
-    },
-    skip: opts?.skip,
-  }),
-  res => res.vals
-);
+const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const [refsRes, setRefsRes] =
+    useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
+  const loadingRef = useRef(false);
+
+  const deepRefUris = useDeepMemo(params.refUris);
+
+  useEffect(() => {
+    if (params.skip || deepRefUris.length === 0) {
+      return;
+    }
+    setRefsRes(null);
+    loadingRef.current = true;
+    getTsClient()
+      .readBatch({
+        refs: deepRefUris,
+      })
+      .then((res: traceServerTypes.TraceRefsReadBatchRes) => {
+        loadingRef.current = false;
+        setRefsRes(res);
+      })
+      .catch((err: Error) => {
+        loadingRef.current = false;
+        console.error('Error fetching refs:', err);
+        setRefsRes(null);
+      });
+  }, [getTsClient, deepRefUris, params.skip]);
+
+  return useMemo(() => {
+    if (params.skip || params.refUris.length === 0) {
+      return {loading: false, result: null};
+    }
+    if (refsRes == null || loadingRef.current) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: refsRes.vals};
+  }, [refsRes, params.skip, params.refUris]);
+};
 
 const useTableQuery = makeTraceServerEndpointHook<
   'tableQuery',
-  [
-    string,
-    string,
-    traceServerTypes.TraceTableQueryReq['filter'],
-    traceServerTypes.TraceTableQueryReq['limit'],
-    traceServerTypes.TraceTableQueryReq['offset'],
-    traceServerTypes.TraceTableQueryReq['sort_by'],
-    {skip?: boolean}?
-  ],
-  any[]
+  UseTableQueryParams,
+  traceServerTypes.TraceTableQueryRes['rows']
 >(
   'tableQuery',
-  (
-    projectId: traceServerTypes.TraceTableQueryReq['project_id'],
-    digest: traceServerTypes.TraceTableQueryReq['digest'],
-    filter: traceServerTypes.TraceTableQueryReq['filter'],
-    limit: traceServerTypes.TraceTableQueryReq['limit'],
-    offset: traceServerTypes.TraceTableQueryReq['offset'],
-    sortBy: traceServerTypes.TraceTableQueryReq['sort_by'],
-    opts?: {skip?: boolean}
-  ) => ({
+  params => ({
     params: {
-      project_id: projectId,
-      digest,
-      filter,
-      limit,
-      offset,
-      sort_by: sortBy,
+      project_id: params.projectId,
+      digest: params.digest,
+      filter: params.filter,
+      limit: params.limit,
+      offset: params.offset,
+      sort_by: params.sortBy,
     },
-    skip: opts?.skip,
+    skip: params.skip,
   }),
   res => res.rows
 );
 
 const useChildCallsForCompare = (
-  entity: string,
-  project: string,
-  parentCallIds: string[] | undefined,
-  selectedOpVersionRef: string | null,
-  selectedObjectVersionRef: string | null
-): {
-  loading: boolean;
-  result: CallSchema[];
-} => {
+  params: UseChildCallsForCompareParams
+): Loadable<CallSchema[]> => {
   // This should be moved to the trace server soon. Doing in memory join for
   // feature completeness now.
   const skipParent =
-    parentCallIds == null ||
-    parentCallIds.length === 0 ||
-    selectedObjectVersionRef == null;
+    params.parentCallIds == null ||
+    params.parentCallIds.length === 0 ||
+    params.selectedObjectVersionRef == null;
 
-  const parentCalls = useCalls(
-    entity,
-    project,
-    {
-      callIds: parentCallIds,
-      inputObjectVersionRefs: selectedObjectVersionRef
-        ? [selectedObjectVersionRef]
+  const parentCalls = useCalls({
+    entity: params.entity,
+    project: params.project,
+    filter: {
+      callIds: params.parentCallIds,
+      inputObjectVersionRefs: params.selectedObjectVersionRef
+        ? [params.selectedObjectVersionRef]
         : [],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {skip: skipParent}
-  );
+    skip: skipParent,
+  });
 
   const subParentCallIds = useMemo(() => {
     return (parentCalls.result ?? []).map(call => call.callId);
   }, [parentCalls.result]);
 
   const skipChild =
-    subParentCallIds.length === 0 || selectedOpVersionRef == null;
+    subParentCallIds.length === 0 || params.selectedOpVersionRef == null;
 
-  const childCalls = useCalls(
-    entity,
-    project,
-    {
+  const childCalls = useCalls({
+    entity: params.entity,
+    project: params.project,
+    filter: {
       parentIds: subParentCallIds,
-      opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
+      opVersionRefs: params.selectedOpVersionRef
+        ? [params.selectedOpVersionRef]
+        : [],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {skip: skipChild}
-  );
+    skip: skipChild,
+  });
 
   const result = useMemo(() => {
     const loading = parentCalls.loading || childCalls.loading;
@@ -1486,11 +1467,8 @@ const useChildCallsForCompare = (
   return result;
 };
 
-const useRefsData = (
-  refUris: string[],
-  tableQuery?: TableQuery
-): Loadable<any[]> => {
-  const refUrisDeep = useDeepMemo(refUris);
+const useRefsData = (params: UseRefsDataParams): Loadable<any[]> => {
+  const refUrisDeep = useDeepMemo(params.refUris);
 
   const [nonTableRefUris, tableRefUris] = useMemo(() => {
     const sUris: string[] = [];
@@ -1525,7 +1503,8 @@ const useRefsData = (
     return [needed, cached];
   }, [nonTableRefUris]);
 
-  const simpleValsResult = useRefsReadBatch(neededSimpleUris, {
+  const simpleValsResult = useRefsReadBatch({
+    refUris: neededSimpleUris,
     skip: neededSimpleUris.length === 0,
   });
   let tableUriProjectId = '';
@@ -1546,24 +1525,33 @@ const useRefsData = (
     return (
       tableRefUris[0] +
       JSON.stringify(tableQueryFilter) +
-      tableQuery?.limit?.toString()
+      params.tableQuery?.limit?.toString()
     );
-  }, [tableQuery?.limit, tableQueryFilter, tableRefUris]);
+  }, [params.tableQuery?.limit, tableQueryFilter, tableRefUris]);
 
   const cachedTableResult = refDataCache.get(tableRefKey);
 
-  const tableValsResult = useTableQuery(
-    tableUriProjectId,
-    tableUriDigest,
-    tableQueryFilter,
-    tableQuery?.limit,
-    undefined,
-    undefined,
-    {skip: tableRefUris.length === 0 || cachedTableResult != null}
+  const tableQueryParams = useMemo(
+    () => ({
+      projectId: tableUriProjectId,
+      digest: tableUriDigest,
+      filter: tableQueryFilter,
+      limit: params.tableQuery?.limit,
+      skip: tableRefUris.length === 0 || cachedTableResult != null,
+    }),
+    [
+      tableUriProjectId,
+      tableUriDigest,
+      tableQueryFilter,
+      params.tableQuery?.limit,
+      tableRefUris,
+      cachedTableResult,
+    ]
   );
+  const tableValsResult = useTableQuery(tableQueryParams);
 
   return useMemo(() => {
-    if (refUris.length === 0) {
+    if (params.refUris.length === 0) {
       return {
         loading: false,
         result: [],
@@ -1594,7 +1582,7 @@ const useRefsData = (
     Object.entries(cachedSimpleUriResults).forEach(([uri, val]) => {
       valueMap.set(uri, val);
     });
-    const valsResult = refUris.map(uri => valueMap.get(uri));
+    const valsResult = params.refUris.map(uri => valueMap.get(uri));
 
     return {
       loading: false,
@@ -1602,7 +1590,7 @@ const useRefsData = (
       error: null,
     };
   }, [
-    refUris,
+    params.refUris,
     simpleValsResult.loading,
     simpleValsResult.result,
     tableValsResult.loading,
@@ -1616,24 +1604,20 @@ const useRefsData = (
 };
 
 const useTableRowsQuery = (
-  entity: string,
-  project: string,
-  digest: string,
-  filter?: traceServerTypes.TraceTableQueryReq['filter'],
-  limit?: traceServerTypes.TraceTableQueryReq['limit'],
-  offset?: traceServerTypes.TraceTableQueryReq['offset'],
-  sortBy?: traceServerTypes.TraceTableQueryReq['sort_by'],
-  opts?: {skip?: boolean}
+  params: UseTableRowsQueryParams
 ): Loadable<traceServerTypes.TraceTableQueryRes> => {
   const getTsClient = useGetTraceServerClientContext();
   const [queryRes, setQueryRes] =
     useState<traceServerTypes.TraceTableQueryRes | null>(null);
   const loadingRef = useRef(false);
 
-  const projectId = projectIdFromParts({entity, project});
+  const projectId = projectIdFromParts({
+    entity: params.entity,
+    project: params.project,
+  });
 
   const doFetch = useCallback(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
     setQueryRes(null);
@@ -1641,11 +1625,11 @@ const useTableRowsQuery = (
 
     const req: traceServerTypes.TraceTableQueryReq = {
       project_id: projectId,
-      digest,
-      filter,
-      limit,
-      offset,
-      sort_by: sortBy,
+      digest: params.digest,
+      filter: params.filter,
+      limit: params.limit,
+      offset: params.offset,
+      sort_by: params.sortBy,
     };
 
     getTsClient()
@@ -1662,12 +1646,12 @@ const useTableRowsQuery = (
   }, [
     getTsClient,
     projectId,
-    digest,
-    filter,
-    limit,
-    offset,
-    sortBy,
-    opts?.skip,
+    params.digest,
+    params.filter,
+    params.limit,
+    params.offset,
+    params.sortBy,
+    params.skip,
   ]);
 
   useEffect(() => {
@@ -1675,61 +1659,59 @@ const useTableRowsQuery = (
   }, [doFetch]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {loading: false, result: null};
     }
     if (queryRes == null || loadingRef.current) {
       return {loading: true, result: null};
     }
     return {loading: false, result: queryRes};
-  }, [queryRes, opts?.skip]);
+  }, [queryRes, params.skip]);
 };
 
 const useTableQueryStats = (
-  entity: string,
-  project: string,
-  digests: string[],
-  opts?: {skip?: boolean; includeStorageSize?: boolean}
+  params: UseTableQueryStatsParams
 ): Loadable<traceServerTypes.TraceTableQueryStatsBatchRes> => {
   const getTsClient = useGetTraceServerClientContext();
-  const [statsRes, setStatsRes] =
+  const [queryRes, setQueryRes] =
     useState<traceServerTypes.TraceTableQueryStatsBatchRes | null>(null);
   const loadingRef = useRef(false);
 
-  const projectId = projectIdFromParts({entity, project});
-
-  const digestsDeep = useDeepMemo(digests);
+  const projectId = projectIdFromParts({
+    entity: params.entity,
+    project: params.project,
+  });
 
   const doFetch = useCallback(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return;
     }
-    setStatsRes(null);
+    setQueryRes(null);
     loadingRef.current = true;
 
     const req: traceServerTypes.TraceTableQueryStatsBatchReq = {
       project_id: projectId,
-      digests: digestsDeep,
-      ...(!!opts?.includeStorageSize ? {include_storage_size: true} : {}),
+      digests: params.digests,
+      include_storage_size: params.includeStorageSize,
     };
 
     getTsClient()
       .tableQueryStatsBatch(req)
       .then(res => {
         loadingRef.current = false;
-        setStatsRes(res);
+        setQueryRes(res);
       })
       .catch(err => {
         loadingRef.current = false;
-        console.error('Error fetching table query stats:', err);
-        setStatsRes(null);
+        console.error('Error fetching table stats:', err);
+        setQueryRes(null);
       });
   }, [
     getTsClient,
     projectId,
-    digestsDeep,
-    opts?.skip,
-    opts?.includeStorageSize,
+    params.digests,
+    params.includeStorageSize,
+    params.skip,
   ]);
 
   useEffect(() => {
@@ -1737,38 +1719,52 @@ const useTableQueryStats = (
   }, [doFetch]);
 
   return useMemo(() => {
-    if (opts?.skip) {
+    if (params.skip) {
       return {loading: false, result: null};
     }
-    if (statsRes == null || loadingRef.current) {
+    if (queryRes == null || loadingRef.current) {
       return {loading: true, result: null};
     }
-    return {loading: false, result: statsRes};
-  }, [statsRes, opts?.skip]);
+    return {loading: false, result: queryRes};
+  }, [queryRes, params.skip]);
+};
+
+const useTableUpdate = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (params: UseTableUpdateParams) => {
+      return getTsClient().tableUpdate({
+        project_id: params.projectId,
+        base_digest: params.baseDigest,
+        updates: params.updates,
+      });
+    },
+    [getTsClient]
+  );
 };
 
 const useApplyMutationsToRef = (): ((
-  refUri: string,
-  edits: RefMutation[]
+  params: UseApplyMutationsToRefParams
 ) => Promise<string>) => {
   throw new Error('Not implemented');
 };
 
-const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
+const useGetRefsType = () => {
   const readBatch = useMakeTraceServerEndpoint(
     'readBatch',
-    (refs: string[]) => ({
-      refs,
+    (params: UseGetRefsTypeParams) => ({
+      refs: params.refUris,
     }),
     (res): any[] => res.vals
   );
-  return async (refUris: string[]) => {
-    if (refUris.length === 0) {
+  return async (params: UseGetRefsTypeParams): Promise<Types.Type[]> => {
+    if (params.refUris.length === 0) {
       return [];
     }
     const needed: string[] = [];
     const refToData: Record<string, any> = {};
-    refUris.forEach(uri => {
+    params.refUris.forEach(uri => {
       const res = refDataCache.get(uri);
       if (res == null) {
         needed.push(uri);
@@ -1777,18 +1773,18 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
       }
     });
     if (needed.length !== 0) {
-      const readBatchResults = await readBatch(refUris);
+      const readBatchResults = await readBatch(params);
       readBatchResults.forEach((res, i) => {
         refToData[needed[i]] = res;
         refDataCache.set(needed[i], res);
       });
     }
-    return refUris.map(uri => weaveTypeOf(refToData[uri]));
+    return params.refUris.map(uri => weaveTypeOf(refToData[uri]));
   };
 };
 
 const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
-  const query = useRefsData([opVersionRef]);
+  const query = useRefsData({refUris: [opVersionRef]});
   const fileSpec = useMemo(() => {
     if (query.result == null) {
       return null;
@@ -1807,12 +1803,12 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     }
     return null;
   }, [opVersionRef, query.result]);
-  const arrayBuffer = useFileContent(
-    fileSpec?.entity ?? '',
-    fileSpec?.project ?? '',
-    fileSpec?.digest ?? '',
-    {skip: fileSpec == null}
-  );
+  const arrayBuffer = useFileContent({
+    entity: fileSpec?.entity ?? '',
+    project: fileSpec?.project ?? '',
+    digest: fileSpec?.digest ?? '',
+    skip: fileSpec == null,
+  });
   const text = useMemo(() => {
     if (arrayBuffer.loading || query.loading) {
       return {
@@ -1912,8 +1908,8 @@ const weaveTypeOf = (o: any): Types.Type => {
   throw new Error('Type conversion not implemented for value: ' + o);
 };
 
-const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
-  const dataResult = useRefsData(refUris);
+const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
+  const dataResult = useRefsData({refUris: params.refUris});
   const finalRes = useMemo(() => {
     if (!dataResult.loading) {
       return {
@@ -2077,56 +2073,23 @@ export const traceCallToUICallSchema = (
   };
 };
 
-export const useObjCreate = (): ((
-  projectId: string,
-  objectId: string,
-  val: any,
-  baseObjectClass?: string
-) => Promise<string>) => {
+export const useObjCreate = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   return useCallback(
-    (
-      projectId: string,
-      objectId: string,
-      val: any,
-      baseObjectClass?: string
-    ) => {
+    (params: UseObjCreateParams) => {
       return getTsClient()
         .objCreate({
           obj: {
-            project_id: projectId,
-            object_id: objectId,
-            val,
-            builtin_object_class: baseObjectClass,
+            project_id: params.projectId,
+            object_id: params.objectId,
+            val: params.val,
+            builtin_object_class: params.baseObjectClass,
           },
         })
         .then(res => {
           return res.digest;
         });
-    },
-    [getTsClient]
-  );
-};
-
-export const useTableUpdate = (): ((
-  projectId: string,
-  digest: string,
-  updates: traceServerTypes.TableUpdateSpec[]
-) => Promise<traceServerTypes.TableUpdateRes>) => {
-  const getTsClient = useGetTraceServerClientContext();
-
-  return useCallback(
-    (
-      projectId: string,
-      baseDigest: string,
-      updates: traceServerTypes.TableUpdateSpec[]
-    ) => {
-      return getTsClient().tableUpdate({
-        project_id: projectId,
-        base_digest: baseDigest,
-        updates,
-      });
     },
     [getTsClient]
   );
@@ -2145,11 +2108,11 @@ export const useTableCreate = (): ((
   );
 };
 
-export const useFilesStats = (projectId: string) => {
+export const useProjectStats = (projectId: string) => {
   const getTsClient = useGetTraceServerClientContext();
 
   return useAsync(async () => {
-    return getTsClient().filesStats({project_id: projectId});
+    return getTsClient().projectStats({project_id: projectId});
   }, [getTsClient, projectId]);
 };
 

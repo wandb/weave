@@ -38,6 +38,7 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[Instructor](/guides/integrations/instructor)**
 - **[CrewAI](/guides/integrations/crewai)**
 - **[Smolagents](/guides/integrations/smolagents)**
+- **[PydanticAI](/guides/integrations/pydantic_ai)**
 
 ## Protocols
 
