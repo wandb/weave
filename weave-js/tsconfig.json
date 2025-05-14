@@ -18,7 +18,7 @@
       "es2017.object",
       "esnext"
     ],
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
     "noErrorTruncation": true,

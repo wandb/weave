@@ -42,10 +42,10 @@ export const WeaveStatsSummarySection = ({
   );
 
   const [
-    totalStorageSize,
-    objectsStorageSize,
-    tablesStorageSize,
-    filesStorageSize,
+    totalIngestionSize,
+    objectsIngestionSize,
+    tablesIngestionSize,
+    filesIngestionSize,
   ] = useMemo(() => {
     if (projectStatsLoading) {
       return Array(4).fill(<LoadingDots />);
@@ -63,17 +63,17 @@ export const WeaveStatsSummarySection = ({
       {projectStatsError ? (
         <p className="text-red-500">Error loading storage sizes</p>
       ) : (
-        <div className="grid w-min grid-cols-[150px_1fr] gap-4 [&>*:nth-child(odd)]:text-moon-400">
+        <div className="grid w-min grid-cols-[150px_1fr] [&>*:nth-child(odd)]:text-moon-400">
           <div>Total traces</div>
           <div>{traceCount}</div>
-          <div>Traces storage size</div>
-          <div>{totalStorageSize}</div>
-          <div>Objects storage size</div>
-          <div>{objectsStorageSize}</div>
-          <div>Tables storage size</div>
-          <div>{tablesStorageSize}</div>
-          <div>Files storage size</div>
-          <div>{filesStorageSize}</div>
+          <div>Traces ingestion size</div>
+          <div>{totalIngestionSize}</div>
+          <div>Objects ingestion size</div>
+          <div>{objectsIngestionSize}</div>
+          <div>Tables ingestion size</div>
+          <div>{tablesIngestionSize}</div>
+          <div>Files ingestion size</div>
+          <div>{filesIngestionSize}</div>
         </div>
       )}
     </Tailwind>

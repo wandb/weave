@@ -1,23 +1,29 @@
-import { op } from '../op';
-import type {Op} from '../opType';
+import {op} from 'weave';
+import type {Op} from 'weave/opType';
 // Import the actual module
-import * as clientApi from '../clientApi';
+import * as clientApi from 'weave/clientApi';
 
 // Function to create a fresh mock client for each call
 const createFreshMockClient = () => ({
-    pushNewCall: jest.fn(() => ({currentCall: {callId: 'mockCallId', traceId: 'mockTraceId'}, parentCall: null, newStack: []})),
-    createCall: jest.fn((_, __, ___, ____, _____, ______, _______, displayName: string) => {
+  pushNewCall: jest.fn(() => ({
+    currentCall: {callId: 'mockCallId', traceId: 'mockTraceId'},
+    parentCall: null,
+    newStack: [],
+  })),
+  createCall: jest.fn(
+    (_, __, ___, ____, _____, ______, _______, displayName: string) => {
       // We still need a way to capture this if tests rely on it.
       // Maybe pass a shared object or use a different mechanism?
       // For now, let's remove the direct capture here.
       // capturedDisplayName = displayName;
       return Promise.resolve();
-    }),
-    runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
-    finishCall: jest.fn(() => Promise.resolve()),
-    finishCallWithException: jest.fn(() => Promise.resolve()),
-    settings: {shouldPrintCallLink: false},
-    waitForBatchProcessing: jest.fn(() => Promise.resolve()),
+    }
+  ),
+  runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
+  finishCall: jest.fn(() => Promise.resolve()),
+  finishCallWithException: jest.fn(() => Promise.resolve()),
+  settings: {shouldPrintCallLink: false},
+  waitForBatchProcessing: jest.fn(() => Promise.resolve()),
 });
 
 describe('op wrappers', () => {
@@ -44,16 +50,16 @@ describe('op wrappers', () => {
         this.oaiClient = {
           chat: {
             completions: {
-              create: async ({ messages }: any) => messages[0].content
-            }
-          }
+              create: async ({messages}: any) => messages[0].content,
+            },
+          },
         };
       }
 
       async invoke(prompt: string) {
         return await this.oaiClient.chat.completions.create({
           model: 'gpt-4-turbo',
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{role: 'user', content: prompt}],
         });
       }
     }
@@ -74,7 +80,7 @@ describe('op wrappers', () => {
 
     // Verify op properties were set correctly
     expect((model.invoke as Op<any>).__isOp).toBe(true);
-    expect((model.invoke as Op<any>).__name).toBe("WeaveModel.invoke");
+    expect((model.invoke as Op<any>).__name).toBe('WeaveModel.invoke');
     expect(typeof (model.invoke as Op<any>).__wrappedFunction).toBe('function');
     expect((model.invoke as Op<any>).__boundThis).toBe(model);
   });
@@ -87,9 +93,9 @@ describe('op wrappers', () => {
         this.oaiClient = {
           chat: {
             completions: {
-              create: async ({ messages }: any) => messages[0].content
-            }
-          }
+              create: async ({messages}: any) => messages[0].content,
+            },
+          },
         };
 
         this.invoke = op(this, this.invoke);
@@ -98,7 +104,7 @@ describe('op wrappers', () => {
       async invoke(prompt: string): Promise<string> {
         return await this.oaiClient.chat.completions.create({
           model: 'gpt-4-turbo',
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{role: 'user', content: prompt}],
         });
       }
     }
@@ -152,7 +158,9 @@ describe('op wrappers', () => {
 
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-    async function testFunc(a: number) { return a * 2; }
+    async function testFunc(a: number) {
+      return a * 2;
+    }
     const wrapped = op(testFunc);
     const result = await wrapped(5); // This call will use the mockImplementationOnce
 
@@ -160,14 +168,18 @@ describe('op wrappers', () => {
     // Verify the spy was called once
     expect(getGlobalClientSpy).toHaveBeenCalledTimes(1);
     // Verify console warning
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('WARNING: Weave is not initialized'));
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARNING: Weave is not initialized')
+    );
 
     consoleWarnSpy.mockRestore();
   });
 
   it('handles errors correctly in wrapped functions', async () => {
     const error = new Error('Test error');
-    async function errorFunc() { throw error; }
+    async function errorFunc() {
+      throw error;
+    }
 
     // Ensure we get a fresh mock client via the spy for this call
     const mockClientInstance = createFreshMockClient();
@@ -183,7 +195,7 @@ describe('op wrappers', () => {
     // Assertions on the specific mock instance returned for this test
     expect(mockClientInstance.finishCallWithException).toHaveBeenCalledWith(
       error,
-      expect.objectContaining({ callId: 'mockCallId' }), // currentCall
+      expect.objectContaining({callId: 'mockCallId'}), // currentCall
       null, // parentCall
       expect.any(Date), // endTime
       expect.any(Promise) // startCallPromise

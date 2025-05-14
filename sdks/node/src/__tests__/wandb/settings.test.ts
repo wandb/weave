@@ -15,7 +15,7 @@ describe('Settings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Create a fresh env object without WANDB_API_KEY
-    process.env = { ...originalEnv };
+    process.env = {...originalEnv};
     delete process.env.WANDB_API_KEY;
     delete process.env.WANDB_BASE_URL;
 
@@ -38,9 +38,7 @@ describe('Settings', () => {
 
     test('returns API key from netrc when environment variable is not set', () => {
       const mockNetrc = {
-        entries: new Map([
-          ['api.wandb.ai', {password: 'netrc-api-key'}]
-        ]),
+        entries: new Map([['api.wandb.ai', {password: 'netrc-api-key'}]]),
       };
       (Netrc as jest.Mock).mockImplementation(() => mockNetrc);
 
@@ -53,7 +51,9 @@ describe('Settings', () => {
       };
       (Netrc as jest.Mock).mockImplementation(() => mockNetrc);
 
-      expect(() => getApiKey('api.wandb.ai')).toThrow('wandb API key not found');
+      expect(() => getApiKey('api.wandb.ai')).toThrow(
+        'wandb API key not found'
+      );
     });
 
     test('handles netrc read errors gracefully', () => {
@@ -61,7 +61,9 @@ describe('Settings', () => {
         throw new Error('Cannot read netrc file');
       });
 
-      expect(() => getApiKey('api.wandb.ai')).toThrow('wandb API key not found');
+      expect(() => getApiKey('api.wandb.ai')).toThrow(
+        'wandb API key not found'
+      );
     });
   });
 

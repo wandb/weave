@@ -2,14 +2,14 @@
 
 Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
-## Features
-
 - **Quick access:** Open the Playground from the W&B sidebar for a fresh session or from the Call page to test an existing project.
 - **Message controls:** Edit, retry, or delete messages directly within the chat.
 - **Flexible messaging:** Add new messages as either user or system inputs, and send them to the LLM.
 - **Customizable settings:** Configure your preferred LLM provider and adjust model settings.
 - **Multi-LLM support:** Switch between models, with team-level API key management.
 - **Compare models:** Compare how different models respond to prompts.
+- **Custom providers:** Test OpenAI compatible API endpoints for custom models.
+- **Saved models:** Create and configure a reusable model preset for your workflow
 
 Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
 
@@ -17,16 +17,11 @@ Get started with the Playground to optimize your LLM interactions and streamline
   - [Add provider credentials and information](#add-provider-credentials-and-information)
   - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
-- [Adjust LLM parameters](#adjust-llm-parameters)
-- [Add a function](#add-a-function)
-- [Retry, edit, and delete messages](#retry-edit-and-delete-messages)
-- [Add a new message](#add-a-new-message)
+- [Customize settings](#customize-settings)
+- [Message controls](#add-retry-edit-and-delete-messages)
 - [Compare LLMs](#compare-llms)
-- [Adjust the number of trials](#adjust-the-number-of-trials)
-- [Add a custom provider](#add-a-custom-provider)
-- [Edit a custom provider](#edit-a-custom-provider)
-- [Remove a custom provider](#remove-a-custom-provider)
-- [Use ngrok with Ollama](#use-ngrok-with-ollama)
+- [Custom providers](#custom-providers)
+- [Saved models](#saved-models) 
 
 ## Prerequisites
 
@@ -228,7 +223,9 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 
 <!-- LLM_LIST_END, DON'T EDIT THIS SECTION -->
 
-## Adjust LLM parameters
+## Customize settings
+
+### Adjust LLM parameters
 
 You can experiment with different parameter values for your selected model. To adjust parameters, do the following:
 
@@ -238,7 +235,7 @@ You can experiment with different parameter values for your selected model. To a
 
 ![Screenshot of Playground settings](imgs/playground_settings.png)
 
-## Add a function
+### Add a function
 
 You can test how different models use functions based on input it receives from the user. To add a function for testing in Playground, do the following:
 
@@ -248,7 +245,16 @@ You can test how different models use functions based on input it receives from 
 4. To save your changes and close the function pop-up, click the **x** in the upper right corner.
 5. Click **Chat settings** to close the settings dropdown and save your changes.
 
-## Retry, edit, and delete messages
+### Adjust the number of trials
+
+Playground allows you to generate multiple outputs for the same input by setting the number of trials. The default setting is `1`. To adjust the number of trials, do the following:
+
+1. In the Playground UI, open the settings sidebar if it is not already open.
+2. Adjust the **Number of trials**.
+
+## Message controls
+
+### Retry, edit, and delete messages
 
 With Playground, you can retry, edit, and delete messages. To use this feature, hover over the message you want to edit, retry, or delete. Three buttons display: **Delete**, **Edit**, and **Retry**.
 
@@ -259,7 +265,7 @@ With Playground, you can retry, edit, and delete messages. To use this feature, 
 ![Screenshot of Playground message buttons](imgs/playground_message_buttons.png)
 ![Screenshot of Playground editing](imgs/playground_message_editor.png)
 
-## Add a new message
+### Add a new message
 
 To add a new message to the chat, do the following:
 
@@ -280,14 +286,9 @@ Playground allows you to compare LLMs. To perform a comparison, do the following
    - [Add functions](#add-a-function)
 3. In the message box, enter a message that you want to test with both models and press **Send**.
 
-## Adjust the number of trials
+## Custom providers
 
-Playground allows you to generate multiple outputs for the same input by setting the number of trials. The default setting is `1`. To adjust the number of trials, do the following:
-
-1. In the Playground UI, open the settings sidebar if it is not already open.
-2. Adjust the **Number of trials**.
-
-## Add a custom provider
+### Add a custom provider
 
 In addition to the [supported providers](#select-an-llm), you can use the Playground to test OpenAI compatible API endpoints for custom models. Examples include:
 
@@ -316,7 +317,7 @@ Because of CORS restrictions, you can't call localhost or 127.0.0.1 URLs directl
 
 Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
 
-## Edit a custom provider
+### Edit a custom provider
 
 To edit information for a [previously created custom provider](#add-a-custom-provider), do the following:
 
@@ -327,7 +328,7 @@ To edit information for a [previously created custom provider](#add-a-custom-pro
 5. In the pop-up modal, edit the provider information.
 6. Click **Save**.
 
-## Remove a custom provider
+### Remove a custom provider
 
 To remove a [previously created custom provider](#add-a-custom-provider), do the following:
 
@@ -338,7 +339,7 @@ To remove a [previously created custom provider](#add-a-custom-provider), do the
 5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
 6. Click **Delete**.
 
-## Use ngrok with Ollama
+### Use ngrok with Ollama
 
 To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions.
 
@@ -410,3 +411,38 @@ flowchart LR
     linkStyle default stroke:#454B52,stroke-width:2px
     linkStyle 8 stroke:#454B52,stroke-width:2px,stroke-dasharray:5
 ```
+
+## Saved models
+
+### Save a model
+
+You can create and configure a reusable model preset for your workflow. Saving a model lets you quickly load it with your preferred settings, parameters, and function hooks.
+
+1. From the LLM dropdown, select a provider.
+2. From the provider list, select a model.
+3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
+4. In the chat settings window:
+   - In the **Model Name** field, enter a name for your saved model. 
+   - Adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
+5. Click **Publish Model**. The model is saved and accesible from **Saved Models** in the LLM dropdown. You can now [use](#use-a-saved-model) and [update](#update-a-saved-model) the saved model.
+
+![Saving a model in the Playground](imgs/saved-model.png)
+
+### Use a saved model 
+
+Quickly switch to a previously [saved model](#save-a-model) to maintain consistency across experiments or sessions. This allows you to pick up right where you left off.
+
+1. From the LLM dropdown, select **Saved Models**.
+2. From the list of saved models, click the saved model you want to load. The model loads and is ready for use in the Playground.
+
+![The LLM dropdown, with Saved Models selected](imgs/saved-models-dropdown.png)
+
+### Update a saved model
+
+Edit an existing [saved model](#save-a-model) to fine-tune parameters or refresh its configuration. This ensures your saved models evolve alongside your use cases.
+
+1. From the LLM dropdown, select **Saved Models**.
+2. From the list of saved models, click the saved model you want to update. 
+3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
+4. In the chat settings window, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
+5. Click **Update model**. The model is updated and accesible from **Saved Models** in the LLM dropdown.
