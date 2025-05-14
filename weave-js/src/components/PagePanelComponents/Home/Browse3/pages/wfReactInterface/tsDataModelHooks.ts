@@ -1950,11 +1950,7 @@ export const traceCallStatusCode = (
   if (traceCall.exception) {
     return traceServerTypes.ComputedCallStatuses.error;
   } else if (traceCall.ended_at) {
-    const errors =
-      traceCall.summary?.status_counts?.error ??
-      // THIS IS NOT CORRECTLY TYPED BECAUSE IT IS FLATTENED IN TABLE VIEW!
-      // traceCall['summary.status_counts.error'] ??
-      0;
+    const errors = traceCall.summary?.status_counts?.error ?? 0;
     if (errors > 0 || hasDescendantErrors) {
       return traceServerTypes.ComputedCallStatuses.descendant_error;
     }
