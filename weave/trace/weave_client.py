@@ -765,6 +765,10 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+RESERVED_SUMMARY_USAGE_KEY = "usage"
+RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
+
+
 class WeaveKeyDict(dict):
     """A dict representing the 'weave' subdictionary of a call's attributes.
 
@@ -1259,15 +1263,17 @@ class WeaveClient:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
-            and "usage" in original_output
+            and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
-            summary["usage"][original_output["model"]] = {
+            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
-                **original_output["usage"],
+                **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
-        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
+            original_output, "model"
+        ):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
             model = original_output.model
@@ -1275,12 +1281,13 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
+                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
 
         # Create client-side rollup of status_counts_by_op
         status_counts_dict = summary.setdefault(
-            "status_counts", {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0}
+            RESERVED_SUMMARY_STATUS_COUNTS_KEY,
+            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
         )
         if exception:
             status_counts_dict[TraceStatus.ERROR] += 1
