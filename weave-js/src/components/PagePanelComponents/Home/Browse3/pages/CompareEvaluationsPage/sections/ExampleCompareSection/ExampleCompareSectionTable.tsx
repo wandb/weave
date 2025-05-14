@@ -189,7 +189,7 @@ const DenseCellValue: React.FC<
   return (
     <CellValue
       value={props.value}
-      style={{
+      stringStyle={{
         height: '100%',
         width: '100%',
         overflow: 'auto',
