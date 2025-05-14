@@ -232,7 +232,7 @@ const DenseCellValue: React.FC<
 export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
-  const [modelsAsRows, setModelsAsRows] = useState(true);
+  const [modelsAsRows, setModelsAsRows] = useState(false);
   const [rowHeight, setRowHeight] = useState(70);
   const increaseRowHeight = useCallback(() => {
     setRowHeight(v => clip(v * 2, 35, 35 * 2 ** 4));
