@@ -26,6 +26,10 @@ import {EvaluationComparisonState} from '../../ecpState';
 import {flattenedDimensionPath} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {
+  ColumnsManagementPanel,
+  CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY,
+} from './ColumnsManagementPanel';
 import {evalAggScorerMetricCompGeneric} from './ExampleCompareSectionDetail';
 import {
   FilteredAggregateRows,
@@ -45,7 +49,7 @@ const styledDataGridStyleOverrides: SxProps = {
   },
   '& .MuiDataGrid-cell--pinnedLeft': {
     backgroundColor: 'white',
-    zIndex: 7,
+    zIndex: '7 !important',
   },
   width: '100%',
 };
@@ -561,7 +565,9 @@ const inputFields = (
     resizable: false,
     disableColumnMenu: true,
     disableReorder: true,
+    filterable: false,
     sortable: false,
+    hideable: false,
     renderCell: params => {
       return (
         <Box
@@ -587,8 +593,8 @@ const inputFields = (
   ...inputSubFields.map(key => ({
     field: `inputs.${key}`,
     headerName: key,
-    disableColumnMenu: true,
     sortable: false,
+    filterable: false,
     width: columnWidths[key],
     maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
     valueGetter: (value: any, row: RowData) => {
@@ -619,6 +625,8 @@ const expansionField = (
   disableColumnMenu: true,
   disableReorder: true,
   sortable: false,
+  filterable: false,
+  hideable: false,
   headerAlign: 'center',
   renderHeader: (params: GridColumnHeaderParams<RowData>) => {
     return (
@@ -698,9 +706,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       ),
       {
         field: 'evaluationCallId',
-        headerName: 'Model',
+        headerName: 'Eval/Model',
         disableColumnMenu: true,
         sortable: false,
+        filterable: false,
+        hideable: false,
         renderCell: params => {
           if (params.row._pivot === 'modelsAsColumns') {
             // This does not make sense for models as columns
@@ -734,6 +744,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         disableColumnMenu: true,
         disableReorder: true,
         sortable: false,
+        filterable: false,
+        hideable: false,
+
         ...DISABLED_ROW_SPANNING,
         renderCell: params => {
           if (params.row._type === 'summary') {
@@ -785,11 +798,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       },
       ...outputColumnKeys.map(key => ({
         field: `output.${key}`,
-        headerName: removePrefix(key, 'output.'),
+        headerName: key,
+        renderHeader: () => removePrefix(key, 'output.'),
         width: outputWidths[key],
         maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
         ...DISABLED_ROW_SPANNING,
-        disableColumnMenu: true,
         disableReorder: true,
         valueGetter: (value: any, row: RowData) => {
           if (row._pivot === 'modelsAsColumns') {
@@ -823,7 +836,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         ),
         ...SCORE_COLUMN_SETTINGS,
         ...DISABLED_ROW_SPANNING,
-        disableColumnMenu: true,
+        disableColumnMenu: false,
         disableReorder: true,
         valueGetter: (value: any, row: RowData) => {
           if (row._pivot === 'modelsAsColumns') {
@@ -911,6 +924,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
+      slots={{columnsPanel: ColumnsManagementPanel}}
     />
   );
 };
@@ -980,10 +994,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `output.${key}.${evaluationCallId}`,
+            headerName: `${key}.${evaluationCallId}`,
             width: outputWidths[key],
             maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
             ...DISABLED_ROW_SPANNING,
-            disableColumnMenu: true,
+            disableColumnMenu: false,
             disableReorder: true,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
@@ -1018,9 +1033,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
             field: `scores.${key}.${evaluationCallId}`,
+            headerName: `scores.${flattenedDimensionPath(
+              props.state.summary.scoreMetrics[key]
+            )}.${evaluationCallId}`,
             ...SCORE_COLUMN_SETTINGS,
             ...DISABLED_ROW_SPANNING,
-            disableColumnMenu: true,
+            disableColumnMenu: false,
             disableReorder: true,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
@@ -1077,6 +1095,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           return {
             groupId: `output.${key}`,
             headerName: removePrefix(key, 'output.'),
+            [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
             children: props.state.evaluationCallIdsOrdered.map(
               evaluationCallId => {
                 return {
@@ -1093,6 +1112,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         children: scoreSubFields.map(key => {
           return {
             groupId: `scores.${key}`,
+            [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
             headerName: flattenedDimensionPath(
               props.state.summary.scoreMetrics[key]
             ),
@@ -1140,6 +1160,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
+      slots={{columnsPanel: ColumnsManagementPanel}}
     />
   );
 };
