@@ -15,6 +15,7 @@ import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 
+import {NotApplicable} from '../../../../NotApplicable';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
@@ -206,6 +207,9 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
 const DenseCellValue: React.FC<
   React.ComponentProps<typeof CellValue>
 > = props => {
+  if (props.value == null) {
+    return <NotApplicable />;
+  }
   return (
     <Box
       sx={{
@@ -568,7 +572,6 @@ const useExpandedIds = () => {
  */
 
 const inputFields = (
-  state: EvaluationComparisonState,
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
@@ -716,7 +719,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
-        props.state,
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
@@ -878,17 +880,18 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     ];
     return res;
   }, [
-    inputSubFields,
-    hasTrials,
-    outputColumnKeys,
-    scoreSubFields,
+    inputSubFields.inputSubFields,
     setSelectedInputDigest,
-    props,
+    props.onShowSplitView,
+    props.state,
+    inputWidths,
+    hasTrials,
     toggleDefaultExpansionState,
     defaultExpandState,
     isExpanded,
     toggleExpansion,
-    inputWidths,
+    outputColumnKeys,
+    scoreSubFields,
     outputWidths,
   ]);
 
@@ -992,7 +995,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
-        props.state,
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
@@ -1083,17 +1085,18 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
 
     return res;
   }, [
-    inputSubFields,
-    hasTrials,
-    outputColumnKeys,
-    scoreSubFields,
+    inputSubFields.inputSubFields,
     setSelectedInputDigest,
-    props,
+    props.onShowSplitView,
+    props.state,
+    inputWidths,
+    hasTrials,
     toggleDefaultExpansionState,
     defaultExpandState,
     isExpanded,
     toggleExpansion,
-    inputWidths,
+    outputColumnKeys,
+    scoreSubFields,
     outputWidths,
   ]);
 
