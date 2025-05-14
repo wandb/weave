@@ -416,17 +416,84 @@ class CallsQueryRes(BaseModel):
     calls: list[CallSchema]
 
 
+class CallBinType(str, Enum):
+    MINUTE = "minute"
+    SECOND = "second"
+    HOUR = "hour"
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
+
+
+class CallBinningSpec(BaseModel):
+    field: str
+    bin_size: int
+    bin_type: CallBinType
+
+
+class CallAggregationFunction(str, Enum):
+    COUNT = "count"
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+
+
+class CallAggregateSpec(BaseModel):
+    field: str
+    function: CallAggregationFunction
+    binning: Optional[CallBinningSpec] = None
+
+
 class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    aggregates: Optional[list[CallAggregateSpec]] = None
+    binning: Optional[CallBinningSpec] = None
+    group_by: Optional[list[str]] = None
 
 
 class CallsQueryStatsRes(BaseModel):
     count: int
     total_storage_size_bytes: Optional[int] = None
+    # New fields for aggregated results
+    aggregates: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Aggregated values when aggregates are requested. Keys are aggregate field names, values are the aggregated results.",
+    )
+    groups: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="Grouped results when group_by is specified. Each item contains group keys and aggregated values.",
+    )
+    bins: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="Binned results when binning is specified. Each item contains bin information and aggregated values.",
+    )
+
+
+class SeriesPoint(BaseModel):
+    """A single data point in a time series."""
+
+    timestamp: datetime.datetime = Field(alias="bin_start")
+    value: float
+
+
+class CallsQueryStatsSeriesRes(BaseModel):
+    """Response that organizes stats data as time series grouped by metric and group values."""
+
+    count: int
+    total_storage_size_bytes: Optional[int] = None
+    series: dict[str, dict[str, list[SeriesPoint]]] = Field(
+        default_factory=dict,
+        description=(
+            "Time series data organized by metric name and group value. "
+            "Structure: {metric_name: {group_value: [SeriesPoint, ...]}}"
+        ),
+    )
 
 
 class CallUpdateReq(BaseModel):

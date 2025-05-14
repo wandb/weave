@@ -1,0 +1,297 @@
+import React, {useCallback, useMemo, useRef, useState} from 'react';
+
+import {useChartsDispatch} from './ChartsContext';
+import {ChartMargins, createChartMargins} from './chartUtils';
+
+export type SelectionState = {
+  isSelecting: boolean;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+};
+
+export type UseFlexibleChartZoomOptions = {
+  chartId?: string;
+  xDomain: [number, number];
+  yDomain: [number, number];
+  isFullscreen?: boolean;
+  onMouseMove?: (event: React.MouseEvent, selection: SelectionState) => void;
+  xAxisZoomOnly?: boolean;
+};
+
+/**
+ * Creates a coordinate clamping function for FlexibleXYPlot
+ * @param containerElement The chart container element
+ * @param margins The chart margins
+ * @returns A function that clamps coordinates to the plot area
+ */
+const createFlexibleCoordinateClamp = (
+  containerElement: HTMLElement,
+  margins: ChartMargins
+) => {
+  return (x: number, y: number) => {
+    const rect = containerElement.getBoundingClientRect();
+    const plotLeft = margins.left;
+    const plotRight = rect.width - margins.right;
+    const plotTop = margins.top;
+    const plotBottom = rect.height - margins.bottom;
+
+    const clampedX = Math.max(plotLeft, Math.min(x, plotRight));
+    const clampedY = Math.max(plotTop, Math.min(y, plotBottom));
+
+    return {x: clampedX, y: clampedY};
+  };
+};
+
+/**
+ * Creates a screen-to-data coordinate converter for FlexibleXYPlot
+ * @param containerElement The chart container element
+ * @param margins The chart margins
+ * @param xDomain The current X-axis domain
+ * @param yDomain The current Y-axis domain
+ * @returns A function that converts screen coordinates to data coordinates
+ */
+const createFlexibleScreenToDataConverter = (
+  containerElement: HTMLElement,
+  margins: ChartMargins,
+  xDomain: [number, number],
+  yDomain: [number, number]
+) => {
+  return (screenX: number, screenY: number) => {
+    const rect = containerElement.getBoundingClientRect();
+    const plotWidth = rect.width - margins.left - margins.right;
+    const plotHeight = rect.height - margins.top - margins.bottom;
+
+    const xRatio = (screenX - margins.left) / plotWidth;
+    const yRatio = (plotHeight - (screenY - margins.top)) / plotHeight;
+
+    const dataX = xDomain[0] + xRatio * (xDomain[1] - xDomain[0]);
+    const dataY = yDomain[0] + yRatio * (yDomain[1] - yDomain[0]);
+
+    return {dataX, dataY};
+  };
+};
+
+export const useFlexibleChartZoom = ({
+  chartId,
+  xDomain,
+  yDomain,
+  isFullscreen,
+  onMouseMove,
+  xAxisZoomOnly,
+}: UseFlexibleChartZoomOptions) => {
+  const dispatch = useChartsDispatch();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [selection, setSelection] = useState<SelectionState>({
+    isSelecting: false,
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0,
+  });
+
+  // Chart margins for coordinate calculations
+  const chartMargins = useMemo(
+    () => createChartMargins(isFullscreen),
+    [isFullscreen]
+  );
+
+  // Create coordinate utilities when we have a container
+  const getCoordinateUtilities = useCallback(() => {
+    if (!containerRef.current) return null;
+
+    const clampToPlotArea = createFlexibleCoordinateClamp(
+      containerRef.current,
+      chartMargins
+    );
+
+    const screenToData = createFlexibleScreenToDataConverter(
+      containerRef.current,
+      chartMargins,
+      xDomain,
+      yDomain
+    );
+
+    return {clampToPlotArea, screenToData};
+  }, [chartMargins, xDomain, yDomain]);
+
+  const handleMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      if (!chartId || !dispatch || !containerRef.current) return;
+
+      const utilities = getCoordinateUtilities();
+      if (!utilities) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const rawX = event.clientX - rect.left;
+      const rawY = event.clientY - rect.top;
+      const {x, y} = utilities.clampToPlotArea(rawX, rawY);
+
+      setSelection({
+        isSelecting: true,
+        startX: x,
+        startY: y,
+        endX: x,
+        endY: y,
+      });
+
+      event.preventDefault();
+    },
+    [chartId, dispatch, getCoordinateUtilities]
+  );
+
+  const handleMouseMoveInternal = useCallback(
+    (event: React.MouseEvent) => {
+      // Always call custom mouse move handler if provided (for crosshair functionality)
+      if (onMouseMove) {
+        onMouseMove(event, selection);
+      }
+
+      // Handle zoom selection logic only when actively selecting
+      if (!selection.isSelecting || !containerRef.current) return;
+
+      const utilities = getCoordinateUtilities();
+      if (!utilities) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const rawX = event.clientX - rect.left;
+      const rawY = event.clientY - rect.top;
+      const {x, y} = utilities.clampToPlotArea(rawX, rawY);
+
+      const newSelection = {
+        ...selection,
+        endX: x,
+        endY: y,
+      };
+
+      setSelection(newSelection);
+    },
+    [selection, getCoordinateUtilities, onMouseMove]
+  );
+
+  const handleMouseUp = useCallback(
+    (event: React.MouseEvent) => {
+      if (
+        !selection.isSelecting ||
+        !chartId ||
+        !dispatch ||
+        !containerRef.current
+      )
+        return;
+
+      const utilities = getCoordinateUtilities();
+      if (!utilities) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const rawEndX = event.clientX - rect.left;
+      const rawEndY = event.clientY - rect.top;
+      const {x: endX, y: endY} = utilities.clampToPlotArea(rawEndX, rawEndY);
+
+      const minSelectionSize = 10;
+      if (
+        Math.abs(endX - selection.startX) > minSelectionSize &&
+        Math.abs(endY - selection.startY) > minSelectionSize
+      ) {
+        const startData = utilities.screenToData(
+          selection.startX,
+          selection.startY
+        );
+        const endData = utilities.screenToData(endX, endY);
+
+        const newXDomain: [number, number] = [
+          Math.min(startData.dataX, endData.dataX),
+          Math.max(startData.dataX, endData.dataX),
+        ];
+
+        if (xAxisZoomOnly) {
+          dispatch({
+            type: 'SET_CHART_DOMAIN',
+            id: chartId,
+            xDomain: newXDomain,
+          });
+        } else {
+          const newYDomain: [number, number] = [
+            Math.min(startData.dataY, endData.dataY),
+            Math.max(startData.dataY, endData.dataY),
+          ];
+
+          dispatch({
+            type: 'SET_CHART_DOMAIN',
+            id: chartId,
+            xDomain: newXDomain,
+            yDomain: newYDomain,
+          });
+        }
+      }
+
+      setSelection({
+        isSelecting: false,
+        startX: 0,
+        startY: 0,
+        endX: 0,
+        endY: 0,
+      });
+    },
+    [selection, chartId, dispatch, getCoordinateUtilities, xAxisZoomOnly]
+  );
+
+  const handleDoubleClick = useCallback(() => {
+    if (chartId && dispatch) {
+      dispatch({
+        type: 'RESET_CHART_DOMAIN',
+        id: chartId,
+      });
+    }
+  }, [chartId, dispatch]);
+
+  // Selection rectangle style
+  const selectionStyle = useMemo(() => {
+    if (!selection.isSelecting) return null;
+
+    const left = Math.min(selection.startX, selection.endX);
+    const width = Math.abs(selection.endX - selection.startX);
+
+    let top: number;
+    let height: number;
+
+    if (xAxisZoomOnly) {
+      // For x-axis only zoom, span the entire vertical chart area
+      top = chartMargins.top;
+      height =
+        (containerRef.current?.getBoundingClientRect().height || 400) -
+        chartMargins.top -
+        chartMargins.bottom;
+    } else {
+      // For normal zoom, use the actual selection area
+      top = Math.min(selection.startY, selection.endY);
+      height = Math.abs(selection.endY - selection.startY);
+    }
+
+    return {
+      position: 'absolute' as const,
+      left,
+      top,
+      width,
+      height,
+      border: '1px dashed #007acc',
+      backgroundColor: 'rgba(0, 122, 204, 0.1)',
+      pointerEvents: 'none' as const,
+      zIndex: 10,
+    };
+  }, [selection, xAxisZoomOnly, chartMargins]);
+
+  return {
+    containerRef,
+    selection,
+    selectionStyle,
+    handleMouseDown,
+    handleMouseMove: handleMouseMoveInternal,
+    handleMouseUp,
+    handleDoubleClick,
+  };
+};
+
+// Export with backward compatibility
+export const useChartZoom = useFlexibleChartZoom;

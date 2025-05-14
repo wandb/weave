@@ -28,7 +28,6 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import KeysView
 from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
@@ -166,13 +165,23 @@ class CallsMergedSummaryField(CallsMergedField):
             )
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+        # Create safe column name by replacing dots with underscores
+        safe_field_name = self.field.replace(".", "_")
+        return f"{self.as_sql(pb, table_alias)} AS {safe_field_name}"
 
     def is_heavy(self) -> bool:
         # These are computed from non-heavy fields (status uses exception and ended_at)
         # If we add more summary fields that depend on heavy fields,
         # this would need to be made more sophisticated
-        return False
+        # Cost and token fields depend on summary_dump which is a heavy field
+        heavy_fields = {
+            "cost",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "requests",
+        }
+        return self.summary_field in heavy_fields
 
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
@@ -490,6 +499,20 @@ class CallsQuery(BaseModel):
         self.include_costs = include_costs
         return self
 
+    def _needs_stats_table_join(self) -> bool:
+        """Check if any selected fields require joining with the stats table."""
+        stats_fields = {
+            "storage_size_bytes",
+            "total_prompt_tokens",
+            "total_completion_tokens",
+            "total_tokens",
+            "total_requests",
+            "total_prompt_tokens_cost",
+            "total_completion_tokens_cost",
+            "total_cost",
+        }
+        return any(field.field in stats_fields for field in self.select_fields)
+
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """
         This is the main entry point for building the query. This method will
@@ -790,11 +813,18 @@ class CallsQuery(BaseModel):
             """
 
         storage_size_sql = ""
-        if self.include_storage_size:
+        if self.include_storage_size or self._needs_stats_table_join():
             storage_size_sql = f"""
             LEFT JOIN (SELECT
                 id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes,
+                sum(total_prompt_tokens) as total_prompt_tokens,
+                sum(total_completion_tokens) as total_completion_tokens,
+                sum(total_tokens) as total_tokens,
+                sum(total_requests) as total_requests,
+                sum(total_prompt_tokens_cost) as total_prompt_tokens_cost,
+                sum(total_completion_tokens_cost) as total_completion_tokens_cost,
+                sum(total_cost) as total_cost
             FROM calls_merged_stats
             WHERE project_id = {param_slot(project_param, "String")}
             GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
@@ -868,6 +898,43 @@ ALLOWED_CALL_FIELDS = {
     "total_storage_size_bytes": AggregatedDataSizeField(
         field="total_storage_size_bytes",
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
+    ),
+    # New token aggregation fields from the materialized view
+    "total_prompt_tokens": AggFieldWithTableOverrides(
+        field="total_prompt_tokens",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_completion_tokens": AggFieldWithTableOverrides(
+        field="total_completion_tokens",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_tokens": AggFieldWithTableOverrides(
+        field="total_tokens",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_requests": AggFieldWithTableOverrides(
+        field="total_requests",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    # Cost aggregation fields from the materialized view
+    "total_prompt_tokens_cost": AggFieldWithTableOverrides(
+        field="total_prompt_tokens_cost",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_completion_tokens_cost": AggFieldWithTableOverrides(
+        field="total_completion_tokens_cost",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
+    ),
+    "total_cost": AggFieldWithTableOverrides(
+        field="total_cost",
+        agg_fn="sum",
+        table_name=STORAGE_SIZE_TABLE_NAME,
     ),
 }
 
@@ -1309,16 +1376,108 @@ def optimized_project_contains_call_query(
     )
 
 
+def get_time_bin_sql(field_sql: str, bin_type: tsi.CallBinType, bin_size: int) -> str:
+    """Generate SQL for time binning based on bin type and size."""
+    if bin_type == tsi.CallBinType.MINUTE:
+        if bin_size == 1:
+            return f"toStartOfMinute({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} MINUTE)"
+    elif bin_type == tsi.CallBinType.SECOND:
+        if bin_size == 1:
+            return f"toStartOfSecond({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} SECOND)"
+    elif bin_type == tsi.CallBinType.HOUR:
+        if bin_size == 1:
+            return f"toStartOfHour({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} HOUR)"
+    elif bin_type == tsi.CallBinType.DAY:
+        if bin_size == 1:
+            return f"toStartOfDay({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} DAY)"
+    elif bin_type == tsi.CallBinType.WEEK:
+        if bin_size == 1:
+            return f"toStartOfWeek({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} WEEK)"
+    elif bin_type == tsi.CallBinType.MONTH:
+        if bin_size == 1:
+            return f"toStartOfMonth({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} MONTH)"
+    elif bin_type == tsi.CallBinType.YEAR:
+        if bin_size == 1:
+            return f"toStartOfYear({field_sql})"
+        else:
+            return f"toStartOfInterval({field_sql}, INTERVAL {bin_size} YEAR)"
+    else:
+        raise ValueError(f"Unsupported bin type: {bin_type}")
+
+
+def get_aggregate_function_sql(
+    field_sql: str, function: tsi.CallAggregationFunction, field_name: str = ""
+) -> str:
+    """Generate SQL for aggregation functions."""
+    # For datetime fields, convert to Unix timestamp for numerical operations
+    datetime_fields = {"started_at", "ended_at", "created_at"}
+    is_datetime_field = field_name in datetime_fields
+
+    if function == tsi.CallAggregationFunction.COUNT:
+        return f"count({field_sql})"
+    elif function == tsi.CallAggregationFunction.SUM:
+        if is_datetime_field:
+            return f"sum(toUnixTimestamp({field_sql}))"
+        return f"sum({field_sql})"
+    elif function == tsi.CallAggregationFunction.AVG:
+        if is_datetime_field:
+            return f"avg(toUnixTimestamp({field_sql}))"
+        return f"avg({field_sql})"
+    elif function == tsi.CallAggregationFunction.MIN:
+        return f"min({field_sql})"
+    elif function == tsi.CallAggregationFunction.MAX:
+        return f"max({field_sql})"
+    else:
+        raise ValueError(f"Unsupported aggregation function: {function}")
+
+
 def build_calls_query_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-) -> tuple[str, KeysView[str]]:
+) -> tuple[str, list[str]]:
     cq = CallsQuery(
         project_id=req.project_id,
         include_total_storage_size=req.include_total_storage_size,
     )
 
+    # Always include id for basic count
     cq.add_field("id")
+
+    # Add fields needed for aggregates and grouping
+    fields_needed = set()
+
+    # Add fields for aggregates
+    if req.aggregates:
+        for aggregate in req.aggregates:
+            fields_needed.add(aggregate.field)
+            # If aggregate has binning, add the binning field too
+            if aggregate.binning:
+                fields_needed.add(aggregate.binning.field)
+
+    # Add fields for global binning
+    if req.binning:
+        fields_needed.add(req.binning.field)
+
+    # Add fields for grouping
+    if req.group_by:
+        fields_needed.update(req.group_by)
+
+    # Add all needed fields to the query
+    for field in fields_needed:
+        cq.add_field(field)
+
     if req.filter is not None:
         cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
     if req.query is not None:
@@ -1326,14 +1485,111 @@ def build_calls_query_stats_query(
     if req.limit is not None:
         cq.set_limit(req.limit)
 
-    aggregated_columns = {"count": "count()"}
+    # Handle total storage size
     if req.include_total_storage_size:
-        aggregated_columns["total_storage_size_bytes"] = (
-            "sum(coalesce(total_storage_size_bytes, 0))"
-        )
         cq.add_field("total_storage_size_bytes")
 
+    # Build the base query
     inner_query = cq.as_sql(param_builder)
-    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
-    return (calls_query_sql, aggregated_columns.keys())
+    # If no aggregates, binning, or grouping, use simple count query
+    if not req.aggregates and not req.binning and not req.group_by:
+        aggregated_columns = {"count": "count()"}
+        if req.include_total_storage_size:
+            aggregated_columns["total_storage_size_bytes"] = (
+                "sum(coalesce(total_storage_size_bytes, 0))"
+            )
+        calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+        return (calls_query_sql, list(aggregated_columns.keys()))
+
+    # Build complex aggregation query
+    select_parts = []
+    group_by_parts = []
+
+    # Helper function to create safe column names
+    def safe_column_name(field_name: str) -> str:
+        """Convert field names with dots to safe column identifiers"""
+        return field_name.replace(".", "_")
+
+    # Handle grouping
+    if req.group_by:
+        for group_field in req.group_by:
+            # Use safe column alias
+            safe_name = safe_column_name(group_field)
+            select_parts.append(f"{safe_name} as {safe_name}")
+            group_by_parts.append(safe_name)
+
+    # Handle global binning (applies to all results)
+    if req.binning:
+        # Use safe column alias
+        safe_field_name = safe_column_name(req.binning.field)
+        bin_sql = get_time_bin_sql(
+            safe_field_name, req.binning.bin_type, req.binning.bin_size
+        )
+        select_parts.append(f"{bin_sql} as bin_start")
+        group_by_parts.append(bin_sql)
+
+    # Always include count
+    select_parts.append("count() as count")
+
+    # Handle aggregates
+    if req.aggregates:
+        for aggregate in req.aggregates:
+            # Use safe column alias from the subquery
+            safe_field_name = safe_column_name(aggregate.field)
+
+            # If this aggregate has its own binning
+            if aggregate.binning:
+                bin_sql = get_time_bin_sql(
+                    safe_field_name,
+                    aggregate.binning.bin_type,
+                    aggregate.binning.bin_size,
+                )
+                agg_sql = get_aggregate_function_sql(
+                    bin_sql, aggregate.function, aggregate.field
+                )
+            else:
+                agg_sql = get_aggregate_function_sql(
+                    safe_field_name, aggregate.function, aggregate.field
+                )
+
+            # Create a safe name for this aggregate
+            agg_name = f"{safe_column_name(aggregate.field)}_{aggregate.function.value}"
+            if aggregate.binning:
+                agg_name += f"_bin_{aggregate.binning.bin_size}_{aggregate.binning.bin_type.value}"
+
+            select_parts.append(f"{agg_sql} as {agg_name}")
+
+    # Handle total storage size if requested
+    if req.include_total_storage_size:
+        select_parts.append(
+            "sum(coalesce(total_storage_size_bytes, 0)) as total_storage_size_bytes"
+        )
+
+    # Build the final query
+    select_clause = ", ".join(select_parts)
+
+    if group_by_parts:
+        group_by_clause = f" GROUP BY {', '.join(group_by_parts)}"
+    else:
+        group_by_clause = ""
+
+    calls_query_sql = f"SELECT {select_clause} FROM ({inner_query}){group_by_clause}"
+
+    # Return column names for result processing
+    result_columns = []
+    if req.group_by:
+        result_columns.extend(safe_column_name(field) for field in req.group_by)
+    if req.binning:
+        result_columns.append("bin_start")
+    result_columns.append("count")
+    if req.aggregates:
+        for aggregate in req.aggregates:
+            agg_name = f"{safe_column_name(aggregate.field)}_{aggregate.function.value}"
+            if aggregate.binning:
+                agg_name += f"_bin_{aggregate.binning.bin_size}_{aggregate.binning.bin_type.value}"
+            result_columns.append(agg_name)
+    if req.include_total_storage_size:
+        result_columns.append("total_storage_size_bytes")
+
+    return (calls_query_sql, result_columns)

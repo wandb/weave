@@ -45,6 +45,7 @@ import {RemovableTag} from '../../../../../Tag';
 import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {CallsCharts} from '../../charts/CallsCharts';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -74,7 +75,6 @@ import {
   CallSchema,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkAddToDatasetButton,

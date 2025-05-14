@@ -103,6 +103,8 @@ from weave.trace_server.trace_server_interface import (
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
+    CallsQueryStatsRes,
+    CallsQueryStatsSeriesRes,
     CallStartReq,
     CallUpdateReq,
     CostCreateInput,
@@ -125,6 +127,7 @@ from weave.trace_server.trace_server_interface import (
     ObjSchemaForInsert,
     Query,
     RefsReadBatchReq,
+    SeriesPoint,
     SortBy,
     StartedCallSchemaForInsert,
     TableAppendSpec,
@@ -1117,6 +1120,92 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def calls_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
+        return self.server.calls_query_stats(req)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def calls_stats_series(self, req: CallsQueryStatsReq) -> CallsQueryStatsSeriesRes:
+        """Query stats and return results organized as time series by metric and group."""
+        # Get the raw stats response
+        raw_response = self.server.calls_query_stats(req)
+
+        # Transform to series format
+        series_data: dict[str, dict[str, list[SeriesPoint]]] = {}
+
+        # Handle grouped results (when both group_by and binning are specified)
+        if raw_response.groups and req.aggregates and req.group_by and req.binning:
+            # With grouping, each group contains: group fields + aggregated values directly
+            # The binning creates one entry per group/bin combination
+            for group in raw_response.groups:
+                # Build group identifier from group field values
+                group_values = []
+                for field in req.group_by:
+                    safe_field = field.replace(".", "_")
+                    group_values.append(str(group.get(safe_field, "unknown")))
+                group_id = ":".join(group_values) if group_values else "all"
+
+                # Get the bin_start from this group entry
+                bin_start = group.get("bin_start")
+                if not bin_start:
+                    continue
+
+                # Process each aggregate metric
+                for aggregate in req.aggregates:
+                    # Construct metric name
+                    metric_name = f"{aggregate.field}_{aggregate.function.value}"
+
+                    # Get the value directly from the group
+                    value = group.get(metric_name, 0)
+
+                    # Initialize nested structure if needed
+                    if metric_name not in series_data:
+                        series_data[metric_name] = {}
+                    if group_id not in series_data[metric_name]:
+                        series_data[metric_name][group_id] = []
+
+                    # Add the data point
+                    series_data[metric_name][group_id].append(
+                        SeriesPoint(bin_start=bin_start, value=value)
+                    )
+
+        # Handle binned results without grouping
+        elif raw_response.bins and req.aggregates:
+            for bin_data in raw_response.bins:
+                bin_start = bin_data.get("bin_start")
+                if not bin_start:
+                    continue
+
+                # Process each aggregate metric
+                for aggregate in req.aggregates:
+                    # Construct metric name
+                    metric_name = f"{aggregate.field}_{aggregate.function.value}"
+
+                    # Get the value
+                    value = bin_data.get(metric_name, 0)
+
+                    # Initialize nested structure if needed
+                    if metric_name not in series_data:
+                        series_data[metric_name] = {}
+                    if "all" not in series_data[metric_name]:
+                        series_data[metric_name]["all"] = []
+
+                    # Add the data point
+                    series_data[metric_name]["all"].append(
+                        SeriesPoint(bin_start=bin_start, value=value)
+                    )
+
+        # Sort each series by timestamp
+        for metric in series_data.values():
+            for series in metric.values():
+                series.sort(key=lambda p: p.timestamp)
+
+        return CallsQueryStatsSeriesRes(
+            count=raw_response.count,
+            total_storage_size_bytes=raw_response.total_storage_size_bytes,
+            series=series_data,
+        )
 
     @deprecated(new_name="get_call")
     def call(
