@@ -1,7 +1,7 @@
 import asyncio
-import inspect
 import logging
 import os
+from collections.abc import Coroutine
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
 
@@ -18,14 +18,16 @@ from tenacity import (
 # This import is used to register built-in scorers so they can be deserialized from the DB
 import weave.scorers  # noqa: F401
 from weave.flow.monitor import Monitor
-from weave.flow.scorer import Scorer, get_scorer_attributes
-from weave.trace.box import box
+from weave.flow.scorer import Scorer
+from weave.trace.call import Call, apply_scorer_async
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import _default_on_input_handler
+from weave.trace.op import (
+    Op,
+    _call_sync_func,
+)
 from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    Call,
     FeedbackCreateReq,
     ObjectRef,
     from_json,
@@ -99,6 +101,7 @@ def get_active_monitors(project_id: str) -> list[ActiveMonitor]:
 
 def fetch_active_monitors(project_id: str) -> list[ActiveMonitor]:
     """Returns active monitors for a given project."""
+    logger.info("Fetching active monitors for project %s", project_id)
     obj_query = tsi.ObjQueryReq(
         project_id=project_id,
         filter=tsi.ObjectVersionFilter(
@@ -264,56 +267,74 @@ async def process_monitor(
         )
 
 
-def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, Any]:
+class WeaveWorkerClient:
+    def __init__(self, project_id: str):
+        self._project_id = project_id
+        self._server = get_trace_server()
+
+    def create_call(self, op: Op, inputs: dict, _: Any, **__: dict) -> Call:
+        inputs_json = to_json(inputs, self._project_id, None, use_dictify=False)
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                op_name=op.name,
+                project_id=self._project_id,
+                inputs=inputs_json,
+                started_at=datetime.now(),
+                attributes={},
+            )
+        )
+
+        call_start_res = self._server.call_start(call_start_req)
+
+        return Call(
+            _op_name=op.name,
+            project_id=self._project_id,
+            parent_id=None,
+            trace_id=call_start_res.trace_id,
+            id=call_start_res.id,
+            inputs=inputs,
+        )
+
+    def finish_call(
+        self, call: Call, output: Any, _: BaseException | None = None, *__, **___
+    ) -> None:
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=self._project_id,
+                id=call.id,
+                ended_at=datetime.now(),
+                output=output,
+                summary={},
+            )
+        )
+
+        self._server.call_end(call_end_req)
+
+
+async def _do_score_call(
+    scorer: Scorer, call: Call, project_id: str
+) -> tuple[str, Any]:
     example = {k: v for k, v in call.inputs.items() if k != "self"}
     output = call.output
 
     if isinstance(output, ObjectRef):
         output = output.get()
 
-    scorer_attributes = get_scorer_attributes(scorer)
-    score_op = scorer_attributes.score_op
-    score_signature = inspect.signature(score_op)
-    score_arg_names = list(score_signature.parameters.keys())
-    score_output_name = "output" if "output" in score_arg_names else "model_output"
-    score_arg_names = [param for param in score_arg_names if (param != "self")]
-    score_args = {k: v for k, v in example.items() if k in score_arg_names}
-    score_args[score_output_name] = output
+    client = WeaveWorkerClient(project_id)
 
-    inputs_with_defaults = _default_on_input_handler(score_op, (), score_args).inputs
-    score_args = {**inputs_with_defaults, "self": scorer}
-
-    server = get_trace_server()
-
-    call_start_req = tsi.CallStartReq(
-        start=tsi.StartedCallSchemaForInsert(
-            op_name=score_op.name,
-            project_id=project_id,
-            inputs=inputs_with_defaults,
-            started_at=datetime.now(),
-            attributes={},
+    def _async_call_op(
+        op: Op, *args: Any, **kwargs: Any
+    ) -> Coroutine[Any, Any, tuple[Any, Call]]:
+        return asyncio.to_thread(
+            lambda: _call_sync_func(op, *args, client=client, **kwargs)
         )
+
+    apply_scorer_result = await apply_scorer_async(
+        scorer, example, output, _async_call_op
     )
-
-    call_start_res = server.call_start(call_start_req)
-
-    result = score_op.resolve_fn(**score_args)
-
-    result = box(result)
-
-    call_end_req = tsi.CallEndReq(
-        end=tsi.EndedCallSchemaForInsert(
-            project_id=project_id,
-            id=call_start_res.id,
-            ended_at=datetime.now(),
-            output=result,
-            summary={},
-        )
-    )
-
-    server.call_end(call_end_req)
-
-    return call_start_res.id, result
+    logger.info("Apply scorer result: %s", apply_scorer_result)
+    return apply_scorer_result.score_call.id, apply_scorer_result.result
 
 
 def _get_score_call(score_call_id: str, project_id: str) -> Call:
@@ -337,7 +358,7 @@ async def apply_scorer(
     wb_user_id: str,
 ) -> None:
     """Actually apply the scorer to the call."""
-    score_call_id, result = _do_score_call(scorer, call, project_id)
+    score_call_id, result = await _do_score_call(scorer, call, project_id)
 
     score_call = _get_score_call(score_call_id, project_id)
 
@@ -364,6 +385,7 @@ async def apply_scorer(
 
 
 async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert) -> None:
+    logger.info("Processing ended call %s", ended_call.id)
     project_id = ended_call.project_id
 
     active_monitors = get_active_monitors(project_id)
@@ -381,9 +403,9 @@ def _task_done_callback(
     task: asyncio.Task,
     msg: Message,
     consumer: KafkaConsumer,
-    call_processors: set[asyncio.Task],
+    tasks: set[asyncio.Task],
 ) -> None:
-    call_processors.discard(task)
+    tasks.discard(task)
 
     try:
         task.result()
@@ -401,7 +423,7 @@ def create_task(
     ended_call = tsi.EndedCallSchemaForInsert.model_validate_json(
         msg.value().decode("utf-8")
     )
-    logger.info("Processing ended call %s", ended_call.id)
+    logger.debug("Creating task for ended call %s", ended_call.id)
 
     task = asyncio.create_task(process_ended_call(ended_call))
     task.add_done_callback(lambda t: _task_done_callback(t, msg, consumer, tasks))
