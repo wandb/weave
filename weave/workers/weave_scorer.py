@@ -3,7 +3,7 @@ import logging
 import os
 from collections.abc import Coroutine
 from datetime import datetime, timedelta
-from typing import Any, Optional, TypedDict
+from typing import Any, Callable, Optional, TypedDict
 
 import sentry_sdk
 from confluent_kafka import KafkaError, Message
@@ -272,8 +272,18 @@ class WeaveWorkerClient:
         self._project_id = project_id
         self._server = get_trace_server()
 
-    def create_call(self, op: Op, inputs: dict, _: Any, **__: dict) -> Call:
-        inputs_json = to_json(inputs, self._project_id, None, use_dictify=False)
+    def create_call(
+        self,
+        op: str | Op,
+        inputs: dict,
+        parent: Call | None = None,
+        attributes: dict | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
+        *,
+        use_stack: bool = True,
+    ) -> Call:
+        assert isinstance(op, Op)  # necessary for type narrowing
+        inputs_json = to_json(inputs, self._project_id, None, use_dictify=False)  # type: ignore
 
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -297,7 +307,12 @@ class WeaveWorkerClient:
         )
 
     def finish_call(
-        self, call: Call, output: Any, _: BaseException | None = None, *__, **___
+        self,
+        call: Call,
+        output: Any,
+        exception: BaseException | None = None,
+        *__: Any,
+        **___: Any,
     ) -> None:
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
@@ -334,6 +349,9 @@ async def _do_score_call(
         scorer, example, output, _async_call_op
     )
     logger.info("Apply scorer result: %s", apply_scorer_result)
+
+    assert apply_scorer_result.score_call.id is not None, "Score call was not created"
+
     return apply_scorer_result.score_call.id, apply_scorer_result.result
 
 

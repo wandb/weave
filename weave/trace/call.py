@@ -151,7 +151,7 @@ class Call:
             )
 
         client = weave_client_context.require_weave_client()
-        return _make_calls_iterator(
+        return make_calls_iterator(
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
@@ -226,7 +226,7 @@ class Call:
         result, score_call = prediction.apply_scorer(my_scorer)
         ```
         """
-        from weave.flow.scorer import Scorer, apply_scorer_async
+        from weave.flow.scorer import Scorer
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
@@ -289,7 +289,7 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
 
 
-def _make_calls_iterator(
+def make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
     filter: CallsFilter,
@@ -457,9 +457,7 @@ async def apply_scorer_async(
     scorer: Union[Op, Scorer],
     example: dict,
     model_output: Any,
-    async_call_op: Callable[
-        [Op, Any, dict[str, Any]], Coroutine[Any, Any, tuple[Any, Call]]
-    ],
+    async_call_op: Callable[[Op, Any, Any], Coroutine[Any, Any, tuple[Any, Call]]],
 ) -> ApplyScorerResult:
     """Apply a scoring function to model output and example data asynchronously.
 
@@ -601,7 +599,7 @@ async def apply_scorer_async(
                 **score_args,
                 "self": scorer_self,
             }
-        result, score_call = await async_call_op(score_op, **score_args)
+        result, score_call = await async_call_op(score_op, **score_args)  # type: ignore
     except OpCallError as e:
         # Provide detailed error message if scoring fails
         dataset_column_names = list(example.keys())

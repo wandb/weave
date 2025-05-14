@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Generator, Iterator, Sequence
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Callable, Generic, Protocol, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, Protocol, TypeVar, overload
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 T = TypeVar("T")
 

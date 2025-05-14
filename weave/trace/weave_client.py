@@ -27,6 +27,8 @@ from weave.trace.call import (
     Call,
     CallsIter,
     elide_display_name,
+    make_calls_iterator,
+    make_client_call,
 )
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
@@ -471,7 +473,7 @@ class WeaveClient:
 
         query = _add_scored_by_to_calls_query(scored_by, query)
 
-        return _make_calls_iterator(
+        return make_calls_iterator(
             self.server,
             self._project_id(),
             filter=filter,

@@ -281,10 +281,24 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
 
 class ClientInterface(Protocol):
-    def create_call(self, op: Op, inputs: dict, _: Any, **__) -> Call: ...
+    def create_call(
+        self,
+        op: str | Op,
+        inputs: dict,
+        parent: Call | None = None,
+        attributes: dict | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
+        *,
+        use_stack: bool = True,
+    ) -> Call: ...
 
     def finish_call(
-        self, call: Call, output: Any, exception: BaseException | None = None, *_, **__
+        self,
+        call: Call,
+        output: Any,
+        exception: BaseException | None = None,
+        *_: Any,
+        **__: Any,
     ) -> None: ...
 
 
@@ -319,7 +333,7 @@ def _create_call(
     return client.create_call(
         func,
         inputs_with_defaults,
-        parent_call,
+        parent=parent_call,
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
@@ -391,7 +405,10 @@ def _call_sync_func(
             call.output = res
             return res, call
 
-    client = client or weave_client_context.require_weave_client()
+    if client is None:
+        client = weave_client_context.require_weave_client()
+
+    client = cast(ClientInterface, client)
 
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
@@ -695,7 +712,11 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op, wrapper),
+                        *args,
+                        __should_raise=True,
+                        client=None,
+                        **kwargs,
                     )
                     return cast(R, res)
 
