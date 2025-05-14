@@ -79,7 +79,7 @@ export const isTraceCallChatFormatAnthropic = (call: TraceCallSchema): boolean =
 };
 
 export const normalizeAnthropicChatCompletion = (
-  request: ChatRequest,
+  _: ChatRequest,
   completion: any
 ): ChatCompletion => {
   return {
