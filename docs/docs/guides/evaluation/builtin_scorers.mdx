@@ -196,7 +196,26 @@ import TabItem from '@theme/TabItem';
 
     - `threshold` (float): The minimum cosine similarity score (between -1 and 1) needed to consider the two texts similar (defaults to `0.5`).
 
-    Here is an example usage in the context of an evaluation:
+    **Column Mapping:**
+
+    You can the `column_map` attribute to tell the scorer which dataset columns to use. The available keys for `column_map` are:
+    - `output` (required): Model prediction
+    - `target` (required): Reference answer to compare with
+    - `kwargs` (optional): Additional input context such as a question or prompt
+    
+    An example of using `column_map`:
+
+    ```python
+    similarity_scorer.column_map = {
+        "output": "model_output",  # The model's generated text
+        "target": "answer",        # The expected or reference response
+        "kwargs": "question"        # Optional: additional context (e.g. the original prompt)
+    }
+    ```
+
+    **Example Usage:**
+    
+    Here is an example usage of `EmbeddingSimilarityScorer` in the context of an evaluation:
 
     ```python
     import asyncio
