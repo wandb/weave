@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Box, SxProps} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -34,6 +34,21 @@ import {
   useExampleCompareData,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
+
+const styledDataGridStyleOverrides: SxProps = {
+  '& .MuiDataGrid-row:hover': {
+    backgroundColor: 'white',
+  },
+  '& .MuiDataGrid-row.Mui-selected:hover': {
+    // match the non-hover background color
+    backgroundColor: 'rgba(169, 237, 242, 0.32)',
+  },
+  '& .MuiDataGrid-cell--pinnedLeft': {
+    backgroundColor: 'white',
+    zIndex: 7,
+  },
+  width: '100%',
+};
 
 /**
  * Types for the comparison table data structure
@@ -882,10 +897,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   }
   return (
     <StyledDataGrid
-      // autosizeOnMount
-      // autosizeOptions={{
-      //   expand: true,
-      // }}
       onColumnWidthChange={onColumnWidthChange}
       pinnedColumns={{
         left: ['inputDigest'],
@@ -899,20 +910,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
-      sx={{
-        '& .MuiDataGrid-row:hover': {
-          backgroundColor: 'white',
-        },
-        '& .MuiDataGrid-row.Mui-selected:hover': {
-          // match the non-hover background color
-          backgroundColor: 'rgba(169, 237, 242, 0.32)',
-        },
-        '& .MuiDataGrid-cell--pinnedLeft': {
-          backgroundColor: 'white',
-          zIndex: '7 !important',
-        },
-        width: '100%',
-      }}
+      sx={styledDataGridStyleOverrides}
     />
   );
 };
@@ -1141,20 +1139,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
-      sx={{
-        '& .MuiDataGrid-row:hover': {
-          backgroundColor: 'white',
-        },
-        '& .MuiDataGrid-row.Mui-selected:hover': {
-          // match the non-hover background color
-          backgroundColor: 'rgba(169, 237, 242, 0.32)',
-        },
-        '& .MuiDataGrid-cell--pinnedLeft': {
-          backgroundColor: 'white',
-          zIndex: 7,
-        },
-        width: '100%',
-      }}
+      sx={styledDataGridStyleOverrides}
     />
   );
 };
