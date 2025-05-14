@@ -7,7 +7,15 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -280,11 +288,7 @@ const ResultExplorer: React.FC<{
           Output Comparison
         </Box>
       </HorizontalBox>
-      <div
-        style={{
-          height,
-          overflow: 'hidden',
-        }}>
+      <AdaptiveHeightParent maxHeight={height}>
         <Box
           style={{
             display: 'flex',
@@ -322,8 +326,66 @@ const ResultExplorer: React.FC<{
             />
           </Box>
         </Box>
-      </div>
+      </AdaptiveHeightParent>
     </VerticalBox>
+  );
+};
+
+/**
+ * This component should behave as follows:
+ * 1. It accepts a maxHeight prop which is the maximum height of the component.
+ * 2. It accepts children to display inside the component.
+ * 3. The children component's parent element should be no taller than the maxHeight, BUT
+ *    IMPORTANTLY: should be contrainted to the visible bounding region.
+ *
+ * In other words: the parent's height is:
+ *    * > 0
+ *    * <= maxHeight
+ *    * <= the visible height of the parent's parent element (bounded by the window or the next visible parent with a height constraint and overflow: hidden)
+ */
+const AdaptiveHeightParent: React.FC<{
+  maxHeight: number;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
+}> = ({maxHeight, children, style, className}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(maxHeight);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (!containerRef.current) return;
+
+      // Get the container's bounding rect
+      const containerRect = containerRef.current.getBoundingClientRect();
+
+      // Find the visible height (distance from top of element to bottom of viewport)
+      const visibleHeight = Math.min(
+        window.innerHeight - containerRect.top,
+        containerRef.current.parentElement?.getBoundingClientRect().height ||
+          Infinity
+      );
+
+      // Set the height to the minimum of maxHeight and visibleHeight
+      const newHeight = Math.max(0, Math.min(maxHeight, visibleHeight));
+      setHeight(newHeight);
+    };
+
+    const interval = setInterval(updateHeight, 100);
+
+    return () => clearInterval(interval);
+  }, [maxHeight]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        height: maxHeight,
+        overflow: 'hidden',
+      }}
+      className={className}>
+      <div style={{height, ...style}}>{children}</div>
+    </div>
   );
 };
 
