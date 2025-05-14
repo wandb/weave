@@ -42,7 +42,9 @@ class LiteralOperation(BaseModel):
     This can be any standard JSON-serializable value.
 
     Example:
+        ```
         {"$literal": "predict"}
+        ```
     """
 
     literal_: typing.Union[
@@ -83,7 +85,9 @@ class GetFieldOperator(BaseModel):
     - Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.
 
     Example:
+        ```
         {"$getField": "op_name"}
+        ```
     """
 
     get_field_: str = Field(alias="$getField")
@@ -95,12 +99,14 @@ class ConvertOperation(BaseModel):
     Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
 
     Example:
+        ```
         {
             "$convert": {
                 "input": {"$getField": "inputs.value"},
                 "to": "int"
             }
         }
+        ```
     """
 
     convert_: "ConvertSpec" = Field(alias="$convert")
@@ -128,12 +134,14 @@ class AndOperation(BaseModel):
     Logical AND. All conditions must evaluate to true.
 
     Example:
+        ```
         {
             "$and": [
                 {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]},
                 {"$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 1000}]}
             ]
         }
+        ```
     """
 
     and_: list["Operand"] = Field(alias="$and")
@@ -145,12 +153,14 @@ class OrOperation(BaseModel):
     Logical OR. At least one condition must be true.
 
     Example:
+        ```
         {
             "$or": [
                 {"$eq": [{"$getField": "op_name"}, {"$literal": "a"}]},
                 {"$eq": [{"$getField": "op_name"}, {"$literal": "b"}]}
             ]
         }
+        ```
     """
 
     or_: list["Operand"] = Field(alias="$or")
@@ -162,11 +172,13 @@ class NotOperation(BaseModel):
     Logical NOT. Inverts the condition.
 
     Example:
+        ```
         {
             "$not": [
                 {"$eq": [{"$getField": "op_name"}, {"$literal": "debug"}]}
             ]
         }
+        ```
     """
 
     not_: tuple["Operand"] = Field(alias="$not")
@@ -178,9 +190,11 @@ class EqOperation(BaseModel):
     Equality check between two operands.
 
     Example:
+        ```
         {
             "$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]
         }
+        ```
     """
 
     eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
@@ -192,9 +206,11 @@ class GtOperation(BaseModel):
     Greater than comparison.
 
     Example:
+        ```
         {
             "$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
         }
+        ```
     """
 
     gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
@@ -206,9 +222,11 @@ class GteOperation(BaseModel):
     Greater than or equal comparison.
 
     Example:
+        ```
         {
             "$gte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
         }
+        ```
     """
 
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
@@ -222,12 +240,14 @@ class InOperation(BaseModel):
     Returns true if the left operand is in the list provided as the second operand.
 
     Example:
+        ```
         {
             "$in": [
                 {"$getField": "op_name"},
                 [{"$literal": "predict"}, {"$literal": "generate"}]
             ]
         }
+        ```
     """
 
     in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
@@ -244,6 +264,7 @@ class ContainsOperation(BaseModel):
     Not part of MongoDB. Weave-specific addition.
 
     Example:
+        ```
         {
             "$contains": {
                 "input": {"$getField": "display_name"},
@@ -251,6 +272,7 @@ class ContainsOperation(BaseModel):
                 "case_insensitive": true
             }
         }
+        ```
     """
 
     contains_: "ContainsSpec" = Field(alias="$contains")
@@ -308,7 +330,7 @@ class Query(BaseModel):
     type conversions, and string matching.
 
     Examples:
-
+        ```
         # Filter calls where op_name == "predict"
         {
             "$expr": {
@@ -329,6 +351,7 @@ class Query(BaseModel):
                 }
             }
         }
+        ```
     """
 
     expr_: Operation = Field(alias="$expr")
