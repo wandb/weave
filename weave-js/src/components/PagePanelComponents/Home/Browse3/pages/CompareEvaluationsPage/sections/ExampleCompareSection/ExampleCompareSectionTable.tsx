@@ -207,23 +207,32 @@ const DenseCellValue: React.FC<
   React.ComponentProps<typeof CellValue>
 > = props => {
   return (
-    <CellValue
-      value={props.value}
-      stringStyle={{
+    <Box
+      sx={{
         height: '100%',
         width: '100%',
-        overflow: 'auto',
-        textAlign: 'left',
-        lineHeight: '1.2',
-        flex: 1,
-        whiteSpace: 'pre-wrap',
-        wordWrap: 'break-word',
-        textOverflow: 'ellipsis',
+        overflow: 'hidden',
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        justifyContent: 'center',
         padding: '4px',
-      }}
-    />
+      }}>
+      <CellValue
+        value={props.value}
+        stringStyle={{
+          maxHeight: '100%',
+          width: '100%',
+          overflow: 'auto',
+          textAlign: 'left',
+          lineHeight: '1.2',
+          flex: 1,
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          textOverflow: 'ellipsis',
+          display: 'flex',
+        }}
+      />
+    </Box>
   );
 };
 /**
