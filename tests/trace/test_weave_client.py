@@ -330,10 +330,6 @@ def test_calls_query(client):
             },
         },
         summary={
-            "status_counts": {
-                "success": 25,
-                "error": 0,
-            },
             "weave": {
                 "status": "running",
                 "trace_name": "x",
@@ -360,10 +356,6 @@ def test_calls_query(client):
             },
         },
         summary={
-            "status_counts": {
-                "success": 25,
-                "error": 0,
-            },
             "weave": {
                 "status": "running",
                 "trace_name": "x",
