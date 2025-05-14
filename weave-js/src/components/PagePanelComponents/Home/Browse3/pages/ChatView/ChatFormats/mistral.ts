@@ -5,7 +5,7 @@ import {
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {ChatCompletion, ChatRequest, Choice, Message, ToolCall} from '../types';
-import {hasNumberProp, hasStringProp, isMessage,isToolCalls} from './utils';
+import {hasNumberProp, hasStringProp, isMessage, isToolCalls} from './utils';
 
 // Define Delta type and type guard for Mistral streaming chunks
 export type MistralDelta = {

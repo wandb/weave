@@ -2,7 +2,7 @@ import _ from 'lodash';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
-import { OptionalTraceCallSchema } from '../PlaygroundPage/types';
+import {OptionalTraceCallSchema} from '../PlaygroundPage/types';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -161,10 +161,10 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   if (!traceCall.output || !traceCall.inputs) {
     return traceCall;
   }
-  const { inputs, output, ...rest } = traceCall;
+  const {inputs, output, ...rest} = traceCall;
   return {
     input: normalizeChatRequest(traceCall.inputs),
     output: normalizeChatCompletion(traceCall.inputs, traceCall.output),
-    ...rest
-  }
-}
+    ...rest,
+  };
+};

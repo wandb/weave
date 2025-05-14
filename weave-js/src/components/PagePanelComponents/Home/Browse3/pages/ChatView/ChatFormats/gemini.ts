@@ -5,7 +5,7 @@ import {
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {ChatCompletion, ChatRequest, Choice} from '../types';
-import {hasNumberProp,hasStringProp} from './utils';
+import {hasNumberProp, hasStringProp} from './utils';
 
 export const isGeminiRequestFormat = (inputs: KeyedDictType): boolean => {
   if (!hasStringProp(inputs, 'contents')) {

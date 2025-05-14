@@ -1,7 +1,7 @@
 import _ from 'lodash';
 
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
-import {hasStringProp,isMessage} from './utils';
+import {hasStringProp, isMessage} from './utils';
 
 export const isTraceCallChatFormatOpenAI = (call: TraceCallSchema): boolean => {
   if (!('messages' in call.inputs)) {

@@ -5,7 +5,7 @@ import {
   normalizeChatRequest,
   normalizeChatTraceCall,
 } from '../ChatView/hooks';
-import { ChatRequest } from '../ChatView/types';
+import {ChatRequest} from '../ChatView/types';
 import {
   DEFAULT_LLM_MODEL,
   LLM_MAX_TOKENS_KEYS,

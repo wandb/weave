@@ -9,8 +9,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { normalizeChatTraceCall } from '../ChatView/hooks';
 
+import { normalizeChatTraceCall } from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
