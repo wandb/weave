@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -21,6 +21,7 @@
     "test:modern": "jest --selectProjects modern",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
+    "prettier-check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
     "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
     "dev": "nodemon"
   },
@@ -42,6 +43,10 @@
           "^.+\\.tsx?$": ["ts-jest", {
             "tsconfig": "<rootDir>/src/__tests__/legacy/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.+)$": "<rootDir>/src/$1"
         }
       },
       {
@@ -51,6 +56,10 @@
           "^.+\\.tsx?$": ["ts-jest", {
             "tsconfig": "<rootDir>/src/__tests__/modern/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.+)$": "<rootDir>/src/$1"
         }
       },
       {
@@ -65,8 +74,12 @@
         ],
         "transform": {
           "^.+\\.tsx?$": ["ts-jest", {
-            "tsconfig": "<rootDir>/tsconfig.json"
+            "tsconfig": "<rootDir>/src/__tests__/tsconfig.json"
           }]
+        },
+        "moduleNameMapper": {
+          "^weave$": "<rootDir>/src/index.ts",
+          "^weave/(.*)$": "<rootDir>/src/$1"
         }
       }
     ],
@@ -82,9 +95,6 @@
       "json",
       "node"
     ],
-    "moduleNameMapper": {
-      "^weave$": "<rootDir>/src/index.ts"
-    },
     "collectCoverage": true,
     "coveragePathIgnorePatterns": [
       "<rootDir>/src/generated",

@@ -10,9 +10,12 @@ export type Op<T extends (...args: any[]) => any> = {
   __name: string;
   __savedRef?: OpRef | Promise<OpRef>;
   __parameterNames?: ParameterNamesOption;
-} & T & ((...args: Parameters<T>) => ReturnType<T> extends AsyncIterable<infer U>
-  ? AsyncIterable<Awaited<U>>
-  : Promise<Awaited<ReturnType<T>>>);
+} & T &
+  ((
+    ...args: Parameters<T>
+  ) => ReturnType<T> extends AsyncIterable<infer U>
+    ? AsyncIterable<Awaited<U>>
+    : Promise<Awaited<ReturnType<T>>>);
 
 interface StreamReducer<T, R> {
   initialStateFn: () => R;
@@ -36,12 +39,13 @@ export type OpDecorator<T extends (...args: any[]) => any> = ((
   // Stage 3 signature
   value: T,
   context: ClassMethodDecoratorContext
-) => T | void) & ((
-  // Legacy signature
-  target: Object,
-  propertyKey: string | symbol,
-  descriptor: TypedPropertyDescriptor<T>
-) => TypedPropertyDescriptor<T> | void);
+) => T | void) &
+  ((
+    // Legacy signature
+    target: Object,
+    propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<T>
+  ) => TypedPropertyDescriptor<T> | void);
 
 /**
  * Options that can be passed to the op wrapper

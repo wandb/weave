@@ -9,8 +9,12 @@
     "composite": true,
     "declaration": true,
     "sourceMap": true,
+    "baseUrl": ".",
+    "rootDir": "../",
     "paths": {
-      "weave": ["../../src/index.ts"]
+      "weave": ["../index.ts"],
+      "weave/*": ["../*"]
     }
-  }
+  },
+  "include": ["../**/*"]
 } 

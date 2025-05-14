@@ -234,7 +234,8 @@ export function renderJsonPoints<T>(
   pointCloud: BabylonPointCloud,
   request: RenderRequest<T>,
   meta?: Camera3DControl,
-  backgroundColor?: RgbaColor
+  backgroundColor?: RgbaColor,
+  useRightHandedSystem?: boolean
 ): RenderResult<T> {
   const context = request.fullscreen
     ? getFullscreenContext()
@@ -250,7 +251,8 @@ export function renderJsonPoints<T>(
     context,
     size,
     meta,
-    backgroundColor
+    backgroundColor,
+    useRightHandedSystem
   );
   const cleanup = () => scene.dispose();
   const camera = scene.cameras[0];
@@ -266,7 +268,8 @@ const pointCloudScene = (
   {engine}: RenderContext,
   {width, height}: {width: number; height: number},
   meta?: Camera3DControl,
-  backgroundColor?: RgbaColor
+  backgroundColor?: RgbaColor,
+  useRightHandedSystem: boolean = false // default to false because that is the existing behavior
 ): Scene => {
   // these dimensions did not have a lot of thought put into them,
   // so they may need fine tuning. The idea is that table & media previews
@@ -280,6 +283,9 @@ const pointCloudScene = (
       backgroundColor.b / 255,
       backgroundColor.a
     );
+  }
+  if (useRightHandedSystem) {
+    scene.useRightHandedSystem = true;
   }
 
   const target = [0, 0, 0];
