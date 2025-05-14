@@ -423,6 +423,15 @@ You can also track class and object methods.
 
     </TabItem>
     <TabItem value="typescript" label="TypeScript">
+
+    :::important
+    **Using decorators in TypeScript**
+
+    To use the `@weave.op` decorator with your TypeScript code, make sure your environment is properly configured:
+
+    - **TypeScript v5.0 or newer**: Decorators are supported out of the box and no additional configuration is required.
+    - **TypeScript older than v5.0**: Enable experimental support for decorators. For more details, see the [official TypeScript documentation on decorators](https://www.typescriptlang.org/docs/handbook/decorators.html).
+    :::
     
     #### Decorate a class method
 
@@ -448,21 +457,6 @@ You can also track class and object methods.
             return n * n;
         }
     }
-    ```
-
-    #### Decorate a method in an object literal
-
-    Use `@weave.op` on methods defined in object literals.
-
-    ```typescript
-    const actions = {
-        @weave.op
-        greet(name: string): string {
-            return `Hello, ${name}!`;
-        }
-    };
-
-    actions.greet("Bill");
     ```
 
     </TabItem>
