@@ -40,7 +40,7 @@ export const STATUS_INFO: Record<ComputedCallStatusType, CallStatusInfo> = {
     label: 'Finished',
     color: 'gold',
     tooltip:
-      'This call succeeded, but one or more descendants failed. Requires `weave>=0.51.47` python client.',
+      'This call succeeded, but one or more descendants failed. Filtering requires logging with `weave>=0.51.47` python client.',
   },
   [ComputedCallStatuses.error]: {
     icon: 'failed',
