@@ -36,7 +36,7 @@ const isJSON = (value: string): boolean => {
 
 type CellValueStringProps = {
   value: string;
-  collapsedStyle?: React.CSSProperties;
+  style?: React.CSSProperties;
 };
 
 const Collapsed = styled.div`
@@ -84,10 +84,7 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const CellValueStringWithPopup = ({
-  value,
-  collapsedStyle,
-}: CellValueStringProps) => {
+const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -146,7 +143,7 @@ const CellValueStringWithPopup = ({
   return (
     <>
       <StyledTooltip enterDelay={500} title={title}>
-        <Collapsed ref={ref} onClick={onClick} style={collapsedStyle}>
+        <Collapsed ref={ref} onClick={onClick} style={style}>
           {trimmed}
         </Collapsed>
       </StyledTooltip>
@@ -258,15 +255,10 @@ const CellValueStringWithPopup = ({
   );
 };
 
-export const CellValueString = ({
-  value,
-  collapsedStyle,
-}: CellValueStringProps) => {
+export const CellValueString = ({value, style}: CellValueStringProps) => {
   const trimmed = value.trim();
   if (isUrl(trimmed)) {
     return <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
   }
-  return (
-    <CellValueStringWithPopup value={value} collapsedStyle={collapsedStyle} />
-  );
+  return <CellValueStringWithPopup value={value} style={style} />;
 };
