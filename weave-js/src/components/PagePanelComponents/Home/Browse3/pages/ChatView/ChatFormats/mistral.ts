@@ -4,14 +4,8 @@ import {
   KeyedDictType,
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
-import {
-    ChatCompletion,
-  ChatRequest,
-  Choice,
-  Message,
-  ToolCall,
-} from '../types';
-import {hasStringProp, hasNumberProp, isToolCalls, isMessage} from './utils';
+import {ChatCompletion, ChatRequest, Choice, Message, ToolCall} from '../types';
+import {hasNumberProp, hasStringProp, isMessage,isToolCalls} from './utils';
 
 // Define Delta type and type guard for Mistral streaming chunks
 export type MistralDelta = {
@@ -206,5 +200,5 @@ export const normalizeMistralChatCompletion = (
           completion_tokens: 0,
           total_tokens: 0,
         },
-    };
-  }
+  };
+};

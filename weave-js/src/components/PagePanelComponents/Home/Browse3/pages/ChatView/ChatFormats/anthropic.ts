@@ -1,5 +1,6 @@
 import _ from 'lodash';
-import { TraceCallSchema } from '../../wfReactInterface/traceServerClientTypes';
+
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {ChatCompletion, ChatRequest, Choice} from '../types';
 import {hasStringProp, isMessage} from './utils';
 
@@ -60,8 +61,9 @@ export const anthropicContentBlocksToChoices = (
   return choices;
 };
 
-
-export const isTraceCallChatFormatAnthropic = (call: TraceCallSchema): boolean => {
+export const isTraceCallChatFormatAnthropic = (
+  call: TraceCallSchema
+): boolean => {
   if (!('messages' in call.inputs)) {
     return false;
   }
@@ -98,9 +100,11 @@ export const normalizeAnthropicChatCompletion = (
         completion.usage.input_tokens + completion.usage.output_tokens,
     },
   };
-}
+};
 
-export const normalizeAnthropicChatRequest = (request: ChatRequest & { system: string }) => {
+export const normalizeAnthropicChatRequest = (
+  request: ChatRequest & {system: string}
+) => {
   return {
     ...request,
     messages: [
@@ -111,4 +115,4 @@ export const normalizeAnthropicChatRequest = (request: ChatRequest & { system: s
       ...request.messages,
     ],
   };
-}
+};

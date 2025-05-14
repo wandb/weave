@@ -3,20 +3,29 @@ import _ from 'lodash';
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
 import {useWFHooks} from '../wfReactInterface/context';
-import {
-  TraceCallSchema,
-} from '../wfReactInterface/traceServerClientTypes';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
-  Chat,
-  ChatCompletion,
-  ChatRequest,
-} from './types';
-import {ChatFormat} from './ChatFormats/types'
-import { isGeminiCompletionFormat, isGeminiRequestFormat, isTraceCallChatFormatGemini, normalizeGeminiChatCompletion, normalizeGeminiChatRequest } from './ChatFormats/gemini';
-import { isAnthropicCompletionFormat, isTraceCallChatFormatAnthropic, normalizeAnthropicChatCompletion, normalizeAnthropicChatRequest } from './ChatFormats/anthropic';
-import { isTraceCallChatFormatOpenAI } from './ChatFormats/openai';
-import { isMistralCompletionFormat, isTraceCallChatFormatMistral, normalizeMistralChatCompletion } from './ChatFormats/mistral';
+  isAnthropicCompletionFormat,
+  isTraceCallChatFormatAnthropic,
+  normalizeAnthropicChatCompletion,
+  normalizeAnthropicChatRequest,
+} from './ChatFormats/anthropic';
+import {
+  isGeminiCompletionFormat,
+  isGeminiRequestFormat,
+  isTraceCallChatFormatGemini,
+  normalizeGeminiChatCompletion,
+  normalizeGeminiChatRequest,
+} from './ChatFormats/gemini';
+import {
+  isMistralCompletionFormat,
+  isTraceCallChatFormatMistral,
+  normalizeMistralChatCompletion,
+} from './ChatFormats/mistral';
+import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
+import {ChatFormat} from './ChatFormats/types';
+import {Chat, ChatCompletion, ChatRequest} from './types';
 
 // Traverse input and outputs looking for any ref strings.
 const getRefs = (call: TraceCallSchema): string[] => {
@@ -88,7 +97,6 @@ export const normalizeChatCompletion = (
   return completion as ChatCompletion;
 };
 
-
 const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
   const {response_format} = call.inputs;
   if (!response_format || !_.isPlainObject(response_format)) {
@@ -109,8 +117,7 @@ const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
 export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isGeminiRequestFormat(request)) {
     normalizeGeminiChatRequest(request);
-  }
-  else if (isAnthropicCompletionFormat(request)) {
+  } else if (isAnthropicCompletionFormat(request)) {
     normalizeAnthropicChatRequest(request);
   }
   // Anthropic has system message as a top-level request field

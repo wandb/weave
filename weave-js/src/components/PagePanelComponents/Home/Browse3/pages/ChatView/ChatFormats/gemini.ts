@@ -1,10 +1,11 @@
 import _ from 'lodash';
+
 import {
   KeyedDictType,
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {ChatCompletion, ChatRequest, Choice} from '../types';
-import {hasStringProp, hasNumberProp} from './utils';
+import {hasNumberProp,hasStringProp} from './utils';
 
 export const isGeminiRequestFormat = (inputs: KeyedDictType): boolean => {
   if (!hasStringProp(inputs, 'contents')) {
@@ -98,22 +99,22 @@ export const normalizeGeminiChatCompletion = (
   request: ChatRequest,
   completion: any
 ): ChatCompletion => {
-    // We normalize to the OpenAI format as our standard representation
-    // but the Gemini format does not have a direct mapping for some fields.
-    // For now we leave empty placeholders for type checking purposes.
-    return {
-      id: '',
-      choices: geminiCandidatesToChoices(completion.candidates),
-      created: 0,
-      model: request.model,
-      system_fingerprint: '',
-      usage: {
-        prompt_tokens: completion.usage_metadata.prompt_token_count,
-        completion_tokens: completion.usage_metadata.candidates_token_count,
-        total_tokens: completion.usage_metadata.total_token_count,
-      },
-    };
-}
+  // We normalize to the OpenAI format as our standard representation
+  // but the Gemini format does not have a direct mapping for some fields.
+  // For now we leave empty placeholders for type checking purposes.
+  return {
+    id: '',
+    choices: geminiCandidatesToChoices(completion.candidates),
+    created: 0,
+    model: request.model,
+    system_fingerprint: '',
+    usage: {
+      prompt_tokens: completion.usage_metadata.prompt_token_count,
+      completion_tokens: completion.usage_metadata.candidates_token_count,
+      total_tokens: completion.usage_metadata.total_token_count,
+    },
+  };
+};
 
 export const normalizeGeminiChatRequest = (request: any): ChatRequest => {
   const modelIn = request.self.model_name;
@@ -127,4 +128,4 @@ export const normalizeGeminiChatRequest = (request: any): ChatRequest => {
       },
     ],
   };
-}
+};
