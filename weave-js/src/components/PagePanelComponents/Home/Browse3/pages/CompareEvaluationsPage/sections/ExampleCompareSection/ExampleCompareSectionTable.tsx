@@ -18,7 +18,10 @@ import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
-import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {
+  CompareEvaluationContext,
+  useCompareEvaluationsState,
+} from '../../compareEvaluationsContext';
 import {EvaluationComparisonState} from '../../ecpState';
 import {flattenedDimensionPath} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
@@ -73,7 +76,6 @@ type RowData = TrialRowData | SummaryRowData;
  * Component Props
  */
 interface DatasetRowItemRendererProps {
-  state: EvaluationComparisonState;
   digest: string;
   inputKey: string;
 }
@@ -126,12 +128,12 @@ const estimateContentWidth = (content: any): number => {
 
 // Hook to calculate column widths based on first row
 const useColumnWidths = (
-  state: EvaluationComparisonState,
+  ctx: CompareEvaluationContext,
   inputSubFields: string[],
   outputColumnKeys: string[],
   rows: RowData[]
 ) => {
-  const firstRow = useFirstExampleRow(state);
+  const firstRow = useFirstExampleRow(ctx);
 
   return useMemo(() => {
     // Calculate input widths from fetched data
@@ -173,15 +175,8 @@ const useColumnWidths = (
  * Renders a cell value from the dataset
  */
 const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
-  const row = useExampleCompareData(
-    props.state,
-    [
-      {
-        inputDigest: props.digest,
-      },
-    ],
-    0
-  );
+  const ctx = useCompareEvaluationsState();
+  const row = useExampleCompareData(ctx, props.digest);
   if (row.loading) {
     return <LoadingDots />;
   }
@@ -289,21 +284,19 @@ export const ExampleCompareSectionTable: React.FC<
  */
 
 // Gets the first example row from the comparison results
-const useFirstExampleRow = (state: EvaluationComparisonState) => {
+const useFirstExampleRow = (ctx: CompareEvaluationContext) => {
+  const {state} = ctx;
   return useExampleCompareData(
-    state,
-    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {}).map(
-      digest => ({
-        inputDigest: digest,
-      })
-    ),
-    0
+    ctx,
+    Object.keys(
+      state.loadableComparisonResults.result?.resultRows ?? {'': ''}
+    )[0]
   );
 };
 
 // Gets the input sub-fields from the first example row
-const useInputSubFields = (state: EvaluationComparisonState) => {
-  const firstExampleRow = useFirstExampleRow(state);
+const useInputSubFields = (ctx: CompareEvaluationContext) => {
+  const firstExampleRow = useFirstExampleRow(ctx);
   const res = useMemo(() => {
     const exampleRow = firstExampleRow.targetRowValue ?? {};
 
@@ -589,7 +582,6 @@ const inputFields = (
     renderCell: (params: GridRenderCellParams<RowData>) => {
       return (
         <DatasetRowItemRenderer
-          state={state}
           digest={params.row.inputDigest}
           inputKey={key}
         />
@@ -653,9 +645,8 @@ const expansionField = (
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
   ExampleCompareSectionTableProps & {rowHeight: number}
 > = props => {
-  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
-    props.state
-  );
+  const ctx = useCompareEvaluationsState();
+  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
   const {
     isExpanded,
     toggleDefaultExpansionState,
@@ -666,7 +657,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     props.state,
     filteredRows
   );
-  const inputSubFields = useInputSubFields(props.state);
+  const inputSubFields = useInputSubFields(ctx);
   const scoreSubFields = useScoreSubFields(rows);
   const {selectedRowInputDigest, setSelectedInputDigest} = useSelectedRowState(
     props.state,
@@ -675,7 +666,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   );
 
   const {inputWidths, outputWidths} = useColumnWidths(
-    props.state,
+    ctx,
     inputSubFields.inputSubFields,
     outputColumnKeys,
     rows
@@ -943,9 +934,8 @@ const useOnlyExpandedRows = (
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   ExampleCompareSectionTableProps & {rowHeight: number}
 > = props => {
-  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(
-    props.state
-  );
+  const ctx = useCompareEvaluationsState();
+  const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
   const {
     isExpanded,
     toggleDefaultExpansionState,
@@ -954,7 +944,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   } = useExpandedIds();
 
   const {rows, hasTrials} = useTableDataForModelsAsColumns(filteredRows);
-  const inputSubFields = useInputSubFields(props.state);
+  const inputSubFields = useInputSubFields(ctx);
   const scoreSubFields = useScoreSubFields(rows);
   const {selectedRowInputDigest, setSelectedInputDigest} = useSelectedRowState(
     props.state,
@@ -963,7 +953,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   );
 
   const {inputWidths, outputWidths} = useColumnWidths(
-    props.state,
+    ctx,
     inputSubFields.inputSubFields,
     outputColumnKeys,
     rows

@@ -1,4 +1,4 @@
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {isWeaveObjectRef, ObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
@@ -402,7 +402,7 @@ export function useExampleCompareDataAndPrefetch(
 }
 
 // Primary method for fetching and caching a single row
-function useExampleCompareData(
+export function useExampleCompareData(
   ctx: CompareEvaluationContext,
   targetDigest: string
 ) {

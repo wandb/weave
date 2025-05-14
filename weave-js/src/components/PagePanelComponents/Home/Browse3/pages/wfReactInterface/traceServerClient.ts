@@ -41,11 +41,6 @@ export class TraceServerClient extends CachingTraceServerClient {
   private onRenameListeners: Array<() => void>;
   private onFeedbackListeners: Record<string, Array<() => void>>;
   private onObjectListeners: Array<() => void>;
-  private tableRowQueryCollectors: Array<{
-    req: TraceTableRowQueryReq;
-    resolvePromise: (res: TraceTableRowQueryRes) => void;
-    rejectPromise: (err: any) => void;
-  }> = [];
 
   // Similar to the readBatchCollectors, but for tableRowQuery.
   // The fundamental idea here is that some tableRowQuery requests
