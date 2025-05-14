@@ -1,4 +1,4 @@
-import {Box, SxProps} from '@mui/material';
+import {Box, SxProps, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -30,6 +30,7 @@ import {
   ColumnsManagementPanel,
   CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY,
 } from './ColumnsManagementPanel';
+import {HEADER_HIEGHT_PX} from './common';
 import {evalAggScorerMetricCompGeneric} from './ExampleCompareSectionDetail';
 import {
   FilteredAggregateRows,
@@ -247,22 +248,28 @@ export const ExampleCompareSectionTable: React.FC<
         alignItems: 'center',
         bgcolor: MOON_50,
         padding: '16px',
-        height: 50,
+        height: HEADER_HIEGHT_PX,
       }}>
       <HorizontalBox
         sx={{
           justifyContent: 'flex-start',
           alignItems: 'center',
         }}>
-        <IconButton onClick={increaseRowHeight}>
-          <Icon name="expand-uncollapse" />
-        </IconButton>
-        <IconButton onClick={decreaseRowHeight}>
-          <Icon name="collapse" />
-        </IconButton>
-        <IconButton onClick={() => setModelsAsRows(v => !v)}>
-          <Icon name="table" />
-        </IconButton>
+        <Tooltip title="Increase Row Height">
+          <IconButton onClick={increaseRowHeight}>
+            <Icon name="expand-uncollapse" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Decrease Row Height">
+          <IconButton onClick={decreaseRowHeight}>
+            <Icon name="collapse" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Pivot on Model">
+          <IconButton onClick={() => setModelsAsRows(v => !v)}>
+            <Icon name="table" />
+          </IconButton>
+        </Tooltip>
       </HorizontalBox>
       <HorizontalBox
         sx={{
@@ -270,9 +277,11 @@ export const ExampleCompareSectionTable: React.FC<
           alignItems: 'center',
         }}>
         {!props.shouldHighlightSelectedRow && (
-          <IconButton onClick={props.onShowSplitView}>
-            <Icon name="panel" />
-          </IconButton>
+          <Tooltip title="Show Detail Panel">
+            <IconButton onClick={props.onShowSplitView}>
+              <Icon name="panel" />
+            </IconButton>
+          </Tooltip>
         )}
       </HorizontalBox>
     </HorizontalBox>

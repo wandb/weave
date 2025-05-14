@@ -46,6 +46,7 @@ import {
   SCORER_VARIATION_WARNING_EXPLANATION,
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
+import {HEADER_HIEGHT_PX} from './common';
 import {
   PivotedRow,
   removePrefix,
@@ -679,28 +680,31 @@ export const ExampleCompareSectionDetail: React.FC<{
         alignItems: 'center',
         bgcolor: MOON_50,
         padding: '16px',
-        // borderBottom: '1px solid #ccc',
-        height: 50,
+        height: HEADER_HIEGHT_PX,
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
           flex: 1,
         }}>
-        <IconButton
-          // disabled={targetIndex === 0}
-          onClick={() => {
-            setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-          }}>
-          <Icon name="chevron-up" />
-        </IconButton>
-        <IconButton
-          // disabled={targetIndex === filteredRows.length - 1}
-          onClick={() => {
-            setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-          }}>
-          <Icon name="chevron-down" />
-        </IconButton>
+        <Tooltip title="Previous Example">
+          <IconButton
+            // disabled={targetIndex === 0}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+            }}>
+            <Icon name="chevron-up" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Next Example">
+          <IconButton
+            // disabled={targetIndex === filteredRows.length - 1}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+            }}>
+            <Icon name="chevron-down" />
+          </IconButton>
+        </Tooltip>
         <Box
           style={{
             flex: 0,
@@ -716,20 +720,26 @@ export const ExampleCompareSectionDetail: React.FC<{
       </HorizontalBox>
 
       <HorizontalBox>
-        <IconButton
-          onClick={() => {
-            props.onExpandToggle();
-          }}>
-          <Icon
-            name={props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'}
-          />
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            props.onClose();
-          }}>
-          <Icon name={'close'} />
-        </IconButton>
+        <Tooltip title="Expand">
+          <IconButton
+            onClick={() => {
+              props.onExpandToggle();
+            }}>
+            <Icon
+              name={
+                props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'
+              }
+            />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Close">
+          <IconButton
+            onClick={() => {
+              props.onClose();
+            }}>
+            <Icon name={'close'} />
+          </IconButton>
+        </Tooltip>
       </HorizontalBox>
     </HorizontalBox>
   );
