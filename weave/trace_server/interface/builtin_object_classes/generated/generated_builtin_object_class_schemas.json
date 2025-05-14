@@ -1298,6 +1298,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Content"
         },
         "name": {
@@ -1309,6 +1310,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Name"
         },
         "function_call": {
@@ -1320,6 +1322,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Function Call"
         },
         "tool_call_id": {
@@ -1331,15 +1334,12 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Tool Call Id"
         }
       },
       "required": [
-        "role",
-        "content",
-        "name",
-        "function_call",
-        "tool_call_id"
+        "role"
       ],
       "title": "Message",
       "type": "object"
@@ -1619,7 +1619,7 @@
     },
     "ResponseFormat": {
       "enum": [
-        "json",
+        "json_object",
         "text"
       ],
       "title": "ResponseFormat",
