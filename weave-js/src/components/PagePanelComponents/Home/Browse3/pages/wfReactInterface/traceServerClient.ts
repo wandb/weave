@@ -310,12 +310,6 @@ export class TraceServerClient extends CachingTraceServerClient {
   ): Promise<TraceRefsReadBatchRes> {
     return super.readBatch(req);
   }
-
-  private async tableRowQueryDirect(
-    req: TraceTableRowQueryReq
-  ): Promise<TraceTableRowQueryRes> {
-    return super.tableRowQuery(req);
-  }
 }
 
 const tableQuerySuitableForBatching = (
