@@ -1929,20 +1929,38 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
 export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
 ): traceServerTypes.ComputedCallStatusType => {
+  const serverSideStatus = traceCall.summary?.weave?.status;
+  if (serverSideStatus) {
+    if (
+      serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
+      hasDescendantErrors
+    ) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return serverSideStatus;
+  }
   if (traceCall.exception) {
     return traceServerTypes.ComputedCallStatuses.error;
   } else if (traceCall.ended_at) {
-    // THIS IS NOT CORRECTLY TYPED BECAUSE IT IS FLATTENED!
-    if ((traceCall['summary.status_counts.error'] ?? 0) > 0) {
+    const errors =
+      traceCall.summary?.status_counts?.error ??
+      // THIS IS NOT CORRECTLY TYPED BECAUSE IT IS FLATTENED IN TABLE VIEW!
+      // traceCall['summary.status_counts.error'] ??
+      0;
+    if (errors > 0 || hasDescendantErrors) {
       return traceServerTypes.ComputedCallStatuses.descendant_error;
     }
     return traceServerTypes.ComputedCallStatuses.success;
-  } else {
-    return traceServerTypes.ComputedCallStatuses.running;
   }
+  return traceServerTypes.ComputedCallStatuses.running;
 };
 
 export const traceCallLatencyS = (

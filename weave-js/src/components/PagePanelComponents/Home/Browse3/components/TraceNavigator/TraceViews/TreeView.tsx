@@ -51,7 +51,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   deemphasizeCallIds,
   searchQuery,
 }) => {
-  const {id, call, level, isExpanded, childrenIds} = node;
+  const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
@@ -95,7 +95,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
   const isDeemphasized = deemphasizeCallIds?.includes(id);
   const hasChildren = childrenIds.length > 0;
-  const statusCode = traceCallStatusCode(call);
+  const statusCode = traceCallStatusCode(call, hasDescendantErrors);
   const indentMultiplier = 14;
 
   return (

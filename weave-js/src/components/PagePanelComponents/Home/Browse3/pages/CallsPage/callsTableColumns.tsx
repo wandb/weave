@@ -65,6 +65,7 @@ import {
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import {FlattenedCallData} from './CallsTable';
 import {
   insertPath,
   isDynamicCallColumn,
@@ -87,7 +88,7 @@ export const useCallsTableColumns = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter,
   currentViewId: string,
-  tableData: TraceCallSchema[],
+  tableData: FlattenedCallData[],
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
