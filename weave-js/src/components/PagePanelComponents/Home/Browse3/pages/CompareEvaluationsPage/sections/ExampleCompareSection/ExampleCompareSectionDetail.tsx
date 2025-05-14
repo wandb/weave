@@ -720,7 +720,7 @@ export const ExampleCompareSectionDetail: React.FC<{
       </HorizontalBox>
 
       <HorizontalBox>
-        <Tooltip title="Expand">
+        <Tooltip title={props.isExpanded ? 'Collapse' : 'Expand'}>
           <IconButton
             onClick={() => {
               props.onExpandToggle();
