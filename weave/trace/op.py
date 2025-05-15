@@ -35,7 +35,7 @@ from typing import (
     runtime_checkable,
 )
 
-from typing_extensions import NotRequired, ParamSpec
+from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
@@ -163,17 +163,18 @@ def _apply_fn_defaults_to_inputs(
 
 
 class WeaveKwargs(TypedDict):
-    display_name: NotRequired[str | None]
-    attributes: NotRequired[dict[str, Any]]
+    display_name: str | None
+    attributes: dict[str, Any]
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
     """Sets up a __weave dict used to pass WeaveKwargs to ops."""
-    if d is None:
-        d = {}
-    d.setdefault("attributes", defaultdict(dict))
-    d.setdefault("display_name", None)
-    return d
+    res: dict[str, Any] = {}
+    if d is not None:
+        res = cast(dict[str, Any], d)
+    res.setdefault("attributes", defaultdict(dict))
+    res.setdefault("display_name", None)
+    return cast(WeaveKwargs, res)
 
 
 @runtime_checkable
