@@ -904,13 +904,18 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # - Else -> SUCCESS
     exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
     ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
+        pb, table_alias, cast="int"
+    )
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
+    descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
 
     return f"""CASE
         WHEN {exception_sql} IS NOT NULL THEN {param_slot(error_param, "String")}
+        WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
         WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
         ELSE {param_slot(success_param, "String")}
     END"""
