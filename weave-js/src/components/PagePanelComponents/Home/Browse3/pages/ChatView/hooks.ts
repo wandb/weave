@@ -98,16 +98,14 @@ export const normalizeChatCompletion = (
   if (isAnthropicCompletionFormat(completion)) {
     return normalizeAnthropicChatCompletion(completion);
   }
-  else if (isGeminiCompletionFormat(completion)) {
+  if (isGeminiCompletionFormat(completion)) {
     return normalizeGeminiChatCompletion(request, completion);
   }
-  else if (isMistralCompletionFormat(completion)) {
+  if (isMistralCompletionFormat(completion)) {
     return normalizeMistralChatCompletion(request, completion);
   }
-  else if (isTraceCallChatFormatOTEL(completion)) {
-    completion = normalizeOTELChatCompletion(request, completion);
-    console.log('OTEL completion', completion);
-    return completion as ChatCompletion;
+  if (isTraceCallChatFormatOTEL(completion)) {
+    return normalizeOTELChatCompletion(request, completion);
   }
   return completion as ChatCompletion;
 };
@@ -218,6 +216,7 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
       ...rest
     }
   }
+
   return {
     inputs: normalizeChatRequest(traceCall.inputs),
     output: normalizeChatCompletion(traceCall.inputs, traceCall.output),
