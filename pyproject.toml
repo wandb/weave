@@ -60,7 +60,7 @@ dependencies = [
 ]
 
 [project.scripts]
-weave = "weave.cli:cli"
+weave = "weave.cli.cli:cli"
 
 [project.optional-dependencies]
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
