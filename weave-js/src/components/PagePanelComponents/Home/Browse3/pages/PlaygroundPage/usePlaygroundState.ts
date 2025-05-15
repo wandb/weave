@@ -1,7 +1,6 @@
 import {SetStateAction, useCallback, useState} from 'react';
-import {
-  normalizeChatTraceCall,
-} from '../ChatView/hooks';
+
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {
   DEFAULT_LLM_MODEL,
   LLM_MAX_TOKENS_KEYS,
