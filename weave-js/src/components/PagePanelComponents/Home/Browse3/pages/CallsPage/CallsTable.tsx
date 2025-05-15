@@ -105,6 +105,7 @@ const MAX_SELECT = 100;
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'summary.status_counts',
   'wb_run_id',
   'attributes.otel_span',
 ];
