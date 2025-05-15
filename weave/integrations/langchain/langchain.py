@@ -36,6 +36,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
+from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
