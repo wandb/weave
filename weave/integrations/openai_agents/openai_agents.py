@@ -73,7 +73,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_trace_start(self, trace: tracing.Trace) -> None:
         """Called when a trace starts."""
-        if not (wc := get_weave_client()):
+        if (wc := get_weave_client()) is None:
             return
 
         # Set up basic trace data
@@ -96,7 +96,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_trace_end(self, trace: tracing.Trace) -> None:
         """Called when a trace ends."""
-        if not (wc := get_weave_client()):
+        if (wc := get_weave_client()) is None:
             return
 
         tid = trace.trace_id
@@ -318,7 +318,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_span_start(self, span: tracing.Span[Any]) -> None:
         """Called when a span starts."""
-        if not (wc := get_weave_client()):
+        if (wc := get_weave_client()) is None:
             return
 
         # For Response spans, we'll defer call creation until on_span_end when we have input data
@@ -354,7 +354,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_span_end(self, span: tracing.Span[Any]) -> None:
         """Called when a span ends."""
-        if not (wc := get_weave_client()):
+        if (wc := get_weave_client()) is None:
             return
 
         trace_id = span.trace_id
@@ -418,7 +418,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
-        if not (wc := get_weave_client()):
+        if (wc := get_weave_client()) is None:
             return
 
         # Finish any unfinished trace calls
