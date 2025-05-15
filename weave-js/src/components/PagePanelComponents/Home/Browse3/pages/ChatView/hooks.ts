@@ -117,11 +117,11 @@ const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
 
 export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isGeminiRequestFormat(request)) {
-    normalizeGeminiChatRequest(request);
-  } else if (isAnthropicCompletionFormat(request)) {
-    normalizeAnthropicChatRequest(request);
+    return normalizeGeminiChatRequest(request);
   }
-  // Anthropic has system message as a top-level request field
+  if (isAnthropicCompletionFormat(request)) {
+    return normalizeAnthropicChatRequest(request);
+  }
   return request as ChatRequest;
 };
 
