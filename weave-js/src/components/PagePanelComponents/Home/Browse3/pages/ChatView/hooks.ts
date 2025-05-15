@@ -1,5 +1,6 @@
 import _ from 'lodash';
 
+import {useMemo} from 'react';
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
 import {OptionalTraceCallSchema} from '../PlaygroundPage/types';
@@ -104,7 +105,9 @@ export const normalizeChatCompletion = (
     return normalizeMistralChatCompletion(request, completion);
   }
   else if (isTraceCallChatFormatOTEL(completion)) {
-    return normalizeOTELChatCompletion(request, completion);
+    completion = normalizeOTELChatCompletion(request, completion);
+    console.log('OTEL completion', completion);
+    return completion as ChatCompletion;
   }
   return completion as ChatCompletion;
 };
@@ -144,30 +147,55 @@ export const useCallAsChat = (
 ): {
   loading: boolean;
 } & Chat => {
-  // Traverse the data and find all ref URIs.
-  const refs = getRefs(call);
+  // Memoize the call data processing to prevent unnecessary recalculations
+  // when the component re-renders but the call data hasn't changed
+  const refs = useMemo(
+    // Traverse the data and find all ref URIs.
+    () => getRefs(call),
+    [call]
+  );
   const {useRefsData} = useWFHooks();
   const refsData = useRefsData({refUris: refs});
-  const refsMap = _.zipObject(refs, refsData.result ?? []);
-  const request = normalizeChatRequest(deref(call.inputs, refsMap));
-  const result = call.output
-    ? normalizeChatCompletion(request, deref(call.output, refsMap))
-    : null;
 
-  // TODO: It is possible that all of the choices are refs again, handle this better.
-  if (
-    result &&
-    result.choices &&
-    result.choices.some(choice => isWeaveRef(choice))
-  ) {
-    result.choices = [];
-  }
+  // Only recalculate when refs data or call data changes
+  const result = useMemo(() => {
+    const refsMap = _.zipObject(refs, refsData.result ?? []);
+    // Handle OTEL span format differently
+    let request: ChatRequest;
+    let result: ChatCompletion | null = null;
+
+    // Check if this is an OTEL span
+    if (isTraceCallChatFormatOTEL(call)) {
+      // Use specialized OTEL handlers
+      request = normalizeOTELChatRequest(call);
+      result = call.output ? normalizeOTELChatCompletion(call, request) : null;
+    } else {
+      // Use standard handlers
+      request = normalizeChatRequest(deref(call.inputs, refsMap));
+      result = call.output
+        ? normalizeChatCompletion(request, deref(call.output, refsMap))
+        : null;
+    }
+
+    // TODO: It is possible that all of the choices are refs again, handle this better.
+    if (
+      result &&
+      result.choices &&
+      result.choices.some(choice => isWeaveRef(choice))
+    ) {
+      result.choices = [];
+    }
+
+    return {
+      isStructuredOutput: isStructuredOutputCall(call),
+      request,
+      result,
+    };
+  }, [refsData.result, call, refs]);
 
   return {
     loading: refsData.loading,
-    isStructuredOutput: isStructuredOutputCall(call),
-    request,
-    result,
+    ...result,
   };
 };
 
