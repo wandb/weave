@@ -120,26 +120,8 @@ However, often LLM applications have additional logic (such as pre/post processi
     print(my_function("World"))
     ```
 
-    This works for both functions as well as methods on classes:
+    You can also track [methods on classes](#4-track-class-and-object-methods).
 
-
-    ```python showLineNumbers
-    import weave
-
-    # Initialize Weave Tracing
-    weave.init("intro-example")
-
-    class MyClass:
-        # Decorate your method
-        @weave.op
-        def my_method(self, name: str):
-            return f"Hello, {name}!"
-
-    instance = MyClass()
-
-    # Call your method -- Weave will automatically track inputs and outputs
-    print(instance.my_method("World"))
-    ```
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     Weave allows you to manually track these calls by wrapping your function with [`weave.op`](../../reference/typescript-sdk/weave/functions/op.md). For example:
@@ -413,7 +395,72 @@ You can also manually create Calls using the API directly.
     </TabItem>
 </Tabs>
 
+### 4. Track class and object methods
 
+You can also track class and object methods.
+
+<Tabs groupId="programming-language">
+    <TabItem value="python" label="Python" default>
+    Track any method on a class using `weave.op`.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize Weave Tracing
+    weave.init("intro-example")
+
+    class MyClass:
+        # Decorate your method
+        @weave.op
+        def my_method(self, name: str):
+            return f"Hello, {name}!"
+
+    instance = MyClass()
+
+    # Call your method -- Weave will automatically track inputs and outputs
+    print(instance.my_method("World"))
+    ```
+
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+
+    :::important
+    **Using decorators in TypeScript**
+
+    To use the `@weave.op` decorator with your TypeScript code, make sure your environment is properly configured:
+
+    - **TypeScript v5.0 or newer**: Decorators are supported out of the box and no additional configuration is required.
+    - **TypeScript older than v5.0**: Enable experimental support for decorators. For more details, see the [official TypeScript documentation on decorators](https://www.typescriptlang.org/docs/handbook/decorators.html).
+    :::
+    
+    #### Decorate a class method
+
+    Use `@weave.op` to trace instance methods.
+
+    ```typescript
+    class Foo {
+        @weave.op
+        async predict(prompt: string) {
+            return "bar"
+        }
+    }
+    ```
+
+    #### Decorate a static class method
+
+    Apply `@weave.op` to static methods to monitor utility functions within a class.
+
+    ```typescript
+    class MathOps {
+        @weave.op
+        static square(n: number): number {
+            return n * n;
+        }
+    }
+    ```
+
+    </TabItem>
+</Tabs>
 
 
 ## Viewing Calls
