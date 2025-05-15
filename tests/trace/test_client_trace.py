@@ -117,11 +117,15 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "my_op",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         attributes={
             "weave": {
@@ -4372,3 +4376,127 @@ def test_project_stats_clickhouse(client, clickhouse_client):
                 include_file_storage_size=False,
             )
         )
+
+
+def test_calls_query_with_descendant_error(client):
+    class TestException(Exception):
+        pass
+
+    @weave.op
+    def child_op(val: int):
+        if val == 0:
+            raise TestException("Error")
+        return val
+
+    @weave.op
+    def parent_op(val: int):
+        if val == 1:
+            raise TestException("Error")
+        try:
+            return child_op(val)
+        except TestException as e:
+            return val
+
+    try:
+        parent_op(0)
+    except TestException as e:
+        pass
+
+    try:
+        parent_op(1)
+    except TestException as e:
+        pass
+
+    try:
+        parent_op(2)
+    except TestException as e:
+        pass
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "started_at", "direction": "asc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert "parent_op" in calls[0].op_name
+    assert calls[0].inputs["val"] == 0
+    assert calls[0].summary["weave"]["status"] == tsi.TraceStatus.DESCENDANT_ERROR
+
+    assert "child_op" in calls[1].op_name
+    assert calls[1].inputs["val"] == 0
+    assert calls[1].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+
+    assert "parent_op" in calls[2].op_name
+    assert calls[2].inputs["val"] == 1
+    assert calls[2].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+
+    assert "parent_op" in calls[3].op_name
+    assert calls[3].inputs["val"] == 2
+    assert calls[3].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+
+    assert "child_op" in calls[4].op_name
+    assert calls[4].inputs["val"] == 2
+    assert calls[4].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "summary.weave.status", "direction": "asc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert [c.summary["weave"]["status"] for c in calls] == [
+        tsi.TraceStatus.DESCENDANT_ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.SUCCESS,
+    ]
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "summary.weave.status", "direction": "desc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert [c.summary["weave"]["status"] for c in calls] == [
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.DESCENDANT_ERROR,
+    ]
+
+    for status, count in [
+        (tsi.TraceStatus.DESCENDANT_ERROR, 1),
+        (tsi.TraceStatus.ERROR, 2),
+        (tsi.TraceStatus.SUCCESS, 2),
+    ]:
+        calls = list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=get_client_project_id(client),
+                    query={
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "summary.weave.status"},
+                                {"$literal": status},
+                            ]
+                        }
+                    },
+                )
+            )
+        )
+
+        assert len(calls) == count
