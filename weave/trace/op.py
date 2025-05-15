@@ -9,7 +9,15 @@ import random
 import sys
 import traceback
 import weakref
-from collections.abc import AsyncIterator, Coroutine, Generator, Iterator, Mapping
+from collections import defaultdict
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Coroutine,
+    Generator,
+    Iterator,
+    Mapping,
+)
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -156,6 +164,17 @@ def _apply_fn_defaults_to_inputs(
 
 class WeaveKwargs(TypedDict):
     display_name: str | None
+    attributes: dict[str, Any]
+
+
+def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
+    """Sets up a __weave dict used to pass WeaveKwargs to ops."""
+    res: dict[str, Any] = {}
+    if d is not None:
+        res = cast(dict[str, Any], d)
+    res.setdefault("attributes", defaultdict(dict))
+    res.setdefault("display_name", None)
+    return cast(WeaveKwargs, res)
 
 
 @runtime_checkable
@@ -186,6 +205,8 @@ class Op(Protocol[P, R]):
 
     call: Callable[..., Any]
     calls: Callable[..., CallsIter]
+
+    _accumulator: Callable[[Any | None, Any], Any] | None
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -293,14 +314,18 @@ def _create_call(
         inputs_with_defaults["api_key"] = "REDACTED"
 
     call_time_display_name = __weave.get("display_name") if __weave else None
+    call_attrs = __weave.get("attributes") if __weave else None
 
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
-    attributes = call_attributes.get()
+
     from weave.trace.serialization.serialize import dictify
 
-    attributes = dictify(attributes)
+    attributes = dictify(call_attributes.get())
+
+    if call_attrs is not None:
+        attributes = {**attributes, **call_attrs}
 
     return client.create_call(
         func,
@@ -376,6 +401,9 @@ def _call_sync_func(
             call.output = res
             return res, call
 
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "function"
+
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
@@ -403,18 +431,65 @@ def _call_sync_func(
 
         nonlocal has_finished
         if has_finished:
-            raise ValueError("Should not call finish more than once")
+            return
+        has_finished = True
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
+
+        if (
+            op._accumulator
+            and isinstance(output, (Iterator, Generator, AsyncIterator))
+            and not isinstance(output, (str, bytes))
+        ):
+            # If an accumulator is set on the op directly (e.g., via @weave.op(accumulator=...))
+            # and the function returns a standard iterator/generator, or an async iterator, apply the accumulator.
+
+            # Create an _Accumulator helper instance
+            # op._accumulator is Callable[[State | None, Value], State]
+            acc_logic: _Accumulator = _Accumulator(op._accumulator)
+
+            # Define callbacks for the _IteratorWrapper
+            def acc_on_yield(value: Any) -> None:
+                acc_logic.next(value)
+
+            def acc_on_error(e: Exception) -> None:
+                # Call the original finish function with accumulated state and exception
+                finish(acc_logic.get_state(), e)
+
+            def acc_on_close() -> None:
+                # Call the original finish function with accumulated state
+                finish(acc_logic.get_state(), None)
+
+            # Wrap the output iterator with the accumulation logic
+            # _IteratorWrapper can handle sync and async iterators through its __next__ and __anext__.
+            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+
+        # Original behavior: if no handler and no accumulator for an iterator,
+        # or if output is not an iterator type we should accumulate.
         finish(output)
         return output
 
@@ -468,6 +543,9 @@ async def _call_async_func(
             call.output = res
             return res, call
 
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "async_function"
+
     # Proceed with tracing
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
@@ -493,20 +571,55 @@ async def _call_async_func(
 
         nonlocal has_finished
         if has_finished:
-            raise ValueError("Should not call finish more than once")
+            return
+        has_finished = True
 
-        client.finish_call(
-            call,
-            output,
-            exception,
-            op=op,
-        )
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
-        finish(output)
-        return output
+
+        if (
+            op._accumulator
+            and isinstance(output, AsyncIterator)
+            and not isinstance(output, (str, bytes))
+        ):
+            acc_logic: _Accumulator = _Accumulator(op._accumulator)
+
+            def acc_on_yield(value: Any) -> None:
+                acc_logic.next(value)
+
+            def acc_on_error(e: Exception) -> None:
+                finish(acc_logic.get_state(), e)
+
+            def acc_on_close() -> None:
+                finish(acc_logic.get_state(), None)
+
+            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+        else:
+            finish(output)
+            return output
 
     try:
         res = await func(*args, **kwargs)
@@ -533,6 +646,430 @@ async def _call_async_func(
         call_context.pop_call(call.id)
 
     return res, call
+
+
+def _call_sync_gen(
+    op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
+    **kwargs: Any,
+) -> tuple[Generator[Any, None, None], Call]:
+    func = op.resolve_fn
+    call = placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if should_skip_tracing_for_op(op):
+        gen = func(*args, **kwargs)
+        call.output = gen
+        return gen, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            gen = func(*args, **kwargs)
+            call.output = gen
+            return gen, call
+
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "generator"
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError:
+        raise
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        gen = func(*args, **kwargs)
+        return gen, call
+
+    # Execute the op and get the generator
+    client = weave_client_context.require_weave_client()
+    has_finished = False
+    accumulated_state = None
+    acc = op._accumulator
+
+    def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
+        nonlocal has_finished
+        if has_finished:
+            return
+        has_finished = True
+
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
+
+    # Create the generator wrapper
+    try:
+        # Define the wrapper generator that will handle the call context properly
+        def wrapped_generator() -> Generator[Any, None, None]:
+            nonlocal accumulated_state, has_finished
+
+            # Set the call context before creating the original generator
+            # This ensures all calls made during generator initialization are properly nested
+            call_context.push_call(call)
+
+            try:
+                # Create the original generator within the proper call context
+                original_gen = func(*args, **kwargs)
+
+                # If there's an on_output_handler, let it process the generator
+                # This is important for integrations that wrap the generator
+                if (handler := op._on_output_handler) is not None:
+                    try:
+                        # The handler might return a different generator or wrap the original
+                        processed_gen = handler(original_gen, finish, call.inputs)
+                        if processed_gen is not original_gen:
+                            # The handler returned a different generator, use that
+                            # and skip our own accumulation logic
+                            # Capture and re-raise any exceptions from the generator
+                            try:
+                                for value in processed_gen:
+                                    yield value
+                            except Exception as e:
+                                # Make sure to mark the call as finished with the exception
+                                if not has_finished:
+                                    finish(accumulated_state, e)
+                                # Re-raise the exception to preserve user code behavior
+                                raise
+                            return
+                    except Exception as e:
+                        # If raise_on_captured_errors is True, propagate the exception
+                        if get_raise_on_captured_errors():
+                            raise
+                        # Otherwise, log the error and continue with the original generator
+                        log_once(
+                            logger.error, ON_OUTPUT_MSG.format(traceback.format_exc())
+                        )
+
+                # If we get here, either there was no handler, it returned the original generator,
+                # or it raised an exception that we caught.  Proceed with our normal accumulation logic
+                # Capture and re-raise any exceptions from the generator
+                try:
+                    for value in original_gen:
+                        # Ensure call context is set for each yield
+                        # This is critical for nested generators
+                        current_call = call_context.get_current_call()
+                        if current_call is None or current_call.id != call.id:
+                            call_context.push_call(call)
+
+                        # Box the value
+                        boxed_value = box.box(value)
+
+                        # Accumulate if we have an accumulator
+                        if acc:
+                            try:
+                                accumulated_state = acc(accumulated_state, boxed_value)
+                            except StopIteration as e:
+                                # Handle special case where accumulator signals end
+                                accumulated_state = e.value
+                                finish(accumulated_state)
+                                return
+
+                        # Update the call's output with the current accumulated state
+                        # This ensures the UI shows the actual values, not just a generator object
+                        if accumulated_state is not None:
+                            call.output = accumulated_state
+                        else:
+                            call.output = boxed_value
+
+                        # Temporarily pop the call context before yielding
+                        # This allows nested generators to establish their own call context
+                        current_call = call_context.get_current_call()
+                        if current_call and current_call.id == call.id:
+                            call_context.pop_call(call.id)
+
+                        # Yield the value to the caller
+                        try:
+                            yield boxed_value
+                        except GeneratorExit:
+                            # Generator was closed before exhaustion (e.g., break in for loop)
+                            # Ensure we finish the call with the accumulated state so far
+                            finish(accumulated_state)
+                            return
+
+                        # Re-establish the call context after yielding
+                        # This ensures subsequent operations are properly nested
+                        call_context.push_call(call)
+                except Exception as e:
+                    # Make sure to mark the call as finished with the exception
+                    if not has_finished:
+                        finish(accumulated_state, e)
+                    # Re-raise the exception to preserve user code behavior
+                    raise
+
+                # Generator completed normally
+                finish(accumulated_state)
+            except Exception as e:
+                # Handle exceptions from the generator
+                if not has_finished:
+                    finish(accumulated_state, e)
+                raise
+
+            finally:
+                # Ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call and current_call.id == call.id:
+                    call_context.pop_call(call.id)
+
+        return wrapped_generator(), call
+    except Exception as e:
+        # Handle exceptions from initial generator creation
+        finish(exception=e)
+        if __should_raise:
+            raise
+
+        def empty_sync_gen() -> Generator[Any, None, None]:
+            # Re-raise the original exception if __should_raise is False
+            # but we're evaluating the generator, to maintain expected behavior
+            if not has_finished:
+                raise e
+            # This will never actually yield anything but is needed for typing
+            yield from []
+
+        return empty_sync_gen(), call
+
+
+async def _call_async_gen(
+    op: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    __should_raise: bool = False,
+    __require_explicit_finish: bool = False,
+    **kwargs: Any,
+) -> tuple[AsyncIterator, Call]:
+    func = op.resolve_fn
+    call = placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
+    if should_skip_tracing_for_op(op):
+        gen = func(*args, **kwargs)
+        call.output = gen
+        return gen, call
+
+    if _should_sample_traces(op):
+        with tracing_disabled():
+            gen = func(*args, **kwargs)
+            call.output = gen
+            return gen, call
+
+    __weave = setup_dunder_weave_dict(__weave)
+    __weave["attributes"]["python"]["type"] = "async_generator"
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError:
+        raise
+    except Exception:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
+        gen = func(*args, **kwargs)
+        return gen, call
+
+    # Execute the op and get the generator
+    client = weave_client_context.require_weave_client()
+    has_finished = False
+    accumulated_state = None
+    acc = op._accumulator
+
+    def finish(output: Any = None, exception: BaseException | None = None) -> None:
+        if __require_explicit_finish:
+            return
+
+        nonlocal has_finished
+        if has_finished:
+            return
+        has_finished = True
+
+        try:
+            # Apply any post-processing to the accumulated state if needed
+            try:
+                if processor := getattr(op, "_on_finish_post_processor", None):
+                    output = processor(output)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+            client.finish_call(
+                call,
+                output,
+                exception,
+                op=op,
+            )
+        finally:
+            # Only pop the call context if we're the current call
+            current_call = call_context.get_current_call()
+            if current_call and current_call.id == call.id:
+                call_context.pop_call(call.id)
+
+    # Create the generator wrapper
+    try:
+        # Define the wrapper generator that will handle the call context properly
+        async def wrapped_generator() -> AsyncIterator:
+            nonlocal accumulated_state, has_finished
+
+            # Set the call context before creating the original generator
+            # This ensures all calls made during generator initialization are properly nested
+            call_context.push_call(call)
+
+            try:
+                # Create the original generator within the proper call context
+                original_gen = func(*args, **kwargs)
+
+                # If there's an on_output_handler, let it process the generator
+                # This is important for integrations that wrap the generator
+                if (handler := op._on_output_handler) is not None:
+                    try:
+                        # The handler might return a different generator or wrap the original
+                        processed_gen = handler(original_gen, finish, call.inputs)
+                        if processed_gen is not original_gen:
+                            # The handler returned a different generator, use that
+                            # and skip our own accumulation logic
+                            # Capture and re-raise any exceptions from the generator
+                            try:
+                                async for value in processed_gen:
+                                    yield value
+                            except Exception as e:
+                                # Make sure to mark the call as finished with the exception
+                                if not has_finished:
+                                    finish(accumulated_state, e)
+                                # Re-raise the exception to preserve user code behavior
+                                raise
+                            return
+                    except Exception as e:
+                        # If raise_on_captured_errors is True, propagate the exception
+                        if get_raise_on_captured_errors():
+                            raise
+                        # Otherwise, log the error and continue with the original generator
+                        log_once(
+                            logger.error, ON_OUTPUT_MSG.format(traceback.format_exc())
+                        )
+
+                # If we get here, either there was no handler, it returned the original generator,
+                # or it raised an exception that we caught.  Proceed with our normal accumulation logic
+                # Capture and re-raise any exceptions from the generator
+                try:
+                    async for value in original_gen:
+                        # Ensure call context is set for each yield
+                        # This is critical for nested generators
+                        current_call = call_context.get_current_call()
+                        if current_call is None or current_call.id != call.id:
+                            call_context.push_call(call)
+
+                        # Box the value
+                        boxed_value = box.box(value)
+
+                        # Accumulate if we have an accumulator
+                        if acc:
+                            try:
+                                accumulated_result = acc(accumulated_state, boxed_value)
+                                # If the accumulator is async, await it
+                                if inspect.iscoroutine(accumulated_result):
+                                    accumulated_state = await accumulated_result
+                                else:
+                                    accumulated_state = accumulated_result
+                            except StopAsyncIteration as e:
+                                # Handle special case where accumulator signals end
+                                # accumulated_state = e.value
+                                finish(accumulated_state)
+                                return
+
+                        # Update the call's output with the current accumulated state
+                        # This ensures the UI shows the actual values, not just a generator object
+                        if accumulated_state is not None:
+                            call.output = accumulated_state
+                        else:
+                            call.output = boxed_value
+
+                        # Temporarily pop the call context before yielding
+                        # This allows nested generators to establish their own call context
+                        current_call = call_context.get_current_call()
+                        if current_call and current_call.id == call.id:
+                            call_context.pop_call(call.id)
+
+                        # Yield the value to the caller
+                        try:
+                            yield boxed_value
+                        except GeneratorExit:
+                            # Generator was closed before exhaustion (e.g., break in for loop)
+                            # Ensure we finish the call with the accumulated state so far
+                            finish(accumulated_state)
+                            return
+
+                        # Re-establish the call context after yielding
+                        # This ensures subsequent operations are properly nested
+                        call_context.push_call(call)
+                except Exception as e:
+                    # Make sure to mark the call as finished with the exception
+                    if not has_finished:
+                        finish(accumulated_state, e)
+                    # Re-raise the exception to preserve user code behavior
+                    raise
+
+                # Generator completed normally
+                finish(accumulated_state)
+            except Exception as e:
+                # Handle exceptions from the generator
+                if not has_finished:
+                    finish(accumulated_state, e)
+                raise
+
+            finally:
+                # Ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call and current_call.id == call.id:
+                    call_context.pop_call(call.id)
+
+        return wrapped_generator(), call
+    except Exception as e:
+        # Handle exceptions from initial generator creation
+        finish(exception=e)
+        if __should_raise:
+            raise
+
+        async def empty_async_gen() -> AsyncIterator[Any]:
+            # Re-raise the original exception if __should_raise is False
+            # but we're evaluating the generator, to maintain expected behavior
+            if not has_finished:
+                raise e
+            # This will never actually yield anything but is needed for typing
+            for _ in []:
+                yield _
+
+        return empty_async_gen(), call
 
 
 def call(
@@ -616,6 +1153,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Op[P, R]: ...
 
 
@@ -626,6 +1164,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 
 
@@ -634,6 +1173,7 @@ def op(
     *,
     name: str | None = None,
     enable_code_capture: bool = True,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 
 
@@ -646,6 +1186,7 @@ def op(
     postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: float = 1.0,
     enable_code_capture: bool = True,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -660,7 +1201,7 @@ def op(
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
-        is_generator = inspect.isgeneratorfunction(func)
+        is_sync_generator = inspect.isgeneratorfunction(func)
         is_async_generator = inspect.isasyncgenfunction(func)
 
         # Create the appropriate wrapper based on function type
@@ -670,15 +1211,34 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
+            elif is_sync_generator:
+
+                @wraps(func)
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                    res, _ = _call_sync_gen(
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                    )
+                    return cast(R, res)
+            elif is_async_generator:
+
+                @wraps(func)
+                async def wrapper(  # pyright: ignore[reportRedeclaration]
+                    *args: P.args, **kwargs: P.kwargs
+                ) -> AsyncGenerator[R, None]:
+                    res, _ = await _call_async_gen(
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                    )
+                    async for item in res:
+                        yield item
             else:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     return cast(R, res)
 
@@ -716,6 +1276,8 @@ def op(
             wrapper._tracing_enabled = True  # type: ignore
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
 
+            wrapper._accumulator = accumulator  # type: ignore
+
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
             wrapper._code_capture_enabled = enable_code_capture  # type: ignore
 
@@ -729,7 +1291,7 @@ def op(
 
             # Mark what type of function this is for runtime type checking
             wrapper._is_async = is_async  # type: ignore
-            wrapper._is_generator = is_generator  # type: ignore
+            wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
             return cast(Op[P, R], wrapper)
@@ -853,20 +1415,32 @@ class _IteratorWrapper(Generic[V]):
             try:
                 self._on_close()  # type: ignore
             except Exception as e:
+                # Even if an exception occurs, we need to ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call is not None:
+                    call_context.pop_call(current_call.id)
+
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
-            self._on_finished_called = True
+            finally:
+                self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
             try:
                 self._on_error(e)
             except Exception as e:
+                # Even if an exception occurs, we need to ensure we clean up the call context
+                current_call = call_context.get_current_call()
+                if current_call is not None:
+                    call_context.pop_call(current_call.id)
+
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
-            self._on_finished_called = True
+            finally:
+                self._on_finished_called = True
 
     def __iter__(self) -> _IteratorWrapper:
         return self
@@ -942,6 +1516,8 @@ class _IteratorWrapper(Generic[V]):
             raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
+            # Always re-raise user exceptions to maintain the expected behavior
+            # This ensures test_resilience_to_accumulator_internal_errors_async passes
             raise
         else:
             return value

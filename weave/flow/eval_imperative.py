@@ -22,7 +22,8 @@ import weave
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
-from weave.flow.scorer import Scorer, auto_summarize
+from weave.flow.scorer import Scorer
+from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -489,7 +490,11 @@ class EvaluationLogger(BaseModel):
         self._accumulated_predictions.append(pred)
         return pred
 
-    def log_summary(self, summary: dict | None = None) -> None:
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None:
         """Log a summary dict to the Evaluation.
 
         This will calculate the summary, call the summarize op, and then finalize
@@ -499,11 +504,18 @@ class EvaluationLogger(BaseModel):
             logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
+        if summary is None:
+            summary = {}
+
         # Calculate summary
-        data_to_summarize = [
-            pred._captured_scores for pred in self._accumulated_predictions
-        ]
-        summary_data = auto_summarize(data_to_summarize)
+        if auto_summarize:
+            data_to_summarize = [
+                pred._captured_scores for pred in self._accumulated_predictions
+            ]
+            summary_data = auto_summarize_fn(data_to_summarize)
+        else:
+            summary_data = summary
+
         final_summary = {}
         if summary_data:
             final_summary = summary_data

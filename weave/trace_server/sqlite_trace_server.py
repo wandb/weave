@@ -507,6 +507,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
                                 ELSE 'success'
                             END
                         """
@@ -1432,6 +1433,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Return the empty ExportTraceServiceResponse as per the OTLP spec
         return tsi.OtelExportRes()
 
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        raise NotImplementedError(
+            "project_stats is not implemented for SQLite trace server"
+        )
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
@@ -1591,6 +1597,15 @@ def _transform_external_calls_field_to_internal_calls_field(
             END
         """
         json_path = None
+    elif field == "summary.weave.status":
+        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
+                                ELSE 'success'
+                            END
+                        """
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"

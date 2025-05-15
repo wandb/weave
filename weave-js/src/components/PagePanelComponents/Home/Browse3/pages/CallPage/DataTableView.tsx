@@ -95,12 +95,15 @@ export const WeaveCHTable: FC<{
     };
   }, [parsedRef]);
 
-  const numRowsQuery = useTableQueryStats(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ? [lookupKey?.digest] : [],
-    {skip: lookupKey == null}
-  );
+  const digests = useMemo(() => {
+    return lookupKey?.digest ? [lookupKey?.digest] : [];
+  }, [lookupKey]);
+  const numRowsQuery = useTableQueryStats({
+    entity: lookupKey?.entity ?? '',
+    project: lookupKey?.project ?? '',
+    digests,
+    skip: lookupKey == null,
+  });
 
   const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [offset, setOffset] = useState(0);
@@ -140,16 +143,15 @@ export const WeaveCHTable: FC<{
     );
   }, [sortModel]);
 
-  const fetchQuery = useTableRowsQuery(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    undefined,
+  const fetchQuery = useTableRowsQuery({
+    entity: lookupKey?.entity ?? '',
+    project: lookupKey?.project ?? '',
+    digest: lookupKey?.digest ?? '',
     limit,
     offset,
     sortBy,
-    {skip: lookupKey == null}
-  );
+    skip: lookupKey == null,
+  });
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
   const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
