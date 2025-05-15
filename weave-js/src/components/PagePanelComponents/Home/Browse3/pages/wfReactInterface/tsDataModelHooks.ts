@@ -2105,11 +2105,11 @@ export const useTableCreate = (): ((
   );
 };
 
-export const useFilesStats = (projectId: string) => {
+export const useProjectStats = (projectId: string) => {
   const getTsClient = useGetTraceServerClientContext();
 
   return useAsync(async () => {
-    return getTsClient().filesStats({project_id: projectId});
+    return getTsClient().projectStats({project_id: projectId});
   }, [getTsClient, projectId]);
 };
 
