@@ -83,10 +83,12 @@ def test_simple_chain_invoke(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_invoke_no_client() -> None:
+def test_simple_chain_invoke_no_client(client) -> None:
     """If no client is available, we should not trace the call, and also not crash."""
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
+
+    client.finish()
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 

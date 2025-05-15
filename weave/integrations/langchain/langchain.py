@@ -36,7 +36,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
@@ -99,6 +98,7 @@ if not import_failed:
 
         def __init__(self, **kwargs: Any) -> None:
             self.gc = None
+            # self.gc = weave_client_context.require_weave_client()
             if gc := weave_client_context.get_weave_client():
                 self.gc = gc
             else:
