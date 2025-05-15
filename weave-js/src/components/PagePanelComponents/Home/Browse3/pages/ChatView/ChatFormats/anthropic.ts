@@ -104,6 +104,7 @@ export const normalizeAnthropicChatCompletion = (
 export const normalizeAnthropicChatRequest = (
   request: ChatRequest & {system: string}
 ) => {
+  // Anthropic has system message as a top-level request field
   return {
     ...request,
     messages: [
