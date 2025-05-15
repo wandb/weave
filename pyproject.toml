@@ -267,15 +267,7 @@ show-fixes = true
 exclude = ["weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
-"*.ipynb" = ["T201"]
-"docs/**/*.py" = ["T201"] 
-"scripts/**/*.py" = ["T201"] 
-"tests/**/*.py" = ["T201"] 
-"weave-js/**/*.py" = ["T201"] 
-"examples/**/*.py" = ["T201"] 
-"gh_actions/**/*.py" = ["T201"] 
-"weave/scripts/**/*.py" = ["T201"] 
-"weave/trace_server/**/*.py" = ["T201"] 
+"!/weave/trace/**/*.py" = ["T201"]
 
 [tool.pyright]
 include = ["weave"]
