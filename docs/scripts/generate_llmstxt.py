@@ -5,8 +5,8 @@ import re
 import json
 from collections import defaultdict
 
-MAX_TOKENS = 2000  # Approximate word count cap for Optional entries
-BASE_URL = "https://weave-docs.wandb.ai/"
+MAX_TOKENS = 2000  # Approximate word count cap for non-core entries
+BASE_URL = "https://docs.yourcompany.com/"
 
 CATEGORY_HINTS = {
     "guides/integrations": "Integrations",
@@ -30,13 +30,9 @@ def is_optional(file_path: Path) -> bool:
     path_str = str(file_path)
     return any(
         [
-            "integrations" in path_str,
-            "integration" in file_path.stem.lower(),
             "gen_notebooks" in path_str,
             "examples" in path_str,
-            "reference" in path_str,
-            "/api/" in path_str,
-            file_path.name.startswith(("example-", "api-")),
+            file_path.name.startswith("example-"),
         ]
     )
 
