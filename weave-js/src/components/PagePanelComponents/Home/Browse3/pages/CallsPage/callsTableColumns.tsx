@@ -16,12 +16,13 @@ import React, {
   FC,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {useDeepMemo} from '../../../../../../common/state/hooks';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
@@ -40,7 +41,10 @@ import {
   RUNNABLE_FEEDBACK_OUTPUT_PART,
 } from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
-import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
+import {
+  CellFilterWrapper,
+  OnUpdateFilter,
+} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
   getCostsFromCellParams,
@@ -53,6 +57,7 @@ import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
+  traceCallLatencyMs,
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
@@ -60,6 +65,7 @@ import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {
   insertPath,
   isDynamicCallColumn,
+  Path,
   pathToString,
   stringToPath,
 } from './callsTableColumnsUtil';
@@ -76,17 +82,20 @@ export const useCallsTableColumns = (
   entity: string,
   project: string,
   effectiveFilter: WFHighLevelCallFilter,
+  currentViewId: string,
   tableData: TraceCallSchema[],
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter,
+  onUpdateFilter?: OnUpdateFilter,
   costsLoading: boolean = false,
+  costsHasError: boolean = false,
   includeTotalStorageSizeBytes: boolean = false,
   storageSizeResults: Map<string, number> | null = null,
-  storageSizeLoading: boolean = false
+  storageSizeLoading: boolean = false,
+  storageHasError: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -122,10 +131,12 @@ export const useCallsTableColumns = (
     [columnsWithRefs]
   );
 
+  // If either of these values has changed we'll reset the dynamic columns.
+  const resetDep = {effectiveFilter, currentViewId};
   const allDynamicColumnNames = useAllDynamicColumnNames(
     tableData,
     shouldIgnoreColumn,
-    effectiveFilter
+    resetDep
   );
 
   // Determine what sort of view we are looking at based on the filter
@@ -162,14 +173,16 @@ export const useCallsTableColumns = (
         columnIsRefExpanded,
         userDefinedColumnWidths,
         allowedColumnPatterns,
-        onAddFilter,
+        onUpdateFilter,
         costsLoading,
+        costsHasError,
         includeTotalStorageSizeBytes
           ? {
               storageSizeResults,
               storageSizeLoading,
             }
-          : null
+          : null,
+        storageHasError
       ),
     [
       entity,
@@ -185,11 +198,13 @@ export const useCallsTableColumns = (
       columnIsRefExpanded,
       userDefinedColumnWidths,
       allowedColumnPatterns,
-      onAddFilter,
+      onUpdateFilter,
       costsLoading,
       includeTotalStorageSizeBytes,
       storageSizeResults,
       storageSizeLoading,
+      storageHasError,
+      costsHasError,
     ]
   );
 
@@ -249,12 +264,14 @@ function buildCallsTableColumns(
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter,
+  onUpdateFilter?: OnUpdateFilter,
   costsLoading: boolean = false,
+  costsHasError: boolean = false,
   storageSizeInfo: {
     storageSizeResults: Map<string, number> | null;
     storageSizeLoading: boolean;
-  } | null = null
+  } | null = null,
+  storageHasError: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -293,13 +310,29 @@ function buildCallsTableColumns(
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
+        const name =
+          rowParams.row.display_name ??
+          // Rows are flattened at this point, they DO NOT strictly
+          // follow the TraceCallSchema!
+          (rowParams.row as any)['summary.weave.trace_name'];
         return (
-          <CallLinkCell
-            rowParams={rowParams}
-            entity={entity}
-            project={project}
-            preservePath={preservePath}
-          />
+          <CellFilterWrapper
+            onUpdateFilter={onUpdateFilter}
+            field="summary.weave.trace_name"
+            rowId={rowParams.id.toString()}
+            operation={'(string): equals'}
+            value={name}
+            style={{
+              display: 'flex',
+              width: '100%',
+            }}>
+            <CallLinkCell
+              rowParams={rowParams}
+              entity={entity}
+              project={project}
+              preservePath={preservePath}
+            />
+          </CellFilterWrapper>
         );
       },
     },
@@ -361,7 +394,7 @@ function buildCallsTableColumns(
         const valueFilter = STATUS_TO_FILTER[valueStatus];
         return (
           <CellFilterWrapper
-            onAddFilter={onAddFilter}
+            onUpdateFilter={onUpdateFilter}
             field="summary.weave.status"
             rowId={cellParams.id.toString()}
             operation={'(string): in'}
@@ -389,7 +422,7 @@ function buildCallsTableColumns(
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
     (key, operator, value, rowId) => {
-      onAddFilter?.(key, operator, value, rowId);
+      onUpdateFilter?.(key, operator, value, rowId);
     }
   );
   cols.push(...newCols);
@@ -539,7 +572,7 @@ function buildCallsTableColumns(
             renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
               return (
                 <CellFilterWrapper
-                  onAddFilter={onAddFilter}
+                  onUpdateFilter={onUpdateFilter}
                   field={field}
                   rowId={params.id.toString()}
                   operation={null}
@@ -571,7 +604,7 @@ function buildCallsTableColumns(
       }
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="wb_user_id"
           rowId={cellParams.id.toString()}
           operation="(string): equals"
@@ -599,7 +632,7 @@ function buildCallsTableColumns(
       const value = date.getTime() / 1000;
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="started_at"
           rowId={cellParams.id.toString()}
           operation="(date): after"
@@ -654,6 +687,16 @@ function buildCallsTableColumns(
       if (costsLoading) {
         return <LoadingDots />;
       }
+      if (costsHasError) {
+        return (
+          <div className="flex h-full w-full items-center justify-center">
+            <StatusChip
+              value="ERROR"
+              tooltipOverride="There was an error fetching the cost for this call."
+            />
+          </div>
+        );
+      }
       const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
       return (
         <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
@@ -684,7 +727,18 @@ function buildCallsTableColumns(
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      return monthRoundedTime(traceCallLatencyS(cellParams.row));
+      const timeMs = traceCallLatencyMs(cellParams.row);
+      const timeString = monthRoundedTime(traceCallLatencyS(cellParams.row));
+      return (
+        <CellFilterWrapper
+          onUpdateFilter={onUpdateFilter}
+          field="summary.weave.latency_ms"
+          rowId={cellParams.id.toString()}
+          operation={'(number): >='}
+          value={timeMs}>
+          <div>{timeString}</div>
+        </CellFilterWrapper>
+      );
     },
   });
 
@@ -703,6 +757,16 @@ function buildCallsTableColumns(
       renderCell: cellParams => {
         if (storageSizeInfo.storageSizeLoading) {
           return <LoadingDots />;
+        }
+        if (storageHasError) {
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <StatusChip
+                value="ERROR"
+                tooltipOverride="There was an error fetching the storage size for this call."
+              />
+            </div>
+          );
         }
         const storageSize =
           storageSizeInfo.storageSizeResults?.get(cellParams.row.id) ?? null;
@@ -737,7 +801,7 @@ function buildCallsTableColumns(
       // that far would be if we had an "ends with" operator.
       return (
         <CellFilterWrapper
-          onAddFilter={onAddFilter}
+          onUpdateFilter={onUpdateFilter}
           field="wb_run_id"
           rowId={cellParams.id.toString()}
           operation="(string): contains"
@@ -786,39 +850,36 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
-    []
-  );
+  const prevColumnsRef = useRef<string[]>([]);
+  const memoedDep = useDeepMemo(resetDep);
+  const prevResetDepRef = useRef<any>(memoedDep);
 
-  useEffect(() => {
-    setAllDynamicColumnNames(last => {
-      let nextAsPaths = last
-        .filter(c => !shouldIgnoreColumn(c))
-        .map(stringToPath);
-      tableData.forEach(row => {
-        Object.keys(row).forEach(key => {
-          const keyAsPath = stringToPath(key);
-          if (isDynamicCallColumn(keyAsPath)) {
-            nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
-          }
-        });
-      });
+  // If resetDep changed, clear the previous columns
+  if (prevResetDepRef.current !== memoedDep) {
+    prevColumnsRef.current = [];
+    prevResetDepRef.current = memoedDep;
+  }
 
-      return nextAsPaths.map(pathToString);
+  // Start with any previous columns
+  let currentColumnPaths: Path[] = prevColumnsRef.current
+    .filter(c => !shouldIgnoreColumn(c))
+    .map(stringToPath);
+
+  // Add new columns from the current table data
+  tableData.forEach(row => {
+    Object.keys(row).forEach(key => {
+      const keyAsPath = stringToPath(key);
+      if (isDynamicCallColumn(keyAsPath)) {
+        currentColumnPaths = insertPath(currentColumnPaths, keyAsPath);
+      }
     });
-  }, [shouldIgnoreColumn, tableData]);
+  });
 
-  useEffect(() => {
-    // Here, we reset the dynamic column names when the filter changes.
-    // Both branches of the if statement are the same. I just wanted to
-    // ensure that the `resetDep` is included in the dependency array.
-    // Perhaps there is a better way to do this?
-    if (resetDep) {
-      setAllDynamicColumnNames([]);
-    } else {
-      setAllDynamicColumnNames([]);
-    }
-  }, [resetDep]);
+  // Convert paths back to strings
+  const allDynamicColumnNames = currentColumnPaths.map(pathToString);
+
+  // Store the current columns for the next render
+  prevColumnsRef.current = allDynamicColumnNames;
 
   return allDynamicColumnNames;
 };

@@ -28,8 +28,10 @@ KNOWN_TYPES = {
     "Op",
     "PIL.Image.Image",
     "wave.Wave_read",
+    "weave.type_handlers.Audio.audio.Audio",
     "datetime.datetime",
     "rich.markdown.Markdown",
+    "moviepy.video.VideoClip.VideoClip",
 }
 
 

@@ -152,12 +152,24 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     };
   }, [parsedRef]);
 
-  const numRowsQuery = useTableQueryStats(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    {skip: lookupKey == null}
+  const tableQueryParams = useMemo(
+    () => ({
+      entity: lookupKey?.entity ?? '',
+      project: lookupKey?.project ?? '',
+      digests: lookupKey?.digest ? [lookupKey?.digest] : [],
+      skip: lookupKey == null,
+    }),
+    [lookupKey]
   );
+
+  const numRowsQuery = useTableQueryStats(tableQueryParams);
+
+  const totalRows = useMemo(() => {
+    if (numRowsQuery.result == null) {
+      return 0;
+    }
+    return numRowsQuery.result.tables?.[0]?.count ?? 0;
+  }, [numRowsQuery.result]);
 
   const numAddedRows = useMemo(
     () => Array.from(addedRows.values()).length,
@@ -180,16 +192,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return {numRowsToFetch: rowsToFetch, offset: offsetVal};
   }, [paginationModel, numAddedRows]);
 
-  const fetchQuery = useTableRowsQuery(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    undefined,
-    numRowsToFetch,
+  const fetchQuery = useTableRowsQuery({
+    entity: lookupKey?.entity ?? '',
+    project: lookupKey?.project ?? '',
+    digest: lookupKey?.digest ?? '',
+    limit: numRowsToFetch,
     offset,
     sortBy,
-    {skip: lookupKey == null}
-  );
+    skip: lookupKey == null,
+  });
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
   const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
@@ -517,6 +528,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
       <StyledDataGrid
+        data-testid="dataset-table"
         apiRef={apiRef}
         initialState={{
           pinnedColumns: {
@@ -541,9 +553,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        rowCount={
-          (numRowsQuery.result?.count ?? 0) + (isEditing ? numAddedRows : 0)
-        }
+        rowCount={totalRows + (isEditing ? numAddedRows : 0)}
         disableMultipleColumnsSorting
         loading={!fetchQueryLoaded}
         disableRowSelectionOnClick

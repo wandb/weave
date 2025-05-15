@@ -125,10 +125,12 @@ export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   query?: Query;
+  limit?: number;
 };
 
 export type TraceCallsQueryStatsRes = {
   count: number;
+  total_storage_size_bytes?: number;
 };
 
 export type TraceCallsDeleteReq = {
@@ -211,6 +213,7 @@ export type TraceObjQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   metadata_only?: boolean;
+  include_storage_size?: boolean;
 };
 
 export interface TraceObjSchema<
@@ -228,6 +231,7 @@ export interface TraceObjSchema<
   base_object_class?: OBC;
   val: T;
   wb_user_id?: string;
+  size_bytes?: number;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {
@@ -287,13 +291,18 @@ export type TraceTableQueryReq = {
   sort_by?: SortBy[];
 };
 
-export type TraceTableQueryStatsReq = {
+export type TraceTableQueryStatsBatchReq = {
   project_id: string;
-  digest: string;
+  digests: string[];
+  include_storage_size?: boolean;
 };
 
-export type TraceTableQueryStatsRes = {
-  count: number;
+export type TraceTableQueryStatsBatchRes = {
+  tables: Array<{
+    digest: string;
+    count: number;
+    storage_size_bytes: number;
+  }>;
 };
 
 export type TraceTableQueryRes = {
@@ -311,6 +320,14 @@ export type TraceFileContentReadReq = {
 
 export type TraceFileContentReadRes = {
   content: ArrayBuffer;
+};
+
+export type FilesStatsReq = {
+  project_id: string;
+};
+
+export type FilesStatsRes = {
+  total_size_bytes: number;
 };
 
 export type CompletionsCreateInputs = {
@@ -342,6 +359,17 @@ export type CompletionsCreateReq = {
 export type CompletionsCreateRes = {
   response: any;
   weave_call_id?: string;
+};
+
+export type ProjectStatsReq = {
+  project_id: string;
+};
+
+export type ProjectStatsRes = {
+  trace_storage_size_bytes: number;
+  objects_storage_size_bytes: number;
+  tables_storage_size_bytes: number;
+  files_storage_size_bytes: number;
 };
 
 export enum ContentType {

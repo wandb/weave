@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogTitle,
 } from '@material-ui/core';
-import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Tag} from '@wandb/weave/components/Tag';
 import React, {useState} from 'react';
@@ -12,11 +11,24 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {CopyableId} from '../../common/Id';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
-import {OptionalTraceCallSchema, PlaygroundState} from '../types';
-import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
+import {
+  OptionalTraceCallSchema,
+  PlaygroundState,
+  SavedPlaygroundModelState,
+} from '../types';
+import {
+  DEFAULT_SAVED_MODEL,
+  DEFAULT_SYSTEM_MESSAGE,
+} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
-import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
+import {ProviderOption} from './LLMDropdownOptions';
+import {
+  SetPlaygroundStateFieldFunctionType,
+  TraceCallOutput,
+} from './useChatFunctions';
+
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -27,7 +39,11 @@ type PlaygroundChatTopBarProps = {
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
   isTeamAdmin: boolean;
-  onConfigureProvider: () => void;
+  refetchConfiguredProviders: () => void;
+  refetchCustomLLMs: () => void;
+  llmDropdownOptions: ProviderOption[];
+  areProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -47,10 +63,13 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   playgroundStates,
   setPlaygroundStates,
   isTeamAdmin,
-  onConfigureProvider,
+  refetchConfiguredProviders,
+  refetchCustomLLMs,
+  llmDropdownOptions,
+  areProvidersLoading,
+  customProvidersResult,
 }) => {
   const history = useHistory();
-  const isLastChat = idx === playgroundStates.length - 1;
   const onlyOneChat = playgroundStates.length === 1;
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -65,23 +84,65 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     } as OptionalTraceCallSchema);
   };
 
-  const handleCompare = () => {
-    if (onlyOneChat) {
-      setPlaygroundStates([
-        ...playgroundStates,
-        JSON.parse(JSON.stringify(playgroundStates[0])),
-      ]);
-    }
-  };
-
   const handleModelChange = (
     index: number,
     model: LLMMaxTokensKey,
-    maxTokens: number
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
   ) => {
-    setPlaygroundStateField(index, 'model', model);
-    setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
-    setPlaygroundStateField(index, 'maxTokens', Math.floor(maxTokens / 2));
+    if (!savedModel) {
+      setPlaygroundStates(
+        playgroundStates.map((state, i) => {
+          if (i === index) {
+            return {
+              ...state,
+              model,
+              maxTokensLimit: maxTokens,
+              maxTokens: Math.floor(maxTokens / 2),
+            };
+          }
+          return state;
+        })
+      );
+      return;
+    }
+
+    const {messagesTemplate, ...defaultParams} =
+      savedModel?.savedModelParams ?? {};
+
+    setPlaygroundStates(
+      playgroundStates.map((state, i) => {
+        if (i === index) {
+          return {
+            ...state,
+            model,
+            maxTokensLimit: maxTokens,
+            maxTokens: Math.floor(maxTokens / 2),
+
+            // Update the state to show we are using a saved model
+            savedModel: savedModel ?? DEFAULT_SAVED_MODEL,
+            traceCall: {
+              ...state.traceCall,
+              inputs: {
+                ...state.traceCall?.inputs,
+                // If the saved model has messages, use them, otherwise use the current messages
+                messages: messagesTemplate ?? state.traceCall?.inputs?.messages,
+              },
+              output: {
+                ...(state.traceCall?.output as TraceCallOutput),
+                // If the saved model has messages, clear the choices, otherwise use the current choices
+                choices: messagesTemplate
+                  ? undefined
+                  : (state.traceCall?.output as TraceCallOutput)?.choices,
+              },
+            },
+            // Update the other params
+            ...defaultParams,
+          };
+        }
+        return state;
+      })
+    );
   };
 
   const ConfirmClearModal: React.FC<{
@@ -108,91 +169,73 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   };
 
   return (
-    <Box
-      sx={{
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'space-between',
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-          backgroundColor: 'transparent',
-        }}>
-        {!onlyOneChat && <Tag label={`${idx + 1}`} />}
+    <div className="flex w-full justify-between">
+      <div className="flex items-center gap-8 bg-transparent">
+        <Tag label={`${idx + 1}`} />
         <LLMDropdown
           value={playgroundStates[idx].model}
-          onChange={(model, maxTokens) =>
-            handleModelChange(idx, model, maxTokens)
+          onChange={(model, maxTokens, savedModel) =>
+            handleModelChange(
+              idx,
+              model as LLMMaxTokensKey,
+              maxTokens,
+              savedModel
+            )
           }
           entity={entity}
           project={project}
           isTeamAdmin={isTeamAdmin}
-          onConfigureProvider={onConfigureProvider}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          refetchCustomLLMs={refetchCustomLLMs}
+          llmDropdownOptions={llmDropdownOptions}
+          areProvidersLoading={areProvidersLoading}
+          customProvidersResult={customProvidersResult}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
         )}
-      </Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          backgroundColor: 'transparent',
-        }}>
+        <Button
+          tooltip={'Chat settings'}
+          icon="settings-parameters"
+          size="medium"
+          variant="ghost"
+          active={settingsTab === idx}
+          onClick={() => {
+            if (settingsTab === idx) {
+              setSettingsTab(null);
+            } else {
+              setSettingsTab(idx);
+            }
+          }}
+        />
+      </div>
+      <div className="flex items-center gap-4 bg-transparent">
         <Button
           tooltip={'Clear chat'}
-          icon="sweeps-broom"
+          icon="randomize-reset-reload"
           size="medium"
           variant="ghost"
           onClick={() => setConfirmClear(true)}
         />
-        {onlyOneChat ? (
-          <Button
-            tooltip={'Add chat'}
-            endIcon="swap"
-            size="medium"
-            variant="ghost"
-            onClick={handleCompare}>
-            Compare
-          </Button>
-        ) : (
-          <Button
-            tooltip={'Remove chat'}
-            endIcon="close"
-            size="medium"
-            variant="ghost"
-            onClick={() => {
-              if (settingsTab === idx) {
-                setSettingsTab(0);
-              }
-              setPlaygroundStates(
-                playgroundStates.filter((_, index) => index !== idx)
-              );
-            }}>
-            Remove
-          </Button>
-        )}
-        {isLastChat && (
-          <Button
-            tooltip={'Chat settings'}
-            icon="settings-parameters"
-            size="medium"
-            variant="ghost"
-            active={settingsTab !== null}
-            onClick={() => {
-              if (settingsTab !== null) {
-                setSettingsTab(null);
-              } else {
-                setSettingsTab(idx);
-              }
-            }}
-          />
-        )}
-      </Box>
+
+        <Button
+          endIcon="close"
+          size="medium"
+          variant="ghost"
+          disabled={onlyOneChat}
+          tooltip={onlyOneChat ? 'Cannot remove last chat' : 'Remove chat'}
+          onClick={() => {
+            // If the settings tab is set to length that is going to be removed,
+            // we need to set the settings tab to the previous chat.
+            if (settingsTab && settingsTab < playgroundStates.length + 1) {
+              setSettingsTab(settingsTab - 1);
+            }
+            setPlaygroundStates(
+              playgroundStates.filter((_, index) => index !== idx)
+            );
+          }}
+        />
+      </div>
       <ConfirmClearModal
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
@@ -201,6 +244,6 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           setConfirmClear(false);
         }}
       />
-    </Box>
+    </div>
   );
 };

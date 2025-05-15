@@ -103,9 +103,9 @@ export const useInputObjectVersionOptions = (
   const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
-  const objectVersion = useObjectVersion(
-    currentRef ? refUriToObjectVersionKey(currentRef) : null
-  );
+  const objectVersion = useObjectVersion({
+    key: currentRef ? refUriToObjectVersionKey(currentRef) : null,
+  });
   return useMemo(() => {
     if (!currentRef || objectVersion.loading || !objectVersion.result) {
       return {};
@@ -129,34 +129,29 @@ export const useOpVersionOptions = (
 } => {
   const {useOpVersions} = useWFHooks();
   // Get all the "latest" versions
-  const latestVersions = useOpVersions(
+  const latestVersions = useOpVersions({
     entity,
     project,
-    {
+    filter: {
       latestOnly: true,
     },
-    undefined,
-    true // metadataOnly
-  );
+    metadataOnly: true,
+  });
 
   // Get all the versions of the currently selected op
   const currentRef = effectiveFilter.opVersionRefs?.[0] ?? null;
   const currentOpId = currentRef
     ? refUriToOpVersionKey(currentRef)?.opId
     : null;
-  const currentVersions = useOpVersions(
+  const currentVersions = useOpVersions({
     entity,
     project,
-    {
+    filter: {
       opIds: [currentOpId ?? ''],
     },
-    undefined,
-    true, // metadataOnly
-    undefined,
-    {
-      skip: !currentOpId,
-    }
-  );
+    metadataOnly: true,
+    skip: !currentOpId,
+  });
 
   const opVersionOptionsWithoutAllSection = useMemo(() => {
     const result: Array<{
@@ -220,9 +215,9 @@ export const useOutputObjectVersionOptions = (
   const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
-  const objectVersion = useObjectVersion(
-    currentRef ? refUriToObjectVersionKey(currentRef) : null
-  );
+  const objectVersion = useObjectVersion({
+    key: currentRef ? refUriToObjectVersionKey(currentRef) : null,
+  });
   return useMemo(() => {
     if (!currentRef || objectVersion.loading || !objectVersion.result) {
       return {};

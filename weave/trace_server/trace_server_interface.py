@@ -418,10 +418,13 @@ class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
+    limit: Optional[int] = None
+    include_total_storage_size: Optional[bool] = False
 
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+    total_storage_size_bytes: Optional[int] = None
 
 
 class CallUpdateReq(BaseModel):
@@ -895,8 +898,16 @@ class FileContentReadReq(BaseModel):
     digest: str
 
 
+class FilesStatsReq(BaseModel):
+    project_id: str
+
+
 class FileContentReadRes(BaseModel):
     content: bytes
+
+
+class FilesStatsRes(BaseModel):
+    total_size_bytes: int
 
 
 class EnsureProjectExistsRes(BaseModel):
@@ -996,6 +1007,21 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class ProjectStatsReq(BaseModel):
+    project_id: str
+    include_trace_storage_size: Optional[bool] = True
+    include_object_storage_size: Optional[bool] = True
+    include_table_storage_size: Optional[bool] = True
+    include_file_storage_size: Optional[bool] = True
+
+
+class ProjectStatsRes(BaseModel):
+    trace_storage_size_bytes: int
+    objects_storage_size_bytes: int
+    tables_storage_size_bytes: int
+    files_storage_size_bytes: int
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1048,6 +1074,7 @@ class TraceServerInterface(Protocol):
     # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
@@ -1062,3 +1089,6 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Project statistics API
+    def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

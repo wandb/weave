@@ -31,7 +31,6 @@ vi.mock('../schemaUtils', () => ({
   createProcessedRowsMap: vi.fn(() => {
     return new Map([['call1', {text: 'Sample text'}]]);
   }),
-  filterRowsForNewDataset: vi.fn(rows => rows),
   createTargetSchema: vi.fn(() => []),
 }));
 

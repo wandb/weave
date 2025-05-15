@@ -63,6 +63,9 @@ export const useCallsForQuery = (
   refetch: () => void;
   storageSizeLoading: boolean;
   storageSizeResults: Map<string, number> | null;
+  primaryError?: Error | null;
+  costsError?: Error | null;
+  storageSizeError?: Error | null;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -73,23 +76,25 @@ export const useCallsForQuery = (
     gridSort
   );
 
-  const calls = useCalls(
+  const calls = useCalls({
     entity,
     project,
-    lowLevelFilter,
-    effectiveLimit,
-    effectiveOffset,
+    filter: lowLevelFilter,
+    limit: effectiveLimit,
+    offset: effectiveOffset,
     sortBy,
-    filterBy,
+    query: filterBy,
     columns,
-    expandedColumns,
-    {
-      refetchOnDelete: true,
-      includeFeedback: true,
-    }
-  );
+    expandedRefColumns: expandedColumns,
+    refetchOnDelete: true,
+    includeFeedback: true,
+  });
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
+  const callsStats = useCallsStats({
+    entity,
+    project,
+    filter: lowLevelFilter,
+    query: filterBy,
     refetchOnDelete: true,
   });
 
@@ -119,40 +124,30 @@ export const useCallsForQuery = (
 
   const costCols = useMemo(() => ['id'], []);
   const noCalls = calls.result == null || calls.result.length === 0;
-  const costs = useCalls(
+  const costs = useCalls({
     entity,
     project,
-    costFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    costCols,
-    expandedColumns,
-    {
-      skip: calls.loading || noCalls,
-      includeCosts: true,
-    }
-  );
+    filter: costFilter,
+    limit: effectiveLimit,
+    columns: costCols,
+    expandedRefColumns: expandedColumns,
+    skip: calls.loading || noCalls,
+    includeCosts: true,
+  });
 
   const storageSizeCols = useMemo(() => ['id', 'total_storage_size_bytes'], []);
   const storageSizeFilter = costFilter;
 
-  const storageSize = useCalls(
+  const storageSize = useCalls({
     entity,
     project,
-    storageSizeFilter,
-    effectiveLimit,
-    undefined,
-    undefined,
-    undefined,
-    storageSizeCols,
-    undefined,
-    {
-      skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
-      includeTotalStorageSize: true,
-    }
-  );
+    filter: storageSizeFilter,
+    limit: effectiveLimit,
+    columns: storageSizeCols,
+    expandedRefColumns: expandedColumns,
+    skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+    includeTotalStorageSize: true,
+  });
 
   const storageSizeResults = useMemo(() => {
     if (storageSize.loading) {
@@ -201,6 +196,9 @@ export const useCallsForQuery = (
         : callResults,
       total,
       refetch,
+      primaryError: calls.error,
+      costsError: costs.error,
+      storageSizeError: storageSize.error,
     };
   }, [
     callResults,
@@ -211,6 +209,9 @@ export const useCallsForQuery = (
     refetch,
     storageSize.loading,
     storageSizeResults,
+    calls.error,
+    costs.error,
+    storageSize.error,
   ]);
 };
 
@@ -282,7 +283,7 @@ const getFilterBy = (
   return {$expr: filterByRaw} as Query;
 };
 
-const convertHighLevelFilterToLowLevelFilter = (
+export const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   return {
@@ -294,6 +295,33 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+// Warning: This is a lossy conversion, there are things we
+// can represent in a low level filter that we cannot represent
+// in a high level filter.
+export const convertLowLevelFilterToHighLevelFilter = (
+  lowLevelFilter: CallFilter
+): WFHighLevelCallFilter => {
+  const highLevelFilter: WFHighLevelCallFilter = {};
+  if (lowLevelFilter.opVersionRefs) {
+    highLevelFilter.opVersionRefs = lowLevelFilter.opVersionRefs;
+  }
+  if (lowLevelFilter.inputObjectVersionRefs) {
+    highLevelFilter.inputObjectVersionRefs =
+      lowLevelFilter.inputObjectVersionRefs;
+  }
+  if (lowLevelFilter.outputObjectVersionRefs) {
+    highLevelFilter.outputObjectVersionRefs =
+      lowLevelFilter.outputObjectVersionRefs;
+  }
+  if (lowLevelFilter.parentIds) {
+    highLevelFilter.parentId = lowLevelFilter.parentIds[0];
+  }
+  if (lowLevelFilter.traceRootsOnly) {
+    highLevelFilter.traceRootsOnly = lowLevelFilter.traceRootsOnly;
+  }
+  return highLevelFilter;
 };
 
 const getFeedbackMerged = (calls: CallSchema[]) => {
@@ -370,10 +398,18 @@ export const useMakeInitialDatetimeFilter = (
     return convertHighLevelFilterToLowLevelFilter(highLevelFilter);
   }, [highLevelFilter]);
 
-  const callStats7Days = useCallsStats(entity, project, filter, d7filter, {
+  const callStats7Days = useCallsStats({
+    entity,
+    project,
+    filter,
+    query: d7filter,
     skip: skip || cachedFilter != null,
   });
-  const callStats30Days = useCallsStats(entity, project, filter, d30filter, {
+  const callStats30Days = useCallsStats({
+    entity,
+    project,
+    filter,
+    query: d30filter,
     skip: skip || cachedFilter != null,
   });
 

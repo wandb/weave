@@ -18,9 +18,9 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
 def function_to_evaluate(question: str):
@@ -38,6 +38,11 @@ weave.init('intro-example')
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
+:::info Looking for a less opinionated approach?
+
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
+:::
+
 ## Create an Evaluation
 
 To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
@@ -50,9 +55,9 @@ First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries w
 
 ### Defining scoring functions
 
-Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+Then, create a list of scoring functions. These are used to score each example. Each function should have a `output` and optionally, other inputs from your examples, and return a dictionary with the scores.
 
-Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
+Scoring functions need to have a `output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
 This will take `expected` from the dictionary for scoring.
 
@@ -68,9 +73,9 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
+def match_score1(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
+    return {'match': expected == output['generated_text']}
 ```
 
 ### Optional: Define a custom `Scorer` class
@@ -159,12 +164,12 @@ examples = [
 ]
 
 @weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+def match_score1(expected: str, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
-def match_score2(expected: dict, model_output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+def match_score2(expected: dict, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
 
 class MyModel(Model):
     prompt: str
@@ -191,7 +196,13 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ### Using `preprocess_model_input` to format dataset rows before evaluating
 
+:::important
+The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
+Scorer functions always receive the original dataset example, without any preprocessing applied.
+:::
+
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
+
 - Rename fields to match your model's expected input
 - Transform data into the correct format
 - Add or remove fields
@@ -219,8 +230,8 @@ def preprocess_example(example):
     }
 
 @weave.op()
-def match_score(expected: str, model_output: dict) -> dict:
-    return {'match': expected == model_output['generated_text']}
+def match_score(expected: str, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
 
 @weave.op()
 def function_to_evaluate(question: str):
@@ -241,6 +252,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 In this example, our dataset contains examples with an `input_text` field, but our evaluation function expects a `question` parameter. The `preprocess_example` function transforms each example by renaming the field, allowing the evaluation to work correctly.
 
 The preprocessing function:
+
 1. Receives the raw example from your dataset
 2. Returns a dictionary with the fields your model expects
 3. Is applied to each example before it's passed to your evaluation function
@@ -249,8 +261,12 @@ This is particularly useful when working with external datasets that may have di
 
 ### Using HuggingFace Datasets with evaluations
 
-We are continuously improving our integrations with third-party services and libraries. 
+We are continuously improving our integrations with third-party services and libraries.
 
-While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).

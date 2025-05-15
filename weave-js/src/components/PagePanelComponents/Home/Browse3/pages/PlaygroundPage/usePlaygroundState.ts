@@ -26,6 +26,14 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
 
+export const DEFAULT_SAVED_MODEL = {
+  llmModelId: null,
+  versionIndex: null,
+  isLatest: false,
+  objectId: null,
+  savedModelParams: null,
+};
+
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
     inputs: {
@@ -46,6 +54,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   maxTokensLimit: 16384,
   model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
+  savedModel: DEFAULT_SAVED_MODEL,
 };
 
 type NumericPlaygroundStateKey =
@@ -186,7 +195,9 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
-    model: state.model,
+    model: state.savedModel.llmModelId
+      ? state.savedModel.llmModelId
+      : state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
     stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,

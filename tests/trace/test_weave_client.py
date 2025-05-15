@@ -22,7 +22,9 @@ from tests.trace.util import (
     client_is_sqlite,
 )
 from weave import Evaluation
+from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
+from weave.trace.context import call_context
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -45,6 +47,7 @@ from weave.trace_server.sqlite_trace_server import (
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
+    FilesStatsReq,
     RefsReadBatchReq,
     TableCreateReq,
     TableQueryReq,
@@ -1971,7 +1974,7 @@ def test_flush_progress_bar(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -1988,7 +1991,7 @@ def test_flush_callback(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
 
@@ -2008,7 +2011,7 @@ def test_repeated_flushing(client):
 
     @weave.op
     def op_1():
-        time.sleep(1)
+        time.sleep(0.01)
 
     op_1()
     client.flush()
@@ -2055,7 +2058,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(10):
+    for i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
@@ -2400,13 +2403,13 @@ def test_calls_query_sort_by_latency(client):
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.1)
+    time.sleep(0.05)
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
     # Sleep to ensure different latency
-    time.sleep(0.2)
+    time.sleep(0.1)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2513,16 +2516,17 @@ def test_calls_filter_by_latency(client):
 
     # Create calls with different latencies
     # Fast call - minimal latency
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
+    fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
+    time.sleep(0.001)
     client.finish_call(fast_call, "fast result")  # Minimal latency
 
     # Medium latency
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
+    medium_call = client.create_call("x-medium", {"a": 2, "b": 2, "test_id": test_id})
     time.sleep(0.1)  # Add delay to increase latency
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
+    slow_call = client.create_call("x-slow", {"a": 3, "b": 3, "test_id": test_id})
     time.sleep(0.2)  # Add more delay to further increase latency
     client.finish_call(slow_call, "slow result")
 
@@ -2543,33 +2547,53 @@ def test_calls_filter_by_latency(client):
             f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
         )
 
-    # Instead of filtering by latency in the database query, let's do it in memory
-    # since we're having issues with the nested JSON query
-    # Sort the calls by latency to identify fast, medium and slow calls
-    sorted_calls = sorted(
-        all_calls, key=lambda call: call.summary.get("weave", {}).get("latency_ms", 0)
+    # Verify asc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="asc")],
     )
-
-    # Verify the order matches our expectation
     assert sorted_calls[0].id == fast_call.id  # Fast call
     assert sorted_calls[1].id == medium_call.id  # Medium call
     assert sorted_calls[2].id == slow_call.id  # Slow call
 
-    # For completeness, let's verify the specific call IDs
-    fast_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[fast_call.id]))
+    # Verify desc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="desc")],
     )
-    assert len(fast_latency_calls) == 1
+    assert sorted_calls[0].id == slow_call.id  # Slow call
+    assert sorted_calls[1].id == medium_call.id  # Medium call
+    assert sorted_calls[2].id == fast_call.id  # Fast call
 
-    medium_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[medium_call.id]))
+    # Filter by latency, Float
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$gte": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 0.001},
+                    ]
+                }
+            }
+        )
     )
-    assert len(medium_latency_calls) == 1
+    assert len(latency_calls) == 3
 
-    slow_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[slow_call.id]))
+    # Filter by latency, Int
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 10},
+                    ]
+                }
+            }
+        )
     )
-    assert len(slow_latency_calls) == 1
+    assert len(latency_calls) == 0
 
 
 def test_calls_query_sort_by_trace_name(client):
@@ -2813,25 +2837,25 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     # Create calls with different timestamps
     # Call 1: Start at t=0, end at t=1
     call1 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     client.finish_call(call1, "result1")
 
     # Call 2: Start at t=1, end at t=2
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call2 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call2, "result2")
 
     # Call 3: Start at t=2, end at t=3
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call3 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call3, "result3")
 
     # Call 4: Start at t=3, end at t=4
-    time.sleep(0.1)  # Ensure different timestamps
+    time.sleep(0.01)  # Ensure different timestamps
     call4 = client.create_call("x", {"test_id": test_id})
-    time.sleep(0.1)
+    time.sleep(0.01)
     client.finish_call(call4, "result4")
 
     # Flush to make sure all calls are committed
@@ -3095,16 +3119,16 @@ def test_calls_query_with_non_uuidv7_ids(client):
 
     # Create calls with timestamps
     call1 = _make_call(client, non_uuidv7_id1)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call2 = _make_call(client, non_uuidv7_id2)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call3 = _make_call(client, non_uuidv7_id3)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     call4 = _make_call(client, non_uuidv7_id4)
-    time.sleep(0.1)
+    time.sleep(0.01)
 
     client.flush()
 
@@ -3188,7 +3212,7 @@ def test_calls_query_with_non_uuidv7_ids(client):
     # Add UUIDv7 calls and test mixed filtering
     uuidv7_calls = []
     for i in range(4):
-        time.sleep(0.1)
+        time.sleep(0.01)
         call = client.create_call("x", {"test_id": f"uuidv7_{i}", "special": "true"})
         client.finish_call(call, "result")
         uuidv7_calls.append(call)
@@ -3276,3 +3300,178 @@ def test_calls_query_with_non_uuidv7_ids(client):
     assert call_ids[5] == uuidv7_calls[1].id
     assert call_ids[6] == uuidv7_calls[2].id
     assert call_ids[7] == uuidv7_calls[3].id
+
+
+def test_calls_query_filter_by_root_refs(client):
+    @weave.op()
+    def root_op(x: int):
+        return {"n": x, "child": child_op(x)}
+
+    @weave.op()
+    def child_op(x: int):
+        return grandchild_op(x)
+
+    @weave.op()
+    def grandchild_op(x: int):
+        return x + 3
+
+    with call_context.set_call_stack([]):
+        root_op(1)
+        root_op(2)
+
+    # 2 root_op calls, 2 child_op calls, 2 grandchild_op calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) == 6
+
+    # basic trace roots only filter
+    calls = client.get_calls(filter={"trace_roots_only": True})
+    assert len(calls) == 2  # tests the stats query
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+    root_op_ref = calls[0].op_name
+
+    # basic trace roots only filter = false, this should be everything
+    calls = client.get_calls(filter={"trace_roots_only": False})
+    assert len(calls) == 6
+
+    # trace roots only + inputs query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
+                    {"$literal": 1},
+                ]
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + output query
+    calls = client.get_calls(
+        filter={"trace_roots_only": True},
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
+                    {"$literal": 2},
+                ],
+            }
+        },
+    )
+    assert len(calls) == 1
+    assert op_name_from_call(calls[0]) == "root_op"
+
+    # trace roots only + op filter
+    calls = client.get_calls(
+        filter={"trace_roots_only": True, "op_names": [root_op_ref]},
+    )
+    assert len(calls) == 2
+    assert op_name_from_call(calls[0]) == "root_op"
+    assert op_name_from_call(calls[1]) == "root_op"
+
+
+def test_filter_calls_by_ref(client):
+    obj = {"a": 1}
+    ref = client.save(obj, "obj").ref
+    ref2 = client.save(obj, "obj2").ref
+    ref3 = client.save(obj, "obj3").ref
+
+    @weave.op
+    def log_obj(ref: str):
+        return {
+            "ref2": ref2,
+            "ref3": ref3,
+        }
+
+    log_obj(ref)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for input ref
+    calls = client.get_calls(filter={"input_refs": [ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # now query by filtering for output ref
+    calls = client.get_calls(filter={"output_refs": [ref2.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by both input and output ref
+    calls = client.get_calls(
+        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
+    )
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by two output refs
+    calls = client.get_calls(filter={"output_refs": [ref2.uri(), ref3.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+    assert calls[0].output["ref3"] == obj
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
+    assert len(calls) == 0
+
+    # filter by the wrong ref
+    calls = client.get_calls(filter={"output_refs": [ref.uri()]})
+    assert len(calls) == 0
+
+    # filter by duplicate refs
+    calls = client.get_calls(filter={"input_refs": [ref.uri(), ref.uri()]})
+    assert len(calls) == 1
+    assert calls[0].inputs["ref"] == obj
+    assert calls[0].output["ref2"] == obj
+
+    # filter by empty refs, this is ambiguously defined, currently we treat
+    # this as "no filter"
+    calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
+    assert len(calls) == 1
+
+
+def test_files_stats(client):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    f_bytes = b"0" * 10000005
+    client.server.file_create(
+        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
+    )
+    read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
+
+    assert read_res.total_size_bytes == 10000005
+
+
+def test_no_400_on_invalid_artifact_url(client):
+    @weave.op()
+    def test() -> str:
+        # This url is too long, should be wandb-artifact:///entity/project/name:version
+        return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id
+
+
+def test_no_400_on_invalid_refs(client):
+    @weave.op()
+    def test() -> str:
+        # This ref is too long, should be weave:///entity/project/object/name:version
+        return "weave:///entity/project/object/toxic-extra-path/object:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id

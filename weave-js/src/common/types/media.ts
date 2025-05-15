@@ -196,6 +196,28 @@ export type MediaCardString =
   | 'molecule'
   | 'molecule-file';
 
+const mediaCardStrings: MediaCardString[] = [
+  'table',
+  'table-file',
+  'images',
+  'images/separated',
+  'image-file',
+  'videos',
+  'video-file',
+  'audio',
+  'audio-file',
+  'html',
+  'html-file',
+  'plotly',
+  'plotly-file',
+  'object3D',
+  'object3D-file',
+  'bokeh',
+  'bokeh-file',
+  'molecule',
+  'molecule-file',
+];
+
 // A simplified version of the media types
 // This is useful for logic around different media types
 // without dealing with all of the different key names
@@ -210,7 +232,7 @@ export type MediaCardType =
   | 'audio'
   | 'plotly';
 
-export const mediaCardStrings = [
+export const mediaCardTypeStrings = [
   'image',
   'video',
   'object3D',
@@ -223,11 +245,15 @@ export const mediaCardStrings = [
 ] as MediaCardType[];
 
 export const isMediaCardType = (type: string): type is MediaCardType => {
-  return _.includes(mediaCardStrings, type);
+  return _.includes(mediaCardTypeStrings, type);
 };
 
 export const isMediaString = (type: string): type is MediaString => {
   return _.includes(mediaStrings, type);
+};
+
+export const isMediaCardString = (type: string): type is MediaCardString => {
+  return _.includes(mediaCardStrings, type);
 };
 
 export const mediaCardTypeToKeys = (mediaType: MediaCardType) => {
