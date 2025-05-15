@@ -489,6 +489,75 @@ You can also track class and object methods.
 
     print(call)
     ```
+    
+    ### Customize rendered traces with `weave.Markdown`
+
+    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
+    With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
+    Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
+
+    The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
+    
+    <pre>
+    ```python
+    import weave
+
+    def postprocess_inputs(query) -> weave.Markdown:
+        search_box = f"""
+    🔍 **Search Query:**
+    ``+`
+    {query}
+    ``+`
+    """
+        return {"search_box": weave.Markdown(search_box),
+                "query": query}
+
+
+    def postprocess_output(docs) -> weave.Markdown:
+        formatted_docs = f"""
+    # 📰 {docs[0]["title"]}
+
+    {docs[0]["content"]}
+
+    🔗 [Read more]({docs[0]["url"]})
+
+    ---
+
+    # 📰 {docs[1]["title"]}
+
+    {docs[1]["content"]}
+
+    🔗 [Read more]({docs[1]["url"]})
+    """
+        return weave.Markdown(formatted_docs)
+
+    @weave.op(
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+    )
+    def rag_step(query):
+        # example newspaper articles of the companies on the S&P 500 
+        docs = [
+            {
+                "title": "OpenAI",
+                "content": "OpenAI is a company that makes AI models.",
+                "url": "https://www.openai.com",
+            },
+            {
+                "title": "Google",
+                "content": "Google is a company that makes search engines.",
+                "url": "https://www.google.com",
+            },
+        ]
+        return docs
+
+    if __name__ == "__main__":
+        weave.init('markdown_renderers')
+        rag_step("Tell me about OpenAI")
+    ```
+    </pre>
+
+    ![A call rendered in the Weave UI using the code sample.](imgs/md-call-render.png)
 
     </TabItem>
     <TabItem value="typescript" label="TypeScript">

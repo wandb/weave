@@ -132,6 +132,9 @@ def test_simple_op(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+            "python": {
+                "type": "function",
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
@@ -1381,6 +1384,9 @@ def test_attributes_on_ops(client):
             "os_version": platform.version(),
             "os_release": platform.release(),
             "sys_version": sys.version,
+        },
+        "python": {
+            "type": "function",
         },
     }
 

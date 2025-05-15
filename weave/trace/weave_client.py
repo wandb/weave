@@ -968,27 +968,40 @@ class WeaveClient:
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """
-        Get a list of calls.
+        Retrieve a list of traced calls (operations) for this project.
+
+        This method provides a powerful and flexible interface for querying trace data.
+        It supports pagination, filtering, sorting, field projection, and scoring metadata,
+        and can be used to power custom trace UIs or analysis tools.
+
+        Performance Tip: Specify `columns` and use `filter` or `query` to reduce result size.
 
         Args:
-            filter: A filter to apply to the calls.
-            limit: The maximum number of calls to return.
-            offset: The number of calls to skip.
-            sort_by: A list of fields to sort the calls by.
-            query: A mongo-like query to filter the calls.
-            include_costs: If true, cost info is included at summary.weave
-            include_feedback: If true, feedback info is included at summary.weave.feedback
-            columns: A list of columns to include in the response. If None,
-               all columns are included. Specifying fewer columns may be more performant.
-               Some columns are always included: id, project_id, trace_id, op_name, started_at
-            scored_by: Accepts a list or single item. Each item is a name or ref uri of a scorer
-                to filter by. Multiple scorers are ANDed together. If passing in just the name,
-                then scores for all versions of the scorer are returned. If passing in the full ref
-                URI, then scores for a specific version of the scorer are returned.
-            page_size: Tune performance by changing the number of calls fetched at a time.
+            `filter`: High-level filter for narrowing results by fields like `op_name`, `parent_ids`, etc.
+            `limit`: Maximum number of calls to return.
+            `offset`: Number of calls to skip before returning results (used for pagination).
+            `sort_by`: List of fields to sort the results by (e.g., `started_at desc`).
+            `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
+            `include_costs`: If True, includes token/cost info in `summary.weave`.
+            `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
+            `columns`: List of fields to return per call. Reducing this can significantly improve performance.
+                    (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
-            An iterator of calls.
+            `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
+
+        Example:
+            ```python
+            calls = client.get_calls(
+                filter=CallsFilter(op_names=["my_op"]),
+                columns=["inputs", "output", "summary"],
+                limit=100,
+            )
+            for call in calls:
+                print(call.inputs, call.output)
+            ```
         """
         if filter is None:
             filter = CallsFilter()
