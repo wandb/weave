@@ -333,7 +333,7 @@ def _create_call(
     return client.create_call(
         func,
         inputs_with_defaults,
-        parent=parent_call,
+        parent_call,
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
