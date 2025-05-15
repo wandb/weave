@@ -130,6 +130,7 @@ export const useCallAsChat = (
 ): {
   loading: boolean;
 } & Chat => {
+  console.log('useCallAsChat', call);
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();
@@ -163,7 +164,7 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   }
   const {inputs, output, ...rest} = traceCall;
   return {
-    input: normalizeChatRequest(traceCall.inputs),
+    inputs: normalizeChatRequest(traceCall.inputs),
     output: normalizeChatCompletion(traceCall.inputs, traceCall.output),
     ...rest,
   };
