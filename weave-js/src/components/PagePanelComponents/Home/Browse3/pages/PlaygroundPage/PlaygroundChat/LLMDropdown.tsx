@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
@@ -122,7 +121,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   ]);
 
   return (
-    <Box sx={{width: '300px'}}>
+    <div className="w-[300px]">
       <Select
         isDisabled={areProvidersLoading}
         placeholder={
@@ -203,6 +202,6 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           defaultProvider={selectedProvider}
         />
       )}
-    </Box>
+    </div>
   );
 };

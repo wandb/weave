@@ -98,6 +98,7 @@
     "pako": "^2.1.0",
     "papaparse": "^5.5.2",
     "pca-js": "^1.0.2",
+    "pdfjs-dist": "^5.2.133",
     "plotly.js": "^2.23.2",
     "plotly.js-dist-min": "^2.6.3",
     "prismjs": "1.29.0",

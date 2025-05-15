@@ -122,8 +122,8 @@ export const SmallWeaveObjectRef = ({
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjectVersion} = useWFHooks();
-  const objectVersion = useObjectVersion(
-    {
+  const objectVersion = useObjectVersion({
+    key: {
       scheme: 'weave',
       entity: objRef.entityName,
       project: objRef.projectName,
@@ -133,8 +133,8 @@ export const SmallWeaveObjectRef = ({
       path: '',
       refExtra: objRef.artifactRefExtra,
     },
-    true
-  );
+    metadataOnly: true,
+  });
 
   const error = objectVersion?.error ?? null;
   if (objectVersion.loading && !error) {
@@ -187,7 +187,7 @@ export const SmallWeaveCallRef = ({
     callId: objRef.artifactName,
   };
 
-  const callResult = useCall(callKey);
+  const callResult = useCall({key: callKey});
 
   const error = callResult.loading
     ? null

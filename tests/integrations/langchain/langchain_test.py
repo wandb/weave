@@ -83,6 +83,35 @@ def test_simple_chain_invoke(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
+def test_simple_chain_invoke_no_client(client) -> None:
+    """If no client is available, we should not trace the call, and also not crash."""
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    client.finish()
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+    long_str = (
+        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
+    )
+    name = long_str + long_str
+    prompt.name = name
+
+    exp_name = "really_massive_name_that_is_longer_than_max_characte_ff6e_at_is_longer_than_max_characters_which_would_be_crazy"
+
+    llm_chain = prompt | llm
+    _ = llm_chain.invoke({"number": 2})
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
 @pytest.mark.asyncio
 @pytest.mark.skip  # TODO: remove this once the langchain issue is fixed
 async def test_simple_chain_ainvoke(

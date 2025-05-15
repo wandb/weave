@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -48,11 +47,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
 
   return (
     <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-        </Box>
-      }
+      title="Playground"
       hideTabsIfSingle
       headerContent={null}
       tabs={[
@@ -119,27 +114,17 @@ export const PlaygroundPageInner = ({
       : null;
   }, [entity, project, callId]);
 
-  const call = useCall(callKey);
-  const callWithCosts = useCall(callKey, {
-    includeCosts: true,
-  });
+  const call = useCall({key: callKey});
+  const callWithCosts = useCall({key: callKey, includeCosts: true});
 
-  const {result: calls} = useCalls(
+  const {result: calls} = useCalls({
     entity,
     project,
-    {
+    filter: {
       callIds: playgroundStates.map(state => state.traceCall.id || ''),
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      includeCosts: true,
-    }
-  );
+    includeCosts: true,
+  });
 
   const {
     result: configuredProviders,
