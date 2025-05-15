@@ -47,6 +47,7 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
+from weave.trace.logging import weave_print
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
@@ -110,7 +111,7 @@ class DisplayNameFuncError(ValueError): ...
 
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
-        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        weave_print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 @dataclass
