@@ -6,7 +6,7 @@ import json
 from collections import defaultdict
 
 MAX_TOKENS = 2000  # Approximate word count cap for non-core entries
-BASE_URL = "https://docs.yourcompany.com/"
+BASE_URL = "https://weave-docs.wandb.ai/"
 
 CATEGORY_HINTS = {
     "guides/integrations": "Integrations",
@@ -113,7 +113,7 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
         url_path = md_file.relative_to(docs_dir).with_suffix("").as_posix()
         url = f"{BASE_URL}{url_path}"
 
-        md_block = f"# {title}\n\n{cleaned}\n\n[Source]({url})"
+        md_block = f"<!--- {section}: {category} -->\n<!--- {title} -->\n\n# {title}\n\n{cleaned}\n\n[Source]({url})"
         sections[section][category].append((title, url, md_block))
 
         json_entries.append({
@@ -141,7 +141,6 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
 
     for section_name in ["Docs", "Optional"]:
         for category in sorted(sections[section_name].keys()):
-            full_md.append(f"# {section_name}: {category}\n")
             full_md.extend(entry for _, _, entry in sections[section_name][category])
             full_md.append("")
 

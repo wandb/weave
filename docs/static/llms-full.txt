@@ -10,342 +10,342 @@
 
 ### Core Types
 
-- [Models](https://docs.yourcompany.com/guides/core-types/models)
+- [Models](https://weave-docs.wandb.ai/guides/core-types/models)
 
-- [Media](https://docs.yourcompany.com/guides/core-types/media)
+- [Media](https://weave-docs.wandb.ai/guides/core-types/media)
 
-- [Env Vars](https://docs.yourcompany.com/guides/core-types/env-vars)
+- [Env Vars](https://weave-docs.wandb.ai/guides/core-types/env-vars)
 
-- [Datasets](https://docs.yourcompany.com/guides/core-types/datasets)
+- [Datasets](https://weave-docs.wandb.ai/guides/core-types/datasets)
 
-- [Prompts](https://docs.yourcompany.com/guides/core-types/prompts)
+- [Prompts](https://weave-docs.wandb.ai/guides/core-types/prompts)
 
-- [Evaluations](https://docs.yourcompany.com/guides/core-types/evaluations)
+- [Evaluations](https://weave-docs.wandb.ai/guides/core-types/evaluations)
 
 
 
 ### Evaluation
 
-- [Builtin Scorers](https://docs.yourcompany.com/guides/evaluation/builtin_scorers)
+- [Builtin Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
 
-- [Guardrails And Monitors](https://docs.yourcompany.com/guides/evaluation/guardrails_and_monitors)
+- [Guardrails And Monitors](https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors)
 
-- [Scorers](https://docs.yourcompany.com/guides/evaluation/scorers)
+- [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers)
 
-- [Weave Local Scorers](https://docs.yourcompany.com/guides/evaluation/weave_local_scorers)
+- [Weave Local Scorers](https://weave-docs.wandb.ai/guides/evaluation/weave_local_scorers)
 
-- [Evaluation Logger](https://docs.yourcompany.com/guides/evaluation/evaluation_logger)
+- [Evaluation Logger](https://weave-docs.wandb.ai/guides/evaluation/evaluation_logger)
 
 
 
 ### Integrations
 
-- [Smolagents](https://docs.yourcompany.com/guides/integrations/smolagents)
+- [Smolagents](https://weave-docs.wandb.ai/guides/integrations/smolagents)
 
-- [Huggingface](https://docs.yourcompany.com/guides/integrations/huggingface)
+- [Huggingface](https://weave-docs.wandb.ai/guides/integrations/huggingface)
 
-- [Local Models](https://docs.yourcompany.com/guides/integrations/local_models)
+- [Local Models](https://weave-docs.wandb.ai/guides/integrations/local_models)
 
-- [Dspy](https://docs.yourcompany.com/guides/integrations/dspy)
+- [Dspy](https://weave-docs.wandb.ai/guides/integrations/dspy)
 
-- [Anthropic](https://docs.yourcompany.com/guides/integrations/anthropic)
+- [Anthropic](https://weave-docs.wandb.ai/guides/integrations/anthropic)
 
-- [Groq](https://docs.yourcompany.com/guides/integrations/groq)
+- [Groq](https://weave-docs.wandb.ai/guides/integrations/groq)
 
-- [Litellm](https://docs.yourcompany.com/guides/integrations/litellm)
+- [Litellm](https://weave-docs.wandb.ai/guides/integrations/litellm)
 
-- [Mcp](https://docs.yourcompany.com/guides/integrations/mcp)
+- [Mcp](https://weave-docs.wandb.ai/guides/integrations/mcp)
 
-- [Openai](https://docs.yourcompany.com/guides/integrations/openai)
+- [Openai](https://weave-docs.wandb.ai/guides/integrations/openai)
 
-- [Bedrock](https://docs.yourcompany.com/guides/integrations/bedrock)
+- [Bedrock](https://weave-docs.wandb.ai/guides/integrations/bedrock)
 
-- [Openai Agents](https://docs.yourcompany.com/guides/integrations/openai_agents)
+- [Openai Agents](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
 
-- [Nvidia Nim](https://docs.yourcompany.com/guides/integrations/nvidia_nim)
+- [Nvidia Nim](https://weave-docs.wandb.ai/guides/integrations/nvidia_nim)
 
-- [Langchain](https://docs.yourcompany.com/guides/integrations/langchain)
+- [Langchain](https://weave-docs.wandb.ai/guides/integrations/langchain)
 
-- [Pydantic Ai](https://docs.yourcompany.com/guides/integrations/pydantic_ai)
+- [Pydantic Ai](https://weave-docs.wandb.ai/guides/integrations/pydantic_ai)
 
-- [Cohere](https://docs.yourcompany.com/guides/integrations/cohere)
+- [Cohere](https://weave-docs.wandb.ai/guides/integrations/cohere)
 
-- [Mistral](https://docs.yourcompany.com/guides/integrations/mistral)
+- [Mistral](https://weave-docs.wandb.ai/guides/integrations/mistral)
 
-- [Index](https://docs.yourcompany.com/guides/integrations/index)
+- [Index](https://weave-docs.wandb.ai/guides/integrations/index)
 
-- [Cerebras](https://docs.yourcompany.com/guides/integrations/cerebras)
+- [Cerebras](https://weave-docs.wandb.ai/guides/integrations/cerebras)
 
-- [Instructor](https://docs.yourcompany.com/guides/integrations/instructor)
+- [Instructor](https://weave-docs.wandb.ai/guides/integrations/instructor)
 
-- [Google](https://docs.yourcompany.com/guides/integrations/google)
+- [Google](https://weave-docs.wandb.ai/guides/integrations/google)
 
-- [Together Ai](https://docs.yourcompany.com/guides/integrations/together_ai)
+- [Together Ai](https://weave-docs.wandb.ai/guides/integrations/together_ai)
 
-- [Llamaindex](https://docs.yourcompany.com/guides/integrations/llamaindex)
+- [Llamaindex](https://weave-docs.wandb.ai/guides/integrations/llamaindex)
 
-- [Notdiamond](https://docs.yourcompany.com/guides/integrations/notdiamond)
+- [Notdiamond](https://weave-docs.wandb.ai/guides/integrations/notdiamond)
 
-- [Openrouter](https://docs.yourcompany.com/guides/integrations/openrouter)
+- [Openrouter](https://weave-docs.wandb.ai/guides/integrations/openrouter)
 
-- [Crewai](https://docs.yourcompany.com/guides/integrations/crewai)
+- [Crewai](https://weave-docs.wandb.ai/guides/integrations/crewai)
 
-- [Azure](https://docs.yourcompany.com/guides/integrations/azure)
+- [Azure](https://weave-docs.wandb.ai/guides/integrations/azure)
 
 
 
 ### Introduction
 
-- [Introduction](https://docs.yourcompany.com/introduction)
+- [Introduction](https://weave-docs.wandb.ai/introduction)
 
 
 
 ### Other
 
-- [Troubleshooting](https://docs.yourcompany.com/guides/troubleshooting)
+- [Troubleshooting](https://weave-docs.wandb.ai/guides/troubleshooting)
 
-- [Intro Notebook](https://docs.yourcompany.com/reference/generated_typescript_docs/intro-notebook)
+- [Intro Notebook](https://weave-docs.wandb.ai/reference/generated_typescript_docs/intro-notebook)
 
 
 
 ### Platform
 
-- [Weave Self Managed](https://docs.yourcompany.com/guides/platform/weave-self-managed)
+- [Weave Self Managed](https://weave-docs.wandb.ai/guides/platform/weave-self-managed)
 
-- [Index](https://docs.yourcompany.com/guides/platform/index)
+- [Index](https://weave-docs.wandb.ai/guides/platform/index)
 
 
 
 ### Python SDK
 
-- [Index](https://docs.yourcompany.com/reference/python-sdk/weave/index)
+- [Index](https://weave-docs.wandb.ai/reference/python-sdk/weave/index)
 
-- [Weave.Trace.Op](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.op)
+- [Weave.Trace.Op](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.op)
 
-- [Weave.Trace.Weave Client](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.weave_client)
+- [Weave.Trace.Weave Client](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.weave_client)
 
-- [Weave.Trace.Util](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.util)
+- [Weave.Trace.Util](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.util)
 
-- [Weave.Trace.Feedback](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.feedback)
+- [Weave.Trace.Feedback](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.feedback)
 
-- [Weave.Trace Server Bindings.Remote Http Trace Server](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server)
+- [Weave.Trace Server Bindings.Remote Http Trace Server](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server)
 
-- [Weave.Trace Server.Trace Server Interface](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface)
+- [Weave.Trace Server.Trace Server Interface](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface)
 
-- [Weave.Trace Server.Interface.Query](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server/interface/weave.trace_server.interface.query)
+- [Weave.Trace Server.Interface.Query](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/interface/weave.trace_server.interface.query)
 
 
 
 ### Quickstart
 
-- [Quickstart](https://docs.yourcompany.com/quickstart)
+- [Quickstart](https://weave-docs.wandb.ai/quickstart)
 
 
 
 ### Service API
 
-- ["Refs Read Batch"](https://docs.yourcompany.com/reference/service-api/refs-read-batch-refs-read-batch-post.api)
+- ["Refs Read Batch"](https://weave-docs.wandb.ai/reference/service-api/refs-read-batch-refs-read-batch-post.api)
 
-- ["Objs Query"](https://docs.yourcompany.com/reference/service-api/objs-query-objs-query-post.api)
+- ["Objs Query"](https://weave-docs.wandb.ai/reference/service-api/objs-query-objs-query-post.api)
 
-- ["Call Start"](https://docs.yourcompany.com/reference/service-api/call-start-call-start-post.api)
+- ["Call Start"](https://weave-docs.wandb.ai/reference/service-api/call-start-call-start-post.api)
 
-- ["Table Update"](https://docs.yourcompany.com/reference/service-api/table-update-table-update-post.api)
+- ["Table Update"](https://weave-docs.wandb.ai/reference/service-api/table-update-table-update-post.api)
 
-- ["Table Query Stats Batch"](https://docs.yourcompany.com/reference/service-api/table-query-stats-batch-table-query-stats-batch-post.api)
+- ["Table Query Stats Batch"](https://weave-docs.wandb.ai/reference/service-api/table-query-stats-batch-table-query-stats-batch-post.api)
 
-- ["Feedback Purge"](https://docs.yourcompany.com/reference/service-api/feedback-purge-feedback-purge-post.api)
+- ["Feedback Purge"](https://weave-docs.wandb.ai/reference/service-api/feedback-purge-feedback-purge-post.api)
 
-- ["Table Query"](https://docs.yourcompany.com/reference/service-api/table-query-table-query-post.api)
+- ["Table Query"](https://weave-docs.wandb.ai/reference/service-api/table-query-table-query-post.api)
 
-- ["Calls Query Stream"](https://docs.yourcompany.com/reference/service-api/calls-query-stream-calls-stream-query-post.api)
+- ["Calls Query Stream"](https://weave-docs.wandb.ai/reference/service-api/calls-query-stream-calls-stream-query-post.api)
 
-- ["Cost Create"](https://docs.yourcompany.com/reference/service-api/cost-create-cost-create-post.api)
+- ["Cost Create"](https://weave-docs.wandb.ai/reference/service-api/cost-create-cost-create-post.api)
 
-- ["Read Root"](https://docs.yourcompany.com/reference/service-api/read-root-health-get.api)
+- ["Read Root"](https://weave-docs.wandb.ai/reference/service-api/read-root-health-get.api)
 
-- ["Calls Delete"](https://docs.yourcompany.com/reference/service-api/calls-delete-calls-delete-post.api)
+- ["Calls Delete"](https://weave-docs.wandb.ai/reference/service-api/calls-delete-calls-delete-post.api)
 
-- ["Call Update"](https://docs.yourcompany.com/reference/service-api/call-update-call-update-post.api)
+- ["Call Update"](https://weave-docs.wandb.ai/reference/service-api/call-update-call-update-post.api)
 
-- ["Read Version"](https://docs.yourcompany.com/reference/service-api/read-version-version-get.api)
+- ["Read Version"](https://weave-docs.wandb.ai/reference/service-api/read-version-version-get.api)
 
-- ["Table Query Stats"](https://docs.yourcompany.com/reference/service-api/table-query-stats-table-query-stats-post.api)
+- ["Table Query Stats"](https://weave-docs.wandb.ai/reference/service-api/table-query-stats-table-query-stats-post.api)
 
-- ["FastAPI"](https://docs.yourcompany.com/reference/service-api/fastapi.info)
+- ["FastAPI"](https://weave-docs.wandb.ai/reference/service-api/fastapi.info)
 
-- ["Obj Read"](https://docs.yourcompany.com/reference/service-api/obj-read-obj-read-post.api)
+- ["Obj Read"](https://weave-docs.wandb.ai/reference/service-api/obj-read-obj-read-post.api)
 
-- ["Table Create"](https://docs.yourcompany.com/reference/service-api/table-create-table-create-post.api)
+- ["Table Create"](https://weave-docs.wandb.ai/reference/service-api/table-create-table-create-post.api)
 
-- ["Server Info"](https://docs.yourcompany.com/reference/service-api/server-info-server-info-get.api)
+- ["Server Info"](https://weave-docs.wandb.ai/reference/service-api/server-info-server-info-get.api)
 
-- ["Obj Create"](https://docs.yourcompany.com/reference/service-api/obj-create-obj-create-post.api)
+- ["Obj Create"](https://weave-docs.wandb.ai/reference/service-api/obj-create-obj-create-post.api)
 
-- ["Feedback Create"](https://docs.yourcompany.com/reference/service-api/feedback-create-feedback-create-post.api)
+- ["Feedback Create"](https://weave-docs.wandb.ai/reference/service-api/feedback-create-feedback-create-post.api)
 
-- ["Call End"](https://docs.yourcompany.com/reference/service-api/call-end-call-end-post.api)
+- ["Call End"](https://weave-docs.wandb.ai/reference/service-api/call-end-call-end-post.api)
 
-- ["File Content"](https://docs.yourcompany.com/reference/service-api/file-content-file-content-post.api)
+- ["File Content"](https://weave-docs.wandb.ai/reference/service-api/file-content-file-content-post.api)
 
-- ["Cost Purge"](https://docs.yourcompany.com/reference/service-api/cost-purge-cost-purge-post.api)
+- ["Cost Purge"](https://weave-docs.wandb.ai/reference/service-api/cost-purge-cost-purge-post.api)
 
-- ["Export Trace"](https://docs.yourcompany.com/reference/service-api/export-trace-otel-v-1-traces-post.api)
+- ["Export Trace"](https://weave-docs.wandb.ai/reference/service-api/export-trace-otel-v-1-traces-post.api)
 
-- ["Feedback Query"](https://docs.yourcompany.com/reference/service-api/feedback-query-feedback-query-post.api)
+- ["Feedback Query"](https://weave-docs.wandb.ai/reference/service-api/feedback-query-feedback-query-post.api)
 
-- ["Call Read"](https://docs.yourcompany.com/reference/service-api/call-read-call-read-post.api)
+- ["Call Read"](https://weave-docs.wandb.ai/reference/service-api/call-read-call-read-post.api)
 
-- ["Calls Query Stats"](https://docs.yourcompany.com/reference/service-api/calls-query-stats-calls-query-stats-post.api)
+- ["Calls Query Stats"](https://weave-docs.wandb.ai/reference/service-api/calls-query-stats-calls-query-stats-post.api)
 
-- ["File Create"](https://docs.yourcompany.com/reference/service-api/file-create-file-create-post.api)
+- ["File Create"](https://weave-docs.wandb.ai/reference/service-api/file-create-file-create-post.api)
 
-- ["Cost Query"](https://docs.yourcompany.com/reference/service-api/cost-query-cost-query-post.api)
+- ["Cost Query"](https://weave-docs.wandb.ai/reference/service-api/cost-query-cost-query-post.api)
 
-- ["Call Start Batch"](https://docs.yourcompany.com/reference/service-api/call-start-batch-call-upsert-batch-post.api)
+- ["Call Start Batch"](https://weave-docs.wandb.ai/reference/service-api/call-start-batch-call-upsert-batch-post.api)
 
-- ["Feedback Replace"](https://docs.yourcompany.com/reference/service-api/feedback-replace-feedback-replace-post.api)
+- ["Feedback Replace"](https://weave-docs.wandb.ai/reference/service-api/feedback-replace-feedback-replace-post.api)
 
-- ["Obj Delete"](https://docs.yourcompany.com/reference/service-api/obj-delete-obj-delete-post.api)
+- ["Obj Delete"](https://weave-docs.wandb.ai/reference/service-api/obj-delete-obj-delete-post.api)
 
 
 
 ### Tools
 
-- [Comparison](https://docs.yourcompany.com/guides/tools/comparison)
+- [Comparison](https://weave-docs.wandb.ai/guides/tools/comparison)
 
-- [Deploy](https://docs.yourcompany.com/guides/tools/deploy)
+- [Deploy](https://weave-docs.wandb.ai/guides/tools/deploy)
 
-- [Playground](https://docs.yourcompany.com/guides/tools/playground)
+- [Playground](https://weave-docs.wandb.ai/guides/tools/playground)
 
-- [Saved Views](https://docs.yourcompany.com/guides/tools/saved-views)
+- [Saved Views](https://weave-docs.wandb.ai/guides/tools/saved-views)
 
-- [Index](https://docs.yourcompany.com/guides/tools/index)
+- [Index](https://weave-docs.wandb.ai/guides/tools/index)
 
-- [Serve](https://docs.yourcompany.com/guides/tools/serve)
+- [Serve](https://weave-docs.wandb.ai/guides/tools/serve)
 
 
 
 ### Tracking
 
-- [Costs](https://docs.yourcompany.com/guides/tracking/costs)
+- [Costs](https://weave-docs.wandb.ai/guides/tracking/costs)
 
-- [Ops](https://docs.yourcompany.com/guides/tracking/ops)
+- [Ops](https://weave-docs.wandb.ai/guides/tracking/ops)
 
-- [Faqs](https://docs.yourcompany.com/guides/tracking/faqs)
+- [Faqs](https://weave-docs.wandb.ai/guides/tracking/faqs)
 
-- [Otel](https://docs.yourcompany.com/guides/tracking/otel)
+- [Otel](https://weave-docs.wandb.ai/guides/tracking/otel)
 
-- [Video](https://docs.yourcompany.com/guides/tracking/video)
+- [Video](https://weave-docs.wandb.ai/guides/tracking/video)
 
-- [Objects](https://docs.yourcompany.com/guides/tracking/objects)
+- [Objects](https://weave-docs.wandb.ai/guides/tracking/objects)
 
-- [Trace Tree](https://docs.yourcompany.com/guides/tracking/trace-tree)
+- [Trace Tree](https://weave-docs.wandb.ai/guides/tracking/trace-tree)
 
-- [Index](https://docs.yourcompany.com/guides/tracking/index)
+- [Index](https://weave-docs.wandb.ai/guides/tracking/index)
 
-- [Tracing](https://docs.yourcompany.com/guides/tracking/tracing)
+- [Tracing](https://weave-docs.wandb.ai/guides/tracking/tracing)
 
-- [Feedback](https://docs.yourcompany.com/guides/tracking/feedback)
+- [Feedback](https://weave-docs.wandb.ai/guides/tracking/feedback)
 
-- [Redact Pii](https://docs.yourcompany.com/guides/tracking/redact-pii)
+- [Redact Pii](https://weave-docs.wandb.ai/guides/tracking/redact-pii)
 
 
 
 ### Tutorials
 
-- [Tutorial Eval](https://docs.yourcompany.com/tutorial-eval)
+- [Tutorial Eval](https://weave-docs.wandb.ai/tutorial-eval)
 
-- [Tutorial Rag](https://docs.yourcompany.com/tutorial-rag)
+- [Tutorial Rag](https://weave-docs.wandb.ai/tutorial-rag)
 
-- [Tutorial Weave Models](https://docs.yourcompany.com/tutorial-weave_models)
+- [Tutorial Weave Models](https://weave-docs.wandb.ai/tutorial-weave_models)
 
-- [Tutorial Tracing 2](https://docs.yourcompany.com/tutorial-tracing_2)
+- [Tutorial Tracing 2](https://weave-docs.wandb.ai/tutorial-tracing_2)
 
 
 
 ### TypeScript SDK
 
-- [Readme](https://docs.yourcompany.com/reference/typescript-sdk/weave/README)
+- [Readme](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/README)
 
-- [Weaveclient](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/WeaveClient)
+- [Weaveclient](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveClient)
 
-- [Dataset](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/Dataset)
+- [Dataset](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Dataset)
 
-- [Weaveobject](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/WeaveObject)
+- [Weaveobject](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveObject)
 
-- [Evaluation](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/Evaluation)
+- [Evaluation](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Evaluation)
 
-- [Op](https://docs.yourcompany.com/reference/typescript-sdk/weave/type-aliases/Op)
+- [Op](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/type-aliases/Op)
 
-- [Requirecurrentcallstackentry](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/requireCurrentCallStackEntry)
+- [Requirecurrentcallstackentry](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentCallStackEntry)
 
-- [Weaveaudio](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/weaveAudio)
+- [Weaveaudio](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveAudio)
 
-- [Weaveimage](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/weaveImage)
+- [Weaveimage](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveImage)
 
-- [Op](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/op)
+- [Op](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/op)
 
-- [Login](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/login)
+- [Login](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/login)
 
-- [Init](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/init)
+- [Init](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/init)
 
-- [Wrapopenai](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/wrapOpenAI)
+- [Wrapopenai](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/wrapOpenAI)
 
-- [Requirecurrentchildsummary](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/requireCurrentChildSummary)
+- [Requirecurrentchildsummary](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentChildSummary)
 
-- [Callsfilter](https://docs.yourcompany.com/reference/typescript-sdk/weave/interfaces/CallsFilter)
+- [Callsfilter](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallsFilter)
 
-- [Callschema](https://docs.yourcompany.com/reference/typescript-sdk/weave/interfaces/CallSchema)
+- [Callschema](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallSchema)
 
 
 
 ### Example Notebooks
 
-- [Scorers as Guardrails](https://docs.yourcompany.com/reference/gen_notebooks/scorers_as_guardrails)
+- [Scorers as Guardrails](https://weave-docs.wandb.ai/reference/gen_notebooks/scorers_as_guardrails)
 
-- [Intro To Weave Hello Eval](https://docs.yourcompany.com/reference/gen_notebooks/Intro_to_Weave_Hello_Eval)
+- [Intro To Weave Hello Eval](https://weave-docs.wandb.ai/reference/gen_notebooks/Intro_to_Weave_Hello_Eval)
 
-- [Service API](https://docs.yourcompany.com/reference/gen_notebooks/weave_via_service_api)
+- [Service API](https://weave-docs.wandb.ai/reference/gen_notebooks/weave_via_service_api)
 
-- [Custom Model Cost](https://docs.yourcompany.com/reference/gen_notebooks/custom_model_cost)
+- [Custom Model Cost](https://weave-docs.wandb.ai/reference/gen_notebooks/custom_model_cost)
 
-- [Log Feedback from Production](https://docs.yourcompany.com/reference/gen_notebooks/feedback_prod)
+- [Log Feedback from Production](https://weave-docs.wandb.ai/reference/gen_notebooks/feedback_prod)
 
-- [Intro To Weave Hello Trace](https://docs.yourcompany.com/reference/gen_notebooks/Intro_to_Weave_Hello_Trace)
+- [Intro To Weave Hello Trace](https://weave-docs.wandb.ai/reference/gen_notebooks/Intro_to_Weave_Hello_Trace)
 
-- [NotDiamond Custom Routing](https://docs.yourcompany.com/reference/gen_notebooks/notdiamond_custom_routing)
+- [NotDiamond Custom Routing](https://weave-docs.wandb.ai/reference/gen_notebooks/notdiamond_custom_routing)
 
-- [Handling and Redacting PII](https://docs.yourcompany.com/reference/gen_notebooks/pii)
+- [Handling and Redacting PII](https://weave-docs.wandb.ai/reference/gen_notebooks/pii)
 
-- [Prompt Optimization](https://docs.yourcompany.com/reference/gen_notebooks/dspy_prompt_optimization)
+- [Prompt Optimization](https://weave-docs.wandb.ai/reference/gen_notebooks/dspy_prompt_optimization)
 
-- [Code Generation](https://docs.yourcompany.com/reference/gen_notebooks/codegen)
+- [Code Generation](https://weave-docs.wandb.ai/reference/gen_notebooks/codegen)
 
-- [Models And Weave Integration Demo](https://docs.yourcompany.com/reference/gen_notebooks/Models_and_Weave_Integration_Demo)
+- [Models And Weave Integration Demo](https://weave-docs.wandb.ai/reference/gen_notebooks/Models_and_Weave_Integration_Demo)
 
-- [Introduction Notebook](https://docs.yourcompany.com/reference/gen_notebooks/01-intro_notebook)
+- [Introduction Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/01-intro_notebook)
 
-- [Integrating with Weave - Production Dashboard](https://docs.yourcompany.com/reference/gen_notebooks/online_monitoring)
+- [Integrating with Weave - Production Dashboard](https://weave-docs.wandb.ai/reference/gen_notebooks/online_monitoring)
 
-- [Using HuggingFace Datasets in evaluations with `preprocess_model_input`](https://docs.yourcompany.com/reference/gen_notebooks/hf_dataset_evals)
+- [Using HuggingFace Datasets in evaluations with `preprocess_model_input`](https://weave-docs.wandb.ai/reference/gen_notebooks/hf_dataset_evals)
 
-- [Log Calls from Existing CSV](https://docs.yourcompany.com/reference/gen_notebooks/import_from_csv)
+- [Log Calls from Existing CSV](https://weave-docs.wandb.ai/reference/gen_notebooks/import_from_csv)
 
-- [Structured Outputs for Multi-Agent Systems](https://docs.yourcompany.com/reference/gen_notebooks/multi-agent-structured-output)
+- [Structured Outputs for Multi-Agent Systems](https://weave-docs.wandb.ai/reference/gen_notebooks/multi-agent-structured-output)
 
-- [Ocr Pipeline](https://docs.yourcompany.com/reference/gen_notebooks/ocr-pipeline)
+- [Ocr Pipeline](https://weave-docs.wandb.ai/reference/gen_notebooks/ocr-pipeline)
 
-- [Chain of Density Summarization](https://docs.yourcompany.com/reference/gen_notebooks/chain_of_density)
+- [Chain of Density Summarization](https://weave-docs.wandb.ai/reference/gen_notebooks/chain_of_density)
 
-- [Log Audio With Weave](https://docs.yourcompany.com/reference/gen_notebooks/audio_with_weave)
+- [Log Audio With Weave](https://weave-docs.wandb.ai/reference/gen_notebooks/audio_with_weave)
 
-- [Leaderboard Quickstart](https://docs.yourcompany.com/reference/gen_notebooks/leaderboard_quickstart)
+- [Leaderboard Quickstart](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
 
 
 
-# Docs: Core Types
-
+<!--- Docs: Core Types -->
+<!--- Models -->
 
 # Models
 
@@ -430,7 +430,10 @@ A `Model` is a combination of data (which can include configuration, trained mod
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
 
-[Source](https://docs.yourcompany.com/guides/core-types/models)
+[Source](https://weave-docs.wandb.ai/guides/core-types/models)
+
+<!--- Docs: Core Types -->
+<!--- Media -->
 
 # Media
 
@@ -595,7 +598,10 @@ This audio is logged to Weave and automatically displayed in the UI, along with 
 
 > 🌟 **Tip**: Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) or Open in Colab. The cookbook also includes an advanced example of a Real Time Audio API based assistant integrated with Weave.
 
-[Source](https://docs.yourcompany.com/guides/core-types/media)
+[Source](https://weave-docs.wandb.ai/guides/core-types/media)
+
+<!--- Docs: Core Types -->
+<!--- Env Vars -->
 
 # Env Vars
 
@@ -640,7 +646,10 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 - `true`, `1`, `yes`, `on` for True
 - `false`, `0`, `no`, `off` for False
 
-[Source](https://docs.yourcompany.com/guides/core-types/env-vars)
+[Source](https://weave-docs.wandb.ai/guides/core-types/env-vars)
+
+<!--- Docs: Core Types -->
+<!--- Datasets -->
 
 # Datasets
 
@@ -881,7 +890,10 @@ You can create, edit, and delete `Dataset`s in the UI.
 
 10. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
 
-[Source](https://docs.yourcompany.com/guides/core-types/datasets)
+[Source](https://weave-docs.wandb.ai/guides/core-types/datasets)
+
+<!--- Docs: Core Types -->
+<!--- Prompts -->
 
 # Prompts
 
@@ -1038,7 +1050,10 @@ response = client.chat.completions.create(
 )
 ```
 
-[Source](https://docs.yourcompany.com/guides/core-types/prompts)
+[Source](https://weave-docs.wandb.ai/guides/core-types/prompts)
+
+<!--- Docs: Core Types -->
+<!--- Evaluations -->
 
 # Evaluations
 
@@ -1310,12 +1325,12 @@ See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_note
 
 You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
 
-[Source](https://docs.yourcompany.com/guides/core-types/evaluations)
+[Source](https://weave-docs.wandb.ai/guides/core-types/evaluations)
 
 
 
-# Docs: Evaluation
-
+<!--- Docs: Evaluation -->
+<!--- Builtin Scorers -->
 
 # Builtin Scorers
 
@@ -1773,7 +1788,10 @@ summarization_scorer = SummarizationScorer(
 )
 ```
 
-[Source](https://docs.yourcompany.com/guides/evaluation/builtin_scorers)
+[Source](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Guardrails And Monitors -->
 
 # Guardrails And Monitors
 
@@ -2315,7 +2333,10 @@ This example demonstrates:
 - Explore [Available Scorers](./scorers.md)
 - Learn about [Weave Ops](../../guides/tracking/ops.md)
 
-[Source](https://docs.yourcompany.com/guides/evaluation/guardrails_and_monitors)
+[Source](https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors)
+
+<!--- Docs: Evaluation -->
+<!--- Scorers -->
 
 # Scorers
 
@@ -2766,7 +2787,10 @@ Next, click the `View Traces` button under `Scores` to view all the calls scored
 
 This will default to the selected version of the Scorer. You can remove the version filter to see all the calls scored by any version of the Scorer.
 
-[Source](https://docs.yourcompany.com/guides/evaluation/scorers)
+[Source](https://weave-docs.wandb.ai/guides/evaluation/scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Weave Local Scorers -->
 
 # Weave Local Scorers
 
@@ -3093,7 +3117,10 @@ The object returned by these scorers contains a `passed` boolean attribute indic
 
     To use Weave scorers in TypeScript, see [function-based scorers](scorers#function-based-scorers).
 
-[Source](https://docs.yourcompany.com/guides/evaluation/weave_local_scorers)
+[Source](https://weave-docs.wandb.ai/guides/evaluation/weave_local_scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Evaluation Logger -->
 
 # Evaluation Logger
 
@@ -3324,12 +3351,12 @@ for model in models:
 - Use `log_summary` to capture metrics not tied to single predictions (e.g., overall latency).
 - Rich media logging is great for qualitative analysis.
 
-[Source](https://docs.yourcompany.com/guides/evaluation/evaluation_logger)
+[Source](https://weave-docs.wandb.ai/guides/evaluation/evaluation_logger)
 
 
 
-# Docs: Integrations
-
+<!--- Docs: Integrations -->
+<!--- Smolagents -->
 
 # Smolagents
 
@@ -3438,7 +3465,10 @@ answer = agent.run("What is the weather in Tokyo?")
 
 Once you run the code sample, navigate to your Weave project dashboard to view the traces.
 
-[Source](https://docs.yourcompany.com/guides/integrations/smolagents)
+[Source](https://weave-docs.wandb.ai/guides/integrations/smolagents)
+
+<!--- Docs: Integrations -->
+<!--- Huggingface -->
 
 # Huggingface
 
@@ -3648,7 +3678,10 @@ rich.print(city_visit_recommender.predict("Paris"))
 
 Weave automatically logs models and tracks different versions, making it easy to analyze performance and experiment history.
 
-[Source](https://docs.yourcompany.com/guides/integrations/huggingface)
+[Source](https://weave-docs.wandb.ai/guides/integrations/huggingface)
+
+<!--- Docs: Integrations -->
+<!--- Local Models -->
 
 # Local Models
 
@@ -3684,7 +3717,10 @@ Here's a list of apps that allows you to download and run models from Hugging Fa
 1. llama.cpp via [llama-cpp-python](https://llama-cpp-python.readthedocs.io/en/latest/server/) python package
 1. [llamafile](https://github.com/Mozilla-Ocho/llamafile#other-example-llamafiles) - `http://localhost:8080/v1` automatically supports OpenAI SDK on Llamafile run
 
-[Source](https://docs.yourcompany.com/guides/integrations/local_models)
+[Source](https://weave-docs.wandb.ai/guides/integrations/local_models)
+
+<!--- Docs: Integrations -->
+<!--- Dspy -->
 
 # Dspy
 
@@ -3809,7 +3845,10 @@ optimized_module = optimizer.compile(
 
 [](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
 
-[Source](https://docs.yourcompany.com/guides/integrations/dspy)
+[Source](https://weave-docs.wandb.ai/guides/integrations/dspy)
+
+<!--- Docs: Integrations -->
+<!--- Anthropic -->
 
 # Anthropic
 
@@ -3982,7 +4021,10 @@ We automatically capture the tools you used on the prompt and keep them versione
 
 [](https://wandb.ai/capecape/anthropic_project/weave/calls)
 
-[Source](https://docs.yourcompany.com/guides/integrations/anthropic)
+[Source](https://weave-docs.wandb.ai/guides/integrations/anthropic)
+
+<!--- Docs: Integrations -->
+<!--- Groq -->
 
 # Groq
 
@@ -4135,7 +4177,10 @@ You can serve your model by using the following command in the terminal:
 weave serve weave:///your_entity/project-name/YourModel:
 ```
 
-[Source](https://docs.yourcompany.com/guides/integrations/groq)
+[Source](https://weave-docs.wandb.ai/guides/integrations/groq)
+
+<!--- Docs: Integrations -->
+<!--- Litellm -->
 
 # Litellm
 
@@ -4281,7 +4326,10 @@ We automatically capture the functions you used in the prompt and keep them vers
 
 [](https://wandb.ai/a-sh0ts/weave_litellm_integration/weave/calls)
 
-[Source](https://docs.yourcompany.com/guides/integrations/litellm)
+[Source](https://weave-docs.wandb.ai/guides/integrations/litellm)
+
+<!--- Docs: Integrations -->
+<!--- Mcp -->
 
 # Mcp
 
@@ -4489,7 +4537,10 @@ In any case, an observability layer allows you to:
 - Audit the workflow or execution logic
 - Identify bottlenecks
 
-[Source](https://docs.yourcompany.com/guides/integrations/mcp)
+[Source](https://weave-docs.wandb.ai/guides/integrations/mcp)
+
+<!--- Docs: Integrations -->
+<!--- Openai -->
 
 # Openai
 
@@ -4799,7 +4850,10 @@ If you explicitly set `stream=True` and `stream_options={"include_usage": True}`
 
 OpenAI deprecated the `functions` argument in favor of `tool_calls`. Since frameworks like Langchain, LlamaIndex, etc., still support this argument our OpenAI weave integration will trace if you pass list of function schemas to `functions` argument.
 
-[Source](https://docs.yourcompany.com/guides/integrations/openai)
+[Source](https://weave-docs.wandb.ai/guides/integrations/openai)
+
+<!--- Docs: Integrations -->
+<!--- Bedrock -->
 
 # Bedrock
 
@@ -4957,7 +5011,10 @@ Do you want to experiment with Amazon Bedrock models in the Weave UI without any
 
 The [Compare LLMs on Bedrock for text summarization with Weave](https://wandb.ai/byyoung3/ML_NEWS3/reports/Compare-LLMs-on-Amazon-Bedrock-for-text-summarization-with-W-B-Weave--VmlldzoxMDI1MTIzNw) report explains how to use Bedrock in combination with Weave to evaluate and compare LLMs for summarization tasks, code samples included.
 
-[Source](https://docs.yourcompany.com/guides/integrations/bedrock)
+[Source](https://weave-docs.wandb.ai/guides/integrations/bedrock)
+
+<!--- Docs: Integrations -->
+<!--- Openai Agents -->
 
 # Openai Agents
 
@@ -5021,7 +5078,10 @@ if __name__ == "__main__":
 
 When the above code sample is run, a link to the Weave dashboard is generated. To see what happened during your agent execution, follow the link to see your agent traces.
 
-[Source](https://docs.yourcompany.com/guides/integrations/openai_agents)
+[Source](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
+
+<!--- Docs: Integrations -->
+<!--- Nvidia Nim -->
 
 # Nvidia Nim
 
@@ -5190,7 +5250,10 @@ Navigate to Weave and you can click `get_pokemon_data` in the UI to see the inpu
 The ChatNVIDIA integration supports `invoke`, `stream` and their async variants. It also supports tool use. 
 As ChatNVIDIA is meant to be used with many types of models, it does not have function calling support.
 
-[Source](https://docs.yourcompany.com/guides/integrations/nvidia_nim)
+[Source](https://weave-docs.wandb.ai/guides/integrations/nvidia_nim)
+
+<!--- Docs: Integrations -->
+<!--- Langchain -->
 
 # Langchain
 
@@ -5453,7 +5516,10 @@ By integrating Weave with Langchain, you can ensure comprehensive logging and mo
 
 - **Tracing Async Calls** - A bug in the implementation of the `AsyncCallbackManager` in Langchain results in async calls not being traced in the correct order. We have filed a [PR](https://github.com/langchain-ai/langchain/pull/23909) to fix this. Therefore, the order of calls in the trace may not be accurate when using `ainvoke`, `astream` and `abatch` methods in Langchain Runnables.
 
-[Source](https://docs.yourcompany.com/guides/integrations/langchain)
+[Source](https://weave-docs.wandb.ai/guides/integrations/langchain)
+
+<!--- Docs: Integrations -->
+<!--- Pydantic Ai -->
 
 # Pydantic Ai
 
@@ -5609,7 +5675,10 @@ This is useful for larger applications where you want consistent tracing across 
 - [Official PydanticAI documentation](https://ai.pydantic.dev/)
 - [PydanticAI GitHub repository](https://github.com/pydantic/pydantic-ai)
 
-[Source](https://docs.yourcompany.com/guides/integrations/pydantic_ai)
+[Source](https://weave-docs.wandb.ai/guides/integrations/pydantic_ai)
+
+<!--- Docs: Integrations -->
+<!--- Cohere -->
 
 # Cohere
 
@@ -5716,7 +5785,10 @@ print(result)
 
 [](https://wandb.ai/capecape/cohere_dev/weave/models)
 
-[Source](https://docs.yourcompany.com/guides/integrations/cohere)
+[Source](https://weave-docs.wandb.ai/guides/integrations/cohere)
+
+<!--- Docs: Integrations -->
+<!--- Mistral -->
 
 # Mistral
 
@@ -5843,7 +5915,10 @@ print(result)
 
 [](https://wandb.ai/capecape/mistralai_project/weave/models)
 
-[Source](https://docs.yourcompany.com/guides/integrations/mistral)
+[Source](https://weave-docs.wandb.ai/guides/integrations/mistral)
+
+<!--- Docs: Integrations -->
+<!--- Index -->
 
 # Index
 
@@ -5897,7 +5972,10 @@ Weave integrates with standardized protocols that enable communication between A
 
 Choose an integration from the lists above to learn more about how to use Weave with your preferred LLM provider, framework, or protocol. Whether you're directly accessing LLM APIs, building complex pipelines, or using standardized protocols, Weave provides the tools to trace and analyze your AI applications effectively.
 
-[Source](https://docs.yourcompany.com/guides/integrations/index)
+[Source](https://weave-docs.wandb.ai/guides/integrations/index)
+
+<!--- Docs: Integrations -->
+<!--- Cerebras -->
 
 # Cerebras
 
@@ -6009,7 +6087,10 @@ With this setup, you can easily experiment with different models and parameters,
 
 [](https://wandb.ai/capecape/cerebras_speedster/weave/traces)
 
-[Source](https://docs.yourcompany.com/guides/integrations/cerebras)
+[Source](https://weave-docs.wandb.ai/guides/integrations/cerebras)
+
+<!--- Docs: Integrations -->
+<!--- Instructor -->
 
 # Instructor
 
@@ -6182,7 +6263,10 @@ You can serve your model by using the following command in the terminal:
 weave serve weave:///your_entity/project-name/YourModel:
 ```
 
-[Source](https://docs.yourcompany.com/guides/integrations/instructor)
+[Source](https://weave-docs.wandb.ai/guides/integrations/instructor)
+
+<!--- Docs: Integrations -->
+<!--- Google -->
 
 # Google
 
@@ -6308,7 +6392,10 @@ print(city_recommender.predict("San Francisco"))
 print(city_recommender.predict("Los Angeles"))
 ```
 
-[Source](https://docs.yourcompany.com/guides/integrations/google)
+[Source](https://weave-docs.wandb.ai/guides/integrations/google)
+
+<!--- Docs: Integrations -->
+<!--- Together Ai -->
 
 # Together Ai
 
@@ -6353,7 +6440,10 @@ print("Together response:\n", response)
 
 While this is a simple example to get started, see our [OpenAI](/guides/integrations/openai#track-your-own-ops) guide for more details on how to integrate Weave with your own functions for more complex use cases.
 
-[Source](https://docs.yourcompany.com/guides/integrations/together_ai)
+[Source](https://weave-docs.wandb.ai/guides/integrations/together_ai)
+
+<!--- Docs: Integrations -->
+<!--- Llamaindex -->
 
 # Llamaindex
 
@@ -6547,7 +6637,10 @@ This evaluation builds on the example in the earlier section. Evaluating using `
 
 By integrating Weave with LlamaIndex, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization using evaluation.
 
-[Source](https://docs.yourcompany.com/guides/integrations/llamaindex)
+[Source](https://weave-docs.wandb.ai/guides/integrations/llamaindex)
+
+<!--- Docs: Integrations -->
+<!--- Notdiamond -->
 
 # Notdiamond
 
@@ -6665,7 +6758,10 @@ Visit the [docs] or [send us a message][support] for further support.
 [quickstart guide]: https://docs.notdiamond.ai/docs/quickstart
 [support]: mailto:support@notdiamond.ai
 
-[Source](https://docs.yourcompany.com/guides/integrations/notdiamond)
+[Source](https://weave-docs.wandb.ai/guides/integrations/notdiamond)
+
+<!--- Docs: Integrations -->
+<!--- Openrouter -->
 
 # Openrouter
 
@@ -6708,7 +6804,10 @@ print("Model response:\n", response)
 
 While this is a simple example to get started, see our [OpenAI](/guides/integrations/openai#track-your-own-ops) guide for more details on how to integrate Weave with your own functions for more complex use cases.
 
-[Source](https://docs.yourcompany.com/guides/integrations/openrouter)
+[Source](https://weave-docs.wandb.ai/guides/integrations/openrouter)
+
+<!--- Docs: Integrations -->
+<!--- Crewai -->
 
 # Crewai
 
@@ -6975,7 +7074,10 @@ Do let us know what we should improve about this integration. Please open an iss
 
 Learn more about how to build powerful multiagent systems using CrewAI through their [many examples](https://github.com/crewAIInc/crewAI-examples) and [documentation](https://docs.crewai.com/introduction).
 
-[Source](https://docs.yourcompany.com/guides/integrations/crewai)
+[Source](https://weave-docs.wandb.ai/guides/integrations/crewai)
+
+<!--- Docs: Integrations -->
+<!--- Azure -->
 
 # Azure
 
@@ -7014,12 +7116,12 @@ Learn how to use the [Azure AI Model Inference API] with Weave to gain insights 
 
 Learn how to trace Azure OpenAI models using Weave in [this guide](https://wandb.ai/a-sh0ts/azure-weave-cookbook/reports/How-to-use-Azure-OpenAI-and-Azure-AI-Studio-with-W-B-Weave--Vmlldzo4MTI0NDgy).
 
-[Source](https://docs.yourcompany.com/guides/integrations/azure)
+[Source](https://weave-docs.wandb.ai/guides/integrations/azure)
 
 
 
-# Docs: Introduction
-
+<!--- Docs: Introduction -->
+<!--- Introduction -->
 
 # Introduction
 
@@ -7052,12 +7154,12 @@ Learn more about advanced topics:
 - [Cookbooks](./reference/gen_notebooks/01-intro_notebook.md): Build with Weave using Python and TypeScript. Tutorials are available as interactive notebooks.
 - [W&B AI Academy](https://www.wandb.courses/pages/w-b-courses): Build advanced RAG systems, improve LLM prompting, fine-tune LLMs, and more.
 
-[Source](https://docs.yourcompany.com/introduction)
+[Source](https://weave-docs.wandb.ai/introduction)
 
 
 
-# Docs: Other
-
+<!--- Docs: Other -->
+<!--- Troubleshooting -->
 
 # Troubleshooting
 
@@ -7205,7 +7307,10 @@ To resolve this issue, increase the system limit for open files to `65,536` usin
 ulimit -n 65536
 ```
 
-[Source](https://docs.yourcompany.com/guides/troubleshooting)
+[Source](https://weave-docs.wandb.ai/guides/troubleshooting)
+
+<!--- Docs: Other -->
+<!--- Intro Notebook -->
 
 # Intro Notebook
 
@@ -7435,12 +7540,12 @@ async function main() {
 }
 ```
 
-[Source](https://docs.yourcompany.com/reference/generated_typescript_docs/intro-notebook)
+[Source](https://weave-docs.wandb.ai/reference/generated_typescript_docs/intro-notebook)
 
 
 
-# Docs: Platform
-
+<!--- Docs: Platform -->
+<!--- Weave Self Managed -->
 
 # Weave Self Managed
 
@@ -7907,7 +8012,10 @@ This has the same effect of `replicated: true` which in preview.
 
 Once the deployment is running, accessing the W&B endpoint configured in the `host` option should display the Weave licensing status as enabled.
 
-[Source](https://docs.yourcompany.com/guides/platform/weave-self-managed)
+[Source](https://weave-docs.wandb.ai/guides/platform/weave-self-managed)
+
+<!--- Docs: Platform -->
+<!--- Index -->
 
 # Index
 
@@ -7952,12 +8060,12 @@ If you're using Weave on SaaS Cloud or Dedicated Cloud, you avoid the overhead a
 
 Security controls for both SaaS Cloud and Dedicated Cloud are periodically audited internally and externally. Both platforms are SOC 2 Type II compliant. Additionally, Dedicated Cloud is HIPAA-compliant for organizations managing PHI data while building Generative AI applications.
 
-[Source](https://docs.yourcompany.com/guides/platform/index)
+[Source](https://weave-docs.wandb.ai/guides/platform/index)
 
 
 
-# Docs: Python SDK
-
+<!--- Docs: Python SDK -->
+<!--- Index -->
 
 # Index
 
@@ -9549,7 +9657,10 @@ Note this is the "result" page with traces etc, not the URL for the view object.
 unpin_column(col_name: 'str') → SavedView
 ```
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/index)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/index)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Op -->
 
 # Weave.Trace.Op
 
@@ -9628,7 +9739,10 @@ for call in calls:
      print(call)
 ```
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.op)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.op)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Weave Client -->
 
 # Weave.Trace.Weave Client
 
@@ -10422,7 +10536,10 @@ to_dict() → CallDict
 PaginatedIterator(*args, **kwargs)
 ```
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.weave_client)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.weave_client)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Util -->
 
 # Weave.Trace.Util
 
@@ -10597,7 +10714,10 @@ This is a non-negative integer. See the get_native_id() function. This represent
 run() → None
 ```
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.util)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.util)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Feedback -->
 
 # Weave.Trace.Feedback
 
@@ -10854,7 +10974,10 @@ refresh() → Feedbacks
 refs() → Refs
 ```
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace/weave.trace.feedback)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.feedback)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server Bindings.Remote Http Trace Server -->
 
 # Weave.Trace Server Bindings.Remote Http Trace Server
 
@@ -11538,7 +11661,10 @@ Similar to `calls/batch_upsert`, we can dynamically adjust the payload size due 
 
 - `batch`: `list[typing.Union[StartBatchItem, EndBatchItem]]`
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server.Trace Server Interface -->
 
 # Weave.Trace Server.Trace Server Interface
 
@@ -13864,7 +13990,10 @@ An enumeration.
 
 ## class `WeaveSummarySchema`
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server.Interface.Query -->
 
 # Weave.Trace Server.Interface.Query
 
@@ -14121,12 +14250,12 @@ simplifications:
 
 - `$expr`: `typing.Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
 
-[Source](https://docs.yourcompany.com/reference/python-sdk/weave/trace_server/interface/weave.trace_server.interface.query)
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/interface/weave.trace_server.interface.query)
 
 
 
-# Docs: Quickstart
-
+<!--- Docs: Quickstart -->
+<!--- Quickstart -->
 
 # Quickstart
 
@@ -14267,12 +14396,12 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrati
 
 - Follow the [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.
 
-[Source](https://docs.yourcompany.com/quickstart)
+[Source](https://weave-docs.wandb.ai/quickstart)
 
 
 
-# Docs: Service API
-
+<!--- Docs: Service API -->
+<!--- "Refs Read Batch" -->
 
 # "Refs Read Batch"
 
@@ -14629,7 +14758,10 @@ Refs Read Batch
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/refs-read-batch-refs-read-batch-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/refs-read-batch-refs-read-batch-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Objs Query" -->
 
 # "Objs Query"
 
@@ -15859,7 +15991,10 @@ Objs Query
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/objs-query-objs-query-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/objs-query-objs-query-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Call Start" -->
 
 # "Call Start"
 
@@ -16577,7 +16712,10 @@ Call Start
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/call-start-call-start-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/call-start-call-start-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Table Update" -->
 
 # "Table Update"
 
@@ -17175,7 +17313,10 @@ Table Update
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/table-update-table-update-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/table-update-table-update-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Table Query Stats Batch" -->
 
 # "Table Query Stats Batch"
 
@@ -17754,7 +17895,10 @@ Table Query Stats Batch
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/table-query-stats-batch-table-query-stats-batch-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/table-query-stats-batch-table-query-stats-batch-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Feedback Purge" -->
 
 # "Feedback Purge"
 
@@ -18158,7 +18302,10 @@ Permanently delete feedback.
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/feedback-purge-feedback-purge-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/feedback-purge-feedback-purge-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Table Query" -->
 
 # "Table Query"
 
@@ -18919,7 +19066,10 @@ Table Query
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/table-query-table-query-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/table-query-table-query-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Calls Query Stream" -->
 
 # "Calls Query Stream"
 
@@ -20356,7 +20506,10 @@ Calls Query Stream
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/calls-query-stream-calls-stream-query-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/calls-query-stream-calls-stream-query-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Cost Create" -->
 
 # "Cost Create"
 
@@ -21064,7 +21217,10 @@ Cost Create
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/cost-create-cost-create-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/cost-create-cost-create-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Read Root" -->
 
 # "Read Root"
 
@@ -21140,7 +21296,10 @@ Read Root
                     >
                       any
 
-[Source](https://docs.yourcompany.com/reference/service-api/read-root-health-get.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/read-root-health-get.api)
+
+<!--- Docs: Service API -->
+<!--- "Calls Delete" -->
 
 # "Calls Delete"
 
@@ -21559,7 +21718,10 @@ Calls Delete
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/calls-delete-calls-delete-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/calls-delete-calls-delete-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Call Update" -->
 
 # "Call Update"
 
@@ -22023,7 +22185,10 @@ Call Update
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/call-update-call-update-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/call-update-call-update-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Read Version" -->
 
 # "Read Version"
 
@@ -22099,7 +22264,10 @@ Read Version
                     >
                       any
 
-[Source](https://docs.yourcompany.com/reference/service-api/read-version-version-get.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/read-version-version-get.api)
+
+<!--- Docs: Service API -->
+<!--- "Table Query Stats" -->
 
 # "Table Query Stats"
 
@@ -22465,7 +22633,10 @@ Table Query Stats
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/table-query-stats-table-query-stats-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/table-query-stats-table-query-stats-post.api)
+
+<!--- Docs: Service API -->
+<!--- "FastAPI" -->
 
 # "FastAPI"
 
@@ -22521,7 +22692,10 @@ Table Query Stats
               
                 basic
 
-[Source](https://docs.yourcompany.com/reference/service-api/fastapi.info)
+[Source](https://weave-docs.wandb.ai/reference/service-api/fastapi.info)
+
+<!--- Docs: Service API -->
+<!--- "Obj Read" -->
 
 # "Obj Read"
 
@@ -23242,7 +23416,10 @@ Obj Read
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/obj-read-obj-read-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/obj-read-obj-read-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Table Create" -->
 
 # "Table Create"
 
@@ -23655,7 +23832,10 @@ Table Create
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/table-create-table-create-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/table-create-table-create-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Server Info" -->
 
 # "Server Info"
 
@@ -23750,7 +23930,10 @@ Server Info
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/server-info-server-info-get.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/server-info-server-info-get.api)
+
+<!--- Docs: Service API -->
+<!--- "Obj Create" -->
 
 # "Obj Create"
 
@@ -24306,7 +24489,10 @@ Obj Create
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/obj-create-obj-create-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/obj-create-obj-create-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Feedback Create" -->
 
 # "Feedback Create"
 
@@ -24995,7 +25181,10 @@ Add feedback to a call or object.
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/feedback-create-feedback-create-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/feedback-create-feedback-create-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Call End" -->
 
 # "Call End"
 
@@ -25840,7 +26029,10 @@ Call End
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/call-end-call-end-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/call-end-call-end-post.api)
+
+<!--- Docs: Service API -->
+<!--- "File Content" -->
 
 # "File Content"
 
@@ -26187,7 +26379,10 @@ File Content
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/file-content-file-content-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/file-content-file-content-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Cost Purge" -->
 
 # "Cost Purge"
 
@@ -26591,7 +26786,10 @@ Cost Purge
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/cost-purge-cost-purge-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/cost-purge-cost-purge-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Export Trace" -->
 
 # "Export Trace"
 
@@ -26875,7 +27073,10 @@ Export Trace
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/export-trace-otel-v-1-traces-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/export-trace-otel-v-1-traces-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Feedback Query" -->
 
 # "Feedback Query"
 
@@ -27492,7 +27693,10 @@ Query for feedback.
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/feedback-query-feedback-query-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/feedback-query-feedback-query-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Call Read" -->
 
 # "Call Read"
 
@@ -28511,7 +28715,10 @@ Call Read
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/call-read-call-read-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/call-read-call-read-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Calls Query Stats" -->
 
 # "Calls Query Stats"
 
@@ -29497,7 +29704,10 @@ Calls Query Stats
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/calls-query-stats-calls-query-stats-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/calls-query-stats-calls-query-stats-post.api)
+
+<!--- Docs: Service API -->
+<!--- "File Create" -->
 
 # "File Create"
 
@@ -29863,7 +30073,10 @@ File Create
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/file-create-file-create-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/file-create-file-create-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Cost Query" -->
 
 # "Cost Query"
 
@@ -30881,7 +31094,10 @@ Cost Query
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/cost-query-cost-query-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/cost-query-cost-query-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Call Start Batch" -->
 
 # "Call Start Batch"
 
@@ -32335,7 +32551,10 @@ Call Start Batch
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/call-start-batch-call-upsert-batch-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/call-start-batch-call-upsert-batch-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Feedback Replace" -->
 
 # "Feedback Replace"
 
@@ -33033,7 +33252,10 @@ Feedback Replace
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/feedback-replace-feedback-replace-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/feedback-replace-feedback-replace-post.api)
+
+<!--- Docs: Service API -->
+<!--- "Obj Delete" -->
 
 # "Obj Delete"
 
@@ -33464,12 +33686,12 @@ Obj Delete
                     language={"json"}
                   >
 
-[Source](https://docs.yourcompany.com/reference/service-api/obj-delete-obj-delete-post.api)
+[Source](https://weave-docs.wandb.ai/reference/service-api/obj-delete-obj-delete-post.api)
 
 
 
-# Docs: Tools
-
+<!--- Docs: Tools -->
+<!--- Comparison -->
 
 # Comparison
 
@@ -33599,7 +33821,10 @@ To remove an object from comparison, do the following:
  - The Comparison feature is only available in the UI.
  - You can compare as many objects as you'd like. However, the UI only displays a maximum of 6. To view an object in the comparison table that is not visible when comparing more than 6 objects, either [change the comparison order](#change-the-comparison-order) so that the object is one of the first 6 objects from left to right, or [pair from a multi-object comparison](#compare-a-pair-from-a-multi-object-comparison) for easy viewing.
 
-[Source](https://docs.yourcompany.com/guides/tools/comparison)
+[Source](https://weave-docs.wandb.ai/guides/tools/comparison)
+
+<!--- Docs: Tools -->
+<!--- Deploy -->
 
 # Deploy
 
@@ -33625,7 +33850,10 @@ weave deploy gcp --help
 
 to see all command line options.
 
-[Source](https://docs.yourcompany.com/guides/tools/deploy)
+[Source](https://weave-docs.wandb.ai/guides/tools/deploy)
+
+<!--- Docs: Tools -->
+<!--- Playground -->
 
 # Playground
 
@@ -34076,7 +34304,10 @@ Edit an existing [saved model](#save-a-model) to fine-tune parameters or refresh
 4. In the chat settings window, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
 5. Click **Update model**. The model is updated and accesible from **Saved Models** in the LLM dropdown.
 
-[Source](https://docs.yourcompany.com/guides/tools/playground)
+[Source](https://weave-docs.wandb.ai/guides/tools/playground)
+
+<!--- Docs: Tools -->
+<!--- Saved Views -->
 
 # Saved Views
 
@@ -34265,7 +34496,10 @@ You can create, load, rename, and edit saved views in the Weave UI. For fine-gra
 2. Click the hamburger menu to the right of the **Traces** or **Evals** tab. A dropdown menu showing all saved views displays. 
 3. At the bottom on the menu, click **Traces** or **Evals**. The default view displays.
 
-[Source](https://docs.yourcompany.com/guides/tools/saved-views)
+[Source](https://weave-docs.wandb.ai/guides/tools/saved-views)
+
+<!--- Docs: Tools -->
+<!--- Index -->
 
 # Index
 
@@ -34291,7 +34525,10 @@ Weave is developing a set of tools and utilities to help with your workflow and 
 
 Please note that these tools are still in very early stages of development. They may not be fully functional, could change significantly, or might be discontinued. We recommend using them for experimental purposes only at this time.
 
-[Source](https://docs.yourcompany.com/guides/tools/index)
+[Source](https://weave-docs.wandb.ai/guides/tools/index)
+
+<!--- Docs: Tools -->
+<!--- Serve -->
 
 # Serve
 
@@ -34324,12 +34561,12 @@ Get your model ref by navigating to the model and copying it from the UI. It sho
 
 To use it, navigate to the Swagger UI link, click the predict endpoint and then click "Try it out!".
 
-[Source](https://docs.yourcompany.com/guides/tools/serve)
+[Source](https://weave-docs.wandb.ai/guides/tools/serve)
 
 
 
-# Docs: Tracking
-
+<!--- Docs: Tracking -->
+<!--- Costs -->
 
 # Costs
 
@@ -34478,7 +34715,10 @@ To use it, navigate to the Swagger UI link, click the predict endpoint and then 
 
 Try our cookbook for a [Setting up costs with a custom model](/reference/gen_notebooks/custom_model_cost) or Open in Colab
 
-[Source](https://docs.yourcompany.com/guides/tracking/costs)
+[Source](https://weave-docs.wandb.ai/guides/tracking/costs)
+
+<!--- Docs: Tracking -->
+<!--- Ops -->
 
 # Ops
 
@@ -34658,7 +34898,10 @@ export WEAVE_PRINT_CALL_LINK=false
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
 
-[Source](https://docs.yourcompany.com/guides/tracking/ops)
+[Source](https://weave-docs.wandb.ai/guides/tracking/ops)
+
+<!--- Docs: Tracking -->
+<!--- Faqs -->
 
 # Faqs
 
@@ -34811,7 +35054,10 @@ evaluation = Evaluation(dataset=dataset, scorers=[pref_scorer])
 evaluation.evaluate(model_a)
 ```
 
-[Source](https://docs.yourcompany.com/guides/tracking/faqs)
+[Source](https://weave-docs.wandb.ai/guides/tracking/faqs)
+
+<!--- Docs: Tracking -->
+<!--- Otel -->
 
 # Otel
 
@@ -35078,7 +35324,10 @@ python opentelemetry_example.py
 
 The span attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all span attributes are visible in the trace view. The full span is available in the side panel when you select a trace.
 
-[Source](https://docs.yourcompany.com/guides/tracking/otel)
+[Source](https://weave-docs.wandb.ai/guides/tracking/otel)
+
+<!--- Docs: Tracking -->
+<!--- Video -->
 
 # Video
 
@@ -35166,7 +35415,10 @@ if __name__ == "__main__":
 
 When the code sample runs successfully, you can view your video by clicking the link in the **Traces** table of your project.
 
-[Source](https://docs.yourcompany.com/guides/tracking/video)
+[Source](https://weave-docs.wandb.ai/guides/tracking/video)
+
+<!--- Docs: Tracking -->
+<!--- Objects -->
 
 # Objects
 
@@ -35268,7 +35520,10 @@ Refs can be constructed with a few different styles
 - `weave.ref(:)`: requires `weave.init()` to have been called.
 - `weave.ref()`: can be constructed without calling weave.init
 
-[Source](https://docs.yourcompany.com/guides/tracking/objects)
+[Source](https://weave-docs.wandb.ai/guides/tracking/objects)
+
+<!--- Docs: Tracking -->
+<!--- Trace Tree -->
 
 # Trace Tree
 
@@ -35352,7 +35607,10 @@ The graph view shows hierarchical relationships between ops. This is useful for 
 - Use the **"Filter by op name”** search bar at the top of the trace tree view to quickly isolate relevant tool or LLM calls.
 - Switch between views based on your debugging need. Use **Code View** for call logic, **Flame Graph** for to understand performance over time, and **Graph View** to understand structure.
 
-[Source](https://docs.yourcompany.com/guides/tracking/trace-tree)
+[Source](https://weave-docs.wandb.ai/guides/tracking/trace-tree)
+
+<!--- Docs: Tracking -->
+<!--- Index -->
 
 # Index
 
@@ -35394,7 +35652,10 @@ By leveraging these tracing capabilities, you can gain deeper insights into your
 
 For answers to common questions about Weave tracing, see the [FAQs page](./faqs.md)
 
-[Source](https://docs.yourcompany.com/guides/tracking/index)
+[Source](https://weave-docs.wandb.ai/guides/tracking/index)
+
+<!--- Docs: Tracking -->
+<!--- Tracing -->
 
 # Tracing
 
@@ -36388,7 +36649,10 @@ output, call = my_op.call()
 
 From here, the `call` object will have all the information about the call, including the inputs, outputs, and other metadata.
 
-[Source](https://docs.yourcompany.com/guides/tracking/tracing)
+[Source](https://weave-docs.wandb.ai/guides/tracking/tracing)
+
+<!--- Docs: Tracking -->
+<!--- Feedback -->
 
 # Feedback
 
@@ -36770,7 +37034,10 @@ The feedback API allows you to use a human annotation scorer by specifying a spe
     )
     ```
 
-[Source](https://docs.yourcompany.com/guides/tracking/feedback)
+[Source](https://weave-docs.wandb.ai/guides/tracking/feedback)
+
+<!--- Docs: Tracking -->
+<!--- Redact Pii -->
 
 # Redact Pii
 
@@ -36894,12 +37161,12 @@ whatever_else = "REDACTED"
 - This feature is only available in the Python SDK.
 - Enabling redaction increases processing time due to the Presidio dependency.
 
-[Source](https://docs.yourcompany.com/guides/tracking/redact-pii)
+[Source](https://weave-docs.wandb.ai/guides/tracking/redact-pii)
 
 
 
-# Docs: Tutorials
-
+<!--- Docs: Tutorials -->
+<!--- Tutorial Eval -->
 
 # Tutorial Eval
 
@@ -37246,7 +37513,10 @@ In some applications we want to create custom `Scorer` classes - where for examp
 
 - Follow the [Model-Based Evaluation of RAG applications](/tutorial-rag) to evaluate a RAG app using an LLM judge.
 
-[Source](https://docs.yourcompany.com/tutorial-eval)
+[Source](https://weave-docs.wandb.ai/tutorial-eval)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Rag -->
 
 # Tutorial Rag
 
@@ -37976,7 +38246,10 @@ Here, we show the code in it's entirety.
 We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
 We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
 
-[Source](https://docs.yourcompany.com/tutorial-rag)
+[Source](https://weave-docs.wandb.ai/tutorial-rag)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Weave Models -->
 
 # Tutorial Weave Models
 
@@ -38137,7 +38410,10 @@ Here you can now see the name Model version (v21) was used with the new input:
 
 - Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
 
-[Source](https://docs.yourcompany.com/tutorial-weave_models)
+[Source](https://weave-docs.wandb.ai/tutorial-weave_models)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Tracing 2 -->
 
 # Tutorial Tracing 2
 
@@ -38309,12 +38585,12 @@ To track system settings, such as a System Prompt, we recommend using [weave Mod
 
 - Follow the [App Versioning tutorial](/tutorial-weave_models) to capture, version and organize ad-hoc prompt, model, and application changes.
 
-[Source](https://docs.yourcompany.com/tutorial-tracing_2)
+[Source](https://weave-docs.wandb.ai/tutorial-tracing_2)
 
 
 
-# Docs: TypeScript SDK
-
+<!--- Docs: TypeScript SDK -->
+<!--- Readme -->
 
 # Readme
 
@@ -38351,7 +38627,10 @@ To track system settings, such as a System Prompt, we recommend using [weave Mod
 - [weaveImage](functions/weaveImage.md)
 - [wrapOpenAI](functions/wrapOpenAI.md)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/README)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/README)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveclient -->
 
 # Weaveclient
 
@@ -38683,7 +38962,10 @@ To track system settings, such as a System Prompt, we recommend using [weave Mod
 
 [weaveClient.ts:103](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L103)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/WeaveClient)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveClient)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Dataset -->
 
 # Dataset
 
@@ -38917,7 +39199,10 @@ const ref = await dataset.save()
 
 [weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/Dataset)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Dataset)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveobject -->
 
 # Weaveobject
 
@@ -39028,7 +39313,10 @@ const ref = await dataset.save()
 
 [weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/WeaveObject)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveObject)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Evaluation -->
 
 # Evaluation
 
@@ -39282,7 +39570,10 @@ const results = await evaluation.evaluate({ model });
 
 [weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/classes/Evaluation)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Evaluation)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Op -->
 
 # Op
 
@@ -39326,7 +39617,10 @@ const results = await evaluation.evaluate({ model });
 
 [opType.ts:6](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/opType.ts#L6)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/type-aliases/Op)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/type-aliases/Op)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Requirecurrentcallstackentry -->
 
 # Requirecurrentcallstackentry
 
@@ -39348,7 +39642,10 @@ const results = await evaluation.evaluate({ model });
 
 [clientApi.ts:119](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L119)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/requireCurrentCallStackEntry)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentCallStackEntry)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveaudio -->
 
 # Weaveaudio
 
@@ -39387,7 +39684,10 @@ const weaveAudio = weaveAudio({ data: audioBuffer });
 
 [media.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L62)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/weaveAudio)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveAudio)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveimage -->
 
 # Weaveimage
 
@@ -39426,7 +39726,10 @@ const weaveImage = weaveImage({ data: imageBuffer });
 
 [media.ts:28](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L28)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/weaveImage)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveImage)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Op -->
 
 # Op
 
@@ -39537,7 +39840,10 @@ const res = await model.invoke();
 
 [op.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L62)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/op)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/op)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Login -->
 
 # Login
 
@@ -39576,7 +39882,10 @@ If the API key is not specified or if the connection to the weave trace server c
 
 [clientApi.ts:22](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L22)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/login)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/login)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Init -->
 
 # Init
 
@@ -39616,7 +39925,10 @@ If the initialization fails
 
 [clientApi.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L57)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/init)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/init)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Wrapopenai -->
 
 # Wrapopenai
 
@@ -39658,7 +39970,10 @@ const result = await openai.chat.completions.create({
 
 [integrations/openai.ts:159](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/integrations/openai.ts#L159)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/wrapOpenAI)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/wrapOpenAI)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Requirecurrentchildsummary -->
 
 # Requirecurrentchildsummary
 
@@ -39680,7 +39995,10 @@ const result = await openai.chat.completions.create({
 
 [clientApi.ts:131](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L131)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/functions/requireCurrentChildSummary)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentChildSummary)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Callsfilter -->
 
 # Callsfilter
 
@@ -39802,7 +40120,10 @@ Wb User Ids
 
 [generated/traceServerApi.ts:201](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L201)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/interfaces/CallsFilter)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallsFilter)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Callschema -->
 
 # Callschema
 
@@ -40010,12 +40331,12 @@ Wb User Id
 
 [generated/traceServerApi.ts:130](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L130)
 
-[Source](https://docs.yourcompany.com/reference/typescript-sdk/weave/interfaces/CallSchema)
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallSchema)
 
 
 
-# Optional: Example Notebooks
-
+<!--- Optional: Example Notebooks -->
+<!--- Scorers as Guardrails -->
 
 # Scorers as Guardrails
 
@@ -40135,7 +40456,10 @@ for prompt in test_prompts:
     print(f"Response: {response}\n")
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/scorers_as_guardrails)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/scorers_as_guardrails)
+
+<!--- Optional: Example Notebooks -->
+<!--- Intro To Weave Hello Eval -->
 
 # Intro To Weave Hello Eval
 
@@ -40285,7 +40609,10 @@ await evaluation.evaluate(model)
 - Learn how to build an [evlauation pipeline end-to-end](https://weave-docs.wandb.ai/tutorial-eval). 
 - Learn how to evaluate a [RAG application by building](https://weave-docs.wandb.ai/tutorial-rag).
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/Intro_to_Weave_Hello_Eval)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/Intro_to_Weave_Hello_Eval)
+
+<!--- Optional: Example Notebooks -->
+<!--- Service API -->
 
 # Service API
 
@@ -40780,7 +41107,10 @@ else:
     print(response.text)
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/weave_via_service_api)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/weave_via_service_api)
+
+<!--- Optional: Example Notebooks -->
+<!--- Custom Model Cost -->
 
 # Custom Model Cost
 
@@ -40908,7 +41238,10 @@ calls = weave_client.get_calls(filter={"trace_roots_only": True}, include_costs=
 list(calls)
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/custom_model_cost)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/custom_model_cost)
+
+<!--- Optional: Example Notebooks -->
+<!--- Log Feedback from Production -->
 
 # Log Feedback from Production
 
@@ -41147,7 +41480,10 @@ call.feedback.add_reaction("👍")  # user reaction through the App UI
 
 In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/feedback_prod)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/feedback_prod)
+
+<!--- Optional: Example Notebooks -->
+<!--- Intro To Weave Hello Trace -->
 
 # Intro To Weave Hello Trace
 
@@ -41249,7 +41585,10 @@ extract_fruit(sentence)
 - Learn more about [advanced tracing topics](https://weave-docs.wandb.ai/tutorial-tracing_2).
 - Learn more about [tracing in Weave](https://weave-docs.wandb.ai/guides/tracking/tracing)
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/Intro_to_Weave_Hello_Trace)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/Intro_to_Weave_Hello_Trace)
+
+<!--- Optional: Example Notebooks -->
+<!--- NotDiamond Custom Routing -->
 
 # NotDiamond Custom Routing
 
@@ -41475,7 +41814,10 @@ Training the custom router via Weave will also run evaluations and upload result
 
 In the UI we see that the Not Diamond "meta-model" outperforms the best-performing model by routing prompts to other models with higher likelihood of answering the prompt accurately.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/notdiamond_custom_routing)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/notdiamond_custom_routing)
+
+<!--- Optional: Example Notebooks -->
+<!--- Handling and Redacting PII -->
 
 # Handling and Redacting PII
 
@@ -41483,7 +41825,10 @@ In the UI we see that the Not Diamond "meta-model" outperforms the best-performi
 
 > Content truncated.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/pii)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/pii)
+
+<!--- Optional: Example Notebooks -->
+<!--- Prompt Optimization -->
 
 # Prompt Optimization
 
@@ -41772,7 +42117,10 @@ When coomparing the evalution of the baseline program with the optimized one sho
 
 In this tutorial, we learned how to use DSPy for prompt optimization alongside using Weave for tracking and evaluation to compare the original and optimized programs.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/dspy_prompt_optimization)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/dspy_prompt_optimization)
+
+<!--- Optional: Example Notebooks -->
+<!--- Code Generation -->
 
 # Code Generation
 
@@ -42200,7 +42548,10 @@ Weave's seamless integration allows us to track inputs, outputs, and intermediat
 
 For more information on Weave and its capabilities, check out the [Weave documentation](https://docs.wandb.ai/weave). You can extend this example to handle larger datasets, implement more sophisticated evaluation metrics, or integrate with other LLM workflows.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/codegen)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/codegen)
+
+<!--- Optional: Example Notebooks -->
+<!--- Models And Weave Integration Demo -->
 
 # Models And Weave Integration Demo
 
@@ -42519,7 +42870,10 @@ with wandb.init(project=PROJECT, entity=ENTITY) as run:
     )
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/Models_and_Weave_Integration_Demo)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/Models_and_Weave_Integration_Demo)
+
+<!--- Optional: Example Notebooks -->
+<!--- Introduction Notebook -->
 
 # Introduction Notebook
 
@@ -42914,7 +43268,10 @@ summary = await evaluation.evaluate(corrector)  # can be a model or simple funct
 
 Follow the [Build an Evaluation pipeline](http://wandb.me/weave_eval_tut) tutorial to learn more about Evaluation and begin iteratively improving your applications.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/01-intro_notebook)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/01-intro_notebook)
+
+<!--- Optional: Example Notebooks -->
+<!--- Integrating with Weave - Production Dashboard -->
 
 # Integrating with Weave - Production Dashboard
 
@@ -43199,7 +43556,10 @@ In this cookbook, we demonstrated how to create a custom production monitoring d
 
 This custom dashboard extends Weave's native Traces view, allowing for tailored monitoring of LLM applications in production. If you're interested in viewing a more complex dashboard, check out a Streamlit example where you can add your own Weave project URL [in this repo](https://github.com/NiWaRe/agent-dev-collection).
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/online_monitoring)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/online_monitoring)
+
+<!--- Optional: Example Notebooks -->
+<!--- Using HuggingFace Datasets in evaluations with `preprocess_model_input` -->
 
 # Using HuggingFace Datasets in evaluations with `preprocess_model_input`
 
@@ -43350,7 +43710,10 @@ async def main():
 asyncio.run(main())
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/hf_dataset_evals)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/hf_dataset_evals)
+
+<!--- Optional: Example Notebooks -->
+<!--- Log Calls from Existing CSV -->
 
 # Log Calls from Existing CSV
 
@@ -43644,7 +44007,10 @@ weave.publish(dset)
 
 To learn more about evaluations, check out our [Quickstart](https://weave-docs.wandb.ai/tutorial-rag) on using your newly created dataset to evaluate your RAG application!
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/import_from_csv)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/import_from_csv)
+
+<!--- Optional: Example Notebooks -->
+<!--- Structured Outputs for Multi-Agent Systems -->
 
 # Structured Outputs for Multi-Agent Systems
 
@@ -43652,7 +44018,10 @@ To learn more about evaluations, check out our [Quickstart](https://weave-docs.w
 
 > Content truncated.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/multi-agent-structured-output)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/multi-agent-structured-output)
+
+<!--- Optional: Example Notebooks -->
+<!--- Ocr Pipeline -->
 
 # Ocr Pipeline
 
@@ -44001,7 +44370,10 @@ print(await evaluation.evaluate(named_entity_recognation))
 
 When the above code is run, a link to the Evaluation table in the Weave UI is generated. Follow the link to view the results and compare different iterations of the pipeline across models, prompts, and datasets of your choice. The Weave UI automatically creates a visualization like the one shown below for your team.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/ocr-pipeline)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/ocr-pipeline)
+
+<!--- Optional: Example Notebooks -->
+<!--- Chain of Density Summarization -->
 
 # Chain of Density Summarization
 
@@ -44390,7 +44762,10 @@ You can extend this example to handle larger datasets, implement more sophistica
 >
   View Full Report on W&B
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/chain_of_density)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/chain_of_density)
+
+<!--- Optional: Example Notebooks -->
+<!--- Log Audio With Weave -->
 
 # Log Audio With Weave
 
@@ -44398,7 +44773,10 @@ You can extend this example to handle larger datasets, implement more sophistica
 
 > Content truncated.
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/audio_with_weave)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/audio_with_weave)
+
+<!--- Optional: Example Notebooks -->
+<!--- Leaderboard Quickstart -->
 
 # Leaderboard Quickstart
 
@@ -44741,5 +45119,5 @@ This leaderboard compares the performance of models in terms of world knowledge 
 ref = weave.publish(spec)
 ```
 
-[Source](https://docs.yourcompany.com/reference/gen_notebooks/leaderboard_quickstart)
+[Source](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
 
