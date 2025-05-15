@@ -6,7 +6,6 @@ from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
-from rich import print
 from rich.console import Console
 from typing_extensions import Self
 

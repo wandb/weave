@@ -10,11 +10,11 @@ from weave_query import cache  # type: ignore
 
 # Script to run to delete expired caches
 if __name__ == "__main__":
-    print("Starting clear cache job", flush=True)
+    print("Starting clear cache job", flush=True)  # noqa: T201
     hour_interval = int(os.getenv("WEAVE_CACHE_CLEAR_INTERVAL", 24))
-    print("Clearing expired caches every " + str(hour_interval) + " hours", flush=True)
+    print("Clearing expired caches every " + str(hour_interval) + " hours", flush=True)  # noqa: T201
     while True:
         curTime = time.strftime("%x, %X", time.localtime())
-        print("Clearing cache " + curTime, flush=True)
+        print("Clearing cache " + curTime, flush=True)  # noqa: T201
         cache.clear_cache()
         time.sleep(60 * 60 * hour_interval)

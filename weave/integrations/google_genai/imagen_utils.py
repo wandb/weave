@@ -1,7 +1,6 @@
 from functools import wraps
 from typing import Any, Callable, Optional
 
-
 import weave
 from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,

@@ -5,8 +5,6 @@ import traceback
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
-from rich import print
-
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.logging import weave_print

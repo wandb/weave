@@ -47,7 +47,9 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
     except ImportError:
         pass
     except Exception as e:
-        weave_print(f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}")
+        weave_print(
+            f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
+        )
     else:
         _patched = True
 
