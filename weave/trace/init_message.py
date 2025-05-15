@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from weave.trace import urls
+from weave.trace.logging import weave_print
 from weave.utils.pypi_version_check import check_available
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ def _print_version_check() -> None:
             "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
             " $ pip install wandb --upgrade"
         )
-        print(message)
+        weave_print(message)
     else:
         wandb_messages = check_available(wandb.__version__, "wandb")
         if wandb_messages:
@@ -45,7 +46,7 @@ def _print_version_check() -> None:
                 "yank_message"
             )  #  or wandb_messages.get("upgrade_message")
             if use_message:
-                print(use_message)
+                weave_print(use_message)
 
     weave_messages = check_available(weave.__version__, "weave")
     if weave_messages:
@@ -55,7 +56,7 @@ def _print_version_check() -> None:
             or weave_messages.get("upgrade_message")
         )
         if use_message:
-            print(use_message)
+            weave_print(use_message)
 
 
 def assert_min_weave_version(
@@ -90,4 +91,4 @@ def print_init_message(
     # Cosmetically, if we are in `read_only` mode, we are not logging data, so
     # we should not print the message about logging data.
     if not read_only:
-        print(message)
+        weave_print(message)

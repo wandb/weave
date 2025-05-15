@@ -1,13 +1,13 @@
 from functools import wraps
 from typing import Any, Callable, Optional
 
-import rich
 
 import weave
 from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,
 )
 from weave.trace.autopatch import OpSettings
+from weave.trace.logging import weave_print
 from weave.trace.weave_client import Call
 
 
@@ -25,7 +25,7 @@ def google_genai_gemini_postprocess_outputs(
             try:
                 pil_image = Image.open(BytesIO(image_data.image.image_bytes))
             except Exception as e:
-                rich.print(f"Error converting image to `PIL.Image.Image`: {e}")
+                weave_print(f"Error converting image to `PIL.Image.Image`: {e}")
 
             modified_outputs.append(
                 {

@@ -15,6 +15,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
+from weave.trace.logging import weave_print
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
@@ -157,7 +158,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        weave_print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 

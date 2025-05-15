@@ -16,6 +16,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from weave.trace.logging import weave_print
 from weave.trace.weave_client import FlushStatus
 
 
@@ -65,7 +66,7 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
 
             # Print initial message
             if not progress.live.is_started:
-                print(f"Flushing {counts['total_jobs']} pending tasks...")
+                weave_print(f"Flushing {counts['total_jobs']} pending tasks...")
 
             # Create the task
             task_id = progress.add_task("Flushing tasks", total=counts["total_jobs"])

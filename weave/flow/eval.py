@@ -29,6 +29,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
+from weave.trace.logging import weave_print
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
@@ -203,7 +204,7 @@ class Evaluation(Object):
             except OpCallError as e:
                 raise e
             except Exception:
-                print("Predict and score failed")
+                weave_print("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
             return eval_row
@@ -218,7 +219,7 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {num_rows} examples")
+            weave_print(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -237,7 +238,7 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+        weave_print("Evaluation summary", summary)
 
         return summary
 

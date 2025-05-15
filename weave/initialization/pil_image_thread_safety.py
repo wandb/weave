@@ -20,6 +20,8 @@ import threading
 from functools import wraps
 from typing import Any, Callable, Optional
 
+from weave.trace.logging import weave_print
+
 # Global state
 # `_patched` is a boolean that indicates whether the thread-safety patch has been applied
 # `_original_methods` is a dictionary that stores the original methods of the ImageFile class
@@ -47,7 +49,7 @@ def apply_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        print(f"Failed to patch PIL.ImageFile.ImageFile: Unexpected error - {e}")
+        weave_print(f"Failed to patch PIL.ImageFile.ImageFile: Unexpected error - {e}")
     else:
         _patched = True
 
@@ -120,7 +122,7 @@ def undo_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        print(
+        weave_print(
             f"Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - {e}"
         )
     else:

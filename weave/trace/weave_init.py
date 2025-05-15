@@ -101,7 +101,8 @@ def init_weave(
     if wandb_context is None:
         import wandb
 
-        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+        # Not using `weave_print` as we want this to always print
+        print("Please login to Weights & Biases (https://wandb.ai/) to continue...")
         wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore
         wandb_api.init()

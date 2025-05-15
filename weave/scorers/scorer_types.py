@@ -5,6 +5,7 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import ensure_hf_imports
+from weave.trace.logging import weave_print
 
 if TYPE_CHECKING:
     import torch
@@ -133,12 +134,12 @@ class HuggingFaceScorer(weave.Scorer):
         if self._model is None:
             self.load_model()
         else:
-            print("Using user-provided model.")
+            weave_print("Using user-provided model.")
 
         if self._tokenizer is None:
             self.load_tokenizer()
         else:
-            print("Using user-provided tokenizer.")
+            weave_print("Using user-provided tokenizer.")
 
         assert self._model is not None, "Model must be loaded, implement `load_model`"
         assert (

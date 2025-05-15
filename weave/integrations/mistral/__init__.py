@@ -2,6 +2,8 @@ from importlib import metadata
 
 from packaging import version
 
+from weave.trace.logging import weave_print
+
 try:
     mistral_version = metadata.version("mistralai")
 except metadata.PackageNotFoundError:
@@ -10,7 +12,7 @@ except metadata.PackageNotFoundError:
 if version.parse(mistral_version) < version.parse("1.0.0"):
     from .v0.mistral import get_mistral_patcher  # noqa: F401
 
-    print(
+    weave_print(
         f"Using MistralAI version {mistral_version}. Please consider upgrading to version 1.0.0 or later."
     )
 else:
