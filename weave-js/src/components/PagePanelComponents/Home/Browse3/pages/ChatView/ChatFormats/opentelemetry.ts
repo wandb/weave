@@ -1,5 +1,6 @@
 import _ from 'lodash';
-import { OptionalTraceCallSchema } from '../../PlaygroundPage/types';
+
+import {OptionalTraceCallSchema} from '../../PlaygroundPage/types';
 import {ChatCompletion, ChatRequest, Choice, Message} from '../types';
 
 // OTEL specific keys for finding prompts
@@ -28,7 +29,6 @@ export const OTEL_OUTPUT_KEYS = [
   'output',
 ];
 
-
 // Find a prompt/completion value from OTEL attributes using the specified keys
 const findOTELValue = (obj: any, searchKeys: string[]): any | null => {
   if (!obj || !_.isPlainObject(obj)) {
@@ -46,10 +46,7 @@ const findOTELValue = (obj: any, searchKeys: string[]): any | null => {
 };
 
 // Process OTEL chat data to find content
-const processOTELContent = (
-  content: any,
-  defaultRole: string
-): Message[] => {
+const processOTELContent = (content: any, defaultRole: string): Message[] => {
   if (_.isString(content)) {
     return [
       {
@@ -77,7 +74,9 @@ const processOTELContent = (
 };
 
 // Detect OTEL span format based on presence of 'otel_span' attribute
-export const isTraceCallChatFormatOTEL = (call: OptionalTraceCallSchema): boolean => {
+export const isTraceCallChatFormatOTEL = (
+  call: OptionalTraceCallSchema
+): boolean => {
   // Check if this is an OTEL span
   if (!call.attributes || !('otel_span' in call.attributes)) {
     return false;

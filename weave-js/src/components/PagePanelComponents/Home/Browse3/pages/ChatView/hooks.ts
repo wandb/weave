@@ -1,6 +1,6 @@
 import _ from 'lodash';
-
 import {useMemo} from 'react';
+
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
 import {OptionalTraceCallSchema} from '../PlaygroundPage/types';
@@ -25,12 +25,12 @@ import {
   isTraceCallChatFormatMistral,
   normalizeMistralChatCompletion,
 } from './ChatFormats/mistral';
+import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
 import {
   isTraceCallChatFormatOTEL,
+  normalizeOTELChatCompletion,
   normalizeOTELChatRequest,
-  normalizeOTELChatCompletion
 } from './ChatFormats/opentelemetry';
-import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
 import {ChatFormat} from './ChatFormats/types';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
@@ -206,15 +206,16 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
 
   if (isTraceCallChatFormatOTEL(traceCall)) {
     const chatRequest = normalizeOTELChatRequest(traceCall);
-    if (!chatRequest) { return traceCall; }
-    const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest)
-
+    if (!chatRequest) {
+      return traceCall;
+    }
+    const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest);
 
     return {
       inputs: chatRequest,
       output: chatCompletion,
-      ...rest
-    }
+      ...rest,
+    };
   }
 
   return {
