@@ -43,7 +43,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call, CallsIter
+    from weave.trace.call import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -98,6 +98,10 @@ UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log 
 
 
 class DisplayNameFuncError(ValueError): ...
+
+
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
 
 
 def print_call_link(call: Call) -> None:
@@ -276,11 +280,35 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
 
 
-def _create_call(
-    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
-) -> Call:
-    client = weave_client_context.require_weave_client()
+class ClientInterface(Protocol):
+    def create_call(
+        self,
+        op: str | Op,
+        inputs: dict,
+        parent: Call | None = None,
+        attributes: dict | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
+        *,
+        use_stack: bool = True,
+    ) -> Call: ...
 
+    def finish_call(
+        self,
+        call: Call,
+        output: Any,
+        exception: BaseException | None = None,
+        *_: Any,
+        **__: Any,
+    ) -> None: ...
+
+
+def _create_call(
+    client: ClientInterface,
+    func: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    **kwargs: Any,
+) -> Call:
     pargs = None
     if func._on_input_handler is not None:
         pargs = func._on_input_handler(func, args, kwargs)
@@ -339,13 +367,13 @@ def _should_sample_traces(op: Op) -> bool:
 
 def placeholder_call() -> Call:
     # Import here to avoid circular dependency
-    from weave.trace.weave_client import NoOpCall
+    from weave.trace.call import NoOpCall
 
     return NoOpCall()
 
 
 def is_placeholder_call(call: Call) -> bool:
-    from weave.trace.weave_client import NoOpCall
+    from weave.trace.call import NoOpCall
 
     return isinstance(call, NoOpCall)
 
@@ -359,13 +387,14 @@ def _call_sync_func(
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
     __require_explicit_finish: bool = False,
+    client: ClientInterface | None = None,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
+    if False:  # is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = func(*args, **kwargs)
         call.output = res
         return res, call
@@ -376,11 +405,16 @@ def _call_sync_func(
             call.output = res
             return res, call
 
+    if client is None:
+        client = weave_client_context.require_weave_client()
+
+    client = cast(ClientInterface, client)
+
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        call = _create_call(client, op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
@@ -394,7 +428,6 @@ def _call_sync_func(
         return res, call
 
     # Execute the op and process the result
-    client = weave_client_context.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
@@ -468,9 +501,11 @@ async def _call_async_func(
             call.output = res
             return res, call
 
+    client = weave_client_context.require_weave_client()
+
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        call = _create_call(client, op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
@@ -484,7 +519,6 @@ async def _call_async_func(
         return res, call
 
     # Execute the op and process the result
-    client = weave_client_context.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
@@ -678,7 +712,11 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op, wrapper),
+                        *args,
+                        __should_raise=True,
+                        client=None,
+                        **kwargs,
                     )
                     return cast(R, res)
 

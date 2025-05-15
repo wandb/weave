@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import warnings
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
@@ -8,8 +9,22 @@ from functools import partial, wraps
 from threading import Thread as _Thread
 from typing import Any, Callable
 
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+
 LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
 logged_messages = []
+
+
+def sanitize_object_name(name: str) -> str:
+    # Replaces any non-alphanumeric characters with a single dash and removes
+    # any leading or trailing dashes. This is more restrictive than the DB
+    # constraints and can be relaxed if needed.
+    res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
+    if not res:
+        raise ValueError(f"Invalid object name: {name}")
+    if len(res) > MAX_OBJECT_NAME_LENGTH:
+        res = res[:MAX_OBJECT_NAME_LENGTH]
+    return res
 
 
 def log_once(log_method: Callable[[str], None], message: str) -> None:
