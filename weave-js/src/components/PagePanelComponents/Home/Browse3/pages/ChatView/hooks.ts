@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import {useMemo} from 'react';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
@@ -573,7 +573,7 @@ export const useCallAsChat = (
   const refsData = useRefsData({refUris: refs});
 
   // Only recalculate when refs data or call data changes
-  const result = React.useMemo(() => {
+  const result = useMemo(() => {
     const refsMap = _.zipObject(refs, refsData.result ?? []);
     const request = normalizeChatRequest(deref(call.inputs, refsMap));
     const result = call.output
