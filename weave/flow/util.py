@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 
 T = TypeVar("T")
 U = TypeVar("U")

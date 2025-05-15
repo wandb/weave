@@ -52,6 +52,13 @@ class UserSettings(BaseModel):
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overridden with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
+    silent: bool = False
+    """Toggles silent mode.
+
+    If True, no output will be printed to the terminal.
+    Can be overridden with the environment variable `WEAVE_SILENT`
+    """
+
     capture_code: bool = True
     """Toggles code capture for ops.
 
@@ -176,6 +183,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def should_be_silent() -> bool:
+    return _should("silent")
 
 
 def should_capture_code() -> bool:

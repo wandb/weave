@@ -16,7 +16,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 from weave.trace.weave_client import FlushStatus
 
 

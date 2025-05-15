@@ -47,8 +47,8 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.logging import weave_print
 from weave.trace.refs import ObjectRef
+from weave.trace.term import weave_print
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:

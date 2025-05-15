@@ -20,7 +20,7 @@ import threading
 from functools import wraps
 from typing import Any, Callable, Optional
 
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 
 # Global state
 # `_patched` is a boolean that indicates whether the thread-safety patch has been applied

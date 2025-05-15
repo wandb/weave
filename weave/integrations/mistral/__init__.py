@@ -2,7 +2,7 @@ from importlib import metadata
 
 from packaging import version
 
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 
 try:
     mistral_version = metadata.version("mistralai")

@@ -5,7 +5,7 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import ensure_hf_imports
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 
 if TYPE_CHECKING:
     import torch

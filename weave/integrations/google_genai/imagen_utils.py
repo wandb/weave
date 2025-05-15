@@ -6,7 +6,7 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,
 )
 from weave.trace.autopatch import OpSettings
-from weave.trace.logging import weave_print
+from weave.trace.term import weave_print
 from weave.trace.weave_client import Call
 
 
