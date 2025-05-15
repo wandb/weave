@@ -2,13 +2,14 @@ import json
 from typing import Any, Literal, Optional, Union
 
 from weave import op
+from weave.flow.casting import LLMStructuredModelParamsLike, MessageListLike
 from weave.flow.model import Model
-from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
     LLMStructuredCompletionModelDefaultParams,
     Message,
-    ResponseFormat,
+    is_response_format,
 )
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
@@ -29,33 +30,17 @@ class PlaygroundModel(Model):
     llm: LLMStructuredCompletionModel
     return_type: Literal["string", "message", "json"] = "message"
 
-    def __init__(
-        self,
-        llm_structured_model_input: LLMStructuredCompletionModel,
-        return_type: Optional[Literal["string", "message", "json"]] = "message",
-    ):
-        # Pass both llm_structured_model_input and client to super().__init__
-        # so that Pydantic can correctly initialize these fields.
-        super().__init__(
-            llm=llm_structured_model_input,
-            return_type=return_type,
-        )
-
-    @op()
+    @op
     def predict(
         self,
-        user_input: Union[Message, list[Message], str],
-        config: Optional[dict[str, Any]] = None,
+        user_input: MessageListLike,
+        config: Optional[LLMStructuredModelParamsLike] = None,
     ) -> Union[Message, str, dict[str, Any]]:
         """
         Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
         """
-        current_client = get_weave_client()
-        if current_client is None:
-            raise ValueError(
-                "Error in PlaygroundModel.predict: No client found in context"
-            )
+        current_client = require_weave_client()
 
         # 1. Prepare messages
         template_msgs = None
@@ -88,7 +73,10 @@ class PlaygroundModel(Model):
         )
 
         # 5. Call the LLM API
-        api_response = current_client.server.completions_create(req=req)
+        try:
+            api_response = current_client.server.completions_create(req=req)
+        except Exception as e:
+            raise RuntimeError("Failed to call LLM completions endpoint.") from e
 
         # 6. Extract the message from the API response
         try:
@@ -119,13 +107,13 @@ class PlaygroundModel(Model):
             json.JSONDecodeError,
         ) as e:
             raise RuntimeError(
-                f"Failed to extract message from LLM response payload. Response: {api_response.response}, Error: {e}"
+                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
             ) from e
 
 
 def _prepare_llm_messages(
     template_messages: Optional[list[Message]],
-    user_input: Union[Message, list[Message], str],
+    user_input: list[Message],
 ) -> list[dict[str, Any]]:
     """
     Prepares a list of message dictionaries for the LLM API from a message template and user input.
@@ -140,73 +128,33 @@ def _prepare_llm_messages(
             msg_dict = msg_template.model_dump(exclude_none=True)
             final_messages_dicts.append(msg_dict)
 
-    # 2. Parse user_input messages
-    user_input_list: list[Message]
-    if isinstance(user_input, str):
-        user_input_list = [
-            Message(
-                role="user",
-                content=user_input,
-                name=None,
-                function_call=None,
-                tool_call_id=None,
-            )
-        ]
-    elif isinstance(user_input, Message):
-        user_input_list = [user_input]
-    elif isinstance(user_input, list):
-        user_input_list = user_input  # Assumes it's List[Message]
-    else:
-        raise TypeError(
-            f"user_input must be a string, Message, or list of Messages, got {type(user_input)}"
-        )
-
-    # 3. Append user_input messages
-    for u_msg in user_input_list:
-        if not isinstance(u_msg, Message):
-            # This check is important if user_input_list could come from an untyped list
-            raise TypeError(
-                f"Each item in user_input list must be of type Message, got {type(u_msg)}"
-            )
+    # 2. Append user_input messages
+    for u_msg in user_input:
         final_messages_dicts.append(u_msg.model_dump(exclude_none=True))
 
     return final_messages_dicts
 
 
 def parse_params_to_litellm_params(
-    params_source: Union[LLMStructuredCompletionModelDefaultParams, dict[str, Any]],
+    params_source: LLMStructuredCompletionModelDefaultParams,
 ) -> dict[str, Any]:
     final_params: dict[str, Any] = {}
-    source_dict_to_iterate: dict[str, Any]
-
-    if isinstance(params_source, dict):
-        source_dict_to_iterate = params_source
-    elif hasattr(params_source, "model_dump"):  # Pydantic model
-        source_dict_to_iterate = params_source.model_dump(exclude_none=True)
-    else:
-        raise TypeError(f"Unsupported type for params_source: {type(params_source)}")
+    source_dict_to_iterate: dict[str, Any] = params_source.model_dump(exclude_none=True)
 
     for key, value in source_dict_to_iterate.items():
         if key == "response_format":
             litellm_response_format_value = None
-            if isinstance(value, ResponseFormat):  # Enum instance
-                litellm_response_format_value = {"type": value.value}
-            elif isinstance(value, str):  # String value
-                if value.lower() == "text" or value == ResponseFormat.TEXT.value:
-                    litellm_response_format_value = {"type": ResponseFormat.TEXT.value}
-                elif (
-                    value.lower() == "json"
-                    or value.lower() == "json_object"
-                    or value == ResponseFormat.JSON.value
-                ):
-                    litellm_response_format_value = {"type": ResponseFormat.JSON.value}
-                # else: unknown string, might be a direct pass-through if LiteLLM supports it, or ignored
-            elif isinstance(value, dict) and "type" in value:  # Pre-formed dict
+            if isinstance(value, str) and is_response_format(value):
+                litellm_response_format_value = {"type": value}
+            elif (
+                isinstance(value, dict)
+                and "type" in value
+                and is_response_format(value["type"])
+            ):  # Pre-formed dict with valid type
                 litellm_response_format_value = value
 
             if litellm_response_format_value is not None:
                 final_params["response_format"] = litellm_response_format_value
-
         elif key == "n_times":
             final_params["n"] = value
         elif key == "messages_template":

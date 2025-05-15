@@ -1109,13 +1109,18 @@
         "response_format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ResponseFormat"
+              "enum": [
+                "json_object",
+                "text"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "title": "Response Format"
         }
       },
       "required": [
@@ -1616,14 +1621,6 @@
       ],
       "title": "Query",
       "type": "object"
-    },
-    "ResponseFormat": {
-      "enum": [
-        "json_object",
-        "text"
-      ],
-      "title": "ResponseFormat",
-      "type": "string"
     },
     "SavedView": {
       "properties": {

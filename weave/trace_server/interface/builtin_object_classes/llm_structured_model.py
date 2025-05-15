@@ -1,17 +1,16 @@
-from enum import Enum
-from typing import Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
+# TODO: Fast follow up
+# JSON_SCHEMA = "json_schema"
+ResponseFormat = Literal["json_object", "text"]
 
-class ResponseFormat(str, Enum):
-    JSON = "json_object"
-    TEXT = "text"
 
-    # TODO: Fast follow up
-    # JSON_SCHEMA = "json_schema"
+def is_response_format(value: Any) -> bool:
+    return isinstance(value, str) and value in ["json_object", "text"]
 
 
 class Message(BaseModel):
