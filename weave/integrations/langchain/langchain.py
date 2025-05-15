@@ -99,8 +99,8 @@ if not import_failed:
 
         def __init__(self, **kwargs: Any) -> None:
             self.wc = None
-            if gc := weave_client_context.get_weave_client():
-                self.wc = gc
+            if wc := weave_client_context.get_weave_client():
+                self.wc = wc
             else:
                 warn_once(
                     logger,
