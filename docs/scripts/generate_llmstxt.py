@@ -6,7 +6,7 @@ import json
 from collections import defaultdict
 
 MAX_TOKENS = 2000  # Approximate word count cap for Optional entries
-BASE_URL = "https://docs.yourcompany.com/"
+BASE_URL = "https://weave-docs.wandb.ai/"
 
 CATEGORY_HINTS = {
     "guides/integrations": "Integrations",
