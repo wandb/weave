@@ -564,7 +564,7 @@ def load_instance(
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        weave_print("Op loading exception. This might be fine!", e)
+        weave_print(f"Op loading exception. This might be fine! {e}")
         import traceback
 
         traceback.print_exc()

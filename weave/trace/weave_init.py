@@ -9,6 +9,7 @@ from weave.trace import (
 )
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
+from weave.trace.term import weave_print
 from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -101,7 +102,9 @@ def init_weave(
     if wandb_context is None:
         import wandb
 
-        print("Please login to Weights & Biases (https://wandb.ai/) to continue...")  # noqa: T201
+        weave_print(
+            "Please login to Weights & Biases (https://wandb.ai/) to continue..."
+        )
         wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore
         wandb_api.init()

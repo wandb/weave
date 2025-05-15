@@ -6,17 +6,12 @@ import click
 
 from weave.trace.settings import should_be_silent
 
-LOG_STRING = click.style("weave", fg="orange", bold=True)
+LOG_STRING = click.style("weave", fg="yellow", bold=True)
 
 _logger = logging.getLogger("weave")
 
 
-def weave_print(
-    *values: object,
-    sep: str = " ",
-    end: str = "\n",
-) -> None:
-    string = sep.join([str(v) for v in values]) + end
+def weave_print(string: str) -> None:
     _log(
         string=string,
         silent=should_be_silent(),
@@ -26,7 +21,6 @@ def weave_print(
 
 def _log(
     string: str = "",
-    newline: bool = True,
     prefix: bool = True,
     silent: bool = False,
     level: int = logging.INFO,
@@ -47,4 +41,4 @@ def _log(
         else:
             _logger.info(line)
     else:
-        click.echo(line, nl=newline)
+        click.echo(line)

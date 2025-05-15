@@ -237,7 +237,7 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
-        weave_print("Evaluation summary", summary)
+        weave_print(f"Evaluation summary {summary}")
 
         return summary
 
