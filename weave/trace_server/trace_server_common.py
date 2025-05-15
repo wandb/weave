@@ -89,6 +89,8 @@ def make_derived_summary_fields(
         status = tsi.TraceStatus.ERROR
     elif ended_at is None:
         status = tsi.TraceStatus.RUNNING
+    elif summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
+        status = tsi.TraceStatus.DESCENDANT_ERROR
     weave_summary["status"] = status
 
     if ended_at and started_at:

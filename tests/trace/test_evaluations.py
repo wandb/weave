@@ -423,6 +423,10 @@ async def test_evaluation_data_topology(client):
                 "total_tokens": 39,
             }
         },
+        "status_counts": {
+            "success": 2,
+            "error": 0,
+        },
         "weave": {
             "latency_ms": AnyIntMatcher(),
             "trace_name": "SimpleModelWithConfidence.predict",
@@ -501,6 +505,10 @@ async def test_evaluation_data_topology(client):
                 ]
                 * 2,
             }
+        },
+        "status_counts": {
+            "success": 25,
+            "error": 0,
         },
         "weave": {
             "display_name": AnyStrMatcher(),

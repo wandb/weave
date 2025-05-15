@@ -132,6 +132,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
+    TraceStatus,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
@@ -764,6 +765,10 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+RESERVED_SUMMARY_USAGE_KEY = "usage"
+RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
+
+
 class WeaveKeyDict(dict):
     """A dict representing the 'weave' subdictionary of a call's attributes.
 
@@ -1271,15 +1276,17 @@ class WeaveClient:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
-            and "usage" in original_output
+            and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
-            summary["usage"][original_output["model"]] = {
+            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
-                **original_output["usage"],
+                **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
-        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
+            original_output, "model"
+        ):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
             model = original_output.model
@@ -1287,21 +1294,19 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
+                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
 
-        # JR Oct 24 - This descendants stats code has been commented out since
-        # it entered the code base. A screenshot of the non-ideal UI that the
-        # comment refers to is available in the description of that PR:
-        # https://github.com/wandb/weave/pull/1414
-        # These should probably be added under the "weave" key in the summary.
-        # ---
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
+        # Create client-side rollup of status_counts_by_op
+        status_counts_dict = summary.setdefault(
+            RESERVED_SUMMARY_STATUS_COUNTS_KEY,
+            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+        )
+        if exception:
+            status_counts_dict[TraceStatus.ERROR] += 1
+        else:
+            status_counts_dict[TraceStatus.SUCCESS] += 1
+
         call.summary = summary
 
         # Exception Handling
