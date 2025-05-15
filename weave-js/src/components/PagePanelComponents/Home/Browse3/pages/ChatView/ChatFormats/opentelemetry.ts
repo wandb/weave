@@ -61,6 +61,16 @@ const processOTELContent = (content: any, defaultRole: string): Message[] => {
       );
     }
     return content;
+  } else if (_.isPlainObject(content) && 'prompt' in content) {
+    const text = _.isString(content.prompt)
+      ? content.prompt
+      : JSON.stringify(content.prompt);
+    return [
+      {
+        role: defaultRole,
+        content: text,
+      },
+    ];
   } else if (_.isArray(content)) {
     return content.flatMap(item => processOTELContent(item, defaultRole));
   }
@@ -219,6 +229,30 @@ export const normalizeOTELChatCompletion = (
       model: modelName,
       system_fingerprint: completionValue.system_fingerprint || '',
       usage: completionValue.usage || usage,
+    };
+  }
+
+  if (
+    _.isPlainObject(completionValue) &&
+    'text' in completionValue &&
+    _.isString(completionValue.text)
+  ) {
+    return {
+      id: completionValue.id || `${request.model}-${Date.now()}`,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: completionValue.role || 'assistant',
+            content: completionValue.text,
+          },
+          finish_reason: completionValue.finish_reason || 'stop',
+        },
+      ],
+      created: Math.floor(Date.now() / 1000),
+      model: request.model || 'unknown',
+      system_fingerprint: '',
+      usage,
     };
   }
 
