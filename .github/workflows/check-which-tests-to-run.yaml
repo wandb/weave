@@ -9,11 +9,14 @@ on:
         value: ${{ jobs.check.outputs.weave_js_tests }}
       trace_server_tests:
         value: ${{ jobs.check.outputs.trace_server_tests }}
+      weave_ts_sdk_tests:
+        value: ${{ jobs.check.outputs.weave_ts_sdk_tests }}
 
 env:
-  WEAVE_QUERY_PATHS: 'weave_query/'
-  WEAVE_JS_PATHS: 'weave-js/'
-  TRACE_SERVER_PATHS: 'weave/trace_server/'
+  WEAVE_QUERY_PATHS: "weave_query/"
+  WEAVE_JS_PATHS: "weave-js/"
+  TRACE_SERVER_PATHS: "weave/trace_server/"
+  WEAVE_TS_SDK_PATHS: "sdks/node/"
   # Everything else is implicitly trace SDK
 
 jobs:
@@ -23,6 +26,7 @@ jobs:
       weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
       weave_js_tests: ${{ steps.weave_js.outputs.run_tests }}
       trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
+      weave_ts_sdk_tests: ${{ steps.weave_ts_sdk.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -80,6 +84,16 @@ jobs:
         name: Weave Trace Server Checks
         run: |
           for path in ${{ env.TRACE_SERVER_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
+      - id: weave_ts_sdk
+        name: Weave TS SDK Checks
+        run: |
+          for path in ${{ env.WEAVE_TS_SDK_PATHS }}; do
             if echo "$changed_files" | grep -q "$path"; then
               echo "run_tests=true" >> $GITHUB_OUTPUT
               exit 0
