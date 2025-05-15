@@ -266,6 +266,7 @@ show-fixes = true
 exclude = ["weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["T201"]
 "docs/**/*.py" = ["T201"] 
 "scripts/**/*.py" = ["T201"] 
 "tests/**/*.py" = ["T201"] 
