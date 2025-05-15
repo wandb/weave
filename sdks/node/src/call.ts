@@ -1,6 +1,8 @@
 import {getGlobalClient} from './clientApi';
 import {CallSchema} from './generated/traceServerApi';
 
+const MAX_DISPLAY_NAME_LENGTH = 1000;
+
 export enum CallState {
   uninitialized,
   pending,
@@ -16,7 +18,8 @@ export class InternalCall {
   constructor() {}
 
   public async setDisplayName(displayName: string) {
-    this.callSchema.display_name = displayName;
+    const elidedDisplayName = elideDisplayName(displayName);
+    this.callSchema.display_name = elidedDisplayName;
 
     if ([CallState.pending, CallState.uninitialized].includes(this._state)) {
       // nothing needs to be done here, the call will be updated when it is finished
@@ -27,7 +30,7 @@ export class InternalCall {
     if (!client) {
       throw new Error('Weave is not initialized');
     }
-    await client.updateCall(this.callSchema.id!, displayName);
+    await client.updateCall(this.callSchema.id!, elidedDisplayName);
   }
 
   public updateWithCallSchemaData(callSchemaExchangeData: Partial<CallSchema>) {
@@ -77,4 +80,14 @@ function buildProxyHandlers(
 
 export interface Call extends CallSchema {
   setDisplayName(displayName: string): Promise<void>;
+}
+
+function elideDisplayName(name: string) {
+  if (name.length > MAX_DISPLAY_NAME_LENGTH) {
+    console.warn(
+      `Display name ${name} is longer than ${MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!`
+    );
+    return name.slice(0, MAX_DISPLAY_NAME_LENGTH - 3) + '...';
+  }
+  return name;
 }
