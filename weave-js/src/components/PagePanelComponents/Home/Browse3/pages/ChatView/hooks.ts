@@ -203,7 +203,21 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   if (!traceCall.output || !traceCall.inputs) {
     return traceCall;
   }
+
   const {inputs, output, ...rest} = traceCall;
+
+  if (isTraceCallChatFormatOTEL(traceCall)) {
+    const chatRequest = normalizeOTELChatRequest(traceCall);
+    if (!chatRequest) { return traceCall; }
+    const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest)
+
+
+    return {
+      inputs: chatRequest,
+      output: chatCompletion,
+      ...rest
+    }
+  }
   return {
     inputs: normalizeChatRequest(traceCall.inputs),
     output: normalizeChatCompletion(traceCall.inputs, traceCall.output),

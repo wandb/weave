@@ -1,8 +1,5 @@
 import _ from 'lodash';
-
-import {
-  TraceCallSchema,
-} from '../../wfReactInterface/traceServerClientTypes';
+import { OptionalTraceCallSchema } from '../../PlaygroundPage/types';
 import {ChatCompletion, ChatRequest, Choice, Message} from '../types';
 
 // OTEL specific keys for finding prompts
@@ -80,7 +77,7 @@ const processOTELContent = (
 };
 
 // Detect OTEL span format based on presence of 'otel_span' attribute
-export const isTraceCallChatFormatOTEL = (call: TraceCallSchema): boolean => {
+export const isTraceCallChatFormatOTEL = (call: OptionalTraceCallSchema): boolean => {
   // Check if this is an OTEL span
   if (!call.attributes || !('otel_span' in call.attributes)) {
     return false;
@@ -97,7 +94,7 @@ export const isTraceCallChatFormatOTEL = (call: TraceCallSchema): boolean => {
 
 // Normalize an OTEL span's input to a ChatRequest
 export const normalizeOTELChatRequest = (
-  call: TraceCallSchema
+  call: OptionalTraceCallSchema
 ): ChatRequest => {
   // Find prompt value from any of the expected OTEL input keys
   const promptValue = findOTELValue(call.inputs, OTEL_INPUT_KEYS);
@@ -110,7 +107,7 @@ export const normalizeOTELChatRequest = (
     };
   }
 
-  let modelName = call.attributes['model'] || 'unknown';
+  let modelName = call.attributes?.model || 'unknown';
   if (
     _.isPlainObject(promptValue) &&
     'messages' in promptValue &&
@@ -169,7 +166,7 @@ export const normalizeOTELChatRequest = (
 
 // Normalize an OTEL span's output to a ChatCompletion
 export const normalizeOTELChatCompletion = (
-  call: TraceCallSchema,
+  call: OptionalTraceCallSchema,
   request: ChatRequest
 ): ChatCompletion => {
   // Find completion value from any of the expected OTEL output keys
@@ -215,7 +212,7 @@ export const normalizeOTELChatCompletion = (
     'choices' in completionValue &&
     _.isArray(completionValue.choices)
   ) {
-    const modelName = call.attributes['model'] ?? 'unknown';
+    const modelName = call.attributes?.model ?? 'unknown';
     return {
       id: completionValue.id || `${request.model}-${Date.now()}`,
       choices: completionValue.choices,
