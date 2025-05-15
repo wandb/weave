@@ -36,10 +36,12 @@ export const OpVersionPage: React.FC<{
   const {useOpVersion} = useWFHooks();
 
   const opVersion = useOpVersion({
-    entity: props.entity,
-    project: props.project,
-    opId: props.opName,
-    versionHash: props.version,
+    key: {
+      entity: props.entity,
+      project: props.project,
+      opId: props.opName,
+      versionHash: props.version,
+    },
   });
   if (opVersion.loading) {
     return <CenteredAnimatedLoader />;
@@ -56,18 +58,21 @@ const OpVersionPageInner: React.FC<{
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex, createdAtMs} = opVersion;
 
-  const opVersions = useOpVersions(
+  const opVersions = useOpVersions({
     entity,
     project,
-    {
+    filter: {
       opIds: [opId],
     },
-    undefined, // limit
-    true // metadataOnly
-  );
+    metadataOnly: true,
+  });
   const opVersionCount = (opVersions.result ?? []).length;
-  const callsStats = useCallsStats(entity, project, {
-    opVersionRefs: [uri],
+  const callsStats = useCallsStats({
+    entity,
+    project,
+    filter: {
+      opVersionRefs: [uri],
+    },
   });
   const opVersionCallCount = callsStats?.result?.count ?? 0;
   const useOpSupported = useMemo(() => {
@@ -242,12 +247,12 @@ const DeleteOpButtonWithModal: React.FC<{
         onClose={() => setDeleteModalOpen(false)}
         deleteTitleStr={deleteStr}
         onDelete={() =>
-          opVersionsDelete(
-            opVersionSchema.entity,
-            opVersionSchema.project,
-            opVersionSchema.opId,
-            [opVersionSchema.versionHash]
-          )
+          opVersionsDelete({
+            entity: opVersionSchema.entity,
+            project: opVersionSchema.project,
+            opId: opVersionSchema.opId,
+            digests: [opVersionSchema.versionHash],
+          })
         }
         onSuccess={onSuccess}
       />
