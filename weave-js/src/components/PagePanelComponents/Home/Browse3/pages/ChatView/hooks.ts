@@ -559,17 +559,16 @@ export const normalizeChatCompletion = (
 
 export const useCallAsChat = (
   call: TraceCallSchema
- ): {
-   loading: boolean;
- } & Chat => {
+): {
+  loading: boolean;
+} & Chat => {
   // Memoize the call data processing to prevent unnecessary recalculations
   // when the component re-renders but the call data hasn't changed
-  const callId = call.id;
-  const callInputs = JSON.stringify(call.inputs);
-  const callOutput = call.output ? JSON.stringify(call.output) : null;
-
-  // Traverse the data and find all ref URIs.
-  const refs = React.useMemo(() => getRefs(call), [callId, callInputs, callOutput]);
+  const refs = React.useMemo(
+    // Traverse the data and find all ref URIs.
+    () => getRefs(call),
+    [call]
+  );
   const {useRefsData} = useWFHooks();
   const refsData = useRefsData({refUris: refs});
 
@@ -595,13 +594,13 @@ export const useCallAsChat = (
       request,
       result,
     };
-  }, [callId, callInputs, callOutput, refsData.result]);
+  }, [refsData.result, call, refs]);
 
-   return {
-     loading: refsData.loading,
+  return {
+    loading: refsData.loading,
     ...result,
-   };
-}
+  };
+};
 
 export const isMistralChatCompletionChoice = (choice: any): boolean => {
   if (!_.isPlainObject(choice)) {
