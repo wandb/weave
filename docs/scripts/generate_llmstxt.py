@@ -3,9 +3,27 @@
 from pathlib import Path
 import re
 import json
+from collections import defaultdict
 
 MAX_TOKENS = 2000  # Approximate word count cap for Optional entries
-BASE_URL = "https://weave-docs.wandb.ai/"
+BASE_URL = "https://docs.yourcompany.com/"
+
+CATEGORY_HINTS = {
+    "guides/integrations": "Integrations",
+    "guides/tracking": "Tracking",
+    "guides/tools": "Tools",
+    "guides/platform": "Platform",
+    "guides/evaluation": "Evaluation",
+    "guides/core-types": "Core Types",
+    "reference/gen_notebooks": "Example Notebooks",
+    "reference/service-api": "Service API",
+    "reference/typescript-sdk": "TypeScript SDK",
+    "reference/python-sdk": "Python SDK",
+    "tutorial": "Tutorials",
+    "quickstart": "Quickstart",
+    "introduction": "Introduction",
+    "faq": "FAQs"
+}
 
 
 def is_optional(file_path: Path) -> bool:
@@ -35,6 +53,14 @@ def extract_title(content: str, fallback: str) -> str:
         if title_match:
             return title_match.group(1).strip()
     return fallback
+
+
+def categorize(file_path: Path) -> str:
+    path_str = file_path.as_posix()
+    for hint_path, category in CATEGORY_HINTS.items():
+        if hint_path in path_str:
+            return category
+    return "Other"
 
 
 def strip_frontmatter(content: str) -> str:
@@ -72,7 +98,7 @@ def clean_markdown(content: str) -> str:
 
 
 def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Path):
-    sections = {"Docs": [], "Optional": []}
+    sections = defaultdict(lambda: defaultdict(list))
     json_entries = []
 
     for md_file in docs_dir.rglob("*.md*"):
@@ -81,6 +107,7 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
 
         raw_content = md_file.read_text(encoding="utf-8")
         section = get_section(md_file)
+        category = categorize(md_file)
         title = extract_title(raw_content, md_file.stem.replace("-", " ").replace("_", " ").title())
         cleaned = clean_markdown(raw_content)
 
@@ -91,20 +118,23 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
         url = f"{BASE_URL}{url_path}"
 
         md_block = f"# {title}\n\n{cleaned}\n\n[Source]({url})"
-        sections[section].append((title, url, md_block))
+        sections[section][category].append((title, url, md_block))
 
         json_entries.append({
             "title": title,
             "url": url,
             "section": section,
+            "category": category,
             "content": cleaned
         })
 
     toc_lines = ["## Table of Contents", ""]
     for section_name in ["Docs", "Optional"]:
-        for title, url, _ in sections[section_name]:
-            toc_lines.append(f"- [{title}]({url})")
-    toc_lines.append("")
+        for category in sorted(sections[section_name].keys()):
+            toc_lines.append(f"### {category}")
+            for title, url, _ in sections[section_name][category]:
+                toc_lines.append(f"- [{title}]({url})")
+            toc_lines.append("")
 
     full_md = [
         "# Weave Documentation",
@@ -114,9 +144,9 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
     ]
 
     for section_name in ["Docs", "Optional"]:
-        if sections[section_name]:
-            full_md.append(f"# {section_name}\n")
-            full_md.extend(entry for _, _, entry in sections[section_name])
+        for category in sorted(sections[section_name].keys()):
+            full_md.append(f"# {section_name}: {category}\n")
+            full_md.extend(entry for _, _, entry in sections[section_name][category])
             full_md.append("")
 
     txt_output.write_text("\n\n".join(full_md), encoding="utf-8")
