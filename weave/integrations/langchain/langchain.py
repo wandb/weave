@@ -31,10 +31,12 @@ This approach allows for more flexible runtime configuration while still respect
 
 import datetime
 import json
+import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
+from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
@@ -59,6 +61,8 @@ from collections.abc import Generator
 from typing import Any, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
+
+logger = logging.getLogger(__name__)
 
 if not import_failed:
 
@@ -94,17 +98,30 @@ if not import_failed:
         run_inline: bool = True
 
         def __init__(self, **kwargs: Any) -> None:
+            self.gc = None
+            if gc := weave_client_context.get_weave_client():
+                self.gc = gc
+            else:
+                warn_once(
+                    logger,
+                    "Weave client not initialized. Langchain tracing will be a no-op. "
+                    "Please call `weave.init(<project_name>)` to enable tracing.",
+                )
+
             self._call_map: dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
-            self.gc = weave_client_context.require_weave_client()
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:
+            if self.gc is None:
+                return
             run_ = run.copy()
             self.latest_run = run_
 
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
+            if self.gc is None:
+                return
             run_dict = _run_to_dict(run, as_input=True)
 
             """Now we must determine the parent_run to associate this call with.
@@ -217,7 +234,8 @@ if not import_failed:
 
         def _finish_run(self, run: Run) -> None:
             """Finish a run."""
-            # If the event is in the call map, finish the call.
+            if self.gc is None:
+                return
             run_id = str(run.id)
             if run_id in self._call_map:
                 # Finish the call.
@@ -226,7 +244,9 @@ if not import_failed:
                 self.gc.finish_call(call, run_dict)
 
         def _update_run_error(self, run: Run) -> None:
-            call = self._call_map.pop(str(run.id))
+            call = self._call_map.pop(str(run.id), None)
+            if self.gc is None:
+                return
             if call:
                 self.gc.finish_call(
                     call, _run_to_dict(run), exception=Exception(run.error)
@@ -267,48 +287,78 @@ if not import_failed:
             return chat_model_run
 
         def _on_llm_start(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._persist_run_single(run)
 
         def _on_llm_end(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._finish_run(run)
 
         def _on_llm_error(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._update_run_error(run)
 
         def _on_chat_model_start(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._persist_run_single(run)
 
         def _on_chat_model_end(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._finish_run(run)
 
         def _on_chat_model_error(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._update_run_error(run)
 
         def _on_chain_start(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._persist_run_single(run)
 
         def _on_chain_end(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._finish_run(run)
 
         def _on_chain_error(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._update_run_error(run)
 
         def _on_tool_start(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._persist_run_single(run)
 
         def _on_tool_end(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._finish_run(run)
 
         def _on_tool_error(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._update_run_error(run)
 
         def _on_retriever_start(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._persist_run_single(run)
 
         def _on_retriever_end(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._finish_run(run)
 
         def _on_retriever_error(self, run: Run) -> None:
+            if self.gc is None:
+                return
             self._update_run_error(run)
 
 else:
