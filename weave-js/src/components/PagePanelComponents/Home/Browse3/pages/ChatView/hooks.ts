@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
@@ -564,7 +564,7 @@ export const useCallAsChat = (
 } & Chat => {
   // Memoize the call data processing to prevent unnecessary recalculations
   // when the component re-renders but the call data hasn't changed
-  const refs = React.useMemo(
+  const refs = useMemo(
     // Traverse the data and find all ref URIs.
     () => getRefs(call),
     [call]
