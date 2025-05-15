@@ -11,9 +11,15 @@ LOG_STRING = click.style("weave", fg="yellow", bold=True)
 _logger = logging.getLogger("weave")
 
 
-def weave_print(string: str) -> None:
+def weave_print(
+    string: str,
+    *,
+    # Defaulting to `False` for now, but I think we should enable this by default.
+    prefix: bool = False,
+) -> None:
     _log(
         string=string,
+        prefix=prefix,
         silent=should_be_silent(),
         level=logging.INFO,
     )
