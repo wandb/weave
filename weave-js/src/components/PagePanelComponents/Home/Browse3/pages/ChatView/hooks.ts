@@ -130,7 +130,6 @@ export const useCallAsChat = (
 ): {
   loading: boolean;
 } & Chat => {
-  console.log('useCallAsChat', call);
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();
