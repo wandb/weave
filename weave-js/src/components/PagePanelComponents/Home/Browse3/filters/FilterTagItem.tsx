@@ -7,6 +7,7 @@ import {RemoveAction} from '@wandb/weave/components/Tag';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
+import {RunLink} from '../../../../RunLink';
 import {Timestamp, TimestampRange, TimestampSmall} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
@@ -26,6 +27,8 @@ import {FilterTagStatus} from './FilterTagStatus';
 import {IdList} from './IdList';
 
 type FilterTagItemProps = {
+  entity: string;
+  project: string;
   item: GridFilterItem;
   onRemoveFilter: (id: FilterId) => void;
   isEditing?: boolean;
@@ -39,6 +42,8 @@ const quoteValue = (valueType: string, value: string): string => {
 };
 
 export const FilterTagItem = ({
+  entity,
+  project,
   item,
   onRemoveFilter,
   isEditing = false,
@@ -53,6 +58,11 @@ export const FilterTagItem = ({
   const fieldType = getFieldType(item.field);
   if (fieldType === 'id') {
     value = <IdList ids={getStringList(item.value)} type="Call" />;
+  } else if (fieldType === 'run') {
+    const runName = item.value.split(':')[1]; // Value is e.g. UHJvamVjdEludGVybmFsSWQ6NDE2OTQ4MDc=:qels1cvj
+    value = (
+      <RunLink entityName={entity} projectName={project} runName={runName} />
+    );
   } else if (fieldType === 'user') {
     // This additional night-aware is unfortunate, necessary to counteract
     // the night-aware in FilterTag's useTagClasses call.

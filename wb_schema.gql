@@ -236,6 +236,12 @@ type ParquetHistory {
   parquetUrls: [String!]!
 }
 
+type RunTag @internal(method: "ProjectID() teams.ProjectID") {
+  id: ID!
+  name: String!
+  colorIndex: Int!
+}
+
 type Run implements Node {
   createdAt: DateTime!
   name: String!
@@ -254,6 +260,9 @@ type Run implements Node {
   historyKeys: JSON
   computeSeconds: Duration!
   parquetHistory(liveKeys: [String!]!): ParquetHistory!
+  notes: String
+  state: String
+  tagColors: [RunTag!]!
 }
 
 type RunConnection {
