@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
-import re
-import json
 import argparse
+import json
+import re
 from collections import defaultdict
+from pathlib import Path
 
 MAX_TOKENS = 2000  # Approximate word count cap for non-core entries
 BASE_URL = "https://weave-docs.wandb.ai/"
@@ -23,7 +23,7 @@ CATEGORY_HINTS = {
     "tutorial": "Tutorials",
     "quickstart": "Quickstart",
     "introduction": "Introduction",
-    "faq": "FAQs"
+    "faq": "FAQs",
 }
 
 
@@ -71,18 +71,27 @@ def strip_jsx(content: str) -> str:
 
 
 def replace_callouts(content: str) -> str:
-    content = re.sub(r":::note\s*\n(.*?)\n:::", r"> 💡 **Note**: \1", content, flags=re.DOTALL)
-    content = re.sub(r":::tip\s*\n(.*?)\n:::", r"> 🌟 **Tip**: \1", content, flags=re.DOTALL)
-    content = re.sub(r":::important\s*\n(.*?)\n:::", r"> 🚨 **Important**: \1", content, flags=re.DOTALL)
+    content = re.sub(
+        r":::note\s*\n(.*?)\n:::", r"> 💡 **Note**: \1", content, flags=re.DOTALL
+    )
+    content = re.sub(
+        r":::tip\s*\n(.*?)\n:::", r"> 🌟 **Tip**: \1", content, flags=re.DOTALL
+    )
+    content = re.sub(
+        r":::important\s*\n(.*?)\n:::",
+        r"> 🚨 **Important**: \1",
+        content,
+        flags=re.DOTALL,
+    )
     return content
 
 
 def remove_highlight_lines(content: str) -> str:
-    return re.sub(r'^\s*# highlight-next-line\n', '', content, flags=re.MULTILINE)
+    return re.sub(r"^\s*# highlight-next-line\n", "", content, flags=re.MULTILINE)
 
 
 def remove_images(content: str) -> str:
-    return re.sub(r'!\[.*?\]\(.*?\)', '', content)
+    return re.sub(r"!\[.*?\]\(.*?\)", "", content)
 
 
 def clean_markdown(content: str) -> str:
@@ -94,8 +103,12 @@ def clean_markdown(content: str) -> str:
     return content.strip()
 
 
-def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Path, split_by_category: bool = False):
-    sections = defaultdict(lambda: defaultdict(list))
+def generate_llms_full_outputs(
+    docs_dir: Path, txt_output: Path, json_output: Path, split_by_category: bool = False
+):
+    sections: dict[str, dict[str, list[tuple[str, str, str]]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     json_entries = []
 
     for md_file in docs_dir.rglob("*.md*"):
@@ -105,11 +118,15 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
         raw_content = md_file.read_text(encoding="utf-8")
         section = get_section(md_file)
         category = categorize(md_file)
-        title = extract_title(raw_content, md_file.stem.replace("-", " ").replace("_", " ").title())
+        title = extract_title(
+            raw_content, md_file.stem.replace("-", " ").replace("_", " ").title()
+        )
         cleaned = clean_markdown(raw_content)
 
         if section == "Optional" and len(cleaned.split()) > MAX_TOKENS:
-            cleaned = " ".join(cleaned.split()[:MAX_TOKENS]) + "\n\n> Content truncated."
+            cleaned = (
+                " ".join(cleaned.split()[:MAX_TOKENS]) + "\n\n> Content truncated."
+            )
 
         url_path = md_file.relative_to(docs_dir).with_suffix("").as_posix()
         url = f"{BASE_URL}{url_path}"
@@ -117,13 +134,15 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
         md_block = f"<!--- {section}: {category} -->\n<!--- {title} -->\n\n# {title}\n\n{cleaned}\n\n[Source]({url})"
         sections[section][category].append((title, url, md_block))
 
-        json_entries.append({
-            "title": title,
-            "url": url,
-            "section": section,
-            "category": category,
-            "content": cleaned
-        })
+        json_entries.append(
+            {
+                "title": title,
+                "url": url,
+                "section": section,
+                "category": category,
+                "content": cleaned,
+            }
+        )
 
     toc_lines = ["## Table of Contents", ""]
     for section_name in ["Docs", "Optional"]:
@@ -153,18 +172,24 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
             for category in sections[section_name]:
                 filename = f"llms-{category.lower().replace(' ', '_')}.txt"
                 category_path = txt_output.parent / filename
-                category_content = [entry for _, _, entry in sections[section_name][category]]
-                category_path.write_text("\n\n".join(category_content), encoding="utf-8")
+                category_content = [
+                    entry for _, _, entry in sections[section_name][category]
+                ]
+                category_path.write_text(
+                    "\n\n".join(category_content), encoding="utf-8"
+                )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--categories", action="store_true", help="Generate per-category .txt files")
+    parser.add_argument(
+        "--categories", action="store_true", help="Generate per-category .txt files"
+    )
     args = parser.parse_args()
 
     generate_llms_full_outputs(
         docs_dir=Path("./docs"),
         txt_output=Path("./static/llms-full.txt"),
         json_output=Path("./static/llms-full.json"),
-        split_by_category=args.categories
+        split_by_category=args.categories,
     )
