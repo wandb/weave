@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import React from 'react';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
@@ -558,35 +559,49 @@ export const normalizeChatCompletion = (
 
 export const useCallAsChat = (
   call: TraceCallSchema
-): {
-  loading: boolean;
-} & Chat => {
+ ): {
+   loading: boolean;
+ } & Chat => {
+  // Memoize the call data processing to prevent unnecessary recalculations
+  // when the component re-renders but the call data hasn't changed
+  const callId = call.id;
+  const callInputs = JSON.stringify(call.inputs);
+  const callOutput = call.output ? JSON.stringify(call.output) : null;
+
   // Traverse the data and find all ref URIs.
-  const refs = getRefs(call);
+  const refs = React.useMemo(() => getRefs(call), [callId, callInputs, callOutput]);
   const {useRefsData} = useWFHooks();
   const refsData = useRefsData({refUris: refs});
-  const refsMap = _.zipObject(refs, refsData.result ?? []);
-  const request = normalizeChatRequest(deref(call.inputs, refsMap));
-  const result = call.output
-    ? normalizeChatCompletion(request, deref(call.output, refsMap))
-    : null;
 
-  // TODO: It is possible that all of the choices are refs again, handle this better.
-  if (
-    result &&
-    result.choices &&
-    result.choices.some(choice => isWeaveRef(choice))
-  ) {
-    result.choices = [];
-  }
+  // Only recalculate when refs data or call data changes
+  const result = React.useMemo(() => {
+    const refsMap = _.zipObject(refs, refsData.result ?? []);
+    const request = normalizeChatRequest(deref(call.inputs, refsMap));
+    const result = call.output
+      ? normalizeChatCompletion(request, deref(call.output, refsMap))
+      : null;
 
-  return {
-    loading: refsData.loading,
-    isStructuredOutput: isStructuredOutputCall(call),
-    request,
-    result,
-  };
-};
+    // TODO: It is possible that all of the choices are refs again, handle this better.
+    if (
+      result &&
+      result.choices &&
+      result.choices.some(choice => isWeaveRef(choice))
+    ) {
+      result.choices = [];
+    }
+
+    return {
+      isStructuredOutput: isStructuredOutputCall(call),
+      request,
+      result,
+    };
+  }, [callId, callInputs, callOutput, refsData.result]);
+
+   return {
+     loading: refsData.loading,
+    ...result,
+   };
+}
 
 export const isMistralChatCompletionChoice = (choice: any): boolean => {
   if (!_.isPlainObject(choice)) {
