@@ -13,5 +13,14 @@ def hello(name):
     """Say hello to someone."""
     click.echo(f'Hello {name}! Welcome to Weave!')
 
+
+@cli.command()
+def complete():
+    """Complete a command."""
+    click.echo('Completing...')
+
+
+
+
 if __name__ == '__main__':
     cli() 
