@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 import json
+import argparse
 from collections import defaultdict
 
 MAX_TOKENS = 2000  # Approximate word count cap for non-core entries
@@ -93,7 +94,7 @@ def clean_markdown(content: str) -> str:
     return content.strip()
 
 
-def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Path):
+def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Path, split_by_category: bool = False):
     sections = defaultdict(lambda: defaultdict(list))
     json_entries = []
 
@@ -147,10 +148,23 @@ def generate_llms_full_outputs(docs_dir: Path, txt_output: Path, json_output: Pa
     txt_output.write_text("\n\n".join(full_md), encoding="utf-8")
     json_output.write_text(json.dumps(json_entries, indent=2), encoding="utf-8")
 
+    if split_by_category:
+        for section_name in sections:
+            for category in sections[section_name]:
+                filename = f"llms-{category.lower().replace(' ', '_')}.txt"
+                category_path = txt_output.parent / filename
+                category_content = [entry for _, _, entry in sections[section_name][category]]
+                category_path.write_text("\n\n".join(category_content), encoding="utf-8")
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--categories", action="store_true", help="Generate per-category .txt files")
+    args = parser.parse_args()
+
     generate_llms_full_outputs(
         docs_dir=Path("./docs"),
         txt_output=Path("./static/llms-full.txt"),
-        json_output=Path("./static/llms-full.json")
+        json_output=Path("./static/llms-full.json"),
+        split_by_category=args.categories
     )
