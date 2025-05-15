@@ -1,5 +1,3 @@
-# Inspired from `wandb` terminal logging (eg. /wandb/errors/term.py)
-
 import logging
 
 import click
@@ -31,6 +29,11 @@ def _log(
     silent: bool = False,
     level: int = logging.INFO,
 ) -> None:
+    """
+    Logging utility inspired from `wandb` terminal logging (eg. /wandb/errors/term.py)
+    1. If prefix is True, prepend the LOG_STRING to the beginning of each line.
+    2. If silent is True, log to the logger instead of printing to the terminal.
+    """
     if string:
         if prefix:
             line = "\n".join([f"{LOG_STRING}: {s}" for s in string.split("\n")])
