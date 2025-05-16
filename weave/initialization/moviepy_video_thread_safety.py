@@ -14,11 +14,12 @@ We call `apply_threadsafe_patch_to_moviepy_video` in the `__init__.py` file to e
 for VideoFileClip loading operations.
 """
 
+import logging
 import threading
 from functools import wraps
 from typing import Any, Callable, Optional
 
-from weave.trace.term import weave_print
+logger = logging.getLogger(__name__)
 
 # Global state
 # `_patched` is a boolean that indicates whether the thread-safety patch has been applied
@@ -47,7 +48,7 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
     except ImportError:
         pass
     except Exception as e:
-        weave_print(
+        logger.info(
             f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
         )
     else:
@@ -117,7 +118,7 @@ def undo_threadsafe_patch_to_moviepy_video() -> None:
     except ImportError:
         pass
     except Exception as e:
-        weave_print(
+        logger.info(
             f"Failed to unpatch moviepy.editor.VideoFileClip: Unable to restore original methods - {e}"
         )
     else:

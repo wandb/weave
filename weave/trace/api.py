@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -23,8 +24,9 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace.term import weave_print
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+
+logger = logging.getLogger(__name__)
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -158,7 +160,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        weave_print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 

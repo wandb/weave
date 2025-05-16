@@ -1,3 +1,4 @@
+import logging
 from functools import wraps
 from typing import Any, Callable, Optional
 
@@ -6,8 +7,9 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,
 )
 from weave.trace.autopatch import OpSettings
-from weave.trace.term import weave_print
 from weave.trace.weave_client import Call
+
+logger = logging.getLogger(__name__)
 
 
 def google_genai_gemini_postprocess_outputs(
@@ -24,7 +26,7 @@ def google_genai_gemini_postprocess_outputs(
             try:
                 pil_image = Image.open(BytesIO(image_data.image.image_bytes))
             except Exception as e:
-                weave_print(f"Error converting image to `PIL.Image.Image`: {e}")
+                logger.info(f"Error converting image to `PIL.Image.Image`: {e}")
 
             modified_outputs.append(
                 {

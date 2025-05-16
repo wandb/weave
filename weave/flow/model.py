@@ -1,4 +1,5 @@
 import inspect
+import logging
 import textwrap
 import time
 import traceback
@@ -9,8 +10,9 @@ from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
-from weave.trace.term import weave_print
 from weave.trace.weave_client import Call
+
+logger = logging.getLogger(__name__)
 
 INFER_METHOD_NAMES = {"predict", "infer", "forward", "invoke"}
 
@@ -164,8 +166,8 @@ async def apply_model_async(
         )
         raise OpCallError(message)
     except Exception:
-        weave_print("model_output failed")
-        weave_print(traceback.format_exc())
+        logger.info("model_output failed")
+        logger.info(traceback.format_exc())
         return ApplyModelError(model_latency=time.time() - model_start_time)
 
     return ApplyModelSuccess(

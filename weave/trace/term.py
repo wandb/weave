@@ -1,53 +1,37 @@
 import logging
+import os
 
 import click
 
-from weave.trace.settings import should_be_silent
-
 LOG_STRING = click.style("weave", fg="yellow", bold=True)
 
-_logger = logging.getLogger("weave")
+# Create and configure the logger
+logger = logging.getLogger("weave")
 
 
-def weave_print(
-    string: str,
-    *,
-    # Defaulting to `False` for now, but I think we should enable this by default.
-    prefix: bool = False,
-) -> None:
-    _log(
-        string=string,
-        prefix=prefix,
-        silent=should_be_silent(),
-        level=logging.INFO,
-    )
+# Create a custom formatter that adds the weave prefix
+class WeaveFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        if not record.getMessage():
+            return ""
+        # Add the weave prefix to each line
+        message = "\n".join(
+            [f"{LOG_STRING}: {line}" for line in record.getMessage().split("\n")]
+        )
+        record.msg = message
+        return super().format(record)
 
 
-def _log(
-    string: str = "",
-    prefix: bool = True,
-    silent: bool = False,
-    level: int = logging.INFO,
-) -> None:
-    """
-    Logging utility inspired from `wandb` terminal logging (eg. /wandb/errors/term.py)
-    1. If prefix is True, prepend the LOG_STRING to the beginning of each line.
-    2. If silent is True, log to the logger instead of printing to the terminal.
-    """
-    if string:
-        if prefix:
-            line = "\n".join([f"{LOG_STRING}: {s}" for s in string.split("\n")])
-        else:
-            line = string
-    else:
-        line = ""
+# Create a console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(WeaveFormatter())
 
-    if silent:
-        if level == logging.ERROR:
-            _logger.error(line)
-        elif level == logging.WARNING:
-            _logger.warning(line)
-        else:
-            _logger.info(line)
-    else:
-        click.echo(line)
+# Add the handler to the logger
+logger.addHandler(console_handler)
+
+# Set the log level based on environment variable
+log_level = os.getenv("WEAVE_LOG_LEVEL", "INFO").upper()
+logger.setLevel(getattr(logging, log_level))
+
+# Export the logger for use in other modules
+__all__ = ["logger"]

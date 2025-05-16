@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
-from weave.trace.term import weave_print
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -140,7 +140,7 @@ async def run_in_process_with_timeout(
         # Wait for the process to complete or timeout
         await asyncio.wait_for(loop.run_in_executor(None, process.join), timeout)
     except asyncio.TimeoutError:
-        weave_print("Function execution exceeded the timeout. Terminating process.")
+        logger.info("Function execution exceeded the timeout. Terminating process.")
         process.terminate()
         process.join()  # Ensure process resources are cleaned up
         raise
