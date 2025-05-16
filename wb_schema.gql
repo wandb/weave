@@ -18,6 +18,7 @@ directive @accessibleIf(
   cond: String
   restrictEvenAdmins: Boolean
 ) on FIELD_DEFINITION
+directive @internal(method: String!) repeatable on OBJECT | INTERFACE
 
 type Query {
   user(id: ID, userName: String): User
