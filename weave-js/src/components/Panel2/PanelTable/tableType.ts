@@ -14,7 +14,6 @@ import {
   opFileJoinedTable,
   opFilePartitionedTable,
   opFileTable,
-  opFileTableWithIncrements,
   opJoinedTableRows,
   opPartitionedTableRows,
   opTableRows,
@@ -81,7 +80,7 @@ export function normalizeTableLike(node: Node, stack: Stack = []) {
       // single run workspace and not via run history.
       // We want to display the increment at that history when using
       // the stepper.
-      return opTableRows({table: opFileTableWithIncrements({file: node})});
+      return opTableRows({table: opFileTable({file: node})});
     }
     return opTableRows({table: opFileTable({file: node})});
   }
