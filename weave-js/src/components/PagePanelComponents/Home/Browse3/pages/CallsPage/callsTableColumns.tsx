@@ -801,24 +801,14 @@ function buildCallsTableColumns(
         return <span>{runId}</span>;
       }
       const [entityName, projectName, runName] = parts;
-      // The filtering here is kind of hacky.
-      // We would need the project internal id to construct an equals filter,
-      // or we need to pass the restriction in as part of the "filter" argument
-      // instead of the "query" argument. A slight improvement that wouldn't go
-      // that far would be if we had an "ends with" operator.
       return (
-        <CellFilterWrapper
+        <CellValueRun
+          entity={entityName}
+          project={projectName}
+          run={runName}
           onUpdateFilter={onUpdateFilter}
-          field="wb_run_id"
           rowId={cellParams.id.toString()}
-          operation="(string): contains"
-          value={':' + runName}>
-          <CellValueRun
-            entity={entityName}
-            project={projectName}
-            run={runName}
-          />
-        </CellFilterWrapper>
+        />
       );
     },
   });
