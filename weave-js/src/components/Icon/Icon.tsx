@@ -19,6 +19,7 @@ import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
+import {ReactComponent as ImportBranchCommit} from '../../assets/icons/icon-branch-commit.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
 import {ReactComponent as ImportBuzzBot10} from '../../assets/icons/icon-buzz-bot10.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
@@ -341,6 +342,9 @@ export const IconBoolean = (props: SVGIconProps) => (
 );
 export const IconBoxPlot = (props: SVGIconProps) => (
   <ImportBoxPlot {...updateIconProps(props)} />
+);
+export const IconBranchCommit = (props: SVGIconProps) => (
+  <ImportBranchCommit {...updateIconProps(props)} />
 );
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
@@ -1119,6 +1123,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
+  'branch-commit': IconBranchCommit,
   bug: IconBug,
   'buzz-bot10': IconBuzzBot10,
   'category-multimodal': IconCategoryMultimodal,
