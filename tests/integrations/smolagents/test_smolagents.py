@@ -10,10 +10,14 @@ from weave.integrations.integration_utilities import op_name_from_ref
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_hf_api_model(client):
     from smolagents import HfApiModel
 
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
+        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+    )
     engine = HfApiModel(
         model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
         token=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"),
@@ -43,9 +47,12 @@ def test_hf_api_model(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_openai_server_model(client):
     from smolagents import OpenAIServerModel
+
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     engine = OpenAIServerModel(
         model_id="gpt-4o-mini",
@@ -73,10 +80,16 @@ def test_openai_server_model(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_ddgsearch(client):
     from smolagents import GoogleSearchTool, OpenAIServerModel, ToolCallingAgent
 
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
+        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+    )
+    os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
     model = OpenAIServerModel(model_id="gpt-4.1-mini")
     agent = ToolCallingAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
@@ -96,9 +109,15 @@ def test_tool_calling_agent_ddgsearch(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_weather(client):
     from smolagents import OpenAIServerModel, ToolCallingAgent, tool
+
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
+        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+    )
 
     model = OpenAIServerModel(model_id="gpt-4.1-mini")
 
@@ -132,6 +151,12 @@ def test_tool_calling_agent_weather(client):
 def test_code_agent_search(client):
     from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
 
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
+        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+    )
+    os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
+
     model = OpenAIServerModel(model_id="gpt-4.1-mini")
     agent = CodeAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
@@ -151,9 +176,16 @@ def test_code_agent_search(client):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_weather(client):
     from smolagents import CodeAgent, OpenAIServerModel, tool
+
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
+        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+    )
+    os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
 
     model = OpenAIServerModel(model_id="gpt-4.1-mini")
 
