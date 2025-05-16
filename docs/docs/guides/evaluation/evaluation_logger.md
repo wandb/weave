@@ -40,7 +40,9 @@ Finally, `log_summary` records any aggregate metrics and triggers automatic scor
 ```python
 import weave
 from openai import OpenAI
-from weave.flow.eval_imperative import EvaluationLogger
+from weave import EvaluationLogger 
+
+weave.init('my-project')
 
 # Initialize the logger (model/dataset names are optional metadata)
 eval_logger = EvaluationLogger(

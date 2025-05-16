@@ -1929,17 +1929,34 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
 export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema
-): StatusCodeType => {
-  if (traceCall.exception) {
-    return 'ERROR';
-  } else if (traceCall.ended_at) {
-    return 'SUCCESS';
-  } else {
-    return 'UNSET';
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  const serverSideStatus = traceCall.summary?.weave?.status;
+  if (serverSideStatus) {
+    if (
+      serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
+      hasDescendantErrors
+    ) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return serverSideStatus;
   }
+  if (traceCall.exception) {
+    return traceServerTypes.ComputedCallStatuses.error;
+  } else if (traceCall.ended_at) {
+    const errors = traceCall.summary?.status_counts?.error ?? 0;
+    if (errors > 0 || hasDescendantErrors) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return traceServerTypes.ComputedCallStatuses.success;
+  }
+  return traceServerTypes.ComputedCallStatuses.running;
 };
 
 export const traceCallLatencyS = (

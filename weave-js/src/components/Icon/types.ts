@@ -18,6 +18,7 @@ export const IconNames = {
   BookDictionary: 'book-dictionary',
   Boolean: 'boolean',
   BoxPlot: 'box-plot',
+  BranchCommit: 'branch-commit',
   Bug: 'bug',
   BuzzBot10: 'buzz-bot10',
   CategoryMultimodal: 'category-multimodal',

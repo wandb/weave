@@ -19,6 +19,7 @@ export {
   IconBookDictionary,
   IconBoolean,
   IconBoxPlot,
+  IconBranchCommit,
   IconBug,
   IconBuzzBot10,
   IconCategoryMultimodal,
