@@ -1,0 +1,1221 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools, behaving like regular python functions:\n```python\ndef web_search(query:
+      string, filter_year: integer) -> string:\n    \"\"\"Performs a google web search
+      for your query then returns a string of the top search results.\n\n    Args:\n        query:
+      The search query to perform.\n        filter_year: Optionally restrict results
+      to a certain year\n    \"\"\"\n\ndef final_answer(answer: any) -> any:\n    \"\"\"Provides
+      a final answer to the given problem.\n\n    Args:\n        answer: The final
+      answer to the problem\n    \"\"\"\n\n```\n\nHere are the rules you should always
+      follow to solve your task:\n1. Always provide a ''Thought:'' sequence, and a
+      ''Code:\\n```py'' sequence ending with ''```<end_code>'' sequence, else you
+      will fail.\n2. Use only variables that you have defined!\n3. Always use the
+      right arguments for the tools. DO NOT pass the arguments as a dict as in ''answer
+      = wiki({''query'': \"What is the place where James Bond lives?\"})'', but use
+      the arguments directly as in ''answer = wiki(query=\"What is the place where
+      James Bond lives?\")''.\n4. Take care to not chain too many sequential tool
+      calls in the same code block, especially when the output format is unpredictable.
+      For instance, a call to search has an unpredictable return format, so do not
+      have another tool call that depends on its output in the same block: rather
+      output results with print() to use them in the next block.\n5. Call a tool only
+      when needed, and never re-do a tool call that you previously did with the exact
+      same parameters.\n6. Don''t name any new variable with the same name as a tool:
+      for instance don''t name a variable ''final_answer''.\n7. Never create any notional
+      variables in our code, as having these in your logs will derail you from the
+      true variables.\n8. You can use imports in your code, but only from the following
+      list of modules: [''collections'', ''datetime'', ''itertools'', ''math'', ''queue'',
+      ''random'', ''re'', ''stat'', ''statistics'', ''time'', ''unicodedata'']\n9.
+      The state persists between code executions: so if in one step you''ve created
+      variables or imported modules, these will all persist.\n10. Don''t give up!
+      You''re in charge of solving the task, not providing directions to solve it.\n\nNow
+      Begin!"}]},{"role":"user","content":[{"type":"text","text":"New task:\nUse the
+      provided tool to answer this question. Get the following page - ''https://weave-docs.wandb.ai/''?"}]}],"model":"gpt-4.1-mini","stop":["<end_code>","Observation:","Calling
+      tools:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '8951'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4RUwU7cMBC971eMfAJpd0mWwMJKXNoLVK2KKpCKGhS8ziQxOHZqTzZEiH+v7IVN
+        aEG9RInfvDfz7Oc8TQCYzNkKmKg4ibpRs08/7w/L+DJJvkeUXx73D+c3x+3Jl+v+2+ONZVPPMOt7
+        FPTKmgtTNwpJGr2FhUVO6FXjZbI8XC6Xi5MA1CZH5WllQ7NkHs9qqeVsES2OZlEyi5MXemWkQMdW
+        8GsCAPAUnn5QneMjW0E0fV2p0TleIlvtigCYNcqvMO6cdMQ1sekACqMJdZj9qjJtWdEKrioE4u4B
+        pAMyUCIBVQgvpWCK8NnwEiFlFVHjVgcHHfINznIj3LzjOl/PuTxI2RzOTYcbtFO4AKNVDxXfYOCT
+        MQpS1uE6c8itqFIGXSVF5dtqs+3peI3AHWykkyR1CRyuf3yFXFoUpPo5XEAnlYIGbWFsDRw6XMNW
+        DzpJVVDxFO7C6+8Wbe9dOUSQBVwEexYVbrimnUeLyh+ZL6SKUzA7T3WqP5scV6m+u7tr+lT75eyV
+        cwaDl73Q5+x/2zOFQipCm/XI7Vm0n+rGSk17Y9390G18ZhaL1nEfHN0qNQK41oa4D15Iy+0L8rzL
+        hzJlY83a/UVlhdTSVZlF7oz2WXBkGhbQ5wnAbchh+yZarLGmbigj84Ch3SJaxFtBNlyAAY6j5AUl
+        Q1yNePHiaPqOZJYjcancKMxMcFFhPhI9XQzh520uzYBFk5H3f0d6T37rX+pypPKh/AAIgQ1hnjUW
+        cyne2h7KLPqfxEdlu70OAzOHdiMFZiTR+vPIseCt2t5c5npHWGeF1CXaEBhfUjTZ8nS9PF1jEhds
+        8jz5AwAA//8DAGRgCe/NBAAA
+    headers:
+      CF-RAY:
+      - 9408e4b099027f74-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 16 May 2025 06:42:11 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=BHITMbi7qyttkZbGmSvRE46HUzsdfaPb_WvPT2_FOts-1747377731-1.0.1.1-9gfRfH1PaKZOXKOxP_6ACTyUdvKZeJzHQJDdEbQHlz_FmpjWDs1Z2ucR8.MnwsOWJ_11JB.s_By74TWszu_oo6cf8ALn5gsDo7F80lZWnjg;
+        path=/; expires=Fri, 16-May-25 07:12:11 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=ytMjVtCHBCs6BsAkTqiUGy847UhEmDPWPm71rAYQWNo-1747377731801-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '3416'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '3423'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149997872'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_feea02b493cad318fb273af526bbb554
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools, behaving like regular python functions:\n```python\ndef web_search(query:
+      string, filter_year: integer) -> string:\n    \"\"\"Performs a google web search
+      for your query then returns a string of the top search results.\n\n    Args:\n        query:
+      The search query to perform.\n        filter_year: Optionally restrict results
+      to a certain year\n    \"\"\"\n\ndef final_answer(answer: any) -> any:\n    \"\"\"Provides
+      a final answer to the given problem.\n\n    Args:\n        answer: The final
+      answer to the problem\n    \"\"\"\n\n```\n\nHere are the rules you should always
+      follow to solve your task:\n1. Always provide a ''Thought:'' sequence, and a
+      ''Code:\\n```py'' sequence ending with ''```<end_code>'' sequence, else you
+      will fail.\n2. Use only variables that you have defined!\n3. Always use the
+      right arguments for the tools. DO NOT pass the arguments as a dict as in ''answer
+      = wiki({''query'': \"What is the place where James Bond lives?\"})'', but use
+      the arguments directly as in ''answer = wiki(query=\"What is the place where
+      James Bond lives?\")''.\n4. Take care to not chain too many sequential tool
+      calls in the same code block, especially when the output format is unpredictable.
+      For instance, a call to search has an unpredictable return format, so do not
+      have another tool call that depends on its output in the same block: rather
+      output results with print() to use them in the next block.\n5. Call a tool only
+      when needed, and never re-do a tool call that you previously did with the exact
+      same parameters.\n6. Don''t name any new variable with the same name as a tool:
+      for instance don''t name a variable ''final_answer''.\n7. Never create any notional
+      variables in our code, as having these in your logs will derail you from the
+      true variables.\n8. You can use imports in your code, but only from the following
+      list of modules: [''collections'', ''datetime'', ''itertools'', ''math'', ''queue'',
+      ''random'', ''re'', ''stat'', ''statistics'', ''time'', ''unicodedata'']\n9.
+      The state persists between code executions: so if in one step you''ve created
+      variables or imported modules, these will all persist.\n10. Don''t give up!
+      You''re in charge of solving the task, not providing directions to solve it.\n\nNow
+      Begin!"}]},{"role":"user","content":[{"type":"text","text":"New task:\nUse the
+      provided tool to answer this question. Get the following page - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Thought:
+      The task is to get the content of the page \"https://weave-docs.wandb.ai/\".
+      However, I only have the tool \"web_search\" which is not the same as visiting
+      a URL directly. I will perform a web search with the URL as the query to see
+      if I get relevant content related to that page.\n\nCode:\n```py\npage_content
+      = web_search(query=\"https://weave-docs.wandb.ai/\", filter_year=0)\nprint(page_content)\n```<end_code>\nCalling
+      tools:\n[{''id'': ''call_1'', ''type'': ''function'', ''function'': {''name'':
+      ''python_interpreter'', ''arguments'': ''page_content = web_search(query=\"https://weave-docs.wandb.ai/\",
+      filter_year=0)\\nprint(page_content)''}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_1\nError:\nCode execution failed at line ''page_content = web_search(query=\"https://weave-docs.wandb.ai/\",
+      filter_year=0)'' due to: ExecutionTimeoutError: Code execution exceeded the
+      maximum execution time of 10 seconds\nNow let''s retry: take care not to repeat
+      previous errors! If you have retried several times, try a completely different
+      approach.\n"}]}],"model":"gpt-4.1-mini","stop":["<end_code>","Observation:","Calling
+      tools:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '10072'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=BHITMbi7qyttkZbGmSvRE46HUzsdfaPb_WvPT2_FOts-1747377731-1.0.1.1-9gfRfH1PaKZOXKOxP_6ACTyUdvKZeJzHQJDdEbQHlz_FmpjWDs1Z2ucR8.MnwsOWJ_11JB.s_By74TWszu_oo6cf8ALn5gsDo7F80lZWnjg;
+        _cfuvid=ytMjVtCHBCs6BsAkTqiUGy847UhEmDPWPm71rAYQWNo-1747377731801-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RUy27bMBC8+ysWPCWA7fjVyjaQQ1OgaIC+kQJ9KFAociXRoUiWXNo1gvx7Idmx
+        lSa56MDZmZ3lDnXXA2BKsiUwUXEStdODix+raXz9aTFffX3/bvRT/tJvPiefL6qPX/xKsH7DsPkK
+        BT2whsLWTiMpa3aw8MgJG9VxMkumSZLMJi1QW4m6oZWOBrPheFArowaT0eTVYDQbjGd7emWVwMCW
+        8LsHAHDXfhujRuJftoRR/+GkxhB4iWx5KAJg3urmhPEQVCBuiPWPoLCG0LTeryoby4qWcFUhOI9r
+        ZWMAToS1IyALAbkXFcSgTAlUIRRRa/j+7QOQqlGCjdQHrW5RbyFHwWPAPachFNY/JqkAxhJgUSih
+        0NAQLk0g5LIPl7BRWgP57ZO+t7jdWC8DhCgq4AFStkG+RpBWBNhwI/OUwaZSooJalRWBR4regEeN
+        a24IlCmsr3mzH7C+4cUaDe0OeG4jtT6DIoSUVUQuLM/O2iaDpsmwbTLk6ixlw9Sk5q2VuEzNzc2N
+        26bG8RKz/bXCOWwwz3YDnPyJ6Lfnz/ntQ6E0oc+2yP356DQ1zitDJ12t07ZDd3ceixh4EyATte4A
+        3Bi7m6dNzfUeuT/kRNvSeZuH/6isUEaFKvPIgzVNJgJZx1r0vgdw3eYxPooYc97WjjKyt9i2m0zm
+        050gOz6EI7yY70GyxHWHNp2P+88oZhKJKx06mWaCiwplhzuazQ8z8CiVPWKjXmf0p46ek9+Nr0zZ
+        UXlR/ggIgY5QZs6jVOLx1Mcyj82/4qWyw1W3hllAv1YCM1Lom3VILHjUuwfMwjYQ1lmhTIm+zUtT
+        UrgsWeTJIsfZuGC9+94/AAAA//8DAE759JDUBAAA
+    headers:
+      CF-RAY:
+      - 9408e5084d688022-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 16 May 2025 06:42:25 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2394'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '2400'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149997625'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_36c322d8f0e2810ebbf8359f95bd932d
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://serpapi.com/search.json?q=weave+docs+wandb&api_key=39666fb918a114c61156898f664682853ea4de76f0f3b7f365511db1eca40c3d&engine=google&google_domain=google.com&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F0%2Ccd_max%3A12%2F31%2F0
+  response:
+    body:
+      string: "{\n  \"search_metadata\": {\n    \"id\": \"6826de5173bf59dcf72184c1\",\n
+        \   \"status\": \"Success\",\n    \"json_endpoint\": \"https://serpapi.com/searches/17d46f02e6926976/6826de5173bf59dcf72184c1.json\",\n
+        \   \"created_at\": \"2025-05-16 06:42:25 UTC\",\n    \"processed_at\": \"2025-05-16
+        06:42:25 UTC\",\n    \"google_url\": \"https://www.google.com/search?q=weave+docs+wandb&oq=weave+docs+wandb&tbs=cdr:1,cd_min:01/01/0,cd_max:12/31/0&sourceid=chrome&ie=UTF-8\",\n
+        \   \"raw_html_file\": \"https://serpapi.com/searches/17d46f02e6926976/6826de5173bf59dcf72184c1.html\",\n
+        \   \"total_time_taken\": 1.06\n  },\n  \"search_parameters\": {\n    \"engine\":
+        \"google\",\n    \"q\": \"weave docs wandb\",\n    \"google_domain\": \"google.com\",\n
+        \   \"device\": \"desktop\",\n    \"tbs\": \"cdr:1,cd_min:01/01/0,cd_max:12/31/0\"\n
+        \ },\n  \"search_information\": {\n    \"query_displayed\": \"weave docs wandb\",\n
+        \   \"total_results\": 0,\n    \"time_taken_displayed\": 0.09,\n    \"organic_results_state\":
+        \"Fully empty\",\n    \"query_feedback\": {\n      \"title\": \"Your search
+        did not match any documents\"\n    }\n  },\n  \"error\": \"Google hasn't returned
+        any results for this query.\"\n}"
+    headers:
+      CF-Cache-Status:
+      - MISS
+      CF-RAY:
+      - 9408e51ee9783c00-BLR
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 16 May 2025 06:42:27 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      alt-svc:
+      - h3=":443"; ma=86400
+      cache-control:
+      - max-age=3600, public
+      etag:
+      - W/"3941c431f429d0caa00e692eda7c7695"
+      referrer-policy:
+      - strict-origin-when-cross-origin
+      serpapi-search-id:
+      - 6826de5173bf59dcf72184c1
+      x-content-type-options:
+      - nosniff
+      x-download-options:
+      - noopen
+      x-frame-options:
+      - SAMEORIGIN
+      x-permitted-cross-domain-policies:
+      - none
+      x-request-id:
+      - 5fd79370-d01a-44a5-9755-992144ac6b62
+      x-robots-tag:
+      - noindex, nofollow
+      x-runtime:
+      - '1.079176'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools, behaving like regular python functions:\n```python\ndef web_search(query:
+      string, filter_year: integer) -> string:\n    \"\"\"Performs a google web search
+      for your query then returns a string of the top search results.\n\n    Args:\n        query:
+      The search query to perform.\n        filter_year: Optionally restrict results
+      to a certain year\n    \"\"\"\n\ndef final_answer(answer: any) -> any:\n    \"\"\"Provides
+      a final answer to the given problem.\n\n    Args:\n        answer: The final
+      answer to the problem\n    \"\"\"\n\n```\n\nHere are the rules you should always
+      follow to solve your task:\n1. Always provide a ''Thought:'' sequence, and a
+      ''Code:\\n```py'' sequence ending with ''```<end_code>'' sequence, else you
+      will fail.\n2. Use only variables that you have defined!\n3. Always use the
+      right arguments for the tools. DO NOT pass the arguments as a dict as in ''answer
+      = wiki({''query'': \"What is the place where James Bond lives?\"})'', but use
+      the arguments directly as in ''answer = wiki(query=\"What is the place where
+      James Bond lives?\")''.\n4. Take care to not chain too many sequential tool
+      calls in the same code block, especially when the output format is unpredictable.
+      For instance, a call to search has an unpredictable return format, so do not
+      have another tool call that depends on its output in the same block: rather
+      output results with print() to use them in the next block.\n5. Call a tool only
+      when needed, and never re-do a tool call that you previously did with the exact
+      same parameters.\n6. Don''t name any new variable with the same name as a tool:
+      for instance don''t name a variable ''final_answer''.\n7. Never create any notional
+      variables in our code, as having these in your logs will derail you from the
+      true variables.\n8. You can use imports in your code, but only from the following
+      list of modules: [''collections'', ''datetime'', ''itertools'', ''math'', ''queue'',
+      ''random'', ''re'', ''stat'', ''statistics'', ''time'', ''unicodedata'']\n9.
+      The state persists between code executions: so if in one step you''ve created
+      variables or imported modules, these will all persist.\n10. Don''t give up!
+      You''re in charge of solving the task, not providing directions to solve it.\n\nNow
+      Begin!"}]},{"role":"user","content":[{"type":"text","text":"New task:\nUse the
+      provided tool to answer this question. Get the following page - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Thought:
+      The task is to get the content of the page \"https://weave-docs.wandb.ai/\".
+      However, I only have the tool \"web_search\" which is not the same as visiting
+      a URL directly. I will perform a web search with the URL as the query to see
+      if I get relevant content related to that page.\n\nCode:\n```py\npage_content
+      = web_search(query=\"https://weave-docs.wandb.ai/\", filter_year=0)\nprint(page_content)\n```<end_code>\nCalling
+      tools:\n[{''id'': ''call_1'', ''type'': ''function'', ''function'': {''name'':
+      ''python_interpreter'', ''arguments'': ''page_content = web_search(query=\"https://weave-docs.wandb.ai/\",
+      filter_year=0)\\nprint(page_content)''}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_1\nError:\nCode execution failed at line ''page_content = web_search(query=\"https://weave-docs.wandb.ai/\",
+      filter_year=0)'' due to: ExecutionTimeoutError: Code execution exceeded the
+      maximum execution time of 10 seconds\nNow let''s retry: take care not to repeat
+      previous errors! If you have retried several times, try a completely different
+      approach.\n"}]},{"role":"assistant","content":[{"type":"text","text":"Thought:
+      The previous attempt to search using the full URL timed out, likely because
+      searching for the full URL is not efficient. Instead, I will try to search using
+      keywords such as \"weave docs wandb\" which might return relevant information
+      or documentation about the site \"https://weave-docs.wandb.ai/\".\n\nCode:\n```py\npage_content
+      = web_search(query=\"weave docs wandb\", filter_year=0)\nprint(page_content)\n```<end_code>\nCalling
+      tools:\n[{''id'': ''call_2'', ''type'': ''function'', ''function'': {''name'':
+      ''python_interpreter'', ''arguments'': ''page_content = web_search(query=\"weave
+      docs wandb\", filter_year=0)\\nprint(page_content)''}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_2\nError:\nCode execution failed at line ''page_content = web_search(query=\"weave
+      docs wandb\", filter_year=0)'' due to: Exception: No results found for query:
+      ''weave docs wandb'' with filtering on year=0. Use a less restrictive query
+      or do not filter on year.\nNow let''s retry: take care not to repeat previous
+      errors! If you have retried several times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["<end_code>","Observation:","Calling
+      tools:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '11228'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=BHITMbi7qyttkZbGmSvRE46HUzsdfaPb_WvPT2_FOts-1747377731-1.0.1.1-9gfRfH1PaKZOXKOxP_6ACTyUdvKZeJzHQJDdEbQHlz_FmpjWDs1Z2ucR8.MnwsOWJ_11JB.s_By74TWszu_oo6cf8ALn5gsDo7F80lZWnjg;
+        _cfuvid=ytMjVtCHBCs6BsAkTqiUGy847UhEmDPWPm71rAYQWNo-1747377731801-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//dFRNb9pAEL3zK0Z7SiRAhjhBIOXSD1U5NJfmEKlEzrIe7G3XM+7uLIRG
+        +e/VGgJum1wsed68Nx9+4+cBgLKlWoAytRbTtG704f7Hxe/p52zu5+2HbGrrzU3+9ekT39/yl50a
+        JgavfqCRV9bYcNM6FMu0h41HLZhUJ7N8djGbzfJZBzRcoku0qpVRPp6MGkt2NM2ml6MsH03yA71m
+        azCoBXwfAAA8d8/UKJX4pBaQDV8jDYagK1SLYxKA8uxSROkQbBBNooYn0DAJUtf7Xc2xqmUBdzVC
+        QO1NDVsrNWhYWyfogQl2qP11Bh4legpADB5DdBJghUbHgJBBg5pCiou3RixVxxzhTgAyOCOGEE3d
+        vZ+P4QZCzdGV4LHhDYLUuE99Le0hoICVpHHLhCmiwWlfIWy0iziGb5bMninMDjz+itZjAE1gSbBC
+        P4Qb2FrnoNUhHOldHWd/IkyzaZ4KaOd4Cx4NkpwGjALEAvhkXCwR2JXdTjBAJEKTdu+t242XtKSP
+        XOJiSY+Pj+1uSa2usDisGq5hi6tiv+CzXxH97nqptqg3CCWbAFtN5WqphofRi27lqbPzJbXekpz1
+        5c67Iv1P6nEdg06+ouhcD9BELDr5sjPTwwF5OdrHcdV6XoV/qGptyYa68KgDU7JKEG5Vh74MAB46
+        m8a/nKdaz00rhfBP7MpNL/OLvaA63ccJnmRXB1RYtOvxrvL58A3JokTR1oWe15XRpsayJzqfnm5D
+        x9LyCcsGvdn/b+kt+f38lqqeyrvyJ8AYbAXLovVYpnvoj31K85j+Ie+lHXfdNawC+o01WIhFn75H
+        iWsd3f6wVdgFwaZYW6rQd4ZJKeu2mM1Xs/kK88laDV4GfwAAAP//AwAcDKqL7AQAAA==
+    headers:
+      CF-RAY:
+      - 9408e5273dd38022-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 16 May 2025 06:42:29 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2010'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '2014'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149997368'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_95858e83676f8e93e571e96e4ff969d2
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://serpapi.com/search.json?q=weave+docs+wandb&api_key=39666fb918a114c61156898f664682853ea4de76f0f3b7f365511db1eca40c3d&engine=google&google_domain=google.com&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024
+  response:
+    body:
+      string: "{\n  \"search_metadata\": {\n    \"id\": \"6826de5566bc78604cd86f6f\",\n
+        \   \"status\": \"Success\",\n    \"json_endpoint\": \"https://serpapi.com/searches/3c2dfd602b012b30/6826de5566bc78604cd86f6f.json\",\n
+        \   \"created_at\": \"2025-05-16 06:42:29 UTC\",\n    \"processed_at\": \"2025-05-16
+        06:42:29 UTC\",\n    \"google_url\": \"https://www.google.com/search?q=weave+docs+wandb&oq=weave+docs+wandb&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&sourceid=chrome&ie=UTF-8\",\n
+        \   \"raw_html_file\": \"https://serpapi.com/searches/3c2dfd602b012b30/6826de5566bc78604cd86f6f.html\",\n
+        \   \"total_time_taken\": 1.76\n  },\n  \"search_parameters\": {\n    \"engine\":
+        \"google\",\n    \"q\": \"weave docs wandb\",\n    \"google_domain\": \"google.com\",\n
+        \   \"device\": \"desktop\",\n    \"tbs\": \"cdr:1,cd_min:01/01/2024,cd_max:12/31/2024\"\n
+        \ },\n  \"search_information\": {\n    \"query_displayed\": \"weave docs wandb\",\n
+        \   \"total_results\": 485,\n    \"time_taken_displayed\": 0.17,\n    \"organic_results_state\":
+        \"Results for exact spelling\"\n  },\n  \"organic_results\": [\n    {\n      \"position\":
+        1,\n      \"title\": \"Track LLM inputs & outputs - W&B Weave - Wandb\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/quickstart/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/quickstart/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECCAQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A quickstart\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a8335dfa4ce39a55966452af7c5acb4937.png\",\n
+        \     \"date\": \"Aug 28, 2024\",\n      \"snippet\": \"Track LLM inputs &
+        outputs. Follow these steps to track your first call or Open In Colab. 1.
+        Install Weave and create an API Key\u200B. Install weave.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Weave\",\n        \"weave\"\n      ],\n      \"source\": \"Weave
+        Docs\"\n    },\n    {\n      \"position\": 2,\n      \"title\": \"Tracing\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/tracking/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/tracking/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECCUQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        tracking\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a8d148168e2ed3f19672bf2706157139a4.png\",\n
+        \     \"date\": \"Sep 15, 2024\",\n      \"snippet\": \"Weave provides powerful
+        tracing capabilities to track and version objects and function calls in your
+        applications.\",\n      \"snippet_highlighted_words\": [\n        \"Weave
+        provides powerful tracing capabilities\"\n      ],\n      \"source\": \"Weave
+        Docs\"\n    },\n    {\n      \"position\": 3,\n      \"title\": \"Deploy\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/tools/deploy/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/tools/deploy/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECB0QAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        tools \u203A deploy\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a872f86d413dc54c73e443dba66594614b.png\",\n
+        \     \"date\": \"Apr 17, 2024\",\n      \"snippet\": \"weave deploy requires
+        your machine to have gcloud installed and configured. weave deploy gcp will
+        use pre-configured configuration when not directly specified ...\",\n      \"snippet_highlighted_words\":
+        [\n        \"weave deploy requires your machine to have gcloud installed and
+        configured\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n    {\n
+        \     \"position\": 4,\n      \"title\": \"LangChain\",\n      \"link\": \"https://weave-docs.wandb.ai/guides/integrations/langchain\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/langchain&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECB8QAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations \u203A lan...\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a886149a96054528c984033b552a5c1022.png\",\n
+        \     \"date\": \"Aug 5, 2024\",\n      \"snippet\": \"Weave is designed to
+        make tracking and logging all calls made through the LangChain Python library
+        effortless. When working with LLMs, debugging is inevitable.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Weave\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n
+        \   {\n      \"position\": 5,\n      \"title\": \"Anthropic\",\n      \"link\":
+        \"https://weave-docs.wandb.ai/guides/integrations/anthropic/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/anthropic/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECCcQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations \u203A ant...\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a82607ed09946037de739d5dfd237b5ed1.png\",\n
+        \     \"date\": \"Aug 29, 2024\",\n      \"snippet\": \"Weave automatically
+        tracks and logs LLM calls made via the Anthropic Python library, after weave.init()
+        is called.\",\n      \"snippet_highlighted_words\": [\n        \"Weave automatically
+        tracks and logs LLM calls\"\n      ],\n      \"source\": \"Weave Docs\"\n
+        \   },\n    {\n      \"position\": 6,\n      \"title\": \"LlamaIndex\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/integrations/llamaindex/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/llamaindex/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECCEQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations \u203A lla...\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a899237f8d65ebc2dde61848e63f0874b7.png\",\n
+        \     \"date\": \"Aug 19, 2024\",\n      \"snippet\": \"Weave is designed
+        to simplify the tracking and logging of all calls made through the LlamaIndex
+        Python library. When working with LLMs, debugging is inevitable.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Weave\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n
+        \   {\n      \"position\": 7,\n      \"title\": \"Ops\",\n      \"link\":
+        \"https://weave-docs.wandb.ai/guides/tracking/ops/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/tracking/ops/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECCIQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        tracking \u203A ops\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a8536a8a6db8894288f6471d43cc32ac58.png\",\n
+        \     \"date\": \"Aug 28, 2024\",\n      \"snippet\": \"A Weave op is a versioned
+        function that automatically logs all calls. To create an op, decorate a python
+        function with weave.op().\",\n      \"snippet_highlighted_words\": [\n        \"A
+        Weave op is a versioned function that automatically logs all calls\"\n      ],\n
+        \     \"source\": \"Weave Docs\"\n    },\n    {\n      \"position\": 8,\n
+        \     \"title\": \"Feedback\",\n      \"link\": \"https://weave-docs.wandb.ai/guides/tracking/feedback\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/tracking/feedback&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECDMQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        tracking \u203A feedba...\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a88a68f4ba643a843f033c69f17c864186.png\",\n
+        \     \"date\": \"Nov 30, 2024\",\n      \"snippet\": \"Weave provides an
+        integrated feedback system, allowing users to provide call feedback directly
+        through the UI or programmatically via the SDK. Various feedback ...\",\n
+        \     \"snippet_highlighted_words\": [\n        \"Weave provides an integrated
+        feedback system\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n    {\n
+        \     \"position\": 9,\n      \"title\": \"Integrations\",\n      \"link\":
+        \"https://weave-docs.wandb.ai/guides/integrations/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECDUQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a8397caa4adbd67af2db0d8d1fa1014bb7.png\",\n
+        \     \"date\": \"Aug 28, 2024\",\n      \"snippet\": \"Weave provides automatic
+        logging integrations for popular LLM providers and orchestration frameworks.
+        These integrations allow you to seamlessly trace calls.\",\n      \"snippet_highlighted_words\":
+        [\n        \"automatic logging integrations\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 10,\n      \"title\": \"Local
+        Models\",\n      \"link\": \"https://weave-docs.wandb.ai/guides/integrations/local_models/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/local_models/&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQFnoECDgQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations \u203A loc...\",\n      \"favicon\": \"https://serpapi.com/searches/6826de5566bc78604cd86f6f/images/1aa1db0af871911d6dffb8a5434258a8282a2e46e655810c8d9a6066e2576286.png\",\n
+        \     \"date\": \"Aug 24, 2024\",\n      \"snippet\": \"There are quite a
+        few ways of running these models locally and Weave supports a few of them
+        out of the box, as long as they support OpenAI SDK compatibility.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Weave supports a few of them out of the box\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    }\n  ],\n  \"pagination\": {\n    \"current\": 1,\n    \"next\":
+        \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=10&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8NMDegQIDxAW\",\n
+        \   \"other_pages\": {\n      \"2\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=10&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAE\",\n
+        \     \"3\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=20&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAG\",\n
+        \     \"4\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=30&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAI\",\n
+        \     \"5\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=40&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAK\",\n
+        \     \"6\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=50&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAM\",\n
+        \     \"7\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=60&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAO\",\n
+        \     \"8\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=70&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAQ\",\n
+        \     \"9\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=80&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAS\",\n
+        \     \"10\": \"https://www.google.com/search?q=weave+docs+wandb&sca_esv=39daea3b50f3b6b8&tbs=cdr:1,cd_min:01/01/2024,cd_max:12/31/2024&ei=V94maI3oBtGf5NoPr-SRwQI&start=90&sa=N&sstk=Af40H4V6bIZs-qhFr3Em9BlAkVbP-YW_NgRMJ7gYcGqTYcWtpetFko5fZ9-ks54SNqUoXroL0qoIqVkPi8cdst8d9Hm08vzgAbDw1Q&ved=2ahUKEwjN75KxsaeNAxXRD1kFHS9yJCgQ8tMDegQIDxAU\"\n
+        \   }\n  },\n  \"serpapi_pagination\": {\n    \"current\": 1,\n    \"next_link\":
+        \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=10&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \   \"next\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=10&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \   \"other_pages\": {\n      \"2\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=10&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"3\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=20&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"4\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=30&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"5\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=40&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"6\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=50&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"7\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=60&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"8\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=70&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"9\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=80&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\",\n
+        \     \"10\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=weave+docs+wandb&start=90&tbs=cdr%3A1%2Ccd_min%3A01%2F01%2F2024%2Ccd_max%3A12%2F31%2F2024\"\n
+        \   }\n  }\n}"
+    headers:
+      CF-Cache-Status:
+      - MISS
+      CF-RAY:
+      - 9408e5368da53c12-BLR
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 16 May 2025 06:42:31 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      alt-svc:
+      - h3=":443"; ma=86400
+      cache-control:
+      - max-age=3600, public
+      etag:
+      - W/"3ce35920658ac7726dba82055571ad0b"
+      referrer-policy:
+      - strict-origin-when-cross-origin
+      serpapi-search-id:
+      - 6826de5566bc78604cd86f6f
+      x-content-type-options:
+      - nosniff
+      x-download-options:
+      - noopen
+      x-frame-options:
+      - SAMEORIGIN
+      x-permitted-cross-domain-policies:
+      - none
+      x-request-id:
+      - 52cef105-4180-4bfc-a34c-ca9fa972f2af
+      x-robots-tag:
+      - noindex, nofollow
+      x-runtime:
+      - '1.790872'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "{\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You
+      are an expert assistant who can solve any task using code blobs. You will be
+      given a task to solve as best you can.\\nTo do so, you have been given access
+      to a list of tools: these tools are basically Python functions which you can
+      call with code.\\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of 'Thought:', 'Code:', and 'Observation:' sequences.\\n\\nAt
+      each step, in the 'Thought:' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\\nThen in the 'Code:'
+      sequence, you should write the code in simple Python. The code sequence must
+      end with '<end_code>' sequence.\\nDuring each intermediate step, you can use
+      'print()' to save whatever important information you will then need.\\nThese
+      print outputs will then appear in the 'Observation:' field, which will be available
+      as input for the next step.\\nIn the end you have to return a final answer using
+      the `final_answer` tool.\\n\\nHere are a few examples using notional tools:\\n---\\nTask:
+      \\\"Generate an image of the oldest person in this document.\\\"\\n\\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\\nCode:\\n```py\\nanswer = document_qa(document=document,
+      question=\\\"Who is the oldest person mentioned?\\\")\\nprint(answer)\\n```<end_code>\\nObservation:
+      \\\"The oldest person in the document is John Doe, a 55 year old lumberjack
+      living in Newfoundland.\\\"\\n\\nThought: I will now generate an image showcasing
+      the oldest person.\\nCode:\\n```py\\nimage = image_generator(\\\"A portrait
+      of John Doe, a 55-year-old man living in Canada.\\\")\\nfinal_answer(image)\\n```<end_code>\\n\\n---\\nTask:
+      \\\"What is the result of the following operation: 5 + 3 + 1294.678?\\\"\\n\\nThought:
+      I will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\\nCode:\\n```py\\nresult = 5
+      + 3 + 1294.678\\nfinal_answer(result)\\n```<end_code>\\n\\n---\\nTask:\\n\\\"Answer
+      the question in the variable `question` about the image stored in the variable
+      `image`. The question is in French.\\nYou have been provided with these additional
+      arguments, that you can access using the keys as variables in your python code:\\n{'question':
+      'Quel est l'animal sur l'image?', 'image': 'path/to/image.jpg'}\\\"\\n\\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\\nCode:\\n```py\\ntranslated_question
+      = translator(question=question, src_lang=\\\"French\\\", tgt_lang=\\\"English\\\")\\nprint(f\\\"The
+      translated question is {translated_question}.\\\")\\nanswer = image_qa(image=image,
+      question=translated_question)\\nfinal_answer(f\\\"The answer is {answer}\\\")\\n```<end_code>\\n\\n---\\nTask:\\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\\nWhat does he say was
+      the consequence of Einstein learning too much math on his creativity, in one
+      word?\\n\\nThought: I need to find and read the 1979 interview of Stanislaus
+      Ulam with Martin Sherwin.\\nCode:\\n```py\\npages = search(query=\\\"1979 interview
+      Stanislaus Ulam Martin Sherwin physicists Einstein\\\")\\nprint(pages)\\n```<end_code>\\nObservation:\\nNo
+      result found for query \\\"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\\\".\\n\\nThought: The query was maybe too restrictive and did not
+      find any results. Let's try again with a broader query.\\nCode:\\n```py\\npages
+      = search(query=\\\"1979 interview Stanislaus Ulam\\\")\\nprint(pages)\\n```<end_code>\\nObservation:\\nFound
+      6 pages:\\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\\n\\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\\n\\n(truncated)\\n\\nThought:
+      I will read the first 2 pages to know more.\\nCode:\\n```py\\nfor url in [\\\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\\\",
+      \\\"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\\\"]:\\n
+      \   whole_page = visit_webpage(url)\\n    print(whole_page)\\n    print(\\\"\\\\n\\\"
+      + \\\"=\\\"*80 + \\\"\\\\n\\\")  # Print separator between pages\\n```<end_code>\\nObservation:\\nManhattan
+      Project Locations:\\nLos Alamos, NM\\nStanislaus Ulam was a Polish-American
+      mathematician. He worked on the Manhattan Project at Los Alamos and later helped
+      design the hydrogen bomb. In this interview, he discusses his work at\\n(truncated)\\n\\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \\\"He learned too much mathematics and sort of diminished, it
+      seems to me personally, it seems to me his purely physics creativity.\\\" Let's
+      answer in one word.\\nCode:\\n```py\\nfinal_answer(\\\"diminished\\\")\\n```<end_code>\\n\\n---\\nTask:
+      \\\"Which city has the highest population: Guangzhou or Shanghai?\\\"\\n\\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\\nCode:\\n```py\\nfor city
+      in [\\\"Guangzhou\\\", \\\"Shanghai\\\"]:\\n    print(f\\\"Population {city}:\\\",
+      search(f\\\"{city} population\\\")\\n```<end_code>\\nObservation:\\nPopulation
+      Guangzhou: ['Guangzhou has a population of 15 million inhabitants as of 2021.']\\nPopulation
+      Shanghai: '26 million (2019)'\\n\\nThought: Now I know that Shanghai has the
+      highest population.\\nCode:\\n```py\\nfinal_answer(\\\"Shanghai\\\")\\n```<end_code>\\n\\n---\\nTask:
+      \\\"What is the current age of the pope, raised to the power 0.36?\\\"\\n\\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\\nCode:\\n```py\\npope_age_wiki = wiki(query=\\\"current pope
+      age\\\")\\nprint(\\\"Pope age as per wikipedia:\\\", pope_age_wiki)\\npope_age_search
+      = web_search(query=\\\"current pope age\\\")\\nprint(\\\"Pope age as per google
+      search:\\\", pope_age_search)\\n```<end_code>\\nObservation:\\nPope age: \\\"The
+      pope Francis is currently 88 years old.\\\"\\n\\nThought: I know that the pope
+      is 88 years old. Let's compute the result using python code.\\nCode:\\n```py\\npope_current_age
+      = 88 ** 0.36\\nfinal_answer(pope_current_age)\\n```<end_code>\\n\\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools, behaving like regular python functions:\\n```python\\ndef web_search(query:
+      string, filter_year: integer) -> string:\\n    \\\"\\\"\\\"Performs a google
+      web search for your query then returns a string of the top search results.\\n\\n
+      \   Args:\\n        query: The search query to perform.\\n        filter_year:
+      Optionally restrict results to a certain year\\n    \\\"\\\"\\\"\\n\\ndef final_answer(answer:
+      any) -> any:\\n    \\\"\\\"\\\"Provides a final answer to the given problem.\\n\\n
+      \   Args:\\n        answer: The final answer to the problem\\n    \\\"\\\"\\\"\\n\\n```\\n\\nHere
+      are the rules you should always follow to solve your task:\\n1. Always provide
+      a 'Thought:' sequence, and a 'Code:\\\\n```py' sequence ending with '```<end_code>'
+      sequence, else you will fail.\\n2. Use only variables that you have defined!\\n3.
+      Always use the right arguments for the tools. DO NOT pass the arguments as a
+      dict as in 'answer = wiki({'query': \\\"What is the place where James Bond lives?\\\"})',
+      but use the arguments directly as in 'answer = wiki(query=\\\"What is the place
+      where James Bond lives?\\\")'.\\n4. Take care to not chain too many sequential
+      tool calls in the same code block, especially when the output format is unpredictable.
+      For instance, a call to search has an unpredictable return format, so do not
+      have another tool call that depends on its output in the same block: rather
+      output results with print() to use them in the next block.\\n5. Call a tool
+      only when needed, and never re-do a tool call that you previously did with the
+      exact same parameters.\\n6. Don't name any new variable with the same name as
+      a tool: for instance don't name a variable 'final_answer'.\\n7. Never create
+      any notional variables in our code, as having these in your logs will derail
+      you from the true variables.\\n8. You can use imports in your code, but only
+      from the following list of modules: ['collections', 'datetime', 'itertools',
+      'math', 'queue', 'random', 're', 'stat', 'statistics', 'time', 'unicodedata']\\n9.
+      The state persists between code executions: so if in one step you've created
+      variables or imported modules, these will all persist.\\n10. Don't give up!
+      You're in charge of solving the task, not providing directions to solve it.\\n\\nNow
+      Begin!\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
+      task:\\nUse the provided tool to answer this question. Get the following page
+      - 'https://weave-docs.wandb.ai/'?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Thought:
+      The task is to get the content of the page \\\"https://weave-docs.wandb.ai/\\\".
+      However, I only have the tool \\\"web_search\\\" which is not the same as visiting
+      a URL directly. I will perform a web search with the URL as the query to see
+      if I get relevant content related to that page.\\n\\nCode:\\n```py\\npage_content
+      = web_search(query=\\\"https://weave-docs.wandb.ai/\\\", filter_year=0)\\nprint(page_content)\\n```<end_code>\\nCalling
+      tools:\\n[{'id': 'call_1', 'type': 'function', 'function': {'name': 'python_interpreter',
+      'arguments': 'page_content = web_search(query=\\\"https://weave-docs.wandb.ai/\\\",
+      filter_year=0)\\\\nprint(page_content)'}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call
+      id: call_1\\nError:\\nCode execution failed at line 'page_content = web_search(query=\\\"https://weave-docs.wandb.ai/\\\",
+      filter_year=0)' due to: ExecutionTimeoutError: Code execution exceeded the maximum
+      execution time of 10 seconds\\nNow let's retry: take care not to repeat previous
+      errors! If you have retried several times, try a completely different approach.\\n\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Thought:
+      The previous attempt to search using the full URL timed out, likely because
+      searching for the full URL is not efficient. Instead, I will try to search using
+      keywords such as \\\"weave docs wandb\\\" which might return relevant information
+      or documentation about the site \\\"https://weave-docs.wandb.ai/\\\".\\n\\nCode:\\n```py\\npage_content
+      = web_search(query=\\\"weave docs wandb\\\", filter_year=0)\\nprint(page_content)\\n```<end_code>\\nCalling
+      tools:\\n[{'id': 'call_2', 'type': 'function', 'function': {'name': 'python_interpreter',
+      'arguments': 'page_content = web_search(query=\\\"weave docs wandb\\\", filter_year=0)\\\\nprint(page_content)'}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call
+      id: call_2\\nError:\\nCode execution failed at line 'page_content = web_search(query=\\\"weave
+      docs wandb\\\", filter_year=0)' due to: Exception: No results found for query:
+      'weave docs wandb' with filtering on year=0. Use a less restrictive query or
+      do not filter on year.\\nNow let's retry: take care not to repeat previous errors!
+      If you have retried several times, try a completely different approach.\\n\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Thought:
+      The search with a filter on year=0 returns no results because 0 means restricting
+      results to year 0 (no such year). I should remove the year filter or set it
+      to None or a large value. Since the tool requires an integer, I will pass a
+      large year like 2024 to allow recent results but not exclude older ones unnecessarily.\\n\\nCode:\\n```py\\npage_content
+      = web_search(query=\\\"weave docs wandb\\\", filter_year=2024)\\nprint(page_content)\\n```<end_code>\\nCalling
+      tools:\\n[{'id': 'call_3', 'type': 'function', 'function': {'name': 'python_interpreter',
+      'arguments': 'page_content = web_search(query=\\\"weave docs wandb\\\", filter_year=2024)\\\\nprint(page_content)'}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Observation:\\nExecution
+      logs:\\n## Search Results\\n0. [Track LLM inputs & outputs - W&B Weave - Wandb](https://weave-docs.wandb.ai/quickstart/)\\nDate
+      published: Aug 28, 2024\\nSource: Weave Docs\\n\\nTrack LLM inputs & outputs.
+      Follow these steps to track your first call or Open In Colab. 1. Install Weave
+      and create an API Key\u200B. Install weave.\\n\\n1. [Tracing](https://weave-docs.wandb.ai/guides/tracking/)\\nDate
+      published: Sep 15, 2024\\nSource: Weave Docs\\n\\nWeave provides powerful tracing
+      capabilities to track and version objects and function calls in your applications.\\n\\n2.
+      [Deploy](https://weave-docs.wandb.ai/guides/tools/deploy/)\\nDate published:
+      Apr 17, 2024\\nSource: Weave Docs\\n\\nweave deploy requires your machine to
+      have gcloud installed and configured. weave deploy gcp will use pre-configured
+      configuration when not directly specified ...\\n\\n3. [LangChain](https://weave-docs.wandb.ai/guides/integrations/langchain)\\nDate
+      published: Aug 5, 2024\\nSource: Weave Docs\\n\\nWeave is designed to make tracking
+      and logging all calls made through the LangChain Python library effortless.
+      When working with LLMs, debugging is inevitable.\\n\\n4. [Anthropic](https://weave-docs.wandb.ai/guides/integrations/anthropic/)\\nDate
+      published: Aug 29, 2024\\nSource: Weave Docs\\n\\nWeave automatically tracks
+      and logs LLM calls made via the Anthropic Python library, after weave.init()
+      is called.\\n\\n5. [LlamaIndex](https://weave-docs.wandb.ai/guides/integrations/llamaindex/)\\nDate
+      published: Aug 19, 2024\\nSource: Weave Docs\\n\\nWeave is designed to simplify
+      the tracking and logging of all calls made through the LlamaIndex Python library.
+      When working with LLMs, debugging is inevitable.\\n\\n6. [Ops](https://weave-docs.wandb.ai/guides/tracking/ops/)\\nDate
+      published: Aug 28, 2024\\nSource: Weave Docs\\n\\nA Weave op is a versioned
+      function that automatically logs all calls. To create an op, decorate a python
+      function with weave.op().\\n\\n7. [Feedback](https://weave-docs.wandb.ai/guides/tracking/feedback)\\nDate
+      published: Nov 30, 2024\\nSource: Weave Docs\\n\\nWeave provides an integrated
+      feedback system, allowing users to provide call feedback directly through the
+      UI or programmatically via the SDK. Various feedback ...\\n\\n8. [Integrations](https://weave-docs.wandb.ai/guides/integrations/)\\nDate
+      published: Aug 28, 2024\\nSource: Weave Docs\\n\\nWeave provides automatic logging
+      integrations for popular LLM providers and orchestration frameworks. These integrations
+      allow you to seamlessly trace calls.\\n\\n9. [Local Models](https://weave-docs.wandb.ai/guides/integrations/local_models/)\\nDate
+      published: Aug 24, 2024\\nSource: Weave Docs\\n\\nThere are quite a few ways
+      of running these models locally and Weave supports a few of them out of the
+      box, as long as they support OpenAI SDK compatibility.\\nLast output from code
+      snippet:\\nNone\"}]}],\"model\":\"gpt-4.1-mini\",\"stop\":[\"<end_code>\",\"Observation:\",\"Calling
+      tools:\"]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '14837'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=BHITMbi7qyttkZbGmSvRE46HUzsdfaPb_WvPT2_FOts-1747377731-1.0.1.1-9gfRfH1PaKZOXKOxP_6ACTyUdvKZeJzHQJDdEbQHlz_FmpjWDs1Z2ucR8.MnwsOWJ_11JB.s_By74TWszu_oo6cf8ALn5gsDo7F80lZWnjg;
+        _cfuvid=ytMjVtCHBCs6BsAkTqiUGy847UhEmDPWPm71rAYQWNo-1747377731801-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//fFXfb9s2EH73X3HQw9oCshPHdr0a2EObYEMQF0HXDNkPF86ZPEmXUCRL
+        Uva8Iv/7QMq27K7diyHreN99393H05ceQMYym0EmKgyitqr/7vfH8Wh187j99fX9L1d/TOa1LD7Y
+        y98+ytH4zyyPGWb1SCLsswbC1FZRYKPbsHCEgSLqcDqejqbT6WSYArWRpGJaaUN/PBj2a9bcvzi/
+        mPTPx/3heJdeGRbksxn81QMA+JJ+I1Et6e9sBuf5/k1N3mNJ2exwCCBzRsU3GXrPPqAOWd4FhdGB
+        dOJ+V5mmrMIMrqHCNUFhGi3BN3WNjv8hCRZLgsBBkQfUEkJF7MBXxgWQ5IVjG0V7MEWMwSKrQrB+
+        dna2IVxTXxrhBxvUcjVAPltk4DkQFM7U6bgndKICR75RwQ/grqJtRN/AGh2bxoMn0RbwjagAPXxo
+        WDz5gC7kcOdQsC5zuCKrzDaHOeryskLWwDpQ6TDl5vBWh8oZyyKHucIar2Mbc7i1PoefieQKxVMO
+        1yc5Ue7cCFTwPs7MD+AaNqwUaLMB68yaJQGCMFqwp13Ttm0j2IM0oqlJhwTX9nHX+KgiikftN+QG
+        C73Ql0bSbKEfHh7sdqH3UD/By4WOI1tkdxXBi/9r7Yu2szteX5cvjIP7mAWrLdz/8G4Ai2wPfRNb
+        vu8ya6GapKvrM5RNlBoxgkPxxLqE+fw9sLZNaG1hmhCfDxMBgRZXrDgw+dPMeHxNzrPR8W97j1qU
+        otGJBghUyudHHNv5Rj0tGQ+OPjfsIkIplGlkfjJx2HCoOjecGCDN9WCCRI6KwrjocZ+ExfKnhJUp
+        y2S0jtKt9bCpOJrS0V4RdSLijDEANsHUGDhibiPOXhx2HiV5MCH4rQ9UHxfCdCOtjVcuknWNTp1T
+        yZtpn3iI+wcDrxS10m8t6bfX8PHqZhCRXi10wRrVsvXcy53DXiXLHe8GR0XjMS4o3Sh1FECtTWum
+        tJU+7SLPhz2kTGmdWfmvUrOCNftq6Qi90XHn+GBslqLPPYBPad81Jysss87UNiyDeaJUbjQeTVvA
+        rFu0Xfhi+OMuGkxAdZT3ejLJvwG5lBSQlT9amplAUZE8Ah2djw8isJFsuth570j7fyl9C77Vz7o8
+        QvkufBcQgmwgubSOJItT2d0xR/ESfe/YodeJcObJrVnQMjC5OA9JBTaq/UJkrf2WBeuSnHXcfiYK
+        u5y+WU3frGg8LLLec+9fAAAA//8DAM7+Wqw1BwAA
+    headers:
+      CF-RAY:
+      - 9408e5438ac68022-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 16 May 2025 06:42:36 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '4231'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '4236'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149996510'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 1ms
+      x-request-id:
+      - req_8a1390732273f5d69afda5bee6b78a33
+    status:
+      code: 200
+      message: OK
+version: 1
