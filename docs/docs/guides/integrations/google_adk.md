@@ -242,7 +242,7 @@ asyncio.run(run_agent())
 Google ADK provides various workflow agents for more complex scenarios. You can trace these workflow agents just like regular LLM agents. Here's an example with a Sequential agent:
 
 ```python
-from google.adk.agents import LlmAgent, Sequential
+from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 import asyncio
@@ -253,19 +253,23 @@ async def run_workflow():
         name="Summarizer",
         model="gemini-2.0-flash",
         instruction="Summarize the given text in one sentence.",
+        description="Summarizes text in one sentence",
+        output_key="summary"  # Store output in state['summary']
     )
     
     analyzer = LlmAgent(
         name="Analyzer",
         model="gemini-2.0-flash",
-        instruction="Analyze the sentiment of the given text as positive, negative, or neutral.",
+        instruction="Analyze the sentiment of the given text as positive, negative, or neutral. The text to analyze: {summary}",
+        description="Analyzes sentiment of text",
+        output_key="sentiment"  # Store output in state['sentiment']
     )
     
     # Create a sequential workflow
-    workflow = Sequential(
+    workflow = SequentialAgent(
         name="TextProcessor",
-        agents=[summarizer, analyzer],
-        instruction="First summarize the text, then analyze the sentiment of the summary.",
+        sub_agents=[summarizer, analyzer],
+        description="Executes a sequence of summarization followed by sentiment analysis.",
     )
     
     # Set up runner
