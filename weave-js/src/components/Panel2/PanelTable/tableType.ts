@@ -14,7 +14,6 @@ import {
   opFileJoinedTable,
   opFilePartitionedTable,
   opFileTable,
-  opFileTableWithIncrements,
   opJoinedTableRows,
   opPartitionedTableRows,
   opTableRows,
@@ -76,13 +75,14 @@ export function normalizeTableLike(node: Node, stack: Stack = []) {
 
   // wb table file
   if (isFile(type) && type.wbObjectType != null && isTable(type.wbObjectType)) {
-    if (isSingleRunWorkspace(stack) && !hasRunHistoryOp(node)) {
-      // The only time incremental table should be loaded is in a
-      // single run workspace and not via run history.
-      // We want to display the increment at that history when using
-      // the stepper.
-      return opTableRows({table: opFileTableWithIncrements({file: node})});
-    }
+    // todo(dom): Disabling this for now
+    // if (isSingleRunWorkspace(stack) && !hasRunHistoryOp(node)) {
+    //   // The only time incremental table should be loaded is in a
+    //   // single run workspace and not via run history.
+    //   // We want to display the increment at that history when using
+    //   // the stepper.
+    //   return opTableRows({table: opFileTableWithIncrements({file: node})});
+    // }
     return opTableRows({table: opFileTable({file: node})});
   }
   // table
