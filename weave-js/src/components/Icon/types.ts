@@ -11,6 +11,7 @@ export const IconNames = {
   AutomationRobotArm: 'automation-robot-arm',
   Back: 'back',
   BaselineAlt: 'baseline-alt',
+  BranchCommit: 'branch-commit',
   BellNotifications: 'bell-notifications',
   BenchmarkSquare: 'benchmark-square',
   BlogReport: 'blog-report',
