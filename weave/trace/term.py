@@ -3,7 +3,7 @@ import os
 
 import click
 
-LOG_STRING = click.style("weave", fg="yellow", bold=True)
+LOG_STRING = click.style("weave", fg="cyan", bold=True)
 
 # Create and configure the logger
 logger = logging.getLogger("weave")
@@ -22,16 +22,19 @@ class WeaveFormatter(logging.Formatter):
         return super().format(record)
 
 
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(WeaveFormatter())
+def configure_logger() -> None:
+    """Configure the root logger for Weave with custom formatting and log level."""
+    # Create a console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(WeaveFormatter())
 
-# Add the handler to the logger
-logger.addHandler(console_handler)
+    # Add the handler to the logger
+    logger.addHandler(console_handler)
 
-# Set the log level based on environment variable
-log_level = os.getenv("WEAVE_LOG_LEVEL", "INFO").upper()
-logger.setLevel(getattr(logging, log_level))
+    # Set the log level based on environment variable
+    log_level = os.getenv("WEAVE_LOG_LEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, log_level))
+
 
 # Export the logger for use in other modules
-__all__ = ["logger"]
+__all__ = ["configure_logger", "logger"]
