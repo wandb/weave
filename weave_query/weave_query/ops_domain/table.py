@@ -684,6 +684,7 @@ def _get_incremental_table_awl_from_file(
     data: dict,
     file: artifact_fs.FilesystemArtifactFile
 ) -> ops_arrow.ArrowWeaveList:
+    from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
     all_awls: list[ops_arrow.ArrowWeaveList] = []
     files = {}
     if "previous_increments_paths" in data:
@@ -698,7 +699,7 @@ def _get_incremental_table_awl_from_file(
             files[fs_art_file.path] = fs_art_file
 
     files[file.path] = file
-    
+
     asyncio.run(ensure_files(files))
     rrows: list[list] = []
     object_types: list[types.Type] = []
