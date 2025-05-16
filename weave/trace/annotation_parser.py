@@ -1,17 +1,19 @@
 import re
-from typing import Dict, Any
-from pydantic import BaseModel
 from inspect import Signature
 
+from pydantic import BaseModel
+
 AUDIO_CLASS_NAME = "weave.trace.type_wrappers.audio.Audio"
+
 
 class AudioAnnotation(BaseModel):
     base_type: str
     media_class: str
     raw_annotation: str
 
-class AudioFileAnnotation(AudioAnnotation):
-    ...
+
+class AudioFileAnnotation(AudioAnnotation): ...
+
 
 class AudioDataAnnotation(AudioAnnotation):
     format: str
@@ -30,7 +32,6 @@ def parse_data_annotation(annotation_string: str) -> AudioDataAnnotation | None:
     Returns:
         AudioDataAnnotation | None: An instance of AudioDataAnnotation if the parsing is successful,
     """
-
     # Audio annotation with a format specifier
     # Example: "typing.Annotated[typing.Union[str, bytes], weave.type_handlers.Audio.audio.Audio[typing.Literal['mp3']]]"
     # Explanation:
@@ -47,23 +48,25 @@ def parse_data_annotation(annotation_string: str) -> AudioDataAnnotation | None:
     pattern_with_format = re.compile(
         r"typing\.Annotated\["
         r"(.+?),\s*"  # Group 1: Base type (non-greedy)
-        fr"{re.escape(AUDIO_CLASS_NAME)}\["
+        rf"{re.escape(AUDIO_CLASS_NAME)}\["
         r"typing\.Literal\[['\"](mp3|wav)['\"]\]"  # Group 2: Format (mp3 or wav)
         r"\]"  # Closing bracket for Audio[...]
         r"\]"  # Closing bracket for Annotated[...]
     )
 
     match_with_format = pattern_with_format.fullmatch(annotation_string)
-    if match_with_format:
-        base_type = match_with_format.group(1).strip()
-        audio_format = match_with_format.group(2)
-        return AudioDataAnnotation(
-            base_type=base_type,
-            media_class=AUDIO_CLASS_NAME,
-            format=audio_format,
-            raw_annotation = annotation_string
-        )
 
+    if not match_with_format:
+        return None
+
+    base_type = match_with_format.group(1).strip()
+    audio_format = match_with_format.group(2)
+    return AudioDataAnnotation(
+        base_type=base_type,
+        media_class=AUDIO_CLASS_NAME,
+        format=audio_format,
+        raw_annotation=annotation_string,
+    )
 
 
 def parse_file_annotation(annotation_string: str) -> AudioFileAnnotation | None:
@@ -79,7 +82,6 @@ def parse_file_annotation(annotation_string: str) -> AudioFileAnnotation | None:
     Returns:
         AudioFileAnnotation | None: An instance of AudioFileAnnotation if the parsing is successful,
     """
-
     # Audio annotation without a format specifier
     # Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Audio.audio.Audio'>]"
     # Explanation:
@@ -91,21 +93,25 @@ def parse_file_annotation(annotation_string: str) -> AudioFileAnnotation | None:
     pattern_without_format = re.compile(
         r"typing\.Annotated\["
         r"(.+?),\s*"  # Group 1: Base type (non-greedy)
-        fr"<class '{re.escape(AUDIO_CLASS_NAME)}'>"
+        rf"<class '{re.escape(AUDIO_CLASS_NAME)}'>"
         r"\]"  # Closing bracket for Annotated[...]
     )
 
     match_without_format = pattern_without_format.fullmatch(annotation_string)
 
     if not match_without_format:
-        return
+        return None
 
     return AudioFileAnnotation(
         base_type=match_without_format.group(1).strip(),
         media_class=AUDIO_CLASS_NAME,
-        raw_annotation=annotation_string
+        raw_annotation=annotation_string,
     )
-def parse_audio_annotation(annotation_string: str) -> AudioFileAnnotation | AudioDataAnnotation | None:
+
+
+def parse_audio_annotation(
+    annotation_string: str,
+) -> AudioFileAnnotation | AudioDataAnnotation | None:
     """
     Parses an audio type annotation string.
 
@@ -127,12 +133,13 @@ def parse_audio_annotation(annotation_string: str) -> AudioFileAnnotation | Audi
         - "raw_annotation": The original input string.
         If parsing fails, it returns a dictionary with an "error" key and "raw_annotation".
     """
-
     # Try matching the pattern with format first (it's more specific)
-    return parse_data_annotation(annotation_string) or parse_file_annotation(annotation_string)
+    return parse_data_annotation(annotation_string) or parse_file_annotation(
+        annotation_string
+    )
+
 
 def parse_from_signature(sig: Signature) -> dict[str, AudioAnnotation]:
-
     parsed_annotations = {}
 
     for param_name, param in sig.parameters.items():

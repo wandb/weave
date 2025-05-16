@@ -13,6 +13,7 @@ from weave.trace.type_wrappers import Audio
 METADATA_FILE_NAME = "_metadata.json"
 AUDIO_FILE_PREFIX = "audio."
 
+
 def audio_filename(ext: str) -> str:
     """Generate the standard filename for an audio file.
 
@@ -23,6 +24,7 @@ def audio_filename(ext: str) -> str:
         str: The formatted filename
     """
     return f"{AUDIO_FILE_PREFIX}{ext}"
+
 
 def export_wave_read(obj: wave.Wave_read, fp: str, name: str) -> None:
     """Export a wave.Wave_read object to a file.

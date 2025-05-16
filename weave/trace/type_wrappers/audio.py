@@ -18,6 +18,7 @@ SUPPORTED_FORMATS = cast(
 )
 T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
 
+
 def get_format_from_filename(filename: str) -> str:
     """Get the file format from a filename.
     Args:
@@ -33,6 +34,7 @@ def get_format_from_filename(filename: str) -> str:
         return ""
 
     return filename[last_dot + 1 :].lower()
+
 
 def try_decode(data: str | bytes) -> bytes:
     """Attempt to decode data as base64 or convert to bytes.
@@ -158,4 +160,3 @@ class Audio(Generic[T]):
         """
         with open(path, "wb") as f:
             f.write(self.data)
-

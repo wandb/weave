@@ -39,10 +39,10 @@ from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
 from weave.trace.annotation_parser import (
+    AudioDataAnnotation,
+    AudioFileAnnotation,
     parse_audio_annotation,
     parse_from_signature,
-    AudioDataAnnotation,
-    AudioFileAnnotation
 )
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
@@ -54,8 +54,8 @@ from weave.trace.context.call_context import (
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
-from weave.trace.util import log_once
 from weave.trace.type_wrappers import Audio
+from weave.trace.util import log_once
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -311,7 +311,9 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
             elif isinstance(parsed, AudioFileAnnotation):
                 to_weave_inputs[param_name] = Audio.from_path(value)
             elif isinstance(parsed, AudioDataAnnotation):
-                to_weave_inputs[param_name] = Audio.from_data(value, format=parsed.format)
+                to_weave_inputs[param_name] = Audio.from_data(
+                    value, format=parsed.format
+                )
     else:
         to_weave_inputs = inputs_with_defaults
 
@@ -331,6 +333,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         kwargs=kwargs,
         inputs=to_weave_inputs,
     )
+
 
 def _create_call(
     func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
