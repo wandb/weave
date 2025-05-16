@@ -4,4 +4,5 @@ export enum ChatFormat {
   Gemini = 'Gemini',
   Anthropic = 'Anthropic',
   Mistral = 'Mistral',
+  OTEL = 'OTEL',
 }

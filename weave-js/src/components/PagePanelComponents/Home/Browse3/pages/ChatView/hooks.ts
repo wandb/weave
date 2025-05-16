@@ -26,6 +26,11 @@ import {
   normalizeMistralChatCompletion,
 } from './ChatFormats/mistral';
 import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
+import {
+  isTraceCallChatFormatOTEL,
+  normalizeOTELChatCompletion,
+  normalizeOTELChatRequest,
+} from './ChatFormats/opentelemetry';
 import {ChatFormat} from './ChatFormats/types';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
@@ -80,6 +85,9 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (isTraceCallChatFormatGemini(call.traceCall)) {
     return ChatFormat.Gemini;
   }
+  if (isTraceCallChatFormatOTEL(call.traceCall)) {
+    return ChatFormat.OTEL;
+  }
   return ChatFormat.None;
 };
 
@@ -95,6 +103,9 @@ export const normalizeChatCompletion = (
   }
   if (isMistralCompletionFormat(completion)) {
     return normalizeMistralChatCompletion(request, completion);
+  }
+  if (isTraceCallChatFormatOTEL(completion)) {
+    return normalizeOTELChatCompletion(request, completion);
   }
   return completion as ChatCompletion;
 };
@@ -123,6 +134,9 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isAnthropicCompletionFormat(request)) {
     return normalizeAnthropicChatRequest(request);
   }
+  if (isTraceCallChatFormatOTEL(request)) {
+    return normalizeOTELChatRequest(request);
+  }
   return request as ChatRequest;
 };
 
@@ -144,10 +158,22 @@ export const useCallAsChat = (
   // Only recalculate when refs data or call data changes
   const result = useMemo(() => {
     const refsMap = _.zipObject(refs, refsData.result ?? []);
-    const request = normalizeChatRequest(deref(call.inputs, refsMap));
-    const result = call.output
-      ? normalizeChatCompletion(request, deref(call.output, refsMap))
-      : null;
+    // Handle OTEL span format differently
+    let request: ChatRequest;
+    let result: ChatCompletion | null = null;
+
+    // Check if this is an OTEL span
+    if (isTraceCallChatFormatOTEL(call)) {
+      // Use specialized OTEL handlers
+      request = normalizeOTELChatRequest(call);
+      result = call.output ? normalizeOTELChatCompletion(call, request) : null;
+    } else {
+      // Use standard handlers
+      request = normalizeChatRequest(deref(call.inputs, refsMap));
+      result = call.output
+        ? normalizeChatCompletion(request, deref(call.output, refsMap))
+        : null;
+    }
 
     // TODO: It is possible that all of the choices are refs again, handle this better.
     if (
@@ -175,7 +201,23 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   if (!traceCall.output || !traceCall.inputs) {
     return traceCall;
   }
+
   const {inputs, output, ...rest} = traceCall;
+
+  if (isTraceCallChatFormatOTEL(traceCall)) {
+    const chatRequest = normalizeOTELChatRequest(traceCall);
+    if (!chatRequest) {
+      return traceCall;
+    }
+    const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest);
+
+    return {
+      inputs: chatRequest,
+      output: chatCompletion,
+      ...rest,
+    };
+  }
+
   return {
     inputs: normalizeChatRequest(traceCall.inputs),
     output: normalizeChatCompletion(traceCall.inputs, traceCall.output),
