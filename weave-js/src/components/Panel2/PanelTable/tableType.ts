@@ -1,11 +1,9 @@
 import {
   applyOpToOneOrMany,
   constBoolean,
-  isConstNode,
   isFile,
   isJoinedTable,
   isListLike,
-  isOutputNode,
   isPartitionedTable,
   isTable,
   listObjectType,
