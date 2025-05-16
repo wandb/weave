@@ -38,6 +38,11 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
+from weave.trace.annotation_parser import (
+    parse_from_signature,
+    AudioDataAnnotation,
+    AudioFileAnnotation
+)
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -49,6 +54,7 @@ from weave.trace.context.call_context import (
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
+from weave.trace.type_wrappers import Audio
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -288,14 +294,29 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         raise OpCallError(f"Error calling {func.name}: {e}")
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+
+    parsed_annotations = parse_from_signature(sig)
+    to_weave_inputs = {}
+
+    for param_name, value in inputs_with_defaults.items():
+        # Check if we found an annotation which requires substitution
+        parsed = parsed_annotations.get(param_name)
+        # We don't need to do anything with this if a special annotation is not found
+        if not parsed:
+            to_weave_inputs[param_name] = value
+            continue
+        elif isinstance(parsed, AudioFileAnnotation):
+            to_weave_inputs[param_name] = Audio.from_path(value)
+        elif isinstance(parsed, AudioDataAnnotation):
+            to_weave_inputs[param_name] = Audio.from_data(value, format=parsed.format)
+
     return ProcessedInputs(
         original_args=args,
         original_kwargs=kwargs,
         args=args,
         kwargs=kwargs,
-        inputs=inputs_with_defaults,
+        inputs=to_weave_inputs,
     )
-
 
 def _create_call(
     func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
