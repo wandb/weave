@@ -43,6 +43,7 @@ dependencies = [
   "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
+  "click",                   # Used for terminal/stdio printing
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",      # Used by scorers for field validation
   "diskcache==5.6.3",        # Used for data caching
@@ -244,6 +245,7 @@ select = [
   "TRY300", # https://docs.astral.sh/ruff/rules/try-consider-else/
   "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
   "C",      # https://docs.astral.sh/ruff/rules/#convention-c
+  "T201",   # https://docs.astral.sh/ruff/rules/print-statement/
 ]
 ignore = [
   # we use Google style
@@ -263,6 +265,9 @@ known-third-party = ["wandb", "weave_query"]
 line-length = 88
 show-fixes = true
 exclude = ["weave_query"]
+
+[tool.ruff.lint.per-file-ignores]
+"!/weave/trace/**/*.py" = ["T201"]
 
 [tool.pyright]
 include = ["weave"]

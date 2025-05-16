@@ -110,7 +110,7 @@ class DisplayNameFuncError(ValueError): ...
 
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
-        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 @dataclass

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import traceback
 from datetime import datetime
@@ -6,7 +7,6 @@ from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
-from rich import print
 from rich.console import Console
 from typing_extensions import Self
 
@@ -203,7 +203,7 @@ class Evaluation(Object):
             except OpCallError as e:
                 raise e
             except Exception:
-                print("Predict and score failed")
+                logger.info("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
             return eval_row
@@ -218,7 +218,7 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {num_rows} examples")
+            logger.info(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -237,7 +237,7 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+        logger.info(f"Evaluation summary {json.dumps(summary, indent=2)}")
 
         return summary
 
