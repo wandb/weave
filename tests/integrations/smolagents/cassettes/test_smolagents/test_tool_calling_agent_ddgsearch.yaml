@@ -32,25 +32,27 @@ interactions:
       \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
       million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
       \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
-      for you. You only have access to these tools:\n- web_search: Performs a duckduckgo
-      web search based on your query (think a Google search) then returns the top
-      search results.\n    Takes inputs: {''query'': {''type'': ''string'', ''description'':
-      ''The search query to perform.''}}\n    Returns an output of type: string\n-
-      final_answer: Provides a final answer to the given problem.\n    Takes inputs:
-      {''answer'': {''type'': ''any'', ''description'': ''The final answer to the
-      problem''}}\n    Returns an output of type: any\n\nHere are the rules you should
-      always follow to solve your task:\n1. ALWAYS provide a tool call, else you will
-      fail.\n2. Always use the right arguments for the tools. Never use variable names
-      as the action arguments, use the value instead.\n3. Call a tool only when needed:
-      do not call the search agent if you do not need information, try to solve the
-      task yourself.\nIf no tool call is needed, use final_answer tool to return your
-      answer.\n4. Never re-do a tool call that you previously did with the exact same
-      parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
-      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]}],"model":"gpt-4o","stop":["Observation:","Calling
+      for you. You only have access to these tools:\n- web_search: Performs a google
+      web search for your query then returns a string of the top search results.\n    Takes
+      inputs: {''query'': {''type'': ''string'', ''description'': ''The search query
+      to perform.''}, ''filter_year'': {''type'': ''integer'', ''description'': ''Optionally
+      restrict results to a certain year'', ''nullable'': True}}\n    Returns an output
+      of type: string\n- final_answer: Provides a final answer to the given problem.\n    Takes
+      inputs: {''answer'': {''type'': ''any'', ''description'': ''The final answer
+      to the problem''}}\n    Returns an output of type: any\n\nHere are the rules
+      you should always follow to solve your task:\n1. ALWAYS provide a tool call,
+      else you will fail.\n2. Always use the right arguments for the tools. Never
+      use variable names as the action arguments, use the value instead.\n3. Call
+      a tool only when needed: do not call the search agent if you do not need information,
+      try to solve the task yourself.\nIf no tool call is needed, use final_answer
+      tool to return your answer.\n4. Never re-do a tool call that you previously
+      did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nUse the provided tool to answer this question. Get the following page
+      - ''https://weave-docs.wandb.ai/''?"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
       tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
-      a duckduckgo web search based on your query (think a Google search) then returns
-      the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
-      search query to perform."}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a google web search for your query then returns a string of the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
+      search query to perform."},"filter_year":{"type":"integer","description":"Optionally
+      restrict results to a certain year","nullable":true}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
       a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
       final answer to the problem"}},"required":["answer"]}}}]}'
     headers:
@@ -61,13 +63,13 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '4602'
+      - '4726'
       content-type:
       - application/json
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.75.0
+      - OpenAI/Python 1.78.1
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -77,7 +79,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.75.0
+      - 1.78.1
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -91,19 +93,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNb9swDL37Vwg8J0XiuY3rW3Lo1gFbLxswYCkMRqIdrbLkSXS7LMh/
-        H2ynsdMPYD4YAp8e+fhI7SMhQCvIBMgtsqxqM13dFZvl8tvy7kt6e2c+fUi//rgKJlZ2tXtMYNIy
-        3OYXSX5mXUhX1YZYO9vD0hMytVnni+Qynl8ni6sOqJwi09LKmqeJm8azOJnO0uns6kjcOi0pQCZ+
-        RkIIse/+rUSr6A9kYjZ5jlQUApYE2emSEOCdaSOAIejAaBkmAyidZbKtatsYMwLYOZNLNGYo3H/7
-        0XnwCY3J/2LhCpvam10cu+8PN83tgtL559moXp96V3eCisbKkz8j/BTPXhQTAixWHfeJNnkg9HL7
-        gi0EoC+biiy3ymG/ht8N+d0asjUEzZQ9oVWbC9Ri1WijtC0Fio9kl7fT3iFSAht2FbKWIrDzO6GN
-        aQJ7ZOcFaza0hgOclT1Eb53vR4Z6KpqA5rXTaK1jbBvurL4/IofTVI0ra+824QUVCm112OaeMHRm
-        jWcWPQvpJEBzthZQe1fVnLN7oK7o9XXSZ4Vhawc0To8gO0YzxOezOJ68kTBXxKi7xTntqkS5JTVw
-        h53FRmk3AqJR86/lvJW7N0Db8n/SD4CUVDOpvPaktDxvebjmqX3V71072dwJhkD+UUvKWZNvB6Ko
-        wMb0Dw7CLjBVeaFtSb72unt1UNR5scDLNJHFvIDoEP0DAAD//wMAL9a+V34EAAA=
+        H4sIAAAAAAAAAwAAAP//jFNdb5swFH3nV1j3OUSQstHy2KpvnaJs2oe0VMjYF+LV2K5tmqRR/vsE
+        SYCkmTQekOXjc+7xude7gBAQHDICbEU9q40M73+Jz7p5Ke7nVb2tfzb6fSHmmyqd/ZgLBZOWoYs/
+        yPyJNWW6NhK90EeYWaQeW9U4TdKbNInS2w6oNUfZ0irjw2Qah7VQIpxFs09hlIRxcqSvtGDoICO/
+        A0II2XX/1qjiuIGMRJPTTo3O0Qoh6w8RAlbLdgeoc8J5qjxMBpBp5VG13lUj5QjwWsucUSmHwodv
+        N1oPaVEpc/918VQuNvj6Hn17+M7N43ZxS92Xx1G9g/TWdIbKRrE+pRHe72cXxQgBReuOu8Yid0gt
+        W12wCQFqq6ZG5VvnsFvCa4N2u4RsCU54zNZI3zDkmrnpmipeTKlYwh7OVPbBtfXzKB+LZeOo/Bgc
+        VUp72vrvkns+Ivu+SVJXxurCXVChFEq4VW6Ruu7u4xYEJyOdBWjOugzG6tr43OsX7IrGURQfZGGY
+        xQGe3RxBrz2VY9osmVxRzDl6KrpB6GePUbZCPnCHGaQNF3oEBKPbf7RzTfuQgFDV/8gPAGNoPPLc
+        WOSCnV95OGaxfav/Otbn3BkGh/ZNMMy9QNt2hGNJG3l4QOC2zmOdl0JVaI0V3SuC0uTpXZHeFZjE
+        JQT74C8AAAD//wMAaF1tt1QEAAA=
     headers:
       CF-RAY:
-      - 933b10fec8247aff-MAA
+      - 94088b945c1c06ac-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -111,14 +113,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 21 Apr 2025 07:11:17 GMT
+      - Fri, 16 May 2025 05:41:19 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=zYPLlmoFsPiiASAPPu0Ag1u8EhdukcDVB3APMDt0z20-1745219477-1.0.1.1-F9FHsGBezJTjyc4Or2r54sS6R5W8bsso3teMawI7FjaqnbsbaBm2JD6uwm3o1mr1v5qdkls6dkO_fmfUhpwSXdw5wFTDjFiVi1q8QkrWMAM;
-        path=/; expires=Mon, 21-Apr-25 07:41:17 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=_CguhDdljmp6s6qxPIueTyzhB3pqrRhuVzgKF3haJ2A-1747374079-1.0.1.1-wU43Ag6_gj9B1l3jq2KLdt16fQ2mKDn00z6bff1P0U780AW2dan3zlmEFqoH7_cHrtaqGIYCt1fBzqST4JxWfArMLDQjaScQ2O1mk5vNORo;
+        path=/; expires=Fri, 16-May-25 06:11:19 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=lEU2MBd7XM7HEGXaKEVD_57e3XylHNHWluvY2VwHvV8-1745219477561-0.0.1.1-604800000;
+      - _cfuvid=e5R1oE8rpeN1CL5OdSZD2XRhWZHVeojxirQk9jKMR_k-1747374079474-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -133,131 +135,309 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '948'
+      - '1071'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '1079'
       x-ratelimit-limit-requests:
-      - '10000'
+      - '30000'
       x-ratelimit-limit-tokens:
-      - '30000000'
+      - '150000000'
       x-ratelimit-remaining-requests:
-      - '9999'
+      - '29999'
       x-ratelimit-remaining-tokens:
-      - '29999100'
+      - '149999094'
       x-ratelimit-reset-requests:
-      - 6ms
+      - 2ms
       x-ratelimit-reset-tokens:
-      - 1ms
+      - 0s
       x-request-id:
-      - req_1147586637f5c443c4e3315bda594291
+      - req_71e95354013f440668cf9ef3cf831288
     status:
       code: 200
       message: OK
 - request:
-    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
-      an expert assistant who can solve any task using tool calls. You will be given
-      a task to solve as best you can.\nTo do so, you have been given access to some
-      tools.\n\nThe tool call you write is an action: after the tool is executed,
-      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
-      can repeat N times, you should take several steps when needed.\n\nYou can use
-      the result of the previous action as input for the next action.\nThe observation
-      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
-      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
-      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
-      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
-      use an action blob with \"name\": \"final_answer\" tool. It is the only way
-      to complete the task, else you will be stuck on a loop. So your final output
-      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
-      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
-      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
-      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
-      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
-      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
-      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
-      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
-      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
-      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
-      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
-      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
-      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
-      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
-      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
-      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
-      for you. You only have access to these tools:\n- web_search: Performs a duckduckgo
-      web search based on your query (think a Google search) then returns the top
-      search results.\n    Takes inputs: {''query'': {''type'': ''string'', ''description'':
-      ''The search query to perform.''}}\n    Returns an output of type: string\n-
-      final_answer: Provides a final answer to the given problem.\n    Takes inputs:
-      {''answer'': {''type'': ''any'', ''description'': ''The final answer to the
-      problem''}}\n    Returns an output of type: any\n\nHere are the rules you should
-      always follow to solve your task:\n1. ALWAYS provide a tool call, else you will
-      fail.\n2. Always use the right arguments for the tools. Never use variable names
-      as the action arguments, use the value instead.\n3. Call a tool only when needed:
-      do not call the search agent if you do not need information, try to solve the
-      task yourself.\nIf no tool call is needed, use final_answer tool to return your
-      answer.\n4. Never re-do a tool call that you previously did with the exact same
-      parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
-      task:\nGet me just the title of the page at url ''https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''site:wandb.ai Building a
-      GenAI-assisted automatic story illustrator title''}\nCalling tools:\n[{''id'':
-      ''call_zafofn8nFy22oUkFuI7e81J0'', ''type'': ''function'', ''function'': {''name'':
-      ''web_search'', ''arguments'': {''query'': ''site:wandb.ai Building a GenAI-assisted
-      automatic story illustrator title''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Observation:\n##
-      Search Results\n\n[Building a GenAI-assisted automatic story illustrator](https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-Automatic-Story-Illustrator--Vmlldzo5MTYxNTkw)\nArchitecture
-      of the story illustrator Given the fact that we have access to quite powerful
-      large language models besides text-to-image generation models that pretty accurate
-      in following detailed prompts, writing an auto-illustration workflow might seem
-      simple at a first glance.\n\n[Tutorial Articles & Tutorials by Weights & Biases
-      - W&B](https://wandb.ai/fully-connected/blog/tutorial)\nBrett Young Sep 11 Articles,
-      LLM, GenAI, Tutorial, Weave Building a system of record for ML Abraham Leal
-      Sep 10 Articles, W&B Features, W&B Meta, Sweeps, Experiment, Tutorial, Model
-      Registry Building a GenAI-assisted automatic story illustrator Soumik Rakshit
-      Sep 05 Articles, GenAI, Image Generation, Tutorial, Intermediate\n\n[Image Generation
-      Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/blog/image-generation)\nPopular
-      Stable Diffusion Settings and Storing Your Images Morgan Aug 22 Computer Vision,
-      Image Generation, Articles, Stable Diffusion Clear Search English Building a
-      GenAI-assisted automatic story illustrator Soumik Rakshit Sep 05 Articles, GenAI,
-      Image Generation, Tutorial, Intermediate Prompt upsampling for diffusion models\n\n[Tutorials
-      | Weights & Biases Documentation](https://docs.wandb.ai/tutorials/)\n2 minute
-      read Fundamentals The following tutorials take you through the fundamentals
-      of W&B for machine learning experiment tracking, model evaluation, hyperparameter
-      tuning, model and dataset versioning, and more.\n\n[Stable Diffusion Articles
-      & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/stable-diffusion?page=2)\nPopular
-      Building a GenAI-assisted automatic story illustrator Soumik Rakshit Sep 5 Articles,
-      GenAI, Image Generation, Tutorial, Intermediate Testing o1-preview on difficult
-      coding problems Morgan Sep 13 Articles, Weave, GenAI, Experiment Product newsletter:
-      Updates and new features from September 2024 Kimberly Madia Oct 2 Articles,
-      W&B Features\n\n[Molecule Generation Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/molecule-generation)\nPopular
-      Building a GenAI-assisted automatic story illustrator Soumik Rakshit Sep 5 Articles,
-      GenAI, Image Generation, Tutorial, Intermediate Testing o1-preview on difficult
-      coding problems Morgan Sep 13 Articles, Weave, GenAI, Experiment Product newsletter:
-      Updates and new features from September 2024 Kimberly Madia Oct 2 Articles,
-      W&B Features\n\n[MLOps, LLM and generative AI courses - Weights & Biases](https://wandb.ai/site/courses/)\nLearn
-      to train, fine-tune, and deploy LLMs and tackle real-world MLOps and LLMOps
-      challenges with free Weights & Biases AI Academy courses.\n\n[Generating High-quality
-      Images with SD.Next, HuggingFace ... - W&B](https://wandb.ai/ml-colabs/automatic/reports/Generating-High-quality-Images-with-SD-Next-HuggingFace-Diffusers-and-W-B--Vmlldzo1NTYzMzQy)\nA
-      walkthrough of using SD.Next (Advanced webUI for Stable Diffusion) for generating
-      high-quality images using HuggingFace Diffusers and managing experiments with
-      W&B. .\n\n[GenAI Articles & Tutorials by Weights & Biases](https://wandb.ai/fully-connected/blog/generative-modeling)\nFind
-      GenAI articles & tutorials from leading machine learning practitioners. Fully
-      Connected: An ML community from Weights & Biases.\n\n[The Lifecycle of a GenAI
-      Project | learn-with-me-llms - W&B](https://wandb.ai/wandb_fc/learn-with-me-llms/reports/The-Lifecycle-of-a-GenAI-Project--Vmlldzo3NDc5NTU1)\nOne
-      thing we didn''t cover is the lifecycle of a GenAI project and why so many companies
-      are prioritizing projects like ours. That''s what we''re going to do today.
-      We''ll begin by explaining the benefits of building with LLMs, then walking
-      through the common steps to doing so. This is informed by our own work here
-      at W&B building LLMs for internal processes as well as what we see our ..."}]}],"model":"gpt-4o","stop":["Observation:","Calling
-      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
-      a duckduckgo web search based on your query (think a Google search) then returns
-      the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
-      search query to perform."}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
-      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
-      final answer to the problem"}},"required":["answer"]}}}]}'
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://serpapi.com/search.json?q=site%3Aweave-docs.wandb.ai&api_key=39666fb918a114c61156898f664682853ea4de76f0f3b7f365511db1eca40c3d&engine=google&google_domain=google.com
+  response:
+    body:
+      string: "{\n  \"search_metadata\": {\n    \"id\": \"6826cfd288de9237b7f81d7e\",\n
+        \   \"status\": \"Success\",\n    \"json_endpoint\": \"https://serpapi.com/searches/691adcf5bf743f54/6826cfd288de9237b7f81d7e.json\",\n
+        \   \"created_at\": \"2025-05-16 05:40:34 UTC\",\n    \"processed_at\": \"2025-05-16
+        05:40:34 UTC\",\n    \"google_url\": \"https://www.google.com/search?q=site%3Aweave-docs.wandb.ai&oq=site%3Aweave-docs.wandb.ai&sourceid=chrome&ie=UTF-8\",\n
+        \   \"raw_html_file\": \"https://serpapi.com/searches/691adcf5bf743f54/6826cfd288de9237b7f81d7e.html\",\n
+        \   \"total_time_taken\": 6.0\n  },\n  \"search_parameters\": {\n    \"engine\":
+        \"google\",\n    \"q\": \"site:weave-docs.wandb.ai\",\n    \"google_domain\":
+        \"google.com\",\n    \"device\": \"desktop\"\n  },\n  \"search_information\":
+        {\n    \"query_displayed\": \"site:weave-docs.wandb.ai\",\n    \"total_results\":
+        206,\n    \"time_taken_displayed\": 0.13,\n    \"organic_results_state\":
+        \"Results for exact spelling\"\n  },\n  \"organic_results\": [\n    {\n      \"position\":
+        1,\n      \"title\": \"W&B Weave | W&B Weave\",\n      \"link\": \"https://weave-docs.wandb.ai/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBYQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai\",\n      \"favicon\":
+        \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff29852cdcfbe16cb39e505e5fc829d3e12b3c3.png\",\n
+        \     \"snippet\": \"Weights & Biases (W&B) Weave is a framework for tracking,
+        experimenting with, evaluating, deploying, and improving LLM-based applications.\",\n
+        \     \"snippet_highlighted_words\": [\n        \"Weights & Biases (W&B) Weave\"\n
+        \     ],\n      \"source\": \"Weave Docs\"\n    },\n    {\n      \"position\":
+        2,\n      \"title\": \"Track LLM inputs & outputs - W&B Weave - Wandb\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/quickstart\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/quickstart&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBwQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A quickstart\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff298522ddf139461ebfba7744759c05db2245e.png\",\n
+        \     \"date\": \"Mar 12, 2025\",\n      \"snippet\": \"Track LLM inputs &
+        outputs. Follow these steps to track your first call or Open In Colab. 1.
+        Install Weave and create an API Key\u200B.\",\n      \"snippet_highlighted_words\":
+        [\n        \"track your first call or Open In Colab\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 3,\n      \"title\": \"Tutorial:
+        Build an Evaluation pipeline\",\n      \"link\": \"https://weave-docs.wandb.ai/tutorial-eval/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/tutorial-eval/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBgQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A tutorial-eval\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff298524828a1e23c6e7296f54e63472ddae8aa.png\",\n
+        \     \"snippet\": \"Weave has a first-class way to track evaluations with
+        Model & Evaluation classes. We have built the APIs to make minimal assumptions
+        to allow for the ...\",\n      \"snippet_highlighted_words\": [\n        \"track
+        evaluations with Model & Evaluation classes\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 4,\n      \"title\": \"Tutorial:
+        Track Application Logic\",\n      \"link\": \"https://weave-docs.wandb.ai/tutorial-tracing_2/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/tutorial-tracing_2/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBkQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A tutorial-tracing_2\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff29852042c9328389207c5d42425666a26e5f2.png\",\n
+        \     \"snippet\": \"Tutorial: Track Application Logic. In the Track LLM inputs
+        & outputs tutorial, the basics of tracking the inputs and outputs of your
+        LLMs was covered.\",\n      \"snippet_highlighted_words\": [\n        \"of
+        tracking the inputs and outputs of your LLMs\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 5,\n      \"title\": \"Tutorial:
+        App versioning\",\n      \"link\": \"https://weave-docs.wandb.ai/tutorial-weave_models/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/tutorial-weave_models/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBUQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A tutorial-weave_models\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff298527715ee7d00cfe009768e803ae060713c.png\",\n
+        \     \"snippet\": \"Tracking the inputs, outputs, metadata as well as data
+        flowing through your app is critical to understanding the performance of your
+        system.\",\n      \"snippet_highlighted_words\": [\n        \"Tracking the
+        inputs, outputs, metadata\"\n      ],\n      \"source\": \"Weave Docs\"\n
+        \   },\n    {\n      \"position\": 6,\n      \"title\": \"Integrations\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/integrations/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/integrations/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBIQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        integrations\",\n      \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff29852a678d7f8088faa25635f3a53e3e39bb6.png\",\n
+        \     \"snippet\": \"Weave provides automatic logging integrations for popular
+        LLM providers and orchestration frameworks. These integrations allow you to
+        seamlessly trace calls ...\",\n      \"snippet_highlighted_words\": [\n        \"automatic
+        logging integrations\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n
+        \   {\n      \"position\": 7,\n      \"title\": \"Tutorial: Model-Based Evaluation
+        of RAG applications\",\n      \"link\": \"https://weave-docs.wandb.ai/tutorial-rag/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/tutorial-rag/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECBEQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A tutorial-rag\",\n
+        \     \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff2985230ef3eb7c97e6ffa0992cc9633a48055.png\",\n
+        \     \"date\": \"7 days ago\",\n      \"snippet\": \"Retrieval Augmented
+        Generation (RAG) is a common way of building Generative AI applications that
+        have access to custom knowledge bases.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Retrieval Augmented Generation (RAG\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 8,\n      \"title\": \"Troubleshooting\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/troubleshooting/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/troubleshooting/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECC4QAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        troubleshooting\",\n      \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff29852cd2df36cc6c4ad3638b937e48853467a.png\",\n
+        \     \"snippet\": \"This page provides solutions and guidance for common
+        issues you may encounter. As we continue to expand this guide, more troubleshooting
+        topics will be added.\",\n      \"snippet_highlighted_words\": [\n        \"common
+        issues you may encounter\"\n      ],\n      \"source\": \"Weave Docs\"\n    },\n
+        \   {\n      \"position\": 9,\n      \"title\": \"Platform & Security\",\n
+        \     \"link\": \"https://weave-docs.wandb.ai/guides/platform/\",\n      \"redirect_link\":
+        \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/platform/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECDMQAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        platform\",\n      \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff2985262687d3e89ee6cbb6a867a9d3448614f.png\",\n
+        \     \"date\": \"7 days ago\",\n      \"snippet\": \"Use the identity and
+        access management capabilities for secure authentication and effective authorization
+        in your W&B Organization.\",\n      \"snippet_highlighted_words\": [\n        \"Use
+        the identity and access management capabilities\"\n      ],\n      \"source\":
+        \"Weave Docs\"\n    },\n    {\n      \"position\": 10,\n      \"title\": \"Tools
+        & Utilities\",\n      \"link\": \"https://weave-docs.wandb.ai/guides/tools/\",\n
+        \     \"redirect_link\": \"https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://weave-docs.wandb.ai/guides/tools/&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQFnoECC0QAQ\",\n
+        \     \"displayed_link\": \"https://weave-docs.wandb.ai \u203A guides \u203A
+        tools\",\n      \"favicon\": \"https://serpapi.com/searches/6826cfd288de9237b7f81d7e/images/a8aea7c777cc2931690fc95e4ff29852d82529dbd9bdce0fd587da2994a90eaa.png\",\n
+        \     \"snippet\": \"Weave is developing a set of tools and utilities to help
+        with your workflow and deployment process for AI applications.\",\n      \"snippet_highlighted_words\":
+        [\n        \"Weave is developing a set of tools and utilities\"\n      ],\n
+        \     \"source\": \"Weave Docs\"\n    }\n  ],\n  \"pagination\": {\n    \"current\":
+        1,\n    \"next\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=10&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8NMDegQICRAW\",\n
+        \   \"other_pages\": {\n      \"2\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=10&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAE\",\n
+        \     \"3\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=20&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAG\",\n
+        \     \"4\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=30&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAI\",\n
+        \     \"5\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=40&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAK\",\n
+        \     \"6\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=50&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAM\",\n
+        \     \"7\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=60&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAO\",\n
+        \     \"8\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=70&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAQ\",\n
+        \     \"9\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=80&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAS\",\n
+        \     \"10\": \"https://www.google.com/search?q=site:weave-docs.wandb.ai&sca_esv=2958ba21f9e34b9e&ei=188maP_xPMPVkPIPmeaVsAY&start=90&sa=N&sstk=Af40H4V4aRq6zjJ7jg287YgH8kbe0TbdybVikvPQ7NSRuq3-fZ21_v8OoFhc_H-bPzQYQ_Dw3w7BpLivzTEOqAhLpTgPp24FNffWbw&ved=2ahUKEwi_ucbHo6eNAxXDKkQIHRlzBWYQ8tMDegQICRAU\"\n
+        \   }\n  },\n  \"serpapi_pagination\": {\n    \"current\": 1,\n    \"next_link\":
+        \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=10\",\n
+        \   \"next\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=10\",\n
+        \   \"other_pages\": {\n      \"2\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=10\",\n
+        \     \"3\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=20\",\n
+        \     \"4\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=30\",\n
+        \     \"5\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=40\",\n
+        \     \"6\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=50\",\n
+        \     \"7\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=60\",\n
+        \     \"8\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=70\",\n
+        \     \"9\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=80\",\n
+        \     \"10\": \"https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=site%3Aweave-docs.wandb.ai&start=90\"\n
+        \   }\n  }\n}"
+    headers:
+      Age:
+      - '39'
+      CF-Cache-Status:
+      - HIT
+      CF-RAY:
+      - 94088b9d99c33c01-BLR
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Fri, 16 May 2025 05:41:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      alt-svc:
+      - h3=":443"; ma=86400
+      cache-control:
+      - max-age=3600, public
+      etag:
+      - W/"94a310e184b523d328dbfaa044dc1f29"
+      referrer-policy:
+      - strict-origin-when-cross-origin
+      serpapi-search-id:
+      - 6826cfd288de9237b7f81d7e
+      x-content-type-options:
+      - nosniff
+      x-download-options:
+      - noopen
+      x-frame-options:
+      - SAMEORIGIN
+      x-permitted-cross-domain-policies:
+      - none
+      x-request-id:
+      - 0c6096bf-0a87-4b99-acd8-fd7dd29242b4
+      x-robots-tag:
+      - noindex, nofollow
+      x-runtime:
+      - '6.036872'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "{\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You
+      are an expert assistant who can solve any task using tool calls. You will be
+      given a task to solve as best you can.\\nTo do so, you have been given access
+      to some tools.\\n\\nThe tool call you write is an action: after the tool is
+      executed, you will get the result of the tool call as an \\\"observation\\\".\\nThis
+      Action/Observation can repeat N times, you should take several steps when needed.\\n\\nYou
+      can use the result of the previous action as input for the next action.\\nThe
+      observation will always be a string: it can represent a file, like \\\"image_1.jpg\\\".\\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\\n\\nObservation:
+      \\\"image_1.jpg\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_transformer\\\",\\n
+      \ \\\"arguments\\\": {\\\"image\\\": \\\"image_1.jpg\\\"}\\n}\\n\\nTo provide
+      the final answer to the task, use an action blob with \\\"name\\\": \\\"final_answer\\\"
+      tool. It is the only way to complete the task, else you will be stuck on a loop.
+      So your final output should look like this:\\nAction:\\n{\\n  \\\"name\\\":
+      \\\"final_answer\\\",\\n  \\\"arguments\\\": {\\\"answer\\\": \\\"insert your
+      final answer here\\\"}\\n}\\n\\n\\nHere are a few examples using notional tools:\\n---\\nTask:
+      \\\"Generate an image of the oldest person in this document.\\\"\\n\\nAction:\\n{\\n
+      \ \\\"name\\\": \\\"document_qa\\\",\\n  \\\"arguments\\\": {\\\"document\\\":
+      \\\"document.pdf\\\", \\\"question\\\": \\\"Who is the oldest person mentioned?\\\"}\\n}\\nObservation:
+      \\\"The oldest person in the document is John Doe, a 55 year old lumberjack
+      living in Newfoundland.\\\"\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"image_generator\\\",\\n
+      \ \\\"arguments\\\": {\\\"prompt\\\": \\\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\\\"}\\n}\\nObservation: \\\"image.png\\\"\\n\\nAction:\\n{\\n
+      \ \\\"name\\\": \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"image.png\\\"\\n}\\n\\n---\\nTask:
+      \\\"What is the result of the following operation: 5 + 3 + 1294.678?\\\"\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"python_interpreter\\\",\\n    \\\"arguments\\\": {\\\"code\\\":
+      \\\"5 + 3 + 1294.678\\\"}\\n}\\nObservation: 1302.678\\n\\nAction:\\n{\\n  \\\"name\\\":
+      \\\"final_answer\\\",\\n  \\\"arguments\\\": \\\"1302.678\\\"\\n}\\n\\n---\\nTask:
+      \\\"Which city has the highest population , Guangzhou or Shanghai?\\\"\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Guangzhou\\\"\\n}\\nObservation:
+      ['Guangzhou has a population of 15 million inhabitants as of 2021.']\\n\\n\\nAction:\\n{\\n
+      \   \\\"name\\\": \\\"search\\\",\\n    \\\"arguments\\\": \\\"Population Shanghai\\\"\\n}\\nObservation:
+      '26 million (2019)'\\n\\nAction:\\n{\\n  \\\"name\\\": \\\"final_answer\\\",\\n
+      \ \\\"arguments\\\": \\\"Shanghai\\\"\\n}\\n\\nAbove example were using notional
+      tools that might not exist for you. You only have access to these tools:\\n-
+      web_search: Performs a google web search for your query then returns a string
+      of the top search results.\\n    Takes inputs: {'query': {'type': 'string',
+      'description': 'The search query to perform.'}, 'filter_year': {'type': 'integer',
+      'description': 'Optionally restrict results to a certain year', 'nullable':
+      True}}\\n    Returns an output of type: string\\n- final_answer: Provides a
+      final answer to the given problem.\\n    Takes inputs: {'answer': {'type': 'any',
+      'description': 'The final answer to the problem'}}\\n    Returns an output of
+      type: any\\n\\nHere are the rules you should always follow to solve your task:\\n1.
+      ALWAYS provide a tool call, else you will fail.\\n2. Always use the right arguments
+      for the tools. Never use variable names as the action arguments, use the value
+      instead.\\n3. Call a tool only when needed: do not call the search agent if
+      you do not need information, try to solve the task yourself.\\nIf no tool call
+      is needed, use final_answer tool to return your answer.\\n4. Never re-do a tool
+      call that you previously did with the exact same parameters.\\n\\nNow Begin!\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
+      task:\\nUse the provided tool to answer this question. Get the following page
+      - 'https://weave-docs.wandb.ai/'?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Called
+      Tool: 'web_search' with arguments: {'query': 'site:weave-docs.wandb.ai'}\\nCalling
+      tools:\\n[{'id': 'call_tRQLfQxeqz0SCUdpEyQ8asME', 'type': 'function', 'function':
+      {'name': 'web_search', 'arguments': {'query': 'site:weave-docs.wandb.ai'}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Observation:\\n##
+      Search Results\\n0. [W&B Weave | W&B Weave](https://weave-docs.wandb.ai/)\\nSource:
+      Weave Docs\\n\\nWeights & Biases (W&B) Weave is a framework for tracking, experimenting
+      with, evaluating, deploying, and improving LLM-based applications.\\n\\n1. [Track
+      LLM inputs & outputs - W&B Weave - Wandb](https://weave-docs.wandb.ai/quickstart)\\nDate
+      published: Mar 12, 2025\\nSource: Weave Docs\\n\\nTrack LLM inputs & outputs.
+      Follow these steps to track your first call or Open In Colab. 1. Install Weave
+      and create an API Key\u200B.\\n\\n2. [Tutorial: Build an Evaluation pipeline](https://weave-docs.wandb.ai/tutorial-eval/)\\nSource:
+      Weave Docs\\n\\nWeave has a first-class way to track evaluations with Model
+      & Evaluation classes. We have built the APIs to make minimal assumptions to
+      allow for the ...\\n\\n3. [Tutorial: Track Application Logic](https://weave-docs.wandb.ai/tutorial-tracing_2/)\\nSource:
+      Weave Docs\\n\\nTutorial: Track Application Logic. In the Track LLM inputs &
+      outputs tutorial, the basics of tracking the inputs and outputs of your LLMs
+      was covered.\\n\\n4. [Tutorial: App versioning](https://weave-docs.wandb.ai/tutorial-weave_models/)\\nSource:
+      Weave Docs\\n\\nTracking the inputs, outputs, metadata as well as data flowing
+      through your app is critical to understanding the performance of your system.\\n\\n5.
+      [Integrations](https://weave-docs.wandb.ai/guides/integrations/)\\nSource: Weave
+      Docs\\n\\nWeave provides automatic logging integrations for popular LLM providers
+      and orchestration frameworks. These integrations allow you to seamlessly trace
+      calls ...\\n\\n6. [Tutorial: Model-Based Evaluation of RAG applications](https://weave-docs.wandb.ai/tutorial-rag/)\\nDate
+      published: 7 days ago\\nSource: Weave Docs\\n\\nRetrieval Augmented Generation
+      (RAG) is a common way of building Generative AI applications that have access
+      to custom knowledge bases.\\n\\n7. [Troubleshooting](https://weave-docs.wandb.ai/guides/troubleshooting/)\\nSource:
+      Weave Docs\\n\\nThis page provides solutions and guidance for common issues
+      you may encounter. As we continue to expand this guide, more troubleshooting
+      topics will be added.\\n\\n8. [Platform & Security](https://weave-docs.wandb.ai/guides/platform/)\\nDate
+      published: 7 days ago\\nSource: Weave Docs\\n\\nUse the identity and access
+      management capabilities for secure authentication and effective authorization
+      in your W&B Organization.\\n\\n9. [Tools & Utilities](https://weave-docs.wandb.ai/guides/tools/)\\nSource:
+      Weave Docs\\n\\nWeave is developing a set of tools and utilities to help with
+      your workflow and deployment process for AI applications.\"}]}],\"model\":\"gpt-4.1-mini\",\"stop\":[\"Observation:\",\"Calling
+      tools:\"],\"tool_choice\":\"required\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"web_search\",\"description\":\"Performs
+      a google web search for your query then returns a string of the top search results.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"The
+      search query to perform.\"},\"filter_year\":{\"type\":\"integer\",\"description\":\"Optionally
+      restrict results to a certain year\",\"nullable\":true}},\"required\":[\"query\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"final_answer\",\"description\":\"Provides
+      a final answer to the given problem.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"answer\":{\"type\":\"string\",\"description\":\"The
+      final answer to the problem\"}},\"required\":[\"answer\"]}}}]}"
     headers:
       accept:
       - application/json
@@ -266,16 +446,16 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '9096'
+      - '7673'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=zYPLlmoFsPiiASAPPu0Ag1u8EhdukcDVB3APMDt0z20-1745219477-1.0.1.1-F9FHsGBezJTjyc4Or2r54sS6R5W8bsso3teMawI7FjaqnbsbaBm2JD6uwm3o1mr1v5qdkls6dkO_fmfUhpwSXdw5wFTDjFiVi1q8QkrWMAM;
-        _cfuvid=lEU2MBd7XM7HEGXaKEVD_57e3XylHNHWluvY2VwHvV8-1745219477561-0.0.1.1-604800000
+      - __cf_bm=_CguhDdljmp6s6qxPIueTyzhB3pqrRhuVzgKF3haJ2A-1747374079-1.0.1.1-wU43Ag6_gj9B1l3jq2KLdt16fQ2mKDn00z6bff1P0U780AW2dan3zlmEFqoH7_cHrtaqGIYCt1fBzqST4JxWfArMLDQjaScQ2O1mk5vNORo;
+        _cfuvid=e5R1oE8rpeN1CL5OdSZD2XRhWZHVeojxirQk9jKMR_k-1747374079474-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.75.0
+      - OpenAI/Python 1.78.1
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -285,7 +465,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.75.0
+      - 1.78.1
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -299,19 +479,23 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNRb9owEH7Pr7DumUwhg8HyRivYuq2t1EqdulFFxrkEF8eO7MtahPjv
-        U5KSBMqk5SGy7rvv7rvP553HGMgEIgZizUnkhfIvbtPV5bUcf5zcflvc0+Lu54/Fr/XDbKW/zm5g
-        UDHM6hkFHVgfhMkLhSSNbmBhkRNWVYeT0Tgcfh5NpjWQmwRVRcsK8kfGD4Nw5AdTP/j0RlwbKdBB
-        xH57jDG2q/+VRJ3gK0QsGBwiOTrHM4SoTWIMrFFVBLhz0hHXBIMOFEYT6kq1LpXqAWSMigVXqmvc
-        fLveufOJKxXPi+n04XFz93izoZf55XzzPA8X36+3vX5N6W1RC0pLLVp/engbj06aMQaa5w1Xaq5i
-        rt0L2hM+Y8BtVuaoqdIOuyU0eUuIlnBRSpVInTHOvqCeXfmNLZiwWUkm5yQFuydjt+xKqdKR5WTs
-        EvZw1GPvnTs/9fyzmJaOq/fGcq0N8Wq+2tmnN2TfXqIyWWHNyp1Qq5GlW8cWuau96V+RdxBSS4Dy
-        aAugsCYvKCazwbppGATjpix0W9qDwzeQDHHVp4WTwZmKcYLEZb0o7W4KLtaYdNxuR3mZSNMDvN70
-        7+Wcq904IHX2P+U7QAgsCJO4sJhIcTxyl2axesX/Smt9rgWDQ/tHCoxJoq1uJMGUl6p5YOC2jjCP
-        U6kztIWV9SuDtIjTCR9PRyIdpuDtvb8AAAD//wMAv0W5pm4EAAA=
+        H4sIAAAAAAAAAwAAAP//jFRNb9w2EL3vrxjw0Fy0611XjbJ7q12gTZE2KVok/XAgzJIjaWqKZEhq
+        N67h/16Qsley4wLVQSD45r15HA7ndgEgWIkdCNlhlL3Ty4vf+eWnX16+v/x0OFbVH/K7Xw/Vdts1
+        m8vy8gdRJIbd/00yPrBW0vZOU2RrRlh6wkhJdVOV1ddVuX61zkBvFelEa11clqvNsmfDy/P1+TfL
+        dbnclPf0zrKkIHbw1wIA4Db/k1Gj6LPYQRbLOz2FgC2J3SkIQHir047AEDhENFEUEyitiWSSdzNo
+        PQOitbqWqPWUePxuZ+upWqh1vX7/c//nux8v+rLaXrfb12/P312+/ef7dpZvlL5x2VAzGHmq0gw/
+        7e+eJAMQBvuRywZ1jSYcyT/hAwj07dCTicm7uL0SY9yV2F2J3zoChy3Biy5GF3ZnZ0fCAy2VlWF1
+        RKP2K+SzF8ABYkegrMxKmAxB4EjQWA8fvrqAD4lXAELjsaej9dcZih7lNZu2APrsyHNis2nhyLEr
+        gA6oB4wZV+S0vclLNAq4d94eUuibNz8t9xhIATqnWebkYQXJe7bARupBUYA4ROsZdcgK7cBp05qT
+        iSQFbNwQxwg7xLQuYD+wVingwZA14NiRZkOhmPgzA6Bty7JIW3AgH9ia7J1NpNaPHvMpc9J8FkU+
+        i9lhryl01o4HdxpjY30PgeTgOd6MBUgtN9ocImuOTCFX9NvXkKrbaHvM6Fi3VNfVlbgTjy7/bvHc
+        +uOssT01Q0D9ZcejMXa859zyH++Ru9Pr0rZ13u7DE2rqRQ5d7QlDbtr521k8GMkWxPDoeQrnbe9i
+        He015aSbal2NsmIaIjN4Xd6j0UbUM+DVZlM8I1krisj5CZ+mhkTZkZq40/TAQbGdAYvZ8b/085z2
+        WAI27f+RnwApyUVStfOkWD4+8xTmKU3Z/wo7FTobFoH8gSXVkcmnK1HU4KDH0SfCTYjU1w2blrzz
+        nOefaFxdbffVdk/lphGLu8W/AAAA//8DAPlNu2sOBgAA
     headers:
       CF-RAY:
-      - 933b110e5aa87aff-MAA
+      - 94088b9e1a7506ac-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -319,7 +503,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 21 Apr 2025 07:11:19 GMT
+      - Fri, 16 May 2025 05:41:21 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -335,25 +519,27 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '816'
+      - '1813'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '1818'
       x-ratelimit-limit-requests:
-      - '10000'
+      - '30000'
       x-ratelimit-limit-tokens:
-      - '30000000'
+      - '150000000'
       x-ratelimit-remaining-requests:
-      - '9999'
+      - '29999'
       x-ratelimit-remaining-tokens:
-      - '29998011'
+      - '149998397'
       x-ratelimit-reset-requests:
-      - 6ms
+      - 2ms
       x-ratelimit-reset-tokens:
-      - 3ms
+      - 0s
       x-request-id:
-      - req_df6325134bb30c97f0f770e361cf36f0
+      - req_d63bff08d26342cebd907d08271b2b63
     status:
       code: 200
       message: OK

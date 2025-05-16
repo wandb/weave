@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 import pytest
+from google.adk.tools.google_search_tool import GoogleSearchTool
 
 from weave.integrations.integration_utilities import op_name_from_ref
 
@@ -75,12 +76,12 @@ def test_openai_server_model(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_tool_calling_agent_ddgsearch(client):
-    from smolagents import DuckDuckGoSearchTool, OpenAIServerModel, ToolCallingAgent
+    from smolagents import GoogleSearchTool, OpenAIServerModel, ToolCallingAgent
 
-    model = OpenAIServerModel(model_id="gpt-4o")
-    agent = ToolCallingAgent(tools=[DuckDuckGoSearchTool()], model=model)
+    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    agent = ToolCallingAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
-        "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
+        "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
     calls = client.calls()
@@ -100,7 +101,7 @@ def test_tool_calling_agent_ddgsearch(client):
 def test_tool_calling_agent_weather(client):
     from smolagents import OpenAIServerModel, ToolCallingAgent, tool
 
-    model = OpenAIServerModel(model_id="gpt-4o")
+    model = OpenAIServerModel(model_id="gpt-4.1-mini")
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
@@ -129,17 +130,17 @@ def test_tool_calling_agent_weather(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_code_agent_ddgsearch(client):
-    from smolagents import CodeAgent, DuckDuckGoSearchTool, OpenAIServerModel
+def test_code_agent_search(client):
+    from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
 
-    model = OpenAIServerModel(model_id="gpt-4o")
-    agent = CodeAgent(tools=[DuckDuckGoSearchTool()], model=model)
+    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    agent = CodeAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
-        "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
+        "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
     calls = client.calls()
-    assert len(calls) == 14
+    assert len(calls) == 20
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -155,7 +156,7 @@ def test_code_agent_ddgsearch(client):
 def test_code_agent_weather(client):
     from smolagents import CodeAgent, OpenAIServerModel, tool
 
-    model = OpenAIServerModel(model_id="gpt-4o")
+    model = OpenAIServerModel(model_id="gpt-4.1-mini")
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
@@ -168,11 +169,11 @@ def test_code_agent_weather(client):
         return f"The weather in {location} is sunny with temperatures around 7°C."
 
     agent = CodeAgent(tools=[get_weather], model=model)
-    answer = agent.run("What is the weather in Tokyo?")
+    answer = agent.run("Use the provided tool to answer this question. What is the weather in Tokyo?")
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 12
+    assert len(calls) == 9
 
     call = calls[0]
     assert call.started_at < call.ended_at
