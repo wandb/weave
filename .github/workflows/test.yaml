@@ -181,6 +181,35 @@ jobs:
           yarn run tsc
           yarn testci
 
+  weave-ts-sdk-lint:
+    name: Weave TS SDK Lint
+    runs-on: ubuntu-latest
+    needs:
+      - check-which-tests-to-run
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check if lint should run
+        id: check_run
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_ts_sdk_tests }}" == "true" ]]; then
+            echo "Lint should run"
+            echo "should_lint=true" >> $GITHUB_OUTPUT
+          else
+            echo "Lint should not run"
+            echo "should_lint=false" >> $GITHUB_OUTPUT
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - name: Run Weave TS SDK Lint
+        if: steps.check_run.outputs.should_lint == 'true'
+        run: |
+          cd sdks/node
+          pnpm install --frozen-lockfile
+          pnpm run prettier-check
+
   # ==== Trace Jobs ====
   lint:
     name: Python lint
@@ -230,8 +259,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
