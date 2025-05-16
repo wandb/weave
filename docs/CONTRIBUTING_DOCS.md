@@ -130,7 +130,6 @@ make update_playground_models
 
 This regenerates the model list section automatically.
 
-Here’s a new subsection you can add under **“Doc generation details”** to explain how to use the `generate_llmstxt.py` script:
 
 ### LLM context doc generation
 
