@@ -39,6 +39,7 @@ from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
 from weave.trace.annotation_parser import (
+    parse_audio_annotation,
     parse_from_signature,
     AudioDataAnnotation,
     AudioFileAnnotation
@@ -295,20 +296,33 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
 
-    parsed_annotations = parse_from_signature(sig)
+    # Annotated input type flow
+    # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
+    if not func.postprocess_inputs:
+        parsed_annotations = parse_from_signature(sig)
+        for param_name, value in inputs_with_defaults.items():
+            # Check if we found an annotation which requires substitution
+            parsed = parsed_annotations.get(param_name)
+            # We don't need to do anything with this if a special annotation is not found
+            if not parsed:
+                to_weave_inputs[param_name] = value
+                continue
+            elif isinstance(parsed, AudioFileAnnotation):
+                to_weave_inputs[param_name] = Audio.from_path(value)
+            elif isinstance(parsed, AudioDataAnnotation):
+                to_weave_inputs[param_name] = Audio.from_data(value, format=parsed.format)
+    else:
+        to_weave_inputs = inputs_with_defaults
 
-    for param_name, value in inputs_with_defaults.items():
-        # Check if we found an annotation which requires substitution
-        parsed = parsed_annotations.get(param_name)
-        # We don't need to do anything with this if a special annotation is not found
-        if not parsed:
-            to_weave_inputs[param_name] = value
-            continue
-        elif isinstance(parsed, AudioFileAnnotation):
-            to_weave_inputs[param_name] = Audio.from_path(value)
+    # Annotated return type flow
+    # If user defines postprocess_output manually, trust it instead of running this
+    if not func.postprocess_output and sig.return_annotation:
+        parsed = parse_audio_annotation(str(sig.return_annotation))
+        if isinstance(parsed, AudioFileAnnotation):
+            func.postprocess_output = lambda x: Audio.from_path(x)
         elif isinstance(parsed, AudioDataAnnotation):
-            to_weave_inputs[param_name] = Audio.from_data(value, format=parsed.format)
+            func.postprocess_output = lambda x: Audio.from_data(x, format=parsed.format)
 
     return ProcessedInputs(
         original_args=args,

@@ -147,23 +147,3 @@ def parse_from_signature(sig: Signature) -> dict[str, AudioAnnotation]:
         parsed_annotations[param_name] = parse_result
 
     return parsed_annotations
-
-def postprocess_input_handler(
-    args: Dict[str, Any], parsed_annotations: Dict[str, AudioFileAnnotation | AudioDataAnnotation]
-) -> Dict[str, Any]:
-    """
-    Post-processes the arguments based on the parsed annotations.
-    Args:
-        args: The original arguments passed to the function.
-        parsed_annotations: The parsed annotations for each argument.
-    Returns:
-        A dictionary of processed arguments.
-    """
-    for param_name, annotation in parsed_annotations.items():
-        if isinstance(annotation, AudioFileAnnotation):
-            # Handle file-based audio
-            pass
-        elif isinstance(annotation, AudioDataAnnotation):
-            # Handle data-based audio
-            pass
-    return args
