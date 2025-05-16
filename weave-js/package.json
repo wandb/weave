@@ -113,6 +113,7 @@
     "react-flame-graph": "^1.4.0",
     "react-hook-mousetrap": "^2.0.4",
     "react-intersection-observer": "^8.31.0",
+    "react-json-view-lite": "^2.4.1",
     "react-markdown": "^8.0.7",
     "react-measure": "^2.3.0",
     "react-redux": "^7.1.1",
