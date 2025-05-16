@@ -16,7 +16,12 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
-import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
+import {
+  formatDate,
+  formatDateOnly,
+  isRelativeDate,
+  parseDate,
+} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -50,6 +55,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
   isActive,
 }) => {
+  // Track whether current value is relative or absolute
   const [inputValue, setInputValue] = useState(value);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -69,12 +75,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   // Set default value to 1mo if no valid date
   useEffect(() => {
     if (!value) {
-      const defaultDate = parseDate('1mo');
-      if (defaultDate) {
-        const localDate = formatDate(defaultDate);
-        onChange(localDate);
-        setInputValue(localDate);
-      }
+      onChange('1mo');
+      setInputValue('1mo');
     }
     // Only run on first render
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,7 +122,16 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   }, []);
 
   const parseAndUpdateDate = useCallback(
-    (newInputValue: string, skipDebounce = false) => {
+    (newInputValue: string) => {
+      // Check if it's a relative time value first
+      if (isRelativeDate(newInputValue)) {
+        setInputValue(newInputValue);
+        onChange(newInputValue);
+        setIsInvalid(false);
+        return;
+      }
+
+      // Handle absolute dates
       const date = parseDate(newInputValue);
       if (date) {
         const formattedDate = formatDate(date);
@@ -192,24 +203,14 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   };
 
   const handleSuggestionClick = useCallback(
-    (
-      suggestionValue: string,
-      absoluteDateTime?: string,
-      isCustomDate?: boolean
-    ) => {
-      if (isCustomDate) {
+    (suggestion: PredefinedSuggestion) => {
+      if (suggestion.isCustomDate) {
         setIsCalendarOpen(true);
         return;
       }
-
-      // Use the absolute date time if provided, otherwise use the abbreviation
-      const valueToUse = absoluteDateTime || suggestionValue;
-      setInputValue(valueToUse);
-
-      // Skip debounce when selecting from suggestions
-      parseAndUpdateDate(suggestionValue, true);
-
-      setSelectedSuggestion(suggestionValue);
+      setInputValue(suggestion.abbreviation);
+      parseAndUpdateDate(suggestion.abbreviation);
+      setSelectedSuggestion(suggestion.abbreviation);
       setDropdownVisible(false);
       if (inputRef.current) {
         inputRef.current.blur();
@@ -500,11 +501,7 @@ type SuggestionsListProps = {
   predefinedSuggestions: PredefinedSuggestion[];
   selectedSuggestion: string | null;
   hoveredIndex: number | null;
-  handleSuggestionClick: (
-    suggestionValue: string,
-    absoluteDateTime?: string,
-    isCustomDate?: boolean
-  ) => void;
+  handleSuggestionClick: (suggestion: PredefinedSuggestion) => void;
   handleMouseEnter: (index: number) => void;
   handleMouseLeave: () => void;
 };
@@ -549,13 +546,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           index={index}
           isSelected={selectedSuggestion === suggestion.abbreviation}
           isHovered={hoveredIndex === index}
-          onClick={() =>
-            handleSuggestionClick(
-              suggestion.abbreviation,
-              suggestion.absoluteDateTime,
-              suggestion.isCustomDate
-            )
-          }
+          onClick={() => handleSuggestionClick(suggestion)}
           onMouseEnter={() => handleMouseEnter(index)}
           onMouseLeave={handleMouseLeave}
         />
