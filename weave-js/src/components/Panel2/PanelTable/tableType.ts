@@ -181,43 +181,44 @@ export function isTableTypeLike(type: Type) {
   return false;
 }
 
-const isSingleRunWorkspace = (stack: Stack) => {
-  const singleRunWorkspaceVar = stack.find(
-    stackVar => stackVar.name === 'singleRunWorkspace'
-  );
+// todo(dom): restore these when we're ready for incremental tables
+// const isSingleRunWorkspace = (stack: Stack) => {
+//   const singleRunWorkspaceVar = stack.find(
+//     stackVar => stackVar.name === 'singleRunWorkspace'
+//   );
 
-  if (
-    singleRunWorkspaceVar == null ||
-    !isConstNode(singleRunWorkspaceVar.value)
-  ) {
-    return false;
-  }
+//   if (
+//     singleRunWorkspaceVar == null ||
+//     !isConstNode(singleRunWorkspaceVar.value)
+//   ) {
+//     return false;
+//   }
 
-  return singleRunWorkspaceVar.value.val;
-};
+//   return singleRunWorkspaceVar.value.val;
+// };
 
-const hasRunHistoryOp = (node: Node): boolean => {
-  const hasRunHistoryOpPattern = (currentNode: any): boolean => {
-    if (!currentNode?.fromOp) {
-      return false;
-    }
+// const hasRunHistoryOp = (node: Node): boolean => {
+//   const hasRunHistoryOpPattern = (currentNode: any): boolean => {
+//     if (!currentNode?.fromOp) {
+//       return false;
+//     }
 
-    const opName = currentNode.fromOp.name;
+//     const opName = currentNode.fromOp.name;
 
-    if (opName === 'run-history') {
-      return true;
-    }
+//     if (opName === 'run-history') {
+//       return true;
+//     }
 
-    const inputs = currentNode.fromOp.inputs;
-    if (inputs) {
-      return Object.values(inputs).some(
-        input =>
-          input != null && isOutputNode(input) && hasRunHistoryOpPattern(input)
-      );
-    }
+//     const inputs = currentNode.fromOp.inputs;
+//     if (inputs) {
+//       return Object.values(inputs).some(
+//         input =>
+//           input != null && isOutputNode(input) && hasRunHistoryOpPattern(input)
+//       );
+//     }
 
-    return false;
-  };
+//     return false;
+//   };
 
-  return node.nodeType === 'output' && hasRunHistoryOpPattern(node);
-};
+//   return node.nodeType === 'output' && hasRunHistoryOpPattern(node);
+// };
