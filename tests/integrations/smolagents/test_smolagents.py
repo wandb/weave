@@ -2,7 +2,6 @@ import os
 from typing import Optional
 
 import pytest
-from google.adk.tools.google_search_tool import GoogleSearchTool
 
 from weave.integrations.integration_utilities import op_name_from_ref
 
@@ -169,7 +168,9 @@ def test_code_agent_weather(client):
         return f"The weather in {location} is sunny with temperatures around 7°C."
 
     agent = CodeAgent(tools=[get_weather], model=model)
-    answer = agent.run("Use the provided tool to answer this question. What is the weather in Tokyo?")
+    answer = agent.run(
+        "Use the provided tool to answer this question. What is the weather in Tokyo?"
+    )
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
