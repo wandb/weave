@@ -6,6 +6,7 @@ from weave.trace.api import *
 __version__ = version.VERSION
 
 
+from weave.content_types import *
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
@@ -21,7 +22,6 @@ from weave.flow.scorer import Scorer
 from weave.initialization import *
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
-from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
 
@@ -56,5 +56,17 @@ __docspec__ = [
     Markdown,
     Monitor,
     SavedView,
+    Content,
     Audio,
+    Video,
+    Image,
+    Pdf,
+    Json,
+    Yaml,
+    Csv,
+    Markdown,
+    PlainText,
+    Python,
+    JavaScript,
+    TypeScript,
 ]

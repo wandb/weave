@@ -32,6 +32,19 @@ KNOWN_TYPES = {
     "datetime.datetime",
     "rich.markdown.Markdown",
     "moviepy.video.VideoClip.VideoClip",
+    # "weave.content_types.Media",
+    # "weave.content_types.Audio",
+    # "weave.content_types.Video",
+    # "weave.content_types.Image",
+    # "weave.content_types.Pdf",
+    # "weave.content_types.Json",
+    # "weave.content_types.Yaml",
+    # "weave.content_types.Csv",
+    # "weave.content_types.Markdown",
+    # "weave.content_types.PlainText",
+    # "weave.content_types.Python",
+    # "weave.content_types.JavaScript",
+    # "weave.content_types.TypeScript",
 }
 
 
