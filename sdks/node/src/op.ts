@@ -242,8 +242,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     });
   }
 
-  // Override the native call method to use the weave call style
-  opWrapper.call = createCallMethod<T>(opWrapper, call.proxy) as any;
+  opWrapper.invoke = createCallMethod<T>(opWrapper, call.proxy) as any;
 
   return opWrapper;
 }

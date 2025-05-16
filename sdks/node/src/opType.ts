@@ -11,7 +11,7 @@ export type Op<T extends (...args: any[]) => any> = {
   __name: string;
   __savedRef?: OpRef | Promise<OpRef>;
   __parameterNames?: ParameterNamesOption;
-  call: CallMethod<T>;
+  invoke: CallMethod<T>;
 } & T &
   ((
     ...args: Parameters<T>
