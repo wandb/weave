@@ -28,11 +28,11 @@ class KafkaProducer(ConfluentKafkaProducer):
 
 class KafkaConsumer(ConfluentKafkaConsumer):
     @classmethod
-    def from_env(cls) -> "KafkaConsumer":
+    def from_env(cls, group_id: str) -> "KafkaConsumer":
         conf = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
-            "group.id": "weave-worker-scorer",
+            "group.id": group_id,
             "auto.offset.reset": "earliest",
         }
         consumer = cls(conf)

@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import logging
 import os
 from datetime import datetime, timedelta
@@ -18,7 +17,7 @@ from tenacity import (
 # This import is used to register built-in scorers so they can be deserialized from the DB
 import weave.scorers  # noqa: F401
 from weave.flow.monitor import Monitor
-from weave.flow.scorer import Scorer, get_scorer_attributes
+from weave.flow.scorer import Scorer, preparer_scorer_op_args
 from weave.trace.box import box
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import _default_on_input_handler
@@ -271,14 +270,7 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
     if isinstance(output, ObjectRef):
         output = output.get()
 
-    scorer_attributes = get_scorer_attributes(scorer)
-    score_op = scorer_attributes.score_op
-    score_signature = inspect.signature(score_op)
-    score_arg_names = list(score_signature.parameters.keys())
-    score_output_name = "output" if "output" in score_arg_names else "model_output"
-    score_arg_names = [param for param in score_arg_names if (param != "self")]
-    score_args = {k: v for k, v in example.items() if k in score_arg_names}
-    score_args[score_output_name] = output
+    score_op, score_args = preparer_scorer_op_args(scorer, example, output)
 
     inputs_with_defaults = _default_on_input_handler(score_op, (), score_args).inputs
     score_args = {**inputs_with_defaults, "self": scorer}
@@ -381,9 +373,9 @@ def _task_done_callback(
     task: asyncio.Task,
     msg: Message,
     consumer: KafkaConsumer,
-    call_processors: set[asyncio.Task],
+    tasks: set[asyncio.Task],
 ) -> None:
-    call_processors.discard(task)
+    tasks.discard(task)
 
     try:
         task.result()
@@ -436,9 +428,12 @@ async def cleanup_tasks(tasks: set[asyncio.Task]) -> set[asyncio.Task]:
     return set()
 
 
+KAFKA_CONSUMER_GROUP_ID = "weave-worker-scorer"
+
+
 async def run_consumer() -> None:
     """This is the main loop consuming the ended calls from the Kafka topic."""
-    consumer = KafkaConsumer.from_env()
+    consumer = KafkaConsumer.from_env(group_id=KAFKA_CONSUMER_GROUP_ID)
     tasks: set[asyncio.Task] = set()
 
     consumer.subscribe([CALL_ENDED_TOPIC])
