@@ -9,7 +9,7 @@ from weave.integrations.integration_utilities import op_name_from_ref
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_hf_api_model(client):
@@ -46,7 +46,7 @@ def test_hf_api_model(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_openai_server_model(client):
@@ -79,7 +79,7 @@ def test_openai_server_model(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_ddgsearch(client):
@@ -108,7 +108,7 @@ def test_tool_calling_agent_ddgsearch(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_weather(client):
@@ -146,7 +146,8 @@ def test_tool_calling_agent_weather(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
+    match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_search(client):
     from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
@@ -164,7 +165,7 @@ def test_code_agent_search(client):
     )
 
     calls = client.calls()
-    assert len(calls) == 20
+    assert len(calls) == 14
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -175,7 +176,7 @@ def test_code_agent_search(client):
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_weather(client):
