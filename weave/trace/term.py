@@ -20,11 +20,14 @@ class WeaveFormatter(logging.Formatter):
         # Then add the weave prefix to each line
         return "\n".join(
             [f"{LOG_STRING}: {line}" for line in formatted_message.split("\n")]
+        )
+
 
 def in_colab() -> bool:
     try:
-        import google.colab
-        return True
+        import google.colab  # noqa: F401
+
+        return True  # noqa: TRY300
     except ImportError:
         return False
 
