@@ -624,8 +624,6 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
-        # If so, build the two queries
-        filter_query = CallsQuery(project_id=self.project_id)
         outer_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
@@ -633,36 +631,22 @@ class CallsQuery(BaseModel):
         )
 
         # Select Fields:
-        filter_query.add_field("id")
         for field in self.select_fields:
             outer_query.select_fields.append(field)
 
         # Query Conditions
         for condition in self.query_conditions:
-            if condition.is_heavy():
-                outer_query.query_conditions.append(condition)
-            else:
-                filter_query.query_conditions.append(condition)
+            outer_query.query_conditions.append(condition)
 
-        # Hardcoded Filter - always light
-        filter_query.hardcoded_filter = self.hardcoded_filter
+        # Hardcoded Filter
+        outer_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
-        if has_light_order_filter:
-            filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
-            # SUPER IMPORTANT: still need to re-sort the final query
-            outer_query.order_fields = self.order_fields
-        else:
-            outer_query.order_fields = self.order_fields
-            outer_query.limit = self.limit
-            outer_query.offset = self.offset
+        outer_query.order_fields = self.order_fields
+        outer_query.limit = self.limit
+        outer_query.offset = self.offset
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        """
-
+        raw_sql = ""
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
@@ -672,15 +656,11 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
-            raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            raw_sql = f"""WITH all_calls AS ({outer_query._as_sql_base_format(pb, table_alias)}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
-
         else:
-            raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
-            """
+            raw_sql = outer_query._as_sql_base_format(pb, table_alias)
 
         return safely_format_sql(raw_sql, logger)
 
@@ -688,7 +668,6 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: Optional[str] = None,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -770,10 +749,6 @@ class CallsQuery(BaseModel):
         if self.offset is not None:
             offset_sql = f"OFFSET {self.offset}"
 
-        id_subquery_sql = ""
-        if id_subquery_name is not None:
-            id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
-
         project_param = pb.add_param(self.project_id)
 
         # Special Optimization
@@ -821,7 +796,6 @@ class CallsQuery(BaseModel):
         {total_storage_size_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
-        {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
         {op_name_sql}
