@@ -1,17 +1,16 @@
-from enum import Enum
-from typing import Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
+# TODO: Fast follow up
+# JSON_SCHEMA = "json_schema"
+ResponseFormat = Literal["json_object", "text"]
 
-class ResponseFormat(str, Enum):
-    JSON = "json"
-    TEXT = "text"
 
-    # TODO: Fast follow up
-    # JSON_SCHEMA = "jsonschema"
+def is_response_format(value: Any) -> bool:
+    return isinstance(value, str) and value in ["json_object", "text"]
 
 
 class Message(BaseModel):
@@ -27,10 +26,10 @@ class Message(BaseModel):
     """
 
     role: str
-    content: Optional[Union[str, list[dict]]]
-    name: Optional[str]
-    function_call: Optional[dict]
-    tool_call_id: Optional[str]
+    content: Optional[Union[str, list[dict]]] = None
+    name: Optional[str] = None
+    function_call: Optional[dict] = None
+    tool_call_id: Optional[str] = None
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
