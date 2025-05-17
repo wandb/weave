@@ -119,7 +119,7 @@ langchain_nvidia_ai_endpoints = [
 ]
 litellm = ["litellm>=1.36.1"]
 # temporary max pin b/c 0.12.0 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35,<0.12.0"]
+llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
