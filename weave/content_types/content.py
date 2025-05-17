@@ -2,630 +2,158 @@ from __future__ import annotations
 
 import base64
 import binascii
-import json
-import os
+import mimetypes
 from pathlib import Path
 from typing import (
     Generic,
-    Optional,  # Added for Optional parameter
-    TypedDict,
-    cast,
+    TypeVar,
 )
 
-# --- Import from our new mime_types module ---
-from weave.content_types.mime_types import (
-    AudioMimeTypes,
-    CsvMimeTypes,
-    ImageMimeTypes,
-    JavaScriptMimeTypes,
-    JsonMimeTypes,
-    MarkdownMimeTypes,
-    MimeT,
-    PdfMimeTypes,
-    PlainTextMimeTypes,
-    PythonMimeTypes,
-    TypeScriptMimeTypes,
-    VideoMimeTypes,
-    YamlMimeTypes,
-    get_default_extension_for_mime,
-    get_supported_mime_types_for_category,
-    guess_mime_type_from_buffer,  # Specifically for buffer-based guessing
-    guess_mime_type_from_filename,  # Specifically for extension-based guessing
-)
+from weave.content_types.File import File
+from weave.content_types.mime_types import guess_mime_type
 
+T = TypeVar("T", bound=str)
 
-# --- Helper Functions (specific to Content class, not general MIME handling) ---
-def get_extension_from_filename(filename: str) -> str:
-    """Extracts the file extension (without the dot, lowercased) from a filename."""
-    last_dot = filename.rfind(".")
-    if last_dot == -1 or last_dot == len(filename) - 1:
-        return ""
-    return filename[last_dot + 1 :].lower()
+# Counterpart for File which allows object creation from bytes in memory
+class Content(Generic[T]):
+    """A class representing raw data.
 
+    This class handles data storage and provides methods for loading from
+    different sources and exporting to files.
 
-def try_decode(data: str | bytes) -> bytes:
-    """
-    Attempts to decode data if it's a base64 encoded string,
-    or encode a plain string to bytes. Returns bytes input as is.
-    """
-    if isinstance(data, str):
-        try:
-            return base64.b64decode(data, validate=True)
-        except binascii.Error:
-            return data.encode("utf-8")
-    return data
+    Attributes:
+        mime-type: The mime-type of the data
+        data: The raw audio data as bytes
+        size: The size of the data in bytes
 
+    Args:
+        data: The audio data (bytes or base64 encoded string)
+        validate_base64: Whether to attempt base64 decoding of the input data
 
-class ContentMetadata(TypedDict):
-    """
-    A TypedDict representing the metadata associated with a Content object.
+    Raises:
+        ValueError: If audio data is empty or format is not supported
     """
 
-    original_path: str | None
-    mimetype: str
+    # The preferred file extension to use when saving
+    preferred_extension: str
+
+    # File Format
+    mime_type: str
+
+    # Raw audio data bytes
+    data: bytes
+
+    # Size of the data in bytes
     size: int
 
-
-TEXT_MEDIA_CATEGORIES = {
-    "json",
-    "yaml",
-    "csv",
-    "markdown",
-    "plaintext",
-    "python",
-    "javascript",
-    "typescript",
-}
-
-# --- Content Base Class ---
-class Content(Generic[MimeT]):
-    _MEDIA_TYPE: str = "_base_media"
-    media_category: str
-    mime_type: MimeT
-    data: bytes
-    _original_path: str | None = None
-
     def __init__(
         self,
-        data: bytes | str,
-        mime_type: MimeT,
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
+        data: bytes,
+        mime_type: str,
+        preferred_extension: str | None = None,
     ) -> None:
-        cls_media_category_key = getattr(self.__class__, "_MEDIA_TYPE", "_base_media")
+        if len(data) == 0:
+            raise ValueError("Audio data cannot be empty")
 
-        if validate_base64:
-            processed_data = try_decode(data)
-        elif isinstance(data, str):
-            processed_data = data.encode("utf-8")
-        else:
-            processed_data = data
-
-        if not processed_data:
-            raise ValueError(
-                f"{cls_media_category_key.capitalize()} data cannot be empty."
-            )
-
-        self.data = processed_data
-        self.media_category = cls_media_category_key
-        self._original_path = _original_path
-
-        current_expected_mime_types = (
-            _expected_mime_types_list
-            or get_supported_mime_types_for_category(self.media_category)
-        )
-
-        if not current_expected_mime_types:
-            raise ValueError(
-                f"No supported MIME types configured for media category '{self.media_category}'."
-            )
-
-        normalized_input_mime = str(mime_type).lower()
-        if normalized_input_mime not in current_expected_mime_types:
-            raise ValueError(
-                f"Unsupported MIME type '{mime_type}' for {self.media_category} ({self.__class__.__name__}). "
-                f"Supported MIME types are: {', '.join(current_expected_mime_types)}"
-            )
+        self.data = data
         self.mime_type = mime_type
+        self.size = len(data)
 
-    @property
-    def metadata(self) -> ContentMetadata:
-        return ContentMetadata(
-            original_path=self._original_path,
-            mimetype=str(self.mime_type),
-            size=len(self.data),
-        )
+        preferred_extension = preferred_extension or mimetypes.guess_extension(mime_type)
+        if not preferred_extension:
+            raise ValueError(f"Failed to determine file extension for mime-type: {mime_type}")
 
-    @property
-    def resolved_filename(self) -> ContentMetadata:
-        return ContentMetadata(
-            original_path=self._original_path,
-            mimetype=str(self.mime_type),
-            size=len(self.data),
-        )
-
-    def export_metadata(self, path: str | Path | os.PathLike) -> str:
-        path_str = os.fspath(path)
-        metadata_to_export = self.metadata
-        dir_name = os.path.dirname(path_str)
-        if dir_name:
-            os.makedirs(dir_name, exist_ok=True)
-        with open(path_str, "w", encoding="utf-8") as f:
-            json.dump(metadata_to_export, f, indent=4)
-        return os.path.abspath(path_str)
+        self.preferred_extension = preferred_extension.lstrip(".")
 
     @classmethod
-    def _get_cls_media_category_key(cls) -> str:
-        category_key = getattr(cls, "_MEDIA_TYPE", "_base_media")
-        if category_key == "_base_media" or not category_key:
-            raise TypeError(
-                f"Class {cls.__name__} must define a `_MEDIA_TYPE` category key."
-            )
-        return category_key
+    def _from_data_with_ext(cls, data: bytes, extension: str) -> Content:
+        """Create a Content object from raw data and specified format.
 
-    @classmethod
-    def from_data(
-        cls: type[Content[MimeT]],
-        data: bytes | str,
-        mime_type_or_extension: Optional[str] = None,  # Parameter changed
-    ) -> Content[MimeT]:
+        Args:
+            data: Content data as bytes or base64 encoded string
+            extension: File extension (e.g., 'wav', 'mp3', 'm4a')
+
+        Returns:
+            Audio: A new Audio instance
+
+        Raises:
+            ValueError: If format is not supported
         """
-        Creates a content object from raw or base64 encoded data.
-        The mime_type_or_extension can be a full MIME type string, a file extension,
-        or None (to guess from buffer).
-        """
-        cls_media_category = cls._get_cls_media_category_key()
-        supported_mime_types = get_supported_mime_types_for_category(cls_media_category)
-
-        # Ensure data is bytes for buffer guessing, if needed.
-        # The __init__ will ultimately handle final conversion of input `data`.
-        if isinstance(data, str):
-            data = data.encode("utf-8")
-
-        if mime_type_or_extension and mime_type_or_extension.find('/') == -1:
-            # Got extension, try to get mime_type from it
-            mime_type_or_extension = guess_mime_type_from_filename(f"example.{mime_type_or_extension}")
-
-        # Use the provided or resolved mime-type if we have it
-        mime_type = mime_type_or_extension or guess_mime_type_from_buffer(data)
+        preferred_extension = extension.lower().lstrip(".")
+        mime_type = guess_mime_type(kwargs={
+            "extension": preferred_extension,
+            "buffer": data[:2048]
+        })
 
         if mime_type is None:
-            raise ValueError(
-                "MIME type could not be determined from buffer and no MIME type or extension was provided.")
+            # Not a valid extension - discard it
+            preferred_extension = None
+            mime_type = guess_mime_type(kwargs={
+                "buffer": data[:2048]
+            })
 
-        mime_type_lower = mime_type.lower()
-        if not mime_type_lower in supported_mime_types:
+        # If we still don't have a mime-type we have to error
+        if mime_type is None:
             raise ValueError(
-                f"Determined MIME type '{mime_type_lower}'"
-                f"is not supported for {cls_media_category} ({cls.__name__})."
-                f"Supported are: {', '.join(supported_mime_types)}"
+                f"Failed to determine mime-type from file extension: {extension}"
             )
 
         return cls(
             data=data,
-            mime_type=cast(MimeT, mime_type_lower),
-            validate_base64=True,
-            _original_path=None,
-            _expected_mime_types_list=supported_mime_types,
+            mime_type=mime_type,
+            preferred_extension=extension
         )
+
 
     @classmethod
-    def from_path(
-        cls: type[Content[MimeT]],
-        path: str | Path | os.PathLike,
-    ) -> Content[MimeT]:
-        cls_media_category = cls._get_cls_media_category_key()
-        supported_mime_types = get_supported_mime_types_for_category(cls_media_category)
-        path_str = os.fspath(path)
+    def from_data(cls, data: bytes, content_type_hint: str | None) -> Content:
+        """Create a Content object from raw data and specified format.
+        Args:
+            data: Content data as bytes
+            content_type_hint: Optional MIME type (e.g. application/json) or extension (e.g., 'mp3', json)
+        Returns:
+            Content: A new Content instance
+        Raises:
+            ValueError: If format is not supported
+        """
+        if not content_type_hint:
+            mime_type = guess_mime_type(kwargs={"buffer": data[:2048]})
+            if not mime_type:
+                raise ValueError("Failed to infer mime-type from data - please provide either the format or extension")
 
-        if not os.path.exists(path_str):
-            raise FileNotFoundError(f"File not found at path: {path_str}")
+            return cls(data, mime_type)
 
-        data = open(path_str, "rb").read()
+        elif content_type_hint.index("/") != -1:
+            # It's a mime-type
+            mime_type = content_type_hint
+            extension = mimetypes.guess_extension(mime_type)
+            if extension is None:
+                raise ValueError(f"Failed to determine file extension from mime-type: {mime_type}")
+            return cls(data, mime_type, extension)
 
-        def is_valid_mime(mime: str | None) -> bool:
-            return mime is not None and mime.lower() in supported_mime_types
+        return cls._from_data_with_ext(data, content_type_hint)
 
-        # Always use filename-based guessing first
-        mime_type = guess_mime_type_from_filename(path_str)
+    @property
+    def filename(self) -> str:
+        """
+        Create a filename based on the mime-type and preferred extension (if available).
+        """
+        content_type = self.mime_type.split("/")[0]
+        extension = self.preferred_extension
+        return f"{content_type}.{extension}"
 
-        # Could be a user defined extension but valid data
-        if not is_valid_mime(mime_type):
-            mime_type = guess_mime_type_from_buffer(data)
+    @property
+    def metadata(self) -> dict[str, str | int]:
+        return {
+            "size": self.size,
+            "mime_type": self.mime_type,
+        }
 
-        return cls(
-            data=data,
-            mime_type=cast(MimeT, mime_type),
-            validate_base64=False,
-            _original_path=path_str,
-            _expected_mime_types_list=supported_mime_types,
-        )
+    def save(self, path: str | Path) -> None:
+        """Export audio data to a file.
 
-    def export(self, path: str | Path | os.PathLike) -> str:
-        path_str = os.fspath(path)
-        output_ext_from_path = get_extension_from_filename(path_str)
-        expected_ext_for_mime = get_default_extension_for_mime(self.mime_type)
-
-        final_path_str = path_str
-        if not output_ext_from_path and expected_ext_for_mime:
-            final_path_str += expected_ext_for_mime
-
-        with open(final_path_str, "wb") as f:
+        Args:
+            path: Path where the audio file should be written
+        """
+        with open(path, "wb") as f:
             f.write(self.data)
-        return final_path_str
-
-    def __repr__(self) -> str:
-        return self.__class__.__name__
-
-# --- Thin Wrapper Classes (Updated from_data signatures) ---
-class Audio(Content[AudioMimeTypes]):
-    _MEDIA_TYPE: str = "audio"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: AudioMimeTypes,
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = None
-    ) -> Audio:
-        return cast(Audio, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Audio:
-        return cast(Audio, super().from_path(path))
-
-
-class Video(Content[VideoMimeTypes]):
-    _MEDIA_TYPE: str = "video"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: VideoMimeTypes,
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = None
-    ) -> Video:
-        return cast(Video, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Video:
-        return cast(Video, super().from_path(path))
-
-
-class Image(Content[ImageMimeTypes]):
-    _MEDIA_TYPE: str = "image"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: ImageMimeTypes,
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = None
-    ) -> Image:
-        return cast(Image, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Image:
-        return cast(Image, super().from_path(path))
-
-
-class Pdf(Content[PdfMimeTypes]):
-    _MEDIA_TYPE: str = "pdf"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: PdfMimeTypes = "application/pdf",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: str | bytes,
-        mime_type_or_extension: Optional[str] = "application/pdf",
-    ) -> Pdf:
-        return cast(Pdf, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Pdf:
-        return cast(Pdf, super().from_path(path))
-
-
-class Json(Content[JsonMimeTypes]):
-    _MEDIA_TYPE: str = "json"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: JsonMimeTypes = "application/json",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: str | bytes,
-        mime_type_or_extension: Optional[str] = "application/json",
-    ) -> Json:
-        return cast(Json, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Json:
-        return cast(Json, super().from_path(path))
-
-
-class Yaml(Content[YamlMimeTypes]):
-    _MEDIA_TYPE: str = "yaml"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: YamlMimeTypes = "application/yaml",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: str | bytes,
-        mime_type_or_extension: Optional[str] = "application/yaml",
-    ) -> Yaml:
-        return cast(Yaml, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Yaml:
-        return cast(Yaml, super().from_path(path))
-
-
-class Csv(Content[CsvMimeTypes]):
-    _MEDIA_TYPE: str = "csv"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: CsvMimeTypes = "text/csv",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = "text/csv"
-    ) -> Csv:
-        return cast(Csv, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Csv:
-        return cast(Csv, super().from_path(path))
-
-
-class Markdown(Content[MarkdownMimeTypes]):
-    _MEDIA_TYPE: str = "markdown"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: MarkdownMimeTypes = "text/markdown",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = "text/markdown"
-    ) -> Markdown:
-        return cast(Markdown, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Markdown:
-        return cast(Markdown, super().from_path(path))
-
-
-class PlainText(Content[PlainTextMimeTypes]):
-    _MEDIA_TYPE: str = "plaintext"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: PlainTextMimeTypes = "text/plain",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = "text/plain"
-    ) -> PlainText:
-        return cast(PlainText, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> PlainText:
-        return cast(PlainText, super().from_path(path))
-
-
-class Python(Content[PythonMimeTypes]):
-    _MEDIA_TYPE: str = "python"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: PythonMimeTypes = "text/x-python",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls, data: str | bytes, mime_type_or_extension: Optional[str] = "text/x-python"
-    ) -> Python:
-        return cast(Python, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> Python:
-        return cast(Python, super().from_path(path))
-
-
-class JavaScript(Content[JavaScriptMimeTypes]):
-    _MEDIA_TYPE: str = "javascript"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: JavaScriptMimeTypes = "application/javascript",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: str | bytes,
-        mime_type_or_extension: Optional[str] = "application/javascript",
-    ) -> JavaScript:
-        return cast(JavaScript, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> JavaScript:
-        return cast(JavaScript, super().from_path(path))
-
-
-class TypeScript(Content[TypeScriptMimeTypes]):
-    _MEDIA_TYPE: str = "typescript"
-
-    def __init__(
-        self,
-        data: bytes | str,
-        mime_type: TypeScriptMimeTypes = "text/x-typescript",
-        validate_base64: bool = True,
-        _original_path: str | None = None,
-        _expected_mime_types_list: list[str] | None = None,
-    ):
-        super().__init__(
-            data,
-            mime_type=mime_type,
-            validate_base64=validate_base64,
-            _original_path=_original_path,
-            _expected_mime_types_list=_expected_mime_types_list,
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: str | bytes,
-        mime_type_or_extension: Optional[str] = "text/x-typescript",
-    ) -> TypeScript:
-        return cast(TypeScript, super().from_data(data, mime_type_or_extension))
-
-    @classmethod
-    def from_path(cls, path: str | Path | os.PathLike) -> TypeScript:
-        return cast(TypeScript, super().from_path(path))
-
-# (Example main_content_test function would go here if needed for testing)

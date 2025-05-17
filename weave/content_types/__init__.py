@@ -1,20 +1,23 @@
 from weave.content_types.content import (
-    Content,
     Audio,
-    Video,
-    Image,
-    Pdf,
-    Json,
-    Yaml,
+    Content,
     Csv,
+    Image,
+    JavaScript,
+    Json,
     Markdown,
+    Pdf,
     PlainText,
     Python,
-    JavaScript,
     TypeScript,
+    Video,
+    Yaml,
 )
+
+
 def test_name():
     print(__name__)
+
 
 __docspec__ = [
     Content,
