@@ -4,11 +4,6 @@ import base64
 import binascii
 import mimetypes
 from pathlib import Path
-from typing import (
-    Generic,
-    TypeVar,
-)
-
 from weave.content_types.file import File
 from weave.content_types.content import Content
 from weave.content_types.mime_types import guess_mime_type

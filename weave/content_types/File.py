@@ -28,9 +28,10 @@ class File:
             raise FileNotFoundError(f"{self.path} does not exist")
         if not self.path.is_file():
             raise FileNotFoundError(f"{self.path} is not a file")
-        self.mimetype = (
-            mimetype if mimetype else mimetypes.guess_type(str(self.path))[0]
-        )
+        mimetype = mimetype if mimetype else mimetypes.guess_type(str(self.path))[0]
+        if mimetype is None:
+            raise ValueError(f"Could not determine MIME type for {self.path} - provide it manually")
+        self.mimetype = mimetype
         self.size = self.path.stat().st_size
 
     @property
@@ -41,6 +42,14 @@ class File:
             str: The name of the file without the directory path.
         """
         return self.path.name
+
+    @property
+    def metadata(self) -> dict[str, str | int]:
+        return {
+            "size": self.size,
+            "mime_type": self.mimetype,
+            "original_path": self.filename # For compatibility with File metadata
+        }
 
     def open(self) -> bool:
         """Open the file using the operating system's default application.

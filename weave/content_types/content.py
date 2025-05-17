@@ -144,6 +144,7 @@ class Content(Generic[T]):
         return {
             "size": self.size,
             "mime_type": self.mime_type,
+            "original_path": self.filename # For compatibility with File metadata
         }
 
     def save(self, path: str | Path) -> None:
