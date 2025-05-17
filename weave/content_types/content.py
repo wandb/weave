@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import base64
-import binascii
 import mimetypes
 from pathlib import Path
 from typing import (
@@ -9,7 +7,6 @@ from typing import (
     TypeVar,
 )
 
-from weave.content_types.File import File
 from weave.content_types.mime_types import guess_mime_type
 
 T = TypeVar("T", bound=str)

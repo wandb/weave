@@ -10,7 +10,7 @@ from typing import (
 )
 
 from weave.content_types.File import File
-from weave.content_types.content import Content
+from weave.content_types.Content import Content
 from weave.content_types.mime_types import guess_mime_type
 
 def handle_content_type_hint(content_type_hint: str | None) -> dict[str, str]:
