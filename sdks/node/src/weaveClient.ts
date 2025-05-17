@@ -33,6 +33,7 @@ import {Table, TableRef, TableRowRef} from './table';
 import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
+import {Call, CallState, InternalCall} from './call';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 
@@ -211,7 +212,7 @@ export class WeaveClient {
   public async getCall(
     callId: string,
     includeCosts: boolean = false
-  ): Promise<CallSchema> {
+  ): Promise<Call> {
     const calls = await this.getCalls({call_ids: [callId]}, includeCosts);
     if (calls.length === 0) {
       throw new Error(`Call not found: ${callId}`);
@@ -223,10 +224,12 @@ export class WeaveClient {
     includeCosts: boolean = false,
     limit: number = 1000
   ) {
-    const calls: CallSchema[] = [];
+    const calls: Call[] = [];
     const iterator = this.getCallsIterator(filter, includeCosts, limit);
     for await (const call of iterator) {
-      calls.push(call);
+      const internalCall = new InternalCall();
+      internalCall.updateWithCallSchemaData(call);
+      calls.push(internalCall.proxy);
     }
     return calls;
   }
@@ -655,6 +658,7 @@ export class WeaveClient {
   }
 
   public async createCall(
+    internalCall: InternalCall,
     opRef: OpRef | Op<any>,
     params: any[],
     parameterNames: ParameterNamesOption,
@@ -689,10 +693,13 @@ export class WeaveClient {
       },
       inputs,
     };
+    internalCall.updateWithCallSchemaData(startReq);
+    internalCall.state = CallState.pending;
     return this.saveCallStart(startReq);
   }
 
   public async finishCall(
+    call: InternalCall,
     result: any,
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
@@ -712,16 +719,27 @@ export class WeaveClient {
     await startCallPromise;
     this.saveWeaveValues(result);
     result = await this.serializedVal(result);
-    await this.saveCallEnd({
-      project_id: this.projectId,
-      id: currentCall.callId,
+    const callSchemaExchangeData = {
       ended_at: endTime.toISOString(),
       output: result,
       summary: mergedSummary,
+    };
+    this.saveCallEnd({
+      project_id: this.projectId,
+      id: currentCall.callId,
+      ...callSchemaExchangeData,
+      // User might change the display name of the call after the call has started.
+      // take this into account when logging the end call.
+      ...(call.callSchema.display_name === null
+        ? null
+        : {display_name: call.callSchema.display_name!}),
     });
+    call.updateWithCallSchemaData(callSchemaExchangeData);
+    call.state = CallState.finished;
   }
 
   public async finishCallWithException(
+    call: InternalCall,
     error: any,
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
@@ -736,13 +754,31 @@ export class WeaveClient {
     );
     // ensure end is logged after start is logged
     await startCallPromise;
-    await this.saveCallEnd({
-      project_id: this.projectId,
-      id: currentCall.callId,
+    const callSchemaExchangeData = {
       ended_at: endTime.toISOString(),
       output: null,
       summary: mergedSummary,
       exception: error instanceof Error ? error.message : String(error),
+    };
+    this.saveCallEnd({
+      project_id: this.projectId,
+      id: currentCall.callId,
+      ...callSchemaExchangeData,
+      // User might change the display name of the call after the call has started.
+      // take this into account when logging the end call.
+      ...(call.callSchema.display_name === null
+        ? null
+        : {display_name: call.callSchema.display_name!}),
+    });
+    call.updateWithCallSchemaData(callSchemaExchangeData);
+    call.state = CallState.failed;
+  }
+
+  public async updateCall(callId: string, displayName: string) {
+    await this.traceServerApi.call.callUpdateCallUpdatePost({
+      project_id: this.projectId,
+      call_id: callId,
+      display_name: displayName,
     });
   }
 }

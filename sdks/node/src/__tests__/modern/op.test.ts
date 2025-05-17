@@ -8,17 +8,8 @@ let capturedDisplayName: string | undefined;
 jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => ({
     pushNewCall: () => ({currentCall: {}, parentCall: null, newStack: []}),
-    createCall: (
-      _: any,
-      __: any,
-      ___: any,
-      ____: any,
-      _____: any,
-      ______: any,
-      _______: any,
-      displayName: string
-    ) => {
-      capturedDisplayName = displayName;
+    createCall: (...args: any[]) => {
+      capturedDisplayName = args.length > 0 ? args[args.length - 1] : undefined;
       return Promise.resolve();
     },
     runWithCallStack: async (stack: any, fn: () => any) => fn(),
