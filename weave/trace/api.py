@@ -84,6 +84,10 @@ def init(
     return initialized_client.client
 
 
+def get_client() -> weave_client.WeaveClient | None:
+    return weave_client_context.get_weave_client()
+
+
 @contextlib.contextmanager
 def remote_client(project_name: str) -> Iterator[weave_init.weave_client.WeaveClient]:
     inited_client = weave_init.init_weave(project_name)
@@ -293,4 +297,5 @@ __all__ = [
     "weave_client_context",
     "require_current_call",
     "get",
+    "get_client",
 ]
