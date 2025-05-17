@@ -20,7 +20,13 @@ class WeaveFormatter(logging.Formatter):
         # Then add the weave prefix to each line
         return "\n".join(
             [f"{LOG_STRING}: {line}" for line in formatted_message.split("\n")]
-        )
+
+def in_colab() -> bool:
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
 
 
 configured = False
@@ -38,8 +44,9 @@ def configure_logger() -> None:
 
     # Add the handler to the logger
     logger.addHandler(console_handler)
-    # Prevent propagation to root logger to avoid double output
-    logger.propagate = False
+    # Only disable propagation in colab to avoid double output
+    if in_colab():
+        logger.propagate = False
 
     # Set the log level based on environment variable
     log_level = settings.log_level()
