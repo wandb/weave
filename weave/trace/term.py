@@ -1,7 +1,8 @@
 import logging
-import os
 
 import click
+
+from weave.trace import settings
 
 LOG_STRING = click.style("weave", fg="cyan", bold=True)
 
@@ -39,7 +40,7 @@ def configure_logger() -> None:
     logger.addHandler(console_handler)
 
     # Set the log level based on environment variable
-    log_level = os.getenv("WEAVE_LOG_LEVEL", "INFO").upper()
+    log_level = settings.log_level()
     logger.setLevel(getattr(logging, log_level))
 
 
