@@ -15,11 +15,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-    "google_genai",
-    "mcp",
-]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents"]
 
 
 @nox.session
@@ -64,6 +60,7 @@ def lint(session):
         "scorers",
         "pandas-test",
         "huggingface",
+        "smolagents",
         "mcp",
     ],
 )
