@@ -14,16 +14,23 @@ class WeaveFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         if not record.getMessage():
             return ""
-        # Add the weave prefix to each line
-        message = "\n".join(
-            [f"{LOG_STRING}: {line}" for line in record.getMessage().split("\n")]
+        # First let the parent class handle the formatting
+        formatted_message = super().format(record)
+        # Then add the weave prefix to each line
+        return "\n".join(
+            [f"{LOG_STRING}: {line}" for line in formatted_message.split("\n")]
         )
-        record.msg = message
-        return super().format(record)
+
+
+configured = False
 
 
 def configure_logger() -> None:
     """Configure the root logger for Weave with custom formatting and log level."""
+    global configured
+    if configured:
+        return
+    configured = True
     # Create a console handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(WeaveFormatter())
