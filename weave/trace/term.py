@@ -38,6 +38,8 @@ def configure_logger() -> None:
 
     # Add the handler to the logger
     logger.addHandler(console_handler)
+    # Prevent propagation to root logger to avoid double output
+    logger.propagate = False
 
     # Set the log level based on environment variable
     log_level = settings.log_level()
