@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
 
@@ -31,22 +32,25 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.environment import (
+    wf_scoring_worker_batch_size,
+    wf_scoring_worker_batch_timeout,
+)
 from weave.trace_server.kafka import CALL_ENDED_TOPIC, KafkaConsumer
 from weave.trace_server.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
     parse_internal_uri,
 )
-from weave.trace_server.trace_server_interface import TraceServerInterface
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-_TRACE_SERVER: Optional[TraceServerInterface] = None
+_TRACE_SERVER: Optional[ClickHouseTraceServer] = None
 
 
-def get_trace_server() -> TraceServerInterface:
+def get_trace_server() -> ClickHouseTraceServer:
     global _TRACE_SERVER
 
     if _TRACE_SERVER is None:
@@ -66,13 +70,15 @@ class ActiveMonitor(TypedDict):
 class MonitorsCache:
     """Cache for active monitors."""
 
-    _cache: dict[str, tuple[datetime, list[ActiveMonitor]]] = {}
+    _cache: OrderedDict[str, tuple[datetime, list[ActiveMonitor]]] = OrderedDict()
     _ttl_seconds = 60
+    _capacity = 100
 
     @classmethod
     def get(cls, project_id: str) -> list[ActiveMonitor] | None:
         if (cached_value := cls._cache.get(project_id)) is not None:
             if cached_value[0] > datetime.now() - timedelta(seconds=cls._ttl_seconds):
+                cls._cache.move_to_end(project_id)
                 return cached_value[1]
             else:
                 del cls._cache[project_id]
@@ -82,6 +88,8 @@ class MonitorsCache:
     @classmethod
     def set(cls, project_id: str, monitors: list[ActiveMonitor]) -> None:
         cls._cache[project_id] = (datetime.now(), monitors)
+        if len(cls._cache) > cls._capacity:
+            cls._cache.popitem(last=False)
 
 
 def get_active_monitors(project_id: str) -> list[ActiveMonitor]:
@@ -168,34 +176,27 @@ class CallNotWrittenError(Exception):
     stop=stop_after_attempt(5),
     before=before_log(logger, logging.INFO),
 )
-def get_filtered_call(
+def get_filtered_calls(
+    project_id: str,
+    call_ids: list[str],
     op_names: list[str],
     query: Optional[tsi.Query],
-    ended_call: tsi.EndedCallSchemaForInsert,
-) -> Optional[Call]:
-    """Looks up the call based on a monitor's call filter."""
+) -> list[Call]:
     server = get_trace_server()
-
-    # We do this two-step querying to circumvent the absence of write->read consistency in ClickHouse.
-    # We want to differentiate between a call not written yet and a call existing but not matching the filter.
-    # - first we count the calls that match the call id
-    # - if that returns 0, we raise an exception in order to trigger a retry
-    # - if that returns > 0, we know the call exists, so we can proceed with the filter
-
     count_req = tsi.CallsQueryStatsReq(
-        project_id=ended_call.project_id,
-        filter=tsi.CallsFilter(call_ids=[ended_call.id]),
+        project_id=project_id,
+        filter=tsi.CallsFilter(call_ids=call_ids),
     )
 
     count = server.calls_query_stats(count_req).count
 
-    if count == 0:
-        raise CallNotWrittenError(f"Call {ended_call.id} not yet written to DB")
+    if count != len(set(call_ids)):
+        raise CallNotWrittenError("Some calls not yet written to DB")
 
     req = tsi.CallsQueryReq(
-        project_id=ended_call.project_id,
+        project_id=project_id,
         filter=tsi.CallsFilter(
-            call_ids=[ended_call.id],
+            call_ids=call_ids,
             query=query,
             op_names=op_names,
         ),
@@ -203,25 +204,9 @@ def get_filtered_call(
 
     calls = server.calls_query(req).calls
 
-    if len(calls) == 0:
-        logger.info("No matching calls found for call id %s", ended_call.id)
-        return None
+    logger.info("Found %s calls to score.", len(calls))
 
-    if len(calls) > 1:
-        logger.warning("Multiple calls found for call id %s", ended_call.id)
-        return None
-
-    call = calls[0]
-
-    if not call.ended_at:
-        return None
-
-    if call.exception:
-        return None
-
-    logger.info("Found call %s", call.id)
-
-    return build_client_call(call)
+    return [build_client_call(call) for call in calls]
 
 
 def build_client_call(server_call: tsi.CallSchema) -> Call:
@@ -244,23 +229,6 @@ def build_client_call(server_call: tsi.CallSchema) -> Call:
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
-
-
-async def process_monitor(
-    monitor: Monitor,
-    monitor_internal_ref: InternalObjectRef,
-    ended_call: tsi.EndedCallSchemaForInsert,
-    wb_user_id: str,
-) -> None:
-    """Actually apply the monitor's scorers for an ended call."""
-    if (call := get_filtered_call(monitor.op_names, monitor.query, ended_call)) is None:
-        return
-
-    for scorer in monitor.scorers:
-        logger.info("Applying scorer %s to call %s", scorer.name, call.id)
-        await apply_scorer(
-            monitor_internal_ref, scorer, call, ended_call.project_id, wb_user_id
-        )
 
 
 def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, Any]:
@@ -308,33 +276,20 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
     return call_start_res.id, result
 
 
-def _get_score_call(score_call_id: str, project_id: str) -> Call:
-    """Gets a score call from the DB."""
-    server = get_trace_server()
-
-    call_req = tsi.CallsQueryReq(
-        project_id=project_id, filter=tsi.CallsFilter(call_ids=[score_call_id])
-    )
-
-    calls = server.calls_query(call_req).calls
-
-    return build_client_call(calls[0])
-
-
 async def apply_scorer(
     monitor_internal_ref: InternalObjectRef,
     scorer: Scorer,
     call: Call,
     project_id: str,
-    wb_user_id: str,
+    wb_user_id: str | None,
 ) -> None:
     """Actually apply the scorer to the call."""
     score_call_id, result = _do_score_call(scorer, call, project_id)
 
-    score_call = _get_score_call(score_call_id, project_id)
+    # score_call = _get_score_call(score_call_id, project_id)
 
     call_ref = InternalCallRef(project_id=project_id, id=call.id)  # type: ignore
-    score_call_ref = InternalCallRef(project_id=project_id, id=score_call.id)  # type: ignore
+    score_call_ref = InternalCallRef(project_id=project_id, id=score_call_id)  # type: ignore
 
     results_json = to_json(result, project_id, None)  # type: ignore
     payload = {"output": results_json}
@@ -355,23 +310,9 @@ async def apply_scorer(
     server.feedback_create(feedback_req)
 
 
-async def process_ended_call(ended_call: tsi.EndedCallSchemaForInsert) -> None:
-    project_id = ended_call.project_id
-
-    active_monitors = get_active_monitors(project_id)
-
-    for active_monitor in active_monitors:
-        await process_monitor(
-            active_monitor["monitor"],
-            active_monitor["internal_ref"],
-            ended_call,
-            active_monitor["wb_user_id"],  # type: ignore
-        )
-
-
 def _task_done_callback(
     task: asyncio.Task,
-    msg: Message,
+    messages: list[Message],
     consumer: KafkaConsumer,
     tasks: set[asyncio.Task],
 ) -> None:
@@ -379,35 +320,23 @@ def _task_done_callback(
 
     try:
         task.result()
-        consumer.commit(msg)
+        for msg in messages:
+            consumer.commit(msg)
     except Exception as e:
         logger.exception(
             f"Error processing message: {e.__class__.__name__} {e}", exc_info=e
         )
 
 
-def create_task(
-    msg: Message, consumer: KafkaConsumer, tasks: set[asyncio.Task]
-) -> asyncio.Task:
-    """Process a single Kafka message and create a task for it."""
-    ended_call = tsi.EndedCallSchemaForInsert.model_validate_json(
-        msg.value().decode("utf-8")
-    )
-    logger.info("Processing ended call %s", ended_call.id)
-
-    task = asyncio.create_task(process_ended_call(ended_call))
-    task.add_done_callback(lambda t: _task_done_callback(t, msg, consumer, tasks))
-
-    return task
-
-
-async def handle_kafka_errors(msg: Message) -> bool:
+def handle_kafka_errors(msg: Message) -> bool:
     """Handle Kafka-specific errors."""
     if msg.error():
         if msg.error().code() == KafkaError._PARTITION_EOF:
             logger.error(
-                "%% %s [%d] reached end at offset %d\n"
-                % (msg.topic(), msg.partition(), msg.offset())
+                "%% %s [%d] reached end at offset %d\n",
+                msg.topic(),
+                msg.partition(),
+                msg.offset(),
             )
         else:
             logger.exception("Kafka error: %s", msg.error())
@@ -431,6 +360,45 @@ async def cleanup_tasks(tasks: set[asyncio.Task]) -> set[asyncio.Task]:
 KAFKA_CONSUMER_GROUP_ID = "weave-worker-scorer"
 
 
+async def process_project_ended_calls(
+    project_id: str,
+    ended_calls: list[tsi.EndedCallSchemaForInsert],
+) -> None:
+    if len(ended_calls) == 0:
+        logger.warning("No ended calls to process, this should not happen")
+
+    project_id = ended_calls[0].project_id
+
+    active_monitors = get_active_monitors(project_id)
+
+    call_ids = [ended_call.id for ended_call in ended_calls]
+
+    for active_monitor in active_monitors:
+        monitor = active_monitor["monitor"]
+        monitor_internal_ref = active_monitor["internal_ref"]
+        wb_user_id = active_monitor["wb_user_id"]
+
+        # Here we potentially query the same calls multiple times.
+        # The reasons is that each monitor has its own call filter, and so we need to query the DB for each monitor.
+        # We could merge the call filters and do a single query, but then
+        # we would need to figure out which call match what monitor filter.
+        # Currently we have no way to apply filters outside the DB
+        calls = get_filtered_calls(
+            project_id,
+            call_ids,
+            monitor.op_names,
+            monitor.query,
+        )
+
+        with get_trace_server().call_batch():
+            for call in calls:
+                for scorer in monitor.scorers:
+                    logger.info("Applying scorer %s to call %s", scorer.name, call.id)
+                await apply_scorer(
+                    monitor_internal_ref, scorer, call, project_id, wb_user_id
+                )
+
+
 async def run_consumer() -> None:
     """This is the main loop consuming the ended calls from the Kafka topic."""
     consumer = KafkaConsumer.from_env(group_id=KAFKA_CONSUMER_GROUP_ID)
@@ -441,19 +409,45 @@ async def run_consumer() -> None:
 
     try:
         while True:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
+            messages: list[Message] = consumer.consume(
+                num_messages=wf_scoring_worker_batch_size(),
+                timeout=wf_scoring_worker_batch_timeout(),
+            )
+            if len(messages) == 0:
                 continue
 
-            if not await handle_kafka_errors(msg):
-                continue
+            ended_calls_by_project_id: dict[
+                str, tuple[list[tsi.EndedCallSchemaForInsert], list[Message]]
+            ] = defaultdict(lambda: ([], []))
+            for message in messages:
+                if not handle_kafka_errors(message):
+                    continue
+
+                ended_call: tsi.EndedCallSchemaForInsert = (
+                    tsi.EndedCallSchemaForInsert.model_validate_json(
+                        message.value().decode("utf-8")
+                    )
+                )
+                ended_calls_by_project_id[ended_call.project_id][0].append(ended_call)
+                ended_calls_by_project_id[ended_call.project_id][1].append(message)
 
             try:
-                task = create_task(msg, consumer, tasks)
-                tasks.add(task)
+                for project_id, (
+                    ended_calls,
+                    messages,
+                ) in ended_calls_by_project_id.items():
+                    task = asyncio.create_task(
+                        process_project_ended_calls(project_id, ended_calls)
+                    )
+                    task.add_done_callback(
+                        lambda t: _task_done_callback(t, messages, consumer, tasks)
+                    )
+                    tasks.add(task)
+
                 tasks = await cleanup_tasks(tasks)
             except Exception as e:
-                logger.exception("Error processing message: %s", e, exc_info=e)
+                logger.exception("Error processing messages: %s", e, exc_info=e)
+
     finally:
         if tasks:
             await asyncio.gather(*tasks)

@@ -14,6 +14,19 @@ def wf_kafka_broker_port() -> int:
     return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
 
 
+# Scoring worker settings
+
+
+def wf_scoring_worker_batch_size() -> int:
+    """The batch size for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+
+
+def wf_scoring_worker_batch_timeout() -> int:
+    """The timeout for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+
+
 # Clickhouse Settings
 
 
