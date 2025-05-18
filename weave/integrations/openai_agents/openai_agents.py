@@ -12,7 +12,9 @@ from typing import Any, TypedDict
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
-from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+)
 from weave.trace.weave_client import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
@@ -71,6 +73,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_trace_start(self, trace: tracing.Trace) -> None:
         """Called when a trace starts."""
+        if (wc := get_weave_client()) is None:
+            return
+
         # Set up basic trace data
         self._trace_data[trace.trace_id] = {
             "name": trace.name,
@@ -80,7 +85,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         }
 
         # Create a call for this trace
-        wc = require_weave_client()
         trace_call = wc.create_call(
             op="openai_agent_trace",
             inputs={"name": trace.name},
@@ -92,6 +96,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_trace_end(self, trace: tracing.Trace) -> None:
         """Called when a trace ends."""
+        if (wc := get_weave_client()) is None:
+            return
+
         tid = trace.trace_id
         if tid not in self._trace_data:
             return
@@ -107,7 +114,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "metrics": trace_data.get("metrics", {}),
             "metadata": trace_data.get("metadata", {}),
         }
-        wc = require_weave_client()
         wc.finish_call(self._trace_calls[tid], output=output)
 
     def _agent_log_data(
@@ -312,6 +318,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_span_start(self, span: tracing.Span[Any]) -> None:
         """Called when a span starts."""
+        if (wc := get_weave_client()) is None:
+            return
+
         # For Response spans, we'll defer call creation until on_span_end when we have input data
         if isinstance(span.span_data, tracing.ResponseSpanData):
             return
@@ -329,7 +338,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         span_type = _call_type(span)
         parent_call = self._get_parent_call(span)
 
-        wc = require_weave_client()
         span_call = wc.create_call(
             op=f"openai_agent_{span_type}",
             inputs={"name": span_name},
@@ -346,6 +354,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def on_span_end(self, span: tracing.Span[Any]) -> None:
         """Called when a span ends."""
+        if (wc := get_weave_client()) is None:
+            return
+
         trace_id = span.trace_id
         span_name = _call_name(span)
         span_type = _call_type(span)
@@ -376,7 +387,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             }
 
             # Create the call now that we have the input data
-            wc = require_weave_client()
             span_call = wc.create_call(
                 op=f"openai_agent_{span_type}",
                 inputs=inputs,
@@ -404,12 +414,13 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             output["error"] = log_data["error"]
 
         # Finish the call with the collected data
-        wc = require_weave_client()
         wc.finish_call(span_call, output=output)
 
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
-        wc = require_weave_client()
+        if (wc := get_weave_client()) is None:
+            return
+
         # Finish any unfinished trace calls
         for trace_id, trace_data in self._trace_data.items():
             if trace_id in self._trace_calls:

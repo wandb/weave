@@ -507,6 +507,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
                                 ELSE 'success'
                             END
                         """
@@ -1596,6 +1597,15 @@ def _transform_external_calls_field_to_internal_calls_field(
             END
         """
         json_path = None
+    elif field == "summary.weave.status":
+        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
+                                ELSE 'success'
+                            END
+                        """
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"

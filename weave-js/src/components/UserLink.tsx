@@ -106,11 +106,12 @@ const UserContent = ({user, mode, onClose, hasPopover}: UserContentProps) => {
   ) : (
     user.username
   );
-  const email = isPopover ? (
-    <A href={`mailto:${user.email}`}>{user.email}</A>
-  ) : (
-    user.email
-  );
+  const email =
+    user.email && isPopover ? (
+      <A href={`mailto:${user.email}`}>{user.email}</A>
+    ) : (
+      user.email
+    );
   const bodyStyle = isPopover ? {fontSize: '0.9em'} : undefined;
   const onCloseClick = onClose ? () => onClose() : undefined;
   return (
@@ -134,8 +135,12 @@ const UserContent = ({user, mode, onClose, hasPopover}: UserContentProps) => {
         <Grid>
           <Label>Username</Label>
           <div>{username}</div>
-          <Label>Email</Label>
-          <div>{email}</div>
+          {email != null && (
+            <>
+              <Label>Email</Label>
+              <div>{email}</div>
+            </>
+          )}
         </Grid>
       </UserContentBody>
       {hasPopover && !isPopover && (
