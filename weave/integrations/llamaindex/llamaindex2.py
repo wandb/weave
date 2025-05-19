@@ -43,6 +43,7 @@ _weave_client_instance: Optional[WeaveClient] = None
 _global_root_call: Optional[Call] = None # Added for global session trace
 TRANSFORM_EMBEDDINGS_FLAG: bool = False # Controls detailed embedding logging
 
+
 def get_weave_client() -> WeaveClient:
     global _weave_client_instance
     if _weave_client_instance is None:
@@ -109,6 +110,20 @@ _EVENT_TYPE_TO_OP_NAME_MAP = {
     "SpanDrop": "span_drop",
 }
 
+# Map Event Class Names to their primary result field for EndEvents
+EVENT_PRIMARY_RESULT_FIELD_MAP = {
+    "QueryEndEvent": "response",
+    "SynthesizeEndEvent": "response",
+    "RetrievalEndEvent": "nodes",
+    "EmbeddingEndEvent": "embeddings",
+    "LLMChatEndEvent": "response",
+    "LLMPredictEndEvent": "output",
+    "ReRankEndEvent": "nodes", # Assuming ReRankEndEvent has a field named 'nodes'
+    "GetResponseEndEvent": "response", # Assuming GetResponseEndEvent has 'response'
+    "AgentChatWithStepEndEvent": "response",
+    "AgentRunStepEndEvent": "step_output", # Or similar, check LlamaIndex source for exact field
+}
+
 def get_op_name_from_event(event: BaseEvent) -> str:
     class_name = event.class_name()
     core_name = class_name
@@ -139,7 +154,7 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         **kwargs: Any,
     ) -> None:
         gc = get_weave_client()
-        op_name = f"llama_index.span.{id_}" # id_ is often "ClassName.method_name"
+        op_name = f"llama_index.span.{id_.split('.')[0]}" # id_ is often "ClassName.method_name-span_id"
 
         inputs = {}
         if bound_args:
@@ -149,7 +164,7 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
                 inputs["kwargs"] = {k: str(v) for k, v in bound_args.kwargs.items()}
                 inputs = process_llamaindex_payload(inputs)
             except Exception: # Catch any serialization errors
-                 inputs = {"args": str(bound_args.args), "kwargs": str(bound_args.kwargs)}
+                inputs = {"args": str(bound_args.args), "kwargs": str(bound_args.kwargs)}
         
         parent_call = None
         if parent_span_id and parent_span_id in _weave_calls_map:
@@ -219,14 +234,17 @@ class WeaveEventHandler(BaseEventHandler):
         gc = get_weave_client()
         
         parent_for_event_call = None
-        if event.span_id and event.span_id in _weave_calls_map:
+        # Determine the op_name first as it's part of the call key
+        op_name = get_op_name_from_event(event)
+
+        if event.span_id and event.span_id in _weave_calls_map: # This refers to span calls map
             parent_for_event_call = _weave_calls_map[event.span_id]
         elif _global_root_call: # Default to global root call
             parent_for_event_call = _global_root_call
 
-        event_id = event.id_
-        op_name = get_op_name_from_event(event)
-        
+        # Key for pairing Start and End events of the same logical operation within a span
+        event_pairing_key = (event.span_id, op_name)
+
         raw_payload = {}
         try:
             raw_payload = event.model_dump(exclude_none=True)
@@ -241,16 +259,32 @@ class WeaveEventHandler(BaseEventHandler):
         try:
             if is_start_event:
                 call = gc.create_call(op_name, processed_payload, parent_for_event_call)
-                _weave_calls_map[event_id] = call
+                _weave_calls_map[event_pairing_key] = call # Use event_pairing_key
             elif is_end_event:
-                if event_id in _weave_calls_map:
-                    call = _weave_calls_map.pop(event_id)
-                    gc.finish_call(call, processed_payload)
+                if event_pairing_key in _weave_calls_map:
+                    call_to_finish = _weave_calls_map.pop(event_pairing_key)
+                    
+                    raw_end_event_payload = event.model_dump(exclude_none=True)
+                    event_class_name = event.class_name()
+                    
+                    output_for_finish_call = processed_payload # Default to full processed payload
+
+                    if event_class_name in EVENT_PRIMARY_RESULT_FIELD_MAP:
+                        primary_result_key = EVENT_PRIMARY_RESULT_FIELD_MAP[event_class_name]
+                        if primary_result_key in raw_end_event_payload:
+                            # Extract only the primary result and process it
+                            isolated_result_payload = {primary_result_key: raw_end_event_payload[primary_result_key]}
+                            output_for_finish_call = process_llamaindex_payload(isolated_result_payload)
+                        # else: primary key defined but not in payload, already using full processed_payload
+                    # else: no rule for this event type, already using full processed_payload
+                        
+                    gc.finish_call(call_to_finish, output_for_finish_call)
                 else:
-                    # Log an instantaneous event if no corresponding start
-                    # print(f"Weave(EventHandler): EndEvent for {event_id} without start, logging.")
+                    # Fallback: Log an instantaneous event if no corresponding start event found for this key
+                    # This might indicate unmatched Start/End events or a new root-level event.
+                    # print(f"Weave(EventHandler): EndEvent for key {event_pairing_key} without start, logging as new.")
                     call = gc.create_call(op_name, processed_payload, parent_for_event_call)
-                    gc.finish_call(call, processed_payload) # Finishes with its own payload as output
+                    gc.finish_call(call, processed_payload)
             elif isinstance(event, (AgentToolCallEvent, StreamChatDeltaReceivedEvent, LLMChatInProgressEvent, StreamChatErrorEvent, SpanDropEvent)):
                 # Atomic, informational or error events
                 exception_obj = None
@@ -269,9 +303,8 @@ class WeaveEventHandler(BaseEventHandler):
                 call = gc.create_call(op_name, processed_payload, parent_for_event_call)
                 gc.finish_call(call, processed_payload)
         except Exception as e:
-            print(f"Weave(EventHandler): Error processing event {op_name} ({event_id}): {e}")
+            print(f"Weave(EventHandler): Error processing event {op_name} ({event_pairing_key}): {e}")
 
-# Removed the old handle_events function as its purpose is integrated into WeaveEventHandler
 
 def _cleanup_global_root_call():
     global _global_root_call
@@ -279,11 +312,12 @@ def _cleanup_global_root_call():
         try:
             client = get_weave_client() # Ensure client is available
             client.finish_call(_global_root_call, {"status": "session_ended_at_exit"})
-            print("Weave(LlamaIndex): Global root call cleaned up at exit.")
         except Exception as e:
-            print(f"Weave(LlamaIndex): Error cleaning up global root call at exit: {e}")
+            # TODO: handle this appropriately
+            pass
         finally:
             _global_root_call = None
+
 
 class LLamaIndexPatcher(Patcher):
     def __init__(self) -> None:
@@ -312,9 +346,11 @@ class LLamaIndexPatcher(Patcher):
                         script_name = __main__.__file__
                 except:
                     pass # Ignore errors in getting script name
-                _global_root_call = gc.create_call("llama_index.session", inputs={"status": "patched", "script": script_name})
-                print(f"Weave(LlamaIndex): Global root call created: {_global_root_call.id if _global_root_call else 'Failed'}")
 
+                _global_root_call = gc.create_call(
+                    "llama_index.session",
+                    inputs={"script": script_name}
+                )
 
             self.dispatcher = instrument.get_dispatcher()
             
