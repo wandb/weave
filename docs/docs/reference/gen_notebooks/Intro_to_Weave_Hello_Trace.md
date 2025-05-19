@@ -1,4 +1,6 @@
-
+---
+title: Introduction to Traces
+---
 
 :::tip[This is a notebook]
 
@@ -7,9 +9,6 @@
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/Intro_to_Weave_Hello_Trace.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
-
-
-# Introduction to Traces
 
 <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 

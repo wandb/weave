@@ -5,9 +5,9 @@ title: Introduction Notebook
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
 
@@ -71,7 +71,29 @@ weave.init('project-name')      # initialize tracking for a specific W&B project
 
 Add the @weave.op decorator to the functions you want to track
 
-![](../../media/intro/1.png)
+
+```python
+import weave
+
+weave.init(PROJECT)
+
+
+@weave.op()
+def strip_user_input(user_input):
+    return user_input.strip()
+
+
+result = strip_user_input("    hello    ")
+print(result)
+```
+
+After adding `weave.op` and calling the function, visit the link and see it tracked within your project.
+
+💡 We automatically track your code, have a look at the code tab!
+
+## Vendor Integrations (OpenAI, Anthropic, Mistral, etc...)
+
+Here, we're automatically tracking all calls to `openai`. We automatically track a lot of LLM libraries, but it's really easy to add support for whatever LLM you're using, as you'll see below. 
 
 
 ```python
@@ -98,32 +120,6 @@ print(generation)
 ```
 
 You can find your interactive dashboard by clicking any of the  👆 wandb links above.
-
-## Vendor Integrations (OpenAI, Anthropic, Mistral, etc...)
-
-Here, we're automatically tracking all calls to `openai`. We automatically track a lot of LLM libraries, but it's really easy to add support for whatever LLM you're using, as you'll see below. 
-
-![](../../media/intro/2.png)
-
-
-```python
-import weave
-
-weave.init(PROJECT)
-
-
-@weave.op()
-def strip_user_input(user_input):
-    return user_input.strip()
-
-
-result = strip_user_input("    hello    ")
-print(result)
-```
-
-After adding `weave.op` and calling the function, visit the link and see it tracked within your project.
-
-💡 We automatically track your code, have a look at the code tab!
 
 ## Track nested functions
 
