@@ -1,12 +1,13 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
+import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
 
 import {
-  MOON_100,
+  MOON_50,
   MOON_200,
   MOON_300,
   MOON_800,
@@ -45,8 +46,10 @@ import {
   SCORER_VARIATION_WARNING_EXPLANATION,
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
+import {HEADER_HIEGHT_PX} from './common';
 import {
   PivotedRow,
+  removePrefix,
   useExampleCompareDataAndPrefetch,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
@@ -128,7 +131,7 @@ const stickyHeaderStyleMixin: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -136,7 +139,7 @@ const stickySidebarStyleMixin: React.CSSProperties = {
   position: 'sticky',
   left: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -197,11 +200,14 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
 
-export const ExampleCompareSection: React.FC<{
+export const ExampleCompareSectionDetail: React.FC<{
   // Not to future devs: `state` here can be derived from the context.
   // This should be removed in a future PR. There are probably other places
   // that can be cleaned up as well.
   state: EvaluationComparisonState;
+  onClose: () => void;
+  onExpandToggle: () => void;
+  isExpanded: boolean;
 }> = props => {
   const ctx = useCompareEvaluationsState();
   // Prefer the method below (since `state` diverging from the
@@ -565,47 +571,20 @@ export const ExampleCompareSection: React.FC<{
     metricIndex: number
   ) => {
     const dimension = lookupDimension(scorerIndex, metricIndex);
-    const unit = dimensionUnit(dimension, true);
-    const isBinary = dimension.scoreType === 'binary';
-    const summaryMetric = adjustValueForDisplay(
-      lookupAggScorerMetricValue(evalIndex, scorerIndex, metricIndex),
-      isBinary
+    const summaryValue = lookupAggScorerMetricValue(
+      evalIndex,
+      scorerIndex,
+      metricIndex
     );
-    const baseline = adjustValueForDisplay(
-      lookupAggScorerMetricValue(BASELINE_EVAL_INDEX, scorerIndex, metricIndex),
-      isBinary
+    const baselineValue = lookupAggScorerMetricValue(
+      BASELINE_EVAL_INDEX,
+      scorerIndex,
+      metricIndex
     );
-
-    const lowerIsBetter = dimension.shouldMinimize ?? false;
-
-    if (summaryMetric == null) {
-      return <NotApplicable />;
-    }
-
-    return (
-      <HorizontalBox
-        style={{
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <HorizontalBox
-          style={{
-            alignItems: 'center',
-            gap: '1px',
-          }}>
-          <ValueViewNumber
-            fractionDigits={SIGNIFICANT_DIGITS}
-            value={summaryMetric}
-          />
-          {unit}
-        </HorizontalBox>
-        <ComparisonPill
-          value={summaryMetric}
-          baseline={baseline}
-          metricUnit={unit}
-          metricLowerIsBetter={lowerIsBetter}
-        />
-      </HorizontalBox>
+    return evalAggScorerMetricCompGeneric(
+      dimension,
+      summaryValue,
+      baselineValue
     );
   };
 
@@ -699,15 +678,33 @@ export const ExampleCompareSection: React.FC<{
       sx={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        bgcolor: MOON_100,
+        bgcolor: MOON_50,
         padding: '16px',
-        borderBottom: '1px solid #ccc',
+        height: HEADER_HIEGHT_PX,
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
           flex: 1,
         }}>
+        <Tooltip title="Previous Example">
+          <IconButton
+            // disabled={targetIndex === 0}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+            }}>
+            <Icon name="chevron-up" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Next Example">
+          <IconButton
+            // disabled={targetIndex === filteredRows.length - 1}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+            }}>
+            <Icon name="chevron-down" />
+          </IconButton>
+        </Tooltip>
         <Box
           style={{
             flex: 0,
@@ -721,32 +718,29 @@ export const ExampleCompareSection: React.FC<{
           {`Example ${targetIndex + 1} of ${filteredRows.length}`}
         </Box>
       </HorizontalBox>
-      <Box>
-        <Button
-          className="mx-16"
-          style={{
-            marginLeft: '0px',
-          }}
-          size="small"
-          disabled={targetIndex === 0}
-          onClick={() => {
-            setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-          }}
-          icon="chevron-back"
-        />
 
-        <Button
-          style={{
-            marginLeft: '0px',
-          }}
-          disabled={targetIndex === filteredRows.length - 1}
-          size="small"
-          onClick={() => {
-            setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-          }}
-          icon="chevron-next"
-        />
-      </Box>
+      <HorizontalBox>
+        <Tooltip title={props.isExpanded ? 'Collapse' : 'Expand'}>
+          <IconButton
+            onClick={() => {
+              props.onExpandToggle();
+            }}>
+            <Icon
+              name={
+                props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'
+              }
+            />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Close">
+          <IconButton
+            onClick={() => {
+              props.onClose();
+            }}>
+            <Icon name={'close'} />
+          </IconButton>
+        </Tooltip>
+      </HorizontalBox>
     </HorizontalBox>
   );
 
@@ -968,7 +962,7 @@ export const ExampleCompareSection: React.FC<{
                       <GridCell
                         key={metricIndex}
                         style={{
-                          backgroundColor: MOON_100,
+                          backgroundColor: MOON_50,
                         }}>
                         {scorerMetricKeyComp(scorerIndex, metricIndex)}
                       </GridCell>
@@ -982,13 +976,6 @@ export const ExampleCompareSection: React.FC<{
       </GridContainer>
     </VerticalBox>
   );
-};
-
-const removePrefix = (key: string, prefix: string) => {
-  if (key.startsWith(prefix)) {
-    return key.slice(prefix.length);
-  }
-  return key;
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
@@ -1099,4 +1086,49 @@ const adjustValueForDisplay = (
   } else {
     return value;
   }
+};
+
+export const evalAggScorerMetricCompGeneric = (
+  dimension: MetricDefinition,
+  summaryValue: MetricValueType | undefined,
+  baselineValue: MetricValueType | undefined
+) => {
+  const unit = dimensionUnit(dimension, true);
+  const isBinary = dimension.scoreType === 'binary';
+
+  const summaryMetric = adjustValueForDisplay(summaryValue, isBinary);
+
+  const baseline = adjustValueForDisplay(baselineValue, isBinary);
+
+  const lowerIsBetter = dimension.shouldMinimize ?? false;
+
+  if (summaryMetric == null) {
+    return <NotApplicable />;
+  }
+
+  return (
+    <HorizontalBox
+      style={{
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+      <HorizontalBox
+        style={{
+          alignItems: 'center',
+          gap: '1px',
+        }}>
+        <ValueViewNumber
+          fractionDigits={SIGNIFICANT_DIGITS}
+          value={summaryMetric}
+        />
+        {unit}
+      </HorizontalBox>
+      <ComparisonPill
+        value={summaryMetric}
+        baseline={baseline}
+        metricUnit={unit}
+        metricLowerIsBetter={lowerIsBetter}
+      />
+    </HorizontalBox>
+  );
 };

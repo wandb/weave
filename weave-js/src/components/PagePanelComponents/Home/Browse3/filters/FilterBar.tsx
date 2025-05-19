@@ -340,6 +340,8 @@ export const FilterBar = ({
           {combinedItems.map(f => (
             <FilterTagItem
               key={f.id}
+              entity={entity}
+              project={project}
               item={f}
               onRemoveFilter={onRemoveFilter}
               isEditing={activeEditIds.has(f.id) || f.id === activeEditId}

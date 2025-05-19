@@ -20,6 +20,7 @@ from weave_query import weave_types as types
 from weave_query.api import op, weave_class
 from weave_query.ops_domain import trace_tree, wbmedia
 
+
 @dataclasses.dataclass(frozen=True)
 class TableType(types.ObjectType):
     name = "table"
@@ -677,14 +678,20 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
         raise errors.WeaveInternalError("File is None or a directory")
     with file.open() as f:
         with tracer.trace("get_table:jsonload"):
-            data = json.load(f)
+            import orjson
+
+            data = orjson.loads(f.read())
     return data
 
+
 def _get_incremental_table_awl_from_file(
-    data: dict,
-    file: artifact_fs.FilesystemArtifactFile
+    data: dict, file: artifact_fs.FilesystemArtifactFile
 ) -> ops_arrow.ArrowWeaveList:
-    from weave_query.ops_domain.wb_util import escape_artifact_path, _filesystem_artifact_file_from_artifact_path
+    from weave_query.ops_domain.wb_util import (
+        _filesystem_artifact_file_from_artifact_path,
+        escape_artifact_path,
+    )
+
     all_awls: list[ops_arrow.ArrowWeaveList] = []
     files = {}
     if "previous_increments_paths" in data:
@@ -692,20 +699,26 @@ def _get_incremental_table_awl_from_file(
         # If we have more than 100, otherwise use all increments
         all_increment_paths = data["previous_increments_paths"]
         MAX_PREVIOUS_INCREMENTS = 99
-        increment_paths = all_increment_paths[-MAX_PREVIOUS_INCREMENTS:] if len(all_increment_paths) > MAX_PREVIOUS_INCREMENTS else all_increment_paths
+        increment_paths = (
+            all_increment_paths[-MAX_PREVIOUS_INCREMENTS:]
+            if len(all_increment_paths) > MAX_PREVIOUS_INCREMENTS
+            else all_increment_paths
+        )
         escaped_paths = [escape_artifact_path(path) for path in increment_paths]
         for path in escaped_paths:
             fs_art_file = _filesystem_artifact_file_from_artifact_path(path)
             files[fs_art_file.path] = fs_art_file
 
     files[file.path] = file
-    
+
     asyncio.run(ensure_files(files))
     rrows: list[list] = []
     object_types: list[types.Type] = []
     for incremental_file in files.values():
         incremental_data = _get_table_data_from_file(incremental_file)
-        rows, object_type = _get_rows_and_object_type_awl_from_file(incremental_data, file)
+        rows, object_type = _get_rows_and_object_type_awl_from_file(
+            incremental_data, file
+        )
         rrows.append(rows)
         object_types.append(object_type)
 
@@ -718,18 +731,17 @@ def _get_incremental_table_awl_from_file(
     return arrow_weave_list
 
 
-
-
 def _get_table_like_awl_from_file(
     file: typing.Union[
         artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
     ],
     num_parts: int = 1,
+    load_increments: bool = False
 ) -> _TableLikeAWLFromFileResult:
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
-    if "log_mode" in data and data["log_mode"] == "INCREMENTAL":
+    if load_increments and "log_mode" in data and data["log_mode"] == "INCREMENTAL":
         awl = _get_incremental_table_awl_from_file(data, file)
     elif file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
@@ -838,7 +850,7 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     client = io_service.get_async_client()
     loop = asyncio.get_running_loop()
     tasks = set()
-    
+
     async with client.connect() as conn:
         for file in files.values():
             if (
@@ -898,6 +910,19 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
     # Prevent a panel crash from stale file handle errors
     # There are rare stale file handle errors that cause panel crashes as noted:
     # https://wandb.atlassian.net/browse/WB-22355
+    except OSError as e:
+        import errno
+
+        if e.errno == errno.ESTALE:
+            return None
+        raise
+
+@op(name="file-table_with_increments", hidden=True)
+def file_table_with_increments(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Table]:
+    try:
+        return Table(_get_table_like_awl_from_file(file, load_increments=True).awl)
+    except FileNotFoundError as e:
+        return None
     except OSError as e:
         import errno
 
