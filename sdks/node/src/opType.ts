@@ -1,3 +1,4 @@
+import {Call} from './call';
 import {getGlobalDomain} from './urls';
 import {WeaveObject} from './weaveObject';
 
@@ -10,6 +11,7 @@ export type Op<T extends (...args: any[]) => any> = {
   __name: string;
   __savedRef?: OpRef | Promise<OpRef>;
   __parameterNames?: ParameterNamesOption;
+  invoke: CallMethod<T>;
 } & T &
   ((
     ...args: Parameters<T>
@@ -59,6 +61,21 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   bindThis?: WeaveObject;
   isDecorator?: boolean;
   parameterNames?: ParameterNamesOption;
+}
+
+type AsyncResult<F extends (...args: any[]) => any> = Promise<
+  Awaited<ReturnType<F>>
+>;
+
+export interface OpWrapper<F extends (...args: any[]) => any> {
+  (this: any, ...params: Parameters<F>): AsyncResult<F>;
+}
+
+export interface CallMethod<F extends (...args: any[]) => any> {
+  (
+    this: any,
+    ...params: Parameters<F>
+  ): Promise<[Awaited<ReturnType<F>>, Call]>;
 }
 
 export function isOp(value: any): value is Op<any> {
