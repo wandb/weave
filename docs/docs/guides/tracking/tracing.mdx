@@ -172,8 +172,10 @@ However, often LLM applications have additional logic (such as pre/post processi
     # This is true for both sync and async generators.
     res = deeply_nested_generator(4)
     list(res)  # Triggers tracing of all nested calls and yields
-
     ```
+    
+    ![Tracing generator functions in Weave.](imgs/generators.png)
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     Weave allows you to manually track these calls by wrapping your function with [`weave.op`](../../reference/typescript-sdk/weave/functions/op.md). For example:
