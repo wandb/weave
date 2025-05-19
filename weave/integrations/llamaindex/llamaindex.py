@@ -1,26 +1,24 @@
-from typing import Dict, List, Any, Optional, Tuple, Union
+import atexit  # Added for cleanup
 import json
-import atexit # Added for cleanup
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
 from weave.trace.weave_client import Call, WeaveClient
 
-import weave
-
 import_failed = False
 
 try:
-    from llama_index.core.instrumentation.events.base import BaseEvent
     from llama_index.core.instrumentation.event_handlers.base import BaseEventHandler
-    from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
+
     # Import specific event types referenced
     from llama_index.core.instrumentation.events.agent import (
         AgentToolCallEvent,
     )
+    from llama_index.core.instrumentation.events.base import BaseEvent
     from llama_index.core.instrumentation.events.chat_engine import (
-        StreamChatErrorEvent,
         StreamChatDeltaReceivedEvent,
+        StreamChatErrorEvent,
     )
     from llama_index.core.instrumentation.events.llm import (
         LLMChatInProgressEvent,
@@ -28,6 +26,7 @@ try:
     from llama_index.core.instrumentation.events.span import (
         SpanDropEvent,
     )
+    from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
     # Other event types will be identified by their class_name()
 except ImportError:
     import_failed = True
@@ -40,8 +39,10 @@ except Exception:
 # Module-level shared state
 _weave_calls_map: Dict[Union[str, Tuple[Optional[str], str]], Call] = {}
 _weave_client_instance: Optional[WeaveClient] = None
-_global_root_call: Optional[Call] = None # Added for global session trace
-TRANSFORM_EMBEDDINGS_FLAG: bool = True # Default to True to enable embedding summarization
+_global_root_call: Optional[Call] = None  # Added for global session trace
+TRANSFORM_EMBEDDINGS_FLAG: bool = (
+    True  # Default to True to enable embedding summarization
+)
 
 
 def get_weave_client() -> WeaveClient:
@@ -49,6 +50,7 @@ def get_weave_client() -> WeaveClient:
     if _weave_client_instance is None:
         _weave_client_instance = weave_client_context.require_weave_client()
     return _weave_client_instance
+
 
 def get_embedding_shape(embedding: List[Any]) -> Tuple[int, ...]:
     """Calculates the shape of a (potentially nested) list representing an embedding."""
@@ -63,45 +65,68 @@ def get_embedding_shape(embedding: List[Any]) -> Tuple[int, ...]:
         current_level = current_level[0] if len(current_level) > 0 else None
     return tuple(shape)
 
+
 def process_llamaindex_payload(
     payload: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     if payload is None:
-        return {} # Return empty dict for None payload to simplify call sites
-    
+        return {}  # Return empty dict for None payload to simplify call sites
+
     res = {}
     for k, v in payload.items():
-        if TRANSFORM_EMBEDDINGS_FLAG and k == "embeddings" and isinstance(v, list) and v: # ensure v is not empty
+        if (
+            TRANSFORM_EMBEDDINGS_FLAG
+            and k == "embeddings"
+            and isinstance(v, list)
+            and v
+        ):  # ensure v is not empty
             # Check if it's sparse or dense
-            if isinstance(v[0], dict): # Likely sparse: List[Dict[int, float]]
-                first_embedding_info = f"first has {len(v[0])} non-zero values" if v[0] else "first is empty"
+            if isinstance(v[0], dict):  # Likely sparse: List[Dict[int, float]]
+                first_embedding_info = (
+                    f"first has {len(v[0])} non-zero values"
+                    if v[0]
+                    else "first is empty"
+                )
                 res[k] = f"{len(v)} sparse embeddings, {first_embedding_info}"
-            elif isinstance(v[0], list): # Likely dense: List[List[float]]
-                shapes = [get_embedding_shape(emb) for emb in v if isinstance(emb, list)] 
-                first_shape_info = f"first shape: {shapes[0]}" if shapes else "first is not a list or empty"
+            elif isinstance(v[0], list):  # Likely dense: List[List[float]]
+                shapes = [
+                    get_embedding_shape(emb) for emb in v if isinstance(emb, list)
+                ]
+                first_shape_info = (
+                    f"first shape: {shapes[0]}"
+                    if shapes
+                    else "first is not a list or empty"
+                )
                 res[k] = f"{len(v)} dense embeddings, {first_shape_info}"
-            else: # Fallback for List of other things if any
+            else:  # Fallback for List of other things if any
                 res[k] = f"{len(v)} embeddings, first item type: {type(v[0]).__name__}"
         elif k == "chunks" and isinstance(v, list):
-            res[k] = f"{len(v)} chunks, first chunk: {str(v[0])[:100]}..." if v else "0 chunks"
+            res[k] = (
+                f"{len(v)} chunks, first chunk: {str(v[0])[:100]}..."
+                if v
+                else "0 chunks"
+            )
         elif isinstance(v, (list, tuple)) and len(v) > 10:
-             res[v] = [str(item)[:100] for item in v[:3]] + [f"... ({len(v)-3} more items)"]
+            res[v] = [str(item)[:100] for item in v[:3]] + [
+                f"... ({len(v)-3} more items)"
+            ]
         elif isinstance(v, str) and len(v) > 500:
             res[v] = v[:500] + "..."
         else:
             try:
                 # Basic check for serializability for JSON
                 # Weave client handles full serialization, this is a pre-emptive simplification.
-                json.dumps({k: v}) 
+                json.dumps({k: v})
                 res[k] = v
             except (TypeError, OverflowError):
                 res[k] = str(v)
     return res
 
+
 _EVENT_TYPE_TO_OP_NAME_SUFFIX_MAP: Dict[str, str] = {
     "Query": "query",
     "Embedding": "embedding",
-    "SparseEmbedding": "sparse_embedding", # Added for clarity
+    "SparseEmbedding": "sparse_embedding",  # Added for clarity
     "LLMPredict": "llm_predict",
     "LLMStructuredPredict": "llm_structured_predict",
     "LLMCompletion": "llm_completion",
@@ -135,20 +160,23 @@ EVENT_PRIMARY_RESULT_FIELD_MAP: Dict[str, Union[str, List[str]]] = {
     "AgentRunStepEndEvent": "step_output",
 }
 
+
 def get_op_name_from_event(event: BaseEvent) -> str:
     """Generates a Weave operation name from a LlamaIndex event."""
     class_name = event.class_name()
     core_name = class_name
     for suffix in ["StartEvent", "EndEvent", "Event"]:
         if core_name.endswith(suffix):
-            core_name = core_name[:-len(suffix)]
+            core_name = core_name[: -len(suffix)]
             break
-            
+
     op_suffix = _EVENT_TYPE_TO_OP_NAME_SUFFIX_MAP.get(core_name)
     if op_suffix:
         return f"llama_index.{op_suffix}"
 
-    snake_case_name = ''.join(['_' + i.lower() if i.isupper() else i for i in core_name]).lstrip('_')
+    snake_case_name = "".join(
+        ["_" + i.lower() if i.isupper() else i for i in core_name]
+    ).lstrip("_")
     return f"llama_index.unmapped.{snake_case_name}"
 
 
@@ -171,33 +199,34 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         """Creates a Weave call when a LlamaIndex span starts."""
         gc = get_weave_client()
         # Use only the ClassName.method_name part for the op_name if a hyphen is present
-        op_name_base = id_.split("-")[0] if "-" in id_ else id_ # More robust split
+        op_name_base = id_.split("-")[0] if "-" in id_ else id_  # More robust split
         op_name = f"llama_index.span.{op_name_base}"
 
-
         inputs = {}
-        if bound_args and hasattr(bound_args, 'args') and hasattr(bound_args, 'kwargs'):
+        if bound_args and hasattr(bound_args, "args") and hasattr(bound_args, "kwargs"):
             try:
                 # process_llamaindex_payload expects a dict
                 raw_inputs = {
                     "args": [str(arg) for arg in bound_args.args],
-                    "kwargs": {k: str(v) for k, v in bound_args.kwargs.items()}
+                    "kwargs": {k: str(v) for k, v in bound_args.kwargs.items()},
                 }
                 inputs = process_llamaindex_payload(raw_inputs)
             except Exception:
-                inputs = {"bound_args": str(bound_args)} # Fallback
+                inputs = {"bound_args": str(bound_args)}  # Fallback
 
         parent_call = None
         if parent_span_id and parent_span_id in _weave_calls_map:
             parent_call = _weave_calls_map[parent_span_id]
-        elif _global_root_call: # Default to global root call
+        elif _global_root_call:  # Default to global root call
             parent_call = _global_root_call
-        
+
         try:
             call = gc.create_call(op_name, inputs, parent_call)
-            _weave_calls_map[id_] = call # Store by full span ID
+            _weave_calls_map[id_] = call  # Store by full span ID
         except Exception as e:
-            print(f"Weave(SpanHandler): Error creating call for {op_name} (ID: {id_}): {e}")
+            print(
+                f"Weave(SpanHandler): Error creating call for {op_name} (ID: {id_}): {e}"
+            )
 
     def _prepare_to_exit_or_drop(
         self,
@@ -215,37 +244,38 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
             if result is not None:
                 try:
                     # Pydantic models are common in LlamaIndex results
-                    if hasattr(result, 'model_dump'):
-                        outputs = process_llamaindex_payload(result.model_dump(exclude_none=True))
+                    if hasattr(result, "model_dump"):
+                        outputs = process_llamaindex_payload(
+                            result.model_dump(exclude_none=True)
+                        )
                     else:
                         outputs = process_llamaindex_payload({"result": result})
-                except Exception: # Catch serialization errors
+                except Exception:  # Catch serialization errors
                     outputs = process_llamaindex_payload({"result": str(result)})
-            
+
             try:
                 gc.finish_call(call_to_finish, outputs, exception=exception_to_log)
             except Exception as e:
                 error_type = "dropping" if err else "finishing"
                 print(f"Weave(SpanHandler): Error {error_type} call for ID {id_}: {e}")
 
-
     def prepare_to_exit_span(
         self,
         id_: str,
-        bound_args: Any, # Retained for signature compatibility
-        instance: Optional[Any] = None, # Retained
+        bound_args: Any,  # Retained for signature compatibility
+        instance: Optional[Any] = None,  # Retained
         result: Optional[Any] = None,
         **kwargs: Any,
     ) -> Any:
         """Finishes the Weave call when a LlamaIndex span exits successfully."""
         self._prepare_to_exit_or_drop(id_, result=result)
-        return result # Must return the result per LlamaIndex spec
+        return result  # Must return the result per LlamaIndex spec
 
     def prepare_to_drop_span(
         self,
         id_: str,
-        bound_args: Any, # Retained
-        instance: Optional[Any] = None, # Retained
+        bound_args: Any,  # Retained
+        instance: Optional[Any] = None,  # Retained
         err: Optional[BaseException] = None,
         **kwargs: Any,
     ) -> Any:
@@ -269,9 +299,11 @@ class WeaveEventHandler(BaseEventHandler):
 
         # Parent call can be an existing span's call or the global session root
         parent_call_for_event = None
-        if event.span_id and event.span_id in _weave_calls_map: # This refers to span calls map
+        if (
+            event.span_id and event.span_id in _weave_calls_map
+        ):  # This refers to span calls map
             parent_call_for_event = _weave_calls_map[event.span_id]
-        elif _global_root_call: # Default to global root call
+        elif _global_root_call:  # Default to global root call
             parent_call_for_event = _global_root_call
 
         # Key for pairing Start and End events of the same logical operation within a span
@@ -297,39 +329,65 @@ class WeaveEventHandler(BaseEventHandler):
             elif is_end_event:
                 if event_pairing_key in _weave_calls_map:
                     call_to_finish = _weave_calls_map.pop(event_pairing_key)
-                    
+
                     # Determine specific output payload for EndEvents
-                    output_payload_for_finish = processed_inputs # Default to full payload
-                    primary_result_keys = EVENT_PRIMARY_RESULT_FIELD_MAP.get(event_class_name)
+                    output_payload_for_finish = (
+                        processed_inputs  # Default to full payload
+                    )
+                    primary_result_keys = EVENT_PRIMARY_RESULT_FIELD_MAP.get(
+                        event_class_name
+                    )
 
                     if primary_result_keys:
                         isolated_result: Dict[str, Any] = {}
-                        keys_to_extract = [primary_result_keys] if isinstance(primary_result_keys, str) else primary_result_keys
-                        
+                        keys_to_extract = (
+                            [primary_result_keys]
+                            if isinstance(primary_result_keys, str)
+                            else primary_result_keys
+                        )
+
                         for key in keys_to_extract:
                             if key in raw_event_payload:
                                 isolated_result[key] = raw_event_payload[key]
-                        
-                        if isolated_result: # Only process if we found primary keys
-                            output_payload_for_finish = process_llamaindex_payload(isolated_result)
-                            
+
+                        if isolated_result:  # Only process if we found primary keys
+                            output_payload_for_finish = process_llamaindex_payload(
+                                isolated_result
+                            )
+
                     gc.finish_call(call_to_finish, output_payload_for_finish)
                 else:
                     # Fallback for unmatched EndEvent: log as an instantaneous event
                     # print(f"Weave(EventHandler): Unmatched EndEvent for {event_pairing_key}, logging as new.")
-                    call = gc.create_call(op_name, processed_inputs, parent_call_for_event)
-                    gc.finish_call(call, processed_inputs) # Output is same as input
+                    call = gc.create_call(
+                        op_name, processed_inputs, parent_call_for_event
+                    )
+                    gc.finish_call(call, processed_inputs)  # Output is same as input
 
             # Handle atomic/informational events that don't have a Start/End pair
-            elif isinstance(event, (
-                AgentToolCallEvent, StreamChatDeltaReceivedEvent,
-                LLMChatInProgressEvent, StreamChatErrorEvent, SpanDropEvent
-            )):
+            elif isinstance(
+                event,
+                (
+                    AgentToolCallEvent,
+                    StreamChatDeltaReceivedEvent,
+                    LLMChatInProgressEvent,
+                    StreamChatErrorEvent,
+                    SpanDropEvent,
+                ),
+            ):
                 exception_to_log = None
-                if isinstance(event, StreamChatErrorEvent) and hasattr(event, 'exception') and event.exception:
-                    exception_to_log = event.exception # type: ignore
-                elif isinstance(event, SpanDropEvent) and hasattr(event, 'err_str') and event.err_str:
-                    exception_to_log = Exception(str(event.err_str)) # type: ignore
+                if (
+                    isinstance(event, StreamChatErrorEvent)
+                    and hasattr(event, "exception")
+                    and event.exception
+                ):
+                    exception_to_log = event.exception  # type: ignore
+                elif (
+                    isinstance(event, SpanDropEvent)
+                    and hasattr(event, "err_str")
+                    and event.err_str
+                ):
+                    exception_to_log = Exception(str(event.err_str))  # type: ignore
 
                 call = gc.create_call(op_name, processed_inputs, parent_call_for_event)
                 if exception_to_log:
@@ -344,7 +402,9 @@ class WeaveEventHandler(BaseEventHandler):
                 gc.finish_call(call, processed_inputs)
 
         except Exception as e:
-            print(f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}")
+            print(
+                f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}"
+            )
 
 
 def _cleanup_global_root_call():
@@ -367,7 +427,7 @@ class LLamaIndexPatcher(Patcher):
 
     def __init__(self) -> None:
         super().__init__()
-        self.dispatcher: Optional[Any] = None # LlamaIndex dispatcher instance
+        self.dispatcher: Optional[Any] = None  # LlamaIndex dispatcher instance
         self._original_event_handlers: Optional[List[BaseEventHandler]] = None
         self._original_span_handlers: Optional[List[BaseSpanHandler[Any]]] = None
         self.weave_event_handler: Optional[WeaveEventHandler] = None
@@ -378,10 +438,11 @@ class LLamaIndexPatcher(Patcher):
         """Tries to determine the name of the executing script."""
         try:
             import __main__
-            if hasattr(__main__, '__file__') and __main__.__file__:
+
+            if hasattr(__main__, "__file__") and __main__.__file__:
                 return __main__.__file__
         except (ImportError, AttributeError):
-            pass # Ignore errors, fallback to default
+            pass  # Ignore errors, fallback to default
         return "unknown_script"
 
     def attempt_patch(self) -> bool:
@@ -391,14 +452,14 @@ class LLamaIndexPatcher(Patcher):
             return False
 
         try:
-            import llama_index.core.instrumentation as instrument # type: ignore
+            import llama_index.core.instrumentation as instrument  # type: ignore
 
-            gc = get_weave_client() # Initialize client early
+            gc = get_weave_client()  # Initialize client early
             if _global_root_call is None:
                 script_name = self._get_script_name()
                 _global_root_call = gc.create_call(
                     "llama_index.session",
-                    inputs={"script": script_name, "status": "patched"}
+                    inputs={"script": script_name, "status": "patched"},
                 )
 
             self.dispatcher = instrument.get_dispatcher()
@@ -419,17 +480,27 @@ class LLamaIndexPatcher(Patcher):
         except Exception as e:
             print(f"Weave: Failed to patch LlamaIndex dispatcher: {e}")
             # If patching fails, attempt to clean up any partially created global root call
-            if _global_root_call and not _global_root_call.output: # Check if not already finished
-                 try: gc.finish_call(_global_root_call, {"status": "patch_failed"}, exception=e)
-                 except: pass # Best effort
-            _global_root_call = None # Ensure it's reset
+            if (
+                _global_root_call and not _global_root_call.output
+            ):  # Check if not already finished
+                try:
+                    gc.finish_call(
+                        _global_root_call, {"status": "patch_failed"}, exception=e
+                    )
+                except:
+                    pass  # Best effort
+            _global_root_call = None  # Ensure it's reset
             return False
         return True
 
     def undo_patch(self) -> bool:
         """Reverts LlamaIndex instrumentation to its original state."""
         global _global_root_call
-        if not self.dispatcher or self._original_event_handlers is None or self._original_span_handlers is None:
+        if (
+            not self.dispatcher
+            or self._original_event_handlers is None
+            or self._original_span_handlers is None
+        ):
             return False
 
         try:
@@ -441,13 +512,15 @@ class LLamaIndexPatcher(Patcher):
             self._original_span_handlers = None
             self.weave_event_handler = None
             self.weave_span_handler = None
-            self.dispatcher = None # Important to release dispatcher reference
+            self.dispatcher = None  # Important to release dispatcher reference
 
             if _global_root_call:
                 client = get_weave_client()
-                client.finish_call(_global_root_call, {"status": "unpatched_gracefully"})
+                client.finish_call(
+                    _global_root_call, {"status": "unpatched_gracefully"}
+                )
                 # print(f"Weave(LlamaIndex): Global root call finished: {_global_root_call.id}")
-            _global_root_call = None # Ensure it's reset after finishing
+            _global_root_call = None  # Ensure it's reset after finishing
 
         except Exception as e:
             print(f"Weave: Failed to undo LlamaIndex dispatcher patch: {e}")
