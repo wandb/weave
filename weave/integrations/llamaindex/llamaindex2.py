@@ -41,7 +41,7 @@ except Exception:
 _weave_calls_map: Dict[str, Call] = {}
 _weave_client_instance: Optional[WeaveClient] = None
 _global_root_call: Optional[Call] = None # Added for global session trace
-TRANSFORM_EMBEDDINGS_FLAG: bool = False # Controls detailed embedding logging
+TRANSFORM_EMBEDDINGS_FLAG: bool = True # Default to True to enable embedding summarization
 
 
 def get_weave_client() -> WeaveClient:
@@ -71,9 +71,17 @@ def process_llamaindex_payload(
     
     res = {}
     for k, v in payload.items():
-        if TRANSFORM_EMBEDDINGS_FLAG and k == "embeddings" and isinstance(v, list):
-            shapes = [get_embedding_shape(emb) for emb in v if isinstance(emb, list)]
-            res[k] = f"{len(v)} embeddings, first shape: {shapes[0] if shapes else 'N/A'}"
+        if TRANSFORM_EMBEDDINGS_FLAG and k == "embeddings" and isinstance(v, list) and v: # ensure v is not empty
+            # Check if it's sparse or dense
+            if isinstance(v[0], dict): # Likely sparse: List[Dict[int, float]]
+                first_embedding_info = f"first has {len(v[0])} non-zero values" if v[0] else "first is empty"
+                res[k] = f"{len(v)} sparse embeddings, {first_embedding_info}"
+            elif isinstance(v[0], list): # Likely dense: List[List[float]]
+                shapes = [get_embedding_shape(emb) for emb in v if isinstance(emb, list)] 
+                first_shape_info = f"first shape: {shapes[0]}" if shapes else "first is not a list or empty"
+                res[k] = f"{len(v)} dense embeddings, {first_shape_info}"
+            else: # Fallback for List of other things if any
+                res[k] = f"{len(v)} embeddings, first item type: {type(v[0]).__name__}"
         elif k == "chunks" and isinstance(v, list):
             res[k] = f"{len(v)} chunks, first chunk: {str(v[0])[:100]}..." if v else "0 chunks"
         elif isinstance(v, (list, tuple)) and len(v) > 10:
@@ -115,7 +123,8 @@ EVENT_PRIMARY_RESULT_FIELD_MAP = {
     "QueryEndEvent": "response",
     "SynthesizeEndEvent": "response",
     "RetrievalEndEvent": "nodes",
-    "EmbeddingEndEvent": "embeddings",
+    "EmbeddingEndEvent": ["chunks", "embeddings"], # Updated
+    "SparseEmbeddingEndEvent": ["chunks", "embeddings"], # Added
     "LLMChatEndEvent": "response",
     "LLMPredictEndEvent": "output",
     "ReRankEndEvent": "nodes", # Assuming ReRankEndEvent has a field named 'nodes'
@@ -270,12 +279,20 @@ class WeaveEventHandler(BaseEventHandler):
                     output_for_finish_call = processed_payload # Default to full processed payload
 
                     if event_class_name in EVENT_PRIMARY_RESULT_FIELD_MAP:
-                        primary_result_key = EVENT_PRIMARY_RESULT_FIELD_MAP[event_class_name]
-                        if primary_result_key in raw_end_event_payload:
-                            # Extract only the primary result and process it
-                            isolated_result_payload = {primary_result_key: raw_end_event_payload[primary_result_key]}
-                            output_for_finish_call = process_llamaindex_payload(isolated_result_payload)
-                        # else: primary key defined but not in payload, already using full processed_payload
+                        result_keys_or_key = EVENT_PRIMARY_RESULT_FIELD_MAP[event_class_name]
+                        
+                        if isinstance(result_keys_or_key, str): # Single primary key
+                            if result_keys_or_key in raw_end_event_payload:
+                                isolated_result_payload = {result_keys_or_key: raw_end_event_payload[result_keys_or_key]}
+                                output_for_finish_call = process_llamaindex_payload(isolated_result_payload)
+                        elif isinstance(result_keys_or_key, list): # List of keys
+                            isolated_result_payload = {}
+                            for r_key in result_keys_or_key:
+                                if r_key in raw_end_event_payload:
+                                    isolated_result_payload[r_key] = raw_end_event_payload[r_key]
+                            if isolated_result_payload: # Only process if we found any of the keys
+                                output_for_finish_call = process_llamaindex_payload(isolated_result_payload)
+                        # else: primary key defined but not in payload, or unknown type, already using full processed_payload
                     # else: no rule for this event type, already using full processed_payload
                         
                     gc.finish_call(call_to_finish, output_for_finish_call)
