@@ -3,26 +3,44 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
+from collections.abc import Sequence
 from functools import wraps
-from typing import Any, Callable, Optional, Sequence, Type, TypeVar
+from typing import Any, Callable, TypeVar
 
 import weave
-from weave.integrations.autogen.config import get_module_patch_configs
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher, SymbolPatcher
+from weave.integrations.patcher import (
+    MultiPatcher,
+    NoOpPatcher,
+    Patcher,
+    SymbolPatcher,
+)
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
+from .config import get_module_patch_configs
+
 logger = logging.getLogger(__name__)
 
-_autogen_patcher: Optional[MultiPatcher] = None
+_autogen_patcher: MultiPatcher | None = None
 
 
 T = TypeVar("T")
 R = TypeVar("R")
 
 
-def _accumulator(acc: Optional[Any], value: Any) -> Any:
-    """Accumulates streamed values based on type."""
+def _accumulator(acc: Any | None, value: Any) -> Any:
+    """Accumulates streamed values based on their type.
+
+    This function handles the accumulation of streamed values from autogen components,
+    with special handling for ModelClientStreamingChunkEvent objects.
+
+    Args:
+        acc: The accumulated value so far, or None if this is the first value.
+        value: The new value to accumulate.
+
+    Returns:
+        The updated accumulated value.
+    """
     if (
         hasattr(value, "type")
         and getattr(value, "type", None) == "ModelClientStreamingChunkEvent"
@@ -65,22 +83,64 @@ def _accumulator(acc: Optional[Any], value: Any) -> Any:
 
 
 def _should_use_accumulator(fn: Callable[..., Any]) -> bool:
-    """Use accumulator if the function is an async generator (streaming)."""
+    """Determines if a function should use an accumulator for results.
+
+    We use accumulators for async generator functions which indicate streaming
+    responses from autogen components.
+
+    Args:
+        fn: The function to check.
+
+    Returns:
+        True if the function is an async generator, False otherwise.
+    """
     return inspect.isasyncgenfunction(fn)
 
 
 def _on_finish_post_processor(value: Any) -> Any:
-    """No-op post-processor for now, but can be extended for custom logic."""
+    """Post-processes the final accumulated value.
+
+    Currently a no-op post-processor, but provides an extension point for
+    custom logic in the future.
+
+    Args:
+        value: The final accumulated value.
+
+    Returns:
+        The processed value.
+    """
     return value
 
 
-def _on_input_handler(func: Op, args: tuple, kwargs: dict) -> Optional[ProcessedInputs]:
-    # No special input processing for now, but placeholder for future use
+def _on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
+    """Handles input processing for operations.
+
+    A placeholder for future custom input processing logic.
+
+    Args:
+        func: The operation being executed.
+        args: Positional arguments to the operation.
+        kwargs: Keyword arguments to the operation.
+
+    Returns:
+        Processed inputs or None if no special processing is needed.
+    """
     return None
 
 
 def _get_fully_qualified_op_display_name(obj: Any, method_name: str) -> str:
-    """Generate a simplified operation name using library name, class, and method names."""
+    """Generates a simplified operation name for display.
+
+    Creates a human-readable operation name using the library name,
+    class name, and method name.
+
+    Args:
+        obj: The object instance the method belongs to.
+        method_name: The name of the method.
+
+    Returns:
+        A string containing the library name, class name, and method name.
+    """
     module_name = obj.__class__.__module__
     library_name = module_name.split(".")[0]
     class_name = obj.__class__.__name__
@@ -94,7 +154,21 @@ def _setup_op_wrapper(
     op_kwargs: dict,
     should_accumulate: bool = False,
 ) -> Op:
-    """Common setup logic for creating a wrapped op."""
+    """Sets up a wrapped operation for a function call.
+
+    Creates a weave operation wrapper around a function and configures it
+    for tracing with appropriate naming and input handling.
+
+    Args:
+        fn: The function to wrap.
+        args: Positional arguments to the function.
+        kwargs: Keyword arguments to the function.
+        op_kwargs: Additional keyword arguments for the operation.
+        should_accumulate: Whether the operation should accumulate results.
+
+    Returns:
+        A configured weave operation.
+    """
     self_obj = args[0]
     op_name = _get_fully_qualified_op_display_name(self_obj, fn.__name__)
     updated_kwargs = op_kwargs.copy()
@@ -102,6 +176,7 @@ def _setup_op_wrapper(
     op = weave.op(fn, **updated_kwargs)
     op._set_on_input_handler(_on_input_handler)
 
+    # Extract inputs from args and kwargs for tracing
     inputs = {}
     if len(args) > 1:
         sig = inspect.signature(fn)
@@ -111,6 +186,7 @@ def _setup_op_wrapper(
                 inputs[param_names[i]] = arg
     inputs.update(kwargs)
 
+    # Add accumulator for streaming operations if needed
     if should_accumulate:
         op = _add_accumulator(
             op,
@@ -125,6 +201,18 @@ def _setup_op_wrapper(
 def _create_wrapper_async_generator(
     settings: OpSettings,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Creates a wrapper for async generator functions.
+
+    This wrapper is specifically designed for streaming methods that use
+    async generators, like streamed LLM responses.
+
+    Args:
+        settings: Operation settings for the wrapper.
+
+    Returns:
+        A function that wraps async generator functions with weave tracing.
+    """
+
     def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
         op_kwargs = settings.model_dump()
 
@@ -143,6 +231,7 @@ def _create_wrapper_async_generator(
                     f"{e}\nError in autogen asyncgen wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
+                # Fall back to original function if our instrumentation fails
                 async for value in fn(*args, **kwargs):
                     yield value
 
@@ -154,6 +243,17 @@ def _create_wrapper_async_generator(
 def _create_wrapper_async(
     settings: OpSettings,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Creates a wrapper for regular async functions.
+
+    This wrapper is for non-streaming async methods that return a single value.
+
+    Args:
+        settings: Operation settings for the wrapper.
+
+    Returns:
+        A function that wraps async functions with weave tracing.
+    """
+
     def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
         op_kwargs = settings.model_dump()
 
@@ -169,6 +269,7 @@ def _create_wrapper_async(
                     f"{e}\nError in autogen async wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
+                # Fall back to original function if our instrumentation fails
                 return await fn(*args, **kwargs)
 
         return _symbol_wrapper
@@ -179,8 +280,18 @@ def _create_wrapper_async(
 def _create_symbol_wrapper(
     settings: OpSettings,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Create a wrapper for BaseChatAgent methods that captures inputs and outputs.
-    Automatically handles both regular methods and streaming methods (AsyncGenerators).
+    """Creates a wrapper factory for autogen methods.
+
+    This is the main entry point for creating wrappers. It automatically
+    determines if a method is a streaming method (async generator) or a
+    regular async method and creates the appropriate wrapper.
+
+    Args:
+        settings: Operation settings for the wrapper.
+
+    Returns:
+        A function that creates the appropriate wrapper based on the
+        function signature.
     """
 
     def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -194,8 +305,21 @@ def _create_symbol_wrapper(
 
 def _get_symbol_patcher(
     module_path: str, class_name: str, method_name: str, settings: OpSettings
-) -> Optional[SymbolPatcher]:
-    """Create a SymbolPatcher for a specific module.class.method combination."""
+) -> SymbolPatcher | None:
+    """Creates a SymbolPatcher for a specific method.
+
+    Attempts to find and create a patcher for a specific method in a class,
+    with error handling for missing modules, classes, or methods.
+
+    Args:
+        module_path: The import path of the module.
+        class_name: The name of the class.
+        method_name: The name of the method to patch.
+        settings: Operation settings for the patcher.
+
+    Returns:
+        A SymbolPatcher if successful, None otherwise.
+    """
     try:
         module = importlib.import_module(module_path)
     except ImportError:
@@ -227,21 +351,36 @@ def _get_class_and_subclass_patchers(
     settings: OpSettings,
     should_patch_base_class: bool = False,
     should_patch_subclasses: bool = True,
-) -> list[Optional[SymbolPatcher]]:
-    """Generate patchers for a class and all its subclasses for specified methods."""
-    patchers: list[Optional[SymbolPatcher]] = []
+) -> list[SymbolPatcher | None]:
+    """Creates patchers for a class and its subclasses.
+
+    This function handles the complexity of patching both a base class and all its
+    subclasses, with careful handling of method inheritance and ownership.
+
+    Args:
+        module_path: The import path of the module.
+        class_name: The name of the base class.
+        method_names: List of method names to patch.
+        settings: Operation settings for the patchers.
+        should_patch_base_class: Whether to patch the base class itself.
+        should_patch_subclasses: Whether to patch subclasses.
+
+    Returns:
+        A list of patchers for the specified methods across classes.
+    """
+    patchers: list[SymbolPatcher | None] = []
 
     try:
         module = importlib.import_module(module_path)
         base_class = getattr(module, class_name)
 
-        classes_to_patch: list[Type] = []
+        classes_to_patch: list[type] = []
         if should_patch_base_class:
             classes_to_patch.append(base_class)
 
         if should_patch_subclasses:
-
-            def collect_subclasses(cls: Type) -> None:
+            # Recursively collect all subclasses
+            def collect_subclasses(cls: type) -> None:
                 direct_subclasses = cls.__subclasses__()
                 classes_to_patch.extend(direct_subclasses)
                 for subclass in direct_subclasses:
@@ -249,6 +388,7 @@ def _get_class_and_subclass_patchers(
 
             collect_subclasses(base_class)
 
+        # Track methods we've already patched to avoid duplicates
         patched_methods: set[tuple[str, str]] = set()
 
         for cls in classes_to_patch:
@@ -259,14 +399,19 @@ def _get_class_and_subclass_patchers(
                 method = getattr(cls, method_name, None)
                 if method is None:
                     continue
+
+                # Skip methods that are inherited from another class without being
+                # overridden in the current class
                 if hasattr(method, "__qualname__"):
                     qualname = method.__qualname__
                     if "." in qualname:
                         owner_name = qualname.split(".")[0]
                         if owner_name != cls_name:
+                            # Allow patching inherited methods for base_class if explicitly requested
                             if not (cls is base_class and should_patch_base_class):
                                 continue
 
+                # Skip methods we've already patched
                 method_key = (cls_module_path, method_name)
                 if method_key in patched_methods:
                     continue
@@ -287,29 +432,88 @@ def _get_class_and_subclass_patchers(
     return patchers
 
 
+def _preload_autogen_extensions() -> None:
+    """Preloads autogen extension modules.
+
+    This function ensures that autogen-ext modules are properly imported
+    before patching, to ensure that all subclasses are properly discovered.
+    This is important because patching relies on the Python class hierarchy.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
+    try:
+        import importlib.util
+
+        if importlib.util.find_spec("autogen_ext") is None:
+            logger.warning(
+                "autogen-ext package not found, skipping extension preloading"
+            )
+            return
+
+        # Define extensions to preload - these are modules that might contain
+        # subclasses of classes we're patching
+        ext_modules = [
+            "autogen_ext.memory.chromadb",  # Contains ChromaDBVectorMemory
+        ]
+
+        # Import each module
+        for module_name in ext_modules:
+            try:
+                importlib.import_module(module_name)
+            except ImportError:
+                logger.exception(
+                    f"Extension module not available: {module_name}", stacklevel=2
+                )
+
+    except Exception as e:
+        # Don't fail if preloading fails
+        logger.exception(f"Error preloading autogen extensions: {e}", stacklevel=2)
+
+
 def get_patcher(
-    settings: Optional[IntegrationSettings] = None,
+    settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
-    """Create and return a patcher for autogen-agentchat"""
+    """Creates and returns a patcher for autogen-agentchat.
+
+    This is the main entry point for the autogen integration. It creates
+    a patcher that can be used to instrument autogen's methods with weave
+    tracing capabilities.
+
+    Args:
+        settings: Integration settings, including whether the integration
+            is enabled and operation-specific settings.
+
+    Returns:
+        Either a MultiPatcher containing all the patchers for autogen methods,
+        or a NoOpPatcher if the integration is disabled.
+    """
     if settings is None:
         settings = IntegrationSettings()
 
     if not settings.enabled:
         return NoOpPatcher()
 
+    global _autogen_patcher
+    if _autogen_patcher is not None:
+        return _autogen_patcher
+
     try:
-        global _autogen_patcher
-        if _autogen_patcher is not None:
-            return _autogen_patcher
+        # Preload autogen-ext modules to ensure subclasses are properly discovered
+        _preload_autogen_extensions()
 
         base_settings = settings.op_settings
         op_patch_settings = base_settings.model_copy(
             update={"name": base_settings.name or "autogen_agentchat.agent"}
         )
 
-        patchers: list[Optional[SymbolPatcher]] = []
+        patchers: list[SymbolPatcher | None] = []
         patch_configs = get_module_patch_configs()
 
+        # Create patchers for each class and method specified in the configuration
         for module_config in patch_configs:
             for class_config in module_config["classes"]:
                 try:
@@ -328,10 +532,11 @@ def get_patcher(
                         stacklevel=2,
                     )
 
+        # Filter out None entries and create the MultiPatcher
         valid_patchers: Sequence[Patcher] = [p for p in patchers if p is not None]
         _autogen_patcher = MultiPatcher(valid_patchers)
-
-        return _autogen_patcher
     except Exception:
         logger.exception("Failed to create autogen_agentchat patcher", stacklevel=2)
         return NoOpPatcher()
+    else:
+        return _autogen_patcher
