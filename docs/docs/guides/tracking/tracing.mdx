@@ -133,6 +133,10 @@ However, often LLM applications have additional logic (such as pre/post processi
 
     ```python showLineNumbers
     from typing import Generator
+    import weave
+
+    weave.init("my-project")
+
     # This function uses a simple sync generator.
     # Weave will trace the call and its input (`x`), 
     # but output values are only captured once the generator is consumed (e.g., via `list()`).
