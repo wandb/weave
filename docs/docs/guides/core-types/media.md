@@ -189,7 +189,7 @@ Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) 
   @weave.op
   def return_file_pdf() -> weave.File:
       # Returns a PDF file "example.pdf" as a Weave file object.
-      # Modify the file name/path as needed
+      # Modify the filename/path as needed
       file_path = Path(__file__).parent.resolve() / "assets" / "example.pdf"
       return weave.File(file_path)
 
@@ -211,6 +211,7 @@ Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) 
   You can also work with multi-page PDFs:
   
   ```python
+  @weave.op
   def return_file_pdf_many_pages() -> weave.File:
       # Similar to the above, but returns a multi-page PDF as a Weave file object.
       # Replace the file path with your own multi-page document.
@@ -239,7 +240,7 @@ Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) 
   
   @weave.op
   def return_file_csv() -> weave.File:
-      # Returns a CSV file wrapped as a Weave file object.
+      # Returns a CSV file as a Weave file object.
       # Replace the path if you want to use your own CSV.
       file_path = Path(__file__).parent.resolve() / "assets" / "example.csv"
       return weave.File(file_path)
