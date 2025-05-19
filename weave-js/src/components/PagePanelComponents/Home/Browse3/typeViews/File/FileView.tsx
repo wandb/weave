@@ -128,7 +128,7 @@ const FileViewMetadataLoaded = ({
   const [showPreview, setShowPreview] = useState(false);
 
   const {useFileContent} = useWFHooks();
-  const {original_path, size, mimetype} = metadata;
+  const {size, mimetype, original_path} = metadata;
 
   const iconStart = <Icon name={getIconName(mimetype)} />;
   const filename = original_path.split('/').pop() || original_path;
