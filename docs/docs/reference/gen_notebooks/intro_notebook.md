@@ -17,20 +17,20 @@ title: Introduction Notebook
 
 # 🏃‍♀️ Quickstart
 
-Get started using Weave to:
+You can use Weave to:
+
 - Log and debug language model inputs, outputs, and traces
 - Build rigorous, apples-to-apples evaluations for language model use cases
 - Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
-See the full Weave documentation [here](https://wandb.me/weave).
+For more information, see the [Weave documentation](/docs/docs/introduction.md).
 
 
-## 🪄 Install `weave` library and login
+## Install `weave` and login
 
+Before you begin, install the required libraries.
 
-Start by installing the library and logging in to your account.
-
-In this example, we're using openai so you should [add an openai API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+For this example, you'll need to [add an OpenAI API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
 
 
 
@@ -55,45 +55,23 @@ PROJECT = "weave-intro-notebook"
 
 Weave allows users to track function calls: the code, inputs, outputs, and even LLM tokens & costs! In the following sections we will cover:
 
-* Custom Functions
-* Vendor Integrations
-* Nested Function Calling
-* Error Tracking
+* Custom functions
+* Vendor integrations
+* Nested function Calling
+* Error tracking
 
-Note: in all cases, we will:
+:::important
+In all cases, we will import `weave` and initialize a Weave project.
 
 ```python
 import weave                    # import the weave library
 weave.init('project-name')      # initialize tracking for a specific W&B project
 ```
+:::
 
-## Track custom functions
+## Vendor integrations 
 
-Add the @weave.op decorator to the functions you want to track
-
-
-```python
-import weave
-
-weave.init(PROJECT)
-
-
-@weave.op()
-def strip_user_input(user_input):
-    return user_input.strip()
-
-
-result = strip_user_input("    hello    ")
-print(result)
-```
-
-After adding `weave.op` and calling the function, visit the link and see it tracked within your project.
-
-💡 We automatically track your code, have a look at the code tab!
-
-## Vendor Integrations (OpenAI, Anthropic, Mistral, etc...)
-
-Here, we're automatically tracking all calls to `openai`. We automatically track a lot of LLM libraries, but it's really easy to add support for whatever LLM you're using, as you'll see below. 
+Here, we're automatically tracking all calls to `openai`. We [automatically track a lot of LLM libraries](/docs/docs/guides/integrations/index.md#llm-providers), but it's really easy to add support for whatever LLM you're using, as you'll see below. 
 
 
 ```python
@@ -119,7 +97,29 @@ generation = response.choices[0].message.content
 print(generation)
 ```
 
-You can find your interactive dashboard by clicking any of the  👆 wandb links above.
+![](../../media/intro/1.png)
+
+## Track custom functions
+
+Add the `@weave.op` decorator to the functions you want to track
+
+
+```python
+import weave
+
+weave.init(PROJECT)
+
+
+@weave.op()
+def strip_user_input(user_input):
+    return user_input.strip()
+
+
+result = strip_user_input("    hello    ")
+print(result)
+```
+
+![](../../media/intro/2.png)
 
 ## Track nested functions
 
@@ -166,9 +166,13 @@ result = correct_grammar("   That was so easy, it was a piece of pie!    ")
 print(result)
 ```
 
-## Track Errors
+After adding `weave.op` and calling the function, visit the link and see it tracked within your project.
 
-Whenever your code crashes, weave will highlight what caused the issue. This is especially useful for finding things like JSON parsing issues that can occasionally happen when parsing data from LLM responses.
+💡 We automatically track your code, have a look at the code tab!
+
+## Track errors
+
+When your code crashes, you can use Weave to pinoint the root cause, making it especially helpful for tracking down issues like JSON parsing errors that can arise when handling LLM responses.
 
 ![](../../media/intro/4.png)
 
@@ -212,17 +216,19 @@ result = correct_grammar("   That was so easy, it was a piece of pie!    ")
 print(result)
 ```
 
-# Tracking Objects
+## Track objects
 
-Organizing experimentation is difficult when there are many moving pieces. You can capture and organize the experimental details of your app like your system prompt or the model you're using within `weave.Objects`. This helps organize and compare different iterations of your app. In this section, we will cover:
+Experimentation can become challenging when your app has many moving parts. With `weave.Objects`, you can capture and organize key experimental details such as your system prompt, model choice, and more. This makes it easier to manage and compare different iterations of your app.
 
-* General Object Tracking
-* Tracking Models
-* Tracking Datasets
+In this section, we’ll cover:
 
-## General Object Tracking
+* General object tracking
+* Tracking models
+* Tracking datasets
 
-Many times, it is useful to track & version data, just like you track and version code. For example, here we define a `SystemPrompt(weave.Object)` object that can be shared between teammates
+### General object tracking
+
+Just like you version your code, it's often valuable to track and version your data. For example, you can define a `SystemPrompt(weave.Object)` that can be easily shared and reused across your team.
 
 ![](../../media/intro/5.png)
 
@@ -243,9 +249,9 @@ system_prompt = SystemPrompt(
 weave.publish(system_prompt)
 ```
 
-## Model Tracking
+## Track models
 
-Models are so common of an object type, that we have a special class to represent them: `weave.Model`. The only requirement is that we define a `predict` method.
+Models are a common object type in LLM app development. Weave provides a dedicated class for them: `weave.Model`. The only requirement is to define a `predict` method that encapsulates the logic.
 
 ![](../../media/intro/6.png)
 
@@ -286,9 +292,9 @@ result = corrector.predict("     That was so easy, it was a piece of pie!       
 print(result)
 ```
 
-## Dataset Tracking
+## Track datasets
 
-Similar to models, a `weave.Dataset` object exists to help track, organize, and operate on datasets
+Similar to models, a `weave.Dataset` object helps track, organize, and version dataset objects.
 
 ![](../../media/intro/7.png)
 
@@ -314,9 +320,9 @@ weave.publish(dataset)
 
 Notice that we saved a versioned `GrammarCorrector` object that captures the configurations you're experimenting with.
 
-## Retrieve Published Objects & Ops
+## Retrieve published objects and ops
 
-You can publish objects and then retrieve them in your code. You can even call functions from your retrieved objects!
+You can programmatically publish and retrieve objects to Weave. You can even call functions from your retrieved objects!
 
 ![](../../media/intro/8.png)
 
@@ -353,11 +359,9 @@ result = fetched_collector.predict("That was so easy, it was a piece of pie!")
 print(result)
 ```
 
-# Evaluation
+# Evaluations
 
-Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
-
-See a preview of the API below:
+Evaluation-driven development helps you reliably iterate on an application. The [`Evaluation` class](/docs/docs/guides/core-types/evaluations.md) is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
 
 ![](../../media/intro/10.png)
 
@@ -385,7 +389,3 @@ weave.init(PROJECT)
 # Run the evaluation
 summary = await evaluation.evaluate(corrector)  # can be a model or simple function
 ```
-
-## What's next?
-
-Follow the [Build an Evaluation pipeline](http://wandb.me/weave_eval_tut) tutorial to learn more about Evaluation and begin iteratively improving your applications.
