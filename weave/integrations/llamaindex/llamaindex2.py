@@ -1,5 +1,6 @@
 from typing import Dict, List, Any, Optional
 import json
+import atexit # Added for cleanup
 
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
@@ -39,6 +40,7 @@ except Exception:
 # Module-level shared state
 _weave_calls_map: Dict[str, Call] = {}
 _weave_client_instance: Optional[WeaveClient] = None
+_global_root_call: Optional[Call] = None # Added for global session trace
 TRANSFORM_EMBEDDINGS_FLAG: bool = False # Controls detailed embedding logging
 
 def get_weave_client() -> WeaveClient:
@@ -74,9 +76,9 @@ def process_llamaindex_payload(
         elif k == "chunks" and isinstance(v, list):
             res[k] = f"{len(v)} chunks, first chunk: {str(v[0])[:100]}..." if v else "0 chunks"
         elif isinstance(v, (list, tuple)) and len(v) > 10:
-             res[k] = [str(item)[:100] for item in v[:3]] + [f"... ({len(v)-3} more items)"]
+             res[v] = [str(item)[:100] for item in v[:3]] + [f"... ({len(v)-3} more items)"]
         elif isinstance(v, str) and len(v) > 500:
-            res[k] = v[:500] + "..."
+            res[v] = v[:500] + "..."
         else:
             try:
                 # Basic check for serializability for JSON
@@ -149,7 +151,11 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
             except Exception: # Catch any serialization errors
                  inputs = {"args": str(bound_args.args), "kwargs": str(bound_args.kwargs)}
         
-        parent_call = _weave_calls_map.get(parent_span_id) if parent_span_id else None
+        parent_call = None
+        if parent_span_id and parent_span_id in _weave_calls_map:
+            parent_call = _weave_calls_map[parent_span_id]
+        elif _global_root_call: # Default to global root call
+            parent_call = _global_root_call
         
         try:
             call = gc.create_call(op_name, inputs, parent_call)
@@ -211,7 +217,12 @@ class WeaveEventHandler(BaseEventHandler):
 
     def handle(self, event: BaseEvent) -> None:
         gc = get_weave_client()
-        parent_span_call = _weave_calls_map.get(event.span_id) if event.span_id else None
+        
+        parent_for_event_call = None
+        if event.span_id and event.span_id in _weave_calls_map:
+            parent_for_event_call = _weave_calls_map[event.span_id]
+        elif _global_root_call: # Default to global root call
+            parent_for_event_call = _global_root_call
 
         event_id = event.id_
         op_name = get_op_name_from_event(event)
@@ -229,7 +240,7 @@ class WeaveEventHandler(BaseEventHandler):
         
         try:
             if is_start_event:
-                call = gc.create_call(op_name, processed_payload, parent_span_call)
+                call = gc.create_call(op_name, processed_payload, parent_for_event_call)
                 _weave_calls_map[event_id] = call
             elif is_end_event:
                 if event_id in _weave_calls_map:
@@ -238,7 +249,7 @@ class WeaveEventHandler(BaseEventHandler):
                 else:
                     # Log an instantaneous event if no corresponding start
                     # print(f"Weave(EventHandler): EndEvent for {event_id} without start, logging.")
-                    call = gc.create_call(op_name, processed_payload, parent_span_call)
+                    call = gc.create_call(op_name, processed_payload, parent_for_event_call)
                     gc.finish_call(call, processed_payload) # Finishes with its own payload as output
             elif isinstance(event, (AgentToolCallEvent, StreamChatDeltaReceivedEvent, LLMChatInProgressEvent, StreamChatErrorEvent, SpanDropEvent)):
                 # Atomic, informational or error events
@@ -248,36 +259,62 @@ class WeaveEventHandler(BaseEventHandler):
                 elif isinstance(event, SpanDropEvent) and hasattr(event, 'err_str') and event.err_str: # type: ignore
                     exception_obj = Exception(event.err_str) # type: ignore
                 
-                call = gc.create_call(op_name, processed_payload, parent_span_call)
+                call = gc.create_call(op_name, processed_payload, parent_for_event_call)
                 if exception_obj:
                     gc.finish_call(call, None, exception=exception_obj)
                 else:
                     gc.finish_call(call, processed_payload) # Output is same as input for these
             else: # Generic/unclassified events
                 # print(f"Weave(EventHandler): Generic event {op_name}, logging.")
-                call = gc.create_call(op_name, processed_payload, parent_span_call)
+                call = gc.create_call(op_name, processed_payload, parent_for_event_call)
                 gc.finish_call(call, processed_payload)
         except Exception as e:
             print(f"Weave(EventHandler): Error processing event {op_name} ({event_id}): {e}")
 
 # Removed the old handle_events function as its purpose is integrated into WeaveEventHandler
 
+def _cleanup_global_root_call():
+    global _global_root_call
+    if _global_root_call:
+        try:
+            client = get_weave_client() # Ensure client is available
+            client.finish_call(_global_root_call, {"status": "session_ended_at_exit"})
+            print("Weave(LlamaIndex): Global root call cleaned up at exit.")
+        except Exception as e:
+            print(f"Weave(LlamaIndex): Error cleaning up global root call at exit: {e}")
+        finally:
+            _global_root_call = None
 
 class LLamaIndexPatcher(Patcher):
     def __init__(self) -> None:
-        super().__init__() # Ensure Patcher's __init__ is called if it has one
+        super().__init__()
         self.dispatcher = None
         self._original_event_handlers: Optional[List[BaseEventHandler]] = None
         self._original_span_handlers: Optional[List[BaseSpanHandler[Any]]] = None
         self.weave_event_handler: Optional[WeaveEventHandler] = None
         self.weave_span_handler: Optional[WeaveSpanHandler] = None
-
+        self._atexit_registered = False # Prevent multiple registrations
 
     def attempt_patch(self) -> bool:
+        global _global_root_call
         if import_failed:
             return False
         try:
             import llama_index.core.instrumentation as instrument
+
+            gc = get_weave_client() # Initialize client early
+            if _global_root_call is None: # Create global root call if it doesn't exist
+                 # Get script name for context if possible
+                script_name = "unknown_script"
+                try:
+                    import __main__
+                    if hasattr(__main__, '__file__'):
+                        script_name = __main__.__file__
+                except:
+                    pass # Ignore errors in getting script name
+                _global_root_call = gc.create_call("llama_index.session", inputs={"status": "patched", "script": script_name})
+                print(f"Weave(LlamaIndex): Global root call created: {_global_root_call.id if _global_root_call else 'Failed'}")
+
 
             self.dispatcher = instrument.get_dispatcher()
             
@@ -289,6 +326,12 @@ class LLamaIndexPatcher(Patcher):
 
             self.dispatcher.add_event_handler(self.weave_event_handler)
             self.dispatcher.add_span_handler(self.weave_span_handler) # type: ignore
+
+            if not self._atexit_registered:
+                atexit.register(_cleanup_global_root_call)
+                self._atexit_registered = True
+                print("Weave(LlamaIndex): atexit handler registered for global root call.")
+
         except Exception as e:
             print(f"Weave: Failed to patch LlamaIndex dispatcher: {e}")
             return False
@@ -296,6 +339,7 @@ class LLamaIndexPatcher(Patcher):
             return True
 
     def undo_patch(self) -> bool:
+        global _global_root_call
         if not self.dispatcher or self._original_event_handlers is None or self._original_span_handlers is None:
             return False
         try:
@@ -310,6 +354,12 @@ class LLamaIndexPatcher(Patcher):
             self.weave_event_handler = None
             self.weave_span_handler = None
             self.dispatcher = None
+
+            if _global_root_call:
+                gc = get_weave_client()
+                gc.finish_call(_global_root_call, {"status": "unpatched_gracefully"})
+                print(f"Weave(LlamaIndex): Global root call finished: {_global_root_call.id}")
+                _global_root_call = None
         except Exception as e:
             print(f"Weave: Failed to undo LlamaIndex dispatcher patch: {e}")
             return False
