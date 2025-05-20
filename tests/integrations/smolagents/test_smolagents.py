@@ -7,7 +7,7 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 
 def mask_api_key_and_skip(request):
-    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
     if "raw.githubusercontent.com/BerriAI/litellm/main" in request.uri:
         return None
