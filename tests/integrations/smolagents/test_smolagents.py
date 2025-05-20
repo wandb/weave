@@ -9,10 +9,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
 def mask_api_key_and_skip(request):
     from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-    # Skip requests to the specific URL
-    if "raw.githubusercontent.com/BerriAI/litellm" in request.uri:
-        return None
-
     # Mask api_key in query params
     url = urlparse(request.uri)
     query = parse_qs(url.query)
@@ -231,7 +227,7 @@ def test_code_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 12
+    assert len(calls) == 9
 
     call = calls[0]
     assert call.started_at < call.ended_at

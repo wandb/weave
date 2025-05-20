@@ -91,19 +91,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNj5swEL3zK6w5h1WSktJw3G6lVdSol7Rqt6yQMQNx1tiubdqmUf57
-        hUmAZFOpHJA1z+/Nmw8fAkKAF5AQYFvqWK1FeP90//jwTej1g3o/Xe6+KlauPjTzzar+VK1g0jJU
-        vkPmzqw7pmot0HElO5gZpA5b1VkcxfE8WsxjD9SqQNHSKu3C6G4W1lzycD6dL8JpFM6iE32rOEML
-        CfkeEELIwf9bo7LA35CQ6eQcqdFaWiEk/SVCwCjRRoBay62j0sFkAJmSDmXrXTZCjACnlMgYFWJI
-        3H2H0XnoFhUi+7JWT/zzoxPyY71b7/MNzWdv3/35McrXSe+1N1Q2kvVdGuF9PLlKRghIWntuhS77
-        hdRt0VzRCQFqqqZG6VrrcEhBKEZbwRSSFDbqZa9SmKTAUFje2BQSZxo8woXMMbh1fh51yGDZWCpe
-        t45KqZxP6Hv3fEKO/ZiEqrRRub2iQsklt9vMILW++vEQgrMRbwGaizmDNqrWLnPqBX3S5SLqVGFY
-        xgGdLU+gU46KESt+M7mhlxXoKPeL0O8eo2yLxUAddpA2BVcjIBjV/trNLe2ufi6r/5EfAMZQOywy
-        bbDg7LLi4ZrB9q3+61rfZW8YLJqfnGHmOJp2HgWWtBHdAwK7tw7rrOSyQqMN968ISp3Fyzxe5hjN
-        SgiOwV8AAAD//wMARXceoVQEAAA=
+        H4sIAAAAAAAAA4xTXW+bMBR951dY9zlUISVD4TGqKvWh07pGm9ZSIcdcwImxmW26RlH++4RJgKSZ
+        NB6QdY/Pued+eO8RAjyDmAArqWVVLfzly/J7cX9fNAsh2O/HFX9mt+8h/frw8W02g0nLUOsNMnti
+        3TBV1QItV7KDmUZqsVUNojCKZvMg+uKASmUoWlpRWz+8CfyKS+7PprO5Pw39IDzSS8UZGojJq0cI
+        IXv3b43KDD8gJtPJKVKhMbRAiPtLhIBWoo0ANYYbS6WFyQAyJS3K1rtshBgBVimRMirEkLj79qPz
+        0C0qRLr6oZ42z+Xy7u7XdiPkz+nTdrfSL5tRvk56VztDeSNZ36UR3sfji2SEgKSV4xZo0z9IbYn6
+        gk4IUF00FUrbWod9AkIx2gomECewUtudSmCSAENheGMSiK1u8ABnMgfv2vlt1CGNeWOo+Nw6KqWy
+        LqHr3dsROfRjEqqotVqbCyrkXHJTphqpcdWPh+CdjDgL0JzNGWqtqtqmVm3RJV3Mw04VhmUc0GBx
+        BK2yVIxY0e3kil6aoaXcLUK/e4yyErOBOuwgbTKuRoA3qv2zm2vaXf1cFv8jPwCMYW0xS2uNGWfn
+        FQ/XNLZv9V/X+i47w2BQv3OGqeWo23lkmNNGdA8IzM5YrNKcywJ1rbl7RZDXabRYR4s1hkEO3sH7
+        CwAA//8DAE7SfnlUBAAA
     headers:
       CF-RAY:
-      - 9429f772393aa92c-MAA
+      - 942a074d2c267f12-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -111,14 +111,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 07:02:07 GMT
+      - Tue, 20 May 2025 07:12:57 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=.f.cTE97x6RpLm_oKaMKtmlmqL7fHbEJDBOMj9dgtzU-1747724527-1.0.1.1-3E4UkssywyhwH9zWTLF3JekzQa3Xj3tUuRcp8izPmhvqroio4bm9Wdryzrj2W4u5soq9kOnGG1MIxOeGOfh1pbinYAKGHjokVKA.mbqIOiA;
-        path=/; expires=Tue, 20-May-25 07:32:07 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=g.psuhfC29nDeLVc3ccvLS.7UBsX133UiiuF.8nallY-1747725177-1.0.1.1-N6Idpy6ww238hYeNR..Wsp4axqQqb7YGnJh0cPb49o_9qbvao7nYnMUiqbwLGaXLBd.RgF5q5SoBK9BFAGtTY._RYrB0y3vYeEm2cM3hVpQ;
+        path=/; expires=Tue, 20-May-25 07:42:57 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=RUOPZvFotWXswCwy9bSllHlYmUKbnK9iQJRk6sgbtdA-1747724527987-0.0.1.1-604800000;
+      - _cfuvid=K3ABGSY4bexPIpskhXEeoV2_6qABLnZfI7vP37cMB3E-1747725177192-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -133,13 +133,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '671'
+      - '1003'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '678'
+      - '1007'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -153,7 +153,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_ff2de5ff77e961ae1d8f7a10c3add263
+      - req_17146c82281045cc0523c9b3d052ab43
     status:
       code: 200
       message: OK
@@ -208,7 +208,7 @@ interactions:
       previously did with the exact same parameters.\\n\\nNow Begin!\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"New
       task:\\nWhat is the weather in Tokyo?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Called
       Tool: 'get_weather' with arguments: {'location': 'Tokyo', 'celsius': True}\\nCalling
-      tools:\\n[{'id': 'call_VMoZiUHtlnLmjMybTab168zq', 'type': 'function', 'function':
+      tools:\\n[{'id': 'call_TVoQjShBDDYkjlnW0QkyTrZj', 'type': 'function', 'function':
       {'name': 'get_weather', 'arguments': {'location': 'Tokyo', 'celsius': True}}}]\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Observation:\\nThe
       weather in Tokyo is sunny with temperatures around 7\xB0C.\"}]}],\"model\":\"gpt-4.1-mini\",\"stop\":[\"Observation:\",\"Calling
       tools:\"],\"tool_choice\":\"required\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get
@@ -229,8 +229,8 @@ interactions:
       content-type:
       - application/json
       cookie:
-      - __cf_bm=.f.cTE97x6RpLm_oKaMKtmlmqL7fHbEJDBOMj9dgtzU-1747724527-1.0.1.1-3E4UkssywyhwH9zWTLF3JekzQa3Xj3tUuRcp8izPmhvqroio4bm9Wdryzrj2W4u5soq9kOnGG1MIxOeGOfh1pbinYAKGHjokVKA.mbqIOiA;
-        _cfuvid=RUOPZvFotWXswCwy9bSllHlYmUKbnK9iQJRk6sgbtdA-1747724527987-0.0.1.1-604800000
+      - __cf_bm=g.psuhfC29nDeLVc3ccvLS.7UBsX133UiiuF.8nallY-1747725177-1.0.1.1-N6Idpy6ww238hYeNR..Wsp4axqQqb7YGnJh0cPb49o_9qbvao7nYnMUiqbwLGaXLBd.RgF5q5SoBK9BFAGtTY._RYrB0y3vYeEm2cM3hVpQ;
+        _cfuvid=K3ABGSY4bexPIpskhXEeoV2_6qABLnZfI7vP37cMB3E-1747725177192-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -258,19 +258,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFPbjtowEH3PV1jzTBBB0ACPVNt21X3YbZG2F1aRcSaJu77JdpZSxD/1
-        G/plVRJIAkul5iGy5syZOXM83geEAE9hQYAV1DNpRLj8tvxwcyvvHlcPX1/MavYwvi+NoY8y/nj/
-        GQYVQ29+IPMn1pBpaQR6rlUDM4vUY1U1iidxPJ5Mx7MakDpFUdFy48PJMAolVzwcj8bTcDQJo8mR
-        XmjO0MGCfA8IIWRf/yuhKsWfsCCjwSki0TmaIyzaJELAalFFgDrHnafKw6ADmVYeVaVdlUL0AK+1
-        SBgVomvcfPveuXOLCpFIOdOz6F3m0tFy7m5vvvz6dDc177HXrym9M7WgrFSsdamHt/HFRTNCQFHZ
-        cLmiIqHKbdFe8AkBavNSovKVdtivoclbw2INqwLJFqkv0BKuyEo/7zThjrhSqR3Zcl8Qj9Kgpb60
-        6Ai1ulQpif/8fjtcwwHOWh2Ca+enno0Ws9JR8dpfqpT2tBqzNvjpiBzauxQ6N1Zv3AW1mpy7IrFI
-        XW1R/6aCk5BaApRnywDGaml84vUz1k2j0XTalIVuZTt4/OYIeu2p6NNm0eBKxSRFT3m9L+2KMsoK
-        TDtut6q0TLnuAUFv+tdyrtVuHOAq/5/yHcAYGo9pYiymnJ2P3KVZrJ70v9Jan2vB4NC+cIaJ52ir
-        G0kxo6Vo3hm4nfMok4yrHK2xvH5skJkknm/i+QYnUQbBIfgLAAD//wMAtWRrbXsEAAA=
+        H4sIAAAAAAAAAwAAAP//jFPbjpswEH3nK6x5TlYBkdDlMdX2ouZhVW2lqs0KGTOAE2NbttkkjfJP
+        /YZ+WQVsgGRTqTwga86cmTPH46NHCPAMYgKspI5VWkyXP5Zfy9X2u9vvFpvHVfg5XaZCiiKIvpkN
+        TBqGSjfI3Jl1x1SlBTquZAczg9RhU9WPwigK5n4UtUClMhQNrdBuGt7504pLPg1mwXw6C6d++Eov
+        FWdoISY/PUIIObb/RqjMcA8xmU3OkQqtpQVC3CcRAkaJJgLUWm4dlQ4mA8iUdCgb7bIWYgQ4pUTC
+        qBBD4+47js6DW1SIBBcval992i8/8kPw8GX1UKx+RY8filG/rvRBt4LyWrLepRHex+OrZoSApFXH
+        5ZKKhEq7Q3PFJwSoKeoKpWu0w3ENXd4a4jU8lUh2SF2JhnBJntT2oAi3xNZSHsiOu5I4rDQa6mqD
+        llCjapmR6M/v93drOMFFq5N36/w8stFgXlsq3vpLpVSONmO2Bj+/Iqf+LoUqtFGpvaI2k3NbJgap
+        bS0a35R3FtJKgPpiGUAbVWmXOLXFtqk/my+6sjCs7AAHZ9ApR8WY9i6Y3KiYZOgob/elX1FGWYnZ
+        wB1WldYZVyPAG03/Vs6t2p0DXBb/U34AGEPtMEu0wYyzy5GHNIPNk/5XWu9zKxgsmhfOMHEcTXMj
+        Gea0Ft07A3uwDqsk57JAow1vHxvkOonu0+g+xdDPwTt5fwEAAP//AwA+smIvewQAAA==
     headers:
       CF-RAY:
-      - 9429f77c8c0ba92c-MAA
+      - 942a07561fd57f12-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -278,7 +278,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 07:02:09 GMT
+      - Tue, 20 May 2025 07:12:58 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -294,13 +294,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '745'
+      - '757'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '751'
+      - '762'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -308,13 +308,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149999046'
+      - '149999047'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_35c6caa7f4368454c8b416641fe6cf2d
+      - req_69f528e9210e9fe190ad7e14a6f74f95
     status:
       code: 200
       message: OK

@@ -93,19 +93,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFPLjtswDLz7KwSe4yTOA258DFA0e2nRB9pim4UhS3Ssriy5Ep1sEOTf
-        CzsPO9ktUB8MgaMhh0PqEDAGSkLCQBScRFnpcPm4XMWc6s/br58+Fjvx48MkW4wLWq3w5QEGDcNm
-        v1HQhTUUtqw0krLmBAuHnLDJGsWzOJ7M5pOoBUorUTe0TUXhbBiFpTIqnIwn83A8C6PZmV5YJdBD
-        wn4FjDF2aP+NUCPxBRI2HlwiJXrPNwjJ9RJj4KxuIsC9V564IRh0oLCG0DTaTa11DyBrdSq41l3h
-        03fonTu3uNbp9wf5zq/Ez7kV8bfl++mXR/e8imLZq3dKva9aQXltxNWlHn6NJ3fFGAPDy5a7wyz1
-        yJ0o7tiMAXebukRDjXI4rOFPjW6/hmQNXhEmBVHlk9Foh3yLobTCD3fcyGzI1WgNgzXkShO6dI/c
-        rSFpfDnCTY1j8Nb5qeeew7z2XL+2lRtjiTfdtb4+nZHjdYTabipnM39HhVwZ5YvUIfetM/0BBRch
-        rQSob3YAKmfLilKyz9gWjcbj6JQWuk3t4Ol5nYAscd2nTS+0m4ypROKqXZPrZgouCpQdt9tQXktl
-        e0DQ6/61nLdynxxQZvM/6TtACKwIZVo5lErcttxdc9i85H9du/rcCgaPbqsEpqTQNRORmPNan54X
-        +L0nLNNcmQ26yqn2jUFepfEiixcZzqIcgmPwFwAA//8DAMIbRepyBAAA
+        H4sIAAAAAAAAA4xTXY/aMBB8z6+w9pkgQkHR5ZF+6KpS6VRatWo5RY69Sdw6ts924BDiv1cxHAkc
+        lZqHyPJ4Zsez631ECAgOGQFWU88aI+PFz8UX+lB/0Kv0uRHJ+9XOuM9L/mPB54mBUcfQxW9k/oU1
+        ZroxEr3Q6ggzi9Rjp5qkszSdzpN0EoBGc5QdrTI+no2TuBFKxNPJdB5PZnEyO9FrLRg6yMiviBBC
+        9uHfGVUcnyEjQSzsNOgcrRCy8yFCwGrZ7QB1TjhPlYdRDzKtPKrOu2qlHABea5kzKmVf+PjtB+s+
+        LSpljh+n9+2GPn1aFquvzdsHXnxb3ot33wf1jtI7EwyVrWLnlAb4eT+7KkYIKNoE7haL3CG1rL5i
+        EwLUVm2DynfOYb+Gpxbtbg3ZGpzwmG2RbjDmmrnxlipejKlYwwEuVA7RrfXjIB+LZeuofB0cVUp7
+        2vkPyT2ekMO5SVJXxurCXVGhFEq4OrdIXbj7sAXRi5FgAdqLLoOxujE+9/oPhqLJZJIcZaGfxR6e
+        vjmBXnsqh7TpbHRDMefoqQiDcJ49RlmNvOf2M0hbLvQAiAa3f23nlvYxAaGq/5HvAcbQeOS5scgF
+        u7xyf8xi91b/deycczAMDu1GMMy9QNt1hGNJW3l8QOB2zmOTl0JVaI0V4RVBafL0rkjvCpwlJUSH
+        6C8AAAD//wMApwNE+lQEAAA=
     headers:
       CF-RAY:
-      - 9429f7512c75a907-MAA
+      - 942a072a78027f8f-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -113,14 +113,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 07:02:02 GMT
+      - Tue, 20 May 2025 07:12:51 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
-        path=/; expires=Tue, 20-May-25 07:32:02 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=lZUY7b3GYVroRLf0V59tybrqWkx3ErTbGqcDoNa41oM-1747725171-1.0.1.1-6gN9r1LLDLC04Ii7BAYjOTr_sFWBtHyMkpA_mVrhpE3k8aDwnqNBqW8vPnzfOJUwi2qSdI2ZEG07R5ygiHqOF1XbhSBdTZT19LNKyQ79kGs;
+        path=/; expires=Tue, 20-May-25 07:42:51 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000;
+      - _cfuvid=XQqXSGebXR5XwE7QJWGnn3WBfAM1ZH7CTPHY8pTEre4-1747725171353-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -135,13 +135,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1211'
+      - '711'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '1216'
+      - '716'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -155,7 +155,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_8e635bd5dee227cf7a18040c0e1061b8
+      - req_122e68f9096213e1b31ffa056b9e97b4
     status:
       code: 200
       message: OK
@@ -209,14 +209,186 @@ interactions:
       did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
       task:\nUse the provided tool to answer this question. Get the following page
       - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/'',
-      ''filter_year'': None}\nCalling tools:\n[{''id'': ''call_VId8sHcX5oc7TBE3RZrkH17d'',
-      ''type'': ''function'', ''function'': {''name'': ''web_search'', ''arguments'':
-      {''query'': ''site:https://weave-docs.wandb.ai/'', ''filter_year'': None}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_VId8sHcX5oc7TBE3RZrkH17d\nError:\nError executing tool ''web_search''
-      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\", \"filter_year\":
-      null}: AttributeError: ''Request'' object has no attribute ''_replace''\nPlease
-      try again or use another tool\nNow let''s retry: take care not to repeat previous
+      Tool: ''web_search'' with arguments: {''query'': ''site:weave-docs.wandb.ai''}\nCalling
+      tools:\n[{''id'': ''call_eI2HuvaqKLbSTmCPdbULHiDW'', ''type'': ''function'',
+      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''site:weave-docs.wandb.ai''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_eI2HuvaqKLbSTmCPdbULHiDW\nError:\nError executing tool ''web_search''
+      with arguments {\"query\": \"site:weave-docs.wandb.ai\"}: AttributeError: ''Request''
+      object has no attribute ''_replace''\nPlease try again or use another tool\nNow
+      let''s retry: take care not to repeat previous errors! If you have retried several
+      times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
+      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
+      a google web search for your query then returns a string of the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
+      search query to perform."},"filter_year":{"type":"integer","description":"Optionally
+      restrict results to a certain year","nullable":true}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
+      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
+      final answer to the problem"}},"required":["answer"]}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '5456'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=lZUY7b3GYVroRLf0V59tybrqWkx3ErTbGqcDoNa41oM-1747725171-1.0.1.1-6gN9r1LLDLC04Ii7BAYjOTr_sFWBtHyMkpA_mVrhpE3k8aDwnqNBqW8vPnzfOJUwi2qSdI2ZEG07R5ygiHqOF1XbhSBdTZT19LNKyQ79kGs;
+        _cfuvid=XQqXSGebXR5XwE7QJWGnn3WBfAM1ZH7CTPHY8pTEre4-1747725171353-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.78.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.78.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFPvb5swEP3OX2Hd51CFLC0N31Zp0lRpXdVt3a9UyNgHeDW2Z5ukWZT/
+        fQISIGkmjQ/Iuud39+7deRsQAoJDQoCV1LPKyPDmx81DdvX86e3myv55d/um+vileLx/mX67s+Y7
+        TBqGzn4h8wfWBdOVkeiFVh3MLFKPTdYonsfx7DKKoxaoNEfZ0Arjw/lFFFZCiXA2nV2G03kYzff0
+        UguGDhLyMyCEkG37b4Qqji+QkOnkEKnQOVogJP0lQsBq2USAOiecp8rDZACZVh5Vo13VUo4Ar7VM
+        GZVyKNx929F5cItKmT58zWv/PvJ39+UHs9B6xR7LWx59HtXrUm9MKyivFetdGuF9PDkpRggoWrXc
+        NWapQ2pZecImBKgt6gqVb5TDdgm/a7SbJSRLWCNdYcg1c2RNFc+WsIMj9i44d34a+WIxrx2Vrw2j
+        SmlPG92tY097ZNcPR+rCWJ25EyrkQglXphapa3seWx8chLQSoD6aLhirK+NTr5+xLRpF19ddWhh2
+        cAQv9qDXnspRfDaNJ2cyphw9Fe0C9DvHKCuRD9xh92jNhR4Bwaj713LO5e4cEKr4n/QDwBgajzw1
+        Frlgxy0P1yw2b/Rf13qfW8Hg0K4Ew9QLtM1EOOa0lt3DAbdxHqs0F6pAa6xoXw/kJo0XWbzIcB7l
+        EOyCvwAAAP//AwA9zizgTAQAAA==
+    headers:
+      CF-RAY:
+      - 942a073269957f8f-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 20 May 2025 07:12:52 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '721'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '727'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998939'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_d49f9210f1299a5cc05f3bcc38a1c2de
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using tool calls. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to some
+      tools.\n\nThe tool call you write is an action: after the tool is executed,
+      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
+      can repeat N times, you should take several steps when needed.\n\nYou can use
+      the result of the previous action as input for the next action.\nThe observation
+      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
+      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
+      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
+      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
+      use an action blob with \"name\": \"final_answer\" tool. It is the only way
+      to complete the task, else you will be stuck on a loop. So your final output
+      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
+      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
+      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
+      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
+      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
+      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
+      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
+      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
+      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
+      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
+      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
+      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
+      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
+      for you. You only have access to these tools:\n- web_search: Performs a google
+      web search for your query then returns a string of the top search results.\n    Takes
+      inputs: {''query'': {''type'': ''string'', ''description'': ''The search query
+      to perform.''}, ''filter_year'': {''type'': ''integer'', ''description'': ''Optionally
+      restrict results to a certain year'', ''nullable'': True}}\n    Returns an output
+      of type: string\n- final_answer: Provides a final answer to the given problem.\n    Takes
+      inputs: {''answer'': {''type'': ''any'', ''description'': ''The final answer
+      to the problem''}}\n    Returns an output of type: any\n\nHere are the rules
+      you should always follow to solve your task:\n1. ALWAYS provide a tool call,
+      else you will fail.\n2. Always use the right arguments for the tools. Never
+      use variable names as the action arguments, use the value instead.\n3. Call
+      a tool only when needed: do not call the search agent if you do not need information,
+      try to solve the task yourself.\nIf no tool call is needed, use final_answer
+      tool to return your answer.\n4. Never re-do a tool call that you previously
+      did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nUse the provided tool to answer this question. Get the following page
+      - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
+      Tool: ''web_search'' with arguments: {''query'': ''site:weave-docs.wandb.ai''}\nCalling
+      tools:\n[{''id'': ''call_eI2HuvaqKLbSTmCPdbULHiDW'', ''type'': ''function'',
+      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''site:weave-docs.wandb.ai''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_eI2HuvaqKLbSTmCPdbULHiDW\nError:\nError executing tool ''web_search''
+      with arguments {\"query\": \"site:weave-docs.wandb.ai\"}: AttributeError: ''Request''
+      object has no attribute ''_replace''\nPlease try again or use another tool\nNow
+      let''s retry: take care not to repeat previous errors! If you have retried several
+      times, try a completely different approach.\n"}]},{"role":"assistant","content":[{"type":"text","text":"Called
+      Tool: ''web_search'' with arguments: {''query'': ''weave-docs wandb''}\nCalling
+      tools:\n[{''id'': ''call_RWfutH1tNPhMp9oovcVhJd1T'', ''type'': ''function'',
+      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''weave-docs
+      wandb''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call id: call_RWfutH1tNPhMp9oovcVhJd1T\nError:\nError
+      executing tool ''web_search'' with arguments {\"query\": \"weave-docs wandb\"}:
+      AttributeError: ''Request'' object has no attribute ''_replace''\nPlease try
+      again or use another tool\nNow let''s retry: take care not to repeat previous
       errors! If you have retried several times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
       tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
       a google web search for your query then returns a string of the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
@@ -232,12 +404,12 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '5548'
+      - '6162'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
-        _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000
+      - __cf_bm=lZUY7b3GYVroRLf0V59tybrqWkx3ErTbGqcDoNa41oM-1747725171-1.0.1.1-6gN9r1LLDLC04Ii7BAYjOTr_sFWBtHyMkpA_mVrhpE3k8aDwnqNBqW8vPnzfOJUwi2qSdI2ZEG07R5ygiHqOF1XbhSBdTZT19LNKyQ79kGs;
+        _cfuvid=XQqXSGebXR5XwE7QJWGnn3WBfAM1ZH7CTPHY8pTEre4-1747725171353-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -265,19 +437,22 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNdb5swFH3nV1j3OSSBkkXhbdGqZe0qVdqeslTImAu4M7Znm2ZVlP9e
-        AQmQtJPGA7Lu8Tn33A8fPEKAZxATYCV1rNLCX2/Xm9Vind8491hs9vcrrB8i93O/re9/3MGkYaj0
-        GZk7s6ZMVVqg40p2MDNIHTaqwTJaLsNoEd60QKUyFA2t0M6PpoFfccn9cB4u/HnkB9GJXirO0EJM
-        fnmEEHJo/41RmeFfiMl8co5UaC0tEOL+EiFglGgiQK3l1lHpYDKATEmHsvEuayFGgFNKJIwKMSTu
-        vsPoPHSLCpHw6JtNeXr3Zb+R/Hb7+fE7XX99uH0e5eukX3VrKK8l67s0wvt4fJWMEJC0arl7TBOL
-        1LDyik0IUFPUFUrXOIfDDv7UaF53EO+gdE7beDbbI31BP1PMTvdUZumU8tkOjnChdPQ+Oj+NemQw
-        ry0V75tHpVSONjW03Xs6Icd+UEIV2qjUXlEh55LbMjFIbVv/eAze2UhrAeqLSYM2qtIuceo3tkmD
-        MPjUycKwjwMcRifQKUfFmBad1ulSMcnQUd4uQ79/jLISs4E77CGtM65GgDeq/r2dj7S7DnBZ/I/8
-        ADCG2mGWaIMZZ5clD9cMNu/1X9f6PreGwaJ54QwTx9E0E8kwp7XoHhHYV+uwSnIuCzTa8PYlQa6T
-        5SpdrlKMghy8o/cGAAD//wMAa5ChJ1gEAAA=
+        H4sIAAAAAAAAAwAAAP//dFRNT9wwEL3vrxj5wmV3IbAosLdSCXURh7ZqRdWCook92Zj6I7InhC3i
+        v1dOYDd85RBZfvPevBmP/TABEFqJJQhZI0vbmNnZ77PvqvMXp6vbTSttzPjLj7z7dqlCdSnFNDF8
+        eUuSn1lz6W1jiLV3AywDIVNSzfJFnh8eZ/lRD1ivyCTauuHZYp7NrHZ6dnhweDw7WMyyxRO99lpS
+        FEv4MwEAeOj/yahTdC+WcDB93rEUI65JLLdBACJ4k3YExqgjo2Mx3YHSOyaXvLvWmBHA3ptCojG7
+        xMP3MFrvuoXGFPL8+OSidPHnurvKzr25WuG/z78Wn0b5BulN0xuqWie3XRrh2/3lq2QAwqEduNqh
+        KdDFjsIrPoDAsG4tOU7excO1GOKuxfJarAAttA5LQ8AeUEqKEbgm6KiMmgn2auYmLvf3O8I7mikv
+        47xDp8o56v09UDqQZLMBH6ChUPlgExUiYZA1RUAGrnUE1pZAtX2apC/bEMgxGG01Yyowgq96KDU7
+        zuGrIYwETfB3WhFYHwj6A7rnlC02JHW16RnapcS9Cmx8Cx06hip4C1wjQ4NrmgI6BSvotDGgPNgN
+        lBS5r7ofhYGouX6juIIa72h+LR7Fi9Y+Tt5b34zGJlDVRjRv5wmd809Vp4G6eUIet7Nr/LoJvoyv
+        qOmkdayLQBj7kRhP5uTZSG9BtC+GXzTB24YL9n+pT5od5dkgK3ZXdAfnJ08ge0Yzoi0Wp9N3FAtF
+        jLq/H9srKVHWpEbc7PhwWwm2SvsddjAZNeCto/fkhyZotx6pfCi/A6SkhkkVTSCl5cuqd2GB0iv2
+        Udi21b1hESncaUkFawrpUBRV2JrhaRFxE5lsUWm3ptAE3b8vomqK/LTMT0taZJWYPE7+AwAA//8D
+        ACqspFVuBQAA
     headers:
       CF-RAY:
-      - 9429f75c2801a907-MAA
+      - 942a073a3bb87f8f-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -285,7 +460,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 07:02:04 GMT
+      - Tue, 20 May 2025 07:12:55 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -301,13 +476,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1141'
+      - '1736'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '1145'
+      - '2407'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -315,189 +490,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998917'
+      - '149998792'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_a2fbf91ce1a1d19abae9344a40e84584
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
-      an expert assistant who can solve any task using tool calls. You will be given
-      a task to solve as best you can.\nTo do so, you have been given access to some
-      tools.\n\nThe tool call you write is an action: after the tool is executed,
-      you will get the result of the tool call as an \"observation\".\nThis Action/Observation
-      can repeat N times, you should take several steps when needed.\n\nYou can use
-      the result of the previous action as input for the next action.\nThe observation
-      will always be a string: it can represent a file, like \"image_1.jpg\".\nThen
-      you can use it as input for the next action. You can do it for instance as follows:\n\nObservation:
-      \"image_1.jpg\"\n\nAction:\n{\n  \"name\": \"image_transformer\",\n  \"arguments\":
-      {\"image\": \"image_1.jpg\"}\n}\n\nTo provide the final answer to the task,
-      use an action blob with \"name\": \"final_answer\" tool. It is the only way
-      to complete the task, else you will be stuck on a loop. So your final output
-      should look like this:\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      {\"answer\": \"insert your final answer here\"}\n}\n\n\nHere are a few examples
-      using notional tools:\n---\nTask: \"Generate an image of the oldest person in
-      this document.\"\n\nAction:\n{\n  \"name\": \"document_qa\",\n  \"arguments\":
-      {\"document\": \"document.pdf\", \"question\": \"Who is the oldest person mentioned?\"}\n}\nObservation:
-      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
-      in Newfoundland.\"\n\nAction:\n{\n  \"name\": \"image_generator\",\n  \"arguments\":
-      {\"prompt\": \"A portrait of John Doe, a 55-year-old man living in Canada.\"}\n}\nObservation:
-      \"image.png\"\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      \"image.png\"\n}\n\n---\nTask: \"What is the result of the following operation:
-      5 + 3 + 1294.678?\"\n\nAction:\n{\n    \"name\": \"python_interpreter\",\n    \"arguments\":
-      {\"code\": \"5 + 3 + 1294.678\"}\n}\nObservation: 1302.678\n\nAction:\n{\n  \"name\":
-      \"final_answer\",\n  \"arguments\": \"1302.678\"\n}\n\n---\nTask: \"Which city
-      has the highest population , Guangzhou or Shanghai?\"\n\nAction:\n{\n    \"name\":
-      \"search\",\n    \"arguments\": \"Population Guangzhou\"\n}\nObservation: [''Guangzhou
-      has a population of 15 million inhabitants as of 2021.'']\n\n\nAction:\n{\n    \"name\":
-      \"search\",\n    \"arguments\": \"Population Shanghai\"\n}\nObservation: ''26
-      million (2019)''\n\nAction:\n{\n  \"name\": \"final_answer\",\n  \"arguments\":
-      \"Shanghai\"\n}\n\nAbove example were using notional tools that might not exist
-      for you. You only have access to these tools:\n- web_search: Performs a google
-      web search for your query then returns a string of the top search results.\n    Takes
-      inputs: {''query'': {''type'': ''string'', ''description'': ''The search query
-      to perform.''}, ''filter_year'': {''type'': ''integer'', ''description'': ''Optionally
-      restrict results to a certain year'', ''nullable'': True}}\n    Returns an output
-      of type: string\n- final_answer: Provides a final answer to the given problem.\n    Takes
-      inputs: {''answer'': {''type'': ''any'', ''description'': ''The final answer
-      to the problem''}}\n    Returns an output of type: any\n\nHere are the rules
-      you should always follow to solve your task:\n1. ALWAYS provide a tool call,
-      else you will fail.\n2. Always use the right arguments for the tools. Never
-      use variable names as the action arguments, use the value instead.\n3. Call
-      a tool only when needed: do not call the search agent if you do not need information,
-      try to solve the task yourself.\nIf no tool call is needed, use final_answer
-      tool to return your answer.\n4. Never re-do a tool call that you previously
-      did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
-      task:\nUse the provided tool to answer this question. Get the following page
-      - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/'',
-      ''filter_year'': None}\nCalling tools:\n[{''id'': ''call_VId8sHcX5oc7TBE3RZrkH17d'',
-      ''type'': ''function'', ''function'': {''name'': ''web_search'', ''arguments'':
-      {''query'': ''site:https://weave-docs.wandb.ai/'', ''filter_year'': None}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_VId8sHcX5oc7TBE3RZrkH17d\nError:\nError executing tool ''web_search''
-      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\", \"filter_year\":
-      null}: AttributeError: ''Request'' object has no attribute ''_replace''\nPlease
-      try again or use another tool\nNow let''s retry: take care not to repeat previous
-      errors! If you have retried several times, try a completely different approach.\n"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''https://weave-docs.wandb.ai/''}\nCalling
-      tools:\n[{''id'': ''call_i4IsbibJDwHniEZAPLaBGMEj'', ''type'': ''function'',
-      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''https://weave-docs.wandb.ai/''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_i4IsbibJDwHniEZAPLaBGMEj\nError:\nError executing tool ''web_search''
-      with arguments {\"query\": \"https://weave-docs.wandb.ai/\"}: AttributeError:
-      ''Request'' object has no attribute ''_replace''\nPlease try again or use another
-      tool\nNow let''s retry: take care not to repeat previous errors! If you have
-      retried several times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
-      tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
-      a google web search for your query then returns a string of the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
-      search query to perform."},"filter_year":{"type":"integer","description":"Optionally
-      restrict results to a certain year","nullable":true}},"required":["query"]}}},{"type":"function","function":{"name":"final_answer","description":"Provides
-      a final answer to the given problem.","parameters":{"type":"object","properties":{"answer":{"type":"string","description":"The
-      final answer to the problem"}},"required":["answer"]}}}]}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '6290'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
-        _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.78.1
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.78.1
-      x-stainless-read-timeout:
-      - '600'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.11.11
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        H4sIAAAAAAAAAwAAAP//dFRNa+MwEL3nVwy69JKkSepsNrm1sLCFUpZdCqVNMWNpbKuVJSHJSUPI
-        f19kp7H75YOR9ObNPD2NtB8AMCnYChgvMfDKqtHVw9Xvy3v9Yuyv6ubZXMz/vVxOq7/KL43P2DAy
-        TPZMPLyxxtxUVlGQRrcwd4SBYtbpIlksZsl8ljRAZQSpSCtsGCXj6aiSWo5mk9l8NElG0+RIL43k
-        5NkKHgcAAPvmH4VqQa9sBZPh20pF3mNBbHUKAmDOqLjC0HvpA+rAhh3IjQ6ko3ZdK9UDgjEq5ahU
-        V7j99r1x5xYqlVby+vanrx/ubZ3fJe4if725vLq9S3r12tQ72wjKa81PLvXw0/rqQzEAprFquVKj
-        SlH7LbkPfACGrqgr0iFqZ/s1a+PWbLVm14AV1BozRRAMCOmIB7WDnAIvwThAzsl7CCXB0RwPJm/m
-        FguCszIE61fn51vCDY2E4X68RS2yMcrzMxB1kzfaB+SccR6sow3pIHUBW8rAEzpeko/F2vLgKDhJ
-        G1Rj+KMIPYF1ZiMF9WXEeG+Jy3wH2xIDSJ0bV2G0CnamBk0kIHemghDhqHYIqAVcw1YqBW0DxA0a
-        J6Qu1G68Zgf2zrzD4KvxU68xHOW1R/W5Y1BrExo1Tcs8HZHDqTuVKawzmf9AjWcpfZk6Qt8cer/3
-        Bm9CGgmsftfezDpT2ZAG80JN0WkySdq0rLuEHfxjeQSDCaj6tMXF8IuMqaCAsrkBp0vHkZcketzp
-        fHbaCdZCmg6bDHoGfFb0VfrWBKmLXpZv03cA52QDidQ6EpK/33UX5ii+U9+FnaxuBDNPbiM5pUGS
-        i4ciKMdatY8H8zsfqEpzqQty1snmBWG5TRfLbLHMKJnmbHAY/AcAAP//AwCQi/tnUAUAAA==
-    headers:
-      CF-RAY:
-      - 9429f7665c12a907-MAA
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Tue, 20 May 2025 07:02:06 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '1320'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-envoy-upstream-service-time:
-      - '1324'
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998760'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_35bed7576ccd25dd42f244a960ccf1d2
+      - req_67d61c24714a1830dad239334e58d037
     status:
       code: 200
       message: OK
