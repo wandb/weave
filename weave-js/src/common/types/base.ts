@@ -101,4 +101,6 @@ export interface MatchParams {
   artifactCollectionView?: string;
   artifactTab?: string;
   registryName?: string;
+  collectionId?: string;
+  modelId?: string;
 }
