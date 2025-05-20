@@ -1,7 +1,7 @@
 import datetime
 import io
+import logging
 import re
-import sys
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -104,18 +104,27 @@ def get_info_loglines(
 
 @contextmanager
 def capture_output(callbacks: list[Callable[[], None]]):
-    captured_stdout = io.StringIO()
-    old_stdout = sys.stdout
-    sys.stdout = captured_stdout
+    captured_logs = io.StringIO()
+
+    # Store original stdout and logging handlers
+    old_handlers = logging.getLogger().handlers[:]
+
+    # Create a new handler for capturing logs
+    log_handler = logging.StreamHandler(captured_logs)
+    log_handler.setFormatter(logging.Formatter("%(message)s"))
+
+    # Replace stdout and logging handlers
+    root_logger = logging.getLogger()
+    root_logger.handlers = [log_handler]
 
     try:
-        yield captured_stdout
+        yield captured_logs
     except DummyTestException:
         pass
     finally:
         for callback in callbacks:
             callback()
-        sys.stdout = old_stdout
+        root_logger.handlers = old_handlers
 
 
 def flushing_callback(client):

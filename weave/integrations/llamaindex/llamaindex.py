@@ -30,9 +30,6 @@ except ImportError:
     _import_failed = True
 except Exception:
     _import_failed = True
-    print(
-        "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
-    )
 
 # Module-level shared state
 _weave_calls_map: Dict[Union[str, Tuple[Optional[str], str]], Call] = {}

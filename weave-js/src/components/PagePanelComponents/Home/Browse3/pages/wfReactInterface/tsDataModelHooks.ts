@@ -1347,8 +1347,14 @@ const useObjectDeleteFunc = () => {
 
 const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
   const getTsClient = useGetTraceServerClientContext();
-  const [refsRes, setRefsRes] =
-    useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
+  // Here we keep track of the result and the uris we fetched for. This is
+  // because repeated calls to this hook with different uris will return
+  // could result in stale results if we just returned the result from the
+  // hook.
+  const [refsRes, setRefsRes] = useState<{
+    res: traceServerTypes.TraceRefsReadBatchRes;
+    forUris: string[];
+  } | null>(null);
   const loadingRef = useRef(false);
 
   const deepRefUris = useDeepMemo(params.refUris);
@@ -1365,7 +1371,7 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
       })
       .then((res: traceServerTypes.TraceRefsReadBatchRes) => {
         loadingRef.current = false;
-        setRefsRes(res);
+        setRefsRes({res, forUris: deepRefUris});
       })
       .catch((err: Error) => {
         loadingRef.current = false;
@@ -1378,11 +1384,15 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
     if (params.skip || params.refUris.length === 0) {
       return {loading: false, result: null};
     }
-    if (refsRes == null || loadingRef.current) {
+    if (
+      refsRes == null ||
+      loadingRef.current ||
+      refsRes.forUris !== deepRefUris
+    ) {
       return {loading: true, result: null};
     }
-    return {loading: false, result: refsRes.vals};
-  }, [refsRes, params.skip, params.refUris]);
+    return {loading: false, result: refsRes.res.vals};
+  }, [params.skip, params.refUris.length, refsRes, deepRefUris]);
 };
 
 const useTableQuery = makeTraceServerEndpointHook<
