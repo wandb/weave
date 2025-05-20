@@ -141,10 +141,13 @@ def test_empty_batch_is_noop(server):
     assert server._send_batch_to_server.call_count == 0
 
 
-@pytest.mark.disable_logging_error_check  # Add this decorator to disable logging error check
+@pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_oversized_item_will_error_without_sending(server):
-    """Test that a single item that's too large raises an error."""
+def test_oversized_item_will_log_error_without_sending(server, caplog):
+    """Test that a single item that's too large logs an error but doesn't raise an exception."""
+    # Set logging level to capture error logs
+    caplog.set_level(logging.ERROR)
+
     # Create a single item with a very large payload
     start = generate_start()
     start.attributes = {
@@ -157,13 +160,12 @@ def test_oversized_item_will_error_without_sending(server):
     encoded_data = data.encode("utf-8")
     assert len(encoded_data) > server.remote_request_bytes_limit
 
-    # Process the batch and expect an error
-    with pytest.raises(ValueError) as excinfo:
-        server._flush_calls(batch)
+    # Process the batch - should NOT raise an exception now
+    server._flush_calls(batch)
 
-    # Verify the error message
-    assert "Single call size" in str(excinfo.value)
-    assert "is too large to send" in str(excinfo.value)
+    # Verify error was logged
+    assert any("Single call size" in record.message for record in caplog.records)
+    assert any("is too large to send" in record.message for record in caplog.records)
 
     # Verify _send_batch_to_server was not called
     assert server._send_batch_to_server.call_count == 0

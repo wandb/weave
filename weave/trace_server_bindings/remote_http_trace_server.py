@@ -169,7 +169,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 f"The maximum size is {self.remote_request_bytes_limit} bytes."
             )
             logger.error(error_message)
-            raise ValueError(error_message)
+            # If we get down to here we have recursed to size 1
+            # We don't want to error the whole process, just drop the call that is too large
+            return
 
         try:
             self._send_batch_to_server(encoded_data)
