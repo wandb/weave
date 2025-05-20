@@ -709,9 +709,10 @@ def _get_incremental_table_awl_from_file(
             fs_art_file = _filesystem_artifact_file_from_artifact_path(path)
             files[fs_art_file.path] = fs_art_file
 
-    files[file.path] = file
+        _ensure_increments_sync(files)
 
-    asyncio.run(ensure_files(files))
+    files[file.path] = file # the latest increment is already downloaded
+
     rrows: list[list] = []
     object_types: list[types.Type] = []
     for incremental_file in files.values():
@@ -861,6 +862,20 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
                 task = loop.create_task(conn.ensure_file(uri))
                 tasks.add(task)
         await asyncio.wait(tasks)
+
+
+def _ensure_increments_sync(files: dict[str, artifact_fs.FilesystemArtifactFile]):
+    client = io_service.get_sync_client()
+
+    uris_to_download = []
+    for file in files.values():
+        if (isinstance(file.artifact, artifact_wandb.WandbArtifact) 
+            and file.artifact._read_artifact_uri):
+            uri = file.artifact._read_artifact_uri.with_path(file.path)
+            uris_to_download.append(uri)
+    
+    client.ensure_incremental_files(uris_to_download)
+
 
 
 def _get_joined_table_awl_from_file(
